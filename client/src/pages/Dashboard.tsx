@@ -107,7 +107,7 @@ export default function Dashboard() {
             Discover leagues in your area and join the action
           </p>
           <button
-            onClick={() => navigate('/find-league')}
+            onClick={() => navigate('/league-search')}
             className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 font-medium"
             data-testid="button-find-league"
           >
