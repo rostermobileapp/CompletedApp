@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Dashboard() {
@@ -95,6 +95,26 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+      
+      {/* Find a League Section */}
+      <div className="px-6 mb-6">
+        <div className="bg-card rounded-xl border border-border p-6 text-center">
+          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+            <Search className="w-8 h-8 text-primary-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Looking for a League?</h3>
+          <p className="text-muted-foreground mb-4">
+            Discover leagues in your area and join the action
+          </p>
+          <button
+            onClick={() => navigate('/find-league')}
+            className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 font-medium"
+            data-testid="button-find-league"
+          >
+            Find a League
+          </button>
+        </div>
+      </div>
       
       {/* Upcoming Games */}
       <div className="px-6 mb-6">

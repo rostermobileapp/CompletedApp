@@ -45,6 +45,7 @@ export default function LeagueSearch() {
       if (!response.ok) throw new Error('Failed to fetch leagues');
       return response.json();
     },
+    enabled: search.trim().length > 0, // Only fetch when there's a search term
   });
 
   const joinLeagueMutation = useMutation({
@@ -128,7 +129,17 @@ export default function LeagueSearch() {
       
       {/* League List */}
       <div className="flex-1 px-6">
-        {isLoading ? (
+        {search.trim().length === 0 ? (
+          // No search performed yet - show initial message
+          <div className="text-center py-12" data-testid="initial-search-message">
+            <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Search for Leagues</h3>
+            <p className="text-muted-foreground">
+              Enter a league name, location, or ID to find leagues in your area
+            </p>
+          </div>
+        ) : isLoading ? (
+          // Searching - show loading state
           <div className="space-y-4" data-testid="loading-leagues">
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-card rounded-xl border border-border p-4 animate-pulse">
@@ -137,6 +148,7 @@ export default function LeagueSearch() {
             ))}
           </div>
         ) : leagues && leagues.length > 0 ? (
+          // Search results found - show leagues
           <div className="space-y-4">
             {leagues.map((league: any) => (
               <div key={league.id} className="bg-card rounded-xl border border-border p-4" data-testid={`card-league-${league.id}`}>
@@ -183,6 +195,7 @@ export default function LeagueSearch() {
             ))}
           </div>
         ) : (
+          // Search performed but no results found
           <div className="text-center py-12" data-testid="empty-leagues">
             <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No leagues found</p>
