@@ -217,7 +217,7 @@ export default function Dashboard() {
               game.homeBeverageDutyUserId === (user as any)?.id || 
               game.awayBeverageDutyUserId === (user as any)?.id
             ) && (
-              <div className="bg-red-500 text-white rounded-lg p-3 mb-3" data-testid="alert-beverage-duty">
+              <div className="bg-red-500/50 text-white rounded-lg p-3 mb-3" data-testid="alert-beverage-duty">
                 <div className="flex items-center gap-2">
                   <Coffee className="w-4 h-4" />
                   <span className="font-medium">Beverage Duty Alert!</span>
@@ -276,7 +276,7 @@ export default function Dashboard() {
                       if (userStatus === 'checked_in') {
                         return (
                           <div className="text-center">
-                            <span className="tier-badge bg-green-500 text-white text-xs px-2 py-1 rounded-full" data-testid={`status-confirmed-${game.id}`}>
+                            <span className="tier-badge bg-green-500/50 text-white text-xs px-2 py-1 rounded-full" data-testid={`status-confirmed-${game.id}`}>
                               ✓ Confirmed
                             </span>
                           </div>
@@ -284,7 +284,7 @@ export default function Dashboard() {
                       } else if (userStatus === 'checked_out') {
                         return (
                           <div className="text-center">
-                            <span className="tier-badge bg-red-500 text-white text-xs px-2 py-1 rounded-full" data-testid={`status-declined-${game.id}`}>
+                            <span className="tier-badge bg-red-500/50 text-white text-xs px-2 py-1 rounded-full" data-testid={`status-declined-${game.id}`}>
                               ✗ Declined
                             </span>
                           </div>
@@ -296,7 +296,7 @@ export default function Dashboard() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 px-2 text-xs bg-green-500 text-white hover:bg-green-600 border-green-500"
+                              className="h-7 px-2 text-xs bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50"
                               onClick={() => {
                                 const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
                                 if (userTeam && primaryTeam) {
@@ -312,7 +312,7 @@ export default function Dashboard() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 px-2 text-xs bg-red-500 text-white hover:bg-red-600 border-red-500"
+                              className="h-7 px-2 text-xs bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
                               onClick={() => checkOutMutation.mutate(game.id)}
                               disabled={checkOutMutation.isPending}
                               data-testid={`button-check-out-${game.id}`}

@@ -98,7 +98,7 @@ export default function LeagueList() {
                         </>
                       )}
                       <span>•</span>
-                      <span className={league.isActive ? 'text-green-600' : 'text-yellow-600'}>
+                      <span className={league.isActive ? 'text-green-600/50' : 'text-yellow-600/50'}>
                         {league.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </div>

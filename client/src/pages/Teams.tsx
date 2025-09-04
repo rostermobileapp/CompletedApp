@@ -190,7 +190,7 @@ export default function Teams() {
                     return (
                       <div
                         key={`attendance-alert-${game.gameId}`}
-                        className="bg-red-500 text-white rounded-lg p-3"
+                        className="bg-red-500/50 text-white rounded-lg p-3"
                         data-testid={`alert-attendance-${game.gameId}`}
                       >
                         <div className="flex items-center gap-2">
@@ -280,15 +280,15 @@ export default function Teams() {
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">{team.wins}</div>
+                        <div className="text-2xl font-bold text-green-600/50">{team.wins}</div>
                         <div className="text-sm text-muted-foreground">Wins</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">{team.losses}</div>
+                        <div className="text-2xl font-bold text-red-600/50">{team.losses}</div>
                         <div className="text-sm text-muted-foreground">Losses</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-yellow-600">{team.ties}</div>
+                        <div className="text-2xl font-bold text-yellow-600/50">{team.ties}</div>
                         <div className="text-sm text-muted-foreground">Ties</div>
                       </div>
                       <div className="text-center">

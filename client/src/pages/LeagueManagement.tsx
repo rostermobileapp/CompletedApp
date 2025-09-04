@@ -691,7 +691,7 @@ export default function LeagueManagement() {
                         <button
                           onClick={() => approveMutation.mutate(member.id)}
                           disabled={approveMutation.isPending}
-                          className="flex items-center gap-1 px-3 py-1 bg-green-500 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                          className="flex items-center gap-1 px-3 py-1 bg-green-500/50 text-white rounded-md text-sm font-medium disabled:opacity-50"
                           data-testid={`button-approve-${member.user.id}`}
                         >
                           <Check className="w-3 h-3" />
@@ -700,7 +700,7 @@ export default function LeagueManagement() {
                         <button
                           onClick={() => rejectMutation.mutate(member.id)}
                           disabled={rejectMutation.isPending}
-                          className="flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                          className="flex items-center gap-1 px-3 py-1 bg-red-500/50 text-white rounded-md text-sm font-medium disabled:opacity-50"
                           data-testid={`button-reject-${member.user.id}`}
                         >
                           <X className="w-3 h-3" />
@@ -716,7 +716,7 @@ export default function LeagueManagement() {
             {/* Approved Members */}
             <div className="bg-card rounded-xl border border-border p-6">
               <div className="flex items-center gap-2 mb-4">
-                <UserCheck className="w-5 h-5 text-green-500" />
+                <UserCheck className="w-5 h-5 text-green-500/50" />
                 <h3 className="text-lg font-semibold">League Members ({members.length})</h3>
               </div>
               {members.length === 0 ? (
@@ -913,7 +913,7 @@ export default function LeagueManagement() {
                                     e.stopPropagation();
                                     toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${team.name}` });
                                   }}
-                                  className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium flex items-center gap-2"
+                                  className="px-3 py-2 bg-blue-500/50 text-white rounded-lg hover:bg-blue-600/50 text-sm font-medium flex items-center gap-2"
                                   data-testid={`button-message-team-${team.id}`}
                                 >
                                   <Users className="w-4 h-4" />
@@ -1160,7 +1160,7 @@ export default function LeagueManagement() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                          <span className="text-xs bg-blue-100/50 text-blue-800/50 px-2 py-1 rounded-full">
                             {game.status || 'SCHEDULED'}
                           </span>
                         </div>
@@ -1282,7 +1282,7 @@ export default function LeagueManagement() {
                       // TODO: Implement messaging functionality
                       toast({ title: 'Messaging feature coming soon!' });
                     }}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+                    className="px-4 py-2 bg-blue-500/50 text-white rounded-lg hover:bg-blue-600/50 text-sm font-medium"
                   >
                     Message Player
                   </button>
@@ -1319,7 +1319,7 @@ export default function LeagueManagement() {
                         });
                       }
                     }}
-                    className="w-full px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm font-medium"
+                    className="w-full px-4 py-2 bg-yellow-500/50 text-white rounded-lg hover:bg-yellow-600/50 text-sm font-medium"
                   >
                     Remove from Team
                   </button>
@@ -1329,7 +1329,7 @@ export default function LeagueManagement() {
                         removeFromLeagueMutation.mutate(selectedPlayer.id);
                       }
                     }}
-                    className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
+                    className="w-full px-4 py-2 bg-red-500/50 text-white rounded-lg hover:bg-red-600/50 text-sm font-medium"
                   >
                     Remove from League
                   </button>
@@ -1383,7 +1383,7 @@ export default function LeagueManagement() {
                     data-testid="input-league-name"
                   />
                   {editLeagueForm.formState.errors.name && (
-                    <p className="text-red-500 text-sm mt-1">
+                    <p className="text-red-500/50 text-sm mt-1">
                       {editLeagueForm.formState.errors.name.message}
                     </p>
                   )}
@@ -1440,7 +1440,7 @@ export default function LeagueManagement() {
 
                 {/* Commissioner Transfer */}
                 <div className="border-t pt-4">
-                  <h3 className="font-medium mb-3 text-orange-600">⚠️ Transfer Commissioner</h3>
+                  <h3 className="font-medium mb-3 text-orange-600/50">⚠️ Transfer Commissioner</h3>
                   <p className="text-sm text-muted-foreground mb-3">
                     Transfer ownership of this league to another user. You will lose all commissioner privileges for this league.
                   </p>
@@ -1464,7 +1464,7 @@ export default function LeagueManagement() {
                           toast({ title: 'Commissioner transfer functionality coming soon!' });
                         }
                       }}
-                      className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium"
+                      className="px-4 py-2 bg-orange-500/50 text-white rounded-lg hover:bg-orange-600/50 text-sm font-medium"
                       data-testid="button-transfer-commissioner"
                     >
                       Transfer
@@ -1482,7 +1482,7 @@ export default function LeagueManagement() {
                       }
                     }}
                     disabled={deleteLeagueMutation.isPending}
-                    className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium disabled:opacity-50"
+                    className="w-full px-4 py-2 bg-red-500/50 text-white rounded-lg hover:bg-red-600/50 text-sm font-medium disabled:opacity-50"
                     data-testid="button-delete-league"
                   >
                     {deleteLeagueMutation.isPending ? 'Deleting...' : 'Delete League'}
@@ -1547,7 +1547,7 @@ export default function LeagueManagement() {
                     data-testid="input-season-name"
                   />
                   {seasonForm.formState.errors.name && (
-                    <p className="text-red-500 text-sm mt-1">
+                    <p className="text-red-500/50 text-sm mt-1">
                       {seasonForm.formState.errors.name.message}
                     </p>
                   )}
