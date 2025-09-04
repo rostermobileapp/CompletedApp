@@ -313,7 +313,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserTeams(userId: string): Promise<Team[]> {
-    const result = await db
+    // Get teams from direct team memberships
+    const teamMembershipResult = await db
       .select({ team: teams })
       .from(teams)
       .innerJoin(teamMemberships, eq(teams.id, teamMemberships.teamId))
@@ -323,7 +324,31 @@ export class DatabaseStorage implements IStorage {
           eq(teamMemberships.status, "approved")
         )
       );
-    return result.map(r => r.team);
+
+    // Get teams from league memberships with assigned teams
+    const leagueMembershipResult = await db
+      .select({ team: teams })
+      .from(teams)
+      .innerJoin(leagueMemberships, eq(teams.id, leagueMemberships.assignedTeamId))
+      .where(
+        and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.status, "approved")
+        )
+      );
+
+    // Combine and deduplicate teams
+    const allTeams = [
+      ...teamMembershipResult.map(r => r.team),
+      ...leagueMembershipResult.map(r => r.team)
+    ];
+
+    // Remove duplicates by team ID
+    const uniqueTeams = allTeams.filter((team, index, arr) => 
+      arr.findIndex(t => t.id === team.id) === index
+    );
+
+    return uniqueTeams;
   }
 
   async updateTeamLogo(id: string, logoUrl: string): Promise<Team> {

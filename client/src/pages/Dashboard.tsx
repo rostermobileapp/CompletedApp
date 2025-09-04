@@ -140,8 +140,8 @@ export default function Dashboard() {
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
                     {(() => {
-                      const opponentTeam = game.homeTeam.id === primaryTeam?.id ? game.awayTeam : game.homeTeam;
-                      return opponentTeam.logoUrl ? (
+                      const opponentTeam = game.homeTeam?.id === primaryTeam?.id ? game.awayTeam : game.homeTeam;
+                      return opponentTeam?.logoUrl ? (
                         <img 
                           src={opponentTeam.logoUrl} 
                           alt={`${opponentTeam.name} logo`}
@@ -155,7 +155,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
-                      vs {game.homeTeam.id === primaryTeam?.id ? game.awayTeam.name : game.homeTeam.name}
+                      vs {game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}
                     </h3>
                     <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
                       {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
