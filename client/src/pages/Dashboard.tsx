@@ -144,14 +144,14 @@ export default function Dashboard() {
       
       {/* Find a League Section - Compact */}
       <div className="px-6 mb-6">
-        <div className="bg-card rounded-lg border border-border px-4 py-3 flex items-center justify-between">
+        <div className="bg-card rounded-lg border border-border px-2 py-1.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Search className="w-5 h-5 text-primary" />
             <span className="font-medium">Looking for a League?</span>
           </div>
           <button
             onClick={() => navigate('/league-search')}
-            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium text-sm"
+            className="bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
             data-testid="button-find-league"
           >
             Find a League
@@ -227,7 +227,13 @@ export default function Dashboard() {
                 </p>
               </div>
             )}
-            {upcomingGames.slice(0, 2).map((game: any) => (
+            {upcomingGames
+              .filter((game: any) => {
+                // Ensure we only show games for teams the user is currently on
+                const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+                return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
+              })
+              .slice(0, 2).map((game: any) => (
               <div key={game.id} className="bg-card rounded-xl border border-border p-4" data-testid={`card-game-${game.id}`}>
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
