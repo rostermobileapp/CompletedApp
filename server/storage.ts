@@ -472,6 +472,76 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteLeagueMembership(membershipId: string): Promise<void> {
+    // First, get the membership to find the user ID and team ID
+    const [membership] = await db
+      .select()
+      .from(leagueMemberships)
+      .where(eq(leagueMemberships.id, membershipId));
+    
+    if (!membership) {
+      throw new Error('Membership not found');
+    }
+    
+    // Clean up attendance records for this user's games in this league
+    if (membership.assignedTeamId) {
+      // Get all games for this team in this league
+      const teamGames = await db
+        .select({ id: games.id })
+        .from(games)
+        .where(
+          and(
+            eq(games.leagueId, membership.leagueId),
+            or(
+              eq(games.homeTeamId, membership.assignedTeamId),
+              eq(games.awayTeamId, membership.assignedTeamId)
+            ),
+            gte(games.scheduledAt, new Date()) // Only future games
+          )
+        );
+      
+      const gameIds = teamGames.map(g => g.id);
+      
+      if (gameIds.length > 0) {
+        // Remove attendance records for these games
+        await db
+          .delete(gameAttendance)
+          .where(
+            and(
+              eq(gameAttendance.userId, membership.userId),
+              inArray(gameAttendance.gameId, gameIds)
+            )
+          );
+        
+        // Remove beverage duty assignments for this user in these games
+        await db
+          .update(games)
+          .set({
+            homeBeverageDutyUserId: null,
+            homeBeverageDutyClaimedAt: null
+          })
+          .where(
+            and(
+              inArray(games.id, gameIds),
+              eq(games.homeBeverageDutyUserId, membership.userId)
+            )
+          );
+        
+        await db
+          .update(games)
+          .set({
+            awayBeverageDutyUserId: null,
+            awayBeverageDutyClaimedAt: null
+          })
+          .where(
+            and(
+              inArray(games.id, gameIds),
+              eq(games.awayBeverageDutyUserId, membership.userId)
+            )
+          );
+      }
+    }
+    
+    // Finally, delete the membership
     await db
       .delete(leagueMemberships)
       .where(eq(leagueMemberships.id, membershipId));
