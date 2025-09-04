@@ -78,6 +78,7 @@ export interface IStorage {
   getUpcomingGames(userId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
   getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
   getGamesByLeague(leagueId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
+  claimBeverageDuty(gameId: string, userId: string): Promise<Game>;
   
   // Message operations
   sendMessage(message: InsertMessage): Promise<Message>;
@@ -525,6 +526,23 @@ export class DatabaseStorage implements IStorage {
     }
     
     return gamesWithTeams;
+  }
+
+  async claimBeverageDuty(gameId: string, userId: string): Promise<Game> {
+    const [updatedGame] = await db
+      .update(games)
+      .set({ 
+        beverageDutyUserId: userId,
+        beverageDutyClaimedAt: new Date()
+      })
+      .where(eq(games.id, gameId))
+      .returning();
+    
+    if (!updatedGame) {
+      throw new Error(`Game with id ${gameId} not found`);
+    }
+    
+    return updatedGame;
   }
 
   async getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {

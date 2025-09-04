@@ -611,6 +611,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Beverage duty routes
+  app.post('/api/games/:gameId/beverage-duty', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const userId = req.user.claims.sub;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      const updatedGame = await storage.claimBeverageDuty(gameId, userId);
+      res.json(updatedGame);
+    } catch (error) {
+      console.error('Error claiming beverage duty:', error);
+      res.status(500).json({ message: 'Failed to claim beverage duty' });
+    }
+  });
+
   // Message routes (Player Plus feature)
   app.get("/api/teams/:id/messages", isAuthenticated, async (req: any, res) => {
     try {

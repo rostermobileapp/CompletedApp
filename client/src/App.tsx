@@ -10,7 +10,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import LeagueSearch from "@/pages/LeagueSearch";
-import Calendar from "@/pages/Calendar";
+import Teams from "@/pages/Teams";
 import Messages from "@/pages/Messages";
 import More from "@/pages/More";
 import Profile from "@/pages/Profile";
@@ -48,7 +48,7 @@ function Router() {
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/league-search" component={LeagueSearch} />
-          <Route path="/calendar" component={Calendar} />
+          <Route path="/teams" component={Teams} />
           <Route path="/messages" component={Messages} />
           <Route path="/more" component={More} />
           <Route path="/profile" component={Profile} />

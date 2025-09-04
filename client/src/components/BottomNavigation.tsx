@@ -1,10 +1,10 @@
-import { Home, Calendar, MessageCircle, MoreHorizontal, User } from 'lucide-react';
+import { Home, Users, MessageCircle, MoreHorizontal, User } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { id: 'home', icon: Home, label: 'Home', path: '/' },
-  { id: 'calendar', icon: Calendar, label: 'Calendar', path: '/calendar' },
+  { id: 'teams', icon: Users, label: 'Teams', path: '/teams' },
   { id: 'messages', icon: MessageCircle, label: 'Messages', path: '/messages' },
   { id: 'more', icon: MoreHorizontal, label: 'More', path: '/more' },
   { id: 'profile', icon: User, label: 'Profile', path: '/profile' },
@@ -15,7 +15,7 @@ export function BottomNavigation() {
 
   const getActiveId = (pathname: string) => {
     if (pathname === '/') return 'home';
-    if (pathname.startsWith('/calendar')) return 'calendar';
+    if (pathname.startsWith('/teams')) return 'teams';
     if (pathname.startsWith('/messages')) return 'messages';
     if (pathname.startsWith('/more') || pathname.startsWith('/roster')) return 'more';
     if (pathname.startsWith('/profile') || pathname.startsWith('/subscription')) return 'profile';

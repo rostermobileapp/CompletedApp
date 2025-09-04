@@ -163,6 +163,8 @@ export const games = pgTable("games", {
   homeScore: integer("home_score"),
   awayScore: integer("away_score"),
   isCompleted: boolean("is_completed").default(false).notNull(),
+  beverageDutyUserId: varchar("beverage_duty_user_id").references(() => users.id),
+  beverageDutyClaimedAt: timestamp("beverage_duty_claimed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
