@@ -232,6 +232,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const leagueId = req.params.leagueId;
       
+      console.log("Creating season - Request body:", req.body);
+      console.log("Creating season - League ID:", leagueId);
+      
       if (!user || user.subscriptionTier !== 'commissioner') {
         return res.status(403).json({ message: "Commissioner access required" });
       }
@@ -242,11 +245,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You can only manage your own leagues" });
       }
       
-      const seasonData = { ...req.body, leagueId };
+      // Validate required fields
+      if (!req.body.name || req.body.name.trim() === '') {
+        return res.status(400).json({ message: "Season name is required" });
+      }
+      
+      // Prepare season data
+      const seasonData = {
+        name: req.body.name,
+        leagueId: leagueId,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : null,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : null,
+        isActive: req.body.isActive === true || req.body.isActive === 'true'
+      };
+      
+      console.log("Creating season - Final data:", seasonData);
+      
       const season = await storage.createSeason(seasonData);
+      console.log("Created season successfully:", season);
       res.json(season);
     } catch (error) {
       console.error("Error creating season:", error);
+      console.error("Error stack:", error instanceof Error ? error.stack : error);
       res.status(500).json({ message: "Failed to create season" });
     }
   });
