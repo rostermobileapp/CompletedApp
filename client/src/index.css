@@ -1,0 +1,233 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 6%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --popover: hsl(240, 10%, 6%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --primary: hsl(217, 91%, 60%);
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(240, 4%, 16%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 5%, 20%);
+  --muted-foreground: hsl(240, 5%, 64%);
+  --accent: hsl(142, 76%, 36%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62%, 50%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 4%, 20%);
+  --input: hsl(240, 4%, 16%);
+  --ring: hsl(217, 91%, 60%);
+  --success: hsl(142, 76%, 36%);
+  --warning: hsl(43, 96%, 56%);
+  --chart-1: hsl(217, 91%, 60%);
+  --chart-2: hsl(142, 76%, 36%);
+  --chart-3: hsl(43, 96%, 56%);
+  --chart-4: hsl(147, 78%, 42%);
+  --chart-5: hsl(341, 75%, 51%);
+  --sidebar: hsl(240, 10%, 6%);
+  --sidebar-foreground: hsl(0, 0%, 98%);
+  --sidebar-primary: hsl(217, 91%, 60%);
+  --sidebar-primary-foreground: hsl(0, 0%, 98%);
+  --sidebar-accent: hsl(142, 76%, 36%);
+  --sidebar-accent-foreground: hsl(0, 0%, 98%);
+  --sidebar-border: hsl(240, 4%, 20%);
+  --sidebar-ring: hsl(217, 91%, 60%);
+  --font-sans: "Inter", sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --radius: 0.75rem;
+  --shadow-2xs: 0px 1px 2px 0px hsl(240, 10%, 3.9%, 0.05);
+  --shadow-xs: 0px 1px 2px 0px hsl(240, 10%, 3.9%, 0.1);
+  --shadow-sm: 0px 1px 3px 0px hsl(240, 10%, 3.9%, 0.1), 0px 1px 2px 0px hsl(240, 10%, 3.9%, 0.06);
+  --shadow: 0px 1px 3px 0px hsl(240, 10%, 3.9%, 0.1), 0px 1px 2px 0px hsl(240, 10%, 3.9%, 0.06);
+  --shadow-md: 0px 4px 6px -1px hsl(240, 10%, 3.9%, 0.1), 0px 2px 4px -1px hsl(240, 10%, 3.9%, 0.06);
+  --shadow-lg: 0px 10px 15px -3px hsl(240, 10%, 3.9%, 0.1), 0px 4px 6px -2px hsl(240, 10%, 3.9%, 0.05);
+  --shadow-xl: 0px 20px 25px -5px hsl(240, 10%, 3.9%, 0.1), 0px 10px 10px -5px hsl(240, 10%, 3.9%, 0.04);
+  --shadow-2xl: 0px 25px 50px -12px hsl(240, 10%, 3.9%, 0.25);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 6%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --popover: hsl(240, 10%, 6%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --primary: hsl(217, 91%, 60%);
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(240, 4%, 16%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 5%, 20%);
+  --muted-foreground: hsl(240, 5%, 64%);
+  --accent: hsl(142, 76%, 36%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62%, 50%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 4%, 20%);
+  --input: hsl(240, 4%, 16%);
+  --ring: hsl(217, 91%, 60%);
+  --success: hsl(142, 76%, 36%);
+  --warning: hsl(43, 96%, 56%);
+  --chart-1: hsl(217, 91%, 60%);
+  --chart-2: hsl(142, 76%, 36%);
+  --chart-3: hsl(43, 96%, 56%);
+  --chart-4: hsl(147, 78%, 42%);
+  --chart-5: hsl(341, 75%, 51%);
+  --sidebar: hsl(240, 10%, 6%);
+  --sidebar-foreground: hsl(0, 0%, 98%);
+  --sidebar-primary: hsl(217, 91%, 60%);
+  --sidebar-primary-foreground: hsl(0, 0%, 98%);
+  --sidebar-accent: hsl(142, 76%, 36%);
+  --sidebar-accent-foreground: hsl(0, 0%, 98%);
+  --sidebar-border: hsl(240, 4%, 20%);
+  --sidebar-ring: hsl(217, 91%, 60%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply dark;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom gradient backgrounds */
+  .gradient-bg {
+    background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--card)) 100%);
+  }
+
+  /* Data visualization bars */
+  .data-bar {
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  /* Tier badges */
+  .tier-badge {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  /* Feature locked state */
+  .feature-locked {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* Custom scrollbars */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground));
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary));
+  }
+
+  /* Input and form styling */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  select,
+  textarea {
+    @apply bg-input border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors;
+  }
+
+  /* Button base styles */
+  button {
+    @apply transition-colors duration-200 ease-in-out;
+  }
+
+  /* Mobile optimizations */
+  @media (max-width: 640px) {
+    body {
+      font-size: 14px;
+    }
+    
+    .tier-badge {
+      font-size: 0.625rem;
+      padding: 0.125rem 0.375rem;
+    }
+  }
+
+  /* Focus improvements for accessibility */
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply ring-2 ring-ring ring-offset-2 ring-offset-background outline-none;
+  }
+
+  /* Calendar day improvements */
+  .calendar-day {
+    @apply aspect-square flex items-center justify-center text-sm relative transition-colors cursor-pointer;
+  }
+
+  .calendar-day:hover {
+    @apply bg-muted rounded-lg;
+  }
+
+  .calendar-day.today {
+    @apply bg-primary text-primary-foreground rounded-lg;
+  }
+
+  .calendar-day.other-month {
+    @apply text-muted-foreground;
+  }
+
+  /* Animation improvements */
+  .animate-in {
+    animation: animate-in 0.2s ease-out;
+  }
+
+  @keyframes animate-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Loading skeleton improvements */
+  .skeleton {
+    @apply animate-pulse bg-muted rounded;
+  }
+
+  /* Progress bars */
+  .progress-bar {
+    @apply h-2 bg-muted rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-300 ease-out;
+  }
+}
