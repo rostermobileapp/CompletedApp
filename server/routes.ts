@@ -60,7 +60,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Commissioner tier required to create leagues" });
       }
       
-      const leagueData = insertLeagueSchema.parse(req.body);
+      const leagueData = insertLeagueSchema.parse({
+        ...req.body,
+        commissionerId: userId
+      });
       
       // Generate unique league ID if not provided
       if (!leagueData.uniqueLeagueId) {

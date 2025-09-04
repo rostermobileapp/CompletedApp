@@ -33,8 +33,6 @@ export default function CreateLeague() {
   const queryClient = useQueryClient();
   const { hasAccess, tier } = useSubscription();
   
-  console.log('CreateLeague - Current tier:', tier, 'Has commissioner access:', hasAccess('commissioner'));
-  
   const form = useForm<CreateLeagueForm>({
     resolver: zodResolver(createLeagueSchema),
     defaultValues: {
@@ -72,9 +70,6 @@ export default function CreateLeague() {
   });
 
   const onSubmit = (data: CreateLeagueForm) => {
-    console.log('Form submitted with data:', data);
-    console.log('Form errors:', form.formState.errors);
-    console.log('Form is valid:', form.formState.isValid);
     createLeagueMutation.mutate(data);
   };
 
@@ -287,11 +282,6 @@ export default function CreateLeague() {
             disabled={createLeagueMutation.isPending}
             className="w-full bg-warning text-black rounded-lg py-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="button-create-league"
-            onClick={() => {
-              console.log('Button clicked!');
-              console.log('Form errors:', form.formState.errors);
-              console.log('Form values:', form.getValues());
-            }}
           >
             {createLeagueMutation.isPending ? 'Creating League...' : 'Create League'}
           </button>
