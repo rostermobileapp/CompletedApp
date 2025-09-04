@@ -346,6 +346,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/user/league-memberships", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const memberships = await storage.getUserLeagueMemberships(userId);
+      res.json(memberships);
+    } catch (error) {
+      console.error("Error fetching user league memberships:", error);
+      res.status(500).json({ message: "Failed to fetch league memberships" });
+    }
+  });
+
   // Get leagues where user is commissioner
   app.get("/api/user/commissioner-leagues", isAuthenticated, async (req: any, res) => {
     try {

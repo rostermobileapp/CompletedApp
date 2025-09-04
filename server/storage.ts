@@ -223,6 +223,20 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => r.league);
   }
 
+  async getUserLeagueMemberships(userId: string): Promise<LeagueMembership[]> {
+    const memberships = await db
+      .select()
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.status, "approved")
+        )
+      );
+    
+    return memberships;
+  }
+
   async getLeaguesByCommissioner(commissionerId: string): Promise<League[]> {
     const result = await db
       .select()

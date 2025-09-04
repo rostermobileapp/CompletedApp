@@ -19,7 +19,12 @@ export default function Dashboard() {
     queryKey: ['/api/user/teams'],
   });
 
+  const { data: userLeagueMemberships } = useQuery({
+    queryKey: ['/api/user/league-memberships'],
+  });
+
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
+  const primaryLeagueMembership = Array.isArray(userLeagueMemberships) && userLeagueMemberships.length > 0 ? userLeagueMemberships[0] : null;
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="dashboard-page">
@@ -37,6 +42,20 @@ export default function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-3">
+            {/* Jersey Number */}
+            {primaryLeagueMembership?.jerseyNumber && (
+              <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded font-semibold">
+                #{primaryLeagueMembership.jerseyNumber}
+              </div>
+            )}
+            
+            {/* Captain Badge */}
+            {primaryLeagueMembership?.isCaptain && (
+              <span className="w-6 h-6 bg-warning text-black font-bold text-sm flex items-center justify-center rounded">
+                C
+              </span>
+            )}
+            
             <span 
               className={`tier-badge text-xs px-2 py-1 rounded-full font-semibold ${
                 tier === 'commissioner' 
@@ -49,14 +68,23 @@ export default function Dashboard() {
             >
               {tier === 'commissioner' ? 'COMMISSIONER' : tier === 'player_plus' ? 'PLAYER PLUS' : 'FREE'}
             </span>
+            
             <button 
               onClick={() => navigate('/profile')}
-              className="w-8 h-8 bg-primary rounded-full flex items-center justify-center"
+              className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden bg-primary"
               data-testid="button-profile"
             >
-              <span className="text-primary-foreground text-sm font-semibold">
-                {user?.firstName?.[0] || 'U'}
-              </span>
+              {user?.profileImageUrl ? (
+                <img 
+                  src={user.profileImageUrl} 
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-primary-foreground text-sm font-semibold">
+                  {user?.firstName?.[0] || 'U'}
+                </span>
+              )}
             </button>
           </div>
         </div>
