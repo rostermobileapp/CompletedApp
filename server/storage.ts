@@ -453,84 +453,184 @@ export class DatabaseStorage implements IStorage {
     
     if (teamIds.length === 0) return [];
 
-    const homeTeams = db.select().from(teams).as('homeTeams');
-    const awayTeams = db.select().from(teams).as('awayTeams');
+    // Use raw SQL for complex joins with same table twice
+    const result = await db.execute(sql`
+      SELECT 
+        g.*,
+        ht.id as home_team_id, ht.name as home_team_name, ht.logo_url as home_team_logo_url, 
+        ht.league_id as home_team_league_id, ht.season_id as home_team_season_id,
+        ht.captain_id as home_team_captain_id, ht.wins as home_team_wins, ht.losses as home_team_losses,
+        ht.ties as home_team_ties, ht.created_at as home_team_created_at, ht.updated_at as home_team_updated_at,
+        at.id as away_team_id, at.name as away_team_name, at.logo_url as away_team_logo_url,
+        at.league_id as away_team_league_id, at.season_id as away_team_season_id,
+        at.captain_id as away_team_captain_id, at.wins as away_team_wins, at.losses as away_team_losses,
+        at.ties as away_team_ties, at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
+      FROM games g
+      INNER JOIN teams ht ON g.home_team_id = ht.id
+      INNER JOIN teams at ON g.away_team_id = at.id
+      WHERE (g.home_team_id = ANY(${teamIds}) OR g.away_team_id = ANY(${teamIds}))
+        AND g.scheduled_at >= NOW()
+      ORDER BY g.scheduled_at ASC
+    `);
 
-    const result = await db
-      .select({
-        games: games,
-        homeTeam: homeTeams,
-        awayTeam: awayTeams
-      })
-      .from(games)
-      .innerJoin(homeTeams, eq(games.homeTeamId, homeTeams.id))
-      .innerJoin(awayTeams, eq(games.awayTeamId, awayTeams.id))
-      .where(
-        and(
-          or(
-            ...teamIds.map(id => eq(games.homeTeamId, id)),
-            ...teamIds.map(id => eq(games.awayTeamId, id))
-          ),
-          sql`${games.scheduledAt} >= NOW()`
-        )
-      )
-      .orderBy(games.scheduledAt);
-
-    return result.map(r => ({
-      ...r.games,
-      homeTeam: r.homeTeam,
-      awayTeam: r.awayTeam,
+    return result.rows.map((row: any) => ({
+      id: row.id,
+      leagueId: row.league_id,
+      seasonId: row.season_id,
+      homeTeamId: row.home_team_id,
+      awayTeamId: row.away_team_id,
+      scheduledAt: row.scheduled_at,
+      venue: row.venue,
+      homeScore: row.home_score,
+      awayScore: row.away_score,
+      isCompleted: row.is_completed,
+      createdAt: row.created_at,
+      homeTeam: {
+        id: row.home_team_id,
+        name: row.home_team_name,
+        logoUrl: row.home_team_logo_url,
+        leagueId: row.home_team_league_id,
+        seasonId: row.home_team_season_id,
+        captainId: row.home_team_captain_id,
+        wins: row.home_team_wins,
+        losses: row.home_team_losses,
+        ties: row.home_team_ties,
+        createdAt: row.home_team_created_at,
+        updatedAt: row.home_team_updated_at,
+      },
+      awayTeam: {
+        id: row.away_team_id,
+        name: row.away_team_name,
+        logoUrl: row.away_team_logo_url,
+        leagueId: row.away_team_league_id,
+        seasonId: row.away_team_season_id,
+        captainId: row.away_team_captain_id,
+        wins: row.away_team_wins,
+        losses: row.away_team_losses,
+        ties: row.away_team_ties,
+        createdAt: row.away_team_created_at,
+        updatedAt: row.away_team_updated_at,
+      },
     }));
   }
 
   async getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
-    const homeTeams = db.select().from(teams).as('homeTeams');
-    const awayTeams = db.select().from(teams).as('awayTeams');
+    const result = await db.execute(sql`
+      SELECT 
+        g.*,
+        ht.id as home_team_id, ht.name as home_team_name, ht.logo_url as home_team_logo_url,
+        ht.league_id as home_team_league_id, ht.season_id as home_team_season_id,
+        ht.captain_id as home_team_captain_id, ht.wins as home_team_wins, ht.losses as home_team_losses,
+        ht.ties as home_team_ties, ht.created_at as home_team_created_at, ht.updated_at as home_team_updated_at,
+        at.id as away_team_id, at.name as away_team_name, at.logo_url as away_team_logo_url,
+        at.league_id as away_team_league_id, at.season_id as away_team_season_id,
+        at.captain_id as away_team_captain_id, at.wins as away_team_wins, at.losses as away_team_losses,
+        at.ties as away_team_ties, at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
+      FROM games g
+      INNER JOIN teams ht ON g.home_team_id = ht.id
+      INNER JOIN teams at ON g.away_team_id = at.id
+      WHERE g.home_team_id = ${teamId} OR g.away_team_id = ${teamId}
+      ORDER BY g.scheduled_at DESC
+    `);
 
-    const result = await db
-      .select({
-        games: games,
-        homeTeam: homeTeams,
-        awayTeam: awayTeams
-      })
-      .from(games)
-      .innerJoin(homeTeams, eq(games.homeTeamId, homeTeams.id))
-      .innerJoin(awayTeams, eq(games.awayTeamId, awayTeams.id))
-      .where(
-        or(
-          eq(games.homeTeamId, teamId),
-          eq(games.awayTeamId, teamId)
-        )
-      )
-      .orderBy(desc(games.scheduledAt));
-
-    return result.map(r => ({
-      ...r.games,
-      homeTeam: r.homeTeam,
-      awayTeam: r.awayTeam,
+    return result.rows.map((row: any) => ({
+      id: row.id,
+      leagueId: row.league_id,
+      seasonId: row.season_id,
+      homeTeamId: row.home_team_id,
+      awayTeamId: row.away_team_id,
+      scheduledAt: row.scheduled_at,
+      venue: row.venue,
+      homeScore: row.home_score,
+      awayScore: row.away_score,
+      isCompleted: row.is_completed,
+      createdAt: row.created_at,
+      homeTeam: {
+        id: row.home_team_id,
+        name: row.home_team_name,
+        logoUrl: row.home_team_logo_url,
+        leagueId: row.home_team_league_id,
+        seasonId: row.home_team_season_id,
+        captainId: row.home_team_captain_id,
+        wins: row.home_team_wins,
+        losses: row.home_team_losses,
+        ties: row.home_team_ties,
+        createdAt: row.home_team_created_at,
+        updatedAt: row.home_team_updated_at,
+      },
+      awayTeam: {
+        id: row.away_team_id,
+        name: row.away_team_name,
+        logoUrl: row.away_team_logo_url,
+        leagueId: row.away_team_league_id,
+        seasonId: row.away_team_season_id,
+        captainId: row.away_team_captain_id,
+        wins: row.away_team_wins,
+        losses: row.away_team_losses,
+        ties: row.away_team_ties,
+        createdAt: row.away_team_created_at,
+        updatedAt: row.away_team_updated_at,
+      },
     }));
   }
 
   async getGamesByLeague(leagueId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
-    const homeTeams = db.select().from(teams).as('homeTeams');
-    const awayTeams = db.select().from(teams).as('awayTeams');
+    const result = await db.execute(sql`
+      SELECT 
+        g.*,
+        ht.id as home_team_id, ht.name as home_team_name, ht.logo_url as home_team_logo_url,
+        ht.league_id as home_team_league_id, ht.season_id as home_team_season_id,
+        ht.captain_id as home_team_captain_id, ht.wins as home_team_wins, ht.losses as home_team_losses,
+        ht.ties as home_team_ties, ht.created_at as home_team_created_at, ht.updated_at as home_team_updated_at,
+        at.id as away_team_id, at.name as away_team_name, at.logo_url as away_team_logo_url,
+        at.league_id as away_team_league_id, at.season_id as away_team_season_id,
+        at.captain_id as away_team_captain_id, at.wins as away_team_wins, at.losses as away_team_losses,
+        at.ties as away_team_ties, at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
+      FROM games g
+      INNER JOIN teams ht ON g.home_team_id = ht.id
+      INNER JOIN teams at ON g.away_team_id = at.id
+      WHERE g.league_id = ${leagueId}
+      ORDER BY g.scheduled_at DESC
+    `);
 
-    const result = await db
-      .select({
-        games: games,
-        homeTeam: homeTeams,
-        awayTeam: awayTeams
-      })
-      .from(games)
-      .innerJoin(homeTeams, eq(games.homeTeamId, homeTeams.id))
-      .innerJoin(awayTeams, eq(games.awayTeamId, awayTeams.id))
-      .where(eq(games.leagueId, leagueId))
-      .orderBy(desc(games.scheduledAt));
-
-    return result.map(r => ({
-      ...r.games,
-      homeTeam: r.homeTeam,
-      awayTeam: r.awayTeam,
+    return result.rows.map((row: any) => ({
+      id: row.id,
+      leagueId: row.league_id,
+      seasonId: row.season_id,
+      homeTeamId: row.home_team_id,
+      awayTeamId: row.away_team_id,
+      scheduledAt: row.scheduled_at,
+      venue: row.venue,
+      homeScore: row.home_score,
+      awayScore: row.away_score,
+      isCompleted: row.is_completed,
+      createdAt: row.created_at,
+      homeTeam: {
+        id: row.home_team_id,
+        name: row.home_team_name,
+        logoUrl: row.home_team_logo_url,
+        leagueId: row.home_team_league_id,
+        seasonId: row.home_team_season_id,
+        captainId: row.home_team_captain_id,
+        wins: row.home_team_wins,
+        losses: row.home_team_losses,
+        ties: row.home_team_ties,
+        createdAt: row.home_team_created_at,
+        updatedAt: row.home_team_updated_at,
+      },
+      awayTeam: {
+        id: row.away_team_id,
+        name: row.away_team_name,
+        logoUrl: row.away_team_logo_url,
+        leagueId: row.away_team_league_id,
+        seasonId: row.away_team_season_id,
+        captainId: row.away_team_captain_id,
+        wins: row.away_team_wins,
+        losses: row.away_team_losses,
+        ties: row.away_team_ties,
+        createdAt: row.away_team_created_at,
+        updatedAt: row.away_team_updated_at,
+      },
     }));
   }
 

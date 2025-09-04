@@ -956,7 +956,18 @@ export default function LeagueManagement() {
                       {teamMembers.map((member: LeagueMember) => (
                         <div 
                           key={member.id} 
-                          className="flex items-center justify-between p-3 bg-background rounded-lg border"
+                          className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => {
+                            setSelectedPlayer(member);
+                            setPlayerEditForm({
+                              assignedTeamId: member.assignedTeamId || '',
+                              isCaptain: member.userId === selectedTeam.captainId,
+                              position: member.position || '',
+                              skillRating: member.skillRating || 1,
+                              jerseyNumber: member.jerseyNumber?.toString() || '',
+                              notes: member.notes || ''
+                            });
+                          }}
                           data-testid={`team-player-${member.user.id}`}
                         >
                           <div className="flex-1">

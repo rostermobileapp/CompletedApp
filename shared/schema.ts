@@ -388,6 +388,8 @@ export const insertTeamMembershipSchema = createInsertSchema(teamMemberships).om
 export const insertGameSchema = createInsertSchema(games).omit({
   id: true,
   createdAt: true,
+}).extend({
+  scheduledAt: z.string().transform((val) => new Date(val)),
 });
 
 export const insertMessageSchema = createInsertSchema(messages).omit({
