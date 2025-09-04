@@ -38,7 +38,7 @@ export default function Teams() {
   // Team logo upload mutation
   const updateTeamLogoMutation = useMutation({
     mutationFn: async (data: { teamId: string; logoUrl: string }) => {
-      return apiRequest(`/api/teams/${data.teamId}/logo`, 'PATCH', { logoUrl: data.logoUrl });
+      return apiRequest('PATCH', `/api/teams/${data.teamId}/logo`, { logoUrl: data.logoUrl });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
@@ -59,7 +59,7 @@ export default function Teams() {
   // Beverage duty claim mutation
   const claimBeverageDutyMutation = useMutation({
     mutationFn: async (gameId: string) => {
-      return apiRequest(`/api/games/${gameId}/beverage-duty`, 'POST', {});
+      return apiRequest('POST', `/api/games/${gameId}/beverage-duty`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
@@ -78,7 +78,7 @@ export default function Teams() {
   });
 
   const handleGetTeamLogoUploadParameters = async () => {
-    const response = await apiRequest('/api/team-logos/upload', 'POST');
+    const response = await apiRequest('POST', '/api/team-logos/upload');
     return {
       method: 'PUT' as const,
       url: (response as any).uploadURL,
