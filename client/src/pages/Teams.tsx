@@ -58,8 +58,8 @@ export default function Teams() {
 
   // Beverage duty claim mutation
   const claimBeverageDutyMutation = useMutation({
-    mutationFn: async (gameId: string) => {
-      return apiRequest('POST', `/api/games/${gameId}/beverage-duty`, {});
+    mutationFn: async (data: { gameId: string; teamId: string }) => {
+      return apiRequest('POST', `/api/games/${data.gameId}/beverage-duty`, { teamId: data.teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
@@ -93,7 +93,9 @@ export default function Teams() {
   };
 
   const handleClaimBeverageDuty = (gameId: string) => {
-    claimBeverageDutyMutation.mutate(gameId);
+    if (currentTeam) {
+      claimBeverageDutyMutation.mutate({ gameId, teamId: currentTeam.id });
+    }
   };
 
   if (isLoading) {
@@ -280,8 +282,12 @@ export default function Teams() {
                           const homeTeam = game.homeTeam;
                           const awayTeam = game.awayTeam;
                           const isHomeGame = game.homeTeamId === team.id;
-                          const beverageDutyClaimed = !!game.beverageDutyUserId;
-                          const userClaimedDuty = game.beverageDutyUserId === (user as any)?.id;
+                          const beverageDutyClaimed = isHomeGame 
+                            ? !!game.homeBeverageDutyUserId 
+                            : !!game.awayBeverageDutyUserId;
+                          const userClaimedDuty = isHomeGame 
+                            ? game.homeBeverageDutyUserId === (user as any)?.id
+                            : game.awayBeverageDutyUserId === (user as any)?.id;
 
                           return (
                             <div key={game.id} className="p-4 border rounded-lg">
@@ -312,9 +318,11 @@ export default function Teams() {
                                   Beverage Duty
                                 </div>
                                 {beverageDutyClaimed ? (
-                                  <Badge variant={userClaimedDuty ? "default" : "secondary"}>
-                                    {userClaimedDuty ? "You claimed it!" : "Already claimed"}
-                                  </Badge>
+                                  <div className="text-right">
+                                    <Badge variant={userClaimedDuty ? "default" : "secondary"}>
+                                      {userClaimedDuty ? "You claimed it!" : "Claimed"}
+                                    </Badge>
+                                  </div>
                                 ) : (
                                   <Button 
                                     size="sm" 

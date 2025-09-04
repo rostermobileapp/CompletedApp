@@ -553,13 +553,28 @@ export class DatabaseStorage implements IStorage {
     return gamesWithTeams;
   }
 
-  async claimBeverageDuty(gameId: string, userId: string): Promise<Game> {
+  async claimBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game> {
+    // First, get the game to determine if the user's team is home or away
+    const [game] = await db.select().from(games).where(eq(games.id, gameId));
+    
+    if (!game) {
+      throw new Error(`Game with id ${gameId} not found`);
+    }
+
+    const isHomeTeam = game.homeTeamId === teamId;
+    const updateData = isHomeTeam 
+      ? { 
+          homeBeverageDutyUserId: userId,
+          homeBeverageDutyClaimedAt: new Date()
+        }
+      : { 
+          awayBeverageDutyUserId: userId,
+          awayBeverageDutyClaimedAt: new Date()
+        };
+
     const [updatedGame] = await db
       .update(games)
-      .set({ 
-        beverageDutyUserId: userId,
-        beverageDutyClaimedAt: new Date()
-      })
+      .set(updateData)
       .where(eq(games.id, gameId))
       .returning();
     

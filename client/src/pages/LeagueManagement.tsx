@@ -744,7 +744,7 @@ export default function LeagueManagement() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{formatUserName(member.user)}</p>
-                          {member.isCaptain && <Crown className="w-4 h-4 text-warning" />}
+                          {member.isCaptain && <span className="w-4 h-4 text-warning font-bold text-sm flex items-center justify-center">C</span>}
                           {member.jerseyNumber && (
                             <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
                               #{member.jerseyNumber}

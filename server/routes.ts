@@ -620,12 +620,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.gameId;
       const userId = req.user.claims.sub;
+      const { teamId } = req.body;
       
       if (!userId) {
         return res.status(401).json({ message: 'User ID not found' });
       }
 
-      const updatedGame = await storage.claimBeverageDuty(gameId, userId);
+      if (!teamId) {
+        return res.status(400).json({ message: 'Team ID is required' });
+      }
+
+      const updatedGame = await storage.claimBeverageDuty(gameId, userId, teamId);
       res.json(updatedGame);
     } catch (error) {
       console.error('Error claiming beverage duty:', error);

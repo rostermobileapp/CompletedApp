@@ -133,7 +133,10 @@ export default function Dashboard() {
         ) : Array.isArray(upcomingGames) && upcomingGames.length > 0 ? (
           <div className="space-y-3">
             {/* Beverage Duty Alert */}
-            {upcomingGames.some((game: any) => game.beverageDutyUserId === (user as any)?.id) && (
+            {upcomingGames.some((game: any) => 
+              game.homeBeverageDutyUserId === (user as any)?.id || 
+              game.awayBeverageDutyUserId === (user as any)?.id
+            ) && (
               <div className="bg-red-500 text-white rounded-lg p-3 mb-3" data-testid="alert-beverage-duty">
                 <div className="flex items-center gap-2">
                   <Coffee className="w-4 h-4" />
