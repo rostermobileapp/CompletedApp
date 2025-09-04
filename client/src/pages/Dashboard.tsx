@@ -19,7 +19,7 @@ export default function Dashboard() {
     queryKey: ['/api/user/teams'],
   });
 
-  const primaryTeam = userTeams?.[0];
+  const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="dashboard-page">
@@ -113,7 +113,7 @@ export default function Dashboard() {
           <div className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid="loading-upcoming-games">
             <div className="h-16 bg-muted rounded"></div>
           </div>
-        ) : upcomingGames && upcomingGames.length > 0 ? (
+        ) : Array.isArray(upcomingGames) && upcomingGames.length > 0 ? (
           <div className="space-y-3">
             {upcomingGames.slice(0, 2).map((game: any) => (
               <div key={game.id} className="bg-card rounded-xl border border-border p-4" data-testid={`card-game-${game.id}`}>
@@ -202,7 +202,11 @@ export default function Dashboard() {
               </div>
             </div>
             
-            <SubscriptionGate requiredTier="player_plus" />
+            <SubscriptionGate requiredTier="player_plus">
+              <div className="text-sm text-muted-foreground">
+                Advanced stats available with Player Plus
+              </div>
+            </SubscriptionGate>
           </div>
         </div>
       )}

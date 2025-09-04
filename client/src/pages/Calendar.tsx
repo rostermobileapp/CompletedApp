@@ -16,7 +16,7 @@ export default function Calendar() {
   const calendarDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   const getGameForDate = (date: Date) => {
-    if (!upcomingGames) return null;
+    if (!Array.isArray(upcomingGames)) return null;
     return upcomingGames.find((game: any) => 
       isSameDay(new Date(game.scheduledAt), date)
     );
@@ -28,9 +28,9 @@ export default function Calendar() {
     setCurrentDate(newDate);
   };
 
-  const todaysGames = upcomingGames?.filter((game: any) => 
+  const todaysGames = Array.isArray(upcomingGames) ? upcomingGames.filter((game: any) => 
     isSameDay(new Date(game.scheduledAt), new Date())
-  ) || [];
+  ) : [];
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="calendar-page">

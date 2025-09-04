@@ -56,27 +56,27 @@ export default function Profile() {
       <div className="px-6 mb-6">
         <div className="bg-card rounded-xl border border-border p-6 text-center" data-testid="card-profile-info">
           <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-            {user?.profileImageUrl ? (
+            {user && typeof user === 'object' && 'profileImageUrl' in user && user.profileImageUrl ? (
               <img 
-                src={user.profileImageUrl} 
+                src={user && typeof user === 'object' && 'profileImageUrl' in user ? user.profileImageUrl : ''} 
                 alt="Profile" 
                 className="w-full h-full rounded-full object-cover"
                 data-testid="img-profile-avatar"
               />
             ) : (
               <span className="text-primary-foreground text-2xl font-bold" data-testid="text-profile-initials">
-                {user?.firstName?.[0] || 'U'}
+                {user && typeof user === 'object' && 'firstName' in user && user.firstName ? user.firstName[0] : 'U'}
               </span>
             )}
           </div>
           <h2 className="text-xl font-bold mb-1" data-testid="text-user-name">
-            {user?.firstName && user?.lastName 
+            {user && typeof user === 'object' && 'firstName' in user && 'lastName' in user && user.firstName && user.lastName 
               ? `${user.firstName} ${user.lastName}`
-              : user?.firstName || 'User'
+              : user && typeof user === 'object' && 'firstName' in user && user.firstName || 'User'
             }
           </h2>
           <p className="text-muted-foreground mb-3" data-testid="text-user-email">
-            {user?.email || 'No email provided'}
+            {user && typeof user === 'object' && 'email' in user && user.email || 'No email provided'}
           </p>
           <div className="flex items-center justify-center gap-2 mb-4">
             <span 

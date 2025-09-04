@@ -23,7 +23,15 @@ export default function Messages() {
       {/* Content */}
       <div className="px-6 mb-6">
         {!hasAccess('player_plus') ? (
-          <SubscriptionGate requiredTier="player_plus" />
+          <SubscriptionGate requiredTier="player_plus">
+            <div className="text-center py-8">
+              <MessageCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Team Messages</h3>
+              <p className="text-muted-foreground">
+                Upgrade to Player Plus to access team messaging
+              </p>
+            </div>
+          </SubscriptionGate>
         ) : (
           <>
             {/* Message Threads */}

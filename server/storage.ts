@@ -116,14 +116,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLeagues(sport?: string, search?: string): Promise<League[]> {
-    let query = db.select().from(leagues);
+    let conditions: any[] = [];
     
     if (sport && sport !== "all") {
-      query = query.where(eq(leagues.sport, sport as any));
+      conditions.push(eq(leagues.sport, sport as any));
     }
     
     if (search) {
-      query = query.where(
+      conditions.push(
         or(
           ilike(leagues.name, `%${search}%`),
           ilike(leagues.location, `%${search}%`)
@@ -131,7 +131,18 @@ export class DatabaseStorage implements IStorage {
       );
     }
     
-    return await query.orderBy(desc(leagues.createdAt));
+    if (conditions.length > 0) {
+      return await db
+        .select()
+        .from(leagues)
+        .where(and(...conditions))
+        .orderBy(desc(leagues.createdAt));
+    }
+    
+    return await db
+      .select()
+      .from(leagues)
+      .orderBy(desc(leagues.createdAt));
   }
 
   async getLeague(id: string): Promise<League | undefined> {
@@ -258,10 +269,14 @@ export class DatabaseStorage implements IStorage {
     if (teamIds.length === 0) return [];
 
     const result = await db
-      .select()
+      .select({
+        games: games,
+        homeTeam: teams,
+        awayTeam: teams
+      })
       .from(games)
-      .innerJoin(teams, eq(games.homeTeamId, teams.id), { as: "homeTeam" })
-      .innerJoin(teams, eq(games.awayTeamId, teams.id), { as: "awayTeam" })
+      .innerJoin(teams, eq(games.homeTeamId, teams.id))
+      .innerJoin(teams, eq(games.awayTeamId, teams.id))
       .where(
         and(
           or(
@@ -282,10 +297,14 @@ export class DatabaseStorage implements IStorage {
 
   async getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
     const result = await db
-      .select()
+      .select({
+        games: games,
+        homeTeam: teams,
+        awayTeam: teams
+      })
       .from(games)
-      .innerJoin(teams, eq(games.homeTeamId, teams.id), { as: "homeTeam" })
-      .innerJoin(teams, eq(games.awayTeamId, teams.id), { as: "awayTeam" })
+      .innerJoin(teams, eq(games.homeTeamId, teams.id))
+      .innerJoin(teams, eq(games.awayTeamId, teams.id))
       .where(
         or(
           eq(games.homeTeamId, teamId),

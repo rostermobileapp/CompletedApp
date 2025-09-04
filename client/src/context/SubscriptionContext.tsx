@@ -20,7 +20,7 @@ const tierHierarchy: Record<SubscriptionTier, number> = {
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   
-  const tier: SubscriptionTier = user?.subscriptionTier || 'free';
+  const tier: SubscriptionTier = (user && typeof user === 'object' && 'subscriptionTier' in user && typeof user.subscriptionTier === 'string') ? user.subscriptionTier as SubscriptionTier : 'free';
   
   const hasAccess = (requiredTier: SubscriptionTier): boolean => {
     return tierHierarchy[tier] >= tierHierarchy[requiredTier];

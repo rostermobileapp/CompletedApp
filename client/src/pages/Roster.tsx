@@ -11,7 +11,7 @@ export default function Roster() {
     queryKey: ['/api/user/teams'],
   });
 
-  const primaryTeam = userTeams?.[0];
+  const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
 
   const { data: teamMembers, isLoading } = useQuery({
     queryKey: ['/api/teams', primaryTeam?.id, 'members'],
