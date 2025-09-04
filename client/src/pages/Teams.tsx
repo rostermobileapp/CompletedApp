@@ -183,8 +183,9 @@ export default function Teams() {
                   )
                   .slice(0, 3)
                   .map((game: any) => {
-                    const checkedOutCount = game.totalRoster - game.checkedInCount - (game.totalRoster - game.checkedInCount - game.checkedOutCount || 0);
-                    const noResponseCount = game.totalRoster - game.checkedInCount - checkedOutCount;
+                    const checkedInCount = game.checkedInCount || 0;
+                    const checkedOutCount = game.checkedOutCount || 0;
+                    const noResponseCount = Math.max(0, game.totalRoster - checkedInCount - checkedOutCount);
                     
                     return (
                       <div
@@ -200,7 +201,7 @@ export default function Teams() {
                           {game.teamName} vs {game.opponent}
                         </p>
                         <p className="text-xs mt-1">
-                          ✅ {game.checkedInCount} Checked In • ❌ {game.checkedOutCount || 0} Checked Out • ⏳ {game.totalRoster - game.checkedInCount - (game.checkedOutCount || 0)} No Response
+                          ✅ {checkedInCount} Checked In • ❌ {checkedOutCount} Checked Out • ⏳ {noResponseCount} No Response
                         </p>
                         <p className="text-xs mt-1">
                           Game: {new Date(game.scheduledAt).toLocaleDateString()} at {new Date(game.scheduledAt).toLocaleTimeString()}

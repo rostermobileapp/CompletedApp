@@ -332,65 +332,6 @@ export default function Dashboard() {
         )}
       </div>
       
-      {/* Team Performance */}
-      {primaryTeam && (
-        <div className="px-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4" data-testid="text-team-performance-title">Team Performance</h2>
-          <div className="bg-card rounded-xl border border-border p-4">
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Wins</span>
-                  <span data-testid="text-wins-stat">
-                    {primaryTeam.wins} / {primaryTeam.wins + primaryTeam.losses + primaryTeam.ties}
-                  </span>
-                </div>
-                <div className="h-1 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-success rounded-full" 
-                    style={{ 
-                      width: `${((primaryTeam.wins / Math.max(1, primaryTeam.wins + primaryTeam.losses + primaryTeam.ties)) * 100)}%` 
-                    }}
-                    data-testid="progress-wins"
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Goals For</span>
-                  <span data-testid="text-goals-for-stat">{primaryTeam.goalsFor}</span>
-                </div>
-                <div className="h-1 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary rounded-full" 
-                    style={{ width: `${Math.min(100, (primaryTeam.goalsFor / 50) * 100)}%` }}
-                    data-testid="progress-goals-for"
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Goals Against</span>
-                  <span data-testid="text-goals-against-stat">{primaryTeam.goalsAgainst}</span>
-                </div>
-                <div className="h-1 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-warning rounded-full" 
-                    style={{ width: `${Math.min(100, (primaryTeam.goalsAgainst / 50) * 100)}%` }}
-                    data-testid="progress-goals-against"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <SubscriptionGate requiredTier="player_plus">
-              <div className="text-sm text-muted-foreground">
-                Advanced stats available with Player Plus
-              </div>
-            </SubscriptionGate>
-          </div>
-        </div>
-      )}
       
       {/* Recent Activity */}
       <div className="px-6">
