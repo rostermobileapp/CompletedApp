@@ -170,6 +170,13 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => r.league);
   }
 
+  async getCommissionerLeagues(userId: string): Promise<League[]> {
+    return await db
+      .select()
+      .from(leagues)
+      .where(eq(leagues.commissionerId, userId));
+  }
+
   async getLeagueByUniqueId(uniqueLeagueId: string): Promise<League | undefined> {
     const [league] = await db.select().from(leagues).where(eq(leagues.uniqueLeagueId, uniqueLeagueId));
     return league;
@@ -290,6 +297,15 @@ export class DatabaseStorage implements IStorage {
     const [membership] = await db
       .update(leagueMemberships)
       .set({ skillRating })
+      .where(eq(leagueMemberships.id, membershipId))
+      .returning();
+    return membership;
+  }
+
+  async updateLeagueMember(membershipId: string, updates: Partial<LeagueMembership>): Promise<LeagueMembership> {
+    const [membership] = await db
+      .update(leagueMemberships)
+      .set(updates)
       .where(eq(leagueMemberships.id, membershipId))
       .returning();
     return membership;

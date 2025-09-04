@@ -114,6 +114,12 @@ export const leagueMemberships = pgTable("league_memberships", {
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
+  // Additional player management fields
+  assignedTeamId: varchar("assigned_team_id").references(() => teams.id),
+  isCaptain: boolean("is_captain").default(false),
+  position: varchar("position"),
+  notes: text("notes"),
+  jerseyNumber: integer("jersey_number"),
 });
 
 // Team memberships table

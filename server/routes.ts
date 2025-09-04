@@ -134,6 +134,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get leagues where user is commissioner
+  app.get("/api/user/commissioner-leagues", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const leagues = await storage.getCommissionerLeagues(userId);
+      res.json(leagues);
+    } catch (error) {
+      console.error("Error fetching commissioner leagues:", error);
+      res.status(500).json({ message: "Failed to fetch commissioner leagues" });
+    }
+  });
+
+  // Update league member details (team assignment, captain role, position, etc.)
+  app.patch("/api/leagues/:leagueId/members/:memberId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId, memberId } = req.params;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(leagueId);
+      
+      // Check if user is the commissioner of this league
+      if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const updates = req.body;
+      const updatedMember = await storage.updateLeagueMember(memberId, updates);
+      res.json(updatedMember);
+    } catch (error) {
+      console.error("Error updating league member:", error);
+      res.status(500).json({ message: "Failed to update league member" });
+    }
+  });
+
   // League Management Routes for Commissioners
   app.get("/api/leagues/:id/members", isAuthenticated, async (req: any, res) => {
     try {

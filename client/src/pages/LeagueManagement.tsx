@@ -20,7 +20,10 @@ import {
   Star,
   Check,
   X,
-  Plus
+  Plus,
+  Edit3,
+  AlertCircle,
+  Settings
 } from 'lucide-react';
 import { insertTeamSchema } from '@shared/schema';
 
@@ -29,6 +32,11 @@ type LeagueMember = {
   userId: string;
   skillRating: number;
   status: string;
+  assignedTeamId?: string;
+  isCaptain?: boolean;
+  position?: string;
+  notes?: string;
+  jerseyNumber?: number;
   user: {
     id: string;
     displayName: string;
@@ -73,6 +81,7 @@ export default function LeagueManagement() {
   const { hasAccess } = useSubscription();
   const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('players');
   const [showCreateTeam, setShowCreateTeam] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
   const [showScheduleGame, setShowScheduleGame] = useState(false);
 
   // Get league ID from URL params
@@ -182,6 +191,28 @@ export default function LeagueManagement() {
     onSuccess: () => {
       toast({ title: 'Skill rating updated successfully' });
       refetchMembers();
+    },
+  });
+
+  const updatePlayerMutation = useMutation({
+    mutationFn: async ({ memberId, updates }: { memberId: string; updates: any }) => {
+      const response = await apiRequest('PATCH', `/api/leagues/${leagueId}/members/${memberId}`, updates);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Player Updated',
+        description: 'Player details have been updated successfully.',
+      });
+      refetchMembers();
+      setSelectedPlayer(null);
+    },
+    onError: () => {
+      toast({
+        title: 'Update Failed',
+        description: 'Failed to update player details.',
+        variant: 'destructive',
+      });
     },
   });
 
@@ -435,22 +466,39 @@ export default function LeagueManagement() {
               ) : (
                 <div className="space-y-3">
                   {members.map((member: LeagueMember) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 bg-background rounded-lg border">
-                      <div className="flex-1" data-testid={`member-${member.user.id}`}>
-                        <p className="font-medium">{member.user.displayName}</p>
+                    <div 
+                      key={member.id} 
+                      className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-card cursor-pointer transition-colors"
+                      onClick={() => setSelectedPlayer(member)}
+                      data-testid={`member-${member.user.id}`}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{member.user.displayName}</p>
+                          {member.isCaptain && <Crown className="w-4 h-4 text-warning" />}
+                          {member.jerseyNumber && (
+                            <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
+                              #{member.jerseyNumber}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">{member.user.email}</p>
+                        {member.position && (
+                          <p className="text-xs text-muted-foreground">{member.position}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1">
                           <Star className="w-4 h-4 text-warning" />
                           <select
                             value={member.skillRating || 5}
-                            onChange={(e) => 
+                            onChange={(e) => {
+                              e.stopPropagation();
                               skillRatingMutation.mutate({ 
                                 membershipId: member.id, 
                                 skillRating: parseInt(e.target.value) 
-                              })
-                            }
+                              });
+                            }}
                             className="bg-background border border-border rounded px-2 py-1 text-sm"
                             data-testid={`skill-rating-${member.user.id}`}
                           >
@@ -459,6 +507,7 @@ export default function LeagueManagement() {
                             ))}
                           </select>
                         </div>
+                        <Edit3 className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </div>
                   ))}
@@ -653,6 +702,149 @@ export default function LeagueManagement() {
           </div>
         )}
       </div>
+
+      {/* Player Detail Modal */}
+      {selectedPlayer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-xl border border-border w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold">{selectedPlayer.user.displayName}</h3>
+                  <p className="text-sm text-muted-foreground">{selectedPlayer.user.email}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedPlayer(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Team Assignment */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Assigned Team</label>
+                  <select
+                    value={selectedPlayer.assignedTeamId || ''}
+                    onChange={(e) => {
+                      updatePlayerMutation.mutate({
+                        memberId: selectedPlayer.id,
+                        updates: { assignedTeamId: e.target.value || null }
+                      });
+                    }}
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">No team assigned</option>
+                    {teams.map((team: Team) => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Captain Role */}
+                <div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedPlayer.isCaptain || false}
+                      onChange={(e) => {
+                        updatePlayerMutation.mutate({
+                          memberId: selectedPlayer.id,
+                          updates: { isCaptain: e.target.checked }
+                        });
+                      }}
+                      className="rounded border-border"
+                    />
+                    <span className="text-sm font-medium">Team Captain</span>
+                    <Crown className="w-4 h-4 text-warning" />
+                  </label>
+                </div>
+
+                {/* Position */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Position</label>
+                  <input
+                    type="text"
+                    value={selectedPlayer.position || ''}
+                    onChange={(e) => {
+                      updatePlayerMutation.mutate({
+                        memberId: selectedPlayer.id,
+                        updates: { position: e.target.value }
+                      });
+                    }}
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="e.g., Forward, Defense, Goalie"
+                  />
+                </div>
+
+                {/* Skill Rating */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Skill Rating (1-10)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={selectedPlayer.skillRating || 5}
+                    onChange={(e) => {
+                      updatePlayerMutation.mutate({
+                        memberId: selectedPlayer.id,
+                        updates: { skillRating: parseInt(e.target.value) }
+                      });
+                    }}
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                {/* Jersey Number */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Jersey Number</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    value={selectedPlayer.jerseyNumber || ''}
+                    onChange={(e) => {
+                      updatePlayerMutation.mutate({
+                        memberId: selectedPlayer.id,
+                        updates: { jerseyNumber: e.target.value ? parseInt(e.target.value) : null }
+                      });
+                    }}
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Enter jersey number"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Notes</label>
+                  <textarea
+                    value={selectedPlayer.notes || ''}
+                    onChange={(e) => {
+                      updatePlayerMutation.mutate({
+                        memberId: selectedPlayer.id,
+                        updates: { notes: e.target.value }
+                      });
+                    }}
+                    rows={3}
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    placeholder="Add notes about this player..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setSelectedPlayer(null)}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
