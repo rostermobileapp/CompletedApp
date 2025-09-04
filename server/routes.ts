@@ -268,6 +268,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/league-memberships/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const membershipId = req.params.id;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+      
+      await storage.deleteLeagueMembership(membershipId);
+      res.json({ message: "Player removed from league successfully" });
+    } catch (error) {
+      console.error("Error removing player from league:", error);
+      res.status(500).json({ message: "Failed to remove player from league" });
+    }
+  });
+
   app.get("/api/leagues/:id/teams", async (req, res) => {
     try {
       const leagueId = req.params.id;

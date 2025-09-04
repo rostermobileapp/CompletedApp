@@ -39,10 +39,24 @@ type LeagueMember = {
   jerseyNumber?: number;
   user: {
     id: string;
-    displayName: string;
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
     email: string;
   };
 };
+
+// Utility function to format names as "Last Name, First Name"
+function formatUserName(user: { firstName?: string; lastName?: string; displayName?: string }): string {
+  if (user.lastName && user.firstName) {
+    return `${user.lastName}, ${user.firstName}`;
+  } else if (user.firstName) {
+    return user.firstName;
+  } else if (user.displayName) {
+    return user.displayName;
+  }
+  return 'User';
+}
 
 type Team = {
   id: string;
@@ -83,6 +97,14 @@ export default function LeagueManagement() {
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
   const [showScheduleGame, setShowScheduleGame] = useState(false);
+  const [playerEditForm, setPlayerEditForm] = useState({
+    assignedTeamId: '',
+    isCaptain: false,
+    position: '',
+    skillRating: 5,
+    jerseyNumber: '',
+    notes: ''
+  });
 
   // Get league ID from URL params
   const leagueId = new URLSearchParams(window.location.search).get('leagueId') || '';
@@ -211,6 +233,28 @@ export default function LeagueManagement() {
       toast({
         title: 'Update Failed',
         description: 'Failed to update player details.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const removeFromLeagueMutation = useMutation({
+    mutationFn: async (membershipId: string) => {
+      const response = await apiRequest('DELETE', `/api/league-memberships/${membershipId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Player Removed',
+        description: 'Player has been removed from the league.',
+      });
+      refetchMembers();
+      setSelectedPlayer(null);
+    },
+    onError: () => {
+      toast({
+        title: 'Remove Failed',
+        description: 'Failed to remove player from league.',
         variant: 'destructive',
       });
     },
@@ -426,7 +470,7 @@ export default function LeagueManagement() {
                   {pendingMembers.map((member: LeagueMember) => (
                     <div key={member.id} className="flex items-center justify-between p-3 bg-background rounded-lg border">
                       <div className="flex-1" data-testid={`pending-player-${member.user.id}`}>
-                        <p className="font-medium">{member.user.displayName}</p>
+                        <p className="font-medium">{formatUserName(member.user)}</p>
                         <p className="text-sm text-muted-foreground">{member.user.email}</p>
                       </div>
                       <div className="flex gap-2">
@@ -469,12 +513,22 @@ export default function LeagueManagement() {
                     <div 
                       key={member.id} 
                       className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-card cursor-pointer transition-colors"
-                      onClick={() => setSelectedPlayer(member)}
+                      onClick={() => {
+                        setSelectedPlayer(member);
+                        setPlayerEditForm({
+                          assignedTeamId: member.assignedTeamId || '',
+                          isCaptain: member.isCaptain || false,
+                          position: member.position || '',
+                          skillRating: member.skillRating || 5,
+                          jerseyNumber: member.jerseyNumber?.toString() || '',
+                          notes: member.notes || ''
+                        });
+                      }}
                       data-testid={`member-${member.user.id}`}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">{member.user.displayName}</p>
+                          <p className="font-medium">{formatUserName(member.user)}</p>
                           {member.isCaptain && <Crown className="w-4 h-4 text-warning" />}
                           {member.jerseyNumber && (
                             <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
@@ -584,8 +638,21 @@ export default function LeagueManagement() {
                       <div className="flex-1" data-testid={`team-${team.id}`}>
                         <p className="font-medium">{team.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          Captain: {members.find((m: LeagueMember) => m.userId === team.captainId)?.user.displayName || 'Not assigned'}
+                          Captain: {members.find((m: LeagueMember) => m.userId === team.captainId)?.user ? formatUserName(members.find((m: LeagueMember) => m.userId === team.captainId)!.user) : 'Not assigned'}
                         </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            // TODO: Implement team group messaging functionality
+                            toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${team.name}` });
+                          }}
+                          className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium flex items-center gap-2"
+                          data-testid={`button-message-team-${team.id}`}
+                        >
+                          <Users className="w-4 h-4" />
+                          Message Team
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -710,7 +777,7 @@ export default function LeagueManagement() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-semibold">{selectedPlayer.user.displayName}</h3>
+                  <h3 className="text-lg font-semibold">{formatUserName(selectedPlayer.user)}</h3>
                   <p className="text-sm text-muted-foreground">{selectedPlayer.user.email}</p>
                 </div>
                 <button
@@ -726,13 +793,8 @@ export default function LeagueManagement() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Assigned Team</label>
                   <select
-                    value={selectedPlayer.assignedTeamId || ''}
-                    onChange={(e) => {
-                      updatePlayerMutation.mutate({
-                        memberId: selectedPlayer.id,
-                        updates: { assignedTeamId: e.target.value || null }
-                      });
-                    }}
+                    value={playerEditForm.assignedTeamId}
+                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, assignedTeamId: e.target.value }))}
                     className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">No team assigned</option>
@@ -747,13 +809,8 @@ export default function LeagueManagement() {
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={selectedPlayer.isCaptain || false}
-                      onChange={(e) => {
-                        updatePlayerMutation.mutate({
-                          memberId: selectedPlayer.id,
-                          updates: { isCaptain: e.target.checked }
-                        });
-                      }}
+                      checked={playerEditForm.isCaptain}
+                      onChange={(e) => setPlayerEditForm(prev => ({ ...prev, isCaptain: e.target.checked }))}
                       className="rounded border-border"
                     />
                     <span className="text-sm font-medium">Team Captain</span>
@@ -766,13 +823,8 @@ export default function LeagueManagement() {
                   <label className="block text-sm font-medium mb-2">Position</label>
                   <input
                     type="text"
-                    value={selectedPlayer.position || ''}
-                    onChange={(e) => {
-                      updatePlayerMutation.mutate({
-                        memberId: selectedPlayer.id,
-                        updates: { position: e.target.value }
-                      });
-                    }}
+                    value={playerEditForm.position}
+                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, position: e.target.value }))}
                     className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="e.g., Forward, Defense, Goalie"
                   />
@@ -785,13 +837,8 @@ export default function LeagueManagement() {
                     type="number"
                     min="1"
                     max="10"
-                    value={selectedPlayer.skillRating || 5}
-                    onChange={(e) => {
-                      updatePlayerMutation.mutate({
-                        memberId: selectedPlayer.id,
-                        updates: { skillRating: parseInt(e.target.value) }
-                      });
-                    }}
+                    value={playerEditForm.skillRating}
+                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, skillRating: parseInt(e.target.value) || 1 }))}
                     className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
@@ -803,13 +850,8 @@ export default function LeagueManagement() {
                     type="number"
                     min="1"
                     max="99"
-                    value={selectedPlayer.jerseyNumber || ''}
-                    onChange={(e) => {
-                      updatePlayerMutation.mutate({
-                        memberId: selectedPlayer.id,
-                        updates: { jerseyNumber: e.target.value ? parseInt(e.target.value) : null }
-                      });
-                    }}
+                    value={playerEditForm.jerseyNumber}
+                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, jerseyNumber: e.target.value }))}
                     className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Enter jersey number"
                   />
@@ -819,13 +861,8 @@ export default function LeagueManagement() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Notes</label>
                   <textarea
-                    value={selectedPlayer.notes || ''}
-                    onChange={(e) => {
-                      updatePlayerMutation.mutate({
-                        memberId: selectedPlayer.id,
-                        updates: { notes: e.target.value }
-                      });
-                    }}
+                    value={playerEditForm.notes}
+                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, notes: e.target.value }))}
                     rows={3}
                     className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                     placeholder="Add notes about this player..."
@@ -833,13 +870,76 @@ export default function LeagueManagement() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => setSelectedPlayer(null)}
-                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                >
-                  Close
-                </button>
+              <div className="space-y-3 mt-6">
+                {/* Action Buttons */}
+                <div className="flex justify-between items-center">
+                  <button
+                    onClick={() => {
+                      // TODO: Implement messaging functionality
+                      toast({ title: 'Messaging feature coming soon!' });
+                    }}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+                  >
+                    Message Player
+                  </button>
+                  <button
+                    onClick={() => {
+                      const updates = {
+                        assignedTeamId: playerEditForm.assignedTeamId || null,
+                        isCaptain: playerEditForm.isCaptain,
+                        position: playerEditForm.position,
+                        skillRating: playerEditForm.skillRating,
+                        jerseyNumber: playerEditForm.jerseyNumber ? parseInt(playerEditForm.jerseyNumber) : null,
+                        notes: playerEditForm.notes
+                      };
+                      updatePlayerMutation.mutate({
+                        memberId: selectedPlayer.id,
+                        updates
+                      });
+                    }}
+                    disabled={updatePlayerMutation.isPending}
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                  >
+                    {updatePlayerMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+
+                {/* Remove Options */}
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      if (confirm('Remove this player from their assigned team?')) {
+                        updatePlayerMutation.mutate({
+                          memberId: selectedPlayer.id,
+                          updates: { assignedTeamId: null, isCaptain: false }
+                        });
+                      }
+                    }}
+                    className="w-full px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm font-medium"
+                  >
+                    Remove from Team
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('Are you sure you want to remove this player from the league entirely? This cannot be undone.')) {
+                        removeFromLeagueMutation.mutate(selectedPlayer.id);
+                      }
+                    }}
+                    className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
+                  >
+                    Remove from League
+                  </button>
+                </div>
+
+                {/* Close Button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setSelectedPlayer(null)}
+                    className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

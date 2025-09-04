@@ -35,6 +35,7 @@ args = "npm run dev"
 waitForPort = 5000
 
 [agent]
+integrations = ["javascript_websocket==1.0.0"]
 
 [[ports]]
 localPort = 5000

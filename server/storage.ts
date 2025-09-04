@@ -53,6 +53,7 @@ export interface IStorage {
   getLeagueMembers(leagueId: string): Promise<(LeagueMembership & { user: User })[]>;
   getPendingLeagueMembers(leagueId: string): Promise<(LeagueMembership & { user: User })[]>;
   updatePlayerSkillRating(membershipId: string, skillRating: number): Promise<LeagueMembership>;
+  deleteLeagueMembership(membershipId: string): Promise<void>;
   requestTeamMembership(membership: InsertTeamMembership): Promise<TeamMembership>;
   approveTeamMembership(membershipId: string, approverId: string): Promise<TeamMembership>;
   getTeamMembers(teamId: string): Promise<(TeamMembership & { user: User })[]>;
@@ -300,6 +301,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(leagueMemberships.id, membershipId))
       .returning();
     return membership;
+  }
+
+  async deleteLeagueMembership(membershipId: string): Promise<void> {
+    await db
+      .delete(leagueMemberships)
+      .where(eq(leagueMemberships.id, membershipId));
   }
 
   async updateLeagueMember(membershipId: string, updates: Partial<LeagueMembership>): Promise<LeagueMembership> {

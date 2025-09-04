@@ -71,7 +71,7 @@ export default function Profile() {
           </div>
           <h2 className="text-xl font-bold mb-1" data-testid="text-user-name">
             {user && typeof user === 'object' && 'firstName' in user && 'lastName' in user && user.firstName && user.lastName 
-              ? `${user.firstName} ${user.lastName}`
+              ? `${user.lastName}, ${user.firstName}`
               : user && typeof user === 'object' && 'firstName' in user && user.firstName || 'User'
             }
           </h2>
