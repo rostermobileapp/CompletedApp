@@ -35,6 +35,12 @@ export default function Teams() {
     enabled: !!isAuthenticated,
   });
 
+  // Get user's league memberships for captain status
+  const { data: userLeagueMemberships = [] } = useQuery({
+    queryKey: ['/api/user/league-memberships'],
+    enabled: !!isAuthenticated,
+  });
+
   // Team logo upload mutation
   const updateTeamLogoMutation = useMutation({
     mutationFn: async (data: { teamId: string; logoUrl: string }) => {
@@ -86,9 +92,9 @@ export default function Teams() {
   };
 
   const handleTeamLogoUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful && result.successful[0] && selectedTeam) {
+    if (result.successful && result.successful[0] && currentTeam) {
       const uploadURL = result.successful[0].uploadURL as string;
-      updateTeamLogoMutation.mutate({ teamId: selectedTeam, logoUrl: uploadURL });
+      updateTeamLogoMutation.mutate({ teamId: currentTeam.id, logoUrl: uploadURL });
     }
   };
 
@@ -117,8 +123,13 @@ export default function Teams() {
   const primaryTeam = (userTeams as any[])[0];
   const currentTeam = selectedTeam ? (userTeams as any[]).find((t: any) => t.id === selectedTeam) : primaryTeam;
   const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
+  // Check if user is captain in league membership for current team
+  const currentTeamMembership = (userLeagueMemberships as any[]).find((membership: any) => 
+    membership.assignedTeamId === currentTeam?.id && membership.isCaptain
+  );
+  const isLeagueMemberCaptain = !!currentTeamMembership;
   const isCommissioner = (user as any)?.subscriptionTier === 'commissioner';
-  const canUploadLogo = isTeamCaptain || isCommissioner;
+  const canUploadLogo = isTeamCaptain || isLeagueMemberCaptain || isCommissioner;
 
   // Filter games for current team only
   const teamGames = (upcomingGames as any[]).filter((game: any) => 

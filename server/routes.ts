@@ -557,13 +557,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Logo URL is required" });
       }
 
-      // Check if user is the team captain or commissioner
+      // Check if user is the team captain, league member captain, or commissioner
       const team = await storage.getTeam(teamId);
       const user = await storage.getUser(userId);
       const isTeamCaptain = team && team.captainId === userId;
       const isCommissioner = user && user.subscriptionTier === 'commissioner';
       
-      if (!team || (!isTeamCaptain && !isCommissioner)) {
+      // Also check if user is a league member captain for this team's league
+      let isLeagueMemberCaptain = false;
+      if (team) {
+        const leagueMemberships = await storage.getUserLeagueMemberships(userId);
+        isLeagueMemberCaptain = leagueMemberships.some(membership => 
+          membership.leagueId === team.leagueId && 
+          membership.isCaptain === true &&
+          membership.assignedTeamId === teamId
+        );
+      }
+      
+      if (!team || (!isTeamCaptain && !isLeagueMemberCaptain && !isCommissioner)) {
         return res.status(403).json({ message: "Only team captains and commissioners can update team logos" });
       }
 
