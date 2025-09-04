@@ -30,6 +30,11 @@ export default function Dashboard() {
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
   const primaryLeagueMembership = Array.isArray(userLeagueMemberships) && userLeagueMemberships.length > 0 ? userLeagueMemberships[0] : null;
 
+  // Get user's attendance statuses
+  const { data: userAttendanceStatuses } = useQuery({
+    queryKey: ['/api/user/attendance-statuses'],
+  });
+
   // Attendance mutations
   const checkInMutation = useMutation({
     mutationFn: async (data: { gameId: string; teamId: string }) => {
@@ -37,6 +42,7 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/attendance-statuses'] });
       toast({
         title: "Success",
         description: "Checked in successfully!",
@@ -57,6 +63,7 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/attendance-statuses'] });
       toast({
         title: "Success",
         description: "Checked out successfully!",
@@ -255,35 +262,63 @@ export default function Dashboard() {
                     <span className="tier-badge bg-success text-accent-foreground text-xs px-2 py-1 rounded-full text-center" data-testid={`badge-game-status-${game.id}`}>
                       UPCOMING
                     </span>
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2 text-xs bg-green-500 text-white hover:bg-green-600 border-green-500"
-                        onClick={() => {
-                          const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
-                          if (userTeam && primaryTeam) {
-                            checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                          }
-                        }}
-                        disabled={checkInMutation.isPending}
-                        data-testid={`button-check-in-${game.id}`}
-                      >
-                        <UserCheck className="w-3 h-3 mr-1" />
-                        Check In
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2 text-xs bg-red-500 text-white hover:bg-red-600 border-red-500"
-                        onClick={() => checkOutMutation.mutate(game.id)}
-                        disabled={checkOutMutation.isPending}
-                        data-testid={`button-check-out-${game.id}`}
-                      >
-                        <UserX className="w-3 h-3 mr-1" />
-                        Check Out
-                      </Button>
-                    </div>
+                    {(() => {
+                      // Find user's attendance status for this game
+                      const userStatus = Array.isArray(userAttendanceStatuses) ? 
+                        userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
+                      
+                      if (userStatus === 'checked_in') {
+                        return (
+                          <div className="text-center">
+                            <span className="tier-badge bg-green-500 text-white text-xs px-2 py-1 rounded-full" data-testid={`status-confirmed-${game.id}`}>
+                              ✓ Confirmed
+                            </span>
+                          </div>
+                        );
+                      } else if (userStatus === 'checked_out') {
+                        return (
+                          <div className="text-center">
+                            <span className="tier-badge bg-red-500 text-white text-xs px-2 py-1 rounded-full" data-testid={`status-declined-${game.id}`}>
+                              ✗ Declined
+                            </span>
+                          </div>
+                        );
+                      } else {
+                        // No response yet, show buttons
+                        return (
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs bg-green-500 text-white hover:bg-green-600 border-green-500"
+                              onClick={() => {
+                                const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
+                                if (userTeam && primaryTeam) {
+                                  checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                                }
+                              }}
+                              disabled={checkInMutation.isPending}
+                              data-testid={`button-check-in-${game.id}`}
+                            >
+                              <UserCheck className="w-3 h-3 mr-1" />
+                              Check In
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs bg-red-500 text-white hover:bg-red-600 border-red-500"
+                              onClick={() => checkOutMutation.mutate(game.id)}
+                              disabled={checkOutMutation.isPending}
+                              data-testid={`button-check-out-${game.id}`}
+                            >
+                              <UserX className="w-3 h-3 mr-1" />
+                              Check Out
+                            </Button>
+                          </div>
+                        );
+                      }
+                    })()
+                    }
                   </div>
                 </div>
               </div>

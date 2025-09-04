@@ -26,7 +26,7 @@ import {
   type InsertMessage,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, inArray, asc, alias } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, inArray, asc } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -706,6 +706,7 @@ export class DatabaseStorage implements IStorage {
       for (const game of upcomingOnly.slice(0, 5)) { // Limit to next 5 games
         const attendance = await this.getGameAttendance(game.id);
         const checkedInCount = attendance.filter(a => a.status === 'checked_in').length;
+        const checkedOutCount = attendance.filter(a => a.status === 'checked_out').length;
         const totalRoster = await this.getTeamMembers(team.id);
         
         attendanceOverview.push({
@@ -715,6 +716,7 @@ export class DatabaseStorage implements IStorage {
           opponent: game.homeTeam?.id === team.id ? game.awayTeam?.name : game.homeTeam?.name,
           scheduledAt: game.scheduledAt,
           checkedInCount,
+          checkedOutCount,
           totalRoster: totalRoster.length,
           attendanceRate: totalRoster.length > 0 ? Math.round((checkedInCount / totalRoster.length) * 100) : 0
         });
@@ -724,6 +726,28 @@ export class DatabaseStorage implements IStorage {
     return attendanceOverview.sort((a, b) => 
       new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
     );
+  }
+
+  async getUserAttendanceStatuses(userId: string): Promise<any[]> {
+    const userTeams = await this.getUserTeams(userId);
+    const statuses = [];
+
+    for (const team of userTeams) {
+      const games = await this.getTeamGames(team.id);
+      const upcomingGames = games.filter(game => new Date(game.scheduledAt) > new Date());
+      
+      for (const game of upcomingGames.slice(0, 5)) {
+        const attendance = await this.getUserAttendanceStatus(game.id, userId);
+        statuses.push({
+          gameId: game.id,
+          teamId: team.id,
+          status: attendance?.status || null,
+          scheduledAt: game.scheduledAt
+        });
+      }
+    }
+
+    return statuses;
   }
 
   async getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {

@@ -51,6 +51,12 @@ export default function Teams() {
     )),
   });
 
+  // Fetch user's attendance status for each upcoming game
+  const { data: userAttendanceStatuses } = useQuery({
+    queryKey: ['/api/user/attendance-statuses'],
+    enabled: !!user,
+  });
+
   // Team logo upload mutation
   const updateTeamLogoMutation = useMutation({
     mutationFn: async (data: { teamId: string; logoUrl: string }) => {
@@ -170,27 +176,38 @@ export default function Teams() {
             {/* Attendance Alerts for Captains */}
             {Array.isArray(gameAttendanceCounts) && gameAttendanceCounts.length > 0 && (
               <div className="space-y-3">
+                {/* Remove duplicates by gameId and only show unique games */}
                 {gameAttendanceCounts
-                  .filter((game: any) => game.attendanceRate < 70) // Show alert if less than 70% attendance
+                  .filter((game: any, index: number, self: any[]) => 
+                    index === self.findIndex((g: any) => g.gameId === game.gameId)
+                  )
                   .slice(0, 3)
-                  .map((game: any) => (
-                  <div
-                    key={game.gameId}
-                    className="bg-orange-500 text-white rounded-lg p-3"
-                    data-testid={`alert-attendance-${game.gameId}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4" />
-                      <span className="font-medium">Low Attendance Alert!</span>
-                    </div>
-                    <p className="text-sm mt-1">
-                      {game.teamName} vs {game.opponent}: Only {game.checkedInCount}/{game.totalRoster} players checked in ({game.attendanceRate}%)
-                    </p>
-                    <p className="text-xs mt-1">
-                      Game: {new Date(game.scheduledAt).toLocaleDateString()} at {new Date(game.scheduledAt).toLocaleTimeString()}
-                    </p>
-                  </div>
-                ))}
+                  .map((game: any) => {
+                    const checkedOutCount = game.totalRoster - game.checkedInCount - (game.totalRoster - game.checkedInCount - game.checkedOutCount || 0);
+                    const noResponseCount = game.totalRoster - game.checkedInCount - checkedOutCount;
+                    
+                    return (
+                      <div
+                        key={`attendance-alert-${game.gameId}`}
+                        className="bg-red-500 text-white rounded-lg p-3"
+                        data-testid={`alert-attendance-${game.gameId}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          <span className="font-medium">Attendance Alert!</span>
+                        </div>
+                        <p className="text-sm mt-1">
+                          {game.teamName} vs {game.opponent}
+                        </p>
+                        <p className="text-xs mt-1">
+                          ✅ {game.checkedInCount} Checked In • ❌ {game.checkedOutCount || 0} Checked Out • ⏳ {game.totalRoster - game.checkedInCount - (game.checkedOutCount || 0)} No Response
+                        </p>
+                        <p className="text-xs mt-1">
+                          Game: {new Date(game.scheduledAt).toLocaleDateString()} at {new Date(game.scheduledAt).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    );
+                  })}
               </div>
             )}
             

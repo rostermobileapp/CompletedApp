@@ -722,6 +722,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/user/attendance-statuses', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const statuses = await storage.getUserAttendanceStatuses(userId);
+      res.json(statuses);
+    } catch (error) {
+      console.error('Error fetching user attendance statuses:', error);
+      res.status(500).json({ message: 'Failed to fetch attendance statuses' });
+    }
+  });
+
   // Message routes (Player Plus feature)
   app.get("/api/teams/:id/messages", isAuthenticated, async (req: any, res) => {
     try {
