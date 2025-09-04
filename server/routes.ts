@@ -131,6 +131,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // League Management Routes for Commissioners
+  app.get("/api/leagues/:id/members", isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.id;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(leagueId);
+      
+      // Check if user is the commissioner of this league
+      if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const members = await storage.getLeagueMembers(leagueId);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching league members:", error);
+      res.status(500).json({ message: "Failed to fetch league members" });
+    }
+  });
+
+  app.get("/api/leagues/:id/pending-members", isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.id;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(leagueId);
+      
+      // Check if user is the commissioner of this league
+      if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const pendingMembers = await storage.getPendingLeagueMembers(leagueId);
+      res.json(pendingMembers);
+    } catch (error) {
+      console.error("Error fetching pending league members:", error);
+      res.status(500).json({ message: "Failed to fetch pending members" });
+    }
+  });
+
+  app.post("/api/league-memberships/:id/approve", isAuthenticated, async (req: any, res) => {
+    try {
+      const membershipId = req.params.id;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+      
+      const membership = await storage.approveLeagueMembership(membershipId, userId);
+      res.json(membership);
+    } catch (error) {
+      console.error("Error approving membership:", error);
+      res.status(500).json({ message: "Failed to approve membership" });
+    }
+  });
+
+  app.post("/api/league-memberships/:id/reject", isAuthenticated, async (req: any, res) => {
+    try {
+      const membershipId = req.params.id;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+      
+      const membership = await storage.rejectLeagueMembership(membershipId, userId);
+      res.json(membership);
+    } catch (error) {
+      console.error("Error rejecting membership:", error);
+      res.status(500).json({ message: "Failed to reject membership" });
+    }
+  });
+
+  app.patch("/api/league-memberships/:id/skill-rating", isAuthenticated, async (req: any, res) => {
+    try {
+      const membershipId = req.params.id;
+      const { skillRating } = req.body;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+      
+      if (skillRating < 1 || skillRating > 10) {
+        return res.status(400).json({ message: "Skill rating must be between 1 and 10" });
+      }
+      
+      const membership = await storage.updatePlayerSkillRating(membershipId, skillRating);
+      res.json(membership);
+    } catch (error) {
+      console.error("Error updating skill rating:", error);
+      res.status(500).json({ message: "Failed to update skill rating" });
+    }
+  });
+
+  app.get("/api/leagues/:id/teams", async (req, res) => {
+    try {
+      const leagueId = req.params.id;
+      const teams = await storage.getTeamsByLeague(leagueId);
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching league teams:", error);
+      res.status(500).json({ message: "Failed to fetch league teams" });
+    }
+  });
+
   // Team routes
   app.post("/api/teams", isAuthenticated, async (req: any, res) => {
     try {
@@ -177,6 +288,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching upcoming games:", error);
       res.status(500).json({ message: "Failed to fetch upcoming games" });
+    }
+  });
+
+  app.post("/api/games", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+      
+      const gameData = insertGameSchema.parse(req.body);
+      const game = await storage.createGame(gameData);
+      res.json(game);
+    } catch (error) {
+      console.error("Error creating game:", error);
+      res.status(500).json({ message: "Failed to create game" });
     }
   });
 

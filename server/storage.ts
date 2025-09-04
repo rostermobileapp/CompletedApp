@@ -48,7 +48,11 @@ export interface IStorage {
   // Membership operations
   requestLeagueMembership(membership: InsertLeagueMembership): Promise<LeagueMembership>;
   approveLeagueMembership(membershipId: string, approverId: string): Promise<LeagueMembership>;
+  rejectLeagueMembership(membershipId: string, approverId: string): Promise<LeagueMembership>;
   getUserLeagueMembership(userId: string, leagueId: string): Promise<LeagueMembership | undefined>;
+  getLeagueMembers(leagueId: string): Promise<(LeagueMembership & { user: User })[]>;
+  getPendingLeagueMembers(leagueId: string): Promise<(LeagueMembership & { user: User })[]>;
+  updatePlayerSkillRating(membershipId: string, skillRating: number): Promise<LeagueMembership>;
   requestTeamMembership(membership: InsertTeamMembership): Promise<TeamMembership>;
   approveTeamMembership(membershipId: string, approverId: string): Promise<TeamMembership>;
   getTeamMembers(teamId: string): Promise<(TeamMembership & { user: User })[]>;
@@ -238,6 +242,56 @@ export class DatabaseStorage implements IStorage {
           eq(leagueMemberships.leagueId, leagueId)
         )
       );
+    return membership;
+  }
+
+  async rejectLeagueMembership(membershipId: string, approverId: string): Promise<LeagueMembership> {
+    const [membership] = await db
+      .update(leagueMemberships)
+      .set({
+        status: "rejected",
+        approvedAt: new Date(),
+        approvedBy: approverId,
+      })
+      .where(eq(leagueMemberships.id, membershipId))
+      .returning();
+    return membership;
+  }
+
+  async getLeagueMembers(leagueId: string): Promise<(LeagueMembership & { user: User })[]> {
+    const result = await db
+      .select()
+      .from(leagueMemberships)
+      .innerJoin(users, eq(leagueMemberships.userId, users.id))
+      .where(
+        and(
+          eq(leagueMemberships.leagueId, leagueId),
+          eq(leagueMemberships.status, "approved")
+        )
+      );
+    return result.map(r => ({ ...r.league_memberships, user: r.users }));
+  }
+
+  async getPendingLeagueMembers(leagueId: string): Promise<(LeagueMembership & { user: User })[]> {
+    const result = await db
+      .select()
+      .from(leagueMemberships)
+      .innerJoin(users, eq(leagueMemberships.userId, users.id))
+      .where(
+        and(
+          eq(leagueMemberships.leagueId, leagueId),
+          eq(leagueMemberships.status, "pending")
+        )
+      );
+    return result.map(r => ({ ...r.league_memberships, user: r.users }));
+  }
+
+  async updatePlayerSkillRating(membershipId: string, skillRating: number): Promise<LeagueMembership> {
+    const [membership] = await db
+      .update(leagueMemberships)
+      .set({ skillRating })
+      .where(eq(leagueMemberships.id, membershipId))
+      .returning();
     return membership;
   }
 

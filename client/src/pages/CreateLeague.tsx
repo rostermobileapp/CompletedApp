@@ -49,7 +49,7 @@ export default function CreateLeague() {
         description: `${league.name} has been created successfully!`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
-      navigate(`/leagues/${league.id}`);
+      navigate(`/league-management?leagueId=${league.id}`);
     },
     onError: (error: any) => {
       toast({

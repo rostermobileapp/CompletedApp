@@ -109,6 +109,7 @@ export const leagueMemberships = pgTable("league_memberships", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  skillRating: integer("skill_rating").default(5), // 1-10 rating system for commissioners
   status: membershipStatusEnum("status").default("pending").notNull(),
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
   approvedAt: timestamp("approved_at"),

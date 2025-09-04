@@ -50,7 +50,7 @@ export default function More() {
       label: 'League Management',
       locked: !hasAccess('commissioner'),
       requiredTier: 'COMMISSIONER',
-      action: () => {/* TODO: Navigate to league management */},
+      action: () => navigate('/league-management'),
     },
   ];
 
