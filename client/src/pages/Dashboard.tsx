@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Dashboard() {
@@ -96,19 +96,16 @@ export default function Dashboard() {
         </div>
       )}
       
-      {/* Find a League Section */}
+      {/* Find a League Section - Compact */}
       <div className="px-6 mb-6">
-        <div className="bg-card rounded-xl border border-border p-6 text-center">
-          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-            <Search className="w-8 h-8 text-primary-foreground" />
+        <div className="bg-card rounded-lg border border-border px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Search className="w-5 h-5 text-primary" />
+            <span className="font-medium">Looking for a League?</span>
           </div>
-          <h3 className="text-lg font-semibold mb-2">Looking for a League?</h3>
-          <p className="text-muted-foreground mb-4">
-            Discover leagues in your area and join the action
-          </p>
           <button
             onClick={() => navigate('/league-search')}
-            className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 font-medium"
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium text-sm"
             data-testid="button-find-league"
           >
             Find a League
@@ -135,6 +132,18 @@ export default function Dashboard() {
           </div>
         ) : Array.isArray(upcomingGames) && upcomingGames.length > 0 ? (
           <div className="space-y-3">
+            {/* Beverage Duty Alert */}
+            {upcomingGames.some((game: any) => game.beverageDutyUserId === (user as any)?.id) && (
+              <div className="bg-red-500 text-white rounded-lg p-3 mb-3" data-testid="alert-beverage-duty">
+                <div className="flex items-center gap-2">
+                  <Coffee className="w-4 h-4" />
+                  <span className="font-medium">Beverage Duty Alert!</span>
+                </div>
+                <p className="text-sm mt-1">
+                  You have beverage duty for upcoming games. Don't forget!
+                </p>
+              </div>
+            )}
             {upcomingGames.slice(0, 2).map((game: any) => (
               <div key={game.id} className="bg-card rounded-xl border border-border p-4" data-testid={`card-game-${game.id}`}>
                 <div className="flex items-center gap-4">

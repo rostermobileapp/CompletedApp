@@ -115,6 +115,8 @@ export default function Teams() {
   const primaryTeam = (userTeams as any[])[0];
   const currentTeam = selectedTeam ? (userTeams as any[]).find((t: any) => t.id === selectedTeam) : primaryTeam;
   const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
+  const isCommissioner = (user as any)?.subscriptionTier === 'commissioner';
+  const canUploadLogo = isTeamCaptain || isCommissioner;
 
   // Filter games for current team only
   const teamGames = (upcomingGames as any[]).filter((game: any) => 
@@ -179,7 +181,7 @@ export default function Teams() {
                           {team.wins}-{team.losses}-{team.ties} Record
                         </p>
                       </div>
-                      {isTeamCaptain && (
+                      {canUploadLogo && (
                         <ObjectUploader
                           maxNumberOfFiles={1}
                           maxFileSize={10485760}
