@@ -11,6 +11,7 @@ import { useSubscription } from '@/context/SubscriptionContext';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import {
   ArrowLeft,
+  ArrowRight,
   Crown,
   Users,
   UserCheck,
@@ -126,6 +127,7 @@ export default function LeagueManagement() {
   const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('games');
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [showScheduleGame, setShowScheduleGame] = useState(false);
   const [showEditLeague, setShowEditLeague] = useState(false);
   const [showCreateSeason, setShowCreateSeason] = useState(false);
@@ -779,17 +781,30 @@ export default function LeagueManagement() {
             <div className="bg-card rounded-xl border border-border p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
+                  {selectedTeam && (
+                    <button
+                      onClick={() => setSelectedTeam(null)}
+                      className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-background"
+                      data-testid="button-back-to-teams"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+                  )}
                   <Trophy className="w-5 h-5 text-primary" />
-                  <h3 className="text-lg font-semibold">Teams ({teams.length})</h3>
+                  <h3 className="text-lg font-semibold">
+                    {selectedTeam ? `${selectedTeam.name} Players` : `Teams (${teams.length})`}
+                  </h3>
                 </div>
-                <button
-                  onClick={() => setShowCreateTeam(!showCreateTeam)}
-                  className="flex items-center gap-2 px-4 py-2 bg-warning text-black rounded-lg text-sm font-medium"
-                  data-testid="button-create-team"
-                >
-                  <Plus className="w-4 h-4" />
-                  Create Team
-                </button>
+                {!selectedTeam && (
+                  <button
+                    onClick={() => setShowCreateTeam(!showCreateTeam)}
+                    className="flex items-center gap-2 px-4 py-2 bg-warning text-black rounded-lg text-sm font-medium"
+                    data-testid="button-create-team"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create Team
+                  </button>
+                )}
               </div>
 
               {/* Create Team Form */}
@@ -830,35 +845,97 @@ export default function LeagueManagement() {
                 </div>
               )}
 
-              {/* Teams List */}
-              {teams.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No teams created yet.</p>
-              ) : (
-                <div className="space-y-3">
-                  {teams.map((team: Team) => (
-                    <div key={team.id} className="flex items-center justify-between p-3 bg-background rounded-lg border">
-                      <div className="flex-1" data-testid={`team-${team.id}`}>
-                        <p className="font-medium">{team.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Captain: {members.find((m: LeagueMember) => m.userId === team.captainId)?.user ? formatUserName(members.find((m: LeagueMember) => m.userId === team.captainId)!.user) : 'Not assigned'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            // TODO: Implement team group messaging functionality
-                            toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${team.name}` });
-                          }}
-                          className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium flex items-center gap-2"
-                          data-testid={`button-message-team-${team.id}`}
+              {/* Teams List or Team Detail */}
+              {!selectedTeam ? (
+                // Teams List View
+                teams.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">No teams created yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {teams.map((team: Team) => {
+                      const teamMembers = members.filter((m: LeagueMember) => m.assignedTeamId === team.id);
+                      const captain = members.find((m: LeagueMember) => m.userId === team.captainId);
+                      
+                      return (
+                        <div 
+                          key={team.id} 
+                          className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => setSelectedTeam(team)}
+                          data-testid={`team-${team.id}`}
                         >
-                          <Users className="w-4 h-4" />
-                          Message Team
-                        </button>
-                      </div>
+                          <div className="flex-1">
+                            <p className="font-medium">{team.name}</p>
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <p>Captain: {captain?.user ? formatUserName(captain.user) : 'Not assigned'}</p>
+                              <p>{teamMembers.length} player{teamMembers.length !== 1 ? 's' : ''}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${team.name}` });
+                              }}
+                              className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium flex items-center gap-2"
+                              data-testid={`button-message-team-${team.id}`}
+                            >
+                              <Users className="w-4 h-4" />
+                              Message Team
+                            </button>
+                            <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                // Team Detail View - Show Players in Selected Team
+                (() => {
+                  const teamMembers = members.filter((m: LeagueMember) => m.assignedTeamId === selectedTeam.id);
+                  
+                  return teamMembers.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No players assigned to this team yet</p>
+                      <p className="text-sm text-muted-foreground mt-2">Assign players from the Players tab</p>
                     </div>
-                  ))}
-                </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {teamMembers.map((member: LeagueMember) => (
+                        <div 
+                          key={member.id} 
+                          className="flex items-center justify-between p-3 bg-background rounded-lg border"
+                          data-testid={`team-player-${member.user.id}`}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{formatUserName(member.user)}</p>
+                              {member.userId === selectedTeam.captainId && (
+                                <Crown className="w-4 h-4 text-warning" title="Team Captain" />
+                              )}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              <p>{member.user.email}</p>
+                              {member.position && <p>Position: {member.position}</p>}
+                              {member.jerseyNumber && <p>Jersey: #{member.jerseyNumber}</p>}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="tier-badge bg-success text-accent-foreground text-xs px-2 py-1 rounded-full">
+                              {member.status?.toUpperCase() || 'ACTIVE'}
+                            </span>
+                            {member.skillRating && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Skill: {member.skillRating}/10
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()
               )}
             </div>
           </div>
