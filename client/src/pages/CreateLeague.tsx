@@ -11,9 +11,18 @@ import type { z } from 'zod';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 
-// Create a form schema that includes the new fields
+// Create a form schema that includes the new fields, making most fields optional
 const createLeagueSchema = insertLeagueSchema.extend({
   uniqueLeagueId: insertLeagueSchema.shape.uniqueLeagueId.optional(),
+  description: insertLeagueSchema.shape.description.optional(),
+  location: insertLeagueSchema.shape.location.optional(),
+  rinkName: insertLeagueSchema.shape.rinkName.optional(),
+  rinkAddress: insertLeagueSchema.shape.rinkAddress.optional(),
+  season: insertLeagueSchema.shape.season.optional(),
+}).partial().extend({
+  name: insertLeagueSchema.shape.name, // Keep name as required
+  sport: insertLeagueSchema.shape.sport, // Keep sport as required
+  maxTeams: insertLeagueSchema.shape.maxTeams, // Keep maxTeams as required
 });
 
 type CreateLeagueForm = z.infer<typeof createLeagueSchema>;
@@ -65,6 +74,7 @@ export default function CreateLeague() {
   const onSubmit = (data: CreateLeagueForm) => {
     console.log('Form submitted with data:', data);
     console.log('Form errors:', form.formState.errors);
+    console.log('Form is valid:', form.formState.isValid);
     createLeagueMutation.mutate(data);
   };
 
@@ -277,7 +287,11 @@ export default function CreateLeague() {
             disabled={createLeagueMutation.isPending}
             className="w-full bg-warning text-black rounded-lg py-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="button-create-league"
-            onClick={() => console.log('Button clicked!')}
+            onClick={() => {
+              console.log('Button clicked!');
+              console.log('Form errors:', form.formState.errors);
+              console.log('Form values:', form.getValues());
+            }}
           >
             {createLeagueMutation.isPending ? 'Creating League...' : 'Create League'}
           </button>

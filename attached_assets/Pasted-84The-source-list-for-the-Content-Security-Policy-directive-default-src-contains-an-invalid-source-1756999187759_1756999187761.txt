@@ -1,0 +1,137 @@
+84The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+84The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+84The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-ed957290dfbc6b7b.js:38 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+5The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+5The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+5The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-ed957290dfbc6b7b.js:38 [LaunchDarkly] LaunchDarkly client initialized
+/~:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+attached_assets/screencapture-apple-os-ios-2025-09-04-09_30_39_1756992685021.png:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
+31Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'battery'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'layout-animations'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'navigation-override'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'oversized-images'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'publickey-credentials'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'speaker-selection'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'unoptimized-images'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'unsized-media'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Unrecognized feature: 'pointer-lock'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+framework-d12711ff36e2d472.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-d12711ff36e2d472.js:1Understand this warning
+about:srcdoc:1 An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.Understand this warning
+ cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation
+(anonymous) @ cdn.tailwindcss.com/:64Understand this warning
+about:srcdoc:1 An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.Understand this warning
+ cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation
+(anonymous) @ cdn.tailwindcss.com/:64Understand this warning
+about:srcdoc:1 An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.Understand this warning
+ cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation
+(anonymous) @ cdn.tailwindcss.com/:64Understand this warning
+8[Violation] Potential permissions policy violation: payment is not allowed in this document.Understand this error
+dotdevproxy.pike.replit.dev/__reachability:1  Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+dotdevproxy.pike.replit.dev/__reachability:1  Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+dotdevproxy.pike.replit.dev/__reachability:1  Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+ [Violation] Permissions policy violation: The Clipboard API has been blocked because of a permissions policy applied to the current document. See https://crbug.com/414348233 for more details.
+(anonymous) @ _app-ed957290dfbc6b7b.js:1Understand this error
+[Report Only] Refused to frame 'https://www.google.com/' because an ancestor violates the following Content Security Policy directive: "frame-ancestors 'self'".
+Understand this error
+[Report Only] Refused to frame 'https://www.google.com/' because an ancestor violates the following Content Security Policy directive: "frame-ancestors 'self'".
+Understand this error
+ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.google.com') does not match the recipient window's origin ('https://replit.com').
+Hv @ js?id=AW-11411994397:480Understand this warning
+ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube.com') does not match the recipient window's origin ('https://replit.com').
+Hv @ js?id=AW-11411994397:480Understand this warning
+ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://m.youtube.com') does not match the recipient window's origin ('https://replit.com').
+Hv @ js?id=AW-11411994397:480Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar152%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
+Console.js:61 Button clicked!
+Console.js:61 CreateLeague - Current tier: commissioner Has commissioner access: true
