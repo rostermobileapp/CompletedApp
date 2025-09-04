@@ -72,13 +72,18 @@ export const users = pgTable("users", {
 export const leagues = pgTable("leagues", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
+  uniqueLeagueId: varchar("unique_league_id").unique().notNull(), // For players to search and join
   sport: sportEnum("sport").notNull(),
   description: text("description"),
   location: varchar("location"),
+  rinkName: varchar("rink_name"), // Added for commissioner feature
+  rinkAddress: text("rink_address"), // Added for commissioner feature
   season: varchar("season"),
   commissionerId: varchar("commissioner_id").references(() => users.id).notNull(),
   maxTeams: integer("max_teams").default(16),
   isActive: boolean("is_active").default(true).notNull(),
+  playoffStarted: boolean("playoff_started").default(false).notNull(),
+  playoffBracket: jsonb("playoff_bracket"), // Store playoff bracket data
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -117,6 +122,7 @@ export const teamMemberships = pgTable("team_memberships", {
   teamId: varchar("team_id").references(() => teams.id).notNull(),
   position: varchar("position"),
   jerseyNumber: integer("jersey_number"),
+  skillRating: integer("skill_rating").default(5), // 1-10 rating system for commissioners
   status: membershipStatusEnum("status").default("pending").notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   approvedBy: varchar("approved_by").references(() => users.id),
@@ -145,6 +151,53 @@ export const messages = pgTable("messages", {
   leagueId: varchar("league_id").references(() => leagues.id),
   content: text("content").notNull(),
   messageType: varchar("message_type").default("text").notNull(), // text, image, gif
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Draft status enum
+export const draftStatusEnum = pgEnum("draft_status", [
+  "created",
+  "in_progress", 
+  "completed",
+  "cancelled"
+]);
+
+// Draft round type enum
+export const draftRoundTypeEnum = pgEnum("draft_round_type", [
+  "snake", // Snake draft: reverse order each round
+  "linear" // Linear draft: same order each round
+]);
+
+// Drafts table
+export const drafts = pgTable("drafts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  name: varchar("name").notNull(),
+  status: draftStatusEnum("status").default("created").notNull(),
+  roundType: draftRoundTypeEnum("round_type").default("snake").notNull(),
+  currentRound: integer("current_round").default(1).notNull(),
+  currentTurn: integer("current_turn").default(1).notNull(),
+  totalRounds: integer("total_rounds").default(10).notNull(),
+  draftOrder: jsonb("draft_order"), // Array of team IDs in draft order
+  timePerPick: integer("time_per_pick").default(120), // seconds
+  scheduledAt: timestamp("scheduled_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Draft picks table
+export const draftPicks = pgTable("draft_picks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  draftId: varchar("draft_id").references(() => drafts.id).notNull(),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  playerId: varchar("player_id").references(() => users.id),
+  round: integer("round").notNull(),
+  pick: integer("pick").notNull(), // Overall pick number
+  pickInRound: integer("pick_in_round").notNull(), // Pick number within round
+  pickedAt: timestamp("picked_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -300,6 +353,22 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
   createdAt: true,
 });
 
+export const insertDraftSchema = createInsertSchema(drafts).omit({
+  id: true,
+  currentRound: true,
+  currentTurn: true,
+  startedAt: true,
+  completedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDraftPickSchema = createInsertSchema(draftPicks).omit({
+  id: true,
+  pickedAt: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -316,3 +385,7 @@ export type Game = typeof games.$inferSelect;
 export type InsertGame = z.infer<typeof insertGameSchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Draft = typeof drafts.$inferSelect;
+export type InsertDraft = z.infer<typeof insertDraftSchema>;
+export type DraftPick = typeof draftPicks.$inferSelect;
+export type InsertDraftPick = z.infer<typeof insertDraftPickSchema>;

@@ -1,5 +1,5 @@
 import { useLocation } from 'wouter';
-import { Users, BarChart3, UserPlus, Trophy, Crown, Settings, Bell, Moon, Shield, LogOut } from 'lucide-react';
+import { Users, BarChart3, UserPlus, Trophy, Crown, Settings, Bell, Moon, Shield, LogOut, Plus } from 'lucide-react';
 import { useSubscription } from '@/context/SubscriptionContext';
 
 export default function More() {
@@ -31,6 +31,13 @@ export default function More() {
   ];
 
   const leagueFeatures = [
+    {
+      icon: Plus,
+      label: 'Create League',
+      locked: !hasAccess('commissioner'),
+      requiredTier: 'COMMISSIONER',
+      action: () => navigate('/create-league'),
+    },
     {
       icon: Trophy,
       label: 'Standings',

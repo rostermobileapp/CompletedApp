@@ -1,0 +1,283 @@
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, Crown, MapPin, Calendar } from 'lucide-react';
+import { useLocation } from 'wouter';
+import { insertLeagueSchema } from '@shared/schema';
+import type { z } from 'zod';
+import { useSubscription } from '@/context/SubscriptionContext';
+import { SubscriptionGate } from '@/components/SubscriptionGate';
+
+// Create a form schema that includes the new fields
+const createLeagueSchema = insertLeagueSchema.extend({
+  uniqueLeagueId: insertLeagueSchema.shape.uniqueLeagueId.optional(),
+});
+
+type CreateLeagueForm = z.infer<typeof createLeagueSchema>;
+
+export default function CreateLeague() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { hasAccess } = useSubscription();
+  
+  const form = useForm<CreateLeagueForm>({
+    resolver: zodResolver(createLeagueSchema),
+    defaultValues: {
+      name: '',
+      sport: 'hockey',
+      description: '',
+      location: '',
+      rinkName: '',
+      rinkAddress: '',
+      season: '',
+      maxTeams: 16,
+    },
+  });
+
+  const createLeagueMutation = useMutation({
+    mutationFn: async (data: CreateLeagueForm) => {
+      const response = await apiRequest('POST', '/api/leagues', data);
+      return response.json();
+    },
+    onSuccess: (league) => {
+      toast({
+        title: 'League Created',
+        description: `${league.name} has been created successfully!`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
+      navigate(`/leagues/${league.id}`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to Create League',
+        description: error.message || 'An error occurred while creating the league',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const onSubmit = (data: CreateLeagueForm) => {
+    createLeagueMutation.mutate(data);
+  };
+
+  if (!hasAccess('commissioner')) {
+    return (
+      <SubscriptionGate requiredTier="commissioner">
+        <div className="min-h-screen flex flex-col items-center justify-center px-6">
+          <Crown className="w-16 h-16 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-bold mb-2">Commissioner Access Required</h2>
+          <p className="text-muted-foreground text-center mb-6">
+            You need Commissioner tier access to create leagues and manage teams.
+          </p>
+          <button 
+            onClick={() => navigate('/subscription')}
+            className="bg-warning text-black px-6 py-3 rounded-lg font-semibold"
+          >
+            Upgrade to Commissioner
+          </button>
+        </div>
+      </SubscriptionGate>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col pb-24" data-testid="create-league-page">
+      {/* Header */}
+      <div className="p-6 pt-12">
+        <div className="flex items-center gap-4 mb-6">
+          <button 
+            onClick={() => navigate('/more')}
+            className="text-muted-foreground"
+            data-testid="button-back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Create League</h1>
+          <Crown className="w-6 h-6 text-warning" />
+        </div>
+        <p className="text-muted-foreground">
+          Set up a new league for your sport community
+        </p>
+      </div>
+      
+      {/* Form */}
+      <div className="px-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* Basic Information */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2" data-testid="label-league-name">
+                  League Name *
+                </label>
+                <input
+                  {...form.register('name')}
+                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="e.g., Downtown Hockey League"
+                  data-testid="input-league-name"
+                />
+                {form.formState.errors.name && (
+                  <p className="text-destructive text-sm mt-1">{form.formState.errors.name.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" data-testid="label-unique-id">
+                  League ID (optional)
+                </label>
+                <input
+                  {...form.register('uniqueLeagueId')}
+                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Leave blank for auto-generated ID"
+                  data-testid="input-unique-id"
+                />
+                <p className="text-muted-foreground text-xs mt-1">
+                  Players will use this ID to search and join your league
+                </p>
+                {form.formState.errors.uniqueLeagueId && (
+                  <p className="text-destructive text-sm mt-1">{form.formState.errors.uniqueLeagueId.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" data-testid="label-sport">
+                  Sport *
+                </label>
+                <select
+                  {...form.register('sport')}
+                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="select-sport"
+                >
+                  <option value="hockey">Hockey</option>
+                  <option value="basketball">Basketball</option>
+                  <option value="soccer">Soccer</option>
+                  <option value="baseball">Baseball</option>
+                  <option value="softball">Softball</option>
+                  <option value="football">Football</option>
+                  <option value="volleyball">Volleyball</option>
+                  <option value="tennis">Tennis</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" data-testid="label-description">
+                  Description
+                </label>
+                <textarea
+                  {...form.register('description')}
+                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  rows={3}
+                  placeholder="Describe your league..."
+                  data-testid="textarea-description"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Location & Venue */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MapPin className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">Location & Venue</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2" data-testid="label-location">
+                  General Location
+                </label>
+                <input
+                  {...form.register('location')}
+                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="e.g., Downtown Toronto"
+                  data-testid="input-location"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" data-testid="label-rink-name">
+                  Rink/Venue Name
+                </label>
+                <input
+                  {...form.register('rinkName')}
+                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="e.g., Metro Ice Center"
+                  data-testid="input-rink-name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" data-testid="label-rink-address">
+                  Venue Address
+                </label>
+                <textarea
+                  {...form.register('rinkAddress')}
+                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  rows={2}
+                  placeholder="Full address of the venue"
+                  data-testid="textarea-rink-address"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* League Settings */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">League Settings</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2" data-testid="label-season">
+                  Season
+                </label>
+                <input
+                  {...form.register('season')}
+                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="e.g., Winter 2025"
+                  data-testid="input-season"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" data-testid="label-max-teams">
+                  Maximum Teams
+                </label>
+                <input
+                  {...form.register('maxTeams', { valueAsNumber: true })}
+                  type="number"
+                  min="4"
+                  max="32"
+                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="input-max-teams"
+                />
+                {form.formState.errors.maxTeams && (
+                  <p className="text-destructive text-sm mt-1">{form.formState.errors.maxTeams.message}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={createLeagueMutation.isPending}
+            className="w-full bg-warning text-black rounded-lg py-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="button-create-league"
+          >
+            {createLeagueMutation.isPending ? 'Creating League...' : 'Create League'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

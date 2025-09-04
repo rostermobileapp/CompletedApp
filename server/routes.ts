@@ -53,7 +53,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leagues", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Check if user has commissioner tier
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner tier required to create leagues" });
+      }
+      
       const leagueData = insertLeagueSchema.parse(req.body);
+      
+      // Generate unique league ID if not provided
+      if (!leagueData.uniqueLeagueId) {
+        leagueData.uniqueLeagueId = `${leagueData.name.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substring(2, 8)}`;
+      }
+      
+      // Check if unique league ID already exists
+      const existingLeague = await storage.getLeagueByUniqueId(leagueData.uniqueLeagueId);
+      if (existingLeague) {
+        return res.status(400).json({ message: "League ID already exists, please choose a different name" });
+      }
+      
       const league = await storage.createLeague({
         ...leagueData,
         commissionerId: userId,
@@ -250,6 +269,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error creating subscription:", error);
       return res.status(400).json({ error: { message: error.message } });
+    }
+  });
+
+  // Change subscription tier (free for testing)
+  app.post('/api/change-tier', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tier } = req.body;
+
+      if (!tier || !['free', 'player_plus', 'commissioner'].includes(tier)) {
+        return res.status(400).json({ message: 'Invalid tier specified' });
+      }
+
+      await storage.updateUserSubscription(userId, tier);
+      
+      res.json({ 
+        message: 'Subscription tier updated successfully',
+        tier: tier 
+      });
+    } catch (error: any) {
+      console.error("Error updating subscription tier:", error);
+      return res.status(500).json({ message: "Failed to update subscription tier" });
     }
   });
 

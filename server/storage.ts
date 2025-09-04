@@ -36,6 +36,8 @@ export interface IStorage {
   getLeagues(sport?: string, search?: string): Promise<League[]>;
   getLeague(id: string): Promise<League | undefined>;
   getUserLeagues(userId: string): Promise<League[]>;
+  getLeagueByUniqueId(uniqueLeagueId: string): Promise<League | undefined>;
+  updateLeague(id: string, updates: Partial<League>): Promise<League>;
   
   // Team operations
   createTeam(team: InsertTeam): Promise<Team>;
@@ -162,6 +164,20 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return result.map(r => r.league);
+  }
+
+  async getLeagueByUniqueId(uniqueLeagueId: string): Promise<League | undefined> {
+    const [league] = await db.select().from(leagues).where(eq(leagues.uniqueLeagueId, uniqueLeagueId));
+    return league;
+  }
+
+  async updateLeague(id: string, updates: Partial<League>): Promise<League> {
+    const [league] = await db
+      .update(leagues)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(leagues.id, id))
+      .returning();
+    return league;
   }
 
   // Team operations
