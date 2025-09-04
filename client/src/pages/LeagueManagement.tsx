@@ -26,7 +26,7 @@ import {
   AlertCircle,
   Settings
 } from 'lucide-react';
-import { insertTeamSchema } from '@shared/schema';
+import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
 
 type LeagueMember = {
   id: string;
@@ -45,6 +45,16 @@ type LeagueMember = {
     displayName?: string;
     email: string;
   };
+};
+
+type Season = {
+  id: string;
+  name: string;
+  leagueId: string;
+  startDate?: string;
+  endDate?: string;
+  isActive: boolean;
+  createdAt: string;
 };
 
 // Utility function to format names as "Last Name, First Name"
@@ -99,6 +109,15 @@ const editLeagueSchema = z.object({
 
 type EditLeagueForm = z.infer<typeof editLeagueSchema>;
 
+const createSeasonSchema = z.object({
+  name: z.string().min(1, 'Season name is required'),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  isActive: z.boolean().default(true),
+});
+
+type CreateSeasonForm = z.infer<typeof createSeasonSchema>;
+
 export default function LeagueManagement() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -109,6 +128,8 @@ export default function LeagueManagement() {
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
   const [showScheduleGame, setShowScheduleGame] = useState(false);
   const [showEditLeague, setShowEditLeague] = useState(false);
+  const [showCreateSeason, setShowCreateSeason] = useState(false);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
   const [playerEditForm, setPlayerEditForm] = useState({
     assignedTeamId: '',
     isCaptain: false,
@@ -137,6 +158,16 @@ export default function LeagueManagement() {
     queryKey: ['/api/leagues', leagueId],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}`);
+      return response.json();
+    },
+    enabled: !!leagueId,
+  });
+
+  // Fetch seasons for this league
+  const { data: seasons = [], refetch: refetchSeasons } = useQuery<Season[]>({
+    queryKey: ['/api/leagues', leagueId, 'seasons'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/seasons`);
       return response.json();
     },
     enabled: !!leagueId,
@@ -204,6 +235,15 @@ export default function LeagueManagement() {
     },
   });
 
+  // Form for creating seasons
+  const seasonForm = useForm<CreateSeasonForm>({
+    resolver: zodResolver(createSeasonSchema),
+    defaultValues: {
+      name: '',
+      isActive: true,
+    },
+  });
+
   // Update form when league data loads
   React.useEffect(() => {
     if (league) {
@@ -216,6 +256,14 @@ export default function LeagueManagement() {
       });
     }
   }, [league, editLeagueForm]);
+
+  // Set initial selected season to the first active season or first season
+  React.useEffect(() => {
+    if (seasons.length > 0 && !selectedSeasonId) {
+      const activeSeason = seasons.find(s => s.isActive);
+      setSelectedSeasonId(activeSeason?.id || seasons[0].id);
+    }
+  }, [seasons, selectedSeasonId]);
 
   // Mutations for member management
   const approveMutation = useMutation({
@@ -350,6 +398,46 @@ export default function LeagueManagement() {
     },
   });
 
+  // League delete mutation
+  const deleteLeagueMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('DELETE', `/api/leagues/${leagueId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'League deleted successfully' });
+      navigate('/league-list');
+    },
+    onError: () => {
+      toast({
+        title: 'Delete Failed',
+        description: 'Failed to delete league.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Season create mutation
+  const createSeasonMutation = useMutation({
+    mutationFn: async (data: CreateSeasonForm) => {
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/seasons`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Season created successfully' });
+      setShowCreateSeason(false);
+      seasonForm.reset();
+      refetchSeasons();
+    },
+    onError: () => {
+      toast({
+        title: 'Creation Failed',
+        description: 'Failed to create season.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   if (!hasAccess('commissioner')) {
     return (
       <SubscriptionGate requiredTier="commissioner">
@@ -477,6 +565,55 @@ export default function LeagueManagement() {
             <Settings className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Season Selector */}
+        {seasons.length > 0 && (
+          <div className="flex items-center gap-4 mb-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-2">Season</label>
+              <select
+                value={selectedSeasonId}
+                onChange={(e) => setSelectedSeasonId(e.target.value)}
+                className="w-full p-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                data-testid="select-season"
+              >
+                {seasons.map((season) => (
+                  <option key={season.id} value={season.id}>
+                    {season.name} {season.isActive ? '(Active)' : '(Inactive)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => setShowCreateSeason(true)}
+              className="mt-6 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium"
+              data-testid="button-create-season"
+            >
+              <Plus className="w-4 h-4 mr-2 inline" />
+              New Season
+            </button>
+          </div>
+        )}
+
+        {/* Create First Season */}
+        {seasons.length === 0 && (
+          <div className="mb-4 p-4 bg-card border border-border rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium">No seasons yet</h3>
+                <p className="text-sm text-muted-foreground">Create your first season to start organizing games and teams.</p>
+              </div>
+              <button
+                onClick={() => setShowCreateSeason(true)}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium"
+                data-testid="button-create-first-season"
+              >
+                <Plus className="w-4 h-4 mr-2 inline" />
+                Create Season
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Tab Navigation */}
         <div className="flex bg-muted rounded-lg p-1">
@@ -1099,6 +1236,57 @@ export default function LeagueManagement() {
                   </label>
                 </div>
 
+                {/* Commissioner Transfer */}
+                <div className="border-t pt-4">
+                  <h3 className="font-medium mb-3 text-orange-600">⚠️ Transfer Commissioner</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Transfer ownership of this league to another user. You will lose all commissioner privileges for this league.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      placeholder="Enter new commissioner's email"
+                      className="flex-1 p-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      data-testid="input-new-commissioner-email"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const email = (document.querySelector('[data-testid="input-new-commissioner-email"]') as HTMLInputElement)?.value;
+                        if (!email) {
+                          toast({ title: 'Please enter an email address', variant: 'destructive' });
+                          return;
+                        }
+                        if (confirm(`Are you sure you want to transfer commissioner privileges to ${email}? This action cannot be undone.`)) {
+                          // TODO: Implement commissioner transfer
+                          toast({ title: 'Commissioner transfer functionality coming soon!' });
+                        }
+                      }}
+                      className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium"
+                      data-testid="button-transfer-commissioner"
+                    >
+                      Transfer
+                    </button>
+                  </div>
+                </div>
+
+                {/* Delete League Button */}
+                <div className="border-t pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to delete the league "${league?.name}"? This action cannot be undone and will remove all associated teams, games, and data.`)) {
+                        deleteLeagueMutation.mutate();
+                      }
+                    }}
+                    disabled={deleteLeagueMutation.isPending}
+                    className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium disabled:opacity-50"
+                    data-testid="button-delete-league"
+                  >
+                    {deleteLeagueMutation.isPending ? 'Deleting...' : 'Delete League'}
+                  </button>
+                </div>
+
                 {/* Submit Buttons */}
                 <div className="flex gap-3 pt-4">
                   <button
@@ -1116,6 +1304,105 @@ export default function LeagueManagement() {
                     data-testid="button-save-league-changes"
                   >
                     {updateLeagueMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Season Modal */}
+      {showCreateSeason && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Create New Season</h2>
+                <button
+                  onClick={() => setShowCreateSeason(false)}
+                  className="text-muted-foreground hover:text-foreground p-1"
+                  data-testid="button-close-create-season"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={seasonForm.handleSubmit((data) => {
+                  createSeasonMutation.mutate(data);
+                })}
+                className="space-y-4"
+              >
+                {/* Season Name */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Season Name</label>
+                  <input
+                    {...seasonForm.register('name')}
+                    type="text"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="e.g., Spring 2024, Fall League 2023"
+                    data-testid="input-season-name"
+                  />
+                  {seasonForm.formState.errors.name && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {seasonForm.formState.errors.name.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Start Date */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Start Date (Optional)</label>
+                  <input
+                    {...seasonForm.register('startDate')}
+                    type="date"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-season-start-date"
+                  />
+                </div>
+
+                {/* End Date */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">End Date (Optional)</label>
+                  <input
+                    {...seasonForm.register('endDate')}
+                    type="date"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-season-end-date"
+                  />
+                </div>
+
+                {/* Active Status */}
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      {...seasonForm.register('isActive')}
+                      type="checkbox"
+                      className="rounded border-border focus:ring-primary"
+                      data-testid="checkbox-season-active"
+                    />
+                    <span className="text-sm font-medium">Season is active</span>
+                  </label>
+                </div>
+
+                {/* Submit Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateSeason(false)}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                    data-testid="button-cancel-create-season"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createSeasonMutation.isPending}
+                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                    data-testid="button-create-season-submit"
+                  >
+                    {createSeasonMutation.isPending ? 'Creating...' : 'Create Season'}
                   </button>
                 </div>
               </form>

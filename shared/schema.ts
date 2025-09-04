@@ -91,11 +91,24 @@ export const leagues = pgTable("leagues", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Seasons table 
+export const seasons = pgTable("seasons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(), // e.g., "Spring 2024", "Fall 2023"
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Teams table
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  seasonId: varchar("season_id").references(() => seasons.id), // Made nullable for safe migration
   captainId: varchar("captain_id").references(() => users.id),
   logoUrl: varchar("logo_url"),
   wins: integer("wins").default(0).notNull(),
@@ -142,6 +155,7 @@ export const teamMemberships = pgTable("team_memberships", {
 export const games = pgTable("games", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  seasonId: varchar("season_id").references(() => seasons.id), // Made nullable for safe migration
   homeTeamId: varchar("home_team_id").references(() => teams.id).notNull(),
   awayTeamId: varchar("away_team_id").references(() => teams.id).notNull(),
   scheduledAt: timestamp("scheduled_at").notNull(),
@@ -226,16 +240,30 @@ export const leaguesRelations = relations(leagues, ({ one, many }) => ({
     fields: [leagues.commissionerId],
     references: [users.id],
   }),
+  seasons: many(seasons),
   teams: many(teams),
   memberships: many(leagueMemberships),
   games: many(games),
   messages: many(messages),
 }));
 
+export const seasonsRelations = relations(seasons, ({ one, many }) => ({
+  league: one(leagues, {
+    fields: [seasons.leagueId],
+    references: [leagues.id],
+  }),
+  teams: many(teams),
+  games: many(games),
+}));
+
 export const teamsRelations = relations(teams, ({ one, many }) => ({
   league: one(leagues, {
     fields: [teams.leagueId],
     references: [leagues.id],
+  }),
+  season: one(seasons, {
+    fields: [teams.seasonId],
+    references: [seasons.id],
   }),
   captain: one(users, {
     fields: [teams.captainId],
@@ -281,6 +309,10 @@ export const gamesRelations = relations(games, ({ one }) => ({
   league: one(leagues, {
     fields: [games.leagueId],
     references: [leagues.id],
+  }),
+  season: one(seasons, {
+    fields: [games.seasonId],
+    references: [seasons.id],
   }),
   homeTeam: one(teams, {
     fields: [games.homeTeamId],
@@ -379,12 +411,20 @@ export const insertDraftPickSchema = createInsertSchema(draftPicks).omit({
   createdAt: true,
 });
 
+export const insertSeasonSchema = createInsertSchema(seasons).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type League = typeof leagues.$inferSelect;
 export type InsertLeague = z.infer<typeof insertLeagueSchema>;
+export type Season = typeof seasons.$inferSelect;
+export type InsertSeason = z.infer<typeof insertSeasonSchema>;
 export type Team = typeof teams.$inferSelect;
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
 export type LeagueMembership = typeof leagueMemberships.$inferSelect;

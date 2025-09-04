@@ -191,6 +191,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/leagues/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const leagueId = req.params.id;
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+      
+      // Verify that the user owns the league
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: "You can only delete your own leagues" });
+      }
+      
+      await storage.deleteLeague(leagueId);
+      res.json({ message: "League deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting league:", error);
+      res.status(500).json({ message: "Failed to delete league" });
+    }
+  });
+
+  // Season routes
+  app.get("/api/leagues/:leagueId/seasons", async (req, res) => {
+    try {
+      const seasons = await storage.getSeasonsByLeague(req.params.leagueId);
+      res.json(seasons);
+    } catch (error) {
+      console.error("Error fetching seasons:", error);
+      res.status(500).json({ message: "Failed to fetch seasons" });
+    }
+  });
+
+  app.post("/api/leagues/:leagueId/seasons", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const leagueId = req.params.leagueId;
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+      
+      // Verify that the user owns the league
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: "You can only manage your own leagues" });
+      }
+      
+      const seasonData = { ...req.body, leagueId };
+      const season = await storage.createSeason(seasonData);
+      res.json(season);
+    } catch (error) {
+      console.error("Error creating season:", error);
+      res.status(500).json({ message: "Failed to create season" });
+    }
+  });
+
   // League membership routes
   app.post("/api/leagues/:id/join", isAuthenticated, async (req: any, res) => {
     try {

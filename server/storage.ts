@@ -1,6 +1,7 @@
 import {
   users,
   leagues,
+  seasons,
   teams,
   leagueMemberships,
   teamMemberships,
@@ -10,6 +11,8 @@ import {
   type UpsertUser,
   type League,
   type InsertLeague,
+  type Season,
+  type InsertSeason,
   type Team,
   type InsertTeam,
   type LeagueMembership,
@@ -41,6 +44,14 @@ export interface IStorage {
   getLeaguesByCommissioner(commissionerId: string): Promise<League[]>;
   getLeagueByUniqueId(uniqueLeagueId: string): Promise<League | undefined>;
   updateLeague(id: string, updates: Partial<League>): Promise<League>;
+  deleteLeague(id: string): Promise<void>;
+
+  // Season operations
+  createSeason(season: InsertSeason): Promise<Season>;
+  getSeasonsByLeague(leagueId: string): Promise<Season[]>;
+  getSeason(id: string): Promise<Season | undefined>;
+  updateSeason(id: string, updates: Partial<Season>): Promise<Season>;
+  deleteSeason(id: string): Promise<void>;
   
   // Team operations
   createTeam(team: InsertTeam): Promise<Team>;
@@ -225,6 +236,51 @@ export class DatabaseStorage implements IStorage {
       .where(eq(leagues.id, id))
       .returning();
     return league;
+  }
+
+  async deleteLeague(id: string): Promise<void> {
+    // TODO: Implement cascade deletion of related data (teams, games, memberships)
+    await db.delete(leagues).where(eq(leagues.id, id));
+  }
+
+  // Season operations
+  async createSeason(season: InsertSeason): Promise<Season> {
+    const [newSeason] = await db
+      .insert(seasons)
+      .values(season)
+      .returning();
+    return newSeason;
+  }
+
+  async getSeasonsByLeague(leagueId: string): Promise<Season[]> {
+    const result = await db
+      .select()
+      .from(seasons)
+      .where(eq(seasons.leagueId, leagueId))
+      .orderBy(desc(seasons.createdAt));
+    return result;
+  }
+
+  async getSeason(id: string): Promise<Season | undefined> {
+    const [season] = await db
+      .select()
+      .from(seasons)
+      .where(eq(seasons.id, id));
+    return season;
+  }
+
+  async updateSeason(id: string, updates: Partial<Season>): Promise<Season> {
+    const [season] = await db
+      .update(seasons)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(seasons.id, id))
+      .returning();
+    return season;
+  }
+
+  async deleteSeason(id: string): Promise<void> {
+    // TODO: Implement cascade deletion of related data (teams, games)
+    await db.delete(seasons).where(eq(seasons.id, id));
   }
 
   // Team operations
