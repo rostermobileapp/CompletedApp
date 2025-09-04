@@ -3,7 +3,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, UserCheck, UserX } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 
 export default function Dashboard() {
@@ -25,6 +29,47 @@ export default function Dashboard() {
 
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
   const primaryLeagueMembership = Array.isArray(userLeagueMemberships) && userLeagueMemberships.length > 0 ? userLeagueMemberships[0] : null;
+
+  // Attendance mutations
+  const checkInMutation = useMutation({
+    mutationFn: async (data: { gameId: string; teamId: string }) => {
+      return apiRequest('POST', `/api/games/${data.gameId}/check-in`, { teamId: data.teamId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      toast({
+        title: "Success",
+        description: "Checked in successfully!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to check in. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const checkOutMutation = useMutation({
+    mutationFn: async (gameId: string) => {
+      return apiRequest('POST', `/api/games/${gameId}/check-out`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      toast({
+        title: "Success",
+        description: "Checked out successfully!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to check out. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="dashboard-page">
@@ -206,10 +251,39 @@ export default function Dashboard() {
                       </p>
                     )}
                   </div>
-                  <div className="text-right">
-                    <span className="tier-badge bg-success text-accent-foreground text-xs px-2 py-1 rounded-full" data-testid={`badge-game-status-${game.id}`}>
+                  <div className="flex flex-col gap-2">
+                    <span className="tier-badge bg-success text-accent-foreground text-xs px-2 py-1 rounded-full text-center" data-testid={`badge-game-status-${game.id}`}>
                       UPCOMING
                     </span>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs bg-green-500 text-white hover:bg-green-600 border-green-500"
+                        onClick={() => {
+                          const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
+                          if (userTeam && primaryTeam) {
+                            checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                          }
+                        }}
+                        disabled={checkInMutation.isPending}
+                        data-testid={`button-check-in-${game.id}`}
+                      >
+                        <UserCheck className="w-3 h-3 mr-1" />
+                        Check In
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs bg-red-500 text-white hover:bg-red-600 border-red-500"
+                        onClick={() => checkOutMutation.mutate(game.id)}
+                        disabled={checkOutMutation.isPending}
+                        data-testid={`button-check-out-${game.id}`}
+                      >
+                        <UserX className="w-3 h-3 mr-1" />
+                        Check Out
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

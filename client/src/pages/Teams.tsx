@@ -41,6 +41,16 @@ export default function Teams() {
     enabled: !!isAuthenticated,
   });
 
+  // Fetch attendance data for games where user is captain (for alerts)
+  const { data: gameAttendanceCounts } = useQuery({
+    queryKey: ['/api/games/attendance/captain-overview'],
+    enabled: !!(user && (
+      (userTeams as any[])?.some((team: any) => team.captainId === (user as any)?.id) ||
+      (userLeagueMemberships as any[])?.some((membership: any) => membership.isCaptain) ||
+      (user as any)?.subscriptionTier === 'commissioner'
+    )),
+  });
+
   // Team logo upload mutation
   const updateTeamLogoMutation = useMutation({
     mutationFn: async (data: { teamId: string; logoUrl: string }) => {
@@ -156,8 +166,36 @@ export default function Teams() {
             </CardContent>
           </Card>
         ) : (
-          <Tabs value={selectedTeam || primaryTeam?.id || ''} onValueChange={setSelectedTeam}>
-            {/* Team Selection */}
+          <>
+            {/* Attendance Alerts for Captains */}
+            {Array.isArray(gameAttendanceCounts) && gameAttendanceCounts.length > 0 && (
+              <div className="space-y-3">
+                {gameAttendanceCounts
+                  .filter((game: any) => game.attendanceRate < 70) // Show alert if less than 70% attendance
+                  .slice(0, 3)
+                  .map((game: any) => (
+                  <div
+                    key={game.gameId}
+                    className="bg-orange-500 text-white rounded-lg p-3"
+                    data-testid={`alert-attendance-${game.gameId}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <span className="font-medium">Low Attendance Alert!</span>
+                    </div>
+                    <p className="text-sm mt-1">
+                      {game.teamName} vs {game.opponent}: Only {game.checkedInCount}/{game.totalRoster} players checked in ({game.attendanceRate}%)
+                    </p>
+                    <p className="text-xs mt-1">
+                      Game: {new Date(game.scheduledAt).toLocaleDateString()} at {new Date(game.scheduledAt).toLocaleTimeString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <Tabs value={selectedTeam || primaryTeam?.id || ''} onValueChange={setSelectedTeam}>
+              {/* Team Selection */}
             {(userTeams as any[]).length > 1 && (
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 {(userTeams as any[]).slice(0, 2).map((team: any) => (
@@ -194,7 +232,11 @@ export default function Teams() {
                           {team.wins}-{team.losses}-{team.ties} Record
                         </p>
                       </div>
-                      {canUploadLogo && (
+                      {((team.captainId === (user as any)?.id) || 
+                        (userLeagueMemberships as any[]).find((membership: any) => 
+                          membership.assignedTeamId === team.id && membership.isCaptain
+                        ) || 
+                        (user as any)?.subscriptionTier === 'commissioner') && (
                         <ObjectUploader
                           maxNumberOfFiles={1}
                           maxFileSize={10485760}
@@ -356,6 +398,7 @@ export default function Teams() {
               </TabsContent>
             ))}
           </Tabs>
+          </>
         )}
       </div>
     </div>

@@ -6,6 +6,7 @@ import {
   leagueMemberships,
   teamMemberships,
   games,
+  gameAttendance,
   messages,
   type User,
   type UpsertUser,
@@ -597,6 +598,132 @@ export class DatabaseStorage implements IStorage {
     }
     
     return updatedGame;
+  }
+
+  // Attendance operations
+  async checkInToGame(gameId: string, userId: string, teamId: string): Promise<any> {
+    const [attendance] = await db
+      .insert(gameAttendance)
+      .values({
+        gameId,
+        userId,
+        teamId,
+        status: 'checked_in',
+        checkedInAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [gameAttendance.gameId, gameAttendance.userId],
+        set: {
+          status: 'checked_in',
+          checkedInAt: new Date(),
+          checkedOutAt: null,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return attendance;
+  }
+
+  async checkOutFromGame(gameId: string, userId: string): Promise<any> {
+    const [attendance] = await db
+      .update(gameAttendance)
+      .set({
+        status: 'checked_out',
+        checkedOutAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(gameAttendance.gameId, gameId),
+          eq(gameAttendance.userId, userId)
+        )
+      )
+      .returning();
+    return attendance;
+  }
+
+  async getGameAttendance(gameId: string): Promise<any[]> {
+    const attendance = await db
+      .select()
+      .from(gameAttendance)
+      .innerJoin(users, eq(gameAttendance.userId, users.id))
+      .where(eq(gameAttendance.gameId, gameId));
+    
+    return attendance.map(a => ({
+      ...a.game_attendance,
+      user: a.users
+    }));
+  }
+
+  async getUserAttendanceStatus(gameId: string, userId: string): Promise<any | null> {
+    const [attendance] = await db
+      .select()
+      .from(gameAttendance)
+      .where(
+        and(
+          eq(gameAttendance.gameId, gameId),
+          eq(gameAttendance.userId, userId)
+        )
+      );
+    return attendance || null;
+  }
+
+  async getCaptainAttendanceOverview(userId: string): Promise<any[]> {
+    // Get teams where user is captain
+    const captainTeams = await db
+      .select({ id: teams.id, name: teams.name })
+      .from(teams)
+      .where(eq(teams.captainId, userId));
+
+    // Get league memberships where user is captain
+    const captainMemberships = await db
+      .select({ 
+        teamId: leagueMemberships.assignedTeamId,
+        teamName: teams.name 
+      })
+      .from(leagueMemberships)
+      .innerJoin(teams, eq(leagueMemberships.assignedTeamId, teams.id))
+      .where(
+        and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.isCaptain, true)
+        )
+      );
+
+    // Combine all teams where user is captain
+    const allCaptainTeams = [
+      ...captainTeams.map(t => ({ id: t.id, name: t.name })),
+      ...captainMemberships.map(m => ({ id: m.teamId!, name: m.teamName }))
+    ];
+
+    const attendanceOverview = [];
+
+    for (const team of allCaptainTeams) {
+      // Get upcoming games for this team
+      const upcomingGames = await this.getTeamGames(team.id);
+      const upcomingOnly = upcomingGames.filter(game => new Date(game.scheduledAt) > new Date());
+
+      for (const game of upcomingOnly.slice(0, 5)) { // Limit to next 5 games
+        const attendance = await this.getGameAttendance(game.id);
+        const checkedInCount = attendance.filter(a => a.status === 'checked_in').length;
+        const totalRoster = await this.getTeamMembers(team.id);
+        
+        attendanceOverview.push({
+          gameId: game.id,
+          teamId: team.id,
+          teamName: team.name,
+          opponent: game.homeTeam?.id === team.id ? game.awayTeam?.name : game.homeTeam?.name,
+          scheduledAt: game.scheduledAt,
+          checkedInCount,
+          totalRoster: totalRoster.length,
+          attendanceRate: totalRoster.length > 0 ? Math.round((checkedInCount / totalRoster.length) * 100) : 0
+        });
+      }
+    }
+
+    return attendanceOverview.sort((a, b) => 
+      new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+    );
   }
 
   async getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
