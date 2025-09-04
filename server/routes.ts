@@ -35,6 +35,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/auth/user/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { firstName, lastName, city, age, phoneNumber } = req.body;
+      
+      const profileData: any = {};
+      if (firstName !== undefined) profileData.firstName = firstName;
+      if (lastName !== undefined) profileData.lastName = lastName;
+      if (city !== undefined) profileData.city = city;
+      if (age !== undefined) profileData.age = parseInt(age);
+      if (phoneNumber !== undefined) profileData.phoneNumber = phoneNumber;
+
+      const user = await storage.updateUserProfile(userId, profileData);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  app.patch('/api/auth/user/image', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { profileImageUrl } = req.body;
+
+      if (!profileImageUrl) {
+        return res.status(400).json({ message: "Profile image URL is required" });
+      }
+
+      const user = await storage.updateUserImage(userId, profileImageUrl);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user image:", error);
+      res.status(500).json({ message: "Failed to update profile image" });
+    }
+  });
+
+  // Object storage routes for profile images  
+  app.post("/api/profile-images/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getProfileImageUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting profile image upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
   // League routes
   app.get("/api/leagues", async (req, res) => {
     try {
@@ -46,6 +96,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(leagues);
     } catch (error) {
       console.error("Error fetching leagues:", error);
+      res.status(500).json({ message: "Failed to fetch leagues" });
+    }
+  });
+
+  app.get("/api/leagues/commissioner", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+      
+      const leagues = await storage.getLeaguesByCommissioner(userId);
+      res.json(leagues);
+    } catch (error) {
+      console.error("Error fetching commissioner leagues:", error);
       res.status(500).json({ message: "Failed to fetch leagues" });
     }
   });
@@ -84,6 +151,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating league:", error);
       res.status(500).json({ message: "Failed to create league" });
+    }
+  });
+
+  app.patch("/api/leagues/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const leagueId = req.params.id;
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+      
+      // Verify that the user owns the league
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: "You can only edit your own leagues" });
+      }
+      
+      const result = await storage.updateLeague(leagueId, req.body);
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating league:", error);
+      res.status(500).json({ message: "Failed to update league" });
     }
   });
 

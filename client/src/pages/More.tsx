@@ -51,19 +51,7 @@ export default function More() {
       label: 'League Management',
       locked: !hasAccess('commissioner'),
       requiredTier: 'COMMISSIONER',
-      action: async () => {
-        try {
-          const response = await apiRequest('GET', '/api/user/commissioner-leagues');
-          const leagues = await response.json();
-          if (leagues.length > 0) {
-            navigate(`/league-management?leagueId=${leagues[0].id}`);
-          } else {
-            navigate('/create-league');
-          }
-        } catch (error) {
-          navigate('/create-league');
-        }
-      },
+      action: () => navigate('/league-list'),
     },
   ];
 

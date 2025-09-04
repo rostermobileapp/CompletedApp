@@ -28,6 +28,8 @@ export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber'>>): Promise<User>;
+  updateUserImage(id: string, profileImageUrl: string): Promise<User>;
   updateUserSubscription(id: string, tier: string): Promise<User>;
   updateUserStripeInfo(id: string, customerId: string, subscriptionId: string): Promise<User>;
   
@@ -36,6 +38,7 @@ export interface IStorage {
   getLeagues(sport?: string, search?: string): Promise<League[]>;
   getLeague(id: string): Promise<League | undefined>;
   getUserLeagues(userId: string): Promise<League[]>;
+  getLeaguesByCommissioner(commissionerId: string): Promise<League[]>;
   getLeagueByUniqueId(uniqueLeagueId: string): Promise<League | undefined>;
   updateLeague(id: string, updates: Partial<League>): Promise<League>;
   
@@ -116,6 +119,30 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber'>>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ...profileData,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserImage(id: string, profileImageUrl: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        profileImageUrl,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
   // League operations
   async createLeague(league: InsertLeague): Promise<League> {
     const [newLeague] = await db.insert(leagues).values(league).returning();
@@ -169,6 +196,14 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return result.map(r => r.league);
+  }
+
+  async getLeaguesByCommissioner(commissionerId: string): Promise<League[]> {
+    const result = await db
+      .select()
+      .from(leagues)
+      .where(eq(leagues.commissionerId, commissionerId));
+    return result;
   }
 
   async getCommissionerLeagues(userId: string): Promise<League[]> {

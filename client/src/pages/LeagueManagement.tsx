@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -88,15 +89,26 @@ const createGameSchema = z.object({
 
 type CreateGameForm = z.infer<typeof createGameSchema>;
 
+const editLeagueSchema = z.object({
+  name: z.string().min(1, 'League name is required'),
+  description: z.string().optional(),
+  location: z.string().optional(),
+  season: z.string().optional(),
+  isActive: z.boolean(),
+});
+
+type EditLeagueForm = z.infer<typeof editLeagueSchema>;
+
 export default function LeagueManagement() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { hasAccess } = useSubscription();
-  const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('players');
+  const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('games');
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
   const [showScheduleGame, setShowScheduleGame] = useState(false);
+  const [showEditLeague, setShowEditLeague] = useState(false);
   const [playerEditForm, setPlayerEditForm] = useState({
     assignedTeamId: '',
     isCaptain: false,
@@ -106,8 +118,9 @@ export default function LeagueManagement() {
     notes: ''
   });
 
-  // Get league ID from URL params
+  // Get league ID and edit mode from URL params
   const leagueId = new URLSearchParams(window.location.search).get('leagueId') || '';
+  const editMode = new URLSearchParams(window.location.search).get('edit') === 'true';
   
   // Fetch user's leagues for selection
   const { data: userLeagues = [] } = useQuery({
@@ -178,6 +191,31 @@ export default function LeagueManagement() {
       venue: '',
     },
   });
+
+  // Form for editing league
+  const editLeagueForm = useForm<EditLeagueForm>({
+    resolver: zodResolver(editLeagueSchema),
+    defaultValues: {
+      name: league?.name || '',
+      description: league?.description || '',
+      location: league?.location || '',
+      season: league?.season || '',
+      isActive: league?.isActive ?? true,
+    },
+  });
+
+  // Update form when league data loads
+  React.useEffect(() => {
+    if (league) {
+      editLeagueForm.reset({
+        name: league.name,
+        description: league.description || '',
+        location: league.location || '',
+        season: league.season || '',
+        isActive: league.isActive ?? true,
+      });
+    }
+  }, [league, editLeagueForm]);
 
   // Mutations for member management
   const approveMutation = useMutation({
@@ -292,6 +330,26 @@ export default function LeagueManagement() {
     },
   });
 
+  // League update mutation
+  const updateLeagueMutation = useMutation({
+    mutationFn: async (data: EditLeagueForm) => {
+      const response = await apiRequest('PATCH', `/api/leagues/${leagueId}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'League updated successfully' });
+      setShowEditLeague(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId] });
+    },
+    onError: () => {
+      toast({
+        title: 'Update Failed',
+        description: 'Failed to update league details.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   if (!hasAccess('commissioner')) {
     return (
       <SubscriptionGate requiredTier="commissioner">
@@ -394,7 +452,7 @@ export default function LeagueManagement() {
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-4">
           <button 
-            onClick={() => navigate('/more')}
+            onClick={() => navigate('/league-list')}
             className="text-muted-foreground"
             data-testid="button-back"
           >
@@ -411,6 +469,13 @@ export default function LeagueManagement() {
               </p>
             )}
           </div>
+          <button
+            onClick={() => setShowEditLeague(true)}
+            className="text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-card"
+            data-testid="button-edit-league"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Tab Navigation */}
@@ -941,6 +1006,119 @@ export default function LeagueManagement() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit League Modal */}
+      {showEditLeague && league && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Edit League</h2>
+                <button
+                  onClick={() => setShowEditLeague(false)}
+                  className="text-muted-foreground hover:text-foreground p-1"
+                  data-testid="button-close-edit-league"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={editLeagueForm.handleSubmit((data) => {
+                  updateLeagueMutation.mutate(data);
+                })}
+                className="space-y-4"
+              >
+                {/* League Name */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">League Name</label>
+                  <input
+                    {...editLeagueForm.register('name')}
+                    type="text"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Enter league name"
+                    data-testid="input-league-name"
+                  />
+                  {editLeagueForm.formState.errors.name && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {editLeagueForm.formState.errors.name.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Description</label>
+                  <textarea
+                    {...editLeagueForm.register('description')}
+                    rows={3}
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    placeholder="Describe your league..."
+                    data-testid="input-league-description"
+                  />
+                </div>
+
+                {/* Location */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Location</label>
+                  <input
+                    {...editLeagueForm.register('location')}
+                    type="text"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="League location"
+                    data-testid="input-league-location"
+                  />
+                </div>
+
+                {/* Season */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Season</label>
+                  <input
+                    {...editLeagueForm.register('season')}
+                    type="text"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="e.g., Spring 2024"
+                    data-testid="input-league-season"
+                  />
+                </div>
+
+                {/* Active Status */}
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      {...editLeagueForm.register('isActive')}
+                      type="checkbox"
+                      className="rounded border-border focus:ring-primary"
+                      data-testid="checkbox-league-active"
+                    />
+                    <span className="text-sm font-medium">League is active</span>
+                  </label>
+                </div>
+
+                {/* Submit Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditLeague(false)}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                    data-testid="button-cancel-edit-league"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateLeagueMutation.isPending}
+                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                    data-testid="button-save-league-changes"
+                  >
+                    {updateLeagueMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

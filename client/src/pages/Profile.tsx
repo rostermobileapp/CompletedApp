@@ -1,12 +1,95 @@
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { ObjectUploader } from '@/components/ObjectUploader';
+import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X } from 'lucide-react';
+
+const profileSchema = z.object({
+  firstName: z.string().min(1, 'First name is required').optional(),
+  lastName: z.string().min(1, 'Last name is required').optional(),
+  age: z.string().transform(val => val === '' ? undefined : Number(val)).optional(),
+  phoneNumber: z.string().optional(),
+  city: z.string().optional(),
+});
+
+type ProfileForm = z.infer<typeof profileSchema>;
 
 export default function Profile() {
   const { user } = useAuth();
   const { tier } = useSubscription();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+
+  const form = useForm<ProfileForm>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      firstName: (user as any)?.firstName || '',
+      lastName: (user as any)?.lastName || '',
+      age: (user as any)?.age?.toString() || '',
+      phoneNumber: (user as any)?.phoneNumber || '',
+      city: (user as any)?.city || '',
+    },
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: ProfileForm) => {
+      const response = await apiRequest('PATCH', '/api/auth/user/profile', data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Profile updated successfully' });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      setIsEditing(false);
+    },
+    onError: () => {
+      toast({ 
+        title: 'Failed to update profile', 
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  const updateImageMutation = useMutation({
+    mutationFn: async (profileImageUrl: string) => {
+      const response = await apiRequest('PATCH', '/api/auth/user/image', { profileImageUrl });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Profile photo updated successfully' });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    },
+    onError: () => {
+      toast({ 
+        title: 'Failed to update profile photo', 
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  const handleGetUploadParameters = async () => {
+    const response = await apiRequest('POST', '/api/profile-images/upload');
+    const { uploadURL } = await response.json();
+    return {
+      method: 'PUT' as const,
+      url: uploadURL,
+    };
+  };
+
+  const handleUploadComplete = (result: any) => {
+    if (result.successful && result.successful.length > 0) {
+      const uploadURL = result.successful[0].uploadURL;
+      updateImageMutation.mutate(uploadURL);
+    }
+  };
 
   const settingsItems = [
     {
@@ -55,28 +138,42 @@ export default function Profile() {
       {/* Profile Info */}
       <div className="px-6 mb-6">
         <div className="bg-card rounded-xl border border-border p-6 text-center" data-testid="card-profile-info">
-          <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-            {user && typeof user === 'object' && 'profileImageUrl' in user && user.profileImageUrl ? (
-              <img 
-                src={user && typeof user === 'object' && 'profileImageUrl' in user ? user.profileImageUrl : ''} 
-                alt="Profile" 
-                className="w-full h-full rounded-full object-cover"
-                data-testid="img-profile-avatar"
-              />
-            ) : (
-              <span className="text-primary-foreground text-2xl font-bold" data-testid="text-profile-initials">
-                {user && typeof user === 'object' && 'firstName' in user && user.firstName ? user.firstName[0] : 'U'}
-              </span>
-            )}
+          <div className="relative w-20 h-20 mx-auto mb-4">
+            <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
+              {(user as any)?.profileImageUrl ? (
+                <img 
+                  src={(user as any).profileImageUrl}
+                  alt="Profile" 
+                  className="w-full h-full rounded-full object-cover"
+                  data-testid="img-profile-avatar"
+                />
+              ) : (
+                <span className="text-primary-foreground text-2xl font-bold" data-testid="text-profile-initials">
+                  {(user as any)?.firstName ? (user as any).firstName[0] : 'U'}
+                </span>
+              )}
+            </div>
+            <div className="absolute -bottom-2 -right-2">
+              <ObjectUploader
+                maxNumberOfFiles={1}
+                maxFileSize={5242880} // 5MB
+                onGetUploadParameters={handleGetUploadParameters}
+                onComplete={handleUploadComplete}
+                buttonClassName="w-8 h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full flex items-center justify-center border-2 border-background"
+              >
+                <Camera className="w-4 h-4" />
+              </ObjectUploader>
+            </div>
           </div>
+          
           <h2 className="text-xl font-bold mb-1" data-testid="text-user-name">
-            {user && typeof user === 'object' && 'firstName' in user && 'lastName' in user && user.firstName && user.lastName 
-              ? `${user.lastName}, ${user.firstName}`
-              : user && typeof user === 'object' && 'firstName' in user && user.firstName || 'User'
+            {(user as any)?.firstName && (user as any)?.lastName 
+              ? `${(user as any).lastName}, ${(user as any).firstName}`
+              : (user as any)?.firstName || 'User'
             }
           </h2>
           <p className="text-muted-foreground mb-3" data-testid="text-user-email">
-            {user && typeof user === 'object' && 'email' in user && user.email || 'No email provided'}
+            {(user as any)?.email || 'No email provided'}
           </p>
           <div className="flex items-center justify-center gap-2 mb-4">
             <span 
@@ -98,7 +195,103 @@ export default function Profile() {
         </div>
       </div>
       
-      {/* User Stats (Placeholder) */}
+      {/* Profile Details */}
+      <div className="px-6 mb-6">
+        <div className="bg-card rounded-xl border border-border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold" data-testid="text-profile-details-title">Profile Details</h2>
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="flex items-center gap-2 text-sm text-primary"
+              data-testid="button-toggle-edit"
+            >
+              {isEditing ? <X className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
+              {isEditing ? 'Cancel' : 'Edit'}
+            </button>
+          </div>
+          
+          {isEditing ? (
+            <form onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">First Name</label>
+                  <input
+                    {...form.register('firstName')}
+                    className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-first-name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Last Name</label>
+                  <input
+                    {...form.register('lastName')}
+                    className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-last-name"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Age</label>
+                <input
+                  {...form.register('age')}
+                  type="number"
+                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="input-age"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Phone Number</label>
+                <input
+                  {...form.register('phoneNumber')}
+                  type="tel"
+                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="(555) 123-4567"
+                  data-testid="input-phone"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">City</label>
+                <input
+                  {...form.register('city')}
+                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Your city of residence"
+                  data-testid="input-city"
+                />
+              </div>
+              
+              <button
+                type="submit"
+                disabled={updateProfileMutation.isPending}
+                className="w-full bg-primary text-primary-foreground rounded-lg py-2 flex items-center justify-center gap-2 disabled:opacity-50"
+                data-testid="button-save-profile"
+              >
+                <Save className="w-4 h-4" />
+                {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </button>
+            </form>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Age:</span>
+                <span>{(user as any)?.age || 'Not specified'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Phone:</span>
+                <span>{(user as any)?.phoneNumber || 'Not specified'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">City:</span>
+                <span>{(user as any)?.city || 'Not specified'}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* User Stats */}
       <div className="px-6 mb-6">
         <h2 className="text-lg font-semibold mb-4" data-testid="text-stats-title">Your Stats</h2>
         <div className="grid grid-cols-2 gap-4">
