@@ -62,6 +62,23 @@ export default function Dashboard() {
         </div>
       </div>
       
+      {/* Find a League Section - Compact */}
+      <div className="px-6 mb-6">
+        <div className="bg-card rounded-lg border border-border px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Search className="w-5 h-5 text-primary" />
+            <span className="font-medium">Looking for a League?</span>
+          </div>
+          <button
+            onClick={() => navigate('/league-search')}
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium text-sm"
+            data-testid="button-find-league"
+          >
+            Find a League
+          </button>
+        </div>
+      </div>
+      
       {/* Quick Stats */}
       {primaryTeam && (
         <div className="px-6 mb-6">
@@ -95,23 +112,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      
-      {/* Find a League Section - Compact */}
-      <div className="px-6 mb-6">
-        <div className="bg-card rounded-lg border border-border px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Search className="w-5 h-5 text-primary" />
-            <span className="font-medium">Looking for a League?</span>
-          </div>
-          <button
-            onClick={() => navigate('/league-search')}
-            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium text-sm"
-            data-testid="button-find-league"
-          >
-            Find a League
-          </button>
-        </div>
-      </div>
       
       {/* Upcoming Games */}
       <div className="px-6 mb-6">

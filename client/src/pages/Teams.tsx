@@ -251,7 +251,7 @@ export default function Teams() {
                               {member.firstName} {member.lastName}
                               {member.id === team.captainId && (
                                 <Badge variant="secondary" className="ml-2">
-                                  <Star className="w-3 h-3 mr-1" />
+                                  <span className="w-3 h-3 mr-1 text-xs font-bold">C</span>
                                   Captain
                                 </Badge>
                               )}

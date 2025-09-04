@@ -546,10 +546,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Logo URL is required" });
       }
 
-      // Check if user is the team captain
+      // Check if user is the team captain or commissioner
       const team = await storage.getTeam(teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: "Only team captains can update team logos" });
+      const user = await storage.getUser(userId);
+      const isTeamCaptain = team && team.captainId === userId;
+      const isCommissioner = user && user.subscriptionTier === 'commissioner';
+      
+      if (!team || (!isTeamCaptain && !isCommissioner)) {
+        return res.status(403).json({ message: "Only team captains and commissioners can update team logos" });
       }
 
       const updatedTeam = await storage.updateTeamLogo(teamId, logoUrl);
