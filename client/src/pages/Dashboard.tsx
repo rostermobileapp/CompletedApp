@@ -85,7 +85,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-welcome">
-              Welcome back, {user?.firstName || 'Player'}
+              {user?.firstName || 'Player'}
             </h1>
             {primaryTeam && (
               <p className="text-muted-foreground" data-testid="text-primary-team">
