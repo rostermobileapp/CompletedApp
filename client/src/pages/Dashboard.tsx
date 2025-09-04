@@ -138,8 +138,20 @@ export default function Dashboard() {
             {upcomingGames.slice(0, 2).map((game: any) => (
               <div key={game.id} className="bg-card rounded-xl border border-border p-4" data-testid={`card-game-${game.id}`}>
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-warning rounded-lg flex items-center justify-center">
-                    <Trophy className="w-6 h-6 text-black" />
+                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                    {(() => {
+                      const opponentTeam = game.homeTeam.id === primaryTeam?.id ? game.awayTeam : game.homeTeam;
+                      return opponentTeam.logoUrl ? (
+                        <img 
+                          src={opponentTeam.logoUrl} 
+                          alt={`${opponentTeam.name} logo`}
+                          className="w-full h-full rounded-lg object-cover"
+                          data-testid={`img-opponent-logo-${game.id}`}
+                        />
+                      ) : (
+                        <Trophy className="w-6 h-6 text-primary-foreground" />
+                      );
+                    })()}
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>

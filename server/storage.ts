@@ -25,7 +25,7 @@ import {
   type InsertMessage,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, inArray, asc, alias } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -58,6 +58,7 @@ export interface IStorage {
   getTeamsByLeague(leagueId: string): Promise<Team[]>;
   getTeam(id: string): Promise<Team | undefined>;
   getUserTeams(userId: string): Promise<Team[]>;
+  updateTeamLogo(id: string, logoUrl: string): Promise<Team>;
   
   // Membership operations
   requestLeagueMembership(membership: InsertLeagueMembership): Promise<LeagueMembership>;
@@ -144,10 +145,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserImage(id: string, profileImageUrl: string): Promise<User> {
+    // Try to normalize the profile image path for local serving
+    let normalizedUrl = profileImageUrl;
+    try {
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      normalizedUrl = objectStorageService.normalizeProfileImagePath(profileImageUrl);
+    } catch (error) {
+      // If normalization fails, use original URL
+      console.warn('Failed to normalize profile image path:', error);
+    }
+    
     const [user] = await db
       .update(users)
       .set({
-        profileImageUrl,
+        profileImageUrl: normalizedUrl,
         updatedAt: new Date(),
       })
       .where(eq(users.id, id))
@@ -313,6 +325,29 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => r.team);
   }
 
+  async updateTeamLogo(id: string, logoUrl: string): Promise<Team> {
+    // Try to normalize the team logo path for local serving
+    let normalizedUrl = logoUrl;
+    try {
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      normalizedUrl = objectStorageService.normalizeTeamLogoPath(logoUrl);
+    } catch (error) {
+      // If normalization fails, use original URL
+      console.warn('Failed to normalize team logo path:', error);
+    }
+
+    const [team] = await db
+      .update(teams)
+      .set({
+        logoUrl: normalizedUrl,
+        updatedAt: new Date(),
+      })
+      .where(eq(teams.id, id))
+      .returning();
+    return team;
+  }
+
   // Membership operations
   async requestLeagueMembership(membership: InsertLeagueMembership): Promise<LeagueMembership> {
     const [newMembership] = await db.insert(leagueMemberships).values(membership).returning();
@@ -451,67 +486,45 @@ export class DatabaseStorage implements IStorage {
     const userTeams = await this.getUserTeams(userId);
     const teamIds = userTeams.map(t => t.id);
     
-    if (teamIds.length === 0) return [];
+    // Also get leagues where user is a member (for commissioners who may not be on teams)
+    const userLeagues = await this.getUserLeagues(userId);
+    const leagueIds = userLeagues.map(l => l.id);
+    
+    // If user has neither teams nor league memberships, return empty
+    if (teamIds.length === 0 && leagueIds.length === 0) return [];
 
-    // Use raw SQL for complex joins with same table twice
-    const result = await db.execute(sql`
-      SELECT 
-        g.*,
-        ht.id as home_team_id, ht.name as home_team_name, ht.logo_url as home_team_logo_url, 
-        ht.league_id as home_team_league_id, ht.season_id as home_team_season_id,
-        ht.captain_id as home_team_captain_id, ht.wins as home_team_wins, ht.losses as home_team_losses,
-        ht.ties as home_team_ties, ht.created_at as home_team_created_at, ht.updated_at as home_team_updated_at,
-        at.id as away_team_id, at.name as away_team_name, at.logo_url as away_team_logo_url,
-        at.league_id as away_team_league_id, at.season_id as away_team_season_id,
-        at.captain_id as away_team_captain_id, at.wins as away_team_wins, at.losses as away_team_losses,
-        at.ties as away_team_ties, at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
-      FROM games g
-      INNER JOIN teams ht ON g.home_team_id = ht.id
-      INNER JOIN teams at ON g.away_team_id = at.id
-      WHERE (g.home_team_id = ANY(${teamIds}) OR g.away_team_id = ANY(${teamIds}))
-        AND g.scheduled_at >= NOW()
-      ORDER BY g.scheduled_at ASC
-    `);
+    // Get all games first, then join with teams
+    const gamesResult = await db
+      .select()
+      .from(games)
+      .where(
+        and(
+          gte(games.scheduledAt, new Date()),
+          or(
+            teamIds.length > 0 ? or(
+              inArray(games.homeTeamId, teamIds),
+              inArray(games.awayTeamId, teamIds)
+            ) : undefined,
+            leagueIds.length > 0 ? inArray(games.leagueId, leagueIds) : undefined
+          )
+        )
+      )
+      .orderBy(asc(games.scheduledAt));
 
-    return result.rows.map((row: any) => ({
-      id: row.id,
-      leagueId: row.league_id,
-      seasonId: row.season_id,
-      homeTeamId: row.home_team_id,
-      awayTeamId: row.away_team_id,
-      scheduledAt: row.scheduled_at,
-      venue: row.venue,
-      homeScore: row.home_score,
-      awayScore: row.away_score,
-      isCompleted: row.is_completed,
-      createdAt: row.created_at,
-      homeTeam: {
-        id: row.home_team_id,
-        name: row.home_team_name,
-        logoUrl: row.home_team_logo_url,
-        leagueId: row.home_team_league_id,
-        seasonId: row.home_team_season_id,
-        captainId: row.home_team_captain_id,
-        wins: row.home_team_wins,
-        losses: row.home_team_losses,
-        ties: row.home_team_ties,
-        createdAt: row.home_team_created_at,
-        updatedAt: row.home_team_updated_at,
-      },
-      awayTeam: {
-        id: row.away_team_id,
-        name: row.away_team_name,
-        logoUrl: row.away_team_logo_url,
-        leagueId: row.away_team_league_id,
-        seasonId: row.away_team_season_id,
-        captainId: row.away_team_captain_id,
-        wins: row.away_team_wins,
-        losses: row.away_team_losses,
-        ties: row.away_team_ties,
-        createdAt: row.away_team_created_at,
-        updatedAt: row.away_team_updated_at,
-      },
-    }));
+    // Get team data for each game
+    const gamesWithTeams = [];
+    for (const game of gamesResult) {
+      const [homeTeam] = await db.select().from(teams).where(eq(teams.id, game.homeTeamId));
+      const [awayTeam] = await db.select().from(teams).where(eq(teams.id, game.awayTeamId));
+      
+      gamesWithTeams.push({
+        ...game,
+        homeTeam,
+        awayTeam,
+      });
+    }
+    
+    return gamesWithTeams;
   }
 
   async getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {

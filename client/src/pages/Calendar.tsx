@@ -136,8 +136,32 @@ export default function Calendar() {
             {todaysGames.map((game: any) => (
               <div key={game.id} className="bg-card rounded-xl border border-border p-4" data-testid={`card-todays-game-${game.id}`}>
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-warning rounded-lg flex items-center justify-center">
-                    <Trophy className="w-6 h-6 text-black" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
+                      {game.homeTeam.logoUrl ? (
+                        <img 
+                          src={game.homeTeam.logoUrl} 
+                          alt={`${game.homeTeam.name} logo`}
+                          className="w-full h-full rounded object-cover"
+                          data-testid={`img-home-team-logo-${game.id}`}
+                        />
+                      ) : (
+                        <Trophy className="w-4 h-4 text-primary-foreground" />
+                      )}
+                    </div>
+                    <span className="text-xs font-medium">vs</span>
+                    <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
+                      {game.awayTeam.logoUrl ? (
+                        <img 
+                          src={game.awayTeam.logoUrl} 
+                          alt={`${game.awayTeam.name} logo`}
+                          className="w-full h-full rounded object-cover"
+                          data-testid={`img-away-team-logo-${game.id}`}
+                        />
+                      ) : (
+                        <Trophy className="w-4 h-4 text-primary-foreground" />
+                      )}
+                    </div>
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold" data-testid={`text-game-matchup-${game.id}`}>

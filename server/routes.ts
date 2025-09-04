@@ -85,6 +85,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Serve profile images
+  app.get("/profile-images/:objectPath(*)", async (req, res) => {
+    try {
+      const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const fullPath = `/profile-images/${req.params.objectPath}`;
+      const objectFile = await objectStorageService.getProfileImageFile(fullPath);
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving profile image:", error);
+      if (error.name === 'ObjectNotFoundError') {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // Team logo upload and serving routes
+  app.post("/api/team-logos/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getTeamLogoUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting team logo upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  // Serve team logos
+  app.get("/team-logos/:objectPath(*)", async (req, res) => {
+    try {
+      const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const fullPath = `/team-logos/${req.params.objectPath}`;
+      const objectFile = await objectStorageService.getTeamLogoFile(fullPath);
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving team logo:", error);
+      if (error.name === 'ObjectNotFoundError') {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
   // League routes
   app.get("/api/leagues", async (req, res) => {
     try {
@@ -486,6 +533,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating team:", error);
       res.status(500).json({ message: "Failed to create team" });
+    }
+  });
+
+  app.patch("/api/teams/:id/logo", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const teamId = req.params.id;
+      const { logoUrl } = req.body;
+
+      if (!logoUrl) {
+        return res.status(400).json({ message: "Logo URL is required" });
+      }
+
+      // Check if user is the team captain
+      const team = await storage.getTeam(teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: "Only team captains can update team logos" });
+      }
+
+      const updatedTeam = await storage.updateTeamLogo(teamId, logoUrl);
+      res.json(updatedTeam);
+    } catch (error) {
+      console.error("Error updating team logo:", error);
+      res.status(500).json({ message: "Failed to update team logo" });
     }
   });
 

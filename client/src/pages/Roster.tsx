@@ -1,11 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowLeft, Trophy, Users } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Upload } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { ObjectUploader } from '@/components/ObjectUploader';
+import { useToast } from '@/hooks/use-toast';
+import { queryClient } from '@/lib/queryClient';
+import type { UploadResult } from '@uppy/core';
+import { apiRequest } from '@/lib/queryClient';
 
 export default function Roster() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
@@ -17,6 +23,44 @@ export default function Roster() {
     queryKey: ['/api/teams', primaryTeam?.id, 'members'],
     enabled: !!primaryTeam?.id,
   });
+
+  // Team logo upload mutation
+  const updateTeamLogoMutation = useMutation({
+    mutationFn: async (logoUrl: string) => {
+      return apiRequest(`/api/teams/${primaryTeam?.id}/logo`, 'PATCH', { logoUrl });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
+      toast({
+        title: "Success",
+        description: "Team logo updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update team logo",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGetTeamLogoUploadParameters = async () => {
+    const response = await apiRequest('/api/team-logos/upload', 'POST');
+    return {
+      method: 'PUT' as const,
+      url: (response as any).uploadURL,
+    };
+  };
+
+  const handleTeamLogoUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    if (result.successful && result.successful[0]) {
+      const uploadURL = result.successful[0].uploadURL as string;
+      updateTeamLogoMutation.mutate(uploadURL);
+    }
+  };
+
+  const isTeamCaptain = user && primaryTeam && primaryTeam.captainId === user.id;
 
   if (!primaryTeam) {
     return (
@@ -57,16 +101,31 @@ export default function Roster() {
       <div className="px-6 mb-6">
         <div className="bg-card rounded-xl border border-border p-4" data-testid="card-team-info">
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center">
-              {primaryTeam.logoUrl ? (
-                <img 
-                  src={primaryTeam.logoUrl} 
-                  alt={`${primaryTeam.name} logo`}
-                  className="w-full h-full rounded-lg object-cover"
-                  data-testid="img-team-logo"
-                />
-              ) : (
-                <Trophy className="w-8 h-8 text-primary-foreground" />
+            <div className="relative">
+              <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center">
+                {primaryTeam.logoUrl ? (
+                  <img 
+                    src={primaryTeam.logoUrl} 
+                    alt={`${primaryTeam.name} logo`}
+                    className="w-full h-full rounded-lg object-cover"
+                    data-testid="img-team-logo"
+                  />
+                ) : (
+                  <Trophy className="w-8 h-8 text-primary-foreground" />
+                )}
+              </div>
+              {isTeamCaptain && (
+                <div className="absolute -bottom-2 -right-2">
+                  <ObjectUploader
+                    maxNumberOfFiles={1}
+                    maxFileSize={5 * 1024 * 1024} // 5MB
+                    onGetUploadParameters={handleGetTeamLogoUploadParameters}
+                    onComplete={handleTeamLogoUploadComplete}
+                    buttonClassName="w-8 h-8 rounded-full bg-primary text-primary-foreground p-0 flex items-center justify-center hover:bg-primary/90"
+                  >
+                    <Upload className="w-4 h-4" />
+                  </ObjectUploader>
+                </div>
               )}
             </div>
             <div>
@@ -74,6 +133,9 @@ export default function Roster() {
               <p className="text-muted-foreground" data-testid="text-team-record">
                 {primaryTeam.wins}-{primaryTeam.losses}-{primaryTeam.ties} • League Position TBD
               </p>
+              {isTeamCaptain && (
+                <p className="text-xs text-primary font-medium mt-1">Team Captain</p>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4 text-center">

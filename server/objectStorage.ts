@@ -143,6 +143,30 @@ export class ObjectStorageService {
     });
   }
 
+  // Gets the upload URL for team logo upload
+  async getTeamLogoUploadURL(): Promise<string> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    if (!privateObjectDir) {
+      throw new Error(
+        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
+          "tool and set PRIVATE_OBJECT_DIR env var."
+      );
+    }
+
+    const objectId = randomUUID();
+    const fullPath = `${privateObjectDir}/team-logos/${objectId}`;
+
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+
+    // Sign URL for PUT method with TTL
+    return signObjectURL({
+      bucketName,
+      objectName,
+      method: "PUT",
+      ttlSec: 900,
+    });
+  }
+
   normalizeProfileImagePath(
     rawPath: string,
   ): string {
@@ -167,6 +191,84 @@ export class ObjectStorageService {
     // Extract the entity ID from the path
     const entityId = rawObjectPath.slice(profileImageDir.length);
     return `/profile-images/${entityId}`;
+  }
+
+  // Get profile image file for serving
+  async getProfileImageFile(profileImagePath: string): Promise<File> {
+    if (!profileImagePath.startsWith("/profile-images/")) {
+      throw new ObjectNotFoundError();
+    }
+
+    const entityId = profileImagePath.slice("/profile-images/".length);
+    let profileImageDir = this.getPrivateObjectDir();
+    if (!profileImageDir.endsWith("/")) {
+      profileImageDir = `${profileImageDir}/`;
+    }
+    profileImageDir += "profile-images/";
+    
+    const objectPath = `${profileImageDir}${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(objectPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    
+    const [exists] = await file.exists();
+    if (!exists) {
+      throw new ObjectNotFoundError();
+    }
+    
+    return file;
+  }
+
+  normalizeTeamLogoPath(
+    rawPath: string,
+  ): string {
+    if (!rawPath.startsWith("https://storage.googleapis.com/")) {
+      return rawPath;
+    }
+  
+    // Extract the path from the URL by removing query parameters and domain
+    const url = new URL(rawPath);
+    const rawObjectPath = url.pathname;
+  
+    let teamLogoDir = this.getPrivateObjectDir();
+    if (!teamLogoDir.endsWith("/")) {
+      teamLogoDir = `${teamLogoDir}/`;
+    }
+    teamLogoDir += "team-logos/";
+  
+    if (!rawObjectPath.startsWith(teamLogoDir)) {
+      return rawObjectPath;
+    }
+  
+    // Extract the entity ID from the path
+    const entityId = rawObjectPath.slice(teamLogoDir.length);
+    return `/team-logos/${entityId}`;
+  }
+
+  // Get team logo file for serving
+  async getTeamLogoFile(teamLogoPath: string): Promise<File> {
+    if (!teamLogoPath.startsWith("/team-logos/")) {
+      throw new ObjectNotFoundError();
+    }
+
+    const entityId = teamLogoPath.slice("/team-logos/".length);
+    let teamLogoDir = this.getPrivateObjectDir();
+    if (!teamLogoDir.endsWith("/")) {
+      teamLogoDir = `${teamLogoDir}/`;
+    }
+    teamLogoDir += "team-logos/";
+    
+    const objectPath = `${teamLogoDir}${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(objectPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    
+    const [exists] = await file.exists();
+    if (!exists) {
+      throw new ObjectNotFoundError();
+    }
+    
+    return file;
   }
 }
 

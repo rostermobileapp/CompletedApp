@@ -1123,13 +1123,37 @@ export default function LeagueManagement() {
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-4 mb-2">
-                            <div className="text-center">
-                              <p className="font-medium">{homeTeam?.name || 'Unknown'}</p>
+                            <div className="flex flex-col items-center">
+                              <div className="w-10 h-10 bg-primary rounded flex items-center justify-center mb-1">
+                                {homeTeam?.logoUrl ? (
+                                  <img 
+                                    src={homeTeam.logoUrl} 
+                                    alt={`${homeTeam.name} logo`}
+                                    className="w-full h-full rounded object-cover"
+                                    data-testid={`img-home-team-logo-${game.id}`}
+                                  />
+                                ) : (
+                                  <Trophy className="w-5 h-5 text-primary-foreground" />
+                                )}
+                              </div>
+                              <p className="font-medium text-center">{homeTeam?.name || 'Unknown'}</p>
                               <p className="text-xs text-muted-foreground">HOME</p>
                             </div>
                             <div className="text-muted-foreground font-bold">VS</div>
-                            <div className="text-center">
-                              <p className="font-medium">{awayTeam?.name || 'Unknown'}</p>
+                            <div className="flex flex-col items-center">
+                              <div className="w-10 h-10 bg-primary rounded flex items-center justify-center mb-1">
+                                {awayTeam?.logoUrl ? (
+                                  <img 
+                                    src={awayTeam.logoUrl} 
+                                    alt={`${awayTeam.name} logo`}
+                                    className="w-full h-full rounded object-cover"
+                                    data-testid={`img-away-team-logo-${game.id}`}
+                                  />
+                                ) : (
+                                  <Trophy className="w-5 h-5 text-primary-foreground" />
+                                )}
+                              </div>
+                              <p className="font-medium text-center">{awayTeam?.name || 'Unknown'}</p>
                               <p className="text-xs text-muted-foreground">AWAY</p>
                             </div>
                           </div>
