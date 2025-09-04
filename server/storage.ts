@@ -76,6 +76,7 @@ export interface IStorage {
   createGame(game: InsertGame): Promise<Game>;
   getUpcomingGames(userId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
   getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
+  getGamesByLeague(leagueId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
   
   // Message operations
   sendMessage(message: InsertMessage): Promise<Message>;
@@ -452,15 +453,18 @@ export class DatabaseStorage implements IStorage {
     
     if (teamIds.length === 0) return [];
 
+    const homeTeams = db.select().from(teams).as('homeTeams');
+    const awayTeams = db.select().from(teams).as('awayTeams');
+
     const result = await db
       .select({
         games: games,
-        homeTeam: teams,
-        awayTeam: teams
+        homeTeam: homeTeams,
+        awayTeam: awayTeams
       })
       .from(games)
-      .innerJoin(teams, eq(games.homeTeamId, teams.id))
-      .innerJoin(teams, eq(games.awayTeamId, teams.id))
+      .innerJoin(homeTeams, eq(games.homeTeamId, homeTeams.id))
+      .innerJoin(awayTeams, eq(games.awayTeamId, awayTeams.id))
       .where(
         and(
           or(
@@ -480,21 +484,47 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
+    const homeTeams = db.select().from(teams).as('homeTeams');
+    const awayTeams = db.select().from(teams).as('awayTeams');
+
     const result = await db
       .select({
         games: games,
-        homeTeam: teams,
-        awayTeam: teams
+        homeTeam: homeTeams,
+        awayTeam: awayTeams
       })
       .from(games)
-      .innerJoin(teams, eq(games.homeTeamId, teams.id))
-      .innerJoin(teams, eq(games.awayTeamId, teams.id))
+      .innerJoin(homeTeams, eq(games.homeTeamId, homeTeams.id))
+      .innerJoin(awayTeams, eq(games.awayTeamId, awayTeams.id))
       .where(
         or(
           eq(games.homeTeamId, teamId),
           eq(games.awayTeamId, teamId)
         )
       )
+      .orderBy(desc(games.scheduledAt));
+
+    return result.map(r => ({
+      ...r.games,
+      homeTeam: r.homeTeam,
+      awayTeam: r.awayTeam,
+    }));
+  }
+
+  async getGamesByLeague(leagueId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
+    const homeTeams = db.select().from(teams).as('homeTeams');
+    const awayTeams = db.select().from(teams).as('awayTeams');
+
+    const result = await db
+      .select({
+        games: games,
+        homeTeam: homeTeams,
+        awayTeam: awayTeams
+      })
+      .from(games)
+      .innerJoin(homeTeams, eq(games.homeTeamId, homeTeams.id))
+      .innerJoin(awayTeams, eq(games.awayTeamId, awayTeams.id))
+      .where(eq(games.leagueId, leagueId))
       .orderBy(desc(games.scheduledAt));
 
     return result.map(r => ({

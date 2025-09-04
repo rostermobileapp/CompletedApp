@@ -205,6 +205,16 @@ export default function LeagueManagement() {
     enabled: !!leagueId,
   });
 
+  // Fetch games
+  const { data: games = [], refetch: refetchGames } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'games'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
+      return response.json();
+    },
+    enabled: !!leagueId,
+  });
+
   // Form for creating teams
   const teamForm = useForm<CreateTeamForm>({
     resolver: zodResolver(createTeamSchema),
@@ -377,6 +387,7 @@ export default function LeagueManagement() {
       toast({ title: 'Game scheduled successfully' });
       setShowScheduleGame(false);
       gameForm.reset();
+      refetchGames();
     },
   });
 
@@ -848,57 +859,97 @@ export default function LeagueManagement() {
               {/* Teams List or Team Detail */}
               {!selectedTeam ? (
                 // Teams List View
-                teams.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No teams created yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {teams.map((team: Team) => {
-                      const teamMembers = members.filter((m: LeagueMember) => m.assignedTeamId === team.id);
-                      const captain = members.find((m: LeagueMember) => m.userId === team.captainId);
-                      
-                      return (
-                        <div 
-                          key={team.id} 
-                          className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                          onClick={() => setSelectedTeam(team)}
-                          data-testid={`team-${team.id}`}
-                        >
-                          <div className="flex-1">
-                            <p className="font-medium">{team.name}</p>
-                            <div className="text-sm text-muted-foreground space-y-1">
-                              <p>Captain: {captain?.user ? formatUserName(captain.user) : 'Not assigned'}</p>
-                              <p>{teamMembers.length} player{teamMembers.length !== 1 ? 's' : ''}</p>
+                (() => {
+                  const freeAgents = members.filter((m: LeagueMember) => !m.assignedTeamId);
+                  const allTeamsToShow = [
+                    // Free Agents virtual team
+                    {
+                      id: 'free-agents',
+                      name: 'Free Agents',
+                      captainId: null,
+                      leagueId: league.id,
+                      isFreeAgents: true
+                    },
+                    ...teams
+                  ];
+
+                  return (
+                    <div className="space-y-3">
+                      {allTeamsToShow.map((team: any) => {
+                        const teamMembers = team.isFreeAgents 
+                          ? freeAgents 
+                          : members.filter((m: LeagueMember) => m.assignedTeamId === team.id);
+                        const captain = team.isFreeAgents 
+                          ? null 
+                          : members.find((m: LeagueMember) => m.userId === team.captainId);
+                        
+                        return (
+                          <div 
+                            key={team.id} 
+                            className={`flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors ${
+                              team.isFreeAgents ? 'bg-muted/30 border-dashed' : 'bg-background'
+                            }`}
+                            onClick={() => setSelectedTeam(team)}
+                            data-testid={`team-${team.id}`}
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{team.name}</p>
+                                {team.isFreeAgents && (
+                                  <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">
+                                    Unassigned
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-muted-foreground space-y-1">
+                                {!team.isFreeAgents && (
+                                  <p>Captain: {captain?.user ? formatUserName(captain.user) : 'Not assigned'}</p>
+                                )}
+                                <p>{teamMembers.length} player{teamMembers.length !== 1 ? 's' : ''}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {!team.isFreeAgents && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${team.name}` });
+                                  }}
+                                  className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium flex items-center gap-2"
+                                  data-testid={`button-message-team-${team.id}`}
+                                >
+                                  <Users className="w-4 h-4" />
+                                  Message Team
+                                </button>
+                              )}
+                              <ArrowRight className="w-4 h-4 text-muted-foreground" />
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${team.name}` });
-                              }}
-                              className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium flex items-center gap-2"
-                              data-testid={`button-message-team-${team.id}`}
-                            >
-                              <Users className="w-4 h-4" />
-                              Message Team
-                            </button>
-                            <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )
+                        );
+                      })}
+                    </div>
+                  );
+                })()
               ) : (
                 // Team Detail View - Show Players in Selected Team
                 (() => {
-                  const teamMembers = members.filter((m: LeagueMember) => m.assignedTeamId === selectedTeam.id);
+                  const teamMembers = selectedTeam.isFreeAgents 
+                    ? members.filter((m: LeagueMember) => !m.assignedTeamId)
+                    : members.filter((m: LeagueMember) => m.assignedTeamId === selectedTeam.id);
                   
                   return teamMembers.length === 0 ? (
                     <div className="text-center py-8">
                       <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No players assigned to this team yet</p>
-                      <p className="text-sm text-muted-foreground mt-2">Assign players from the Players tab</p>
+                      <p className="text-muted-foreground">
+                        {selectedTeam.isFreeAgents 
+                          ? "All players are currently assigned to teams" 
+                          : "No players assigned to this team yet"}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {selectedTeam.isFreeAgents 
+                          ? "Players without team assignments will appear here" 
+                          : "Assign players from the Players tab"}
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -911,7 +962,7 @@ export default function LeagueManagement() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <p className="font-medium">{formatUserName(member.user)}</p>
-                              {member.userId === selectedTeam.captainId && (
+                              {!selectedTeam.isFreeAgents && member.userId === selectedTeam.captainId && (
                                 <Crown className="w-4 h-4 text-warning" title="Team Captain" />
                               )}
                             </div>
@@ -1041,9 +1092,51 @@ export default function LeagueManagement() {
                 </div>
               )}
 
-              <p className="text-muted-foreground text-center py-8">
-                Scheduled games will appear here and sync with the calendar.
-              </p>
+              {/* Games List */}
+              {games.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  No games scheduled yet. Create your first game above.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {games.map((game: any) => {
+                    const homeTeam = teams.find((t: Team) => t.id === game.homeTeamId);
+                    const awayTeam = teams.find((t: Team) => t.id === game.awayTeamId);
+                    const gameDate = new Date(game.scheduledAt);
+                    
+                    return (
+                      <div 
+                        key={game.id} 
+                        className="flex items-center justify-between p-4 bg-background rounded-lg border"
+                        data-testid={`game-${game.id}`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-4 mb-2">
+                            <div className="text-center">
+                              <p className="font-medium">{homeTeam?.name || 'Unknown'}</p>
+                              <p className="text-xs text-muted-foreground">HOME</p>
+                            </div>
+                            <div className="text-muted-foreground font-bold">VS</div>
+                            <div className="text-center">
+                              <p className="font-medium">{awayTeam?.name || 'Unknown'}</p>
+                              <p className="text-xs text-muted-foreground">AWAY</p>
+                            </div>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            <p>📅 {gameDate.toLocaleDateString()} at {gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            {game.venue && <p>📍 {game.venue}</p>}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                            {game.status || 'SCHEDULED'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
