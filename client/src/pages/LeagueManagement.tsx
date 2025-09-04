@@ -686,7 +686,6 @@ export default function LeagueManagement() {
                     <div key={member.id} className="flex items-center justify-between p-3 bg-background rounded-lg border">
                       <div className="flex-1" data-testid={`pending-player-${member.user.id}`}>
                         <p className="font-medium">{formatUserName(member.user)}</p>
-                        <p className="text-sm text-muted-foreground">{member.user.email}</p>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -751,7 +750,6 @@ export default function LeagueManagement() {
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">{member.user.email}</p>
                         {member.position && (
                           <p className="text-xs text-muted-foreground">{member.position}</p>
                         )}
@@ -978,7 +976,6 @@ export default function LeagueManagement() {
                               )}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              <p>{member.user.email}</p>
                               {member.position && <p>Position: {member.position}</p>}
                               {member.jerseyNumber && <p>Jersey: #{member.jerseyNumber}</p>}
                             </div>
