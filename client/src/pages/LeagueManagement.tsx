@@ -103,7 +103,8 @@ type CreateGameForm = z.infer<typeof createGameSchema>;
 const editGameSchema = z.object({
   homeTeamId: z.string().min(1, 'Home team is required'),
   awayTeamId: z.string().min(1, 'Away team is required'),
-  scheduledAt: z.string().min(1, 'Game date and time is required'),
+  gameDate: z.string().min(1, 'Game date is required'),
+  gameTime: z.string().min(1, 'Game time is required'),
   venue: z.string().optional(),
 });
 
@@ -273,7 +274,8 @@ export default function LeagueManagement() {
     defaultValues: {
       homeTeamId: '',
       awayTeamId: '',
-      scheduledAt: '',
+      gameDate: '',
+      gameTime: '',
       venue: '',
     },
   });
@@ -282,11 +284,13 @@ export default function LeagueManagement() {
   React.useEffect(() => {
     if (selectedGame) {
       const gameDate = new Date(selectedGame.scheduledAt);
-      const formattedDateTime = gameDate.toISOString().slice(0, 16);
+      const formattedDate = gameDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      const formattedTime = gameDate.toTimeString().slice(0, 5); // HH:MM
       editGameForm.reset({
         homeTeamId: selectedGame.homeTeamId,
         awayTeamId: selectedGame.awayTeamId,
-        scheduledAt: formattedDateTime,
+        gameDate: formattedDate,
+        gameTime: formattedTime,
         venue: selectedGame.venue || '',
       });
     }
@@ -430,9 +434,13 @@ export default function LeagueManagement() {
   // Game update mutation
   const updateGameMutation = useMutation({
     mutationFn: async ({ gameId, data }: { gameId: string; data: EditGameForm }) => {
+      // Combine date and time into a single datetime
+      const combinedDateTime = new Date(`${data.gameDate}T${data.gameTime}`);
       const response = await apiRequest('PATCH', `/api/games/${gameId}`, {
-        ...data,
-        scheduledAt: new Date(data.scheduledAt).toISOString(),
+        homeTeamId: data.homeTeamId,
+        awayTeamId: data.awayTeamId,
+        scheduledAt: combinedDateTime.toISOString(),
+        venue: data.venue,
       });
       return response.json();
     },
@@ -1742,18 +1750,34 @@ export default function LeagueManagement() {
                   )}
                 </div>
 
-                {/* Date and Time */}
+                {/* Date */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Date & Time</label>
+                  <label className="block text-sm font-medium mb-2">Game Date</label>
                   <input
-                    {...editGameForm.register('scheduledAt')}
-                    type="datetime-local"
+                    {...editGameForm.register('gameDate')}
+                    type="date"
                     className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    data-testid="input-game-datetime"
+                    data-testid="input-game-date"
                   />
-                  {editGameForm.formState.errors.scheduledAt && (
+                  {editGameForm.formState.errors.gameDate && (
                     <p className="text-red-500/50 text-sm mt-1">
-                      {editGameForm.formState.errors.scheduledAt.message}
+                      {editGameForm.formState.errors.gameDate.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Time */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Game Time</label>
+                  <input
+                    {...editGameForm.register('gameTime')}
+                    type="time"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-game-time"
+                  />
+                  {editGameForm.formState.errors.gameTime && (
+                    <p className="text-red-500/50 text-sm mt-1">
+                      {editGameForm.formState.errors.gameTime.message}
                     </p>
                   )}
                 </div>
