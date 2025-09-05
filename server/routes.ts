@@ -654,6 +654,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updates = req.body;
+      
+      // Convert scheduledAt string to Date object if present
+      if (updates.scheduledAt) {
+        updates.scheduledAt = new Date(updates.scheduledAt);
+      }
+      
       const updatedGame = await storage.updateGame(gameId, updates);
       res.json(updatedGame);
     } catch (error) {

@@ -160,6 +160,7 @@ export const games = pgTable("games", {
   awayTeamId: varchar("away_team_id").references(() => teams.id).notNull(),
   scheduledAt: timestamp("scheduled_at").notNull(),
   venue: varchar("venue"),
+  lockerRoom: varchar("locker_room"),
   homeScore: integer("home_score"),
   awayScore: integer("away_score"),
   isCompleted: boolean("is_completed").default(false).notNull(),

@@ -477,7 +477,6 @@ export default function LeagueManagement() {
   // Game update mutation
   const updateGameMutation = useMutation({
     mutationFn: async ({ gameId, data }: { gameId: string; data: EditGameForm }) => {
-      console.log('Form data being submitted:', data);
       // Combine date and time into a single datetime using local date components
       const [year, month, day] = data.gameDate.split('-');
       const [hours, minutes] = data.gameTime.split(':');
@@ -488,8 +487,6 @@ export default function LeagueManagement() {
         parseInt(hours), 
         parseInt(minutes)
       );
-      console.log('Combined DateTime object:', combinedDateTime);
-      console.log('ISO String being sent:', combinedDateTime.toISOString());
       
       const response = await apiRequest('PATCH', `/api/games/${gameId}`, {
         homeTeamId: data.homeTeamId,
@@ -1846,7 +1843,6 @@ export default function LeagueManagement() {
                                     const month = String(date.getMonth() + 1).padStart(2, '0');
                                     const day = String(date.getDate()).padStart(2, '0');
                                     const dateString = `${year}-${month}-${day}`;
-                                    console.log('Selected date:', dateString, 'from date object:', date);
                                     field.onChange(dateString);
                                     setShowDatePicker(false);
                                   }
