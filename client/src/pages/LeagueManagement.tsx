@@ -1805,9 +1805,13 @@ export default function LeagueManagement() {
                                 }}
                                 className="p-3"
                                 classNames={{
-                                  today: "rdp-cell_today bg-primary/20 text-primary font-bold",
-                                  selected: "rdp-cell_selected bg-primary text-primary-foreground font-bold",
-                                  root: "text-foreground",
+                                  today: "rdp-cell_today bg-primary/20 text-black font-bold",
+                                  selected: "rdp-cell_selected bg-primary text-white font-bold",
+                                  root: "text-black",
+                                  day: "text-black hover:bg-gray-100",
+                                  nav_button: "text-black hover:bg-gray-100",
+                                  caption: "text-black font-medium",
+                                  head_cell: "text-black font-medium",
                                 }}
                               />
                             </div>
