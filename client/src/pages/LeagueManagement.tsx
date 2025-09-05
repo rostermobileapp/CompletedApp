@@ -455,8 +455,20 @@ export default function LeagueManagement() {
   // Game update mutation
   const updateGameMutation = useMutation({
     mutationFn: async ({ gameId, data }: { gameId: string; data: EditGameForm }) => {
-      // Combine date and time into a single datetime
-      const combinedDateTime = new Date(`${data.gameDate}T${data.gameTime}`);
+      console.log('Form data being submitted:', data);
+      // Combine date and time into a single datetime using local date components
+      const [year, month, day] = data.gameDate.split('-');
+      const [hours, minutes] = data.gameTime.split(':');
+      const combinedDateTime = new Date(
+        parseInt(year), 
+        parseInt(month) - 1, 
+        parseInt(day), 
+        parseInt(hours), 
+        parseInt(minutes)
+      );
+      console.log('Combined DateTime object:', combinedDateTime);
+      console.log('ISO String being sent:', combinedDateTime.toISOString());
+      
       const response = await apiRequest('PATCH', `/api/games/${gameId}`, {
         homeTeamId: data.homeTeamId,
         awayTeamId: data.awayTeamId,
@@ -1786,7 +1798,11 @@ export default function LeagueManagement() {
                             className="w-full p-3 pr-12 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
                             data-testid="button-game-date"
                           >
-                            {field.value ? new Date(field.value).toLocaleDateString() : 'Select date'}
+                            {field.value ? (() => {
+                              const [year, month, day] = field.value.split('-');
+                              const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                              return date.toLocaleDateString();
+                            })() : 'Select date'}
                           </button>
                           <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
                           {showDatePicker && (
