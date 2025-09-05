@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import logoUrl from '@assets/Roster Logo White_1757083079896.png';
-import beerIconUrl from '@assets/image_1757085015074.png';
+import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -219,17 +219,6 @@ export default function Dashboard() {
                         <Trophy className="w-6 h-6 text-primary-foreground" />
                       );
                     })()}
-                    {/* Beverage Duty Icon */}
-                    {(game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id) && (
-                      <div className="absolute -top-1 -left-1">
-                        <img 
-                          src={beerIconUrl}
-                          alt="Beverage Duty"
-                          className="w-4 h-4"
-                          data-testid={`icon-beverage-duty-${game.id}`}
-                        />
-                      </div>
-                    )}
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
@@ -244,6 +233,17 @@ export default function Dashboard() {
                       </p>
                     )}
                   </div>
+                  {/* Beverage Duty Icon - Between game info and attendance */}
+                  {(game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id) && (
+                    <div className="flex items-center">
+                      <img 
+                        src={beverageJarUrl}
+                        alt="Beverage Duty"
+                        className="w-6 h-6"
+                        data-testid={`icon-beverage-duty-${game.id}`}
+                      />
+                    </div>
+                  )}
                   <div className="flex flex-col gap-2">
                     {(() => {
                       // Find user's attendance status for this game
