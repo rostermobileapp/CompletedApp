@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import logoUrl from '@assets/Roster Logo White_1757083079896.png';
+import beerIconUrl from '@assets/image_1757085015074.png';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -89,7 +90,7 @@ export default function Dashboard() {
             <img 
               src={logoUrl}
               alt="Roster Logo" 
-              className="h-12 w-auto"
+              className="h-6 w-auto"
               data-testid="img-roster-logo"
             />
           </div>
@@ -204,7 +205,7 @@ export default function Dashboard() {
               .slice(0, 2).map((game: any) => (
               <div key={game.id} className="bg-card rounded-xl border border-border p-4 relative" data-testid={`card-game-${game.id}`}>
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
                     {(() => {
                       const opponentTeam = game.homeTeam?.id === primaryTeam?.id ? game.awayTeam : game.homeTeam;
                       return opponentTeam?.logoUrl ? (
@@ -218,14 +219,19 @@ export default function Dashboard() {
                         <Trophy className="w-6 h-6 text-primary-foreground" />
                       );
                     })()}
-                  </div>
-                  <div className="flex-1">
                     {/* Beverage Duty Icon */}
                     {(game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id) && (
-                      <div className="absolute top-3 right-3">
-                        <Beer className="w-5 h-5 text-orange-500" data-testid={`icon-beverage-duty-${game.id}`} />
+                      <div className="absolute -top-1 -left-1">
+                        <img 
+                          src={beerIconUrl}
+                          alt="Beverage Duty"
+                          className="w-4 h-4"
+                          data-testid={`icon-beverage-duty-${game.id}`}
+                        />
                       </div>
                     )}
+                  </div>
+                  <div className="flex-1">
                     <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
                       vs {game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}
                     </h3>
