@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -161,6 +161,78 @@ export default function Dashboard() {
                 </span>
               )}
             </button>
+          </div>
+        </div>
+      </div>
+      
+      {/* 3-Card Section */}
+      <div className="px-6 mb-6">
+        <div className="grid grid-cols-3 gap-3">
+          {/* Announcements Card */}
+          <div className="bg-card rounded-xl border border-border p-3" data-testid="card-announcements">
+            <div className="mb-3">
+              <Megaphone className="w-4 h-4 text-orange-500 mb-1" />
+              <p className="text-xs font-medium">Announcements</p>
+              <p className="text-xs text-muted-foreground">Latest Updates</p>
+            </div>
+            <div className="h-8 flex items-center">
+              <div className="w-full h-1 bg-orange-500/20 rounded-full">
+                <div className="w-3/4 h-full bg-orange-500 rounded-full"></div>
+              </div>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-lg font-bold">3</span>
+              <span className="text-xs text-muted-foreground">new</span>
+            </div>
+          </div>
+
+          {/* Stats Card */}
+          <div className="bg-card rounded-xl border border-border p-3" data-testid="card-stats">
+            <div className="mb-3">
+              <BarChart3 className="w-4 h-4 text-purple-500 mb-1" />
+              <p className="text-xs font-medium">Stats</p>
+              <p className="text-xs text-muted-foreground">Season Progress</p>
+            </div>
+            <div className="h-8 flex items-center justify-center">
+              <div className="w-full flex justify-between items-end h-6">
+                <div className="w-1 bg-purple-500/30 rounded-full h-2"></div>
+                <div className="w-1 bg-purple-500/50 rounded-full h-3"></div>
+                <div className="w-1 bg-purple-500/70 rounded-full h-4"></div>
+                <div className="w-1 bg-purple-500 rounded-full h-6"></div>
+                <div className="w-1 bg-purple-500/80 rounded-full h-4"></div>
+                <div className="w-1 bg-purple-500/60 rounded-full h-3"></div>
+              </div>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-lg font-bold">12.4</span>
+              <span className="text-xs text-muted-foreground">avg</span>
+            </div>
+          </div>
+
+          {/* Standings Card */}
+          <div className="bg-card rounded-xl border border-border p-3" data-testid="card-standings">
+            <div className="mb-3">
+              <Award className="w-4 h-4 text-blue-500 mb-1" />
+              <p className="text-xs font-medium">Standings</p>
+              <p className="text-xs text-muted-foreground">League Position</p>
+            </div>
+            <div className="h-8 flex items-center justify-center">
+              <div className="flex gap-1">
+                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">1</span>
+                </div>
+                <div className="w-6 h-6 bg-blue-500/30 rounded-full flex items-center justify-center">
+                  <span className="text-blue-500 text-xs font-bold">2</span>
+                </div>
+                <div className="w-6 h-6 bg-blue-500/20 rounded-full flex items-center justify-center">
+                  <span className="text-blue-500 text-xs">3</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-lg font-bold">2nd</span>
+              <span className="text-xs text-muted-foreground">place</span>
+            </div>
           </div>
         </div>
       </div>
