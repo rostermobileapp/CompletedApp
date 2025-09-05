@@ -109,6 +109,7 @@ const editGameSchema = z.object({
   gameDate: z.string().min(1, 'Game date is required'),
   gameTime: z.string().min(1, 'Game time is required'),
   venue: z.string().optional(),
+  lockerRoom: z.string().optional(),
 });
 
 type EditGameForm = z.infer<typeof editGameSchema>;
@@ -333,6 +334,7 @@ export default function LeagueManagement() {
         gameDate: formattedDate,
         gameTime: formattedTime,
         venue: selectedGame.venue || '',
+        lockerRoom: selectedGame.lockerRoom || '',
       });
     }
   }, [selectedGame, editGameForm]);
@@ -494,6 +496,7 @@ export default function LeagueManagement() {
         awayTeamId: data.awayTeamId,
         scheduledAt: combinedDateTime.toISOString(),
         venue: data.venue,
+        lockerRoom: data.lockerRoom,
       });
       return response.json();
     },
@@ -1902,12 +1905,12 @@ export default function LeagueManagement() {
                               ref={timePickerRef}
                               className="absolute z-50 mt-1 bg-white dark:bg-card border border-border rounded-lg shadow-lg min-w-[300px]"
                             >
-                              <div className="p-4">
-                                <div className="flex items-center justify-center gap-4">
+                              <div className="p-6">
+                                <div className="flex items-start justify-center gap-8">
                                   {/* Hours */}
                                   <div className="flex flex-col items-center">
-                                    <div className="text-sm font-medium mb-2">Hour</div>
-                                    <div className="h-32 overflow-y-auto border border-border rounded-lg bg-background">
+                                    <div className="text-base font-semibold mb-3 text-foreground">Hour</div>
+                                    <div className="h-40 w-16 overflow-y-auto border-2 border-border rounded-xl bg-background/50 scrollbar-thin">
                                       {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
                                         <button
                                           key={hour}
@@ -1929,12 +1932,12 @@ export default function LeagueManagement() {
                                             }
                                             field.onChange(`${String(newHour24).padStart(2, '0')}:${minutes}`);
                                           }}
-                                          className={`w-12 h-10 flex items-center justify-center text-sm hover:bg-primary/10 ${
+                                          className={`w-full h-12 flex items-center justify-center text-base font-medium hover:bg-primary/10 rounded-lg mx-1 my-1 transition-colors ${
                                             field.value && (() => {
                                               const currentHour24 = parseInt(field.value.split(':')[0]);
                                               const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24;
                                               return currentHour12 === hour;
-                                            })() ? 'bg-primary text-white' : ''
+                                            })() ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground'
                                           }`}
                                         >
                                           {hour}
@@ -1943,10 +1946,12 @@ export default function LeagueManagement() {
                                     </div>
                                   </div>
 
+                                  <div className="flex items-center text-2xl font-bold text-muted-foreground mt-12">:</div>
+
                                   {/* Minutes */}
                                   <div className="flex flex-col items-center">
-                                    <div className="text-sm font-medium mb-2">Min</div>
-                                    <div className="h-32 overflow-y-auto border border-border rounded-lg bg-background">
+                                    <div className="text-base font-semibold mb-3 text-foreground">Minutes</div>
+                                    <div className="h-40 w-16 overflow-y-auto border-2 border-border rounded-xl bg-background/50 scrollbar-thin">
                                       {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
                                         <button
                                           key={minute}
@@ -1956,8 +1961,8 @@ export default function LeagueManagement() {
                                             const [hours] = currentTime.split(':');
                                             field.onChange(`${hours}:${String(minute).padStart(2, '0')}`);
                                           }}
-                                          className={`w-12 h-10 flex items-center justify-center text-sm hover:bg-primary/10 ${
-                                            field.value && parseInt(field.value.split(':')[1]) === minute ? 'bg-primary text-white' : ''
+                                          className={`w-full h-12 flex items-center justify-center text-base font-medium hover:bg-primary/10 rounded-lg mx-1 my-1 transition-colors ${
+                                            field.value && parseInt(field.value.split(':')[1]) === minute ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground'
                                           }`}
                                         >
                                           {String(minute).padStart(2, '0')}
@@ -1968,8 +1973,8 @@ export default function LeagueManagement() {
 
                                   {/* AM/PM */}
                                   <div className="flex flex-col items-center">
-                                    <div className="text-sm font-medium mb-2">Period</div>
-                                    <div className="flex flex-col gap-2">
+                                    <div className="text-base font-semibold mb-3 text-foreground">Period</div>
+                                    <div className="flex flex-col gap-3">
                                       {['AM', 'PM'].map((period) => (
                                         <button
                                           key={period}
@@ -1993,12 +1998,12 @@ export default function LeagueManagement() {
                                             
                                             field.onChange(`${String(newHour24).padStart(2, '0')}:${minutes}`);
                                           }}
-                                          className={`w-12 h-10 flex items-center justify-center text-sm hover:bg-primary/10 ${
+                                          className={`w-16 h-12 flex items-center justify-center text-base font-semibold hover:bg-primary/10 rounded-lg transition-colors ${
                                             field.value && (() => {
                                               const currentHour24 = parseInt(field.value.split(':')[0]);
                                               const isCurrentlyPM = currentHour24 >= 12;
                                               return (period === 'PM' && isCurrentlyPM) || (period === 'AM' && !isCurrentlyPM);
-                                            })() ? 'bg-primary text-white' : ''
+                                            })() ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground border border-border'
                                           }`}
                                         >
                                           {period}
@@ -2008,11 +2013,11 @@ export default function LeagueManagement() {
                                   </div>
                                 </div>
 
-                                <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-border">
+                                <div className="flex justify-center mt-6 pt-4 border-t border-border">
                                   <button
                                     type="button"
                                     onClick={() => setShowTimePicker(false)}
-                                    className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+                                    className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium transition-colors"
                                   >
                                     Done
                                   </button>
@@ -2031,15 +2036,27 @@ export default function LeagueManagement() {
                   </div>
                 </div>
 
-                {/* Venue */}
+                {/* Rink */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Venue (Optional)</label>
+                  <label className="block text-sm font-medium mb-2">Rink (Optional)</label>
                   <input
                     {...editGameForm.register('venue')}
                     type="text"
-                    placeholder="Enter venue"
+                    placeholder="Enter rink name"
                     className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="input-game-venue"
+                  />
+                </div>
+
+                {/* Locker Room */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Locker Room (Optional)</label>
+                  <input
+                    {...editGameForm.register('lockerRoom')}
+                    type="text"
+                    placeholder="Enter locker room assignment"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-game-locker-room"
                   />
                 </div>
 
