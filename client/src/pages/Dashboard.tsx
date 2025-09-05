@@ -435,18 +435,6 @@ export default function Dashboard() {
       <div className="px-6 mb-6">
         <h2 className="text-lg font-semibold mb-4" data-testid="text-recent-activity-title">Recent Activity</h2>
         <div className="space-y-3">
-          <div className="bg-card rounded-lg border border-border p-3" data-testid="card-activity-placeholder">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center mt-1">
-                <Users className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">
-                  Join a team to see recent activity
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       
