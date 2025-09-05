@@ -1,197 +1,308 @@
-import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock, MapPin, Trophy } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, isSameMonth } from 'date-fns';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { format } from "date-fns";
+import { Trophy, Check, X, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
+import beverageJarUrl from "@assets/beverage_jar.png";
 
 export default function Calendar() {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
-  const { data: upcomingGames, isLoading } = useQuery({
-    queryKey: ['/api/user/games/upcoming'],
+  // Fetch user's teams
+  const { data: userTeams } = useQuery({
+    queryKey: ["/api/user/teams"],
   });
 
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
-  const calendarDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  // Get primary team (first team for now)
+  const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
 
-  const getGameForDate = (date: Date) => {
-    if (!Array.isArray(upcomingGames)) return null;
-    return upcomingGames.find((game: any) => 
-      isSameDay(new Date(game.scheduledAt), date)
-    );
-  };
+  // Fetch all upcoming games
+  const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
+    queryKey: ["/api/user/games/upcoming"],
+  });
 
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 1 : -1));
-    setCurrentDate(newDate);
-  };
+  // Fetch user attendance statuses
+  const { data: userAttendanceStatuses } = useQuery({
+    queryKey: ["/api/user/attendance-statuses"],
+  });
 
-  const todaysGames = Array.isArray(upcomingGames) ? upcomingGames.filter((game: any) => 
-    isSameDay(new Date(game.scheduledAt), new Date())
-  ) : [];
+  // Check in mutation
+  const checkInMutation = useMutation({
+    mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
+      await apiRequest(`/api/games/${gameId}/check-in`, {
+        method: "POST",
+        body: JSON.stringify({ teamId }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/attendance-statuses"] });
+      toast({
+        title: "Checked In",
+        description: "You've successfully checked in to this game.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to check in. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Check out mutation
+  const checkOutMutation = useMutation({
+    mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
+      await apiRequest(`/api/games/${gameId}/check-out`, {
+        method: "POST",
+        body: JSON.stringify({ teamId }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/attendance-statuses"] });
+      toast({
+        title: "Checked Out",
+        description: "You've successfully checked out of this game.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to check out. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Claim beverage duty mutation
+  const claimBeverageDutyMutation = useMutation({
+    mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
+      await apiRequest(`/api/games/${gameId}/beverage-duty`, {
+        method: "POST",
+        body: JSON.stringify({ teamId }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
+      toast({
+        title: "Beverage Duty Claimed",
+        description: "You've successfully claimed beverage duty for this game.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to claim beverage duty. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Filter games for user's teams
+  const userGames = Array.isArray(upcomingGames) && Array.isArray(userTeams) 
+    ? upcomingGames.filter((game: any) => {
+        const userTeamIds = userTeams.map((team: any) => team.id);
+        return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
+      })
+    : [];
 
   return (
-    <div className="min-h-screen flex flex-col pb-24" data-testid="calendar-page">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="p-6 pt-12">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Schedule</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setViewMode('month')}
-              className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                viewMode === 'month' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'
-              }`}
-              data-testid="button-view-month"
-            >
-              Month
-            </button>
-            <button
-              onClick={() => setViewMode('week')}
-              className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                viewMode === 'week' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'
-              }`}
-              data-testid="button-view-week"
-            >
-              Week
-            </button>
-          </div>
-        </div>
-        
-        {/* Month Navigation */}
-        <div className="flex items-center justify-between mb-4">
-          <button 
-            onClick={() => navigateMonth('prev')}
-            className="p-2 text-muted-foreground hover:text-foreground"
-            data-testid="button-prev-month"
+      <div className="bg-card border-b border-border px-6 py-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/")}
+            className="p-2"
+            data-testid="button-back-to-dashboard"
           >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h2 className="text-lg font-semibold" data-testid="text-current-month">
-            {format(currentDate, 'MMMM yyyy')}
-          </h2>
-          <button 
-            onClick={() => navigateMonth('next')}
-            className="p-2 text-muted-foreground hover:text-foreground"
-            data-testid="button-next-month"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <h1 className="text-xl font-semibold" data-testid="text-calendar-title">
+            All Upcoming Games
+          </h1>
         </div>
       </div>
-      
-      {/* Calendar Grid */}
-      <div className="px-6 mb-6">
-        <div className="grid grid-cols-7 gap-1 mb-4">
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-            <div key={index} className="text-center text-xs font-medium text-muted-foreground py-2" data-testid={`header-day-${index}`}>
-              {day}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {calendarDays.map((day, index) => {
-            const hasGame = getGameForDate(day);
-            const isCurrentDay = isToday(day);
-            const isCurrentMonth = isSameMonth(day, currentDate);
-            
-            return (
-              <div 
-                key={index}
-                className={`aspect-square flex items-center justify-center text-sm relative transition-colors ${
-                  isCurrentDay 
-                    ? 'bg-primary text-primary-foreground rounded-lg' 
-                    : isCurrentMonth
-                      ? 'text-foreground hover:bg-muted rounded-lg'
-                      : 'text-muted-foreground'
-                }`}
-                data-testid={`calendar-day-${format(day, 'yyyy-MM-dd')}`}
-              >
-                {format(day, 'd')}
-                {hasGame && !isCurrentDay && (
-                  <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full" data-testid={`game-indicator-${format(day, 'yyyy-MM-dd')}`} />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      
-      {/* Today's Events */}
-      <div className="px-6">
-        <h2 className="text-lg font-semibold mb-4" data-testid="text-todays-events-title">Today's Events</h2>
-        
-        {isLoading ? (
-          <div className="space-y-3" data-testid="loading-todays-events">
-            {[1, 2].map((i) => (
-              <div key={i} className="bg-card rounded-xl border border-border p-4 animate-pulse">
+
+      {/* Games List */}
+      <div className="px-6 py-6">
+        {gamesLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid={`loading-game-${i}`}>
                 <div className="h-16 bg-muted rounded"></div>
               </div>
             ))}
           </div>
-        ) : todaysGames.length > 0 ? (
+        ) : userGames.length > 0 ? (
           <div className="space-y-3">
-            {todaysGames.map((game: any) => (
-              <div key={game.id} className="bg-card rounded-xl border border-border p-4" data-testid={`card-todays-game-${game.id}`}>
+            {userGames.map((game: any) => (
+              <div key={game.id} className="bg-card rounded-xl border border-border p-4 relative" data-testid={`card-game-${game.id}`}>
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
-                      {game.homeTeam.logoUrl ? (
+                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
+                    {(() => {
+                      const opponentTeam = game.homeTeam?.id === primaryTeam?.id ? game.awayTeam : game.homeTeam;
+                      return opponentTeam?.logoUrl ? (
                         <img 
-                          src={game.homeTeam.logoUrl} 
-                          alt={`${game.homeTeam.name} logo`}
-                          className="w-full h-full rounded object-cover"
-                          data-testid={`img-home-team-logo-${game.id}`}
+                          src={opponentTeam.logoUrl} 
+                          alt={`${opponentTeam.name} logo`}
+                          className="w-full h-full rounded-lg object-cover"
+                          data-testid={`img-opponent-logo-${game.id}`}
                         />
                       ) : (
-                        <Trophy className="w-4 h-4 text-primary-foreground" />
-                      )}
-                    </div>
-                    <span className="text-xs font-medium">vs</span>
-                    <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
-                      {game.awayTeam.logoUrl ? (
-                        <img 
-                          src={game.awayTeam.logoUrl} 
-                          alt={`${game.awayTeam.name} logo`}
-                          className="w-full h-full rounded object-cover"
-                          data-testid={`img-away-team-logo-${game.id}`}
-                        />
-                      ) : (
-                        <Trophy className="w-4 h-4 text-primary-foreground" />
-                      )}
-                    </div>
+                        <Trophy className="w-6 h-6 text-primary-foreground" />
+                      );
+                    })()}
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold" data-testid={`text-game-matchup-${game.id}`}>
-                      {game.homeTeam.name} vs {game.awayTeam.name}
+                    <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
+                      vs {game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}
                     </h3>
                     <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
-                      {format(new Date(game.scheduledAt), 'h:mm a')} - {format(new Date(new Date(game.scheduledAt).getTime() + 90 * 60000), 'h:mm a')}
+                      {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
                     </p>
                     {game.venue && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <MapPin className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground" data-testid={`text-game-venue-${game.id}`}>
-                          {game.venue}
-                        </span>
-                      </div>
+                      <p className="text-xs text-muted-foreground" data-testid={`text-game-venue-${game.id}`}>
+                        {game.venue}
+                      </p>
                     )}
                   </div>
-                  <div className="text-right">
-                    <span className="tier-badge bg-success text-accent-foreground text-xs px-2 py-1 rounded-full" data-testid={`badge-game-status-${game.id}`}>
-                      TODAY
-                    </span>
+                  <div className="flex items-center gap-2">
+                    {/* Beverage Duty Icon - Left side */}
+                    {(() => {
+                      // Find user's attendance status for this game
+                      const userStatus = Array.isArray(userAttendanceStatuses) ? 
+                        userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
+                      
+                      // Show beverage icon only if user has beverage duty AND is not checked out
+                      const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
+                      const isCheckedOut = userStatus === 'checked_out';
+                      
+                      return hasBeverageDuty && !isCheckedOut ? (
+                        <div className="flex items-center">
+                          <img 
+                            src={beverageJarUrl}
+                            alt="Beverage Duty"
+                            className="h-8 w-auto"
+                            style={{ aspectRatio: '9/16' }}
+                            data-testid={`icon-beverage-duty-${game.id}`}
+                          />
+                        </div>
+                      ) : null;
+                    })()}
+                    {/* Claim Beverage Duty Button */}
+                    {(() => {
+                      // Find user's attendance status for this game
+                      const userStatus = Array.isArray(userAttendanceStatuses) ? 
+                        userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
+                      
+                      // Show claim button only if no one has claimed beverage duty AND user is not checked out
+                      const noBeverageDutyClaimed = !(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
+                      const isCheckedOut = userStatus === 'checked_out';
+                      
+                      return noBeverageDutyClaimed && !isCheckedOut;
+                    })() && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
+                        onClick={() => {
+                          const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
+                          if (userTeam && primaryTeam) {
+                            claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                          }
+                        }}
+                        disabled={claimBeverageDutyMutation.isPending}
+                        data-testid={`button-claim-beverage-duty-${game.id}`}
+                      >
+                        <img 
+                          src={beverageJarUrl}
+                          alt="Claim Beverage Duty"
+                          className="h-4 w-auto"
+                          style={{ aspectRatio: '9/16' }}
+                        />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {(() => {
+                      // Find user's attendance status for this game
+                      const userStatus = Array.isArray(userAttendanceStatuses) ? 
+                        userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
+                      
+                      if (userStatus === 'checked_in') {
+                        return (
+                          <div className="text-center">
+                            <div className="bg-green-500/50 text-white w-8 h-8 rounded flex items-center justify-center" data-testid={`status-confirmed-${game.id}`}>
+                              <Check className="w-4 h-4" />
+                            </div>
+                          </div>
+                        );
+                      } else if (userStatus === 'checked_out') {
+                        return (
+                          <div className="text-center">
+                            <div className="bg-red-500/50 text-white w-8 h-8 rounded flex items-center justify-center" data-testid={`status-declined-${game.id}`}>
+                              <X className="w-4 h-4" />
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        // No response yet, show buttons
+                        return (
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0 bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50"
+                              onClick={() => {
+                                const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
+                                if (userTeam && primaryTeam) {
+                                  checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                                }
+                              }}
+                              disabled={checkInMutation.isPending}
+                              data-testid={`button-check-in-${game.id}`}
+                            >
+                              <Check className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0 bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
+                              onClick={() => {
+                                const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
+                                if (userTeam && primaryTeam) {
+                                  checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                                }
+                              }}
+                              disabled={checkOutMutation.isPending}
+                              data-testid={`button-check-out-${game.id}`}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        );
+                      }
+                    })()}
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="bg-card rounded-xl border border-border p-8 text-center" data-testid="empty-todays-events">
-            <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No games scheduled for today</p>
+          <div className="bg-card rounded-xl border border-border p-8 text-center" data-testid="empty-all-games">
+            <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No upcoming games scheduled</p>
           </div>
         )}
       </div>
