@@ -197,12 +197,6 @@ export default function GameDetails() {
   const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
   const beverageDutyClaimed = !!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
   const beverageDutyClaimedByOther = beverageDutyClaimed && !hasBeverageDuty;
-  
-  // Get the name of the person who claimed beverage duty
-  const beverageDutyClaimantId = game.homeBeverageDutyUserId || game.awayBeverageDutyUserId;
-  const allTeamMembers = [...(homeTeamMembers || []), ...(awayTeamMembers || [])];
-  const beverageDutyClaimant = allTeamMembers.find((member: any) => member.user.id === beverageDutyClaimantId);
-  const claimantName = beverageDutyClaimant ? `${beverageDutyClaimant.user.firstName || ''} ${beverageDutyClaimant.user.lastName || ''}`.trim() || 'Teammate' : 'Teammate';
 
   return (
     <div className="min-h-screen bg-background">
@@ -410,8 +404,8 @@ export default function GameDetails() {
                   />
                 </div>
                 <div>
-                  <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">Beverage Duty Claimed by {claimantName}</p>
-                  <p className="text-sm text-muted-foreground">{claimantName} is bringing beverages</p>
+                  <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">Beverage Duty Claimed by Teammate</p>
+                  <p className="text-sm text-muted-foreground">A teammate is bringing beverages</p>
                 </div>
               </div>
             ) : (
