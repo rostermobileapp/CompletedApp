@@ -1792,26 +1792,32 @@ export default function LeagueManagement() {
                           {showDatePicker && (
                             <div 
                               ref={datePickerRef}
-                              className="absolute z-50 mt-1 bg-white dark:bg-card border border-border rounded-lg shadow-lg"
+                              className="absolute z-50 mt-1 bg-white dark:bg-card border border-border rounded-lg shadow-lg min-w-[350px]"
                             >
                               <DayPicker
                                 mode="single"
-                                selected={field.value ? new Date(field.value) : undefined}
+                                selected={field.value ? new Date(field.value + 'T00:00:00') : undefined}
                                 onSelect={(date) => {
                                   if (date) {
-                                    field.onChange(date.toISOString().split('T')[0]);
+                                    // Format date as YYYY-MM-DD to avoid timezone issues
+                                    const year = date.getFullYear();
+                                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                                    const day = String(date.getDate()).padStart(2, '0');
+                                    field.onChange(`${year}-${month}-${day}`);
                                     setShowDatePicker(false);
                                   }
                                 }}
-                                className="p-3"
+                                className="p-4"
                                 classNames={{
-                                  today: "rdp-cell_today bg-primary/20 text-black font-bold",
-                                  selected: "rdp-cell_selected bg-primary text-white font-bold",
-                                  root: "text-black",
-                                  day: "text-black hover:bg-gray-100",
-                                  nav_button: "text-black hover:bg-gray-100",
-                                  caption: "text-black font-medium",
-                                  head_cell: "text-black font-medium",
+                                  today: "rdp-cell_today bg-primary/20 text-black font-bold text-lg w-12 h-12",
+                                  selected: "rdp-cell_selected bg-primary text-white font-bold text-lg w-12 h-12",
+                                  root: "text-black text-lg",
+                                  day: "text-black hover:bg-gray-100 text-lg w-12 h-12 flex items-center justify-center cursor-pointer",
+                                  nav_button: "text-black hover:bg-gray-100 w-10 h-10 flex items-center justify-center",
+                                  caption: "text-black font-medium text-xl mb-4",
+                                  head_cell: "text-black font-medium text-base p-2",
+                                  table: "w-full border-spacing-1",
+                                  cell: "text-center p-1",
                                 }}
                               />
                             </div>
