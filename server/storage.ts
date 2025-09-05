@@ -786,6 +786,23 @@ export class DatabaseStorage implements IStorage {
     return { success: true, notes, gameId, userId, teamId };
   }
 
+  async updateGame(gameId: string, updates: Partial<InsertGame>): Promise<Game> {
+    const [updatedGame] = await db
+      .update(games)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(games.id, gameId))
+      .returning();
+    
+    if (!updatedGame) {
+      throw new Error(`Game with id ${gameId} not found`);
+    }
+    
+    return updatedGame;
+  }
+
   // Attendance operations
   async checkInToGame(gameId: string, userId: string, teamId: string): Promise<any> {
     const [attendance] = await db

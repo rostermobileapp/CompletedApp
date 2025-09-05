@@ -637,6 +637,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/games/:gameId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const gameId = req.params.gameId;
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+
+      // Verify that the game exists and the user has permission to edit it
+      const existingGame = await storage.getGameById(gameId);
+      if (!existingGame) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      const updates = req.body;
+      const updatedGame = await storage.updateGame(gameId, updates);
+      res.json(updatedGame);
+    } catch (error) {
+      console.error("Error updating game:", error);
+      res.status(500).json({ message: "Failed to update game" });
+    }
+  });
+
   // Beverage duty routes
   app.post('/api/games/:gameId/beverage-duty', isAuthenticated, async (req: any, res) => {
     try {

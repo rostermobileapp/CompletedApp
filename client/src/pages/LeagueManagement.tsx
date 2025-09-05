@@ -100,6 +100,15 @@ const createGameSchema = z.object({
 
 type CreateGameForm = z.infer<typeof createGameSchema>;
 
+const editGameSchema = z.object({
+  homeTeamId: z.string().min(1, 'Home team is required'),
+  awayTeamId: z.string().min(1, 'Away team is required'),
+  scheduledAt: z.string().min(1, 'Game date and time is required'),
+  venue: z.string().optional(),
+});
+
+type EditGameForm = z.infer<typeof editGameSchema>;
+
 const editLeagueSchema = z.object({
   name: z.string().min(1, 'League name is required'),
   description: z.string().optional(),
@@ -128,7 +137,9 @@ export default function LeagueManagement() {
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [showScheduleGame, setShowScheduleGame] = useState(false);
+  const [showEditGame, setShowEditGame] = useState(false);
   const [showEditLeague, setShowEditLeague] = useState(false);
   const [showCreateSeason, setShowCreateSeason] = useState(false);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
@@ -255,6 +266,31 @@ export default function LeagueManagement() {
       isActive: true,
     },
   });
+
+  // Form for editing games
+  const editGameForm = useForm<EditGameForm>({
+    resolver: zodResolver(editGameSchema),
+    defaultValues: {
+      homeTeamId: '',
+      awayTeamId: '',
+      scheduledAt: '',
+      venue: '',
+    },
+  });
+
+  // Update edit game form when selected game changes
+  React.useEffect(() => {
+    if (selectedGame) {
+      const gameDate = new Date(selectedGame.scheduledAt);
+      const formattedDateTime = gameDate.toISOString().slice(0, 16);
+      editGameForm.reset({
+        homeTeamId: selectedGame.homeTeamId,
+        awayTeamId: selectedGame.awayTeamId,
+        scheduledAt: formattedDateTime,
+        venue: selectedGame.venue || '',
+      });
+    }
+  }, [selectedGame, editGameForm]);
 
   // Update form when league data loads
   React.useEffect(() => {
@@ -388,6 +424,30 @@ export default function LeagueManagement() {
       setShowScheduleGame(false);
       gameForm.reset();
       refetchGames();
+    },
+  });
+
+  // Game update mutation
+  const updateGameMutation = useMutation({
+    mutationFn: async ({ gameId, data }: { gameId: string; data: EditGameForm }) => {
+      const response = await apiRequest('PATCH', `/api/games/${gameId}`, {
+        ...data,
+        scheduledAt: new Date(data.scheduledAt).toISOString(),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Game updated successfully' });
+      setShowEditGame(false);
+      setSelectedGame(null);
+      refetchGames();
+    },
+    onError: () => {
+      toast({
+        title: 'Update Failed',
+        description: 'Failed to update game details.',
+        variant: 'destructive',
+      });
     },
   });
 
@@ -1115,7 +1175,11 @@ export default function LeagueManagement() {
                     return (
                       <div 
                         key={game.id} 
-                        className="flex items-center justify-between p-4 bg-background rounded-lg border"
+                        className="flex items-center justify-between p-4 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => {
+                          setSelectedGame(game);
+                          setShowEditGame(true);
+                        }}
                         data-testid={`game-${game.id}`}
                       >
                         <div className="flex-1">
@@ -1605,6 +1669,127 @@ export default function LeagueManagement() {
                     data-testid="button-create-season-submit"
                   >
                     {createSeasonMutation.isPending ? 'Creating...' : 'Create Season'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Game Modal */}
+      {showEditGame && selectedGame && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Edit Game</h2>
+                <button
+                  onClick={() => {
+                    setShowEditGame(false);
+                    setSelectedGame(null);
+                  }}
+                  className="text-muted-foreground hover:text-foreground p-1"
+                  data-testid="button-close-edit-game"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={editGameForm.handleSubmit((data) => {
+                  updateGameMutation.mutate({ gameId: selectedGame.id, data });
+                })}
+                className="space-y-4"
+              >
+                {/* Home Team */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Home Team</label>
+                  <select
+                    {...editGameForm.register('homeTeamId')}
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="select-home-team"
+                  >
+                    <option value="">Select home team</option>
+                    {teams.map((team: Team) => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                  {editGameForm.formState.errors.homeTeamId && (
+                    <p className="text-red-500/50 text-sm mt-1">
+                      {editGameForm.formState.errors.homeTeamId.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Away Team */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Away Team</label>
+                  <select
+                    {...editGameForm.register('awayTeamId')}
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="select-away-team"
+                  >
+                    <option value="">Select away team</option>
+                    {teams.map((team: Team) => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                  {editGameForm.formState.errors.awayTeamId && (
+                    <p className="text-red-500/50 text-sm mt-1">
+                      {editGameForm.formState.errors.awayTeamId.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Date and Time */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Date & Time</label>
+                  <input
+                    {...editGameForm.register('scheduledAt')}
+                    type="datetime-local"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-game-datetime"
+                  />
+                  {editGameForm.formState.errors.scheduledAt && (
+                    <p className="text-red-500/50 text-sm mt-1">
+                      {editGameForm.formState.errors.scheduledAt.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Venue */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Venue (Optional)</label>
+                  <input
+                    {...editGameForm.register('venue')}
+                    type="text"
+                    placeholder="Enter venue"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-game-venue"
+                  />
+                </div>
+
+                {/* Submit Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditGame(false);
+                      setSelectedGame(null);
+                    }}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                    data-testid="button-cancel-edit-game"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateGameMutation.isPending}
+                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                    data-testid="button-save-game-changes"
+                  >
+                    {updateGameMutation.isPending ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </form>
