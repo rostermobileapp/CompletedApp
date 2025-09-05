@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import beverageJarUrl from "@assets/beverage_jar.png";
+import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 
 export default function Calendar() {
   const { user } = useAuth();
@@ -35,10 +35,7 @@ export default function Calendar() {
   // Check in mutation
   const checkInMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/check-in`, {
-        method: "POST",
-        body: JSON.stringify({ teamId }),
-      });
+      await apiRequest(`/api/games/${gameId}/check-in`, "POST", { teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -60,10 +57,7 @@ export default function Calendar() {
   // Check out mutation
   const checkOutMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/check-out`, {
-        method: "POST",
-        body: JSON.stringify({ teamId }),
-      });
+      await apiRequest(`/api/games/${gameId}/check-out`, "POST", { teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -85,10 +79,7 @@ export default function Calendar() {
   // Claim beverage duty mutation
   const claimBeverageDutyMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/beverage-duty`, {
-        method: "POST",
-        body: JSON.stringify({ teamId }),
-      });
+      await apiRequest(`/api/games/${gameId}/beverage-duty`, "POST", { teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });

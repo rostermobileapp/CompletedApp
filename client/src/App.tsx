@@ -19,6 +19,7 @@ import Subscription from "@/pages/Subscription";
 import CreateLeague from "@/pages/CreateLeague";
 import LeagueManagement from "@/pages/LeagueManagement";
 import LeagueList from "@/pages/LeagueList";
+import Calendar from "@/pages/Calendar";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -57,6 +58,7 @@ function Router() {
           <Route path="/create-league" component={CreateLeague} />
           <Route path="/league-management" component={LeagueManagement} />
           <Route path="/league-list" component={LeagueList} />
+          <Route path="/calendar" component={Calendar} />
           <Route component={NotFound} />
         </Switch>
         <BottomNavigation />
