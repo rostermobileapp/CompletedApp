@@ -256,17 +256,27 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center gap-2">
                     {/* Beverage Duty Icon - Left side */}
-                    {(game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id) && (
-                      <div className="flex items-center">
-                        <img 
-                          src={beverageJarUrl}
-                          alt="Beverage Duty"
-                          className="h-8 w-auto"
-                          style={{ aspectRatio: '9/16' }}
-                          data-testid={`icon-beverage-duty-${game.id}`}
-                        />
-                      </div>
-                    )}
+                    {(() => {
+                      // Find user's attendance status for this game
+                      const userStatus = Array.isArray(userAttendanceStatuses) ? 
+                        userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
+                      
+                      // Show beverage icon only if user has beverage duty AND is not checked out
+                      const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
+                      const isCheckedOut = userStatus === 'checked_out';
+                      
+                      return hasBeverageDuty && !isCheckedOut ? (
+                        <div className="flex items-center">
+                          <img 
+                            src={beverageJarUrl}
+                            alt="Beverage Duty"
+                            className="h-8 w-auto"
+                            style={{ aspectRatio: '9/16' }}
+                            data-testid={`icon-beverage-duty-${game.id}`}
+                          />
+                        </div>
+                      ) : null;
+                    })()}
                     {/* Claim Beverage Duty Button */}
                     {!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId) && (
                       <Button
