@@ -226,19 +226,6 @@ export default function GameDetails() {
   const validBeverageDutyClaimed = beverageDutyClaimed && (claimantExists || beverageDutyClaimantId === (user as any)?.id);
   const validBeverageDutyClaimedByOther = validBeverageDutyClaimed && !hasBeverageDuty;
 
-  // Debug logging for game-specific issues
-  console.log(`Game ${gameId} beverage duty debug:`, {
-    gameDate: game.scheduledAt,
-    userId: (user as any)?.id,
-    homeBeverageDutyUserId: game.homeBeverageDutyUserId,
-    awayBeverageDutyUserId: game.awayBeverageDutyUserId,
-    beverageDutyClaimed,
-    claimantExists,
-    validBeverageDutyClaimed,
-    validBeverageDutyClaimedByOther,
-    homeTeamMembersCount: homeTeamMembers?.length || 0,
-    awayTeamMembersCount: awayTeamMembers?.length || 0
-  });
 
   return (
     <div className="min-h-screen bg-background">

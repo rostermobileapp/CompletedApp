@@ -1,0 +1,72 @@
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+14The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+14The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-f1f6a4605a6d964d.js:38 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+Rosters:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+Rosters:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+Rosters:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-f1f6a4605a6d964d.js:38 [LaunchDarkly] LaunchDarkly client initialized
+Rosters:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+6Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'battery'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'layout-animations'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'navigation-override'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'oversized-images'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'publickey-credentials'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'speaker-selection'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'unoptimized-images'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'unsized-media'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Unrecognized feature: 'pointer-lock'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+framework-48a90735d2f1eabd.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-48a90735d2f1eabd.js:1Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html?initialPath=%2Fcalendar&id=%3Arf6%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+Console.js:61 Game 2e21dc4c-1ead-4219-97be-b0c4cd035da2 beverage duty debug: Object
+Console.js:61 Game 2e21dc4c-1ead-4219-97be-b0c4cd035da2 beverage duty debug: Object
+Console.js:61 Game 2e21dc4c-1ead-4219-97be-b0c4cd035da2 beverage duty debug: Object
+Console.js:61 Game 2e21dc4c-1ead-4219-97be-b0c4cd035da2 beverage duty debug: Object
