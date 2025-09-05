@@ -389,8 +389,7 @@ export default function GameDetails() {
         </div>
 
         {/* Beverage Responsibility */}
-        {currentStatus !== 'checked_out' && (
-          <div className="bg-card rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-semibold mb-4" data-testid="text-beverage-title">Beverage Responsibility</h3>
             
             {hasBeverageDuty ? (
@@ -473,8 +472,7 @@ export default function GameDetails() {
                 </Button>
               </div>
             )}
-          </div>
-        )}
+        </div>
 
         {/* Notes for Captain */}
         <div className="bg-card rounded-xl border border-border p-6">
