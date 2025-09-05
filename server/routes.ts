@@ -733,6 +733,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get specific game details
+  app.get('/api/games/:gameId', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+      res.json(game);
+    } catch (error) {
+      console.error('Error fetching game details:', error);
+      res.status(500).json({ message: 'Failed to fetch game details' });
+    }
+  });
+
+  // Release beverage duty
+  app.post('/api/games/:gameId/release-beverage-duty', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const userId = req.user.claims.sub;
+      const { teamId } = req.body;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      if (!teamId) {
+        return res.status(400).json({ message: 'Team ID is required' });
+      }
+
+      const updatedGame = await storage.releaseBeverageDuty(gameId, userId, teamId);
+      res.json(updatedGame);
+    } catch (error) {
+      console.error('Error releasing beverage duty:', error);
+      res.status(500).json({ message: 'Failed to release beverage duty' });
+    }
+  });
+
+  // Save notes for game
+  app.post('/api/games/:gameId/notes', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const userId = req.user.claims.sub;
+      const { teamId, notes } = req.body;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      if (!teamId) {
+        return res.status(400).json({ message: 'Team ID is required' });
+      }
+
+      const savedNotes = await storage.saveGameNotes(gameId, userId, teamId, notes);
+      res.json(savedNotes);
+    } catch (error) {
+      console.error('Error saving game notes:', error);
+      res.status(500).json({ message: 'Failed to save notes' });
+    }
+  });
+
   // Message routes (Player Plus feature)
   app.get("/api/teams/:id/messages", isAuthenticated, async (req: any, res) => {
     try {

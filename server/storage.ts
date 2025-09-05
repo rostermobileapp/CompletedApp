@@ -79,7 +79,17 @@ export interface IStorage {
   getUpcomingGames(userId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
   getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
   getGamesByLeague(leagueId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
-  claimBeverageDuty(gameId: string, userId: string): Promise<Game>;
+  getGameById(gameId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team }) | undefined>;
+  claimBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game>;
+  releaseBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game>;
+  saveGameNotes(gameId: string, userId: string, teamId: string, notes: string): Promise<any>;
+  
+  // Attendance operations
+  checkInToGame(gameId: string, userId: string, teamId: string): Promise<any>;
+  checkOutFromGame(gameId: string, userId: string): Promise<any>;
+  getGameAttendance(gameId: string): Promise<any[]>;
+  getUserAttendanceStatuses(userId: string): Promise<any[]>;
+  getCaptainAttendanceOverview(userId: string): Promise<any[]>;
   
   // Message operations
   sendMessage(message: InsertMessage): Promise<Message>;
@@ -638,6 +648,39 @@ export class DatabaseStorage implements IStorage {
     return gamesWithTeams;
   }
 
+  async getGameById(gameId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team }) | undefined> {
+    const [game] = await db
+      .select({
+        id: games.id,
+        homeTeamId: games.homeTeamId,
+        awayTeamId: games.awayTeamId,
+        scheduledAt: games.scheduledAt,
+        venue: games.venue,
+        homeBeverageDutyUserId: games.homeBeverageDutyUserId,
+        awayBeverageDutyUserId: games.awayBeverageDutyUserId,
+        homeBeverageDutyClaimedAt: games.homeBeverageDutyClaimedAt,
+        awayBeverageDutyClaimedAt: games.awayBeverageDutyClaimedAt,
+        createdAt: games.createdAt,
+        updatedAt: games.updatedAt,
+        homeTeam: teams,
+        awayTeam: {
+          id: sql<string>`away_team.id`,
+          name: sql<string>`away_team.name`,
+          logoUrl: sql<string>`away_team.logo_url`,
+          leagueId: sql<string>`away_team.league_id`,
+          captainId: sql<string>`away_team.captain_id`,
+          createdAt: sql<Date>`away_team.created_at`,
+          updatedAt: sql<Date>`away_team.updated_at`,
+        },
+      })
+      .from(games)
+      .leftJoin(teams, eq(games.homeTeamId, teams.id))
+      .leftJoin(sql`teams AS away_team`, sql`games.away_team_id = away_team.id`)
+      .where(eq(games.id, gameId));
+    
+    return game;
+  }
+
   async claimBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game> {
     // First, get the game to determine if the user's team is home or away
     const [game] = await db.select().from(games).where(eq(games.id, gameId));
@@ -668,6 +711,63 @@ export class DatabaseStorage implements IStorage {
     }
     
     return updatedGame;
+  }
+
+  async releaseBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game> {
+    // First, get the game to determine if the user's team is home or away
+    const [game] = await db.select().from(games).where(eq(games.id, gameId));
+    
+    if (!game) {
+      throw new Error(`Game with id ${gameId} not found`);
+    }
+
+    const isHomeTeam = game.homeTeamId === teamId;
+    const updateData = isHomeTeam 
+      ? { 
+          homeBeverageDutyUserId: null,
+          homeBeverageDutyClaimedAt: null
+        }
+      : { 
+          awayBeverageDutyUserId: null,
+          awayBeverageDutyClaimedAt: null
+        };
+
+    const [updatedGame] = await db
+      .update(games)
+      .set(updateData)
+      .where(eq(games.id, gameId))
+      .returning();
+    
+    if (!updatedGame) {
+      throw new Error(`Game with id ${gameId} not found`);
+    }
+    
+    return updatedGame;
+  }
+
+  async saveGameNotes(gameId: string, userId: string, teamId: string, notes: string): Promise<any> {
+    // For now, we'll store notes in the gameAttendance table
+    // In a real application, you might want a separate notes table
+    const [savedNotes] = await db
+      .insert(gameAttendance)
+      .values({
+        gameId,
+        userId,
+        teamId,
+        notes,
+        status: 'pending', // Default status if not set
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [gameAttendance.gameId, gameAttendance.userId],
+        set: {
+          notes,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    
+    return savedNotes;
   }
 
   // Attendance operations

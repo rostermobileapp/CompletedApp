@@ -138,7 +138,12 @@ export default function Calendar() {
         ) : userGames.length > 0 ? (
           <div className="space-y-3">
             {userGames.map((game: any) => (
-              <div key={game.id} className="bg-card rounded-xl border border-border p-4 relative" data-testid={`card-game-${game.id}`}>
+              <div 
+                key={game.id} 
+                className="bg-card rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors" 
+                onClick={() => navigate(`/game/${game.id}`)}
+                data-testid={`card-game-${game.id}`}
+              >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
                     {(() => {
