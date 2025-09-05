@@ -1753,12 +1753,16 @@ export default function LeagueManagement() {
                 {/* Date */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Game Date</label>
-                  <input
-                    {...editGameForm.register('gameDate')}
-                    type="date"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    data-testid="input-game-date"
-                  />
+                  <div className="relative">
+                    <input
+                      {...editGameForm.register('gameDate')}
+                      type="date"
+                      className="w-full p-3 pr-12 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      data-testid="input-game-date"
+                      placeholder="Select date"
+                    />
+                    <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                  </div>
                   {editGameForm.formState.errors.gameDate && (
                     <p className="text-red-500/50 text-sm mt-1">
                       {editGameForm.formState.errors.gameDate.message}
