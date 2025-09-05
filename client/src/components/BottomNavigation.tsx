@@ -1,11 +1,12 @@
-import { Home, Users, MessageCircle, MoreHorizontal, User } from 'lucide-react';
+import { Users, MessageCircle, MoreHorizontal, User } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
+import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
 const navItems = [
-  { id: 'home', icon: Home, label: 'Home', path: '/' },
   { id: 'teams', icon: Users, label: 'Teams', path: '/teams' },
   { id: 'messages', icon: MessageCircle, label: 'Messages', path: '/messages' },
+  { id: 'home', icon: null, label: 'Home', path: '/' },
   { id: 'more', icon: MoreHorizontal, label: 'More', path: '/more' },
   { id: 'profile', icon: User, label: 'Profile', path: '/profile' },
 ];
@@ -37,7 +38,16 @@ export function BottomNavigation() {
             )}
             data-testid={`nav-${id}`}
           >
-            <Icon className="w-5 h-5 mb-1" />
+            {id === 'home' ? (
+              <img 
+                src={rostersLogoUrl}
+                alt="Home"
+                className="mb-1 object-contain"
+                style={{ width: '30px', height: '30px' }}
+              />
+            ) : Icon && (
+              <Icon className="w-5 h-5 mb-1" />
+            )}
             <span className="text-xs">{label}</span>
           </button>
         ))}

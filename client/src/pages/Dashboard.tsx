@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
+import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -174,10 +175,16 @@ export default function Dashboard() {
                   <Trophy className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold" data-testid="text-games-played">
-                    {primaryTeam.wins + primaryTeam.losses + primaryTeam.ties}
+                  <p className="text-2xl font-bold" data-testid="text-games-remaining">
+                    {(() => {
+                      const totalGames = Array.isArray(upcomingGames) ? upcomingGames.filter((game: any) => {
+                        const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+                        return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
+                      }).length : 0;
+                      return totalGames;
+                    })()}
                   </p>
-                  <p className="text-xs text-muted-foreground">Games Played</p>
+                  <p className="text-xs text-muted-foreground">Games Remaining</p>
                 </div>
               </div>
             </div>
