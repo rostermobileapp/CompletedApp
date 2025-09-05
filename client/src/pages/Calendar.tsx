@@ -180,11 +180,10 @@ export default function Calendar() {
                       const userStatus = Array.isArray(userAttendanceStatuses) ? 
                         userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
                       
-                      // Show beverage icon only if user has beverage duty AND is not checked out
+                      // Show beverage icon if user has beverage duty
                       const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
-                      const isCheckedOut = userStatus === 'checked_out';
                       
-                      return hasBeverageDuty && !isCheckedOut ? (
+                      return hasBeverageDuty ? (
                         <div className="flex items-center">
                           <img 
                             src={beverageJarUrl}
