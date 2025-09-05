@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { apiRequest } from '@/lib/queryClient';
@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
 import {
   ArrowLeft,
   ArrowRight,
@@ -141,6 +143,25 @@ export default function LeagueManagement() {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [showScheduleGame, setShowScheduleGame] = useState(false);
   const [showEditGame, setShowEditGame] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = React.useRef<HTMLDivElement>(null);
+
+  // Close date picker when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+
+    if (showDatePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDatePicker]);
   const [showEditLeague, setShowEditLeague] = useState(false);
   const [showCreateSeason, setShowCreateSeason] = useState(false);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
@@ -1754,14 +1775,46 @@ export default function LeagueManagement() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Game Date</label>
                   <div className="relative">
-                    <input
-                      {...editGameForm.register('gameDate')}
-                      type="date"
-                      className="w-full p-3 pr-12 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      data-testid="input-game-date"
-                      placeholder="Select date"
+                    <Controller
+                      name="gameDate"
+                      control={editGameForm.control}
+                      render={({ field }) => (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowDatePicker(!showDatePicker)}
+                            className="w-full p-3 pr-12 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
+                            data-testid="button-game-date"
+                          >
+                            {field.value ? new Date(field.value).toLocaleDateString() : 'Select date'}
+                          </button>
+                          <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                          {showDatePicker && (
+                            <div 
+                              ref={datePickerRef}
+                              className="absolute z-50 mt-1 bg-white dark:bg-card border border-border rounded-lg shadow-lg"
+                            >
+                              <DayPicker
+                                mode="single"
+                                selected={field.value ? new Date(field.value) : undefined}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    field.onChange(date.toISOString().split('T')[0]);
+                                    setShowDatePicker(false);
+                                  }
+                                }}
+                                className="p-3"
+                                classNames={{
+                                  today: "rdp-cell_today bg-primary/20 text-primary font-bold",
+                                  selected: "rdp-cell_selected bg-primary text-primary-foreground font-bold",
+                                  root: "text-foreground",
+                                }}
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
                     />
-                    <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
                   </div>
                   {editGameForm.formState.errors.gameDate && (
                     <p className="text-red-500/50 text-sm mt-1">
