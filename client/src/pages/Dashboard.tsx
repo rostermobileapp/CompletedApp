@@ -278,7 +278,17 @@ export default function Dashboard() {
                       ) : null;
                     })()}
                     {/* Claim Beverage Duty Button */}
-                    {!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId) && (
+                    {(() => {
+                      // Find user's attendance status for this game
+                      const userStatus = Array.isArray(userAttendanceStatuses) ? 
+                        userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
+                      
+                      // Show claim button only if no one has claimed beverage duty AND user is not checked out
+                      const noBeverageDutyClaimed = !(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
+                      const isCheckedOut = userStatus === 'checked_out';
+                      
+                      return noBeverageDutyClaimed && !isCheckedOut;
+                    })() && (
                       <Button
                         size="sm"
                         variant="outline"
