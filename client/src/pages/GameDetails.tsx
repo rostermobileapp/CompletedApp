@@ -197,6 +197,15 @@ export default function GameDetails() {
   const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
   const beverageDutyClaimed = !!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
   const beverageDutyClaimedByOther = beverageDutyClaimed && !hasBeverageDuty;
+  
+  console.log('Beverage duty debug:', {
+    userId: (user as any)?.id,
+    homeBeverageDutyUserId: game.homeBeverageDutyUserId,
+    awayBeverageDutyUserId: game.awayBeverageDutyUserId,
+    hasBeverageDuty,
+    beverageDutyClaimed,
+    beverageDutyClaimedByOther
+  });
 
   return (
     <div className="min-h-screen bg-background">
