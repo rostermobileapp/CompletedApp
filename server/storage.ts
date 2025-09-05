@@ -649,36 +649,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGameById(gameId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team }) | undefined> {
-    const [game] = await db
-      .select({
-        id: games.id,
-        homeTeamId: games.homeTeamId,
-        awayTeamId: games.awayTeamId,
-        scheduledAt: games.scheduledAt,
-        venue: games.venue,
-        homeBeverageDutyUserId: games.homeBeverageDutyUserId,
-        awayBeverageDutyUserId: games.awayBeverageDutyUserId,
-        homeBeverageDutyClaimedAt: games.homeBeverageDutyClaimedAt,
-        awayBeverageDutyClaimedAt: games.awayBeverageDutyClaimedAt,
-        createdAt: games.createdAt,
-        updatedAt: games.updatedAt,
-        homeTeam: teams,
-        awayTeam: {
-          id: sql<string>`away_team.id`,
-          name: sql<string>`away_team.name`,
-          logoUrl: sql<string>`away_team.logo_url`,
-          leagueId: sql<string>`away_team.league_id`,
-          captainId: sql<string>`away_team.captain_id`,
-          createdAt: sql<Date>`away_team.created_at`,
-          updatedAt: sql<Date>`away_team.updated_at`,
-        },
-      })
+    const result = await db
+      .select()
       .from(games)
       .leftJoin(teams, eq(games.homeTeamId, teams.id))
       .leftJoin(sql`teams AS away_team`, sql`games.away_team_id = away_team.id`)
       .where(eq(games.id, gameId));
     
-    return game;
+    if (!result.length) {
+      return undefined;
+    }
+    
+    const row = result[0];
+    return {
+      ...row.games,
+      homeTeam: row.teams!,
+      awayTeam: {
+        id: (row as any).away_team.id,
+        name: (row as any).away_team.name,
+        logoUrl: (row as any).away_team.logo_url,
+        leagueId: (row as any).away_team.league_id,
+        captainId: (row as any).away_team.captain_id,
+        createdAt: (row as any).away_team.created_at,
+        updatedAt: (row as any).away_team.updated_at,
+      }
+    };
   }
 
   async claimBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game> {
