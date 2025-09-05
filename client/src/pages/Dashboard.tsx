@@ -3,12 +3,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -86,14 +87,11 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <img 
-              src="/attached_assets/Roster Logo White_1757083079896.png" 
+              src={logoUrl}
               alt="Roster Logo" 
               className="h-12 w-auto"
               data-testid="img-roster-logo"
             />
-            <h1 className="text-2xl font-bold" data-testid="text-welcome">
-              {user?.firstName || 'Player'}
-            </h1>
           </div>
           <div className="flex items-center gap-3">
             {/* Jersey Number */}
@@ -225,7 +223,7 @@ export default function Dashboard() {
                     {/* Beverage Duty Icon */}
                     {(game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id) && (
                       <div className="absolute top-3 right-3">
-                        <Coffee className="w-5 h-5 text-orange-500" data-testid={`icon-beverage-duty-${game.id}`} />
+                        <Beer className="w-5 h-5 text-orange-500" data-testid={`icon-beverage-duty-${game.id}`} />
                       </div>
                     )}
                     <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
@@ -241,9 +239,6 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <span className="tier-badge bg-success text-accent-foreground text-xs px-2 py-1 rounded-full text-center" data-testid={`badge-game-status-${game.id}`}>
-                      UPCOMING
-                    </span>
                     {(() => {
                       // Find user's attendance status for this game
                       const userStatus = Array.isArray(userAttendanceStatuses) ? 
@@ -252,17 +247,17 @@ export default function Dashboard() {
                       if (userStatus === 'checked_in') {
                         return (
                           <div className="text-center">
-                            <span className="tier-badge bg-green-500/50 text-white text-xs px-2 py-1 rounded-full" data-testid={`status-confirmed-${game.id}`}>
-                              ✓ Confirmed
-                            </span>
+                            <div className="bg-green-500/50 text-white w-8 h-8 rounded flex items-center justify-center" data-testid={`status-confirmed-${game.id}`}>
+                              <Check className="w-4 h-4" />
+                            </div>
                           </div>
                         );
                       } else if (userStatus === 'checked_out') {
                         return (
                           <div className="text-center">
-                            <span className="tier-badge bg-red-500/50 text-white text-xs px-2 py-1 rounded-full" data-testid={`status-declined-${game.id}`}>
-                              ✗ Declined
-                            </span>
+                            <div className="bg-red-500/50 text-white w-8 h-8 rounded flex items-center justify-center" data-testid={`status-declined-${game.id}`}>
+                              <X className="w-4 h-4" />
+                            </div>
                           </div>
                         );
                       } else {
