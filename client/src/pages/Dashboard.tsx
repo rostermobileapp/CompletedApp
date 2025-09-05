@@ -169,10 +169,10 @@ export default function Dashboard() {
       <div className="px-6 mb-6">
         <div className="grid grid-cols-3 gap-3">
           {/* Announcements Card */}
-          <div className="bg-card rounded-xl border border-border p-3" data-testid="card-announcements">
-            <div className="flex items-center justify-between">
+          <div className="bg-card rounded-xl border border-border p-5 min-h-[72px]" data-testid="card-announcements">
+            <div className="flex items-center justify-between h-full">
               <div>
-                <Megaphone className="w-4 h-4 text-orange-500 mb-1" />
+                <Megaphone className="w-4 h-4 text-orange-500 mb-2" />
                 <p className="text-xs font-medium">Announcements</p>
               </div>
               <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
@@ -182,17 +182,17 @@ export default function Dashboard() {
           </div>
 
           {/* Stats Card */}
-          <div className="bg-card rounded-xl border border-border p-3" data-testid="card-stats">
-            <div>
-              <BarChart3 className="w-4 h-4 text-purple-500 mb-1" />
+          <div className="bg-card rounded-xl border border-border p-5 min-h-[72px]" data-testid="card-stats">
+            <div className="h-full flex flex-col justify-center">
+              <BarChart3 className="w-4 h-4 text-purple-500 mb-2" />
               <p className="text-xs font-medium">Stats</p>
             </div>
           </div>
 
           {/* Standings Card */}
-          <div className="bg-card rounded-xl border border-border p-3" data-testid="card-standings">
-            <div>
-              <Award className="w-4 h-4 text-blue-500 mb-1" />
+          <div className="bg-card rounded-xl border border-border p-5 min-h-[72px]" data-testid="card-standings">
+            <div className="h-full flex flex-col justify-center">
+              <Award className="w-4 h-4 text-blue-500 mb-2" />
               <p className="text-xs font-medium">Standings</p>
             </div>
           </div>
