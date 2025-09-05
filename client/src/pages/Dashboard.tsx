@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, UserCheck, UserX } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { tier } = useSubscription();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
@@ -83,15 +84,16 @@ export default function Dashboard() {
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center justify-between mb-6">
-          <div>
+          <div className="flex items-center gap-4">
+            <img 
+              src="/attached_assets/Roster Logo White_1757083079896.png" 
+              alt="Roster Logo" 
+              className="h-12 w-auto"
+              data-testid="img-roster-logo"
+            />
             <h1 className="text-2xl font-bold" data-testid="text-welcome">
               {user?.firstName || 'Player'}
             </h1>
-            {primaryTeam && (
-              <p className="text-muted-foreground" data-testid="text-primary-team">
-                {primaryTeam.name}
-              </p>
-            )}
           </div>
           <div className="flex items-center gap-3">
             {/* Jersey Number */}
@@ -139,23 +141,6 @@ export default function Dashboard() {
               )}
             </button>
           </div>
-        </div>
-      </div>
-      
-      {/* Find a League Section - Compact */}
-      <div className="px-6 mb-6">
-        <div className="bg-card rounded-lg border border-border px-2 py-1.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Search className="w-5 h-5 text-primary" />
-            <span className="font-medium">Looking for a League?</span>
-          </div>
-          <button
-            onClick={() => navigate('/league-search')}
-            className="bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
-            data-testid="button-find-league"
-          >
-            Find a League
-          </button>
         </div>
       </div>
       
@@ -212,21 +197,6 @@ export default function Dashboard() {
           </div>
         ) : Array.isArray(upcomingGames) && upcomingGames.length > 0 ? (
           <div className="space-y-3">
-            {/* Beverage Duty Alert */}
-            {upcomingGames.some((game: any) => 
-              game.homeBeverageDutyUserId === (user as any)?.id || 
-              game.awayBeverageDutyUserId === (user as any)?.id
-            ) && (
-              <div className="bg-red-500/50 text-white rounded-lg p-3 mb-3" data-testid="alert-beverage-duty">
-                <div className="flex items-center gap-2">
-                  <Coffee className="w-4 h-4" />
-                  <span className="font-medium">Beverage Duty Alert!</span>
-                </div>
-                <p className="text-sm mt-1">
-                  You have beverage duty for upcoming games. Don't forget!
-                </p>
-              </div>
-            )}
             {upcomingGames
               .filter((game: any) => {
                 // Ensure we only show games for teams the user is currently on
@@ -234,7 +204,7 @@ export default function Dashboard() {
                 return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
               })
               .slice(0, 2).map((game: any) => (
-              <div key={game.id} className="bg-card rounded-xl border border-border p-4" data-testid={`card-game-${game.id}`}>
+              <div key={game.id} className="bg-card rounded-xl border border-border p-4 relative" data-testid={`card-game-${game.id}`}>
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
                     {(() => {
@@ -252,6 +222,12 @@ export default function Dashboard() {
                     })()}
                   </div>
                   <div className="flex-1">
+                    {/* Beverage Duty Icon */}
+                    {(game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id) && (
+                      <div className="absolute top-3 right-3">
+                        <Coffee className="w-5 h-5 text-orange-500" data-testid={`icon-beverage-duty-${game.id}`} />
+                      </div>
+                    )}
                     <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
                       vs {game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}
                     </h3>
@@ -296,7 +272,7 @@ export default function Dashboard() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 px-2 text-xs bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50"
+                              className="h-8 w-8 p-0 bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50"
                               onClick={() => {
                                 const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
                                 if (userTeam && primaryTeam) {
@@ -306,19 +282,17 @@ export default function Dashboard() {
                               disabled={checkInMutation.isPending}
                               data-testid={`button-check-in-${game.id}`}
                             >
-                              <UserCheck className="w-3 h-3 mr-1" />
-                              Check In
+                              <Check className="w-4 h-4" />
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 px-2 text-xs bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
+                              className="h-8 w-8 p-0 bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
                               onClick={() => checkOutMutation.mutate(game.id)}
                               disabled={checkOutMutation.isPending}
                               data-testid={`button-check-out-${game.id}`}
                             >
-                              <UserX className="w-3 h-3 mr-1" />
-                              Check Out
+                              <X className="w-4 h-4" />
                             </Button>
                           </div>
                         );
@@ -340,7 +314,7 @@ export default function Dashboard() {
       
       
       {/* Recent Activity */}
-      <div className="px-6">
+      <div className="px-6 mb-6">
         <h2 className="text-lg font-semibold mb-4" data-testid="text-recent-activity-title">Recent Activity</h2>
         <div className="space-y-3">
           <div className="bg-card rounded-lg border border-border p-3" data-testid="card-activity-placeholder">
@@ -355,6 +329,23 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+      
+      {/* Find a League Section - Bottom */}
+      <div className="px-6">
+        <div className="bg-card rounded-lg border border-border px-2 py-1 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-primary" />
+            <span className="font-medium text-sm">Looking for a League?</span>
+          </div>
+          <button
+            onClick={() => navigate('/league-search')}
+            className="bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
+            data-testid="button-find-league"
+          >
+            Find a League
+          </button>
         </div>
       </div>
     </div>
