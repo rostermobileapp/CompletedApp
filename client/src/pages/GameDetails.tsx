@@ -144,6 +144,7 @@ export default function GameDetails() {
         title: "Notes Saved",
         description: "Your notes have been saved for the captain to see.",
       });
+      // Don't clear notes after saving - keep them visible
     },
     onError: (error) => {
       toast({
@@ -184,6 +185,7 @@ export default function GameDetails() {
   const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
   const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
   const beverageDutyClaimed = !!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
+  const beverageDutyClaimedByOther = beverageDutyClaimed && !hasBeverageDuty;
 
   return (
     <div className="min-h-screen bg-background">
@@ -380,7 +382,7 @@ export default function GameDetails() {
                   Release Duty
                 </Button>
               </div>
-            ) : beverageDutyClaimed ? (
+            ) : beverageDutyClaimedByOther ? (
               <div className="flex items-center gap-3">
                 <div className="bg-muted w-10 h-10 rounded-lg flex items-center justify-center">
                   <img 
