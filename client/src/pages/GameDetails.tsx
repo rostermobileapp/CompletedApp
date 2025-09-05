@@ -39,6 +39,17 @@ export default function GameDetails() {
     queryKey: ["/api/user/attendance-statuses"],
   });
 
+  // Fetch team members to get names for beverage duty
+  const { data: homeTeamMembers } = useQuery({
+    queryKey: [`/api/teams/${game?.homeTeam?.id}/members`],
+    enabled: !!game?.homeTeam?.id,
+  });
+
+  const { data: awayTeamMembers } = useQuery({
+    queryKey: [`/api/teams/${game?.awayTeam?.id}/members`],
+    enabled: !!game?.awayTeam?.id,
+  });
+
   // Get current attendance status for this game
   const currentStatus = Array.isArray(userAttendanceStatuses) ? 
     userAttendanceStatuses.find((status: any) => status.gameId === gameId)?.status : null;
@@ -186,6 +197,12 @@ export default function GameDetails() {
   const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
   const beverageDutyClaimed = !!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
   const beverageDutyClaimedByOther = beverageDutyClaimed && !hasBeverageDuty;
+  
+  // Get the name of the person who claimed beverage duty
+  const beverageDutyClaimantId = game.homeBeverageDutyUserId || game.awayBeverageDutyUserId;
+  const allTeamMembers = [...(homeTeamMembers || []), ...(awayTeamMembers || [])];
+  const beverageDutyClaimant = allTeamMembers.find((member: any) => member.user.id === beverageDutyClaimantId);
+  const claimantName = beverageDutyClaimant ? `${beverageDutyClaimant.user.firstName || ''} ${beverageDutyClaimant.user.lastName || ''}`.trim() || 'Teammate' : 'Teammate';
 
   return (
     <div className="min-h-screen bg-background">
@@ -393,8 +410,8 @@ export default function GameDetails() {
                   />
                 </div>
                 <div>
-                  <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">Beverage Duty Claimed</p>
-                  <p className="text-sm text-muted-foreground">Another teammate is bringing beverages</p>
+                  <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">Beverage Duty Claimed by {claimantName}</p>
+                  <p className="text-sm text-muted-foreground">{claimantName} is bringing beverages</p>
                 </div>
               </div>
             ) : (
