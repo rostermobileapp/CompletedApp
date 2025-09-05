@@ -61,8 +61,8 @@ export default function Dashboard() {
   });
 
   const checkOutMutation = useMutation({
-    mutationFn: async (gameId: string) => {
-      return apiRequest('POST', `/api/games/${gameId}/check-out`, {});
+    mutationFn: async (data: { gameId: string; teamId: string }) => {
+      return apiRequest('POST', `/api/games/${data.gameId}/check-out`, { teamId: data.teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
@@ -76,6 +76,27 @@ export default function Dashboard() {
       toast({
         title: "Error",
         description: "Failed to check out. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Beverage duty mutation
+  const claimBeverageDutyMutation = useMutation({
+    mutationFn: async (data: { gameId: string; teamId: string }) => {
+      return apiRequest('POST', `/api/games/${data.gameId}/beverage-duty`, { teamId: data.teamId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      toast({
+        title: "Success",
+        description: "Beverage duty claimed!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to claim beverage duty. Please try again.",
         variant: "destructive",
       });
     },
@@ -233,18 +254,43 @@ export default function Dashboard() {
                       </p>
                     )}
                   </div>
-                  {/* Beverage Duty Icon - Between game info and attendance */}
-                  {(game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id) && (
-                    <div className="flex items-center">
-                      <img 
-                        src={beverageJarUrl}
-                        alt="Beverage Duty"
-                        className="h-12 w-auto"
-                        style={{ aspectRatio: '9/16' }}
-                        data-testid={`icon-beverage-duty-${game.id}`}
-                      />
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {/* Beverage Duty Icon - Left side */}
+                    {(game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id) && (
+                      <div className="flex items-center">
+                        <img 
+                          src={beverageJarUrl}
+                          alt="Beverage Duty"
+                          className="h-8 w-auto"
+                          style={{ aspectRatio: '9/16' }}
+                          data-testid={`icon-beverage-duty-${game.id}`}
+                        />
+                      </div>
+                    )}
+                    {/* Claim Beverage Duty Button */}
+                    {!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
+                        onClick={() => {
+                          const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
+                          if (userTeam && primaryTeam) {
+                            claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                          }
+                        }}
+                        disabled={claimBeverageDutyMutation.isPending}
+                        data-testid={`button-claim-beverage-duty-${game.id}`}
+                      >
+                        <img 
+                          src={beverageJarUrl}
+                          alt="Claim Beverage Duty"
+                          className="h-4 w-auto"
+                          style={{ aspectRatio: '9/16' }}
+                        />
+                      </Button>
+                    )}
+                  </div>
                   <div className="flex flex-col gap-2">
                     {(() => {
                       // Find user's attendance status for this game
@@ -290,7 +336,12 @@ export default function Dashboard() {
                               size="sm"
                               variant="outline"
                               className="h-8 w-8 p-0 bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
-                              onClick={() => checkOutMutation.mutate(game.id)}
+                              onClick={() => {
+                                const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
+                                if (userTeam && primaryTeam) {
+                                  checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                                }
+                              }}
                               disabled={checkOutMutation.isPending}
                               data-testid={`button-check-out-${game.id}`}
                             >
