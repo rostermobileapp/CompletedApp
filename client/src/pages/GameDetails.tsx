@@ -46,7 +46,7 @@ export default function GameDetails() {
   // Check in mutation
   const checkInMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/check-in`, "POST", { teamId });
+      await apiRequest("POST", `/api/games/${gameId}/check-in`, { teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -69,7 +69,7 @@ export default function GameDetails() {
   // Check out mutation
   const checkOutMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/check-out`, "POST", { teamId });
+      await apiRequest("POST", `/api/games/${gameId}/check-out`, { teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -92,7 +92,7 @@ export default function GameDetails() {
   // Claim beverage duty mutation
   const claimBeverageDutyMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/beverage-duty`, "POST", { teamId });
+      await apiRequest("POST", `/api/games/${gameId}/beverage-duty`, { teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -114,7 +114,7 @@ export default function GameDetails() {
   // Release beverage duty mutation
   const releaseBeverageDutyMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/release-beverage-duty`, "POST", { teamId });
+      await apiRequest("POST", `/api/games/${gameId}/release-beverage-duty`, { teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -136,7 +136,7 @@ export default function GameDetails() {
   // Save notes mutation
   const saveNotesMutation = useMutation({
     mutationFn: async ({ gameId, teamId, notes }: { gameId: string; teamId: string; notes: string }) => {
-      await apiRequest(`/api/games/${gameId}/notes`, "POST", { teamId, notes });
+      await apiRequest("POST", `/api/games/${gameId}/notes`, { teamId, notes });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
