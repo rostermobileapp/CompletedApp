@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
 import { useState } from "react";
+import * as React from "react";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 
 export default function GameDetails() {
@@ -49,6 +50,24 @@ export default function GameDetails() {
     queryKey: [`/api/teams/${game?.awayTeam?.id}/members`],
     enabled: !!game?.awayTeam?.id,
   });
+
+  // Fetch game attendance to get notes
+  const { data: gameAttendance } = useQuery({
+    queryKey: [`/api/games/${gameId}/attendance`],
+    enabled: !!gameId,
+  });
+
+  // Get current user's notes from attendance data
+  const userAttendance = Array.isArray(gameAttendance) ? 
+    gameAttendance.find((attendance: any) => attendance.userId === (user as any)?.id) : null;
+  const existingNotes = userAttendance?.notes || "";
+
+  // Update notes state when existing notes are loaded
+  React.useEffect(() => {
+    if (existingNotes && notes === "") {
+      setNotes(existingNotes);
+    }
+  }, [existingNotes, notes]);
 
   // Get current attendance status for this game
   const currentStatus = Array.isArray(userAttendanceStatuses) ? 
@@ -198,14 +217,14 @@ export default function GameDetails() {
   const beverageDutyClaimed = !!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
   const beverageDutyClaimedByOther = beverageDutyClaimed && !hasBeverageDuty;
   
-  console.log('Beverage duty debug:', {
-    userId: (user as any)?.id,
-    homeBeverageDutyUserId: game.homeBeverageDutyUserId,
-    awayBeverageDutyUserId: game.awayBeverageDutyUserId,
-    hasBeverageDuty,
-    beverageDutyClaimed,
-    beverageDutyClaimedByOther
-  });
+  // Check if the claimed user actually exists in team members
+  const allTeamMembers = [...(homeTeamMembers || []), ...(awayTeamMembers || [])];
+  const beverageDutyClaimantId = game.homeBeverageDutyUserId || game.awayBeverageDutyUserId;
+  const claimantExists = beverageDutyClaimantId ? allTeamMembers.some((member: any) => member.user?.id === beverageDutyClaimantId) : false;
+  
+  // If duty is claimed but claimant doesn't exist in team members, treat as unclaimed
+  const validBeverageDutyClaimed = beverageDutyClaimed && (claimantExists || beverageDutyClaimantId === (user as any)?.id);
+  const validBeverageDutyClaimedByOther = validBeverageDutyClaimed && !hasBeverageDuty;
 
   return (
     <div className="min-h-screen bg-background">
@@ -402,7 +421,7 @@ export default function GameDetails() {
                   Release Duty
                 </Button>
               </div>
-            ) : beverageDutyClaimedByOther ? (
+            ) : validBeverageDutyClaimedByOther ? (
               <div className="flex items-center gap-3">
                 <div className="bg-muted w-10 h-10 rounded-lg flex items-center justify-center">
                   <img 
