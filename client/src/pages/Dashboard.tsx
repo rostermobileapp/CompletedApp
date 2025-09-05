@@ -431,12 +431,7 @@ export default function Dashboard() {
       </div>
       
       
-      {/* Recent Activity */}
-      <div className="px-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4" data-testid="text-recent-activity-title">Recent Activity</h2>
-        <div className="space-y-3">
-        </div>
-      </div>
+      
       
       {/* Find a League Section - Bottom */}
       <div className="px-6">
