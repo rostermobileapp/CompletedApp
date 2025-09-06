@@ -117,12 +117,7 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex items-center gap-3">
-            {/* Jersey Number */}
-            {primaryLeagueMembership?.jerseyNumber && (
-              <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded font-semibold">
-                #{primaryLeagueMembership.jerseyNumber}
-              </div>
-            )}
+            
             
             {/* Captain Badge */}
             {primaryLeagueMembership?.isCaptain && (
