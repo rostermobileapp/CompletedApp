@@ -23,9 +23,18 @@ export default function Dashboard() {
   // League selection state
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
   const [showLeagueDropdown, setShowLeagueDropdown] = useState(false);
-
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  
   const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
+    select: (games) => {
+      // Filter games by selected league if available
+      if (!selectedLeagueId || !Array.isArray(games)) return games;
+      return games.filter(game => 
+        game.homeTeam?.leagueId === selectedLeagueId || 
+        game.awayTeam?.leagueId === selectedLeagueId
+      );
+    }
   });
 
   const { data: userTeams } = useQuery({
@@ -51,6 +60,23 @@ export default function Dashboard() {
       setSelectedLeagueId(userLeagues[0].id);
     }
   }, [userLeagues, selectedLeagueId]);
+  
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowLeagueDropdown(false);
+      }
+    };
+
+    if (showLeagueDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLeagueDropdown]);
   
   // Get currently selected league and membership
   const selectedLeague = Array.isArray(userLeagues) && selectedLeagueId
@@ -196,7 +222,7 @@ export default function Dashboard() {
       {/* League Selection Dropdown */}
       {Array.isArray(userLeagues) && userLeagues.length > 1 && (
         <div className="px-6 mb-4">
-          <div className="relative">
+          <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowLeagueDropdown(!showLeagueDropdown)}
               className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
