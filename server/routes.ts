@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { db } from "./db";
-import { leagueMemberships } from "@shared/schema";
+import { leagueMemberships, importedPlayers, teams } from "@shared/schema";
 import {
   insertLeagueSchema,
   insertTeamSchema,
