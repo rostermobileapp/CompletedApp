@@ -577,7 +577,16 @@ export default function LeagueManagement() {
   const deleteGameMutation = useMutation({
     mutationFn: async (gameId: string) => {
       const response = await apiRequest('DELETE', `/api/games/${gameId}`);
-      return response.json();
+      // Check if response has content before trying to parse JSON
+      const text = await response.text();
+      if (text) {
+        try {
+          return JSON.parse(text);
+        } catch {
+          return { message: text };
+        }
+      }
+      return { message: 'Game deleted successfully' };
     },
     onSuccess: () => {
       toast({ 
