@@ -1026,13 +1026,17 @@ export default function LeagueManagement() {
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="w-5 h-5 text-warning mt-0.5" />
                       <div>
-                        <h5 className="font-medium text-warning">Expected Format</h5>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          CSV file with columns: Name, Team Name
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Example: "John Smith,Team Alpha" or save Excel file as CSV format
-                        </p>
+                        <h5 className="font-medium text-warning">Expected CSV Format</h5>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          <p className="mb-2">CSV file with these exact column headers:</p>
+                          <div className="bg-muted/50 p-2 rounded text-xs font-mono">
+                            Name,Team Name<br/>
+                            John Smith,Team Alpha<br/>
+                            Jane Doe,Team Beta<br/>
+                            Mike Johnson,Team Alpha
+                          </div>
+                          <p className="text-xs mt-2">Save Excel files as CSV format before uploading</p>
+                        </div>
                       </div>
                     </div>
                   </div>
