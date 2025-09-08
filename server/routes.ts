@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { db } from "./db";
+import { leagueMemberships } from "@shared/schema";
 import {
   insertLeagueSchema,
   insertTeamSchema,
@@ -1177,6 +1179,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create imported player records with team assignments
       if (validPlayers.length > 0) {
         await storage.createImportedPlayersWithTeams(importRecord.id, leagueId, validPlayers);
+        
+        // Create placeholder user accounts and league memberships for imported players
+        for (const player of validPlayers) {
+          try {
+            // Create a placeholder user account
+            const placeholderUser = await storage.upsertUser({
+              id: `placeholder_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              email: player.email || `${player.firstName.toLowerCase()}.${player.lastName.toLowerCase()}@placeholder.roster`,
+              firstName: player.firstName,
+              lastName: player.lastName,
+              profileImageUrl: null,
+            });
+            
+            // Create league membership for this user
+            await db.insert(leagueMemberships).values({
+              userId: placeholderUser.id,
+              leagueId: leagueId,
+              assignedTeamId: player.teamId,
+              status: 'approved',
+              skillRating: player.skillRating,
+              position: player.position,
+              jerseyNumber: player.jerseyNumber,
+              notes: player.notes,
+              approvedAt: new Date(),
+            });
+            
+          } catch (error) {
+            console.error(`Failed to create user and membership for ${player.firstName} ${player.lastName}:`, error);
+          }
+        }
       }
 
       // Clean up uploaded file
