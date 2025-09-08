@@ -1183,10 +1183,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create placeholder user accounts and league memberships for imported players
         for (const player of validPlayers) {
           try {
-            // Create a placeholder user account
+            // Create a placeholder user account - let DB generate ID
+            const uniqueEmail = player.email || `${player.firstName.toLowerCase()}.${player.lastName.toLowerCase()}.${Date.now()}@placeholder.roster`;
             const placeholderUser = await storage.upsertUser({
-              id: `placeholder_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              email: player.email || `${player.firstName.toLowerCase()}.${player.lastName.toLowerCase()}@placeholder.roster`,
+              email: uniqueEmail,
               firstName: player.firstName,
               lastName: player.lastName,
               profileImageUrl: null,
@@ -1207,6 +1207,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
           } catch (error) {
             console.error(`Failed to create user and membership for ${player.firstName} ${player.lastName}:`, error);
+            // Add error to response so we can debug
+            errors.push(`Failed to create user for ${player.firstName} ${player.lastName}: ${error.message}`);
           }
         }
       }
