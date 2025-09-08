@@ -243,6 +243,62 @@ export const draftPicks = pgTable("draft_picks", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Player import sessions table
+export const playerImports = pgTable("player_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  importedBy: varchar("imported_by").references(() => users.id).notNull(),
+  fileName: varchar("file_name").notNull(),
+  totalRecords: integer("total_records").notNull(),
+  successfulRecords: integer("successful_records").notNull(),
+  failedRecords: integer("failed_records").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Imported players table (placeholder records from spreadsheet)
+export const importedPlayers = pgTable("imported_players", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  importId: varchar("import_id").references(() => playerImports.id).notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  // Player data from spreadsheet
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  email: varchar("email"),
+  phoneNumber: varchar("phone_number"),
+  position: varchar("position"),
+  jerseyNumber: integer("jersey_number"),
+  skillRating: integer("skill_rating").default(5),
+  teamName: varchar("team_name"),
+  notes: text("notes"),
+  // Merge status
+  isPlaceholder: boolean("is_placeholder").default(true).notNull(),
+  mergedWithUserId: varchar("merged_with_user_id").references(() => users.id),
+  mergedAt: timestamp("merged_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Player merge suggestions enum
+export const mergeStatusEnum = pgEnum("merge_status", [
+  "pending",
+  "approved", 
+  "rejected",
+  "auto_suggested"
+]);
+
+// Player merge requests table
+export const playerMergeRequests = pgTable("player_merge_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  importedPlayerId: varchar("imported_player_id").references(() => importedPlayers.id).notNull(),
+  existingUserId: varchar("existing_user_id").references(() => users.id).notNull(),
+  confidenceScore: decimal("confidence_score", { precision: 3, scale: 2 }), // 0.00 to 1.00
+  matchingFields: jsonb("matching_fields"), // Store which fields matched
+  status: mergeStatusEnum("status").default("auto_suggested").notNull(),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   leagueMemberships: many(leagueMemberships),
@@ -365,6 +421,52 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
+export const playerImportsRelations = relations(playerImports, ({ one, many }) => ({
+  league: one(leagues, {
+    fields: [playerImports.leagueId],
+    references: [leagues.id],
+  }),
+  importedBy: one(users, {
+    fields: [playerImports.importedBy],
+    references: [users.id],
+  }),
+  importedPlayers: many(importedPlayers),
+}));
+
+export const importedPlayersRelations = relations(importedPlayers, ({ one }) => ({
+  import: one(playerImports, {
+    fields: [importedPlayers.importId],
+    references: [playerImports.id],
+  }),
+  league: one(leagues, {
+    fields: [importedPlayers.leagueId],
+    references: [leagues.id],
+  }),
+  mergedUser: one(users, {
+    fields: [importedPlayers.mergedWithUserId],
+    references: [users.id],
+  }),
+}));
+
+export const playerMergeRequestsRelations = relations(playerMergeRequests, ({ one }) => ({
+  league: one(leagues, {
+    fields: [playerMergeRequests.leagueId],
+    references: [leagues.id],
+  }),
+  importedPlayer: one(importedPlayers, {
+    fields: [playerMergeRequests.importedPlayerId],
+    references: [importedPlayers.id],
+  }),
+  existingUser: one(users, {
+    fields: [playerMergeRequests.existingUserId],
+    references: [users.id],
+  }),
+  reviewer: one(users, {
+    fields: [playerMergeRequests.reviewedBy],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
@@ -437,6 +539,23 @@ export const insertSeasonSchema = createInsertSchema(seasons).omit({
   updatedAt: true,
 });
 
+export const insertPlayerImportSchema = createInsertSchema(playerImports).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertImportedPlayerSchema = createInsertSchema(importedPlayers).omit({
+  id: true,
+  mergedAt: true,
+  createdAt: true,
+});
+
+export const insertPlayerMergeRequestSchema = createInsertSchema(playerMergeRequests).omit({
+  id: true,
+  reviewedAt: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -459,3 +578,9 @@ export type Draft = typeof drafts.$inferSelect;
 export type InsertDraft = z.infer<typeof insertDraftSchema>;
 export type DraftPick = typeof draftPicks.$inferSelect;
 export type InsertDraftPick = z.infer<typeof insertDraftPickSchema>;
+export type PlayerImport = typeof playerImports.$inferSelect;
+export type InsertPlayerImport = z.infer<typeof insertPlayerImportSchema>;
+export type ImportedPlayer = typeof importedPlayers.$inferSelect;
+export type InsertImportedPlayer = z.infer<typeof insertImportedPlayerSchema>;
+export type PlayerMergeRequest = typeof playerMergeRequests.$inferSelect;
+export type InsertPlayerMergeRequest = z.infer<typeof insertPlayerMergeRequestSchema>;
