@@ -174,6 +174,8 @@ export default function LeagueManagement() {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [showDeleteTeamConfirmation, setShowDeleteTeamConfirmation] = useState(false);
   const [teamToDelete, setTeamToDelete] = useState<string | null>(null);
+  const [showEditTeam, setShowEditTeam] = useState(false);
+  const [selectedTeamForEdit, setSelectedTeamForEdit] = useState<Team | null>(null);
 
   // Close date picker when clicking outside
   React.useEffect(() => {
@@ -1264,25 +1266,24 @@ export default function LeagueManagement() {
                                       e.stopPropagation();
                                       toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${team.name}` });
                                     }}
-                                    className="px-3 py-2 bg-blue-500/50 text-white rounded-lg hover:bg-blue-600/50 text-sm font-medium flex items-center gap-2"
+                                    className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs hover:bg-blue-500/30 flex items-center gap-1"
                                     data-testid={`button-message-team-${team.id}`}
                                   >
-                                    <Users className="w-4 h-4" />
-                                    Message Team
+                                    <Users className="w-3 h-3" />
+                                    Message
                                   </button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
+                                  <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setTeamToDelete(team.id);
-                                      setShowDeleteTeamConfirmation(true);
+                                      setSelectedTeamForEdit(team);
+                                      setShowEditTeam(true);
                                     }}
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
-                                    data-testid={`delete-team-${team.id}`}
+                                    className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs hover:bg-gray-500/30 flex items-center gap-1"
+                                    data-testid={`edit-team-${team.id}`}
                                   >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                                    <Edit className="w-3 h-3" />
+                                    Edit
+                                  </button>
                                 </>
                               )}
                               <ArrowRight className="w-4 h-4 text-muted-foreground" />
