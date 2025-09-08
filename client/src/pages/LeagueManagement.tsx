@@ -165,6 +165,8 @@ export default function LeagueManagement() {
   
   // Delete confirmation state
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [showDeleteTeamConfirmation, setShowDeleteTeamConfirmation] = useState(false);
+  const [teamToDelete, setTeamToDelete] = useState<string | null>(null);
 
   // Close date picker when clicking outside
   React.useEffect(() => {
@@ -601,6 +603,39 @@ export default function LeagueManagement() {
     onError: (error: Error) => {
       toast({
         title: 'Delete Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Team delete mutation
+  const deleteTeamMutation = useMutation({
+    mutationFn: async (teamId: string) => {
+      const response = await apiRequest('DELETE', `/api/teams/${teamId}`);
+      // Check if response has content before trying to parse JSON
+      const text = await response.text();
+      if (text) {
+        try {
+          return JSON.parse(text);
+        } catch {
+          return { message: text };
+        }
+      }
+      return { message: 'Team deleted successfully' };
+    },
+    onSuccess: () => {
+      toast({ 
+        title: 'Team deleted successfully',
+        description: 'The team and all associated data have been permanently removed.'
+      });
+      // Invalidate both teams and games as team deletion affects both
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Delete Team Failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -1247,17 +1282,32 @@ export default function LeagueManagement() {
                             </div>
                             <div className="flex items-center gap-2">
                               {!team.isFreeAgents && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${team.name}` });
-                                  }}
-                                  className="px-3 py-2 bg-blue-500/50 text-white rounded-lg hover:bg-blue-600/50 text-sm font-medium flex items-center gap-2"
-                                  data-testid={`button-message-team-${team.id}`}
-                                >
-                                  <Users className="w-4 h-4" />
-                                  Message Team
-                                </button>
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${team.name}` });
+                                    }}
+                                    className="px-3 py-2 bg-blue-500/50 text-white rounded-lg hover:bg-blue-600/50 text-sm font-medium flex items-center gap-2"
+                                    data-testid={`button-message-team-${team.id}`}
+                                  >
+                                    <Users className="w-4 h-4" />
+                                    Message Team
+                                  </button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTeamToDelete(team.id);
+                                      setShowDeleteTeamConfirmation(true);
+                                    }}
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                                    data-testid={`delete-team-${team.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
                               )}
                               <ArrowRight className="w-4 h-4 text-muted-foreground" />
                             </div>
@@ -2367,6 +2417,79 @@ export default function LeagueManagement() {
                   data-testid="button-confirm-delete-game"
                 >
                   {deleteGameMutation.isPending ? 'Deleting...' : 'Delete Game'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Team Confirmation Modal */}
+      {showDeleteTeamConfirmation && teamToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-xl border border-border max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Delete Team</h2>
+                  <p className="text-sm text-muted-foreground">This action cannot be undone</p>
+                </div>
+              </div>
+              
+              <div className="bg-muted p-4 rounded-lg mb-6">
+                <p className="text-sm font-medium mb-1">
+                  {(() => {
+                    const team = teams.find(t => t.id === teamToDelete);
+                    return team?.name || 'Unknown Team';
+                  })()}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {(() => {
+                    const teamMembers = members.filter((m: LeagueMember) => m.assignedTeamId === teamToDelete);
+                    return `${teamMembers.length} player${teamMembers.length !== 1 ? 's' : ''}`;
+                  })()}
+                </p>
+              </div>
+
+              <p className="text-sm text-muted-foreground mb-6">
+                Are you sure you want to delete this team? This will permanently remove the team and all associated data including:
+              </p>
+              
+              <ul className="text-sm text-muted-foreground mb-6 ml-4 space-y-1 list-disc">
+                <li>All team memberships</li>
+                <li>All games involving this team</li>
+                <li>All attendance records for this team</li>
+              </ul>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteTeamConfirmation(false);
+                    setTeamToDelete(null);
+                  }}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                  data-testid="button-cancel-delete-team"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (teamToDelete) {
+                      deleteTeamMutation.mutate(teamToDelete);
+                      setShowDeleteTeamConfirmation(false);
+                      setTeamToDelete(null);
+                    }
+                  }}
+                  disabled={deleteTeamMutation.isPending}
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium disabled:opacity-50"
+                  data-testid="button-confirm-delete-team"
+                >
+                  {deleteTeamMutation.isPending ? 'Deleting...' : 'Delete Team'}
                 </button>
               </div>
             </div>

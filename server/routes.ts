@@ -696,6 +696,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete team
+  app.delete("/api/teams/:teamId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const teamId = req.params.teamId;
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+
+      // Verify that the team exists
+      const team = await storage.getTeam(teamId);
+      if (!team) {
+        return res.status(404).json({ message: "Team not found" });
+      }
+
+      await storage.deleteTeam(teamId);
+      res.json({ message: "Team deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      res.status(500).json({ message: "Failed to delete team" });
+    }
+  });
+
   // Beverage duty routes
   app.post('/api/games/:gameId/beverage-duty', isAuthenticated, async (req: any, res) => {
     try {

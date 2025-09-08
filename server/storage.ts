@@ -1250,6 +1250,39 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
+
+  async deleteTeam(teamId: string): Promise<void> {
+    try {
+      // First delete all related attendance records for this team
+      console.log(`Deleting attendance records for team ${teamId}`);
+      const deletedAttendance = await db.delete(gameAttendance).where(eq(gameAttendance.teamId, teamId));
+      console.log(`Deleted ${deletedAttendance.rowCount || 0} attendance records for team`);
+
+      // Delete team memberships (players on the team)
+      console.log(`Deleting team memberships for team ${teamId}`);
+      const deletedMemberships = await db.delete(teamMemberships).where(eq(teamMemberships.teamId, teamId));
+      console.log(`Deleted ${deletedMemberships.rowCount || 0} team memberships`);
+
+      // Delete games where this team is home or away team
+      console.log(`Deleting games involving team ${teamId}`);
+      const deletedGames = await db.delete(games).where(
+        or(eq(games.homeTeamId, teamId), eq(games.awayTeamId, teamId))
+      );
+      console.log(`Deleted ${deletedGames.rowCount || 0} games involving team`);
+
+      // Finally delete the team itself
+      console.log(`Deleting team ${teamId}`);
+      const deletedTeam = await db.delete(teams).where(eq(teams.id, teamId));
+      console.log(`Deleted ${deletedTeam.rowCount || 0} team records`);
+
+      if (deletedTeam.rowCount === 0) {
+        throw new Error(`Team ${teamId} not found or already deleted`);
+      }
+    } catch (error) {
+      console.error(`Error deleting team ${teamId}:`, error);
+      throw error;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
