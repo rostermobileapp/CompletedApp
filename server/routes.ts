@@ -1039,9 +1039,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         header: true,
         skipEmptyLines: true,
         transformHeader: (header: string) => {
-          // Normalize header names
+          // Normalize header names for simplified format
           const normalized = header.toLowerCase().trim();
           const mapping: Record<string, string> = {
+            'name': 'name',
+            'team name': 'teamName',
+            'team': 'teamName',
+            // Legacy support for old format
             'first name': 'firstName',
             'firstname': 'firstName',
             'last name': 'lastName', 
@@ -1052,8 +1056,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'position': 'position',
             'jersey number': 'jerseyNumber',
             'jersey': 'jerseyNumber',
-            'team': 'teamName',
-            'team name': 'teamName',
             'skill rating': 'skillRating',
             'rating': 'skillRating',
             'notes': 'notes'
@@ -1084,14 +1086,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamsToCreate: Set<string> = new Set();
 
       parseResults.data.forEach((row: any, index: number) => {
-        if (!row.firstName || !row.lastName) {
-          errors.push(`Row ${index + 1}: First name and last name are required`);
+        // Handle both new simplified format (Name, Team Name) and legacy format
+        let firstName = '';
+        let lastName = '';
+        
+        if (row.name) {
+          // New simplified format: split "Name" field
+          const nameParts = row.name.trim().split(' ');
+          firstName = nameParts[0] || '';
+          lastName = nameParts.slice(1).join(' ') || '';
+        } else if (row.firstName && row.lastName) {
+          // Legacy format
+          firstName = row.firstName.trim();
+          lastName = row.lastName.trim();
+        }
+        
+        if (!firstName) {
+          errors.push(`Row ${index + 1}: Name is required`);
           return;
         }
 
         const player = {
-          firstName: row.firstName?.trim(),
-          lastName: row.lastName?.trim(),
+          firstName: firstName,
+          lastName: lastName,
           email: row.email?.trim() || null,
           phoneNumber: row.phoneNumber?.trim() || null,
           position: row.position?.trim() || null,
