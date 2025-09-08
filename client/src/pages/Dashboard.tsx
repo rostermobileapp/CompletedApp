@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +19,10 @@ export default function Dashboard() {
   const { tier } = useSubscription();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  
+  // League selection state
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+  const [showLeagueDropdown, setShowLeagueDropdown] = useState(false);
 
   const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
@@ -25,14 +30,32 @@ export default function Dashboard() {
 
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
+    select: (teams) => {
+      // Filter teams by selected league if available
+      if (!selectedLeagueId || !Array.isArray(teams)) return teams;
+      return teams.filter(team => team.leagueId === selectedLeagueId);
+    }
   });
 
   const { data: userLeagueMemberships } = useQuery({
     queryKey: ['/api/user/league-memberships'],
   });
+  
+  // Set default selected league when memberships load
+  React.useEffect(() => {
+    if (Array.isArray(userLeagueMemberships) && userLeagueMemberships.length > 0 && !selectedLeagueId) {
+      setSelectedLeagueId(userLeagueMemberships[0].league.id);
+    }
+  }, [userLeagueMemberships, selectedLeagueId]);
+  
+  // Get currently selected league membership
+  const selectedLeagueMembership = Array.isArray(userLeagueMemberships) && selectedLeagueId
+    ? userLeagueMemberships.find(membership => membership.league.id === selectedLeagueId)
+    : Array.isArray(userLeagueMemberships) && userLeagueMemberships.length > 0 
+      ? userLeagueMemberships[0] 
+      : null;
 
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
-  const primaryLeagueMembership = Array.isArray(userLeagueMemberships) && userLeagueMemberships.length > 0 ? userLeagueMemberships[0] : null;
 
   // Get user's attendance statuses
   const { data: userAttendanceStatuses } = useQuery({
@@ -120,7 +143,7 @@ export default function Dashboard() {
             
             
             {/* Captain Badge */}
-            {primaryLeagueMembership?.isCaptain && (
+            {selectedLeagueMembership?.isCaptain && (
               <span className="w-6 h-6 bg-warning text-black font-bold text-sm flex items-center justify-center rounded">
                 C
               </span>
