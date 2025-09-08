@@ -444,9 +444,15 @@ export default function LeagueManagement() {
       return response.json();
     },
     onSuccess: (data) => {
+      const successMessage = [
+        `${data.successfulRecords} players imported successfully`,
+        data.teamsCreated > 0 ? `${data.teamsCreated} teams created` : null,
+        data.failedRecords > 0 ? `${data.failedRecords} failed` : null
+      ].filter(Boolean).join(', ');
+      
       toast({
         title: 'Import Successful',
-        description: `${data.successfulRecords} players imported successfully${data.failedRecords > 0 ? `, ${data.failedRecords} failed` : ''}`,
+        description: successMessage,
       });
       setImportFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -879,7 +885,8 @@ export default function LeagueManagement() {
                     <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">How it works:</h4>
                     <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
                       <li>• Upload a CSV or Excel file with player information</li>
-                      <li>• System creates placeholder records from your data</li>
+                      <li>• System creates placeholder records and assigns players to teams</li>
+                      <li>• Teams are automatically created if they don't exist in your league</li>
                       <li>• When players sign up, we'll suggest account merges based on name matching</li>
                       <li>• Review and approve merges to link real accounts with your roster data</li>
                     </ul>

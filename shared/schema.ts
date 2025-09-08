@@ -269,6 +269,7 @@ export const importedPlayers = pgTable("imported_players", {
   jerseyNumber: integer("jersey_number"),
   skillRating: integer("skill_rating").default(5),
   teamName: varchar("team_name"),
+  teamId: varchar("team_id").references(() => teams.id),
   notes: text("notes"),
   // Merge status
   isPlaceholder: boolean("is_placeholder").default(true).notNull(),

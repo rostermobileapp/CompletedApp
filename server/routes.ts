@@ -1020,9 +1020,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Get existing teams in the league for team matching
+      const existingTeams = await storage.getTeamsByLeague(leagueId);
+      const teamLookup = new Map<string, string>(); // teamName -> teamId
+      
+      existingTeams.forEach(team => {
+        // Create case-insensitive lookup
+        teamLookup.set(team.name.toLowerCase().trim(), team.id);
+      });
+
       // Process the parsed data
       const validPlayers: any[] = [];
       const errors: string[] = [];
+      const teamsToCreate: Set<string> = new Set();
 
       parseResults.data.forEach((row: any, index: number) => {
         if (!row.firstName || !row.lastName) {
@@ -1039,6 +1049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           jerseyNumber: row.jerseyNumber ? parseInt(row.jerseyNumber) : null,
           skillRating: row.skillRating ? parseInt(row.skillRating) : 5,
           teamName: row.teamName?.trim() || null,
+          teamId: null as string | null,
           notes: row.notes?.trim() || null
         };
 
@@ -1047,7 +1058,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           player.skillRating = 5;
         }
 
+        // Try to match team name to existing team
+        if (player.teamName) {
+          const matchedTeamId = teamLookup.get(player.teamName.toLowerCase());
+          if (matchedTeamId) {
+            player.teamId = matchedTeamId;
+          } else {
+            // Track teams that don't exist yet
+            teamsToCreate.add(player.teamName);
+          }
+        }
+
         validPlayers.push(player);
+      });
+
+      // Auto-create missing teams if they were referenced in the import
+      const createdTeams = new Map<string, string>(); // teamName -> teamId
+      for (const teamName of teamsToCreate) {
+        try {
+          const newTeam = await storage.createTeam({
+            name: teamName,
+            leagueId: leagueId,
+            captainId: null, // Will be assigned later when players join
+          });
+          createdTeams.set(teamName, newTeam.id);
+        } catch (error) {
+          console.error(`Failed to create team ${teamName}:`, error);
+          errors.push(`Failed to create team: ${teamName}`);
+        }
+      }
+
+      // Update player records with newly created team IDs
+      validPlayers.forEach(player => {
+        if (player.teamName && !player.teamId) {
+          const createdTeamId = createdTeams.get(player.teamName);
+          if (createdTeamId) {
+            player.teamId = createdTeamId;
+          }
+        }
       });
 
       // Create import record and imported players
@@ -1060,9 +1108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         failedRecords: errors.length
       });
 
-      // Create imported player records
+      // Create imported player records with team assignments
       if (validPlayers.length > 0) {
-        await storage.createImportedPlayers(importRecord.id, leagueId, validPlayers);
+        await storage.createImportedPlayersWithTeams(importRecord.id, leagueId, validPlayers);
       }
 
       // Clean up uploaded file
@@ -1073,6 +1121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalRecords: parseResults.data.length,
         successfulRecords: validPlayers.length,
         failedRecords: errors.length,
+        teamsCreated: createdTeams.size,
         errors
       });
 

@@ -108,6 +108,7 @@ export interface IStorage {
   // Bulk import operations
   createPlayerImport(importData: InsertPlayerImport): Promise<PlayerImport>;
   createImportedPlayers(importId: string, leagueId: string, players: any[]): Promise<ImportedPlayer[]>;
+  createImportedPlayersWithTeams(importId: string, leagueId: string, players: any[]): Promise<ImportedPlayer[]>;
   getPlayerImports(leagueId: string): Promise<PlayerImport[]>;
   getPlayerMergeRequests(leagueId: string): Promise<PlayerMergeRequest[]>;
   updateMergeRequestStatus(requestId: string, status: string, reviewerId: string): Promise<PlayerMergeRequest>;
@@ -1157,6 +1158,31 @@ export class DatabaseStorage implements IStorage {
       jerseyNumber: player.jerseyNumber,
       skillRating: player.skillRating,
       teamName: player.teamName,
+      notes: player.notes,
+      isPlaceholder: true,
+    }));
+
+    const importedPlayerRecords = await db
+      .insert(importedPlayers)
+      .values(playersToInsert)
+      .returning();
+
+    return importedPlayerRecords;
+  }
+
+  async createImportedPlayersWithTeams(importId: string, leagueId: string, players: any[]): Promise<ImportedPlayer[]> {
+    const playersToInsert = players.map(player => ({
+      importId,
+      leagueId,
+      firstName: player.firstName,
+      lastName: player.lastName,
+      email: player.email,
+      phoneNumber: player.phoneNumber,
+      position: player.position,
+      jerseyNumber: player.jerseyNumber,
+      skillRating: player.skillRating,
+      teamName: player.teamName,
+      teamId: player.teamId, // Include team ID reference
       notes: player.notes,
       isPlaceholder: true,
     }));
