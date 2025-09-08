@@ -35,7 +35,8 @@ import {
   AlertTriangle,
   Download,
   Merge,
-  Trash2
+  Trash2,
+  Edit
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
 import { Button } from '@/components/ui/button';
@@ -2570,6 +2571,79 @@ export default function LeagueManagement() {
                     {approveMutation.isPending ? 'Approving...' : 'Approve Without Merge'}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Team Modal */}
+      {showEditTeam && selectedTeamForEdit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Edit Team</h3>
+              <button
+                onClick={() => {
+                  setShowEditTeam(false);
+                  setSelectedTeamForEdit(null);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <p className="font-medium text-lg">{selectedTeamForEdit.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {(() => {
+                    const teamMembers = members.filter((m: LeagueMember) => m.assignedTeamId === selectedTeamForEdit.id);
+                    return `${teamMembers.length} player${teamMembers.length !== 1 ? 's' : ''}`;
+                  })()}
+                </p>
+              </div>
+              
+              <div className="pt-4 border-t border-border">
+                <p className="text-sm font-medium mb-3">Team Actions</p>
+                
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${selectedTeamForEdit.name}` });
+                    }}
+                    className="w-full px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 font-medium flex items-center gap-2"
+                  >
+                    <Users className="w-4 h-4" />
+                    Message Team
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setShowEditTeam(false);
+                      setTeamToDelete(selectedTeamForEdit.id);
+                      setShowDeleteTeamConfirmation(true);
+                      setSelectedTeamForEdit(null);
+                    }}
+                    className="w-full px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 font-medium flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Team
+                  </button>
+                </div>
+              </div>
+              
+              <div className="pt-4 border-t border-border">
+                <button
+                  onClick={() => {
+                    setShowEditTeam(false);
+                    setSelectedTeamForEdit(null);
+                  }}
+                  className="w-full px-4 py-2 bg-gray-500/20 text-gray-400 rounded-lg hover:bg-gray-500/30 font-medium"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
