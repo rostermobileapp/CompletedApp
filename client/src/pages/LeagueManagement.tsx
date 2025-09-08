@@ -1028,7 +1028,7 @@ export default function LeagueManagement() {
                       <div>
                         <h5 className="font-medium text-warning">Expected Format</h5>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Include columns: First Name, Last Name, Email (optional), Phone, Position, Jersey Number, Team Name
+                          Include columns: Name, Team Name
                         </p>
                       </div>
                     </div>
