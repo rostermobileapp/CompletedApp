@@ -28,7 +28,13 @@ import {
   Edit3,
   AlertCircle,
   Settings,
-  Clock
+  Clock,
+  Upload,
+  FileText,
+  UserCheck2,
+  AlertTriangle,
+  Download,
+  Merge
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
 
@@ -149,6 +155,12 @@ export default function LeagueManagement() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const datePickerRef = React.useRef<HTMLDivElement>(null);
   const timePickerRef = React.useRef<HTMLDivElement>(null);
+  
+  // Bulk import state
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [showMergeRequests, setShowMergeRequests] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Close date picker when clicking outside
   React.useEffect(() => {
@@ -795,6 +807,133 @@ export default function LeagueManagement() {
         {/* Player Management Tab */}
         {activeTab === 'players' && (
           <div className="space-y-6">
+            {/* Bulk Player Import Section */}
+            <div className="bg-card rounded-xl border border-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-blue-500" />
+                  <h3 className="text-lg font-semibold">Bulk Player Import</h3>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowMergeRequests(!showMergeRequests)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted"
+                    data-testid="button-view-merge-requests"
+                  >
+                    <Merge className="w-4 h-4" />
+                    Merge Requests
+                  </button>
+                  <button
+                    onClick={() => setShowBulkImport(!showBulkImport)}
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+                    data-testid="button-bulk-import"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Import Players
+                  </button>
+                </div>
+              </div>
+
+              {showBulkImport && (
+                <div className="border-t border-border pt-4 space-y-4">
+                  <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">How it works:</h4>
+                    <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                      <li>• Upload a CSV or Excel file with player information</li>
+                      <li>• System creates placeholder records from your data</li>
+                      <li>• When players sign up, we'll suggest account merges based on name matching</li>
+                      <li>• Review and approve merges to link real accounts with your roster data</li>
+                    </ul>
+                  </div>
+
+                  <div className="flex flex-col gap-4">
+                    <div
+                      className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                      data-testid="file-drop-zone"
+                    >
+                      <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      {importFile ? (
+                        <div>
+                          <p className="font-medium text-green-600">{importFile.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {(importFile.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="font-medium mb-2">Click to select or drag & drop</p>
+                          <p className="text-sm text-muted-foreground">
+                            Supported formats: CSV, Excel (.xlsx, .xls)
+                          </p>
+                        </div>
+                      )}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,.xlsx,.xls"
+                        onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                        data-testid="file-input"
+                      />
+                    </div>
+
+                    {importFile && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            // TODO: Implement upload functionality
+                            toast({
+                              title: "Feature in development",
+                              description: "Bulk import functionality is being implemented",
+                            });
+                          }}
+                          className="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-medium"
+                          data-testid="button-upload-file"
+                        >
+                          Upload & Process
+                        </button>
+                        <button
+                          onClick={() => {
+                            setImportFile(null);
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                          }}
+                          className="px-4 py-2 border border-border rounded-lg hover:bg-muted"
+                          data-testid="button-clear-file"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-warning/10 p-4 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-5 h-5 text-warning mt-0.5" />
+                      <div>
+                        <h5 className="font-medium text-warning">Expected Format</h5>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Include columns: First Name, Last Name, Email (optional), Phone, Position, Jersey Number, Team Name
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showMergeRequests && (
+                <div className="border-t border-border pt-4">
+                  <div className="bg-muted p-4 rounded-lg text-center">
+                    <UserCheck2 className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+                    <p className="font-medium">No merge requests yet</p>
+                    <p className="text-sm text-muted-foreground">
+                      Import player data first, then merge requests will appear here when users sign up
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Pending Approvals */}
             {pendingMembers.length > 0 && (
               <div className="bg-card rounded-xl border border-border p-6">
