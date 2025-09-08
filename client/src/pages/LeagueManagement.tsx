@@ -1237,15 +1237,15 @@ export default function LeagueManagement() {
                         return (
                           <div 
                             key={team.id} 
-                            className={`flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors ${
+                            className={`flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors ${
                               team.isFreeAgents ? 'bg-muted/30 border-dashed' : 'bg-background'
                             }`}
                             onClick={() => setSelectedTeam(team)}
                             data-testid={`team-${team.id}`}
                           >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium">{team.name}</p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2">
+                                <p className="font-medium text-base">{team.name}</p>
                                 {team.isFreeAgents && (
                                   <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">
                                     Unassigned
@@ -1259,15 +1259,15 @@ export default function LeagueManagement() {
                                 <p>{teamMembers.length} player{teamMembers.length !== 1 ? 's' : ''}</p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3 ml-4">
                               {!team.isFreeAgents && (
-                                <>
+                                <div className="flex gap-2">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       toast({ title: 'Team messaging feature coming soon!', description: `Start a group chat with ${team.name}` });
                                     }}
-                                    className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs hover:bg-blue-500/30 flex items-center gap-1"
+                                    className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs hover:bg-blue-500/30 flex items-center gap-1 transition-colors"
                                     data-testid={`button-message-team-${team.id}`}
                                   >
                                     <Users className="w-3 h-3" />
@@ -1279,15 +1279,15 @@ export default function LeagueManagement() {
                                       setSelectedTeamForEdit(team);
                                       setShowEditTeam(true);
                                     }}
-                                    className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs hover:bg-gray-500/30 flex items-center gap-1"
+                                    className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs hover:bg-gray-500/30 flex items-center gap-1 transition-colors"
                                     data-testid={`edit-team-${team.id}`}
                                   >
                                     <Edit className="w-3 h-3" />
                                     Edit
                                   </button>
-                                </>
+                                </div>
                               )}
-                              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                              <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                             </div>
                           </div>
                         );
