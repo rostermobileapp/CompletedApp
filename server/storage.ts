@@ -113,6 +113,7 @@ export interface IStorage {
   getPlayerImports(leagueId: string): Promise<PlayerImport[]>;
   getPlayerMergeRequests(leagueId: string): Promise<PlayerMergeRequest[]>;
   updateMergeRequestStatus(requestId: string, status: string, reviewerId: string): Promise<PlayerMergeRequest>;
+  findPotentialMatches(leagueId: string, firstName: string, lastName: string): Promise<ImportedPlayer[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1228,6 +1229,28 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return updatedRequest;
+  }
+
+  async findPotentialMatches(leagueId: string, firstName: string, lastName: string): Promise<ImportedPlayer[]> {
+    return await db.select()
+      .from(importedPlayers)
+      .where(
+        and(
+          eq(importedPlayers.leagueId, leagueId),
+          eq(importedPlayers.isPlaceholder, true),
+          isNull(importedPlayers.mergedWithUserId),
+          or(
+            and(
+              ilike(importedPlayers.firstName, `%${firstName}%`),
+              ilike(importedPlayers.lastName, `%${lastName}%`)
+            ),
+            and(
+              ilike(importedPlayers.firstName, firstName),
+              ilike(importedPlayers.lastName, lastName)
+            )
+          )
+        )
+      );
   }
 
   async deleteGame(id: string): Promise<void> {

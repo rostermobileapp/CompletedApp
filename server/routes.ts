@@ -1325,6 +1325,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Find potential merge matches for a player
+  app.get('/api/leagues/:leagueId/imported-players/matches', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const { firstName, lastName } = req.query;
+      
+      if (!firstName || !lastName) {
+        return res.json([]);
+      }
+      
+      const matches = await storage.findPotentialMatches(leagueId, firstName as string, lastName as string);
+      res.json(matches);
+    } catch (error) {
+      console.error('Error finding potential matches:', error);
+      res.status(500).json({ message: 'Failed to find matches' });
+    }
+  });
+
+  // Merge an imported player with a real user account
+  app.post('/api/leagues/:leagueId/players/merge', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const { membershipId, importedPlayerId } = req.body;
+      const userId = req.user.claims.sub;
+
+      // Check commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Get the imported player details
+      const importedPlayer = await db.select()
+        .from(importedPlayers)
+        .where(eq(importedPlayers.id, importedPlayerId))
+        .limit(1);
+
+      if (!importedPlayer.length) {
+        return res.status(404).json({ message: 'Imported player not found' });
+      }
+
+      const player = importedPlayer[0];
+
+      // Approve the membership and assign to team if available
+      await storage.approveLeagueMembership(membershipId, userId);
+
+      // If imported player has team info, assign the user to that team
+      if (player.teamName) {
+        // Find or create the team
+        let team = await db.select()
+          .from(teams)
+          .where(and(eq(teams.leagueId, leagueId), eq(teams.name, player.teamName)))
+          .limit(1);
+
+        if (!team.length) {
+          // Create team if it doesn't exist
+          const newTeam = await storage.createTeam({
+            name: player.teamName,
+            leagueId: leagueId,
+            createdBy: userId
+          });
+          team = [newTeam];
+        }
+
+        // Assign the user to the team
+        await db.update(leagueMemberships)
+          .set({ assignedTeamId: team[0].id })
+          .where(eq(leagueMemberships.id, membershipId));
+      }
+
+      // Mark the imported player as merged
+      await db.update(importedPlayers)
+        .set({ 
+          mergedWithUserId: (await db.select().from(leagueMemberships).where(eq(leagueMemberships.id, membershipId)).limit(1))[0].userId,
+          updatedAt: new Date()
+        })
+        .where(eq(importedPlayers.id, importedPlayerId));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error merging player:', error);
+      res.status(500).json({ message: 'Failed to merge player' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

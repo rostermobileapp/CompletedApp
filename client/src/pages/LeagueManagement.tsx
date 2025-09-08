@@ -1024,9 +1024,20 @@ export default function LeagueManagement() {
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             // Check for potential merges before approving
                             setSelectedMember(member);
+                            
+                            // Find potential matches in imported players
+                            try {
+                              const response = await apiRequest('GET', `/api/leagues/${leagueId}/imported-players/matches?firstName=${encodeURIComponent(member.user.firstName || '')}&lastName=${encodeURIComponent(member.user.lastName || '')}`);
+                              const matches = await response.json();
+                              setPotentialMatches(matches);
+                            } catch (error) {
+                              console.error('Error fetching matches:', error);
+                              setPotentialMatches([]);
+                            }
+                            
                             setShowMergeModal(true);
                           }}
                           disabled={approveMutation.isPending}
@@ -2486,6 +2497,63 @@ export default function LeagueManagement() {
                 <p className="font-medium">New Player:</p>
                 <p className="text-sm text-muted-foreground">{formatUserName(selectedMember.user)}</p>
               </div>
+              
+              {potentialMatches.length > 0 && (
+                <div className="border-t border-border pt-4">
+                  <p className="font-medium mb-2">Potential Matches Found:</p>
+                  <div className="space-y-2 mb-4">
+                    {potentialMatches.map((match: any) => (
+                      <div 
+                        key={match.id} 
+                        className={`p-2 border rounded-lg cursor-pointer ${
+                          selectedMatch === match.id ? 'border-blue-500 bg-blue-500/10' : 'border-border'
+                        }`}
+                        onClick={() => setSelectedMatch(selectedMatch === match.id ? null : match.id)}
+                      >
+                        <p className="text-sm font-medium">{match.firstName} {match.lastName}</p>
+                        <p className="text-xs text-muted-foreground">Team: {match.teamName}</p>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {selectedMatch && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          // Merge the selected imported player with the real user
+                          await apiRequest('POST', `/api/leagues/${leagueId}/players/merge`, {
+                            membershipId: selectedMember.id,
+                            importedPlayerId: selectedMatch
+                          });
+                          
+                          // Refresh the member lists
+                          queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'pending-members'] });
+                          queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
+                          
+                          toast({
+                            title: "Success",
+                            description: "Player merged successfully!",
+                          });
+                          
+                          setShowMergeModal(false);
+                          setSelectedMember(null);
+                          setPotentialMatches([]);
+                          setSelectedMatch(null);
+                        } catch (error) {
+                          toast({
+                            title: "Error",
+                            description: "Failed to merge player.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      className="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 font-medium"
+                    >
+                      Approve and Merge with Selected
+                    </button>
+                  )}
+                </div>
+              )}
               
               <div className="pt-4 border-t border-border">
                 <div className="flex gap-2">
