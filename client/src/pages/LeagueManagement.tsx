@@ -38,6 +38,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
+import { Button } from '@/components/ui/button';
 
 type LeagueMember = {
   id: string;
