@@ -11,6 +11,10 @@ import {
   insertMessageSchema,
 } from "@shared/schema";
 import Stripe from "stripe";
+import multer from "multer";
+import Papa from "papaparse";
+import * as fs from 'fs';
+import * as path from 'path';
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -936,6 +940,239 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error updating subscription tier:", error);
       return res.status(500).json({ message: "Failed to update subscription tier" });
+    }
+  });
+
+  // Configure multer for file uploads
+  const upload = multer({ 
+    dest: 'temp/', 
+    fileFilter: (req, file, cb) => {
+      const allowedMimeTypes = [
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ];
+      if (allowedMimeTypes.includes(file.mimetype) || file.originalname.endsWith('.csv')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only CSV and Excel files are allowed.'));
+      }
+    },
+    limits: {
+      fileSize: 5 * 1024 * 1024 // 5MB limit
+    }
+  });
+
+  // Bulk Player Import Routes
+  app.post('/api/leagues/:leagueId/players/import', isAuthenticated, upload.single('playerFile'), async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+
+      // Check if user has commissioner access to this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can import players' });
+      }
+
+      // Read and parse the CSV file
+      const fileContent = fs.readFileSync(file.path, 'utf8');
+      const parseResults = Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header: string) => {
+          // Normalize header names
+          const normalized = header.toLowerCase().trim();
+          const mapping: Record<string, string> = {
+            'first name': 'firstName',
+            'firstname': 'firstName',
+            'last name': 'lastName', 
+            'lastname': 'lastName',
+            'email': 'email',
+            'phone': 'phoneNumber',
+            'phone number': 'phoneNumber',
+            'position': 'position',
+            'jersey number': 'jerseyNumber',
+            'jersey': 'jerseyNumber',
+            'team': 'teamName',
+            'team name': 'teamName',
+            'skill rating': 'skillRating',
+            'rating': 'skillRating',
+            'notes': 'notes'
+          };
+          return mapping[normalized] || header;
+        }
+      });
+
+      if (parseResults.errors.length > 0) {
+        return res.status(400).json({ 
+          message: 'Error parsing CSV file', 
+          errors: parseResults.errors 
+        });
+      }
+
+      // Process the parsed data
+      const validPlayers: any[] = [];
+      const errors: string[] = [];
+
+      parseResults.data.forEach((row: any, index: number) => {
+        if (!row.firstName || !row.lastName) {
+          errors.push(`Row ${index + 1}: First name and last name are required`);
+          return;
+        }
+
+        const player = {
+          firstName: row.firstName?.trim(),
+          lastName: row.lastName?.trim(),
+          email: row.email?.trim() || null,
+          phoneNumber: row.phoneNumber?.trim() || null,
+          position: row.position?.trim() || null,
+          jerseyNumber: row.jerseyNumber ? parseInt(row.jerseyNumber) : null,
+          skillRating: row.skillRating ? parseInt(row.skillRating) : 5,
+          teamName: row.teamName?.trim() || null,
+          notes: row.notes?.trim() || null
+        };
+
+        // Validate skill rating
+        if (player.skillRating < 1 || player.skillRating > 10) {
+          player.skillRating = 5;
+        }
+
+        validPlayers.push(player);
+      });
+
+      // Create import record and imported players
+      const importRecord = await storage.createPlayerImport({
+        leagueId,
+        importedBy: userId,
+        fileName: file.originalname,
+        totalRecords: parseResults.data.length,
+        successfulRecords: validPlayers.length,
+        failedRecords: errors.length
+      });
+
+      // Create imported player records
+      if (validPlayers.length > 0) {
+        await storage.createImportedPlayers(importRecord.id, leagueId, validPlayers);
+      }
+
+      // Clean up uploaded file
+      fs.unlinkSync(file.path);
+
+      res.json({
+        importId: importRecord.id,
+        totalRecords: parseResults.data.length,
+        successfulRecords: validPlayers.length,
+        failedRecords: errors.length,
+        errors
+      });
+
+    } catch (error) {
+      console.error('Error importing players:', error);
+      
+      // Clean up file if it exists
+      if (req.file?.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (cleanupError) {
+          console.error('Error cleaning up file:', cleanupError);
+        }
+      }
+      
+      res.status(500).json({ message: 'Failed to import players' });
+    }
+  });
+
+  // Get import history for a league
+  app.get('/api/leagues/:leagueId/players/imports', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+
+      // Check if user has commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const imports = await storage.getPlayerImports(leagueId);
+      res.json(imports);
+    } catch (error) {
+      console.error('Error fetching import history:', error);
+      res.status(500).json({ message: 'Failed to fetch import history' });
+    }
+  });
+
+  // Get merge requests for a league
+  app.get('/api/leagues/:leagueId/players/merge-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+
+      // Check if user has commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const mergeRequests = await storage.getPlayerMergeRequests(leagueId);
+      res.json(mergeRequests);
+    } catch (error) {
+      console.error('Error fetching merge requests:', error);
+      res.status(500).json({ message: 'Failed to fetch merge requests' });
+    }
+  });
+
+  // Approve/reject merge requests
+  app.patch('/api/leagues/:leagueId/merge-requests/:requestId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId, requestId } = req.params;
+      const { status } = req.body; // 'approved' or 'rejected'
+      const userId = req.user.claims.sub;
+
+      // Check if user has commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+
+      const mergeRequest = await storage.updateMergeRequestStatus(requestId, status, userId);
+      
+      if (status === 'approved') {
+        // TODO: Implement actual account merging logic
+        // This would involve linking the imported player to the real user account
+        // and potentially creating a league membership for the user
+      }
+
+      res.json(mergeRequest);
+    } catch (error) {
+      console.error('Error updating merge request:', error);
+      res.status(500).json({ message: 'Failed to update merge request' });
     }
   });
 

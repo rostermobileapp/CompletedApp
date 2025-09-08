@@ -422,14 +422,53 @@ export default function LeagueManagement() {
       refetchMembers();
       setSelectedPlayer(null);
     },
-    onError: () => {
+  });
+
+  // Upload mutation for bulk player import
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('playerFile', file);
+
+      const response = await fetch(`/api/leagues/${leagueId}/players/import`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
       toast({
-        title: 'Update Failed',
-        description: 'Failed to update player details.',
+        title: 'Import Successful',
+        description: `${data.successfulRecords} players imported successfully${data.failedRecords > 0 ? `, ${data.failedRecords} failed` : ''}`,
+      });
+      setImportFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setShowBulkImport(false);
+      
+      // Refetch data to show any new suggestions
+      refetchMembers();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Import Failed',
+        description: error.message,
         variant: 'destructive',
       });
     },
   });
+
+  // Handle file upload
+  const handleFileUpload = () => {
+    if (!importFile) return;
+    uploadMutation.mutate(importFile);
+  };
 
   const removeFromLeagueMutation = useMutation({
     mutationFn: async (membershipId: string) => {
@@ -881,17 +920,12 @@ export default function LeagueManagement() {
                     {importFile && (
                       <div className="flex gap-2">
                         <button
-                          onClick={() => {
-                            // TODO: Implement upload functionality
-                            toast({
-                              title: "Feature in development",
-                              description: "Bulk import functionality is being implemented",
-                            });
-                          }}
-                          className="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-medium"
+                          onClick={handleFileUpload}
+                          disabled={uploadMutation.isPending}
+                          className="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                           data-testid="button-upload-file"
                         >
-                          Upload & Process
+                          {uploadMutation.isPending ? 'Processing...' : 'Upload & Process'}
                         </button>
                         <button
                           onClick={() => {

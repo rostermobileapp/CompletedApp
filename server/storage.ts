@@ -8,6 +8,9 @@ import {
   games,
   gameAttendance,
   messages,
+  playerImports,
+  importedPlayers,
+  playerMergeRequests,
   type User,
   type UpsertUser,
   type League,
@@ -24,6 +27,12 @@ import {
   type InsertGame,
   type Message,
   type InsertMessage,
+  type PlayerImport,
+  type InsertPlayerImport,
+  type ImportedPlayer,
+  type InsertImportedPlayer,
+  type PlayerMergeRequest,
+  type InsertPlayerMergeRequest,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, inArray, asc } from "drizzle-orm";
@@ -95,6 +104,13 @@ export interface IStorage {
   sendMessage(message: InsertMessage): Promise<Message>;
   getTeamMessages(teamId: string): Promise<(Message & { sender: User })[]>;
   getDirectMessages(userId1: string, userId2: string): Promise<(Message & { sender: User })[]>;
+  
+  // Bulk import operations
+  createPlayerImport(importData: InsertPlayerImport): Promise<PlayerImport>;
+  createImportedPlayers(importId: string, leagueId: string, players: any[]): Promise<ImportedPlayer[]>;
+  getPlayerImports(leagueId: string): Promise<PlayerImport[]>;
+  getPlayerMergeRequests(leagueId: string): Promise<PlayerMergeRequest[]>;
+  updateMergeRequestStatus(requestId: string, status: string, reviewerId: string): Promise<PlayerMergeRequest>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1118,6 +1134,73 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(messages.createdAt));
 
     return result.map(r => ({ ...r.messages, sender: r.users }));
+  }
+
+  // Bulk import operations
+  async createPlayerImport(importData: InsertPlayerImport): Promise<PlayerImport> {
+    const [playerImport] = await db
+      .insert(playerImports)
+      .values(importData)
+      .returning();
+    return playerImport;
+  }
+
+  async createImportedPlayers(importId: string, leagueId: string, players: any[]): Promise<ImportedPlayer[]> {
+    const playersToInsert = players.map(player => ({
+      importId,
+      leagueId,
+      firstName: player.firstName,
+      lastName: player.lastName,
+      email: player.email,
+      phoneNumber: player.phoneNumber,
+      position: player.position,
+      jerseyNumber: player.jerseyNumber,
+      skillRating: player.skillRating,
+      teamName: player.teamName,
+      notes: player.notes,
+      isPlaceholder: true,
+    }));
+
+    const importedPlayerRecords = await db
+      .insert(importedPlayers)
+      .values(playersToInsert)
+      .returning();
+
+    return importedPlayerRecords;
+  }
+
+  async getPlayerImports(leagueId: string): Promise<PlayerImport[]> {
+    const imports = await db
+      .select()
+      .from(playerImports)
+      .where(eq(playerImports.leagueId, leagueId))
+      .orderBy(desc(playerImports.createdAt));
+
+    return imports;
+  }
+
+  async getPlayerMergeRequests(leagueId: string): Promise<PlayerMergeRequest[]> {
+    const requests = await db
+      .select()
+      .from(playerMergeRequests)
+      .where(eq(playerMergeRequests.leagueId, leagueId))
+      .orderBy(desc(playerMergeRequests.createdAt));
+
+    return requests;
+  }
+
+  async updateMergeRequestStatus(requestId: string, status: string, reviewerId: string): Promise<PlayerMergeRequest> {
+    const [updatedRequest] = await db
+      .update(playerMergeRequests)
+      .set({
+        status: status as any,
+        reviewedBy: reviewerId,
+        reviewedAt: new Date(),
+      })
+      .where(eq(playerMergeRequests.id, requestId))
+      .returning();
+
+    return updatedRequest;
   }
 }
 
