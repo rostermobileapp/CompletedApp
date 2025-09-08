@@ -92,6 +92,7 @@ export interface IStorage {
   claimBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game>;
   releaseBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game>;
   saveGameNotes(gameId: string, userId: string, teamId: string, notes: string): Promise<any>;
+  deleteGame(id: string): Promise<void>;
   
   // Attendance operations
   checkInToGame(gameId: string, userId: string, teamId: string): Promise<any>;
@@ -1227,6 +1228,14 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return updatedRequest;
+  }
+
+  async deleteGame(id: string): Promise<void> {
+    // First delete all related attendance records
+    await db.delete(gameAttendance).where(eq(gameAttendance.gameId, id));
+    
+    // Then delete the game
+    await db.delete(games).where(eq(games.id, id));
   }
 }
 

@@ -672,6 +672,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/games/:gameId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const gameId = req.params.gameId;
+      
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: "Commissioner access required" });
+      }
+
+      // Verify that the game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      await storage.deleteGame(gameId);
+      res.json({ message: "Game deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting game:", error);
+      res.status(500).json({ message: "Failed to delete game" });
+    }
+  });
+
   // Beverage duty routes
   app.post('/api/games/:gameId/beverage-duty', isAuthenticated, async (req: any, res) => {
     try {

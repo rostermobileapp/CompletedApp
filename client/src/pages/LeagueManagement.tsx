@@ -34,7 +34,8 @@ import {
   UserCheck2,
   AlertTriangle,
   Download,
-  Merge
+  Merge,
+  Trash2
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
 
@@ -161,6 +162,9 @@ export default function LeagueManagement() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [showMergeRequests, setShowMergeRequests] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
+  // Delete confirmation state
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   // Close date picker when clicking outside
   React.useEffect(() => {
@@ -564,6 +568,31 @@ export default function LeagueManagement() {
       toast({
         title: 'Update Failed',
         description: 'Failed to update game details.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Game delete mutation
+  const deleteGameMutation = useMutation({
+    mutationFn: async (gameId: string) => {
+      const response = await apiRequest('DELETE', `/api/games/${gameId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ 
+        title: 'Game deleted successfully',
+        description: 'The game has been permanently removed from the schedule.'
+      });
+      setShowEditGame(false);
+      setSelectedGame(null);
+      setShowDeleteConfirmation(false);
+      refetchGames();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Delete Failed',
+        description: error.message,
         variant: 'destructive',
       });
     },
@@ -2237,28 +2266,100 @@ export default function LeagueManagement() {
                 </div>
 
                 {/* Submit Buttons */}
-                <div className="flex gap-3 pt-4">
+                <div className="space-y-3 pt-4">
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEditGame(false);
+                        setSelectedGame(null);
+                      }}
+                      className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                      data-testid="button-cancel-edit-game"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={updateGameMutation.isPending}
+                      className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                      data-testid="button-save-game-changes"
+                    >
+                      {updateGameMutation.isPending ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowEditGame(false);
-                      setSelectedGame(null);
-                    }}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
-                    data-testid="button-cancel-edit-game"
+                    onClick={() => setShowDeleteConfirmation(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium transition-colors"
+                    data-testid="button-delete-game"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={updateGameMutation.isPending}
-                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
-                    data-testid="button-save-game-changes"
-                  >
-                    {updateGameMutation.isPending ? 'Saving...' : 'Save Changes'}
+                    <Trash2 className="w-4 h-4" />
+                    Delete Game
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Game Confirmation Modal */}
+      {showDeleteConfirmation && selectedGame && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-xl border border-border max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Delete Game</h2>
+                  <p className="text-sm text-muted-foreground">This action cannot be undone</p>
+                </div>
+              </div>
+              
+              <div className="bg-muted p-4 rounded-lg mb-6">
+                <p className="text-sm font-medium mb-1">
+                  {(() => {
+                    const homeTeam = teams.find(t => t.id === selectedGame.homeTeamId);
+                    const awayTeam = teams.find(t => t.id === selectedGame.awayTeamId);
+                    return `${homeTeam?.name || 'Unknown'} vs ${awayTeam?.name || 'Unknown'}`;
+                  })()}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(selectedGame.scheduledAt).toLocaleDateString()} at {
+                    new Date(selectedGame.scheduledAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
+                  }
+                </p>
+              </div>
+
+              <p className="text-sm text-muted-foreground mb-6">
+                Are you sure you want to delete this game? This will permanently remove the game from the schedule and delete all associated attendance records.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirmation(false)}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                  data-testid="button-cancel-delete-game"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteGameMutation.mutate(selectedGame.id)}
+                  disabled={deleteGameMutation.isPending}
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium disabled:opacity-50"
+                  data-testid="button-confirm-delete-game"
+                >
+                  {deleteGameMutation.isPending ? 'Deleting...' : 'Delete Game'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
