@@ -991,7 +991,7 @@ export default function LeagueManagement() {
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept=".csv,.xlsx,.xls"
+                        accept=".csv"
                         onChange={(e) => setImportFile(e.target.files?.[0] || null)}
                         className="hidden"
                         data-testid="file-input"
@@ -1028,7 +1028,10 @@ export default function LeagueManagement() {
                       <div>
                         <h5 className="font-medium text-warning">Expected Format</h5>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Include columns: Name, Team Name
+                          CSV file with columns: Name, Team Name
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Example: "John Smith,Team Alpha" or save Excel file as CSV format
                         </p>
                       </div>
                     </div>
