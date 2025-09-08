@@ -1263,6 +1263,13 @@ export class DatabaseStorage implements IStorage {
       const deletedMemberships = await db.delete(teamMemberships).where(eq(teamMemberships.teamId, teamId));
       console.log(`Deleted ${deletedMemberships.rowCount || 0} team memberships`);
 
+      // Update league memberships to remove team assignment (set to null instead of delete)
+      console.log(`Updating league memberships assigned to team ${teamId}`);
+      const updatedLeagueMemberships = await db.update(leagueMemberships)
+        .set({ assignedTeamId: null })
+        .where(eq(leagueMemberships.assignedTeamId, teamId));
+      console.log(`Updated ${updatedLeagueMemberships.rowCount || 0} league memberships`);
+
       // Delete games where this team is home or away team
       console.log(`Deleting games involving team ${teamId}`);
       const deletedGames = await db.delete(games).where(
