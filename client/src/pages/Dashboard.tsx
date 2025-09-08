@@ -220,7 +220,7 @@ export default function Dashboard() {
       </div>
       
       {/* League Selection Dropdown */}
-      {Array.isArray(userLeagues) && userLeagues.length > 1 && (
+      {Array.isArray(userLeagues) && userLeagues.length > 0 && (
         <div className="px-6 mb-4">
           <div className="relative" ref={dropdownRef}>
             <button
