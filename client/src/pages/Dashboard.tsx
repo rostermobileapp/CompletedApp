@@ -41,16 +41,26 @@ export default function Dashboard() {
     queryKey: ['/api/user/league-memberships'],
   });
   
-  // Set default selected league when memberships load
-  React.useEffect(() => {
-    if (Array.isArray(userLeagueMemberships) && userLeagueMemberships.length > 0 && !selectedLeagueId) {
-      setSelectedLeagueId(userLeagueMemberships[0].league.id);
-    }
-  }, [userLeagueMemberships, selectedLeagueId]);
+  const { data: userLeagues } = useQuery({
+    queryKey: ['/api/user/leagues'],
+  });
   
-  // Get currently selected league membership
+  // Set default selected league when leagues load
+  React.useEffect(() => {
+    if (Array.isArray(userLeagues) && userLeagues.length > 0 && !selectedLeagueId) {
+      setSelectedLeagueId(userLeagues[0].id);
+    }
+  }, [userLeagues, selectedLeagueId]);
+  
+  // Get currently selected league and membership
+  const selectedLeague = Array.isArray(userLeagues) && selectedLeagueId
+    ? userLeagues.find(league => league.id === selectedLeagueId)
+    : Array.isArray(userLeagues) && userLeagues.length > 0 
+      ? userLeagues[0] 
+      : null;
+      
   const selectedLeagueMembership = Array.isArray(userLeagueMemberships) && selectedLeagueId
-    ? userLeagueMemberships.find(membership => membership.league.id === selectedLeagueId)
+    ? userLeagueMemberships.find(membership => membership.leagueId === selectedLeagueId)
     : Array.isArray(userLeagueMemberships) && userLeagueMemberships.length > 0 
       ? userLeagueMemberships[0] 
       : null;
@@ -182,6 +192,60 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      
+      {/* League Selection Dropdown */}
+      {Array.isArray(userLeagues) && userLeagues.length > 1 && (
+        <div className="px-6 mb-4">
+          <div className="relative">
+            <button
+              onClick={() => setShowLeagueDropdown(!showLeagueDropdown)}
+              className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
+              data-testid="button-league-selector"
+            >
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-primary" />
+                <span className="font-medium text-sm">
+                  {selectedLeague?.name || 'Select League'}
+                </span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showLeagueDropdown ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {showLeagueDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50">
+                {userLeagues.map((league: any) => {
+                  const membership = Array.isArray(userLeagueMemberships) 
+                    ? userLeagueMemberships.find(m => m.leagueId === league.id)
+                    : null;
+                  return (
+                    <button
+                      key={league.id}
+                      onClick={() => {
+                        setSelectedLeagueId(league.id);
+                        setShowLeagueDropdown(false);
+                      }}
+                      className={`w-full p-3 text-left hover:bg-muted/50 transition-colors first:rounded-t-lg last:rounded-b-lg ${
+                        selectedLeagueId === league.id ? 'bg-primary/10 text-primary' : ''
+                      }`}
+                      data-testid={`option-league-${league.id}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Trophy className="w-4 h-4" />
+                        <span className="font-medium text-sm">{league.name}</span>
+                        {membership?.isCaptain && (
+                          <span className="ml-auto w-4 h-4 bg-warning text-black font-bold text-xs flex items-center justify-center rounded">
+                            C
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* 3-Card Section */}
       <div className="px-6 mb-6">
