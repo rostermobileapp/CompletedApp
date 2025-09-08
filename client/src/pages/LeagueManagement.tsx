@@ -164,6 +164,12 @@ export default function LeagueManagement() {
   const [showMergeRequests, setShowMergeRequests] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   
+  // Merge modal state
+  const [selectedMember, setSelectedMember] = useState<LeagueMember | null>(null);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [potentialMatches, setPotentialMatches] = useState<any[]>([]);
+  const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
+  
   // Delete confirmation state
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [showDeleteTeamConfirmation, setShowDeleteTeamConfirmation] = useState(false);
@@ -926,135 +932,82 @@ export default function LeagueManagement() {
         {/* Player Management Tab */}
         {activeTab === 'players' && (
           <div className="space-y-6">
-            {/* Bulk Player Import Section */}
-            <div className="bg-card rounded-xl border border-border p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-blue-500" />
-                  <h3 className="text-lg font-semibold">Bulk Player Import</h3>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowMergeRequests(!showMergeRequests)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted"
-                    data-testid="button-view-merge-requests"
-                  >
-                    <Merge className="w-4 h-4" />
-                    Merge Requests
-                  </button>
-                  <button
-                    onClick={() => setShowBulkImport(!showBulkImport)}
-                    className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
-                    data-testid="button-bulk-import"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Import Players
-                  </button>
-                </div>
+            {/* Simple Import Button */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-muted-foreground" />
+                <h3 className="text-lg font-semibold">Players</h3>
               </div>
+              <button
+                onClick={() => setShowBulkImport(!showBulkImport)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+                data-testid="button-import-players"
+              >
+                <Upload className="w-3 h-3" />
+                Import Players
+              </button>
+            </div>
 
-              {showBulkImport && (
-                <div className="border-t border-border pt-4 space-y-4">
-                  <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
-                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">How it works:</h4>
-                    <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                      <li>• Upload a CSV or Excel file with player information</li>
-                      <li>• System creates placeholder records and assigns players to teams</li>
-                      <li>• Teams are automatically created if they don't exist in your league</li>
-                      <li>• When players sign up, we'll suggest account merges based on name matching</li>
-                      <li>• Review and approve merges to link real accounts with your roster data</li>
-                    </ul>
-                  </div>
-
-                  <div className="flex flex-col gap-4">
-                    <div
-                      className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => fileInputRef.current?.click()}
-                      data-testid="file-drop-zone"
-                    >
-                      <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      {importFile ? (
-                        <div>
-                          <p className="font-medium text-green-600">{importFile.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {(importFile.size / 1024).toFixed(1)} KB
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="font-medium mb-2">Click to select or drag & drop</p>
-                          <p className="text-sm text-muted-foreground">
-                            Supported formats: CSV, Excel (.xlsx, .xls)
-                          </p>
-                        </div>
-                      )}
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".csv"
-                        onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                        data-testid="file-input"
-                      />
-                    </div>
-
-                    {importFile && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleFileUpload}
-                          disabled={uploadMutation.isPending}
-                          className="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                          data-testid="button-upload-file"
-                        >
-                          {uploadMutation.isPending ? 'Processing...' : 'Upload & Process'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setImportFile(null);
-                            if (fileInputRef.current) fileInputRef.current.value = '';
-                          }}
-                          className="px-4 py-2 border border-border rounded-lg hover:bg-muted"
-                          data-testid="button-clear-file"
-                        >
-                          Clear
-                        </button>
+            {/* Import Panel */}
+            {showBulkImport && (
+              <div className="mt-4 p-4 bg-card rounded-lg border border-border">
+                <div className="flex flex-col gap-3">
+                  <div
+                    className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                    data-testid="file-drop-zone"
+                  >
+                    <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                    {importFile ? (
+                      <div>
+                        <p className="font-medium text-green-600 text-sm">{importFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(importFile.size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="font-medium text-sm mb-1">Select CSV file</p>
+                        <p className="text-xs text-muted-foreground">
+                          Format: Name,Team Name
+                        </p>
                       </div>
                     )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                      data-testid="file-input"
+                    />
                   </div>
 
-                  <div className="bg-warning/10 p-4 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="w-5 h-5 text-warning mt-0.5" />
-                      <div>
-                        <h5 className="font-medium text-warning">Expected CSV Format</h5>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          <p className="mb-2">CSV file with these exact column headers:</p>
-                          <div className="bg-muted/50 p-2 rounded text-xs font-mono">
-                            Name,Team Name<br/>
-                            John Smith,Team Alpha<br/>
-                            Jane Doe,Team Beta<br/>
-                            Mike Johnson,Team Alpha
-                          </div>
-                          <p className="text-xs mt-2">Save Excel files as CSV format before uploading</p>
-                        </div>
-                      </div>
+                  {importFile && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleFileUpload}
+                        disabled={uploadMutation.isPending}
+                        className="flex-1 bg-green-500 text-white px-3 py-1.5 rounded-md hover:bg-green-600 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        data-testid="button-upload-file"
+                      >
+                        {uploadMutation.isPending ? 'Processing...' : 'Upload'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setImportFile(null);
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                        className="px-3 py-1.5 border border-border rounded-md hover:bg-muted text-sm"
+                        data-testid="button-clear-file"
+                      >
+                        Clear
+                      </button>
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
-
-              {showMergeRequests && (
-                <div className="border-t border-border pt-4">
-                  <div className="bg-muted p-4 rounded-lg text-center">
-                    <UserCheck2 className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                    <p className="font-medium">No merge requests yet</p>
-                    <p className="text-sm text-muted-foreground">
-                      Import player data first, then merge requests will appear here when users sign up
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Pending Approvals */}
             {pendingMembers.length > 0 && (
@@ -1071,7 +1024,11 @@ export default function LeagueManagement() {
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => approveMutation.mutate(member.id)}
+                          onClick={() => {
+                            // Check for potential merges before approving
+                            setSelectedMember(member);
+                            setShowMergeModal(true);
+                          }}
                           disabled={approveMutation.isPending}
                           className="flex items-center gap-1 px-3 py-1 bg-green-500/50 text-white rounded-md text-sm font-medium disabled:opacity-50"
                           data-testid={`button-approve-${member.user.id}`}
@@ -2499,6 +2456,51 @@ export default function LeagueManagement() {
                 >
                   {deleteTeamMutation.isPending ? 'Deleting...' : 'Delete Team'}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Merge Approval Modal */}
+      {showMergeModal && selectedMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Approve Player</h3>
+              <button
+                onClick={() => {
+                  setShowMergeModal(false);
+                  setSelectedMember(null);
+                  setPotentialMatches([]);
+                  setSelectedMatch(null);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <p className="font-medium">New Player:</p>
+                <p className="text-sm text-muted-foreground">{formatUserName(selectedMember.user)}</p>
+              </div>
+              
+              <div className="pt-4 border-t border-border">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      approveMutation.mutate(selectedMember.id);
+                      setShowMergeModal(false);
+                      setSelectedMember(null);
+                    }}
+                    disabled={approveMutation.isPending}
+                    className="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-medium disabled:opacity-50"
+                  >
+                    {approveMutation.isPending ? 'Approving...' : 'Approve Without Merge'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
