@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { db } from "./db";
 import { leagueMemberships, importedPlayers, teams } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 import {
   insertLeagueSchema,
   insertTeamSchema,
