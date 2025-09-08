@@ -1231,11 +1231,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteGame(id: string): Promise<void> {
-    // First delete all related attendance records
-    await db.delete(gameAttendance).where(eq(gameAttendance.gameId, id));
-    
-    // Then delete the game
-    await db.delete(games).where(eq(games.id, id));
+    try {
+      // First delete all related attendance records
+      console.log(`Deleting attendance records for game ${id}`);
+      const deletedAttendance = await db.delete(gameAttendance).where(eq(gameAttendance.gameId, id));
+      console.log(`Deleted ${deletedAttendance.rowCount || 0} attendance records`);
+      
+      // Then delete the game
+      console.log(`Deleting game ${id}`);
+      const deletedGame = await db.delete(games).where(eq(games.id, id));
+      console.log(`Deleted ${deletedGame.rowCount || 0} game records`);
+      
+      if (deletedGame.rowCount === 0) {
+        throw new Error(`Game ${id} not found or already deleted`);
+      }
+    } catch (error) {
+      console.error(`Error deleting game ${id}:`, error);
+      throw error;
+    }
   }
 }
 
