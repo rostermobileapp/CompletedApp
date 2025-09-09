@@ -475,10 +475,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/league-memberships/:id/skill-rating", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/league-memberships/:id/skill-level", isAuthenticated, async (req: any, res) => {
     try {
       const membershipId = req.params.id;
-      const { skillRating } = req.body;
+      const { skillLevel } = req.body;
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
@@ -486,15 +486,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Commissioner access required" });
       }
       
-      if (skillRating < 1 || skillRating > 10) {
-        return res.status(400).json({ message: "Skill rating must be between 1 and 10" });
-      }
+      // Validate skill level - can be text, number, or null
+      const trimmedSkillLevel = skillLevel?.toString()?.trim() || null;
       
-      const membership = await storage.updatePlayerSkillRating(membershipId, skillRating);
+      const membership = await storage.updatePlayerSkillLevel(membershipId, trimmedSkillLevel);
       res.json(membership);
     } catch (error) {
-      console.error("Error updating skill rating:", error);
-      res.status(500).json({ message: "Failed to update skill rating" });
+      console.error("Error updating skill level:", error);
+      res.status(500).json({ message: "Failed to update skill level" });
     }
   });
 
