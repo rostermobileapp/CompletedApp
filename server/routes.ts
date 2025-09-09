@@ -818,8 +818,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(game.leagueId);
       const isCommissioner = league && league.commissionerId === userId;
       
-      const homeTeamMemberships = await storage.getTeamMemberships(game.homeTeamId);
-      const awayTeamMemberships = await storage.getTeamMemberships(game.awayTeamId);
+      const homeTeamMemberships = await storage.getTeamMembers(game.homeTeamId);
+      const awayTeamMemberships = await storage.getTeamMembers(game.awayTeamId);
       const isHomeCaptain = homeTeamMemberships.some(m => m.userId === userId && m.isCaptain);
       const isAwayCaptain = awayTeamMemberships.some(m => m.userId === userId && m.isCaptain);
 
