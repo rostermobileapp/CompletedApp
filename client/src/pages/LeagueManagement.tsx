@@ -42,6 +42,7 @@ import {
   AlertCircle as AlertIcon
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
+import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,6 +65,92 @@ type LeagueMember = {
     email: string;
   };
 };
+
+// Commissioner To-Do Component for Score Verification
+function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
+  // Fetch games that need score verification
+  const { data: gamesNeedingVerification = [] } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
+      const allGames = await response.json();
+      
+      if (!Array.isArray(allGames)) return [];
+      
+      // Find games that have score submissions but are not yet completed
+      const gamesNeedingVerification = [];
+      
+      for (const game of allGames) {
+        if (game.isCompleted) continue; // Skip already completed games
+        
+        try {
+          const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
+          const submissions = await submissionsResponse.json();
+          
+          // Include games that have at least one score submission
+          if (Array.isArray(submissions) && submissions.length > 0) {
+            gamesNeedingVerification.push({
+              ...game,
+              submissions: submissions.length
+            });
+          }
+        } catch (error) {
+          // Skip on error
+          continue;
+        }
+      }
+      
+      return gamesNeedingVerification;
+    },
+    enabled: !!leagueId,
+  });
+
+  if (!Array.isArray(gamesNeedingVerification) || gamesNeedingVerification.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mb-4">
+      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Target className="w-5 h-5 text-blue-600" />
+          <h2 className="text-lg font-semibold text-blue-600">Score Verification Needed</h2>
+          <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+            <span className="text-white text-xs font-bold">{gamesNeedingVerification.length}</span>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          {gamesNeedingVerification.slice(0, 5).map((game: any) => (
+            <div 
+              key={game.id}
+              className="bg-white dark:bg-card border border-blue-200 dark:border-blue-700 rounded-lg p-3 flex items-center justify-between hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              data-testid={`score-verification-${game.id}`}
+            >
+              <div className="flex items-center gap-3">
+                <AlertIcon className="w-4 h-4 text-blue-500" />
+                <div>
+                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                    {game.homeTeam?.name} vs {game.awayTeam?.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {format(new Date(game.scheduledAt), 'MMM d • h:mm a')} • {game.submissions} submission{game.submissions === 1 ? '' : 's'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {gamesNeedingVerification.length > 5 && (
+            <p className="text-center text-sm text-blue-600 font-medium">
+              +{gamesNeedingVerification.length - 5} more games need verification
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type Season = {
   id: string;
@@ -1128,6 +1215,9 @@ export default function LeagueManagement() {
             </div>
           </div>
         )}
+
+        {/* Commissioner Score Verification To-Do */}
+        {league && <CommissionerScoreToDo leagueId={league.id} />}
 
         {/* Tab Navigation */}
         <div className="flex bg-muted rounded-lg p-1">

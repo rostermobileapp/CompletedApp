@@ -64,7 +64,7 @@ function CommissionerToDo({ leagueId, onNavigate }: {
     <div className="px-6 mb-4">
       <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
         <button
-          onClick={() => onNavigate('/commissioner')}
+          onClick={() => onNavigate('/league-management')}
           className="w-full flex items-center justify-between hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors rounded p-1"
           data-testid="button-commissioner-todo"
         >
