@@ -33,30 +33,31 @@ export const setPageTransitionDirection = (direction: 'left' | 'right' | 'up' | 
 export function PageTransition({ children }: PageTransitionProps) {
   const [location] = useLocation();
   const previousPageIndexRef = useRef<number | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const previousLocationRef = useRef<string | null>(null);
   
   const currentPageIndex = getPageIndex(location);
   const isBottomNav = isBottomNavPage(location);
   
   // Determine animation direction
   let direction: 'left' | 'right' | 'up' | 'down' = 'right';
+  let shouldAnimate = false;
   
   if (globalAnimationDirection) {
     direction = globalAnimationDirection;
+    shouldAnimate = true;
     globalAnimationDirection = null; // Reset after use
-  } else if (isBottomNav && previousPageIndexRef.current !== null && isInitialized) {
+  } else if (isBottomNav && previousPageIndexRef.current !== null && previousLocationRef.current !== null) {
     direction = currentPageIndex > previousPageIndexRef.current ? 'left' : 'right';
+    shouldAnimate = true;
   }
   
-  // Update previous page index and initialization state
+  // Update previous page index and location
   useEffect(() => {
     if (isBottomNav) {
-      if (previousPageIndexRef.current !== null) {
-        setIsInitialized(true);
-      }
       previousPageIndexRef.current = currentPageIndex;
     }
-  }, [currentPageIndex, isBottomNav]);
+    previousLocationRef.current = location;
+  }, [currentPageIndex, isBottomNav, location]);
   
   const variants = {
     initial: (direction: string) => {
@@ -98,7 +99,7 @@ export function PageTransition({ children }: PageTransitionProps) {
         key={location}
         custom={direction}
         variants={variants}
-        initial="initial"
+        initial={shouldAnimate ? "initial" : "animate"}
         animate="animate"
         exit="exit"
         transition={{
