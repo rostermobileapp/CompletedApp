@@ -37,10 +37,14 @@ import {
   Merge,
   Trash2,
   Edit,
-  List
+  List,
+  Target,
+  AlertCircle as AlertIcon
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type LeagueMember = {
   id: string;
@@ -290,6 +294,10 @@ export default function LeagueManagement() {
   const [showEditGame, setShowEditGame] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  
+  // Score management state
+  const [commissionerHomeScore, setCommissionerHomeScore] = useState('');
+  const [commissionerAwayScore, setCommissionerAwayScore] = useState('');
   const datePickerRef = React.useRef<HTMLDivElement>(null);
   const timePickerRef = React.useRef<HTMLDivElement>(null);
   
@@ -434,6 +442,12 @@ export default function LeagueManagement() {
       return response.json();
     },
     enabled: !!leagueId,
+  });
+
+  // Fetch score submissions for selected game
+  const { data: selectedGameScoreSubmissions = [] } = useQuery({
+    queryKey: [`/api/games/${selectedGame?.id}/score-submissions`],
+    enabled: !!selectedGame?.id,
   });
 
   // Sort games chronologically (earliest first)
@@ -815,6 +829,32 @@ export default function LeagueManagement() {
         title: 'Delete Failed',
         description: error.message,
         variant: 'destructive',
+      });
+    },
+  });
+
+  // Commissioner score override mutation
+  const commissionerScoreOverrideMutation = useMutation({
+    mutationFn: async ({ gameId, homeScore, awayScore }: { gameId: string; homeScore: number; awayScore: number }) => {
+      return await apiRequest("POST", `/api/games/${gameId}/submit-score`, { homeScore, awayScore });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${selectedGame?.id}/score-submissions`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games'] });
+      
+      setCommissionerHomeScore("");
+      setCommissionerAwayScore("");
+      
+      toast({
+        title: "Score Override Complete",
+        description: data.message || "Commissioner score has been set and game updated.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Score Override Failed",
+        description: error.message || "Failed to override score. Please try again.",
+        variant: "destructive",
       });
     },
   });
@@ -2592,6 +2632,171 @@ export default function LeagueManagement() {
                     data-testid="input-game-locker-room"
                   />
                 </div>
+
+                {/* Score Management Section */}
+                {selectedGame && (
+                  <div className="pt-6 border-t border-border">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Target className="w-5 h-5" />
+                      Score Management
+                    </h3>
+                    
+                    {/* Current Game Score */}
+                    {selectedGame.isCompleted || (selectedGame.homeScore !== null && selectedGame.awayScore !== null) ? (
+                      <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+                        <p className="text-sm font-medium text-green-600 mb-2">Final Score:</p>
+                        <div className="flex items-center justify-center space-x-4">
+                          <div className="text-center">
+                            <p className="text-sm text-muted-foreground">
+                              {teams.find(t => t.id === selectedGame.homeTeamId)?.name || 'Home'}
+                            </p>
+                            <p className="text-2xl font-bold text-green-600">{selectedGame.homeScore}</p>
+                          </div>
+                          <div className="text-xl font-bold text-muted-foreground">-</div>
+                          <div className="text-center">
+                            <p className="text-sm text-muted-foreground">
+                              {teams.find(t => t.id === selectedGame.awayTeamId)?.name || 'Away'}
+                            </p>
+                            <p className="text-2xl font-bold text-green-600">{selectedGame.awayScore}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mb-4">
+                        <p className="text-sm text-muted-foreground mb-3">Game not yet completed</p>
+                        
+                        {/* Score Submissions */}
+                        {selectedGameScoreSubmissions.length > 0 && (
+                          <div className="space-y-3 mb-4">
+                            <p className="text-sm font-medium">Score Submissions:</p>
+                            {selectedGameScoreSubmissions.map((submission: any, index: number) => (
+                              <div 
+                                key={submission.id} 
+                                className={`p-3 rounded-lg border ${
+                                  submission.submitterRole === 'commissioner' 
+                                    ? 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800'
+                                    : 'bg-muted border-border'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-4">
+                                    <div className="text-center">
+                                      <p className="text-xs text-muted-foreground">
+                                        {teams.find(t => t.id === selectedGame.homeTeamId)?.name || 'Home'}
+                                      </p>
+                                      <p className="text-lg font-bold">{submission.homeScore}</p>
+                                    </div>
+                                    <div className="text-sm font-bold text-muted-foreground">-</div>
+                                    <div className="text-center">
+                                      <p className="text-xs text-muted-foreground">
+                                        {teams.find(t => t.id === selectedGame.awayTeamId)?.name || 'Away'}
+                                      </p>
+                                      <p className="text-lg font-bold">{submission.awayScore}</p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs font-medium capitalize">
+                                      {submission.submitterRole.replace('_', ' ')}
+                                      {submission.submitterRole === 'commissioner' && ' (Override)'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {new Date(submission.submittedAt).toLocaleDateString()} {new Date(submission.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            
+                            {/* Check for conflicts */}
+                            {(() => {
+                              const captainSubmissions = selectedGameScoreSubmissions.filter((s: any) => 
+                                s.submitterRole === 'home_captain' || s.submitterRole === 'away_captain'
+                              );
+                              const homeSubmission = captainSubmissions.find((s: any) => s.submitterRole === 'home_captain');
+                              const awaySubmission = captainSubmissions.find((s: any) => s.submitterRole === 'away_captain');
+                              
+                              if (homeSubmission && awaySubmission && 
+                                  (homeSubmission.homeScore !== awaySubmission.homeScore || 
+                                   homeSubmission.awayScore !== awaySubmission.awayScore)) {
+                                return (
+                                  <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <AlertIcon className="w-4 h-4 text-yellow-600" />
+                                      <p className="text-sm font-medium text-yellow-600">Score Conflict Detected</p>
+                                    </div>
+                                    <p className="text-xs text-yellow-600">
+                                      Team captains have submitted different scores. Commissioner override required.
+                                    </p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        )}
+
+                        {/* Commissioner Score Override */}
+                        <div className="bg-card border border-border rounded-lg p-4">
+                          <h4 className="text-sm font-medium mb-3">Commissioner Score Override</h4>
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <Label htmlFor="commissionerHomeScore" className="text-xs font-medium">
+                                {teams.find(t => t.id === selectedGame.homeTeamId)?.name || 'Home'} Score
+                              </Label>
+                              <Input
+                                id="commissionerHomeScore"
+                                type="number"
+                                min="0"
+                                value={commissionerHomeScore}
+                                onChange={(e) => setCommissionerHomeScore(e.target.value)}
+                                placeholder="0"
+                                className="mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="commissionerAwayScore" className="text-xs font-medium">
+                                {teams.find(t => t.id === selectedGame.awayTeamId)?.name || 'Away'} Score
+                              </Label>
+                              <Input
+                                id="commissionerAwayScore"
+                                type="number"
+                                min="0"
+                                value={commissionerAwayScore}
+                                onChange={(e) => setCommissionerAwayScore(e.target.value)}
+                                placeholder="0"
+                                className="mt-1"
+                              />
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              const home = parseInt(commissionerHomeScore);
+                              const away = parseInt(commissionerAwayScore);
+                              if (!isNaN(home) && !isNaN(away) && home >= 0 && away >= 0) {
+                                commissionerScoreOverrideMutation.mutate({ 
+                                  gameId: selectedGame.id, 
+                                  homeScore: home, 
+                                  awayScore: away 
+                                });
+                              }
+                            }}
+                            disabled={
+                              commissionerScoreOverrideMutation.isPending || 
+                              !commissionerHomeScore.trim() || 
+                              !commissionerAwayScore.trim() ||
+                              isNaN(parseInt(commissionerHomeScore)) ||
+                              isNaN(parseInt(commissionerAwayScore))
+                            }
+                            className="w-full text-sm"
+                          >
+                            {commissionerScoreOverrideMutation.isPending ? "Setting Score..." : "Set Final Score"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Submit Buttons */}
                 <div className="space-y-3 pt-4">
