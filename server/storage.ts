@@ -1358,6 +1358,13 @@ export class DatabaseStorage implements IStorage {
       );
       console.log(`Deleted ${deletedGames.rowCount || 0} games involving team`);
 
+      // Delete imported schedules where this team is home or away team
+      console.log(`Deleting imported schedules involving team ${teamId}`);
+      const deletedImportedSchedules = await db.delete(importedSchedules).where(
+        or(eq(importedSchedules.homeTeamId, teamId), eq(importedSchedules.awayTeamId, teamId))
+      );
+      console.log(`Deleted ${deletedImportedSchedules.rowCount || 0} imported schedules involving team`);
+
       // Finally delete the team itself
       console.log(`Deleting team ${teamId}`);
       const deletedTeam = await db.delete(teams).where(eq(teams.id, teamId));
