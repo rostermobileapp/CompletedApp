@@ -69,7 +69,7 @@ type LeagueMember = {
 // Commissioner To-Do Component for Score Verification
 function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
   // Fetch games that need score verification
-  const { data: gamesNeedingVerification = [] } = useQuery({
+  const { data: gamesNeedingVerification = [], isLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
@@ -100,10 +100,25 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
         }
       }
       
+      console.log('Games needing verification:', gamesNeedingVerification.length);
       return gamesNeedingVerification;
     },
     enabled: !!leagueId,
   });
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="mb-4">
+        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-blue-600" />
+            <span className="text-sm text-blue-600">Checking for games needing verification...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!Array.isArray(gamesNeedingVerification) || gamesNeedingVerification.length === 0) {
     return null;
