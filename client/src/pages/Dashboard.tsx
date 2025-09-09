@@ -31,35 +31,70 @@ function CommissionerToDo({ leagueId, onNavigate }: {
       
       if (!Array.isArray(allGames)) return [];
       
-      // Find games that have score submissions but are not yet completed
+      // Find games that need commissioner verification based on the correct business logic:
+      // 1. Today's date is AFTER the game's date (past games)
+      // 2. Game has problematic score submissions (0, 1, or 2 mismatched)
       const gamesNeedingVerification = [];
-      const debugInfo = { totalGames: allGames.length, completedGames: 0, gamesWithSubmissions: 0, oldGames: [] };
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
+      
+      const debugInfo = { 
+        totalGames: allGames.length, 
+        pastGames: 0, 
+        gamesNeedingVerification: 0,
+        problemGames: []
+      };
       
       for (const game of allGames) {
-        if (game.isCompleted) {
-          debugInfo.completedGames++;
-          continue; // Skip already completed games
+        const gameDate = new Date(game.scheduledAt);
+        gameDate.setHours(0, 0, 0, 0); // Start of game date
+        
+        // Only check games from past dates
+        if (gameDate >= today) {
+          continue; // Skip future games
         }
         
-        // Check if game is from 9/7/2025 or earlier
-        const gameDate = new Date(game.scheduledAt);
-        const sept7 = new Date('2025-09-07');
-        if (gameDate <= sept7) {
-          debugInfo.oldGames.push({
-            homeTeam: game.homeTeam?.name,
-            awayTeam: game.awayTeam?.name,
-            date: game.scheduledAt,
-            isCompleted: game.isCompleted
-          });
-        }
+        debugInfo.pastGames++;
         
         try {
           const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
           const submissions = await submissionsResponse.json();
           
-          // Include games that have at least one score submission
-          if (Array.isArray(submissions) && submissions.length > 0) {
-            debugInfo.gamesWithSubmissions++;
+          if (!Array.isArray(submissions)) continue;
+          
+          const submissionCount = submissions.length;
+          let needsVerification = false;
+          let reason = '';
+          
+          if (submissionCount === 0) {
+            // No score submissions - needs verification
+            needsVerification = true;
+            reason = 'No score submissions';
+          } else if (submissionCount === 1) {
+            // Only one team submitted - needs verification
+            needsVerification = true;
+            reason = 'Missing one team submission';
+          } else if (submissionCount === 2) {
+            // Two submissions - check if they match
+            const [sub1, sub2] = submissions;
+            if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
+              needsVerification = true;
+              reason = `Mismatched scores: ${sub1.homeScore}-${sub1.awayScore} vs ${sub2.homeScore}-${sub2.awayScore}`;
+            }
+          } else if (submissionCount > 2) {
+            // More than 2 submissions - definitely needs verification
+            needsVerification = true;
+            reason = `${submissionCount} submissions (too many)`;
+          }
+          
+          if (needsVerification) {
+            debugInfo.gamesNeedingVerification++;
+            debugInfo.problemGames.push({
+              homeTeam: game.homeTeam?.name,
+              awayTeam: game.awayTeam?.name,
+              date: game.scheduledAt,
+              reason: reason
+            });
             gamesNeedingVerification.push(game);
           }
         } catch (error) {
@@ -82,16 +117,15 @@ function CommissionerToDo({ leagueId, onNavigate }: {
     return (
       <div className="px-6 mb-4">
         <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-3 text-sm">
-          <p>CommissionerToDo Debug:</p>
+          <p>CommissionerToDo Debug (NEW LOGIC):</p>
           <p>• Total games: {debugInfo?.totalGames || 0}</p>
-          <p>• Completed games: {debugInfo?.completedGames || 0}</p>
-          <p>• Games with submissions: {debugInfo?.gamesWithSubmissions || 0}</p>
-          <p>• Old games (9/7 or earlier): {debugInfo?.oldGames?.length || 0}</p>
-          {debugInfo?.oldGames?.length > 0 && (
+          <p>• Past games: {debugInfo?.pastGames || 0}</p>
+          <p>• Games needing verification: {debugInfo?.gamesNeedingVerification || 0}</p>
+          {debugInfo?.problemGames?.length > 0 && (
             <div>
-              <p>Old games details:</p>
-              {debugInfo.oldGames.map((game: any, i: number) => (
-                <p key={i}>- {game.homeTeam} vs {game.awayTeam} on {new Date(game.date).toLocaleDateString()} (completed: {String(game.isCompleted)})</p>
+              <p>Problem games details:</p>
+              {debugInfo.problemGames.map((game: any, i: number) => (
+                <p key={i}>- {game.homeTeam} vs {game.awayTeam} on {new Date(game.date).toLocaleDateString()} ({game.reason})</p>
               ))}
             </div>
           )}
