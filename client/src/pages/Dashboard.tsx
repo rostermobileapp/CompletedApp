@@ -601,7 +601,7 @@ export default function Dashboard() {
       )}
       
       {/* Commissioner To-Do Section */}
-      {selectedLeagueMembership?.isCommissioner && selectedLeagueId && (
+      {tier === 'commissioner' && selectedLeagueId && (
         <CommissionerToDo 
           leagueId={selectedLeagueId} 
           onNavigate={navigate}
