@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
+import { format, isBefore, isAfter, addHours } from "date-fns";
 import { Trophy, Check, X, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import { useEffect, useRef } from "react";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 
 export default function Calendar() {
@@ -13,6 +14,7 @@ export default function Calendar() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const gamesListRef = useRef<HTMLDivElement>(null);
 
   // Fetch user's teams
   const { data: userTeams } = useQuery({
@@ -22,9 +24,9 @@ export default function Calendar() {
   // Get primary team (first team for now)
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
 
-  // Fetch all upcoming games
-  const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
-    queryKey: ["/api/user/games/upcoming"],
+  // Fetch all games (past and future)
+  const { data: allGames, isLoading: gamesLoading } = useQuery({
+    queryKey: ["/api/user/games/all"],
   });
 
   // Fetch user attendance statuses
@@ -97,13 +99,33 @@ export default function Calendar() {
     },
   });
 
-  // Filter games for user's teams
-  const userGames = Array.isArray(upcomingGames) && Array.isArray(userTeams) 
-    ? upcomingGames.filter((game: any) => {
+  // Filter games for user's teams and sort chronologically
+  const userGames = Array.isArray(allGames) && Array.isArray(userTeams) 
+    ? allGames.filter((game: any) => {
         const userTeamIds = userTeams.map((team: any) => team.id);
         return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
-      })
+      }).sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
     : [];
+
+  // Find the index to scroll to (between last game and next game)
+  const currentTime = new Date();
+  const nextGameIndex = userGames.findIndex((game: any) => 
+    isAfter(new Date(game.scheduledAt), currentTime)
+  );
+  const scrollToIndex = nextGameIndex > 0 ? nextGameIndex - 1 : 0;
+
+  // Auto-scroll to position between last and next game
+  useEffect(() => {
+    if (!gamesLoading && userGames.length > 0 && gamesListRef.current) {
+      const gameCards = gamesListRef.current.children;
+      if (gameCards[scrollToIndex]) {
+        gameCards[scrollToIndex].scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }
+    }
+  }, [gamesLoading, userGames.length, scrollToIndex]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -120,7 +142,7 @@ export default function Calendar() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <h1 className="text-xl font-semibold" data-testid="text-calendar-title">
-            All Upcoming Games
+            Schedule & Results
           </h1>
         </div>
       </div>
@@ -136,8 +158,11 @@ export default function Calendar() {
             ))}
           </div>
         ) : userGames.length > 0 ? (
-          <div className="space-y-3">
-            {userGames.map((game: any) => (
+          <div className="space-y-3" ref={gamesListRef}>
+            {userGames.map((game: any) => {
+              const isCompleted = game.isCompleted || (game.homeScore !== null && game.awayScore !== null);
+              const isPastGame = isBefore(addHours(new Date(game.scheduledAt), 2), new Date());
+              return (
               <div 
                 key={game.id} 
                 className="bg-card rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors" 
@@ -171,6 +196,18 @@ export default function Calendar() {
                       <p className="text-xs text-muted-foreground" data-testid={`text-game-venue-${game.id}`}>
                         {game.venue}
                       </p>
+                    )}
+                    {/* Score display for completed games */}
+                    {isCompleted && (
+                      <div className="text-sm font-medium mt-1" data-testid={`text-game-score-${game.id}`}>
+                        <span className={game.homeTeam?.id === primaryTeam?.id ? "text-primary" : "text-muted-foreground"}>
+                          {game.homeTeam?.name}: {game.homeScore ?? 0}
+                        </span>
+                        <span className="text-muted-foreground mx-2">•</span>
+                        <span className={game.awayTeam?.id === primaryTeam?.id ? "text-primary" : "text-muted-foreground"}>
+                          {game.awayTeam?.name}: {game.awayScore ?? 0}
+                        </span>
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -292,7 +329,8 @@ export default function Calendar() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="bg-card rounded-xl border border-border p-8 text-center" data-testid="empty-all-games">
