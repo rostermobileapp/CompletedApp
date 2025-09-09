@@ -1067,7 +1067,7 @@ export class DatabaseStorage implements IStorage {
       INNER JOIN teams ht ON g.home_team_id = ht.id
       INNER JOIN teams at ON g.away_team_id = at.id
       WHERE g.league_id = ${leagueId}
-      ORDER BY g.scheduled_at DESC
+      ORDER BY g.scheduled_at ASC
     `);
 
     return result.rows.map((row: any) => ({
