@@ -17,6 +17,125 @@ import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
+// Standings Modal Component
+function StandingsModal({ isOpen, onClose, leagueId }: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  leagueId: string | null; 
+}) {
+  const { data: standings = [], isLoading } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'standings'],
+    queryFn: async () => {
+      if (!leagueId) return [];
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/standings`);
+      return response.json();
+    },
+    enabled: !!leagueId && isOpen,
+  });
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-card rounded-lg border border-border w-full max-w-6xl h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-border">
+          <h2 className="text-2xl font-semibold text-center">League Standings</h2>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                <p className="text-muted-foreground">Loading standings...</p>
+              </div>
+            </div>
+          ) : standings.length === 0 ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-muted-foreground">No standings data available</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-3 font-semibold">Team Name</th>
+                    <th className="text-center p-3 font-semibold">GP</th>
+                    <th className="text-center p-3 font-semibold">W</th>
+                    <th className="text-center p-3 font-semibold">L</th>
+                    <th className="text-center p-3 font-semibold">T</th>
+                    <th className="text-center p-3 font-semibold">SOL</th>
+                    <th className="text-center p-3 font-semibold">PTS</th>
+                    <th className="text-center p-3 font-semibold">GF</th>
+                    <th className="text-center p-3 font-semibold">GA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {standings.map((team: any, index: number) => (
+                    <tr 
+                      key={team.teamId} 
+                      className={`border-b border-border/50 hover:bg-muted/30 ${index === 0 ? 'bg-primary/5' : ''}`}
+                      data-testid={`standings-row-${team.teamId}`}
+                    >
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground font-mono w-6">
+                            {index + 1}.
+                          </span>
+                          <span className="font-medium">{team.teamName}</span>
+                        </div>
+                      </td>
+                      <td className="text-center p-3" data-testid={`games-played-${team.teamId}`}>
+                        {team.gamesPlayed}
+                      </td>
+                      <td className="text-center p-3 text-green-600 font-medium" data-testid={`wins-${team.teamId}`}>
+                        {team.wins}
+                      </td>
+                      <td className="text-center p-3 text-red-600 font-medium" data-testid={`losses-${team.teamId}`}>
+                        {team.losses}
+                      </td>
+                      <td className="text-center p-3 text-yellow-600 font-medium" data-testid={`ties-${team.teamId}`}>
+                        {team.ties}
+                      </td>
+                      <td className="text-center p-3 text-orange-600 font-medium" data-testid={`shootout-losses-${team.teamId}`}>
+                        {team.shootoutLosses}
+                      </td>
+                      <td className="text-center p-3 font-bold text-primary" data-testid={`points-${team.teamId}`}>
+                        {team.points}
+                      </td>
+                      <td className="text-center p-3" data-testid={`goals-for-${team.teamId}`}>
+                        {team.goalsFor}
+                      </td>
+                      <td className="text-center p-3" data-testid={`goals-against-${team.teamId}`}>
+                        {team.goalsAgainst}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Footer with Close Button */}
+        <div className="p-6 border-t border-border">
+          <div className="flex justify-center">
+            <Button 
+              onClick={onClose}
+              className="px-8 py-2"
+              data-testid="button-close-standings"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Commissioner To-Do Component for Score Verification
 function CommissionerToDo({ leagueId, onNavigate }: { 
   leagueId: string; 
@@ -281,6 +400,9 @@ export default function Dashboard() {
   const [selectedGameForScore, setSelectedGameForScore] = useState<any>(null);
   const [homeScore, setHomeScore] = useState('');
   const [awayScore, setAwayScore] = useState('');
+
+  // Standings modal state
+  const [showStandingsModal, setShowStandingsModal] = useState(false);
   
   const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
@@ -593,7 +715,11 @@ export default function Dashboard() {
           </div>
 
           {/* Standings Card */}
-          <div className="bg-card rounded-xl border border-border p-5 min-h-[72px]" data-testid="card-standings">
+          <div 
+            className="bg-card rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors" 
+            data-testid="card-standings"
+            onClick={() => selectedLeagueId && setShowStandingsModal(true)}
+          >
             <div className="h-full flex flex-col items-center justify-center">
               <Award className="w-8 h-8 text-blue-500 mb-3" />
               <p className="text-xs font-medium">Standings</p>
@@ -928,6 +1054,13 @@ export default function Dashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Standings Modal */}
+      <StandingsModal
+        isOpen={showStandingsModal}
+        onClose={() => setShowStandingsModal(false)}
+        leagueId={selectedLeagueId}
+      />
     </div>
   );
 }
