@@ -1,9 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
-import { Trophy, Check, X, ArrowLeft, MapPin, Clock, MessageSquare } from "lucide-react";
+import { Trophy, Check, X, ArrowLeft, MapPin, Clock, MessageSquare, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
@@ -20,6 +22,8 @@ export default function GameDetails() {
   const gameId = params?.id;
 
   const [notes, setNotes] = useState("");
+  const [homeScore, setHomeScore] = useState("");
+  const [awayScore, setAwayScore] = useState("");
 
   // Fetch user's teams
   const { data: userTeams } = useQuery({
@@ -54,6 +58,12 @@ export default function GameDetails() {
   // Fetch game attendance to get notes
   const { data: gameAttendance } = useQuery({
     queryKey: [`/api/games/${gameId}/attendance`],
+    enabled: !!gameId,
+  });
+
+  // Fetch score submissions
+  const { data: scoreSubmissions } = useQuery({
+    queryKey: [`/api/games/${gameId}/score-submissions`],
     enabled: !!gameId,
   });
 
@@ -185,6 +195,33 @@ export default function GameDetails() {
     },
   });
 
+  // Submit score mutation
+  const submitScoreMutation = useMutation({
+    mutationFn: async ({ gameId, homeScore, awayScore }: { gameId: string; homeScore: number; awayScore: number }) => {
+      return await apiRequest("POST", `/api/games/${gameId}/submit-score`, { homeScore, awayScore });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/score-submissions`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
+      
+      setHomeScore("");
+      setAwayScore("");
+      
+      toast({
+        title: "Score Submitted",
+        description: data.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit score. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (gameLoading || !game) {
     return (
       <div className="min-h-screen bg-background">
@@ -216,6 +253,35 @@ export default function GameDetails() {
   const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
   const beverageDutyClaimed = !!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
   const beverageDutyClaimedByOther = beverageDutyClaimed && !hasBeverageDuty;
+
+  // Score submission logic
+  const gameStartTime = new Date(game.scheduledAt).getTime();
+  const oneHourAfterStart = gameStartTime + (60 * 60 * 1000); // 1 hour in milliseconds
+  const now = Date.now();
+  const isScoreSubmissionAvailable = now >= oneHourAfterStart;
+
+  // Check if user is a captain or commissioner
+  const isHomeCaptain = homeTeamMembers?.some((member: any) => member.userId === (user as any)?.id && member.isCaptain);
+  const isAwayCaptain = awayTeamMembers?.some((member: any) => member.userId === (user as any)?.id && member.isCaptain);
+  const isCaptain = isHomeCaptain || isAwayCaptain;
+  
+  // Check if user is commissioner (need to check league)
+  const { data: league } = useQuery({
+    queryKey: [`/api/leagues/${game.leagueId}`],
+    enabled: !!game?.leagueId,
+  });
+  const isCommissioner = league?.commissionerId === (user as any)?.id;
+  
+  const canSubmitScore = (isCaptain || isCommissioner) && isScoreSubmissionAvailable;
+
+  // Check if game is already completed
+  const isGameCompleted = game.isCompleted || (game.homeScore !== null && game.awayScore !== null);
+
+  // Get existing submissions for display
+  const userSubmissions = Array.isArray(scoreSubmissions) 
+    ? scoreSubmissions.filter((submission: any) => submission.submittedBy === (user as any)?.id)
+    : [];
+  const latestUserSubmission = userSubmissions.length > 0 ? userSubmissions[userSubmissions.length - 1] : null;
   
   // Check if the claimed user actually exists in team members
   const allTeamMembers = [...(homeTeamMembers || []), ...(awayTeamMembers || [])];
@@ -501,6 +567,129 @@ export default function GameDetails() {
             </Button>
           </div>
         </div>
+
+        {/* Score Submission */}
+        {(canSubmitScore || isGameCompleted) && (
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h3 className="text-lg font-semibold mb-4" data-testid="text-score-title">
+              <Target className="w-5 h-5 inline mr-2" />
+              Game Score
+            </h3>
+            
+            {isGameCompleted ? (
+              <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <div className="flex items-center justify-center space-x-4">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">{game.homeTeam?.name}</p>
+                    <p className="text-3xl font-bold text-green-600" data-testid="text-final-home-score">
+                      {game.homeScore}
+                    </p>
+                  </div>
+                  <div className="text-2xl font-bold text-muted-foreground">-</div>
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">{game.awayTeam?.name}</p>
+                    <p className="text-3xl font-bold text-green-600" data-testid="text-final-away-score">
+                      {game.awayScore}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-center text-sm text-green-600 mt-2 font-medium">
+                  Game Complete
+                </p>
+              </div>
+            ) : canSubmitScore ? (
+              <div className="space-y-4">
+                {latestUserSubmission && (
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <p className="text-sm font-medium text-blue-600 mb-2">Your Last Submission:</p>
+                    <div className="flex items-center justify-center space-x-4">
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">{game.homeTeam?.name}</p>
+                        <p className="text-2xl font-bold">{latestUserSubmission.homeScore}</p>
+                      </div>
+                      <div className="text-xl font-bold text-muted-foreground">-</div>
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">{game.awayTeam?.name}</p>
+                        <p className="text-2xl font-bold">{latestUserSubmission.awayScore}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-blue-600 text-center mt-2">
+                      Submitted {format(new Date(latestUserSubmission.submittedAt), 'MMM d, h:mm a')}
+                      {latestUserSubmission.submitterRole === 'commissioner' && ' (Commissioner Override)'}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="homeScore" className="text-sm font-medium">
+                      {game.homeTeam?.name} Score
+                    </Label>
+                    <Input
+                      id="homeScore"
+                      type="number"
+                      min="0"
+                      value={homeScore}
+                      onChange={(e) => setHomeScore(e.target.value)}
+                      placeholder="0"
+                      className="mt-1"
+                      data-testid="input-home-score"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="awayScore" className="text-sm font-medium">
+                      {game.awayTeam?.name} Score
+                    </Label>
+                    <Input
+                      id="awayScore"
+                      type="number"
+                      min="0"
+                      value={awayScore}
+                      onChange={(e) => setAwayScore(e.target.value)}
+                      placeholder="0"
+                      className="mt-1"
+                      data-testid="input-away-score"
+                    />
+                  </div>
+                </div>
+                
+                <Button
+                  onClick={() => {
+                    const home = parseInt(homeScore);
+                    const away = parseInt(awayScore);
+                    if (!isNaN(home) && !isNaN(away) && home >= 0 && away >= 0) {
+                      submitScoreMutation.mutate({ gameId: game.id, homeScore: home, awayScore: away });
+                    }
+                  }}
+                  disabled={
+                    submitScoreMutation.isPending || 
+                    !homeScore.trim() || 
+                    !awayScore.trim() ||
+                    isNaN(parseInt(homeScore)) ||
+                    isNaN(parseInt(awayScore))
+                  }
+                  className="w-full"
+                  data-testid="button-submit-score"
+                >
+                  {submitScoreMutation.isPending ? "Submitting..." : 
+                   isCommissioner ? "Submit Score (Commissioner)" : "Submit Score (Captain)"}
+                </Button>
+                
+                {!isScoreSubmissionAvailable && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Score submission will be available 1 hour after game start ({format(new Date(oneHourAfterStart), 'h:mm a')})
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground">
+                  Only team captains and commissioners can submit scores
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
