@@ -1385,7 +1385,18 @@ export default function LeagueManagement() {
         )}
 
         {/* Commissioner Score Verification To-Do */}
-        {league && <CommissionerScoreToDo leagueId={league.id} />}
+        {league ? (
+          <div>
+            <div className="mb-4 p-2 bg-yellow-100 rounded">
+              <p className="text-sm">Debug: League loaded: {league.name} (ID: {league.id})</p>
+            </div>
+            <CommissionerScoreToDo leagueId={league.id} />
+          </div>
+        ) : (
+          <div className="mb-4 p-2 bg-red-100 rounded">
+            <p className="text-sm">Debug: No league loaded</p>
+          </div>
+        )}
 
         {/* Tab Navigation */}
         <div className="flex bg-muted rounded-lg p-1">
