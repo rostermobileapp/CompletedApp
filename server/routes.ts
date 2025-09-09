@@ -537,6 +537,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/leagues/:id/standings", async (req, res) => {
+    try {
+      const leagueId = req.params.id;
+      const standings = await storage.getLeagueStandings(leagueId);
+      res.json(standings);
+    } catch (error) {
+      console.error("Error fetching league standings:", error);
+      res.status(500).json({ message: "Failed to fetch league standings" });
+    }
+  });
+
   // Team routes
   app.post("/api/teams", isAuthenticated, async (req: any, res) => {
     try {

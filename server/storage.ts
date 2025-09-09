@@ -790,6 +790,94 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  async getLeagueStandings(leagueId: string): Promise<Array<{
+    teamId: string;
+    teamName: string;
+    gamesPlayed: number;
+    wins: number;
+    losses: number;
+    ties: number;
+    shootoutLosses: number;
+    points: number;
+    goalsFor: number;
+    goalsAgainst: number;
+  }>> {
+    // Get all teams in the league
+    const teams = await this.getTeamsByLeague(leagueId);
+    
+    // Get all completed games in the league
+    const games = await this.getGamesByLeague(leagueId);
+    const completedGames = games.filter(game => 
+      game.isCompleted || (game.homeScore !== null && game.awayScore !== null)
+    );
+
+    // Calculate standings for each team
+    const standings = [];
+    
+    for (const team of teams) {
+      let gamesPlayed = 0;
+      let wins = 0;
+      let losses = 0;
+      let ties = 0;
+      let shootoutLosses = 0; // For now, this will be 0 until we add shootout data
+      let goalsFor = 0;
+      let goalsAgainst = 0;
+
+      // Process each completed game
+      for (const game of completedGames) {
+        if (game.homeTeamId === team.id || game.awayTeamId === team.id) {
+          gamesPlayed++;
+          
+          const isHomeTeam = game.homeTeamId === team.id;
+          const teamScore = isHomeTeam ? game.homeScore : game.awayScore;
+          const opponentScore = isHomeTeam ? game.awayScore : game.homeScore;
+          
+          // Add to goals for/against
+          goalsFor += teamScore || 0;
+          goalsAgainst += opponentScore || 0;
+          
+          // Determine win/loss/tie
+          if (teamScore > opponentScore) {
+            wins++;
+          } else if (teamScore < opponentScore) {
+            losses++;
+          } else {
+            ties++;
+          }
+        }
+      }
+
+      // Calculate points: Wins = 2 points, Ties = 1 point, SOL = 1 point, Losses = 0
+      const points = (wins * 2) + (ties * 1) + (shootoutLosses * 1);
+
+      standings.push({
+        teamId: team.id,
+        teamName: team.name,
+        gamesPlayed,
+        wins,
+        losses,
+        ties,
+        shootoutLosses,
+        points,
+        goalsFor,
+        goalsAgainst
+      });
+    }
+
+    // Sort by points (descending), then by goal differential (descending)
+    standings.sort((a, b) => {
+      if (b.points !== a.points) {
+        return b.points - a.points;
+      }
+      // If points are tied, sort by goal differential
+      const goalDiffA = a.goalsFor - a.goalsAgainst;
+      const goalDiffB = b.goalsFor - b.goalsAgainst;
+      return goalDiffB - goalDiffA;
+    });
+
+    return standings;
+  }
+
   async getGameById(gameId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team }) | undefined> {
     const result = await db.execute(sql`
       SELECT 
