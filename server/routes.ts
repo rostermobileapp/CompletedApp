@@ -734,14 +734,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         submitterRole = 'commissioner';
       } else {
         // Check if user is captain of home team
-        const homeTeamMemberships = await storage.getTeamMemberships(game.homeTeamId);
+        const homeTeamMemberships = await storage.getTeamMembers(game.homeTeamId);
         const homeTeamCaptain = homeTeamMemberships.find(m => m.userId === userId && m.isCaptain);
         
         if (homeTeamCaptain) {
           submitterRole = 'home_captain';
         } else {
           // Check if user is captain of away team
-          const awayTeamMemberships = await storage.getTeamMemberships(game.awayTeamId);
+          const awayTeamMemberships = await storage.getTeamMembers(game.awayTeamId);
           const awayTeamCaptain = awayTeamMemberships.find(m => m.userId === userId && m.isCaptain);
           
           if (awayTeamCaptain) {

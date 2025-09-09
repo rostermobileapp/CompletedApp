@@ -67,6 +67,12 @@ export default function GameDetails() {
     enabled: !!gameId,
   });
 
+  // Fetch league details for commissioner check
+  const { data: league } = useQuery({
+    queryKey: [`/api/leagues/${game?.leagueId}`],
+    enabled: !!game?.leagueId,
+  });
+
   // Get current user's notes from attendance data
   const userAttendance = Array.isArray(gameAttendance) ? 
     gameAttendance.find((attendance: any) => attendance.userId === (user as any)?.id) : null;
@@ -265,11 +271,7 @@ export default function GameDetails() {
   const isAwayCaptain = awayTeamMembers?.some((member: any) => member.userId === (user as any)?.id && member.isCaptain);
   const isCaptain = isHomeCaptain || isAwayCaptain;
   
-  // Check if user is commissioner (need to check league)
-  const { data: league } = useQuery({
-    queryKey: [`/api/leagues/${game.leagueId}`],
-    enabled: !!game?.leagueId,
-  });
+  // Check if user is commissioner
   const isCommissioner = league?.commissionerId === (user as any)?.id;
   
   const canSubmitScore = (isCaptain || isCommissioner) && isScoreSubmissionAvailable;
