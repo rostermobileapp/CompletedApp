@@ -112,8 +112,8 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
       <div className="mb-4">
         <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <div className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-blue-600">Checking for games needing verification...</span>
+            <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <span className="text-sm text-blue-600 dark:text-blue-300">Checking for games needing verification...</span>
           </div>
         </div>
       </div>
@@ -128,8 +128,8 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
     <div className="mb-4">
       <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Target className="w-5 h-5 text-blue-600" />
-          <h2 className="text-lg font-semibold text-blue-600">Score Verification Needed</h2>
+          <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <h2 className="text-lg font-semibold text-blue-600 dark:text-blue-300">Score Verification Needed</h2>
           <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
             <span className="text-white text-xs font-bold">{gamesNeedingVerification.length}</span>
           </div>
@@ -139,16 +139,16 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
           {gamesNeedingVerification.slice(0, 5).map((game: any) => (
             <div 
               key={game.id}
-              className="bg-white dark:bg-card border border-blue-200 dark:border-blue-700 rounded-lg p-3 flex items-center justify-between hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              className="bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-lg p-3 flex items-center justify-between hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
               data-testid={`score-verification-${game.id}`}
             >
               <div className="flex items-center gap-3">
-                <AlertIcon className="w-4 h-4 text-blue-500" />
+                <AlertIcon className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                 <div>
-                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {game.homeTeam?.name} vs {game.awayTeam?.name}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-gray-600 dark:text-gray-300">
                     {format(new Date(game.scheduledAt), 'MMM d • h:mm a')} • {game.submissions} submission{game.submissions === 1 ? '' : 's'}
                   </p>
                 </div>
@@ -157,7 +157,7 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
           ))}
           
           {gamesNeedingVerification.length > 5 && (
-            <p className="text-center text-sm text-blue-600 font-medium">
+            <p className="text-center text-sm text-blue-600 dark:text-blue-300 font-medium">
               +{gamesNeedingVerification.length - 5} more games need verification
             </p>
           )}
