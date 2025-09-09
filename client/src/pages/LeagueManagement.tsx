@@ -44,7 +44,7 @@ import { Button } from '@/components/ui/button';
 type LeagueMember = {
   id: string;
   userId: string;
-  skillRating: number;
+  skillLevel: string | null;
   status: string;
   assignedTeamId?: string;
   isCaptain?: boolean;
@@ -218,7 +218,7 @@ export default function LeagueManagement() {
     assignedTeamId: '',
     isCaptain: false,
     position: '',
-    skillRating: 5,
+    skillLevel: '',
     jerseyNumber: '',
     notes: ''
   });
@@ -412,15 +412,15 @@ export default function LeagueManagement() {
     },
   });
 
-  const skillRatingMutation = useMutation({
-    mutationFn: async ({ membershipId, skillRating }: { membershipId: string; skillRating: number }) => {
-      const response = await apiRequest('PATCH', `/api/league-memberships/${membershipId}/skill-rating`, {
-        skillRating,
+  const skillLevelMutation = useMutation({
+    mutationFn: async ({ membershipId, skillLevel }: { membershipId: string; skillLevel: string | null }) => {
+      const response = await apiRequest('PATCH', `/api/league-memberships/${membershipId}/skill-level`, {
+        skillLevel,
       });
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: 'Skill rating updated successfully' });
+      toast({ title: 'Skill level updated successfully' });
       refetchMembers();
     },
   });
@@ -1086,7 +1086,7 @@ export default function LeagueManagement() {
                           assignedTeamId: member.assignedTeamId || '',
                           isCaptain: member.isCaptain || false,
                           position: member.position || '',
-                          skillRating: member.skillRating || 5,
+                          skillLevel: member.skillLevel || '',
                           jerseyNumber: member.jerseyNumber?.toString() || '',
                           notes: member.notes || ''
                         });
@@ -1108,25 +1108,14 @@ export default function LeagueManagement() {
                         )}
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-warning" />
-                          <select
-                            value={member.skillRating || 5}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              skillRatingMutation.mutate({ 
-                                membershipId: member.id, 
-                                skillRating: parseInt(e.target.value) 
-                              });
-                            }}
-                            className="bg-background border border-border rounded px-2 py-1 text-sm"
-                            data-testid={`skill-rating-${member.user.id}`}
-                          >
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(rating => (
-                              <option key={rating} value={rating}>{rating}</option>
-                            ))}
-                          </select>
-                        </div>
+                        {member.skillLevel && (
+                          <div className="flex items-center gap-1">
+                            <Star className="w-4 h-4 text-warning" />
+                            <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">
+                              {member.skillLevel}
+                            </span>
+                          </div>
+                        )}
                         <Edit3 className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </div>

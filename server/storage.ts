@@ -491,10 +491,10 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => ({ ...r.league_memberships, user: r.users }));
   }
 
-  async updatePlayerSkillRating(membershipId: string, skillRating: number): Promise<LeagueMembership> {
+  async updatePlayerSkillLevel(membershipId: string, skillLevel: string | null): Promise<LeagueMembership> {
     const [membership] = await db
       .update(leagueMemberships)
-      .set({ skillRating })
+      .set({ skillLevel })
       .where(eq(leagueMemberships.id, membershipId))
       .returning();
     return membership;

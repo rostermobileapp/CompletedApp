@@ -1059,8 +1059,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'position': 'position',
             'jersey number': 'jerseyNumber',
             'jersey': 'jerseyNumber',
-            'skill rating': 'skillRating',
-            'rating': 'skillRating',
+            'skill rating': 'skillLevel',
+            'skill level': 'skillLevel',
+            'rating': 'skillLevel',
             'notes': 'notes'
           };
           return mapping[normalized] || header;
@@ -1116,16 +1117,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phoneNumber: row.phoneNumber?.trim() || null,
           position: row.position?.trim() || null,
           jerseyNumber: row.jerseyNumber ? parseInt(row.jerseyNumber) : null,
-          skillRating: row.skillRating ? parseInt(row.skillRating) : 5,
+          skillLevel: row.skillLevel?.trim() || null,
           teamName: row.teamName?.trim() || null,
           teamId: null as string | null,
           notes: row.notes?.trim() || null
         };
 
-        // Validate skill rating
-        if (player.skillRating < 1 || player.skillRating > 10) {
-          player.skillRating = 5;
-        }
+        // Keep skill level as provided (no validation since it can be text)
 
         // Try to match team name to existing team
         if (player.teamName) {
@@ -1199,7 +1197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               leagueId: leagueId,
               assignedTeamId: player.teamId,
               status: 'approved',
-              skillRating: player.skillRating,
+              skillLevel: player.skillLevel,
               position: player.position,
               jerseyNumber: player.jerseyNumber,
               notes: player.notes,
