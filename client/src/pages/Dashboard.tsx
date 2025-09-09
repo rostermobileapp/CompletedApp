@@ -60,7 +60,7 @@ function CommissionerToDo({ leagueId, onNavigate }: {
     // Debug - show what we found
     return (
       <div className="px-6 mb-4">
-        <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-3 text-sm">
+        <div className="border border-yellow-400 rounded-lg p-3 text-sm bg-[#ef444480]">
           <p>CommissionerToDo Debug: Found {gamesNeedingVerification?.length || 0} games needing verification</p>
         </div>
       </div>
