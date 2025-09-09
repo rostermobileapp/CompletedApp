@@ -108,7 +108,15 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
           let reason = '';
           let submissionDetails = submissions;
           
-          if (submissionCount === 0) {
+          // Check if there's a commissioner submission - if so, no verification needed
+          const hasCommissionerSubmission = submissions.some(sub => 
+            sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
+          );
+          
+          if (hasCommissionerSubmission) {
+            // Commissioner has already submitted final score - no verification needed
+            needsVerification = false;
+          } else if (submissionCount === 0) {
             // No score submissions - needs verification
             needsVerification = true;
             reason = 'No score submissions';
