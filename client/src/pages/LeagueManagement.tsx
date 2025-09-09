@@ -165,6 +165,11 @@ export default function LeagueManagement() {
   const [showMergeRequests, setShowMergeRequests] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   
+  // Schedule import state  
+  const [showScheduleImport, setShowScheduleImport] = useState(false);
+  const [scheduleImportFile, setScheduleImportFile] = useState<File | null>(null);
+  const scheduleFileInputRef = React.useRef<HTMLInputElement>(null);
+  
   // Merge modal state
   const [selectedMember, setSelectedMember] = useState<LeagueMember | null>(null);
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -490,6 +495,58 @@ export default function LeagueManagement() {
   const handleFileUpload = () => {
     if (!importFile) return;
     uploadMutation.mutate(importFile);
+  };
+
+  // Upload mutation for bulk schedule import
+  const scheduleUploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('scheduleFile', file);
+
+      const response = await fetch(`/api/leagues/${leagueId}/schedules/import`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Schedule upload failed');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const successMessage = [
+        `${data.successfulRecords} games scheduled successfully`,
+        data.teamsCreated > 0 ? `${data.teamsCreated} teams created` : null,
+        data.failedRecords > 0 ? `${data.failedRecords} failed` : null
+      ].filter(Boolean).join(', ');
+      
+      toast({
+        title: 'Schedule Import Successful',
+        description: successMessage,
+      });
+      setScheduleImportFile(null);
+      if (scheduleFileInputRef.current) scheduleFileInputRef.current.value = '';
+      setShowScheduleImport(false);
+      
+      // Refetch games to show newly imported schedules
+      refetchGames();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Schedule Import Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Handle schedule file upload
+  const handleScheduleFileUpload = () => {
+    if (!scheduleImportFile) return;
+    scheduleUploadMutation.mutate(scheduleImportFile);
   };
 
   const removeFromLeagueMutation = useMutation({
@@ -1365,15 +1422,25 @@ export default function LeagueManagement() {
                   <Calendar className="w-5 h-5 text-primary" />
                   <h3 className="text-lg font-semibold">Game Schedule</h3>
                 </div>
-                <button
-                  onClick={() => setShowScheduleGame(!showScheduleGame)}
-                  disabled={teams.length < 2}
-                  className="flex items-center gap-2 px-4 py-2 bg-warning text-black rounded-lg text-sm font-medium disabled:opacity-50"
-                  data-testid="button-schedule-game"
-                >
-                  <Plus className="w-4 h-4" />
-                  Schedule Game
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowScheduleImport(!showScheduleImport)}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+                    data-testid="button-import-schedules"
+                  >
+                    <Upload className="w-3 h-3" />
+                    Import Schedules
+                  </button>
+                  <button
+                    onClick={() => setShowScheduleGame(!showScheduleGame)}
+                    disabled={teams.length < 2}
+                    className="flex items-center gap-2 px-4 py-2 bg-warning text-black rounded-lg text-sm font-medium disabled:opacity-50"
+                    data-testid="button-schedule-game"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Schedule Game
+                  </button>
+                </div>
               </div>
 
               {teams.length < 2 && (
@@ -1453,6 +1520,67 @@ export default function LeagueManagement() {
                       </button>
                     </div>
                   </form>
+                </div>
+              )}
+
+              {/* Schedule Import Panel */}
+              {showScheduleImport && (
+                <div className="mb-6 p-4 bg-card rounded-lg border border-border">
+                  <div className="flex flex-col gap-3">
+                    <div
+                      className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => scheduleFileInputRef.current?.click()}
+                      data-testid="schedule-file-drop-zone"
+                    >
+                      <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      {scheduleImportFile ? (
+                        <div>
+                          <p className="font-medium text-green-600 text-sm">{scheduleImportFile.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(scheduleImportFile.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="font-medium text-sm mb-1">Select CSV file</p>
+                          <p className="text-xs text-muted-foreground">
+                            Format: Date, Time, Home Team, Away Team, Home Team Locker Room (optional), Away Team Locker Room (optional)
+                          </p>
+                        </div>
+                      )}
+                      <input
+                        ref={scheduleFileInputRef}
+                        type="file"
+                        accept=".csv"
+                        onChange={(e) => setScheduleImportFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                        data-testid="schedule-file-input"
+                      />
+                    </div>
+
+                    {scheduleImportFile && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleScheduleFileUpload}
+                          disabled={scheduleUploadMutation.isPending}
+                          className="flex-1 bg-green-500 text-white px-3 py-1.5 rounded-md hover:bg-green-600 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          data-testid="button-upload-schedule-file"
+                        >
+                          {scheduleUploadMutation.isPending ? 'Processing...' : 'Upload'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setScheduleImportFile(null);
+                            if (scheduleFileInputRef.current) scheduleFileInputRef.current.value = '';
+                          }}
+                          className="px-3 py-1.5 bg-muted text-muted-foreground rounded-md hover:bg-muted/80 text-sm font-medium"
+                          data-testid="button-clear-schedule-file"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
