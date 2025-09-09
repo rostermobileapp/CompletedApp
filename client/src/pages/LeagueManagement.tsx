@@ -69,7 +69,10 @@ type LeagueMember = {
 
 // Commissioner To-Do Component for Score Verification
 function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
-  // Fetch games that need score verification
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch games that need score verification using correct business logic
   const { data: gamesNeedingVerification = [], isLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
     queryFn: async () => {
@@ -78,21 +81,56 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
       
       if (!Array.isArray(allGames)) return [];
       
-      // Find games that have score submissions but are not yet completed
+      // Find games that need commissioner verification based on the correct business logic:
+      // 1. Today's date is AFTER the game's date (past games)
+      // 2. Game has problematic score submissions (0, 1, or 2 mismatched)
       const gamesNeedingVerification = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
       
       for (const game of allGames) {
-        if (game.isCompleted) continue; // Skip already completed games
+        const gameDate = new Date(game.scheduledAt);
+        gameDate.setHours(0, 0, 0, 0); // Start of game date
+        
+        // Only check games from past dates
+        if (gameDate >= today) {
+          continue; // Skip future games
+        }
         
         try {
           const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
           const submissions = await submissionsResponse.json();
           
-          // Include games that have at least one score submission
-          if (Array.isArray(submissions) && submissions.length > 0) {
+          if (!Array.isArray(submissions)) continue;
+          
+          const submissionCount = submissions.length;
+          let needsVerification = false;
+          let reason = '';
+          let submissionDetails = submissions;
+          
+          if (submissionCount === 0) {
+            // No score submissions - needs verification
+            needsVerification = true;
+            reason = 'No score submissions';
+          } else if (submissionCount === 1) {
+            // Only one team submitted - needs verification
+            needsVerification = true;
+            reason = 'Missing one team submission';
+          } else if (submissionCount === 2) {
+            // Two submissions - check if they match
+            const [sub1, sub2] = submissions;
+            if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
+              needsVerification = true;
+              reason = `Mismatched scores`;
+            }
+          }
+          
+          if (needsVerification) {
             gamesNeedingVerification.push({
               ...game,
-              submissions: submissions.length
+              submissionCount,
+              reason,
+              submissions: submissionDetails
             });
           }
         } catch (error) {
@@ -101,11 +139,137 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
         }
       }
       
-      console.log('Games needing verification:', gamesNeedingVerification.length);
       return gamesNeedingVerification;
     },
     enabled: !!leagueId,
   });
+
+  // Mutation to submit/update score for a game
+  const submitScoreMutation = useMutation({
+    mutationFn: async ({ gameId, homeScore, awayScore }: { gameId: string; homeScore: number; awayScore: number }) => {
+      const response = await apiRequest('POST', `/api/games/${gameId}/score`, {
+        homeScore,
+        awayScore,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Score submitted",
+        description: "Game score has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games-needing-verification'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games'] });
+    },
+    onError: (error) => {
+      console.error('Error submitting score:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit score. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Component to handle individual score submission
+  const ScoreSubmissionCard = ({ game }: { game: any }) => {
+    const [homeScore, setHomeScore] = useState('');
+    const [awayScore, setAwayScore] = useState('');
+
+    const handleSubmitScore = () => {
+      const home = parseInt(homeScore);
+      const away = parseInt(awayScore);
+      
+      if (isNaN(home) || isNaN(away) || home < 0 || away < 0) {
+        toast({
+          title: "Invalid Score",
+          description: "Please enter valid scores (numbers only).",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      submitScoreMutation.mutate({ gameId: game.id, homeScore: home, awayScore: away });
+    };
+
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-700 rounded-lg p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              {game.homeTeam?.name} vs {game.awayTeam?.name}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              {format(new Date(game.scheduledAt), 'MMM d, yyyy • h:mm a')}
+            </p>
+            <div className="flex items-center gap-1 mt-1">
+              <AlertTriangle className="w-4 h-4 text-red-500" />
+              <span className="text-sm text-red-600 dark:text-red-400">{game.reason}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Show existing submissions if any */}
+        {game.submissions && game.submissions.length > 0 && (
+          <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Current Submissions:</h4>
+            {game.submissions.map((sub: any, index: number) => (
+              <div key={index} className="text-sm text-gray-700 dark:text-gray-300">
+                Submission {index + 1}: {game.homeTeam?.name} {sub.homeScore} - {sub.awayScore} {game.awayTeam?.name}
+                {sub.submittedBy && <span className="text-xs text-gray-500 ml-2">(by Team {sub.submittedBy})</span>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Score submission form */}
+        <div className="grid grid-cols-3 gap-3 items-center">
+          <div className="text-center">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {game.homeTeam?.name}
+            </label>
+            <Input
+              type="number"
+              min="0"
+              value={homeScore}
+              onChange={(e) => setHomeScore(e.target.value)}
+              className="text-center"
+              placeholder="0"
+              data-testid={`input-home-score-${game.id}`}
+            />
+          </div>
+          
+          <div className="text-center text-lg font-bold text-gray-500">
+            -
+          </div>
+          
+          <div className="text-center">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {game.awayTeam?.name}
+            </label>
+            <Input
+              type="number"
+              min="0"
+              value={awayScore}
+              onChange={(e) => setAwayScore(e.target.value)}
+              className="text-center"
+              placeholder="0"
+              data-testid={`input-away-score-${game.id}`}
+            />
+          </div>
+        </div>
+        
+        <Button
+          onClick={handleSubmitScore}
+          disabled={submitScoreMutation.isPending || !homeScore || !awayScore}
+          className="w-full mt-3"
+          data-testid={`button-submit-score-${game.id}`}
+        >
+          {submitScoreMutation.isPending ? "Submitting..." : "Submit Final Score"}
+        </Button>
+      </div>
+    );
+  };
 
   // Show loading state
   if (isLoading) {
@@ -122,47 +286,32 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
   }
 
   if (!Array.isArray(gamesNeedingVerification) || gamesNeedingVerification.length === 0) {
-    return null;
+    return (
+      <div className="mb-4">
+        <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <span className="text-sm text-green-600 dark:text-green-300">All games are up to date - no verification needed!</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="mb-4">
-      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <h2 className="text-lg font-semibold text-blue-600 dark:text-blue-300">Score Verification Needed</h2>
-          <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">{gamesNeedingVerification.length}</span>
-          </div>
+    <div className="mb-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Target className="w-5 h-5 text-red-600" />
+        <h2 className="text-xl font-bold text-red-600">Score Verification Needed</h2>
+        <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+          <span className="text-white text-xs font-bold">{gamesNeedingVerification.length}</span>
         </div>
-        
-        <div className="space-y-2">
-          {gamesNeedingVerification.slice(0, 5).map((game: any) => (
-            <div 
-              key={game.id}
-              className="bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-lg p-3 flex items-center justify-between hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
-              data-testid={`score-verification-${game.id}`}
-            >
-              <div className="flex items-center gap-3">
-                <AlertIcon className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {game.homeTeam?.name} vs {game.awayTeam?.name}
-                  </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-300">
-                    {format(new Date(game.scheduledAt), 'MMM d • h:mm a')} • {game.submissions} submission{game.submissions === 1 ? '' : 's'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-          
-          {gamesNeedingVerification.length > 5 && (
-            <p className="text-center text-sm text-blue-600 dark:text-blue-300 font-medium">
-              +{gamesNeedingVerification.length - 5} more games need verification
-            </p>
-          )}
-        </div>
+      </div>
+      
+      <div className="space-y-4">
+        {gamesNeedingVerification.map((game: any) => (
+          <ScoreSubmissionCard key={game.id} game={game} />
+        ))}
       </div>
     </div>
   );

@@ -81,10 +81,6 @@ function CommissionerToDo({ leagueId, onNavigate }: {
               needsVerification = true;
               reason = `Mismatched scores: ${sub1.homeScore}-${sub1.awayScore} vs ${sub2.homeScore}-${sub2.awayScore}`;
             }
-          } else if (submissionCount > 2) {
-            // More than 2 submissions - definitely needs verification
-            needsVerification = true;
-            reason = `${submissionCount} submissions (too many)`;
           }
           
           if (needsVerification) {
@@ -112,26 +108,7 @@ function CommissionerToDo({ leagueId, onNavigate }: {
   });
 
   if (!Array.isArray(gamesNeedingVerification) || gamesNeedingVerification.length === 0) {
-    // Debug - show what we found
-    const debugInfo = (window as any).commissionerDebug;
-    return (
-      <div className="px-6 mb-4">
-        <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-3 text-sm">
-          <p>CommissionerToDo Debug (NEW LOGIC):</p>
-          <p>• Total games: {debugInfo?.totalGames || 0}</p>
-          <p>• Past games: {debugInfo?.pastGames || 0}</p>
-          <p>• Games needing verification: {debugInfo?.gamesNeedingVerification || 0}</p>
-          {debugInfo?.problemGames?.length > 0 && (
-            <div>
-              <p>Problem games details:</p>
-              {debugInfo.problemGames.map((game: any, i: number) => (
-                <p key={i}>- {game.homeTeam} vs {game.awayTeam} on {new Date(game.date).toLocaleDateString()} ({game.reason})</p>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
