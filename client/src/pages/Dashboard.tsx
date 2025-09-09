@@ -608,6 +608,16 @@ export default function Dashboard() {
         />
       )}
       
+      {/* Debug info - remove later */}
+      {tier === 'commissioner' && (
+        <div className="px-6 mb-4">
+          <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-3 text-sm">
+            <p>Debug: tier={tier}, selectedLeagueId={selectedLeagueId}</p>
+            <p>Condition result: {String(tier === 'commissioner' && selectedLeagueId)}</p>
+          </div>
+        </div>
+      )}
+      
       {/* Upcoming Games */}
       <div className="px-6 mb-6">
         <div className="flex items-center justify-between mb-4">
