@@ -698,6 +698,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Game Score Submission Routes
+  app.post("/api/games/:gameId/submit-score", isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const { homeScore, awayScore } = req.body;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get the game to validate it exists and get team info
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      // Check if the game started more than 1 hour ago
+      const gameStartTime = new Date(game.scheduledAt).getTime();
+      const oneHourAfterStart = gameStartTime + (60 * 60 * 1000); // 1 hour in milliseconds
+      const now = Date.now();
+      
+      if (now < oneHourAfterStart) {
+        return res.status(400).json({ message: "Score submission not available until 1 hour after game start" });
+      }
+
+      // Determine the user's role in this game
+      let submitterRole = '';
+      
+      // Check if user is commissioner
+      const league = await storage.getLeague(game.leagueId);
+      if (league && league.commissionerId === userId) {
+        submitterRole = 'commissioner';
+      } else {
+        // Check if user is captain of home team
+        const homeTeamMemberships = await storage.getTeamMemberships(game.homeTeamId);
+        const homeTeamCaptain = homeTeamMemberships.find(m => m.userId === userId && m.isCaptain);
+        
+        if (homeTeamCaptain) {
+          submitterRole = 'home_captain';
+        } else {
+          // Check if user is captain of away team
+          const awayTeamMemberships = await storage.getTeamMemberships(game.awayTeamId);
+          const awayTeamCaptain = awayTeamMemberships.find(m => m.userId === userId && m.isCaptain);
+          
+          if (awayTeamCaptain) {
+            submitterRole = 'away_captain';
+          }
+        }
+      }
+
+      if (!submitterRole) {
+        return res.status(403).json({ message: "You must be a team captain or commissioner to submit scores" });
+      }
+
+      // Create the score submission
+      const submission = await storage.submitGameScore({
+        gameId,
+        submittedBy: userId,
+        submitterRole,
+        homeScore: parseInt(homeScore),
+        awayScore: parseInt(awayScore),
+        isCommissionerOverride: submitterRole === 'commissioner'
+      });
+
+      // If it's a commissioner submission, update the game score immediately
+      if (submitterRole === 'commissioner') {
+        await storage.updateGameScore(gameId, parseInt(homeScore), parseInt(awayScore));
+        res.json({ 
+          submission, 
+          gameUpdated: true, 
+          message: "Commissioner score submitted and game updated" 
+        });
+      } else {
+        // Check if both captains have submitted matching scores
+        const matchResult = await storage.checkForMatchingCaptainScores(gameId);
+        
+        if (matchResult.isMatch && matchResult.homeScore !== undefined && matchResult.awayScore !== undefined) {
+          // Update the game score automatically
+          await storage.updateGameScore(gameId, matchResult.homeScore, matchResult.awayScore);
+          res.json({ 
+            submission, 
+            gameUpdated: true, 
+            message: "Captain scores match - game score updated automatically" 
+          });
+        } else {
+          res.json({ 
+            submission, 
+            gameUpdated: false, 
+            message: "Score submitted - waiting for other captain or commissioner" 
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error submitting game score:", error);
+      res.status(500).json({ message: "Failed to submit score" });
+    }
+  });
+
+  app.get("/api/games/:gameId/score-submissions", isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get the game to validate access
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      // Check if user has permission to view submissions (captain or commissioner)
+      const league = await storage.getLeague(game.leagueId);
+      const isCommissioner = league && league.commissionerId === userId;
+      
+      const homeTeamMemberships = await storage.getTeamMemberships(game.homeTeamId);
+      const awayTeamMemberships = await storage.getTeamMemberships(game.awayTeamId);
+      const isHomeCaptain = homeTeamMemberships.some(m => m.userId === userId && m.isCaptain);
+      const isAwayCaptain = awayTeamMemberships.some(m => m.userId === userId && m.isCaptain);
+
+      if (!isCommissioner && !isHomeCaptain && !isAwayCaptain) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const submissions = await storage.getGameScoreSubmissions(gameId);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching score submissions:", error);
+      res.status(500).json({ message: "Failed to fetch score submissions" });
+    }
+  });
+
   // Delete team
   app.delete("/api/teams/:teamId", isAuthenticated, async (req: any, res) => {
     try {

@@ -6,6 +6,7 @@ import {
   leagueMemberships,
   teamMemberships,
   games,
+  gameScoreSubmissions,
   gameAttendance,
   messages,
   playerImports,
@@ -27,6 +28,8 @@ import {
   type InsertTeamMembership,
   type Game,
   type InsertGame,
+  type GameScoreSubmission,
+  type InsertGameScoreSubmission,
   type Message,
   type InsertMessage,
   type PlayerImport,
@@ -1377,6 +1380,101 @@ export class DatabaseStorage implements IStorage {
       console.error(`Error deleting team ${teamId}:`, error);
       throw error;
     }
+  }
+
+  // Game score submissions
+  async submitGameScore(submission: InsertGameScoreSubmission): Promise<GameScoreSubmission> {
+    const [newSubmission] = await db
+      .insert(gameScoreSubmissions)
+      .values(submission)
+      .returning();
+    return newSubmission;
+  }
+
+  async getGameScoreSubmissions(gameId: string): Promise<GameScoreSubmission[]> {
+    return await db
+      .select()
+      .from(gameScoreSubmissions)
+      .where(eq(gameScoreSubmissions.gameId, gameId))
+      .orderBy(asc(gameScoreSubmissions.submittedAt));
+  }
+
+  async getCaptainScoreSubmissions(gameId: string): Promise<GameScoreSubmission[]> {
+    return await db
+      .select()
+      .from(gameScoreSubmissions)
+      .where(
+        and(
+          eq(gameScoreSubmissions.gameId, gameId),
+          or(
+            eq(gameScoreSubmissions.submitterRole, 'home_captain'),
+            eq(gameScoreSubmissions.submitterRole, 'away_captain')
+          )
+        )
+      )
+      .orderBy(asc(gameScoreSubmissions.submittedAt));
+  }
+
+  async getCommissionerScoreSubmission(gameId: string): Promise<GameScoreSubmission | undefined> {
+    const [submission] = await db
+      .select()
+      .from(gameScoreSubmissions)
+      .where(
+        and(
+          eq(gameScoreSubmissions.gameId, gameId),
+          eq(gameScoreSubmissions.submitterRole, 'commissioner')
+        )
+      )
+      .orderBy(desc(gameScoreSubmissions.submittedAt))
+      .limit(1);
+    return submission;
+  }
+
+  async updateGameScore(gameId: string, homeScore: number, awayScore: number): Promise<Game> {
+    const [updatedGame] = await db
+      .update(games)
+      .set({ 
+        homeScore, 
+        awayScore, 
+        isCompleted: true 
+      })
+      .where(eq(games.id, gameId))
+      .returning();
+    return updatedGame;
+  }
+
+  async checkForMatchingCaptainScores(gameId: string): Promise<{
+    isMatch: boolean;
+    homeScore?: number;
+    awayScore?: number;
+  }> {
+    const captainSubmissions = await this.getCaptainScoreSubmissions(gameId);
+    
+    if (captainSubmissions.length < 2) {
+      return { isMatch: false };
+    }
+
+    // Get the latest submission from each captain
+    const homeSubmission = captainSubmissions
+      .filter(s => s.submitterRole === 'home_captain')
+      .pop();
+    const awaySubmission = captainSubmissions
+      .filter(s => s.submitterRole === 'away_captain')
+      .pop();
+
+    if (!homeSubmission || !awaySubmission) {
+      return { isMatch: false };
+    }
+
+    const isMatch = 
+      homeSubmission.homeScore === awaySubmission.homeScore &&
+      homeSubmission.awayScore === awaySubmission.awayScore;
+
+    return {
+      isMatch,
+      homeScore: isMatch ? homeSubmission.homeScore : undefined,
+      awayScore: isMatch ? homeSubmission.awayScore : undefined,
+    };
   }
 }
 
