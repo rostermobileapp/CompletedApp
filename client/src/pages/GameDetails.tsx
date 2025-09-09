@@ -420,14 +420,7 @@ export default function GameDetails() {
             </div>
           ) : (
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-muted w-10 h-10 rounded-lg flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="font-medium text-muted-foreground" data-testid="text-status-pending">Status Pending</p>
-                </div>
-              </div>
+              
               <div className="flex gap-2">
                 <Button
                   variant="outline"
