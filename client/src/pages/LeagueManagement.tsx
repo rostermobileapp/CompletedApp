@@ -2585,14 +2585,14 @@ export default function LeagueManagement() {
                           {showTimePicker && (
                             <div 
                               ref={timePickerRef}
-                              className="absolute z-50 mt-1 bg-white dark:bg-card border border-border rounded-lg shadow-lg min-w-[300px]"
+                              className="absolute z-50 mt-1 bg-background border border-border rounded-lg shadow-lg min-w-[300px]"
                             >
                               <div className="p-6">
                                 <div className="flex items-start justify-center gap-8">
                                   {/* Hours */}
                                   <div className="flex flex-col items-center">
                                     <div className="text-base font-semibold mb-3 text-foreground">Hour</div>
-                                    <div className="h-40 w-16 overflow-y-auto border-2 border-border rounded-xl bg-background/50 scrollbar-thin">
+                                    <div className="h-40 w-16 overflow-y-auto border-2 border-border rounded-xl bg-card scrollbar-thin">
                                       {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
                                         <button
                                           key={hour}
@@ -2633,7 +2633,7 @@ export default function LeagueManagement() {
                                   {/* Minutes */}
                                   <div className="flex flex-col items-center">
                                     <div className="text-base font-semibold mb-3 text-foreground">Minutes</div>
-                                    <div className="h-40 w-16 overflow-y-auto border-2 border-border rounded-xl bg-background/50 scrollbar-thin">
+                                    <div className="h-40 w-16 overflow-y-auto border-2 border-border rounded-xl bg-card scrollbar-thin">
                                       {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
                                         <button
                                           key={minute}
