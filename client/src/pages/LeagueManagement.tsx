@@ -36,7 +36,8 @@ import {
   Download,
   Merge,
   Trash2,
-  Edit
+  Edit,
+  List
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
 import { Button } from '@/components/ui/button';
@@ -142,6 +143,138 @@ const createSeasonSchema = z.object({
 
 type CreateSeasonForm = z.infer<typeof createSeasonSchema>;
 
+// Games Calendar Component
+function GamesCalendar({ games, teams, onGameClick }: {
+  games: any[];
+  teams: any[];
+  onGameClick: (game: any) => void;
+}) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Group games by date
+  const gamesByDate = React.useMemo(() => {
+    const grouped: { [key: string]: any[] } = {};
+    games.forEach(game => {
+      const dateKey = new Date(game.scheduledAt).toDateString();
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(game);
+    });
+    return grouped;
+  }, [games]);
+
+  // Get calendar days for current month
+  const getCalendarDays = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+    
+    const days = [];
+    const endDate = new Date(lastDay);
+    endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
+    
+    for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
+      days.push(new Date(date));
+    }
+    return days;
+  };
+
+  const calendarDays = getCalendarDays();
+  const currentMonth = currentDate.getMonth();
+
+  return (
+    <div className="bg-background rounded-lg border p-4">
+      {/* Calendar Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-semibold">
+          {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+        </h3>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
+            data-testid="button-prev-month"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setCurrentDate(new Date())}
+            className="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            data-testid="button-today"
+          >
+            Today
+          </button>
+          <button
+            onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
+            data-testid="button-next-month"
+          >
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Calendar Grid */}
+      <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+        {/* Day Headers */}
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          <div key={day} className="bg-muted p-3 text-center text-sm font-medium text-muted-foreground">
+            {day}
+          </div>
+        ))}
+        
+        {/* Calendar Days */}
+        {calendarDays.map((date, index) => {
+          const dateKey = date.toDateString();
+          const dayGames = gamesByDate[dateKey] || [];
+          const isCurrentMonth = date.getMonth() === currentMonth;
+          const isToday = date.toDateString() === new Date().toDateString();
+          
+          return (
+            <div
+              key={index}
+              className={`bg-background p-2 min-h-[100px] ${
+                !isCurrentMonth ? 'opacity-40' : ''
+              } ${isToday ? 'bg-primary/5 border-2 border-primary/20' : ''}`}
+            >
+              <div className={`text-sm font-medium mb-1 ${isToday ? 'text-primary' : ''}`}>
+                {date.getDate()}
+              </div>
+              <div className="space-y-1">
+                {dayGames.map(game => {
+                  const homeTeam = teams.find(t => t.id === game.homeTeamId);
+                  const awayTeam = teams.find(t => t.id === game.awayTeamId);
+                  const gameTime = new Date(game.scheduledAt);
+                  
+                  return (
+                    <div
+                      key={game.id}
+                      onClick={() => onGameClick(game)}
+                      className="bg-blue-100 text-blue-800 p-1 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                      data-testid={`calendar-game-${game.id}`}
+                    >
+                      <div className="font-medium truncate">
+                        {homeTeam?.name || 'Team'} vs {awayTeam?.name || 'Team'}
+                      </div>
+                      <div className="text-blue-600">
+                        {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function LeagueManagement() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -182,6 +315,9 @@ export default function LeagueManagement() {
   const [teamToDelete, setTeamToDelete] = useState<string | null>(null);
   const [showEditTeam, setShowEditTeam] = useState(false);
   const [selectedTeamForEdit, setSelectedTeamForEdit] = useState<Team | null>(null);
+  
+  // Games view state
+  const [gamesViewMode, setGamesViewMode] = useState<'calendar' | 'list'>('calendar');
 
   // Close date picker when clicking outside
   React.useEffect(() => {
@@ -293,7 +429,7 @@ export default function LeagueManagement() {
   });
 
   // Fetch games
-  const { data: games = [], refetch: refetchGames } = useQuery({
+  const { data: gamesData = [], refetch: refetchGames } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games'],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
@@ -301,6 +437,15 @@ export default function LeagueManagement() {
     },
     enabled: !!leagueId,
   });
+
+  // Sort games chronologically (earliest first)
+  const games = React.useMemo(() => {
+    return [...gamesData].sort((a, b) => {
+      const dateA = new Date(a.scheduledAt);
+      const dateB = new Date(b.scheduledAt);
+      return dateA.getTime() - dateB.getTime();
+    });
+  }, [gamesData]);
 
   // Form for creating teams
   const teamForm = useForm<CreateTeamForm>({
@@ -1423,6 +1568,32 @@ export default function LeagueManagement() {
                   <h3 className="text-lg font-semibold">Game Schedule</h3>
                 </div>
                 <div className="flex gap-2">
+                  <div className="flex bg-muted rounded-lg p-1">
+                    <button
+                      onClick={() => setGamesViewMode('calendar')}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                        gamesViewMode === 'calendar'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                      data-testid="button-calendar-view"
+                    >
+                      <Calendar className="w-3 h-3" />
+                      Calendar
+                    </button>
+                    <button
+                      onClick={() => setGamesViewMode('list')}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                        gamesViewMode === 'list'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                      data-testid="button-list-view"
+                    >
+                      <List className="w-3 h-3" />
+                      List
+                    </button>
+                  </div>
                   <button
                     onClick={() => setShowScheduleImport(!showScheduleImport)}
                     className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
@@ -1584,11 +1755,16 @@ export default function LeagueManagement() {
                 </div>
               )}
 
-              {/* Games List */}
+              {/* Games Display */}
               {games.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
                   No games scheduled yet. Create your first game above.
                 </p>
+              ) : gamesViewMode === 'calendar' ? (
+                <GamesCalendar games={games} teams={teams} onGameClick={(game) => {
+                  setSelectedGame(game);
+                  setShowEditGame(true);
+                }} />
               ) : (
                 <div className="space-y-3">
                   {games.map((game: any) => {
