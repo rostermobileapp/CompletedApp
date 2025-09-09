@@ -519,7 +519,7 @@ export default function Dashboard() {
       {/* Upcoming Games */}
       <div className="px-6 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold" data-testid="text-upcoming-games-title">Upcoming Games</h2>
+          <h2 className="text-lg font-semibold" data-testid="text-schedule-title">Schedule</h2>
           <button 
             onClick={() => navigate('/calendar')}
             className="text-primary text-sm"
