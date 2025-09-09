@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { ReactNode, useState, useEffect, useRef } from 'react';
+import { ReactNode, useRef } from 'react';
 import { useLocation } from 'wouter';
 
 interface PageTransitionProps {
@@ -25,39 +25,34 @@ const isBottomNavPage = (path: string): boolean => {
 
 // Simple global state for animation direction
 let globalAnimationDirection: 'left' | 'right' | 'up' | 'down' | null = null;
+let hasNavigated = false;
 
 export const setPageTransitionDirection = (direction: 'left' | 'right' | 'up' | 'down') => {
   globalAnimationDirection = direction;
+  hasNavigated = true;
 };
 
 export function PageTransition({ children }: PageTransitionProps) {
   const [location] = useLocation();
   const previousPageIndexRef = useRef<number | null>(null);
-  const previousLocationRef = useRef<string | null>(null);
   
   const currentPageIndex = getPageIndex(location);
   const isBottomNav = isBottomNavPage(location);
   
-  // Determine animation direction
-  let direction: 'left' | 'right' | 'up' | 'down' = 'right';
-  let shouldAnimate = false;
+  // Determine animation direction - only animate on explicit navigation
+  let direction: 'left' | 'right' | 'up' | 'down' = 'left';
   
   if (globalAnimationDirection) {
     direction = globalAnimationDirection;
-    shouldAnimate = true;
     globalAnimationDirection = null; // Reset after use
-  } else if (isBottomNav && previousPageIndexRef.current !== null && previousLocationRef.current !== null) {
+  } else if (isBottomNav && hasNavigated && previousPageIndexRef.current !== null) {
     direction = currentPageIndex > previousPageIndexRef.current ? 'left' : 'right';
-    shouldAnimate = true;
   }
   
-  // Update previous page index and location
-  useEffect(() => {
-    if (isBottomNav) {
-      previousPageIndexRef.current = currentPageIndex;
-    }
-    previousLocationRef.current = location;
-  }, [currentPageIndex, isBottomNav, location]);
+  // Update previous page index
+  if (isBottomNav) {
+    previousPageIndexRef.current = currentPageIndex;
+  }
   
   const variants = {
     initial: (direction: string) => {
@@ -96,10 +91,10 @@ export function PageTransition({ children }: PageTransitionProps) {
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
-        key={location}
+        key={`${location}-${hasNavigated}`}
         custom={direction}
         variants={variants}
-        initial={shouldAnimate ? "initial" : "animate"}
+        initial={hasNavigated ? "initial" : false}
         animate="animate"
         exit="exit"
         transition={{
