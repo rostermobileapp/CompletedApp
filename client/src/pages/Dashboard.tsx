@@ -57,7 +57,14 @@ function CommissionerToDo({ leagueId, onNavigate }: {
   });
 
   if (!Array.isArray(gamesNeedingVerification) || gamesNeedingVerification.length === 0) {
-    return null;
+    // Debug - show what we found
+    return (
+      <div className="px-6 mb-4">
+        <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-3 text-sm">
+          <p>CommissionerToDo Debug: Found {gamesNeedingVerification?.length || 0} games needing verification</p>
+        </div>
+      </div>
+    );
   }
 
   return (
