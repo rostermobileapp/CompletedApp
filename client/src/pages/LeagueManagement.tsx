@@ -623,7 +623,7 @@ export default function LeagueManagement() {
   });
 
   // Get league ID and edit mode from URL params
-  const leagueId = new URLSearchParams(window.location.search).get('leagueId') || '';
+  const leagueId = new URLSearchParams(window.location.search).get('league') || '';
   const editMode = new URLSearchParams(window.location.search).get('edit') === 'true';
   
   // Fetch user's leagues for selection
