@@ -100,7 +100,7 @@ export function PageTransition({ children }: PageTransitionProps) {
         transition={{
           type: "tween",
           ease: [0.4, 0, 0.2, 1],
-          duration: 0.1,
+          duration: 0.3,
         }}
         className="absolute inset-0 w-full h-full bg-background"
       >
