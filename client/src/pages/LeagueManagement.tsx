@@ -1234,7 +1234,7 @@ export default function LeagueManagement() {
 
   if (!leagueId) {
     return (
-      <div className="min-h-screen flex flex-col pb-24" data-testid="league-selection-page">
+      <div className="min-h-screen flex flex-col pb-6" data-testid="league-selection-page">
         <div className="p-6 pt-12">
           <div className="flex items-center gap-4 mb-6">
             <button 
@@ -1309,7 +1309,7 @@ export default function LeagueManagement() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col pb-24" data-testid="league-management-page">
+    <div className="min-h-screen flex flex-col pb-6" data-testid="league-management-page">
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-4">

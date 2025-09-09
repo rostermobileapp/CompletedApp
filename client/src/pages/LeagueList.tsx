@@ -87,7 +87,7 @@ export default function LeagueList() {
               <div
                 key={league.id}
                 className="bg-card rounded-xl border border-border p-6 cursor-pointer hover:bg-card/80 transition-colors"
-                onClick={() => navigate(`/league-management?leagueId=${league.id}`)}
+                onClick={() => navigate(`/league-management?league=${league.id}`)}
                 data-testid={`league-card-${league.id}`}
               >
                 <div className="flex items-start justify-between mb-3">
@@ -111,7 +111,7 @@ export default function LeagueList() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/league-management?leagueId=${league.id}&edit=true`);
+                        navigate(`/league-management?league=${league.id}&edit=true`);
                       }}
                       className="text-sm text-primary hover:underline"
                       data-testid={`button-edit-league-${league.id}`}
