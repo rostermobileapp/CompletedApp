@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SubscriptionProvider } from "@/context/SubscriptionContext";
 import { BottomNavigation } from "@/components/BottomNavigation";
+import { PageTransition } from "@/components/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
@@ -46,23 +47,25 @@ function Router() {
 
   return (
     <SubscriptionProvider>
-      <div className="relative">
-        <Switch>
-          <Route path="/" component={Dashboard} />
-          <Route path="/league-search" component={LeagueSearch} />
-          <Route path="/teams" component={Teams} />
-          <Route path="/messages" component={Messages} />
-          <Route path="/more" component={More} />
-          <Route path="/profile" component={Profile} />
-          <Route path="/roster" component={Roster} />
-          <Route path="/subscription" component={Subscription} />
-          <Route path="/create-league" component={CreateLeague} />
-          <Route path="/league-management" component={LeagueManagement} />
-          <Route path="/league-list" component={LeagueList} />
-          <Route path="/calendar" component={Calendar} />
-          <Route path="/game/:id" component={GameDetails} />
-          <Route component={NotFound} />
-        </Switch>
+      <div className="relative min-h-screen overflow-hidden">
+        <PageTransition>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/league-search" component={LeagueSearch} />
+            <Route path="/teams" component={Teams} />
+            <Route path="/messages" component={Messages} />
+            <Route path="/more" component={More} />
+            <Route path="/profile" component={Profile} />
+            <Route path="/roster" component={Roster} />
+            <Route path="/subscription" component={Subscription} />
+            <Route path="/create-league" component={CreateLeague} />
+            <Route path="/league-management" component={LeagueManagement} />
+            <Route path="/league-list" component={LeagueList} />
+            <Route path="/calendar" component={Calendar} />
+            <Route path="/game/:id" component={GameDetails} />
+            <Route component={NotFound} />
+          </Switch>
+        </PageTransition>
         <BottomNavigation />
       </div>
     </SubscriptionProvider>
