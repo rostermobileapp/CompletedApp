@@ -147,7 +147,7 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
   // Mutation to submit/update score for a game
   const submitScoreMutation = useMutation({
     mutationFn: async ({ gameId, homeScore, awayScore }: { gameId: string; homeScore: number; awayScore: number }) => {
-      const response = await apiRequest('POST', `/api/games/${gameId}/score`, {
+      const response = await apiRequest('POST', `/api/games/${gameId}/submit-score`, {
         homeScore,
         awayScore,
       });
