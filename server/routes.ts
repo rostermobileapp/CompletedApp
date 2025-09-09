@@ -1323,6 +1323,267 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk schedule upload
+  app.post('/api/leagues/:leagueId/schedules/import', isAuthenticated, upload.single('scheduleFile'), async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+
+      // Check if user has commissioner access to this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can import schedules' });
+      }
+
+      // Read and parse the CSV file
+      const fileContent = fs.readFileSync(file.path, 'utf8');
+      const parseResults = Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header: string) => {
+          // Normalize header names
+          const normalized = header.toLowerCase().trim();
+          const mapping: Record<string, string> = {
+            'date': 'date',
+            'time': 'time',
+            'home team': 'homeTeam',
+            'home': 'homeTeam',
+            'away team': 'awayTeam',
+            'away': 'awayTeam',
+            'home team locker room': 'homeTeamLockerRoom',
+            'home locker room': 'homeTeamLockerRoom',
+            'away team locker room': 'awayTeamLockerRoom',
+            'away locker room': 'awayTeamLockerRoom',
+            'locker room': 'lockerRoom',
+            'venue': 'venue'
+          };
+          return mapping[normalized] || header;
+        }
+      });
+
+      if (parseResults.errors.length > 0) {
+        return res.status(400).json({ 
+          message: 'Error parsing CSV file', 
+          errors: parseResults.errors 
+        });
+      }
+
+      // Get existing teams in the league for team matching
+      const existingTeams = await storage.getTeamsByLeague(leagueId);
+      const teamLookup = new Map<string, string>(); // teamName -> teamId
+      
+      existingTeams.forEach(team => {
+        // Create case-insensitive lookup
+        teamLookup.set(team.name.toLowerCase().trim(), team.id);
+      });
+
+      // Process the parsed data
+      const validSchedules: any[] = [];
+      const errors: string[] = [];
+      const teamsToCreate: Set<string> = new Set();
+
+      parseResults.data.forEach((row: any, index: number) => {
+        // Required fields validation
+        if (!row.date) {
+          errors.push(`Row ${index + 1}: Date is required`);
+          return;
+        }
+        if (!row.time) {
+          errors.push(`Row ${index + 1}: Time is required`);
+          return;
+        }
+        if (!row.homeTeam) {
+          errors.push(`Row ${index + 1}: Home Team is required`);
+          return;
+        }
+        if (!row.awayTeam) {
+          errors.push(`Row ${index + 1}: Away Team is required`);
+          return;
+        }
+
+        // Parse date and time
+        let gameDate: Date;
+        try {
+          gameDate = new Date(row.date.trim());
+          if (isNaN(gameDate.getTime())) {
+            errors.push(`Row ${index + 1}: Invalid date format`);
+            return;
+          }
+        } catch {
+          errors.push(`Row ${index + 1}: Invalid date format`);
+          return;
+        }
+
+        const schedule = {
+          gameDate: gameDate,
+          gameTime: row.time?.trim() || null,
+          homeTeamName: row.homeTeam?.trim() || null,
+          awayTeamName: row.awayTeam?.trim() || null,
+          homeTeamId: null as string | null,
+          awayTeamId: null as string | null,
+          homeTeamLockerRoom: row.homeTeamLockerRoom?.trim() || null,
+          awayTeamLockerRoom: row.awayTeamLockerRoom?.trim() || null,
+        };
+
+        // Try to match team names to existing teams
+        if (schedule.homeTeamName) {
+          const matchedHomeTeamId = teamLookup.get(schedule.homeTeamName.toLowerCase());
+          if (matchedHomeTeamId) {
+            schedule.homeTeamId = matchedHomeTeamId;
+          } else {
+            teamsToCreate.add(schedule.homeTeamName);
+          }
+        }
+
+        if (schedule.awayTeamName) {
+          const matchedAwayTeamId = teamLookup.get(schedule.awayTeamName.toLowerCase());
+          if (matchedAwayTeamId) {
+            schedule.awayTeamId = matchedAwayTeamId;
+          } else {
+            teamsToCreate.add(schedule.awayTeamName);
+          }
+        }
+
+        validSchedules.push(schedule);
+      });
+
+      // Create missing teams
+      const createdTeams = new Map<string, string>();
+      for (const teamName of teamsToCreate) {
+        try {
+          const newTeam = await storage.createTeam({
+            name: teamName,
+            leagueId: leagueId,
+            captainId: null, // Will be assigned later when players join
+          });
+          createdTeams.set(teamName, newTeam.id);
+        } catch (error) {
+          console.error(`Failed to create team ${teamName}:`, error);
+          errors.push(`Failed to create team: ${teamName}`);
+        }
+      }
+
+      // Update schedule team IDs with newly created teams
+      validSchedules.forEach(schedule => {
+        if (schedule.homeTeamName && !schedule.homeTeamId) {
+          const createdTeamId = createdTeams.get(schedule.homeTeamName);
+          if (createdTeamId) {
+            schedule.homeTeamId = createdTeamId;
+          }
+        }
+        if (schedule.awayTeamName && !schedule.awayTeamId) {
+          const createdTeamId = createdTeams.get(schedule.awayTeamName);
+          if (createdTeamId) {
+            schedule.awayTeamId = createdTeamId;
+          }
+        }
+      });
+
+      // Create import record and imported schedules
+      const importRecord = await storage.createScheduleImport({
+        leagueId,
+        importedBy: userId,
+        fileName: file.originalname,
+        totalRecords: parseResults.data.length,
+        successfulRecords: validSchedules.length,
+        failedRecords: errors.length
+      });
+
+      // Create imported schedule records
+      if (validSchedules.length > 0) {
+        await storage.createImportedSchedules(importRecord.id, leagueId, validSchedules);
+        
+        // Create actual game records for valid schedules
+        for (const schedule of validSchedules) {
+          try {
+            if (schedule.homeTeamId && schedule.awayTeamId) {
+              // Combine date and time for scheduledAt
+              const scheduledAt = new Date(schedule.gameDate);
+              if (schedule.gameTime) {
+                const [hours, minutes] = schedule.gameTime.split(':').map(Number);
+                if (!isNaN(hours) && !isNaN(minutes)) {
+                  scheduledAt.setHours(hours, minutes);
+                }
+              }
+
+              await storage.createGame({
+                leagueId: leagueId,
+                homeTeamId: schedule.homeTeamId,
+                awayTeamId: schedule.awayTeamId,
+                scheduledAt: scheduledAt.toISOString(),
+                venue: null,
+                homeTeamLockerRoom: schedule.homeTeamLockerRoom,
+                awayTeamLockerRoom: schedule.awayTeamLockerRoom,
+              });
+            }
+          } catch (error) {
+            console.error(`Failed to create game for ${schedule.homeTeamName} vs ${schedule.awayTeamName}:`, error);
+            errors.push(`Failed to create game: ${schedule.homeTeamName} vs ${schedule.awayTeamName}`);
+          }
+        }
+      }
+
+      // Clean up uploaded file
+      fs.unlinkSync(file.path);
+
+      res.json({
+        importId: importRecord.id,
+        totalRecords: parseResults.data.length,
+        successfulRecords: validSchedules.length,
+        failedRecords: errors.length,
+        teamsCreated: createdTeams.size,
+        errors
+      });
+
+    } catch (error) {
+      console.error('Error importing schedules:', error);
+      
+      // Clean up file if it exists
+      if (req.file?.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (cleanupError) {
+          console.error('Error cleaning up file:', cleanupError);
+        }
+      }
+      
+      res.status(500).json({ message: 'Failed to import schedules' });
+    }
+  });
+
+  // Get schedule import history for a league
+  app.get('/api/leagues/:leagueId/schedules/imports', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+
+      // Check if user has commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const imports = await storage.getScheduleImports(leagueId);
+      res.json(imports);
+    } catch (error) {
+      console.error('Error fetching schedule import history:', error);
+      res.status(500).json({ message: 'Failed to fetch schedule import history' });
+    }
+  });
+
   // Find potential merge matches for a player
   app.get('/api/leagues/:leagueId/imported-players/matches', isAuthenticated, async (req: any, res) => {
     try {

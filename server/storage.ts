@@ -11,6 +11,8 @@ import {
   playerImports,
   importedPlayers,
   playerMergeRequests,
+  scheduleImports,
+  importedSchedules,
   type User,
   type UpsertUser,
   type League,
@@ -33,6 +35,9 @@ import {
   type InsertImportedPlayer,
   type PlayerMergeRequest,
   type InsertPlayerMergeRequest,
+  type ScheduleImport,
+  type InsertScheduleImport,
+  type ImportedSchedule,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, inArray, asc, isNull } from "drizzle-orm";
@@ -114,6 +119,12 @@ export interface IStorage {
   getPlayerMergeRequests(leagueId: string): Promise<PlayerMergeRequest[]>;
   updateMergeRequestStatus(requestId: string, status: string, reviewerId: string): Promise<PlayerMergeRequest>;
   findPotentialMatches(leagueId: string, firstName: string, lastName: string): Promise<ImportedPlayer[]>;
+  
+  // Schedule import operations
+  createScheduleImport(importData: InsertScheduleImport): Promise<ScheduleImport>;
+  createImportedSchedules(importId: string, leagueId: string, schedules: any[]): Promise<ImportedSchedule[]>;
+  getScheduleImports(leagueId: string): Promise<ScheduleImport[]>;
+  getImportedSchedules(importId: string): Promise<ImportedSchedule[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -698,6 +709,9 @@ export class DatabaseStorage implements IStorage {
       awayTeamId: row.away_team_id,
       scheduledAt: row.scheduled_at,
       venue: row.venue,
+      lockerRoom: row.locker_room,
+      homeTeamLockerRoom: row.home_team_locker_room,
+      awayTeamLockerRoom: row.away_team_locker_room,
       homeScore: row.home_score,
       awayScore: row.away_score,
       isCompleted: row.is_completed,
@@ -1251,6 +1265,50 @@ export class DatabaseStorage implements IStorage {
           )
         )
       );
+  }
+
+  // Schedule import operations
+  async createScheduleImport(importData: InsertScheduleImport): Promise<ScheduleImport> {
+    const [scheduleImport] = await db
+      .insert(scheduleImports)
+      .values(importData)
+      .returning();
+    return scheduleImport;
+  }
+
+  async createImportedSchedules(importId: string, leagueId: string, schedules: any[]): Promise<ImportedSchedule[]> {
+    if (schedules.length === 0) return [];
+    
+    const scheduleRecords = schedules.map(schedule => ({
+      importId,
+      leagueId,
+      gameDate: schedule.gameDate,
+      gameTime: schedule.gameTime,
+      homeTeamName: schedule.homeTeamName,
+      awayTeamName: schedule.awayTeamName,
+      homeTeamId: schedule.homeTeamId,
+      awayTeamId: schedule.awayTeamId,
+      homeTeamLockerRoom: schedule.homeTeamLockerRoom,
+      awayTeamLockerRoom: schedule.awayTeamLockerRoom,
+    }));
+
+    return await db.insert(importedSchedules)
+      .values(scheduleRecords)
+      .returning();
+  }
+
+  async getScheduleImports(leagueId: string): Promise<ScheduleImport[]> {
+    return await db.select()
+      .from(scheduleImports)
+      .where(eq(scheduleImports.leagueId, leagueId))
+      .orderBy(desc(scheduleImports.createdAt));
+  }
+
+  async getImportedSchedules(importId: string): Promise<ImportedSchedule[]> {
+    return await db.select()
+      .from(importedSchedules)
+      .where(eq(importedSchedules.importId, importId))
+      .orderBy(asc(importedSchedules.gameDate));
   }
 
   async deleteGame(id: string): Promise<void> {
