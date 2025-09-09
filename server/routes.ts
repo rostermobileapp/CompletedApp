@@ -637,6 +637,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get team record (wins, losses, ties) based on game scores
+  app.get("/api/teams/:teamId/record", isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const record = await storage.getTeamRecord(teamId);
+      res.json(record);
+    } catch (error) {
+      console.error("Error fetching team record:", error);
+      res.status(500).json({ message: "Failed to fetch team record" });
+    }
+  });
+
   app.post("/api/games", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

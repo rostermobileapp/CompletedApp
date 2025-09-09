@@ -723,6 +723,45 @@ export class DatabaseStorage implements IStorage {
     return gamesWithTeams;
   }
 
+  async getTeamRecord(teamId: string): Promise<{ wins: number; losses: number; ties: number; gamesPlayed: number; gamesRemaining: number }> {
+    // Get all games for this team
+    const teamGames = await this.getTeamGames(teamId);
+    
+    let wins = 0;
+    let losses = 0;
+    let ties = 0;
+    let gamesPlayed = 0;
+    
+    for (const game of teamGames) {
+      // Only count completed games with scores
+      if (game.isCompleted || (game.homeScore !== null && game.awayScore !== null)) {
+        gamesPlayed++;
+        
+        const isHomeTeam = game.homeTeamId === teamId;
+        const teamScore = isHomeTeam ? game.homeScore : game.awayScore;
+        const opponentScore = isHomeTeam ? game.awayScore : game.homeScore;
+        
+        if (teamScore > opponentScore) {
+          wins++;
+        } else if (teamScore < opponentScore) {
+          losses++;
+        } else {
+          ties++;
+        }
+      }
+    }
+    
+    const gamesRemaining = teamGames.length - gamesPlayed;
+    
+    return {
+      wins,
+      losses,
+      ties,
+      gamesPlayed,
+      gamesRemaining
+    };
+  }
+
   async getGameById(gameId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team }) | undefined> {
     const result = await db.execute(sql`
       SELECT 

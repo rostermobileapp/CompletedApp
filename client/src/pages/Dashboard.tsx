@@ -215,6 +215,12 @@ export default function Dashboard() {
 
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
 
+  // Fetch team record based on game scores
+  const { data: teamRecord } = useQuery({
+    queryKey: [`/api/teams/${primaryTeam?.id}/record`],
+    enabled: !!primaryTeam?.id,
+  });
+
   // Get user's attendance statuses
   const { data: userAttendanceStatuses } = useQuery({
     queryKey: ['/api/user/attendance-statuses'],
@@ -474,13 +480,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold" data-testid="text-games-remaining">
-                    {(() => {
-                      const totalGames = Array.isArray(upcomingGames) ? upcomingGames.filter((game: any) => {
-                        const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
-                        return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
-                      }).length : 0;
-                      return totalGames;
-                    })()}
+                    {teamRecord?.gamesRemaining ?? 0}
                   </p>
                   <p className="text-xs text-muted-foreground">Games Remaining</p>
                 </div>
@@ -493,7 +493,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold" data-testid="text-team-record">
-                    {primaryTeam.wins}-{primaryTeam.losses}-{primaryTeam.ties}
+                    {teamRecord ? `${teamRecord.wins}-${teamRecord.losses}-${teamRecord.ties}` : '0-0-0'}
                   </p>
                   <p className="text-xs text-muted-foreground">Team Record</p>
                 </div>
