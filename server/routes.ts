@@ -1566,7 +1566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 leagueId: leagueId,
                 homeTeamId: schedule.homeTeamId,
                 awayTeamId: schedule.awayTeamId,
-                scheduledAt: scheduledAt.toISOString(),
+                scheduledAt: scheduledAt,
                 venue: null,
                 homeTeamLockerRoom: schedule.homeTeamLockerRoom,
                 awayTeamLockerRoom: schedule.awayTeamLockerRoom,
