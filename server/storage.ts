@@ -43,7 +43,7 @@ import {
   type ImportedSchedule,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, inArray, asc, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
