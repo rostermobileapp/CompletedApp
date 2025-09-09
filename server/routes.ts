@@ -1684,10 +1684,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Create imported schedule records
+      let gamesCreated = 0;
+      let gamesSkipped = 0;
+      
       if (validSchedules.length > 0) {
         await storage.createImportedSchedules(importRecord.id, leagueId, validSchedules);
         
-        // Create actual game records for valid schedules
+        // Create actual game records for valid schedules, but skip duplicates
+        
         for (const schedule of validSchedules) {
           try {
             if (schedule.homeTeamId && schedule.awayTeamId) {
@@ -1729,6 +1733,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               }
 
+              // Check for existing game before creating
+              const existingGame = await storage.findExistingGame(
+                leagueId,
+                schedule.homeTeamId,
+                schedule.awayTeamId,
+                scheduledAt
+              );
+
+              if (existingGame) {
+                console.log(`Skipping duplicate game: ${schedule.homeTeamName} vs ${schedule.awayTeamName} on ${scheduledAt}`);
+                gamesSkipped++;
+                continue;
+              }
+
               await storage.createGame({
                 leagueId: leagueId,
                 homeTeamId: schedule.homeTeamId,
@@ -1738,6 +1756,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 homeTeamLockerRoom: schedule.homeTeamLockerRoom,
                 awayTeamLockerRoom: schedule.awayTeamLockerRoom,
               });
+              
+              gamesCreated++;
             }
           } catch (error) {
             console.error(`Failed to create game for ${schedule.homeTeamName} vs ${schedule.awayTeamName}:`, error);
@@ -1755,6 +1775,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         successfulRecords: validSchedules.length,
         failedRecords: errors.length,
         teamsCreated: createdTeams.size,
+        gamesCreated: gamesCreated || 0,
+        gamesSkipped: gamesSkipped || 0,
         errors
       });
 

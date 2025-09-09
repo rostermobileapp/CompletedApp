@@ -93,6 +93,7 @@ export interface IStorage {
   
   // Game operations
   createGame(game: InsertGame): Promise<Game>;
+  findExistingGame(leagueId: string, homeTeamId: string, awayTeamId: string, scheduledAt: Date): Promise<Game | null>;
   getUpcomingGames(userId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
   getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
   getGamesByLeague(leagueId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
@@ -634,6 +635,33 @@ export class DatabaseStorage implements IStorage {
   async createGame(game: InsertGame): Promise<Game> {
     const [newGame] = await db.insert(games).values(game).returning();
     return newGame;
+  }
+
+  async findExistingGame(leagueId: string, homeTeamId: string, awayTeamId: string, scheduledAt: Date): Promise<Game | null> {
+    // Check for a game with same teams and scheduled time (within 30 minutes)
+    const timeBuffer = 30 * 60 * 1000; // 30 minutes in milliseconds
+    const startTime = new Date(scheduledAt.getTime() - timeBuffer);
+    const endTime = new Date(scheduledAt.getTime() + timeBuffer);
+    
+    const [existingGame] = await db
+      .select()
+      .from(games)
+      .where(
+        and(
+          eq(games.leagueId, leagueId),
+          or(
+            and(eq(games.homeTeamId, homeTeamId), eq(games.awayTeamId, awayTeamId)),
+            and(eq(games.homeTeamId, awayTeamId), eq(games.awayTeamId, homeTeamId))
+          ),
+          and(
+            gte(games.scheduledAt, startTime),
+            lte(games.scheduledAt, endTime)
+          )
+        )
+      )
+      .limit(1);
+
+    return existingGame || null;
   }
 
   async getUpcomingGames(userId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
