@@ -38,21 +38,39 @@ function CaptainToDo({ leagueId, userTeams, onNavigate, onOpenScoreModal }: {
       const now = new Date();
       const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
       
-      // Filter games that need score submission
-      return allGames.filter((game: any) => {
+      // Filter games that need score submission and check if user has already submitted
+      const gamesNeedingUserSubmission = [];
+      
+      for (const game of allGames) {
         const gameStartTime = new Date(game.scheduledAt);
         const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
         const isUserGame = userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
         
-        // Game needs score if:
-        // 1. It's a game involving user's team
-        // 2. Game started more than 1 hour ago
-        // 3. Game is not completed yet (no final scores)
-        return isUserGame && 
-               gameStartTime < oneHourAgo && 
-               !game.isCompleted && 
-               (game.homeScore === null || game.awayScore === null);
-      });
+        // Check basic criteria first
+        if (!isUserGame || gameStartTime >= oneHourAgo || game.isCompleted) {
+          continue;
+        }
+        
+        // Check if user has already submitted their score for this game
+        try {
+          const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
+          const submissions = await submissionsResponse.json();
+          
+          // Check if current user has already submitted a score
+          const userSubmission = Array.isArray(submissions) ? 
+            submissions.find((sub: any) => userTeamIds.includes(sub.teamId)) : null;
+          
+          // Only include if user hasn't submitted yet
+          if (!userSubmission) {
+            gamesNeedingUserSubmission.push(game);
+          }
+        } catch (error) {
+          // If we can't fetch submissions, include the game to be safe
+          gamesNeedingUserSubmission.push(game);
+        }
+      }
+      
+      return gamesNeedingUserSubmission;
     },
     enabled: !!leagueId && Array.isArray(userTeams) && userTeams.length > 0,
   });
