@@ -58,32 +58,32 @@ export function PageTransition({ children }: PageTransitionProps) {
     initial: (direction: string) => {
       switch (direction) {
         case 'up':
-          return { opacity: 0, y: '100%' };
+          return { y: '100%', opacity: 1 };
         case 'down':
-          return { opacity: 0, y: '-100%' };
+          return { y: '-100%', opacity: 1 };
         case 'left':
-          return { opacity: 0, x: '100%' };
+          return { x: '100%', opacity: 1 };
         case 'right':
         default:
-          return { opacity: 0, x: '-100%' };
+          return { x: '-100%', opacity: 1 };
       }
     },
     animate: {
-      opacity: 1,
       x: 0,
       y: 0,
+      opacity: 1,
     },
     exit: (direction: string) => {
       switch (direction) {
         case 'up':
-          return { opacity: 0, y: '-100%' };
+          return { y: '-100%', opacity: 1 };
         case 'down':
-          return { opacity: 0, y: '100%' };
+          return { y: '100%', opacity: 1 };
         case 'left':
-          return { opacity: 0, x: '-100%' };
+          return { x: '-100%', opacity: 1 };
         case 'right':
         default:
-          return { opacity: 0, x: '100%' };
+          return { x: '100%', opacity: 1 };
       }
     },
   };
@@ -102,7 +102,7 @@ export function PageTransition({ children }: PageTransitionProps) {
           ease: [0.4, 0, 0.2, 1],
           duration: 0.1,
         }}
-        className="absolute inset-0 w-full h-full"
+        className="absolute inset-0 w-full h-full bg-background"
       >
         {children}
       </motion.div>
