@@ -426,7 +426,6 @@ export default function GameDetails() {
                 </div>
                 <div>
                   <p className="font-medium text-muted-foreground" data-testid="text-status-pending">Status Pending</p>
-                  <p className="text-sm text-muted-foreground">Please confirm your attendance</p>
                 </div>
               </div>
               <div className="flex gap-2">
