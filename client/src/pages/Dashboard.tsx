@@ -17,6 +17,72 @@ import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
+// Commissioner To-Do Component for Score Verification
+function CommissionerToDo({ leagueId, onNavigate }: { 
+  leagueId: string; 
+  onNavigate: (path: string) => void; 
+}) {
+  // Fetch games that need score verification
+  const { data: gamesNeedingVerification = [] } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
+      const allGames = await response.json();
+      
+      if (!Array.isArray(allGames)) return [];
+      
+      // Find games that have score submissions but are not yet completed
+      const gamesNeedingVerification = [];
+      
+      for (const game of allGames) {
+        if (game.isCompleted) continue; // Skip already completed games
+        
+        try {
+          const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
+          const submissions = await submissionsResponse.json();
+          
+          // Include games that have at least one score submission
+          if (Array.isArray(submissions) && submissions.length > 0) {
+            gamesNeedingVerification.push(game);
+          }
+        } catch (error) {
+          // Skip on error
+          continue;
+        }
+      }
+      
+      return gamesNeedingVerification;
+    },
+    enabled: !!leagueId,
+  });
+
+  if (!Array.isArray(gamesNeedingVerification) || gamesNeedingVerification.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="px-6 mb-4">
+      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+        <button
+          onClick={() => onNavigate('/commissioner')}
+          className="w-full flex items-center justify-between hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors rounded p-1"
+          data-testid="button-commissioner-todo"
+        >
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-600">
+              {gamesNeedingVerification.length} game{gamesNeedingVerification.length === 1 ? '' : 's'} need score verification
+            </span>
+          </div>
+          <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+            <span className="text-white text-xs font-bold">{gamesNeedingVerification.length}</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Captain To-Do Component for Score Submission Tasks
 function CaptainToDo({ leagueId, userTeams, onNavigate, onOpenScoreModal }: { 
   leagueId: string; 
@@ -531,6 +597,14 @@ export default function Dashboard() {
             setSelectedGameForScore(game);
             setShowScoreModal(true);
           }}
+        />
+      )}
+      
+      {/* Commissioner To-Do Section */}
+      {selectedLeagueMembership?.isCommissioner && selectedLeagueId && (
+        <CommissionerToDo 
+          leagueId={selectedLeagueId} 
+          onNavigate={navigate}
         />
       )}
       
