@@ -173,6 +173,18 @@ export const games = pgTable("games", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Game score submissions table
+export const gameScoreSubmissions = pgTable("game_score_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: varchar("game_id").references(() => games.id).notNull(),
+  submittedBy: varchar("submitted_by").references(() => users.id).notNull(),
+  submitterRole: varchar("submitter_role").notNull(), // 'home_captain', 'away_captain', 'commissioner'
+  homeScore: integer("home_score").notNull(),
+  awayScore: integer("away_score").notNull(),
+  isCommissionerOverride: boolean("is_commissioner_override").default(false).notNull(),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+});
+
 // Game attendance table
 export const gameAttendance = pgTable("game_attendance", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -583,6 +595,11 @@ export const insertGameSchema = createInsertSchema(games).omit({
   scheduledAt: z.string().transform((val) => new Date(val)),
 });
 
+export const insertGameScoreSubmissionSchema = createInsertSchema(gameScoreSubmissions).omit({
+  id: true,
+  submittedAt: true,
+});
+
 export const insertMessageSchema = createInsertSchema(messages).omit({
   id: true,
   createdAt: true,
@@ -654,6 +671,8 @@ export type TeamMembership = typeof teamMemberships.$inferSelect;
 export type InsertTeamMembership = z.infer<typeof insertTeamMembershipSchema>;
 export type Game = typeof games.$inferSelect;
 export type InsertGame = z.infer<typeof insertGameSchema>;
+export type GameScoreSubmission = typeof gameScoreSubmissions.$inferSelect;
+export type InsertGameScoreSubmission = z.infer<typeof insertGameScoreSubmissionSchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Draft = typeof drafts.$inferSelect;
