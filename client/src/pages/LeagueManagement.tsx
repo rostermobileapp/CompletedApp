@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { DayPicker } from 'react-day-picker';
@@ -1156,7 +1157,10 @@ export default function LeagueManagement() {
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-4">
           <button 
-            onClick={() => navigate('/league-list')}
+            onClick={() => {
+              setPageTransitionDirection('down');
+              navigate('/league-list');
+            }}
             className="text-muted-foreground"
             data-testid="button-back"
           >

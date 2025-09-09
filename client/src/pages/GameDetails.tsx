@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Trophy, Check, X, ArrowLeft, MapPin, Clock, MessageSquare, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -236,7 +237,10 @@ export default function GameDetails() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/calendar")}
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate("/calendar");
+              }}
               className="p-2"
               data-testid="button-back"
             >
@@ -303,7 +307,10 @@ export default function GameDetails() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/calendar")}
+            onClick={() => {
+              setPageTransitionDirection('down');
+              navigate("/calendar");
+            }}
             className="p-2"
             data-testid="button-back"
           >

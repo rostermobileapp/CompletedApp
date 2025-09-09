@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Crown, MapPin, Calendar } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { insertLeagueSchema } from '@shared/schema';
@@ -99,7 +100,10 @@ export default function CreateLeague() {
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
           <button 
-            onClick={() => navigate('/more')}
+            onClick={() => {
+              setPageTransitionDirection('down');
+              navigate('/more');
+            }}
             className="text-muted-foreground"
             data-testid="button-back"
           >

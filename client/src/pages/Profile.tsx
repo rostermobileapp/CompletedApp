@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ObjectUploader } from '@/components/ObjectUploader';
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X } from 'lucide-react';
 
 const profileSchema = z.object({
@@ -125,7 +126,10 @@ export default function Profile() {
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => {
+              setPageTransitionDirection('down');
+              navigate('/');
+            }}
             className="text-muted-foreground"
             data-testid="button-back"
           >

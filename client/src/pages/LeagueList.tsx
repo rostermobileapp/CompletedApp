@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Plus, Users, Trophy, Calendar } from 'lucide-react';
 import { useSubscription } from '@/context/SubscriptionContext';
 
@@ -38,7 +39,10 @@ export default function LeagueList() {
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
           <button 
-            onClick={() => navigate('/more')}
+            onClick={() => {
+              setPageTransitionDirection('down');
+              navigate('/more');
+            }}
             className="text-muted-foreground"
             data-testid="button-back"
           >

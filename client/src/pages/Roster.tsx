@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Trophy, Users, Upload } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { ObjectUploader } from '@/components/ObjectUploader';
@@ -87,7 +88,10 @@ export default function Roster() {
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
           <button 
-            onClick={() => navigate('/more')}
+            onClick={() => {
+              setPageTransitionDirection('down');
+              navigate('/more');
+            }}
             className="text-muted-foreground"
             data-testid="button-back"
           >

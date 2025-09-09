@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format, isBefore, isAfter, addHours } from "date-fns";
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Trophy, Check, X, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -135,7 +136,10 @@ export default function Calendar() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/")}
+            onClick={() => {
+              setPageTransitionDirection('down');
+              navigate("/");
+            }}
             className="p-2"
             data-testid="button-back-to-dashboard"
           >
