@@ -1,4 +1,5 @@
 import { useLocation } from 'wouter';
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Users, BarChart3, UserPlus, Trophy, Crown, Settings, Bell, Moon, Shield, LogOut, Plus } from 'lucide-react';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { apiRequest } from '@/lib/queryClient';
@@ -13,7 +14,10 @@ export default function More() {
       label: 'Team Roster',
       locked: false,
       requiredTier: null,
-      action: () => navigate('/roster'),
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/roster');
+      },
     },
     {
       icon: BarChart3,
@@ -37,7 +41,10 @@ export default function More() {
       label: 'Create League',
       locked: !hasAccess('commissioner'),
       requiredTier: 'COMMISSIONER',
-      action: () => navigate('/create-league'),
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/create-league');
+      },
     },
     {
       icon: Trophy,
@@ -51,7 +58,10 @@ export default function More() {
       label: 'League Management',
       locked: !hasAccess('commissioner'),
       requiredTier: 'COMMISSIONER',
-      action: () => navigate('/league-list'),
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/league-list');
+      },
     },
   ];
 
@@ -61,7 +71,10 @@ export default function More() {
       label: 'Upgrade Subscription',
       locked: false,
       requiredTier: null,
-      action: () => navigate('/subscription'),
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/subscription');
+      },
       highlight: tier === 'free',
     },
     {

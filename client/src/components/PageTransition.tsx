@@ -7,22 +7,20 @@ interface PageTransitionProps {
 }
 
 const getPageIndex = (path: string): number => {
-  if (path.startsWith('/teams')) return 0;
-  if (path.startsWith('/messages')) return 1;
+  if (path === '/teams') return 0;
+  if (path === '/messages') return 1;
   if (path === '/') return 2;
-  if (path.startsWith('/more') || path.startsWith('/roster') || path.startsWith('/subscription')) return 3;
-  if (path.startsWith('/profile')) return 4;
+  if (path === '/more') return 3;
+  if (path === '/profile') return 4;
   return 2; // Default to home
 };
 
 const isBottomNavPage = (path: string): boolean => {
   return path === '/' || 
-         path.startsWith('/teams') || 
-         path.startsWith('/messages') || 
-         path.startsWith('/more') || 
-         path.startsWith('/roster') ||
-         path.startsWith('/subscription') ||
-         path.startsWith('/profile');
+         path === '/teams' || 
+         path === '/messages' || 
+         path === '/more' || 
+         path === '/profile';
 };
 
 // Simple global state for animation direction
@@ -102,9 +100,9 @@ export function PageTransition({ children }: PageTransitionProps) {
         transition={{
           type: "tween",
           ease: [0.4, 0, 0.2, 1],
-          duration: 0.3,
+          duration: 0.1,
         }}
-        className="absolute inset-0 w-full"
+        className="absolute inset-0 w-full h-full"
       >
         {children}
       </motion.div>
