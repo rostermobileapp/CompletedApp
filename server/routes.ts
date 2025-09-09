@@ -625,6 +625,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all games for user (past and future) with scores
+  app.get("/api/user/games/all", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const games = await storage.getAllUserGames(userId);
+      res.json(games);
+    } catch (error) {
+      console.error("Error fetching all user games:", error);
+      res.status(500).json({ message: "Failed to fetch all user games" });
+    }
+  });
+
   app.post("/api/games", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

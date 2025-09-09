@@ -681,6 +681,48 @@ export class DatabaseStorage implements IStorage {
     return gamesWithTeams;
   }
 
+  async getAllUserGames(userId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
+    const userTeams = await this.getUserTeams(userId);
+    const teamIds = userTeams.map(t => t.id);
+    
+    // Also get leagues where user is a member (for commissioners who may not be on teams)
+    const userLeagues = await this.getUserLeagues(userId);
+    const leagueIds = userLeagues.map(l => l.id);
+    
+    // If user has neither teams nor league memberships, return empty
+    if (teamIds.length === 0 && leagueIds.length === 0) return [];
+
+    // Get all games (past and future) - removed the date filter from getUpcomingGames
+    const gamesResult = await db
+      .select()
+      .from(games)
+      .where(
+        or(
+          teamIds.length > 0 ? or(
+            inArray(games.homeTeamId, teamIds),
+            inArray(games.awayTeamId, teamIds)
+          ) : undefined,
+          leagueIds.length > 0 ? inArray(games.leagueId, leagueIds) : undefined
+        )
+      )
+      .orderBy(asc(games.scheduledAt)); // Chronological order
+
+    // Get team data for each game
+    const gamesWithTeams = [];
+    for (const game of gamesResult) {
+      const [homeTeam] = await db.select().from(teams).where(eq(teams.id, game.homeTeamId));
+      const [awayTeam] = await db.select().from(teams).where(eq(teams.id, game.awayTeamId));
+      
+      gamesWithTeams.push({
+        ...game,
+        homeTeam,
+        awayTeam,
+      });
+    }
+    
+    return gamesWithTeams;
+  }
+
   async getGameById(gameId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team }) | undefined> {
     const result = await db.execute(sql`
       SELECT 
