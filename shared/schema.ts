@@ -161,6 +161,8 @@ export const games = pgTable("games", {
   scheduledAt: timestamp("scheduled_at").notNull(),
   venue: varchar("venue"),
   lockerRoom: varchar("locker_room"),
+  homeTeamLockerRoom: varchar("home_team_locker_room"),
+  awayTeamLockerRoom: varchar("away_team_locker_room"),
   homeScore: integer("home_score"),
   awayScore: integer("away_score"),
   isCompleted: boolean("is_completed").default(false).notNull(),
@@ -297,6 +299,39 @@ export const playerMergeRequests = pgTable("player_merge_requests", {
   status: mergeStatusEnum("status").default("auto_suggested").notNull(),
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Schedule import sessions table
+export const scheduleImports = pgTable("schedule_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  importedBy: varchar("imported_by").references(() => users.id).notNull(),
+  fileName: varchar("file_name").notNull(),
+  totalRecords: integer("total_records").notNull(),
+  successfulRecords: integer("successful_records").notNull(),
+  failedRecords: integer("failed_records").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Imported schedules table (records from spreadsheet before being processed)
+export const importedSchedules = pgTable("imported_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  importId: varchar("import_id").references(() => scheduleImports.id).notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  // Schedule data from spreadsheet
+  gameDate: timestamp("game_date"),
+  gameTime: varchar("game_time"),
+  homeTeamName: varchar("home_team_name"),
+  awayTeamName: varchar("away_team_name"),
+  homeTeamId: varchar("home_team_id").references(() => teams.id),
+  awayTeamId: varchar("away_team_id").references(() => teams.id),
+  homeTeamLockerRoom: varchar("home_team_locker_room"),
+  awayTeamLockerRoom: varchar("away_team_locker_room"),
+  // Processing status
+  isProcessed: boolean("is_processed").default(false).notNull(),
+  gameId: varchar("game_id").references(() => games.id), // Set when processed into actual game
+  processedAt: timestamp("processed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -468,6 +503,41 @@ export const playerMergeRequestsRelations = relations(playerMergeRequests, ({ on
   }),
 }));
 
+export const scheduleImportsRelations = relations(scheduleImports, ({ one, many }) => ({
+  league: one(leagues, {
+    fields: [scheduleImports.leagueId],
+    references: [leagues.id],
+  }),
+  importedBy: one(users, {
+    fields: [scheduleImports.importedBy],
+    references: [users.id],
+  }),
+  importedSchedules: many(importedSchedules),
+}));
+
+export const importedSchedulesRelations = relations(importedSchedules, ({ one }) => ({
+  import: one(scheduleImports, {
+    fields: [importedSchedules.importId],
+    references: [scheduleImports.id],
+  }),
+  league: one(leagues, {
+    fields: [importedSchedules.leagueId],
+    references: [leagues.id],
+  }),
+  homeTeam: one(teams, {
+    fields: [importedSchedules.homeTeamId],
+    references: [teams.id],
+  }),
+  awayTeam: one(teams, {
+    fields: [importedSchedules.awayTeamId],
+    references: [teams.id],
+  }),
+  game: one(games, {
+    fields: [importedSchedules.gameId],
+    references: [games.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
@@ -557,6 +627,17 @@ export const insertPlayerMergeRequestSchema = createInsertSchema(playerMergeRequ
   createdAt: true,
 });
 
+export const insertScheduleImportSchema = createInsertSchema(scheduleImports).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertImportedScheduleSchema = createInsertSchema(importedSchedules).omit({
+  id: true,
+  processedAt: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -585,3 +666,7 @@ export type ImportedPlayer = typeof importedPlayers.$inferSelect;
 export type InsertImportedPlayer = z.infer<typeof insertImportedPlayerSchema>;
 export type PlayerMergeRequest = typeof playerMergeRequests.$inferSelect;
 export type InsertPlayerMergeRequest = z.infer<typeof insertPlayerMergeRequestSchema>;
+export type ScheduleImport = typeof scheduleImports.$inferSelect;
+export type InsertScheduleImport = z.infer<typeof insertScheduleImportSchema>;
+export type ImportedSchedule = typeof importedSchedules.$inferSelect;
+export type InsertImportedSchedule = z.infer<typeof insertImportedScheduleSchema>;
