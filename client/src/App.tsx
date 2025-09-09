@@ -47,7 +47,7 @@ function Router() {
 
   return (
     <SubscriptionProvider>
-      <div className="relative min-h-screen w-full overflow-hidden">
+      <div className="relative min-h-screen w-full">
         <PageTransition>
           <Switch>
             <Route path="/" component={Dashboard} />
