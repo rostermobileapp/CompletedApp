@@ -466,7 +466,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      
       {/* League Selection Dropdown */}
       {Array.isArray(userLeagues) && userLeagues.length > 0 && (
         <div className="px-6 mb-4">
@@ -520,7 +519,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      
       {/* 3-Card Section */}
       <div className="px-6 mb-6">
         <div className="grid grid-cols-3 gap-3">
@@ -552,7 +550,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      
       {/* Quick Stats */}
       {primaryTeam && (
         <div className="px-6 mb-6">
@@ -586,7 +583,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      
       {/* Captain To-Do Section */}
       {selectedLeagueMembership?.isCaptain && selectedLeagueId && (
         <CaptainToDo 
@@ -599,7 +595,6 @@ export default function Dashboard() {
           }}
         />
       )}
-      
       {/* Commissioner To-Do Section */}
       {tier === 'commissioner' && selectedLeagueId && (
         <CommissionerToDo 
@@ -607,17 +602,15 @@ export default function Dashboard() {
           onNavigate={navigate}
         />
       )}
-      
       {/* Debug info - remove later */}
       {tier === 'commissioner' && (
         <div className="px-6 mb-4">
-          <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-3 text-sm">
+          <div className="border border-yellow-400 rounded-lg p-3 text-sm bg-[#ef444482]">
             <p>Debug: tier={tier}, selectedLeagueId={selectedLeagueId}</p>
             <p>Condition result: {String(tier === 'commissioner' && selectedLeagueId)}</p>
           </div>
         </div>
       )}
-      
       {/* Upcoming Games */}
       <div className="px-6 mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -808,10 +801,6 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-      
-      
-      
-      
       {/* Find a League Section - Bottom */}
       <div className="px-6">
         <div className="bg-card rounded-lg border border-border px-2 py-1 flex items-center justify-between">
@@ -828,7 +817,6 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
-      
       {/* Score Submission Modal */}
       <Dialog open={showScoreModal} onOpenChange={setShowScoreModal}>
         <DialogContent className="sm:max-w-md">
