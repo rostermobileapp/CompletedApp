@@ -33,9 +33,25 @@ function CommissionerToDo({ leagueId, onNavigate }: {
       
       // Find games that have score submissions but are not yet completed
       const gamesNeedingVerification = [];
+      const debugInfo = { totalGames: allGames.length, completedGames: 0, gamesWithSubmissions: 0, oldGames: [] };
       
       for (const game of allGames) {
-        if (game.isCompleted) continue; // Skip already completed games
+        if (game.isCompleted) {
+          debugInfo.completedGames++;
+          continue; // Skip already completed games
+        }
+        
+        // Check if game is from 9/7/2025 or earlier
+        const gameDate = new Date(game.scheduledAt);
+        const sept7 = new Date('2025-09-07');
+        if (gameDate <= sept7) {
+          debugInfo.oldGames.push({
+            homeTeam: game.homeTeam?.name,
+            awayTeam: game.awayTeam?.name,
+            date: game.scheduledAt,
+            isCompleted: game.isCompleted
+          });
+        }
         
         try {
           const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
@@ -43,6 +59,7 @@ function CommissionerToDo({ leagueId, onNavigate }: {
           
           // Include games that have at least one score submission
           if (Array.isArray(submissions) && submissions.length > 0) {
+            debugInfo.gamesWithSubmissions++;
             gamesNeedingVerification.push(game);
           }
         } catch (error) {
@@ -51,6 +68,9 @@ function CommissionerToDo({ leagueId, onNavigate }: {
         }
       }
       
+      // Store debug info globally for inspection
+      (window as any).commissionerDebug = debugInfo;
+      
       return gamesNeedingVerification;
     },
     enabled: !!leagueId,
@@ -58,10 +78,23 @@ function CommissionerToDo({ leagueId, onNavigate }: {
 
   if (!Array.isArray(gamesNeedingVerification) || gamesNeedingVerification.length === 0) {
     // Debug - show what we found
+    const debugInfo = (window as any).commissionerDebug;
     return (
       <div className="px-6 mb-4">
-        <div className="border border-yellow-400 rounded-lg p-3 text-sm bg-[#ef444480]">
-          <p>CommissionerToDo Debug: Found {gamesNeedingVerification?.length || 0} games needing verification</p>
+        <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-3 text-sm">
+          <p>CommissionerToDo Debug:</p>
+          <p>• Total games: {debugInfo?.totalGames || 0}</p>
+          <p>• Completed games: {debugInfo?.completedGames || 0}</p>
+          <p>• Games with submissions: {debugInfo?.gamesWithSubmissions || 0}</p>
+          <p>• Old games (9/7 or earlier): {debugInfo?.oldGames?.length || 0}</p>
+          {debugInfo?.oldGames?.length > 0 && (
+            <div>
+              <p>Old games details:</p>
+              {debugInfo.oldGames.map((game: any, i: number) => (
+                <p key={i}>- {game.homeTeam} vs {game.awayTeam} on {new Date(game.date).toLocaleDateString()} (completed: {String(game.isCompleted)})</p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
