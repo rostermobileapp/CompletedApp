@@ -33,6 +33,7 @@ export const setPageTransitionDirection = (direction: 'left' | 'right' | 'up' | 
 export function PageTransition({ children }: PageTransitionProps) {
   const [location] = useLocation();
   const previousPageIndexRef = useRef<number | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   const currentPageIndex = getPageIndex(location);
   const isBottomNav = isBottomNavPage(location);
@@ -43,13 +44,16 @@ export function PageTransition({ children }: PageTransitionProps) {
   if (globalAnimationDirection) {
     direction = globalAnimationDirection;
     globalAnimationDirection = null; // Reset after use
-  } else if (isBottomNav && previousPageIndexRef.current !== null) {
+  } else if (isBottomNav && previousPageIndexRef.current !== null && isInitialized) {
     direction = currentPageIndex > previousPageIndexRef.current ? 'left' : 'right';
   }
   
-  // Update previous page index
+  // Update previous page index and initialization state
   useEffect(() => {
     if (isBottomNav) {
+      if (previousPageIndexRef.current !== null) {
+        setIsInitialized(true);
+      }
       previousPageIndexRef.current = currentPageIndex;
     }
   }, [currentPageIndex, isBottomNav]);
