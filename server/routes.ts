@@ -1413,10 +1413,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Parse date and time
         let gameDate: Date;
         try {
-          gameDate = new Date(row.date.trim());
+          const dateStr = row.date.trim();
+          gameDate = new Date(dateStr);
           if (isNaN(gameDate.getTime())) {
-            errors.push(`Row ${index + 1}: Invalid date format`);
-            return;
+            // Try different date formats
+            const dateFormats = [
+              dateStr,
+              `${dateStr} 00:00:00`,
+              new Date(Date.parse(dateStr))
+            ];
+            
+            for (const format of dateFormats) {
+              const testDate = new Date(format);
+              if (!isNaN(testDate.getTime())) {
+                gameDate = testDate;
+                break;
+              }
+            }
+            
+            if (isNaN(gameDate.getTime())) {
+              errors.push(`Row ${index + 1}: Invalid date format: ${dateStr}`);
+              return;
+            }
           }
         } catch {
           errors.push(`Row ${index + 1}: Invalid date format`);
@@ -1506,12 +1524,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const schedule of validSchedules) {
           try {
             if (schedule.homeTeamId && schedule.awayTeamId) {
-              // Combine date and time for scheduledAt
-              const scheduledAt = new Date(schedule.gameDate);
+              // Ensure we have a valid Date object
+              let scheduledAt: Date;
+              if (schedule.gameDate instanceof Date) {
+                scheduledAt = new Date(schedule.gameDate.getTime());
+              } else {
+                scheduledAt = new Date(schedule.gameDate);
+              }
+              
+              // Validate the date
+              if (isNaN(scheduledAt.getTime())) {
+                console.error(`Invalid date for game ${schedule.homeTeamName} vs ${schedule.awayTeamName}:`, schedule.gameDate);
+                errors.push(`Invalid date for game: ${schedule.homeTeamName} vs ${schedule.awayTeamName}`);
+                continue;
+              }
+              
+              // Parse and add time if provided
               if (schedule.gameTime) {
-                const [hours, minutes] = schedule.gameTime.split(':').map(Number);
-                if (!isNaN(hours) && !isNaN(minutes)) {
-                  scheduledAt.setHours(hours, minutes);
+                const timeMatch = schedule.gameTime.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM))?$/i);
+                if (timeMatch) {
+                  let hours = parseInt(timeMatch[1], 10);
+                  const minutes = parseInt(timeMatch[2], 10);
+                  const ampm = timeMatch[4];
+                  
+                  // Handle 12-hour format
+                  if (ampm) {
+                    if (ampm.toUpperCase() === 'PM' && hours !== 12) {
+                      hours += 12;
+                    } else if (ampm.toUpperCase() === 'AM' && hours === 12) {
+                      hours = 0;
+                    }
+                  }
+                  
+                  if (!isNaN(hours) && !isNaN(minutes) && hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+                    scheduledAt.setHours(hours, minutes, 0, 0);
+                  }
                 }
               }
 
