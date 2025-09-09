@@ -2501,7 +2501,7 @@ export default function LeagueManagement() {
                           <button
                             type="button"
                             onClick={() => setShowDatePicker(!showDatePicker)}
-                            className="w-full p-3 pr-12 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
+                            className="w-full p-3 pr-12 bg-card text-card-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
                             data-testid="button-game-date"
                           >
                             {field.value ? (() => {
@@ -2571,7 +2571,7 @@ export default function LeagueManagement() {
                           <button
                             type="button"
                             onClick={() => setShowTimePicker(!showTimePicker)}
-                            className="w-full p-3 pr-12 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
+                            className="w-full p-3 pr-12 bg-card text-card-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
                             data-testid="button-game-time"
                           >
                             {field.value ? (() => {
