@@ -1562,15 +1562,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               }
 
-              await storage.createGame({
+              const gameData = {
                 leagueId: leagueId,
                 homeTeamId: schedule.homeTeamId,
                 awayTeamId: schedule.awayTeamId,
-                scheduledAt: scheduledAt,
+                scheduledAt: scheduledAt.toISOString(),
                 venue: null,
                 homeTeamLockerRoom: schedule.homeTeamLockerRoom,
                 awayTeamLockerRoom: schedule.awayTeamLockerRoom,
-              });
+              };
+
+              const validatedData = insertGameSchema.parse(gameData);
+              await storage.createGame(validatedData);
             }
           } catch (error) {
             console.error(`Failed to create game for ${schedule.homeTeamName} vs ${schedule.awayTeamName}:`, error);
