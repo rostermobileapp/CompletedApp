@@ -281,6 +281,7 @@ export default function LeagueManagement() {
   const queryClient = useQueryClient();
   const { hasAccess } = useSubscription();
   const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('games');
+  const [gamesViewMode, setGamesViewMode] = useState<'calendar' | 'list'>('calendar');
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
@@ -316,9 +317,6 @@ export default function LeagueManagement() {
   const [showEditTeam, setShowEditTeam] = useState(false);
   const [selectedTeamForEdit, setSelectedTeamForEdit] = useState<Team | null>(null);
   
-  // Games view state
-  const [gamesViewMode, setGamesViewMode] = useState<'calendar' | 'list'>('calendar');
-
   // Close date picker when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
