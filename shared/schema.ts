@@ -125,7 +125,7 @@ export const leagueMemberships = pgTable("league_memberships", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
-  skillRating: integer("skill_rating").default(5), // 1-10 rating system for commissioners
+  skillLevel: varchar("skill_level"), // Text field for skill level (number or letter)
   status: membershipStatusEnum("status").default("pending").notNull(),
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
   approvedAt: timestamp("approved_at"),
@@ -145,7 +145,7 @@ export const teamMemberships = pgTable("team_memberships", {
   teamId: varchar("team_id").references(() => teams.id).notNull(),
   position: varchar("position"),
   jerseyNumber: integer("jersey_number"),
-  skillRating: integer("skill_rating").default(5), // 1-10 rating system for commissioners
+  skillLevel: varchar("skill_level"), // Text field for skill level (number or letter)
   status: membershipStatusEnum("status").default("pending").notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   approvedBy: varchar("approved_by").references(() => users.id),
@@ -267,7 +267,7 @@ export const importedPlayers = pgTable("imported_players", {
   phoneNumber: varchar("phone_number"),
   position: varchar("position"),
   jerseyNumber: integer("jersey_number"),
-  skillRating: integer("skill_rating").default(5),
+  skillLevel: varchar("skill_level"), // Text field for skill level (number or letter)
   teamName: varchar("team_name"),
   teamId: varchar("team_id").references(() => teams.id),
   notes: text("notes"),
