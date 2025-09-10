@@ -1056,7 +1056,7 @@ export default function Dashboard() {
                   <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">To-Do List</h3>
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">
                     {commissionerTodoData.total === 0 ? (
-                      'All caught up! No pending tasks.'
+                      ''
                     ) : (
                       <>
                         {commissionerTodoData.pendingMembers > 0 && `${commissionerTodoData.pendingMembers} pending approval${commissionerTodoData.pendingMembers === 1 ? '' : 's'}`}
