@@ -1,0 +1,90 @@
+**"Build a complete RSVP system for the game scheduling app with the following requirements:
+User Roles & Permissions
+
+Player: Can RSVP yes/no to games
+Captain: Can view RSVP counts, see who's not attending, request substitutes
+Commissioner: Can approve substitute requests
+
+Core RSVP Functionality
+For Players:
+
+Game Schedule Card Display: Show two buttons on each game card:
+
+Green checkmark (✓) for "attending"
+Red X (✗) for "not attending"
+
+
+Button States:
+
+Default: Both buttons available, semi-transparent
+After selection: Selected button becomes solid/highlighted, other becomes disabled
+Allow players to change their RSVP (toggle between yes/no)
+
+
+
+For Captains:
+
+RSVP Count Display: Show attendance summary on game cards:
+
+"X attending, Y not attending"
+
+
+Detailed View: Clickable count that opens modal showing:
+
+List of players attending (names)
+List of players not attending (names with "Request Substitute" button)
+
+
+Substitute Request:
+
+Button next to each non-attending player
+Opens modal with list of available players (not scheduled that day)
+Send substitute request with: original player, substitute player, game details
+
+
+
+For Commissioners:
+
+Pending Requests View: Dashboard showing all substitute requests
+Approve/Deny: Buttons for each request with reason field
+
+Database Schema Needed:
+sql-- Game RSVPs
+game_rsvps (
+  id, gameId, userId, status: 'attending'|'not_attending'|'no_response',
+  createdAt, updatedAt
+)
+
+-- Substitute Requests  
+substitute_requests (
+  id, gameId, originalPlayerId, substitutePlayerId, requestedBy,
+  status: 'pending'|'approved'|'denied', 
+  approvedBy, reason, createdAt
+)
+API Endpoints Required:
+
+POST /api/games/:gameId/rsvp (body: {status: 'attending'|'not_attending'})
+GET /api/games/:gameId/rsvp-summary (returns counts and player lists)
+GET /api/players/available/:date (players not scheduled that day)
+POST /api/substitute-requests (create new request)
+GET /api/substitute-requests (for commissioners)
+PUT /api/substitute-requests/:id (approve/deny)
+
+UI Components Needed:
+
+RSVPButtons - Green/red buttons for players
+RSVPSummary - Count display for captains
+RSVPDetailModal - Detailed attendance list
+SubstituteRequestModal - Available players list
+SubstituteRequestsDashboard - For commissioners
+
+Key Requirements:
+
+Real-time updates when RSVPs change
+Proper error handling and loading states
+Clear visual feedback for button states
+Mobile-responsive design
+Prevent duplicate requests
+Email notifications for substitute requests (optional)
+
+Please implement this step-by-step, starting with the basic player RSVP functionality, then captain views, then substitute request system. Test each component thoroughly before moving to the next."**
