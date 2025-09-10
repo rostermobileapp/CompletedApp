@@ -18,10 +18,11 @@ import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
 // Commissioner To-Do Modal Component
-function CommissionerToDoModal({ isOpen, onClose, leagueId }: { 
+function CommissionerToDoModal({ isOpen, onClose, leagueId, onNavigate }: { 
   isOpen: boolean; 
   onClose: () => void; 
-  leagueId: string | null; 
+  leagueId: string | null;
+  onNavigate: (path: string) => void;
 }) {
   // Fetch pending league member approvals
   const { data: pendingMembers = [], isLoading: pendingMembersLoading } = useQuery({
@@ -166,7 +167,7 @@ function CommissionerToDoModal({ isOpen, onClose, leagueId }: {
                           <Button 
                             size="sm" 
                             className="bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => navigate(`/league-management?league=${leagueId}`)}
+                            onClick={() => onNavigate(`/league-management?league=${leagueId}`)}
                             data-testid={`button-review-member-${member.id}`}
                           >
                             Review
@@ -212,7 +213,7 @@ function CommissionerToDoModal({ isOpen, onClose, leagueId }: {
                           <Button 
                             size="sm" 
                             className="bg-orange-600 hover:bg-orange-700 text-white"
-                            onClick={() => navigate(`/league-management?league=${leagueId}`)}
+                            onClick={() => onNavigate(`/league-management?league=${leagueId}`)}
                             data-testid={`button-verify-game-${game.id}`}
                           >
                             Verify
@@ -377,7 +378,7 @@ function CommissionerToDo({ leagueId, onNavigate }: {
       // Find games that need commissioner verification based on the correct business logic:
       // 1. Today's date is AFTER the game's date (past games)
       // 2. Game has problematic score submissions (0, 1, or 2 mismatched)
-      const gamesNeedingVerification = [];
+      const gamesNeedingVerification: any[] = [];
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Start of today
       
@@ -385,7 +386,7 @@ function CommissionerToDo({ leagueId, onNavigate }: {
         totalGames: allGames.length, 
         pastGames: 0, 
         gamesNeedingVerification: 0,
-        problemGames: []
+        problemGames: [] as any[]
       };
       
       for (const game of allGames) {
@@ -429,9 +430,9 @@ function CommissionerToDo({ leagueId, onNavigate }: {
           if (needsVerification) {
             debugInfo.gamesNeedingVerification++;
             debugInfo.problemGames.push({
-              homeTeam: game.homeTeam?.name,
-              awayTeam: game.awayTeam?.name,
-              date: game.scheduledAt,
+              homeTeam: game.homeTeam?.name || 'Unknown',
+              awayTeam: game.awayTeam?.name || 'Unknown', 
+              date: game.scheduledAt || new Date().toISOString(),
               reason: reason
             });
             gamesNeedingVerification.push(game);
@@ -873,15 +874,15 @@ export default function Dashboard() {
               className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden bg-primary"
               data-testid="button-profile"
             >
-              {user?.profileImageUrl ? (
+              {(user as any)?.profileImageUrl ? (
                 <img 
-                  src={user.profileImageUrl} 
+                  src={(user as any).profileImageUrl} 
                   alt="Profile"
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <span className="text-primary-foreground text-sm font-semibold">
-                  {user?.firstName?.[0] || 'U'}
+                  {(user as any)?.firstName?.[0] || 'U'}
                 </span>
               )}
             </button>
@@ -987,7 +988,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold" data-testid="text-games-remaining">
-                    {teamRecord?.gamesRemaining ?? 0}
+                    {(teamRecord as any)?.gamesRemaining ?? 0}
                   </p>
                   <p className="text-xs text-muted-foreground">Games Remaining</p>
                 </div>
@@ -1000,7 +1001,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold" data-testid="text-team-record">
-                    {teamRecord ? `${teamRecord.wins}-${teamRecord.losses}-${teamRecord.ties}` : '0-0-0'}
+                    {teamRecord ? `${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}` : '0-0-0'}
                   </p>
                   <p className="text-xs text-muted-foreground">Team Record</p>
                 </div>
@@ -1082,7 +1083,7 @@ export default function Dashboard() {
           </div>
         ) : Array.isArray(upcomingGames) && upcomingGames.length > 0 ? (
           <div className="space-y-3">
-            {upcomingGames
+            {(upcomingGames as any[])
               .filter((game: any) => {
                 // Ensure we only show games for teams the user is currently on
                 const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
@@ -1280,6 +1281,7 @@ export default function Dashboard() {
         isOpen={showCommissionerToDoModal}
         onClose={() => setShowCommissionerToDoModal(false)}
         leagueId={selectedLeagueId}
+        onNavigate={navigate}
       />
     </div>
   );
