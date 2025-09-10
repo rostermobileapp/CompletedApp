@@ -116,7 +116,7 @@ export default function GameDetails() {
   // Check out mutation
   const checkOutMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest("POST", `/api/games/${gameId}/check-out`, { teamId });
+      await apiRequest("POST", `/api/games/${gameId}/check-out`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });

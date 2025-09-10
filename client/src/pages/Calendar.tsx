@@ -60,7 +60,7 @@ export default function Calendar() {
   // Check out mutation
   const checkOutMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/check-out`, "POST", { teamId });
+      await apiRequest(`/api/games/${gameId}/check-out`, "POST", {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });

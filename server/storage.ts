@@ -1060,20 +1060,43 @@ export class DatabaseStorage implements IStorage {
     return attendance;
   }
 
+  async getUserTeamForGame(gameId: string, userId: string): Promise<any | null> {
+    // Get the game to find which teams are playing
+    const game = await this.getGame(gameId);
+    if (!game) return null;
+    
+    // Get user's teams
+    const userTeams = await this.getUserTeams(userId);
+    
+    // Find which team the user is on for this game
+    const userTeam = userTeams.find(team => 
+      team.id === game.homeTeamId || team.id === game.awayTeamId
+    );
+    
+    return userTeam || null;
+  }
+
   async checkOutFromGame(gameId: string, userId: string): Promise<any> {
+    // First, try to get the user's team for this game
+    const userTeam = await this.getUserTeamForGame(gameId, userId);
+    
     const [attendance] = await db
-      .update(gameAttendance)
-      .set({
+      .insert(gameAttendance)
+      .values({
+        gameId,
+        userId,
+        teamId: userTeam?.id || '', // Use empty string if no team found
         status: 'checked_out',
         checkedOutAt: new Date(),
-        updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(gameAttendance.gameId, gameId),
-          eq(gameAttendance.userId, userId)
-        )
-      )
+      .onConflictDoUpdate({
+        target: [gameAttendance.gameId, gameAttendance.userId],
+        set: {
+          status: 'checked_out',
+          checkedOutAt: new Date(),
+          updatedAt: new Date(),
+        },
+      })
       .returning();
     return attendance;
   }
