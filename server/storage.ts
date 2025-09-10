@@ -7,6 +7,8 @@ import {
   teamMemberships,
   games,
   gameScoreSubmissions,
+  gameRsvps,
+  substituteRequests,
   messages,
   playerImports,
   importedPlayers,
@@ -29,6 +31,10 @@ import {
   type InsertGame,
   type GameScoreSubmission,
   type InsertGameScoreSubmission,
+  type GameRsvp,
+  type InsertGameRsvp,
+  type SubstituteRequest,
+  type InsertSubstituteRequest,
   type Message,
   type InsertMessage,
   type PlayerImport,
@@ -101,6 +107,17 @@ export interface IStorage {
   releaseBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game>;
   saveGameNotes(gameId: string, userId: string, teamId: string, notes: string): Promise<any>;
   deleteGame(id: string): Promise<void>;
+  
+  // RSVP operations
+  createOrUpdateRsvp(rsvp: InsertGameRsvp): Promise<GameRsvp>;
+  getGameRsvp(gameId: string, userId: string): Promise<GameRsvp | undefined>;
+  getGameRsvpSummary(gameId: string): Promise<{ attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }>;
+  getAvailablePlayers(date: Date, leagueId: string): Promise<User[]>;
+  
+  // Substitute request operations
+  createSubstituteRequest(request: InsertSubstituteRequest): Promise<SubstituteRequest>;
+  getSubstituteRequests(status?: string): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User })[]>;
+  updateSubstituteRequest(requestId: string, status: string, approverId?: string, reason?: string): Promise<SubstituteRequest>;
   
   
   // Message operations
@@ -1512,6 +1529,170 @@ export class DatabaseStorage implements IStorage {
       homeScore: isMatch ? homeSubmission.homeScore : undefined,
       awayScore: isMatch ? homeSubmission.awayScore : undefined,
     };
+  }
+
+  // RSVP operations
+  async createOrUpdateRsvp(rsvp: InsertGameRsvp): Promise<GameRsvp> {
+    const [existingRsvp] = await db
+      .select()
+      .from(gameRsvps)
+      .where(and(eq(gameRsvps.gameId, rsvp.gameId), eq(gameRsvps.userId, rsvp.userId)))
+      .limit(1);
+
+    if (existingRsvp) {
+      const [updatedRsvp] = await db
+        .update(gameRsvps)
+        .set({ status: rsvp.status, updatedAt: new Date() })
+        .where(and(eq(gameRsvps.gameId, rsvp.gameId), eq(gameRsvps.userId, rsvp.userId)))
+        .returning();
+      return updatedRsvp;
+    } else {
+      const [newRsvp] = await db
+        .insert(gameRsvps)
+        .values(rsvp)
+        .returning();
+      return newRsvp;
+    }
+  }
+
+  async getGameRsvp(gameId: string, userId: string): Promise<GameRsvp | undefined> {
+    const [rsvp] = await db
+      .select()
+      .from(gameRsvps)
+      .where(and(eq(gameRsvps.gameId, gameId), eq(gameRsvps.userId, userId)))
+      .limit(1);
+    return rsvp;
+  }
+
+  async getGameRsvpSummary(gameId: string): Promise<{ attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }> {
+    // Get all RSVPs for this game
+    const rsvps = await db
+      .select()
+      .from(gameRsvps)
+      .leftJoin(users, eq(gameRsvps.userId, users.id))
+      .where(eq(gameRsvps.gameId, gameId));
+
+    const attending = rsvps
+      .filter(r => r.game_rsvps.status === 'attending')
+      .map(r => ({ ...r.game_rsvps, user: r.users! }));
+
+    const notAttending = rsvps
+      .filter(r => r.game_rsvps.status === 'not_attending')
+      .map(r => ({ ...r.game_rsvps, user: r.users! }));
+
+    // Get all team members for this game to find no response users
+    const game = await this.getGameById(gameId);
+    if (!game) {
+      return { attending, notAttending, noResponse: [] };
+    }
+
+    const homeTeamMembers = await this.getTeamMembers(game.homeTeamId);
+    const awayTeamMembers = await this.getTeamMembers(game.awayTeamId);
+    const allTeamMembers = [...homeTeamMembers, ...awayTeamMembers];
+
+    const rsvpUserIds = rsvps.map(r => r.game_rsvps.userId);
+    const noResponse = allTeamMembers
+      .filter(member => !rsvpUserIds.includes(member.userId))
+      .map(member => member.user);
+
+    return { attending, notAttending, noResponse };
+  }
+
+  async getAvailablePlayers(date: Date, leagueId: string): Promise<User[]> {
+    // Get all league members
+    const leagueMembers = await this.getLeagueMembers(leagueId);
+    
+    // Get all games on the same date
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const gamesOnDate = await db
+      .select()
+      .from(games)
+      .where(
+        and(
+          eq(games.leagueId, leagueId),
+          gte(games.scheduledAt, startOfDay),
+          lte(games.scheduledAt, endOfDay)
+        )
+      );
+
+    // Get team members for all games on that date
+    const scheduledUserIds = new Set<string>();
+    for (const game of gamesOnDate) {
+      const homeMembers = await this.getTeamMembers(game.homeTeamId);
+      const awayMembers = await this.getTeamMembers(game.awayTeamId);
+      [...homeMembers, ...awayMembers].forEach(member => {
+        scheduledUserIds.add(member.userId);
+      });
+    }
+
+    // Return league members not scheduled for any game that day
+    return leagueMembers
+      .filter(member => !scheduledUserIds.has(member.userId))
+      .map(member => member.user);
+  }
+
+  // Substitute request operations
+  async createSubstituteRequest(request: InsertSubstituteRequest): Promise<SubstituteRequest> {
+    const [newRequest] = await db
+      .insert(substituteRequests)
+      .values(request)
+      .returning();
+    return newRequest;
+  }
+
+  async getSubstituteRequests(status?: string): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User })[]> {
+    const query = db
+      .select()
+      .from(substituteRequests)
+      .leftJoin(games, eq(substituteRequests.gameId, games.id))
+      .leftJoin(users, eq(substituteRequests.originalPlayerId, users.id))
+      .leftJoin(teams, eq(games.homeTeamId, teams.id))
+      .leftJoin(teams, eq(games.awayTeamId, teams.id));
+
+    const requests = await (status 
+      ? query.where(eq(substituteRequests.status, status as any))
+      : query);
+
+    const result = [];
+    for (const request of requests) {
+      const game = await this.getGameById(request.substitute_requests.gameId);
+      const originalPlayer = await this.getUser(request.substitute_requests.originalPlayerId);
+      const requestedByUser = await this.getUser(request.substitute_requests.requestedBy);
+      let substitutePlayer = undefined;
+      
+      if (request.substitute_requests.substitutePlayerId) {
+        substitutePlayer = await this.getUser(request.substitute_requests.substitutePlayerId);
+      }
+
+      if (game && originalPlayer && requestedByUser) {
+        result.push({
+          ...request.substitute_requests,
+          game,
+          originalPlayer,
+          substitutePlayer,
+          requestedByUser,
+        });
+      }
+    }
+
+    return result;
+  }
+
+  async updateSubstituteRequest(requestId: string, status: string, approverId?: string, reason?: string): Promise<SubstituteRequest> {
+    const updateData: any = { status };
+    if (approverId) updateData.approvedBy = approverId;
+    if (reason) updateData.reason = reason;
+
+    const [updatedRequest] = await db
+      .update(substituteRequests)
+      .set(updateData)
+      .where(eq(substituteRequests.id, requestId))
+      .returning();
+    return updatedRequest;
   }
 }
 
