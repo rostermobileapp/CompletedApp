@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format, isBefore, isAfter, addHours } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Check, X, ArrowLeft } from "lucide-react";
+import { Trophy, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -30,64 +30,8 @@ export default function Calendar() {
     queryKey: ["/api/user/games/all"],
   });
 
-  // Fetch user attendance statuses
-  const { data: userAttendanceStatuses } = useQuery({
-    queryKey: ["/api/user/attendance-statuses"],
-  });
 
-  // Check in mutation
-  const checkInMutation = useMutation({
-    mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      console.log('Checking into game:', gameId, 'teamId:', teamId);
-      const response = await apiRequest("POST", `/api/games/${gameId}/check-in`, { teamId });
-      console.log('Check-in response:', response);
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user/attendance-statuses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user/games/all"] });
-      queryClient.refetchQueries({ queryKey: ["/api/user/attendance-statuses"] });
-      toast({
-        title: "Checked In",
-        description: "You've successfully checked in to this game.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to check in. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
 
-  // Check out mutation
-  const checkOutMutation = useMutation({
-    mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      console.log('Checking out of game:', gameId, 'teamId:', teamId);
-      const response = await apiRequest("POST", `/api/games/${gameId}/check-out`, {});
-      console.log('Check-out response:', response);
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user/attendance-statuses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user/games/all"] });
-      queryClient.refetchQueries({ queryKey: ["/api/user/attendance-statuses"] });
-      toast({
-        title: "Checked Out",
-        description: "You've successfully checked out of this game.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to check out. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
 
   // Claim beverage duty mutation
   const claimBeverageDutyMutation = useMutation({
@@ -227,10 +171,6 @@ export default function Calendar() {
                   <div className="flex items-center gap-2">
                     {/* Beverage Duty Icon - Left side */}
                     {(() => {
-                      // Find user's attendance status for this game
-                      const userStatus = Array.isArray(userAttendanceStatuses) ? 
-                        userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
-                      
                       // Show beverage icon if user has beverage duty
                       const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
                       
@@ -248,15 +188,10 @@ export default function Calendar() {
                     })()}
                     {/* Claim Beverage Duty Button */}
                     {(() => {
-                      // Find user's attendance status for this game
-                      const userStatus = Array.isArray(userAttendanceStatuses) ? 
-                        userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
-                      
-                      // Show claim button only if no one has claimed beverage duty AND user is not checked out
+                      // Show claim button only if no one has claimed beverage duty
                       const noBeverageDutyClaimed = !(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
-                      const isCheckedOut = userStatus === 'checked_out';
                       
-                      return noBeverageDutyClaimed && !isCheckedOut;
+                      return noBeverageDutyClaimed;
                     })() && (
                       <Button
                         size="sm"
@@ -279,63 +214,6 @@ export default function Calendar() {
                         />
                       </Button>
                     )}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {(() => {
-                      // Find user's attendance status for this game
-                      const userStatus = Array.isArray(userAttendanceStatuses) ? 
-                        userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
-                      
-                      // Debug logging for buttons
-                      console.log(`Game ${game.id} buttons - userStatus:`, userStatus, 'userAttendanceStatuses:', userAttendanceStatuses);
-                      
-                      return (
-                        <div className="flex gap-1">
-                          {/* Green checkmark button - always shown */}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className={`h-8 w-8 p-0 ${userStatus === 'checked_in' ? 'bg-green-600 text-white border-green-600' : 'bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50'}`}
-                            onClick={() => {
-                              // Find which of user's teams is playing in this game
-                              const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
-                              const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
-                                              userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
-                              console.log('Check-in button clicked - userTeam:', userTeam, 'gameId:', game.id);
-                              if (userTeam) {
-                                checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                              }
-                            }}
-                            disabled={checkInMutation.isPending || userStatus === 'checked_in'}
-                            data-testid={`button-check-in-${game.id}`}
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          {/* Red X button - only shown when user is checked in */}
-                          {userStatus === 'checked_in' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 w-8 p-0 bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
-                              onClick={() => {
-                                // Find which of user's teams is playing in this game
-                                const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
-                                const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
-                                                userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
-                                console.log('Check-out button clicked - userTeam:', userTeam, 'gameId:', game.id);
-                                if (userTeam) {
-                                  checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                                }
-                              }}
-                              disabled={checkOutMutation.isPending}
-                              data-testid={`button-check-out-${game.id}`}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })()}
                   </div>
                 </div>
               </div>
