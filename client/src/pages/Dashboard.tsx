@@ -17,8 +17,8 @@ import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
-// Commissioner To-Do Modal Component
-function CommissionerToDoModal({ isOpen, onClose, leagueId, onNavigate }: { 
+// Needs Attention Modal Component
+function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: { 
   isOpen: boolean; 
   onClose: () => void; 
   leagueId: string | null;
@@ -102,7 +102,7 @@ function CommissionerToDoModal({ isOpen, onClose, leagueId, onNavigate }: {
       <div className="bg-card rounded-lg border border-border w-full max-w-6xl h-[90vh] flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-border">
-          <h2 className="text-2xl font-semibold text-center">Commissioner To-Do List</h2>
+          <h2 className="text-2xl font-semibold text-center">Needs Attention</h2>
           <p className="text-center text-muted-foreground mt-1">
             {totalTasks} task{totalTasks === 1 ? '' : 's'} requiring your attention
           </p>
@@ -360,8 +360,8 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
   );
 }
 
-// Commissioner To-Do Component for Score Verification
-function CommissionerToDo({ leagueId, onNavigate }: { 
+// Needs Attention Component for Score Verification
+function NeedsAttentionTasks({ leagueId, onNavigate }: { 
   leagueId: string; 
   onNavigate: (path: string) => void; 
 }) {
@@ -374,7 +374,7 @@ function CommissionerToDo({ leagueId, onNavigate }: {
       
       if (!Array.isArray(allGames)) return [];
       
-      // Find games that need commissioner verification based on the correct business logic:
+      // Find games that need verification based on the correct business logic:
       // 1. Today's date is AFTER the game's date (past games)
       // 2. Game has problematic score submissions (0, 1, or 2 mismatched)
       const gamesNeedingVerification: any[] = [];
@@ -628,8 +628,8 @@ export default function Dashboard() {
   // Standings modal state
   const [showStandingsModal, setShowStandingsModal] = useState(false);
   
-  // Commissioner To-Do modal state
-  const [showCommissionerToDoModal, setShowCommissionerToDoModal] = useState(false);
+  // Needs Attention modal state
+  const [showNeedsAttentionModal, setShowNeedsAttentionModal] = useState(false);
   
   const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
@@ -763,11 +763,11 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch commissioner to-do data for the permanent bar
-  const { data: commissionerTodoData } = useQuery({
-    queryKey: ['/api/commissioner/todo-summary', selectedLeagueId],
+  // Fetch needs attention data for the permanent bar
+  const { data: needsAttentionData } = useQuery({
+    queryKey: ['/api/needs-attention-summary', selectedLeagueId],
     queryFn: async () => {
-      if (!selectedLeagueId || tier !== 'commissioner') return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
+      if (!selectedLeagueId) return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
       
       try {
         // Fetch pending members
@@ -829,7 +829,7 @@ export default function Dashboard() {
         return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
       }
     },
-    enabled: !!selectedLeagueId && tier === 'commissioner',
+    enabled: !!selectedLeagueId,
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
@@ -1022,22 +1022,22 @@ export default function Dashboard() {
           }}
         />
       )}
-      {/* Permanent Commissioner To-Do Bar */}
-      {tier === 'commissioner' && selectedLeagueId && commissionerTodoData && (
+      {/* Permanent Needs Attention Bar */}
+      {selectedLeagueId && needsAttentionData && (
         <div className="px-6 mb-4">
           <div className="bg-black dark:bg-black border border-gray-600 rounded-lg">
             <button
-              onClick={() => setShowCommissionerToDoModal(true)}
+              onClick={() => setShowNeedsAttentionModal(true)}
               className="w-full flex items-center justify-between hover:bg-gray-800 transition-colors rounded-lg px-3 py-2"
-              data-testid="button-commissioner-todo-permanent"
+              data-testid="button-needs-attention-permanent"
             >
               <div className="flex items-center gap-3">
                 <Settings className="w-4 h-4 text-white" />
-                <span className="text-white font-medium text-sm">Commissioner Tasks</span>
+                <span className="text-white font-medium text-sm">Needs Attention</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">{commissionerTodoData.total}</span>
+                  <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
                 </div>
                 <ChevronDown className="w-4 h-4 text-white" />
               </div>
@@ -1045,9 +1045,9 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* Commissioner To-Do Section */}
-      {tier === 'commissioner' && selectedLeagueId && (
-        <CommissionerToDo 
+      {/* Needs Attention Section */}
+      {selectedLeagueId && (
+        <NeedsAttentionTasks 
           leagueId={selectedLeagueId} 
           onNavigate={navigate}
         />
@@ -1262,10 +1262,10 @@ export default function Dashboard() {
         onClose={() => setShowStandingsModal(false)}
         leagueId={selectedLeagueId}
       />
-      {/* Commissioner To-Do Modal */}
-      <CommissionerToDoModal 
-        isOpen={showCommissionerToDoModal}
-        onClose={() => setShowCommissionerToDoModal(false)}
+      {/* Needs Attention Modal */}
+      <NeedsAttentionModal 
+        isOpen={showNeedsAttentionModal}
+        onClose={() => setShowNeedsAttentionModal(false)}
         leagueId={selectedLeagueId}
         onNavigate={navigate}
       />
