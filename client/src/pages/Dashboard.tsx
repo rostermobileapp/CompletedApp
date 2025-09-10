@@ -121,7 +121,6 @@ function CommissionerToDoModal({ isOpen, onClose, leagueId, onNavigate }: {
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <Check className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                <p className="text-lg font-medium text-green-600">All caught up!</p>
                 <p className="text-muted-foreground">No pending tasks at this time.</p>
               </div>
             </div>
