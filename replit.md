@@ -32,6 +32,20 @@ User authentication leverages Replit's OpenID Connect provider with session-base
 
 Authorization is implemented at both the API level (middleware checks) and UI level (conditional rendering based on subscription status). This ensures security while providing clear upgrade paths for users.
 
+# Recent Changes
+
+## Universal Needs Attention System (September 2025)
+
+Implemented a universal "Needs Attention" task management system that replaced the previous commissioner-only todo system. This system provides a persistent black notification bar on the dashboard for all users, displaying pending tasks that require user action. The system includes:
+
+- **Universal Access**: Available to all users regardless of subscription tier
+- **Single-line Interface**: Compact notification bar matching the league selection dropdown design
+- **Red Badge Notifications**: Clear visual indicator showing the number of pending tasks
+- **Modal Details**: Expandable modal window showing detailed task breakdown including pending member approvals and score verifications
+- **Real-time Updates**: Automatic refresh every 30 seconds to keep task counts current
+
+The system maintains strict team boundaries and role-based functionality while providing a unified interface for task management across all user types.
+
 # External Dependencies
 
 ## Third-Party Services

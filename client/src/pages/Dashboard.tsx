@@ -233,7 +233,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
             <Button 
               onClick={onClose}
               className="px-8 py-2"
-              data-testid="button-close-commissioner-todo"
+              data-testid="button-close-needs-attention"
             >
               Close
             </Button>
@@ -381,13 +381,6 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Start of today
       
-      const debugInfo = { 
-        totalGames: allGames.length, 
-        pastGames: 0, 
-        gamesNeedingVerification: 0,
-        problemGames: [] as any[]
-      };
-      
       for (const game of allGames) {
         const gameDate = new Date(game.scheduledAt);
         gameDate.setHours(0, 0, 0, 0); // Start of game date
@@ -396,8 +389,6 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
         if (gameDate >= today) {
           continue; // Skip future games
         }
-        
-        debugInfo.pastGames++;
         
         try {
           const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
@@ -427,13 +418,6 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
           }
           
           if (needsVerification) {
-            debugInfo.gamesNeedingVerification++;
-            debugInfo.problemGames.push({
-              homeTeam: game.homeTeam?.name || 'Unknown',
-              awayTeam: game.awayTeam?.name || 'Unknown', 
-              date: game.scheduledAt || new Date().toISOString(),
-              reason: reason
-            });
             gamesNeedingVerification.push(game);
           }
         } catch (error) {
@@ -442,39 +426,14 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
         }
       }
       
-      // Store debug info globally for inspection
-      (window as any).commissionerDebug = debugInfo;
-      
       return gamesNeedingVerification;
     },
     enabled: !!leagueId,
   });
 
-  if (!Array.isArray(gamesNeedingVerification) || gamesNeedingVerification.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="px-6 mb-4">
-      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-        <button
-          onClick={() => onNavigate(`/league-management?league=${leagueId}`)}
-          className="w-full flex items-center justify-between hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors rounded p-1"
-          data-testid="button-commissioner-todo"
-        >
-          <div className="flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-blue-600" />
-            <span className="text-sm font-medium text-blue-600">
-              {gamesNeedingVerification.length} game{gamesNeedingVerification.length === 1 ? '' : 's'} need score verification
-            </span>
-          </div>
-          <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">{gamesNeedingVerification.length}</span>
-          </div>
-        </button>
-      </div>
-    </div>
-  );
+  // This component no longer renders UI since the permanent "Needs Attention" bar
+  // in the main component handles all needs attention tasks
+  return null;
 }
 
 // Captain To-Do Component for Score Submission Tasks
