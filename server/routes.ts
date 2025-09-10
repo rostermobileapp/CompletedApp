@@ -11,6 +11,8 @@ import {
   insertLeagueMembershipSchema,
   insertTeamMembershipSchema,
   insertGameSchema,
+  insertGameRsvpSchema,
+  insertSubstituteRequestSchema,
   insertMessageSchema,
 } from "@shared/schema";
 import Stripe from "stripe";
@@ -983,6 +985,215 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error saving game notes:', error);
       res.status(500).json({ message: 'Failed to save notes' });
+    }
+  });
+
+  // RSVP routes
+  app.post('/api/games/:gameId/rsvp', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const userId = req.user.claims.sub;
+      const { status } = req.body;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      if (!status || !['attending', 'not_attending'].includes(status)) {
+        return res.status(400).json({ message: 'Valid status (attending/not_attending) is required' });
+      }
+
+      // Verify the game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Verify user is on one of the teams
+      const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
+      const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+      const isOnTeam = [...homeTeamMembers, ...awayTeamMembers].some(member => member.userId === userId);
+      
+      if (!isOnTeam) {
+        return res.status(403).json({ message: 'You must be on one of the teams to RSVP' });
+      }
+
+      const rsvpData = insertGameRsvpSchema.parse({
+        gameId,
+        userId,
+        status,
+      });
+
+      const rsvp = await storage.createOrUpdateRsvp(rsvpData);
+      res.json(rsvp);
+    } catch (error) {
+      console.error('Error updating RSVP:', error);
+      res.status(500).json({ message: 'Failed to update RSVP' });
+    }
+  });
+
+  app.get('/api/games/:gameId/rsvp-summary', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const userId = req.user.claims.sub;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      // Verify the game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Check if user is captain or commissioner
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(game.leagueId);
+      const isCommissioner = league && league.commissionerId === userId;
+      
+      const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
+      const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+      const isHomeCaptain = homeTeamMembers.some(m => m.userId === userId && m.isCaptain);
+      const isAwayCaptain = awayTeamMembers.some(m => m.userId === userId && m.isCaptain);
+      
+      if (!isCommissioner && !isHomeCaptain && !isAwayCaptain) {
+        return res.status(403).json({ message: 'Captain or Commissioner access required' });
+      }
+
+      const summary = await storage.getGameRsvpSummary(gameId);
+      res.json(summary);
+    } catch (error) {
+      console.error('Error fetching RSVP summary:', error);
+      res.status(500).json({ message: 'Failed to fetch RSVP summary' });
+    }
+  });
+
+  app.get('/api/players/available/:date', isAuthenticated, async (req: any, res) => {
+    try {
+      const { date } = req.params;
+      const { leagueId } = req.query;
+      const userId = req.user.claims.sub;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      if (!leagueId) {
+        return res.status(400).json({ message: 'League ID is required' });
+      }
+
+      // Check if user is captain or commissioner
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(leagueId as string);
+      const isCommissioner = league && league.commissionerId === userId;
+      
+      // For captain check, we need to verify they're captain of a team in this league
+      const userTeams = await storage.getUserTeams(userId);
+      const userTeamsInLeague = userTeams.filter(team => team.leagueId === leagueId);
+      const isTeamCaptain = userTeamsInLeague.some(team => team.captainId === userId);
+      
+      if (!isCommissioner && !isTeamCaptain) {
+        return res.status(403).json({ message: 'Captain or Commissioner access required' });
+      }
+
+      const availablePlayers = await storage.getAvailablePlayers(new Date(date), leagueId as string);
+      res.json(availablePlayers);
+    } catch (error) {
+      console.error('Error fetching available players:', error);
+      res.status(500).json({ message: 'Failed to fetch available players' });
+    }
+  });
+
+  // Substitute request routes
+  app.post('/api/substitute-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { gameId, originalPlayerId, substitutePlayerId } = req.body;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      // Verify the game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Check if user is captain
+      const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
+      const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+      const isHomeCaptain = homeTeamMembers.some(m => m.userId === userId && m.isCaptain);
+      const isAwayCaptain = awayTeamMembers.some(m => m.userId === userId && m.isCaptain);
+      
+      if (!isHomeCaptain && !isAwayCaptain) {
+        return res.status(403).json({ message: 'Captain access required' });
+      }
+
+      const requestData = insertSubstituteRequestSchema.parse({
+        gameId,
+        originalPlayerId,
+        substitutePlayerId,
+        requestedBy: userId,
+      });
+
+      const request = await storage.createSubstituteRequest(requestData);
+      res.json(request);
+    } catch (error) {
+      console.error('Error creating substitute request:', error);
+      res.status(500).json({ message: 'Failed to create substitute request' });
+    }
+  });
+
+  app.get('/api/substitute-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { status } = req.query;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      // Check if user is commissioner
+      const user = await storage.getUser(userId);
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: 'Commissioner access required' });
+      }
+
+      const requests = await storage.getSubstituteRequests(status as string);
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching substitute requests:', error);
+      res.status(500).json({ message: 'Failed to fetch substitute requests' });
+    }
+  });
+
+  app.put('/api/substitute-requests/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requestId = req.params.id;
+      const { status, reason } = req.body;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      if (!status || !['approved', 'denied'].includes(status)) {
+        return res.status(400).json({ message: 'Valid status (approved/denied) is required' });
+      }
+
+      // Check if user is commissioner
+      const user = await storage.getUser(userId);
+      if (!user || user.subscriptionTier !== 'commissioner') {
+        return res.status(403).json({ message: 'Commissioner access required' });
+      }
+
+      const updatedRequest = await storage.updateSubstituteRequest(requestId, status, userId, reason);
+      res.json(updatedRequest);
+    } catch (error) {
+      console.error('Error updating substitute request:', error);
+      res.status(500).json({ message: 'Failed to update substitute request' });
     }
   });
 
