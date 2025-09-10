@@ -820,6 +820,14 @@ export default function Dashboard() {
         const pendingMembersCount = Array.isArray(pendingMembers) ? pendingMembers.length : 0;
         const total = pendingMembersCount + gamesNeedingVerification;
         
+        console.log('Commissioner TODO Debug:', {
+          tier,
+          selectedLeagueId,
+          pendingMembersCount,
+          gamesNeedingVerification,
+          total
+        });
+        
         return {
           pendingMembers: pendingMembersCount,
           gamesNeedingVerification,
@@ -1023,7 +1031,17 @@ export default function Dashboard() {
         />
       )}
       {/* Permanent Commissioner To-Do Bar */}
-      {tier === 'commissioner' && selectedLeagueId && commissionerTodoData && commissionerTodoData.total > 0 && (
+      {(() => {
+        console.log('Commissioner To-Do Bar Debug:', {
+          tier,
+          isCommissioner: tier === 'commissioner',
+          selectedLeagueId,
+          commissionerTodoData,
+          shouldShow: tier === 'commissioner' && selectedLeagueId && commissionerTodoData
+        });
+        return null;
+      })()}
+      {tier === 'commissioner' && selectedLeagueId && commissionerTodoData && (
         <div className="px-6 mb-4">
           <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950 dark:to-orange-950 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 shadow-sm">
             <button
@@ -1040,9 +1058,15 @@ export default function Dashboard() {
                     Commissioner Tasks
                   </h3>
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                    {commissionerTodoData.pendingMembers > 0 && `${commissionerTodoData.pendingMembers} pending approval${commissionerTodoData.pendingMembers === 1 ? '' : 's'}`}
-                    {commissionerTodoData.pendingMembers > 0 && commissionerTodoData.gamesNeedingVerification > 0 && ' • '}
-                    {commissionerTodoData.gamesNeedingVerification > 0 && `${commissionerTodoData.gamesNeedingVerification} score verification${commissionerTodoData.gamesNeedingVerification === 1 ? '' : 's'}`}
+                    {commissionerTodoData.total === 0 ? (
+                      'All caught up! No pending tasks.'
+                    ) : (
+                      <>
+                        {commissionerTodoData.pendingMembers > 0 && `${commissionerTodoData.pendingMembers} pending approval${commissionerTodoData.pendingMembers === 1 ? '' : 's'}`}
+                        {commissionerTodoData.pendingMembers > 0 && commissionerTodoData.gamesNeedingVerification > 0 && ' • '}
+                        {commissionerTodoData.gamesNeedingVerification > 0 && `${commissionerTodoData.gamesNeedingVerification} score verification${commissionerTodoData.gamesNeedingVerification === 1 ? '' : 's'}`}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
