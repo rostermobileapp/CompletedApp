@@ -99,6 +99,8 @@ export default function GameDetails() {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/attendance-statuses"] });
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/attendance`] });
+      queryClient.refetchQueries({ queryKey: ["/api/user/attendance-statuses"] });
       toast({
         title: "Checked In",
         description: "You've successfully checked in to this game.",
@@ -122,6 +124,8 @@ export default function GameDetails() {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/attendance-statuses"] });
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/attendance`] });
+      queryClient.refetchQueries({ queryKey: ["/api/user/attendance-statuses"] });
       toast({
         title: "Checked Out",
         description: "You've successfully checked out of this game.",
