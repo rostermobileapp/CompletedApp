@@ -276,65 +276,46 @@ export default function Calendar() {
                       const userStatus = Array.isArray(userAttendanceStatuses) ? 
                         userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
                       
-                      if (userStatus === 'checked_in') {
-                        return (
-                          <div className="text-center">
-                            <div className="bg-green-500/50 text-white w-8 h-8 rounded flex items-center justify-center" data-testid={`status-confirmed-${game.id}`}>
-                              <Check className="w-4 h-4" />
-                            </div>
-                          </div>
-                        );
-                      } else if (userStatus === 'checked_out') {
-                        return (
-                          <div className="text-center">
-                            <div className="bg-red-500/50 text-white w-8 h-8 rounded flex items-center justify-center" data-testid={`status-declined-${game.id}`}>
-                              <X className="w-4 h-4" />
-                            </div>
-                          </div>
-                        );
-                      } else {
-                        // No response yet, show buttons
-                        return (
-                          <div className="flex gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 w-8 p-0 bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50"
-                              onClick={() => {
-                                // Find which of user's teams is playing in this game
-                                const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
-                                const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
-                                                userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
-                                if (userTeam) {
-                                  checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                                }
-                              }}
-                              disabled={checkInMutation.isPending}
-                              data-testid={`button-check-in-${game.id}`}
-                            >
-                              <Check className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 w-8 p-0 bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
-                              onClick={() => {
-                                // Find which of user's teams is playing in this game
-                                const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
-                                const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
-                                                userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
-                                if (userTeam) {
-                                  checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                                }
-                              }}
-                              disabled={checkOutMutation.isPending}
-                              data-testid={`button-check-out-${game.id}`}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        );
-                      }
+                      return (
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={`h-8 w-8 p-0 ${userStatus === 'checked_in' ? 'bg-green-600 text-white border-green-600' : 'bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50'}`}
+                            onClick={() => {
+                              // Find which of user's teams is playing in this game
+                              const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+                              const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
+                                              userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
+                              if (userTeam) {
+                                checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                              }
+                            }}
+                            disabled={checkInMutation.isPending || userStatus === 'checked_in'}
+                            data-testid={`button-check-in-${game.id}`}
+                          >
+                            <Check className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={`h-8 w-8 p-0 ${userStatus === 'checked_out' ? 'bg-red-600 text-white border-red-600' : 'bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50'}`}
+                            onClick={() => {
+                              // Find which of user's teams is playing in this game
+                              const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+                              const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
+                                              userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
+                              if (userTeam) {
+                                checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                              }
+                            }}
+                            disabled={checkOutMutation.isPending || userStatus === 'checked_out'}
+                            data-testid={`button-check-out-${game.id}`}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      );
                     })()}
                   </div>
                 </div>
