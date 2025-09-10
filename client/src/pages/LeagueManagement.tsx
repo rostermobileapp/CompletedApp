@@ -746,6 +746,11 @@ export default function LeagueManagement() {
       return dateA.getTime() - dateB.getTime();
     });
   }, [gamesData]);
+  
+  // Centralized commissioner check (after league query)
+  const isCommissioner = React.useMemo(() => {
+    return Boolean(league && user && league.commissionerId === user.id);
+  }, [league, user]);
 
   // Form for creating teams
   const teamForm = useForm<CreateTeamForm>({
@@ -2940,7 +2945,7 @@ export default function LeagueManagement() {
                     {/* Current Game Score */}
                     {selectedGame.isCompleted || (selectedGame.homeScore !== null && selectedGame.awayScore !== null) ? (
                       <div className="space-y-4 mb-4">
-                        {isEditingGameScore && league?.commissionerId === user?.id ? (
+                        {isEditingGameScore && isCommissioner ? (
                           <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                             <p className="text-sm font-medium text-blue-600 mb-3 text-center">Edit Final Score:</p>
                             <div className="grid grid-cols-3 gap-3 items-center mb-4">
@@ -2991,13 +2996,25 @@ export default function LeagueManagement() {
                               </Button>
                               <Button
                                 onClick={() => {
+                                  if (!isCommissioner) {
+                                    toast({
+                                      title: "Access Denied",
+                                      description: "Only league commissioners can edit final scores.",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+                                  
                                   const home = parseInt(editGameHomeScore);
                                   const away = parseInt(editGameAwayScore);
                                   
-                                  if (isNaN(home) || isNaN(away) || home < 0 || away < 0 || editGameHomeScore.trim() === '' || editGameAwayScore.trim() === '') {
+                                  // Robust validation
+                                  if (editGameHomeScore.trim() === '' || editGameAwayScore.trim() === '' || 
+                                      isNaN(home) || isNaN(away) || home < 0 || away < 0 || 
+                                      !Number.isInteger(home) || !Number.isInteger(away)) {
                                     toast({
                                       title: "Invalid Score",
-                                      description: "Please enter valid scores (numbers only, 0 or greater).",
+                                      description: "Please enter valid whole numbers (0 or greater) for both teams.",
                                       variant: "destructive",
                                     });
                                     return;
@@ -3010,14 +3027,31 @@ export default function LeagueManagement() {
                                         setIsEditingGameScore(false);
                                         setEditGameHomeScore('');
                                         setEditGameAwayScore('');
-                                        // Invalidate related queries
+                                        
+                                        // Comprehensive cache invalidation
                                         queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games'] });
+                                        queryClient.invalidateQueries({ queryKey: ['/api/games', selectedGame.id] });
                                         queryClient.invalidateQueries({ queryKey: [`/api/games/${selectedGame.id}/score-submissions`] });
+                                        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'standings'] });
+                                        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+                                        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId] });
+                                        
+                                        toast({
+                                          title: "Score Updated",
+                                          description: "Final score has been successfully updated.",
+                                        });
+                                      },
+                                      onError: (error) => {
+                                        toast({
+                                          title: "Update Failed",
+                                          description: "Failed to update score. Please try again.",
+                                          variant: "destructive",
+                                        });
                                       }
                                     }
                                   );
                                 }}
-                                disabled={commissionerScoreOverrideMutation.isPending || !editGameHomeScore.trim() || !editGameAwayScore.trim() || isNaN(parseInt(editGameHomeScore)) || isNaN(parseInt(editGameAwayScore)) || parseInt(editGameHomeScore) < 0 || parseInt(editGameAwayScore) < 0}
+                                disabled={!isCommissioner || commissionerScoreOverrideMutation.isPending || !editGameHomeScore.trim() || !editGameAwayScore.trim() || isNaN(parseInt(editGameHomeScore)) || isNaN(parseInt(editGameAwayScore)) || parseInt(editGameHomeScore) < 0 || parseInt(editGameAwayScore) < 0}
                                 className="flex-1"
                                 data-testid="button-save-game-score-changes"
                               >
@@ -3029,14 +3063,25 @@ export default function LeagueManagement() {
                           <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
                             <div className="flex items-center justify-between mb-2">
                               <p className="text-sm font-medium text-green-600">Final Score:</p>
-                              {league?.commissionerId === user?.id && (
+                              {isCommissioner && (
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   onClick={() => {
+                                    if (!isCommissioner) {
+                                      toast({
+                                        title: "Access Denied",
+                                        description: "Only league commissioners can edit final scores.",
+                                        variant: "destructive",
+                                      });
+                                      return;
+                                    }
                                     setIsEditingGameScore(true);
-                                    setEditGameHomeScore(selectedGame.homeScore?.toString() || '0');
-                                    setEditGameAwayScore(selectedGame.awayScore?.toString() || '0');
+                                    // Prefill with current scores, ensuring we have valid numbers
+                                    const currentHomeScore = selectedGame.homeScore ?? 0;
+                                    const currentAwayScore = selectedGame.awayScore ?? 0;
+                                    setEditGameHomeScore(currentHomeScore.toString());
+                                    setEditGameAwayScore(currentAwayScore.toString());
                                   }}
                                   className="flex items-center gap-2 text-xs"
                                   data-testid="button-edit-game-score"
