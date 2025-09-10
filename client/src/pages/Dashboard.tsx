@@ -81,9 +81,6 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
                     >
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground font-mono w-6">
-                            {index + 1}.
-                          </span>
                           <span className="font-medium">{team.teamName}</span>
                         </div>
                       </td>
