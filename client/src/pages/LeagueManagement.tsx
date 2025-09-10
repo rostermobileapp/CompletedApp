@@ -52,6 +52,7 @@ type LeagueMember = {
   id: string;
   userId: string;
   skillLevel: string | null;
+  skillRating?: number; // Added missing property
   status: string;
   assignedTeamId?: string;
   isCaptain?: boolean;
@@ -352,14 +353,31 @@ type Team = {
   name: string;
   captainId: string;
   leagueId: string;
+  isFreeAgents?: boolean; // Added missing property
 };
 
 type Game = {
   id: string;
+  leagueId: string;
+  seasonId?: string;
   homeTeamId: string;
   awayTeamId: string;
   scheduledAt: string;
-  venue: string;
+  venue?: string;
+  lockerRoom?: string; // Added missing property
+  homeTeamLockerRoom?: string;
+  awayTeamLockerRoom?: string;
+  homeScore?: number; // Added missing property
+  awayScore?: number; // Added missing property
+  isCompleted: boolean; // Added missing property
+  homeBeverageDutyUserId?: string;
+  homeBeverageDutyClaimedAt?: string;
+  awayBeverageDutyUserId?: string;
+  awayBeverageDutyClaimedAt?: string;
+  createdAt: string;
+  // Add team objects that are commonly included in API responses
+  homeTeam?: Team;
+  awayTeam?: Team;
 };
 
 const createTeamSchema = insertTeamSchema.extend({
@@ -626,6 +644,7 @@ export default function LeagueManagement() {
     isCaptain: false,
     position: '',
     skillLevel: '',
+    skillRating: 1,
     jerseyNumber: '',
     notes: ''
   });
@@ -705,7 +724,7 @@ export default function LeagueManagement() {
   });
 
   // Fetch score submissions for selected game
-  const { data: selectedGameScoreSubmissions = [] } = useQuery({
+  const { data: selectedGameScoreSubmissions = [] } = useQuery<any[]>({
     queryKey: [`/api/games/${selectedGame?.id}/score-submissions`],
     enabled: !!selectedGame?.id,
   });
@@ -1107,7 +1126,7 @@ export default function LeagueManagement() {
       
       toast({
         title: "Score Override Complete",
-        description: data.message || "Commissioner score has been set and game updated.",
+        description: "Commissioner score has been set and game updated.",
       });
     },
     onError: (error: any) => {
@@ -1593,6 +1612,7 @@ export default function LeagueManagement() {
                           isCaptain: member.isCaptain || false,
                           position: member.position || '',
                           skillLevel: member.skillLevel || '',
+                          skillRating: member.skillRating || 1,
                           jerseyNumber: member.jerseyNumber?.toString() || '',
                           notes: member.notes || ''
                         });
@@ -1823,6 +1843,7 @@ export default function LeagueManagement() {
                               assignedTeamId: member.assignedTeamId || '',
                               isCaptain: member.userId === selectedTeam.captainId,
                               position: member.position || '',
+                              skillLevel: member.skillLevel || '',
                               skillRating: member.skillRating || 1,
                               jerseyNumber: member.jerseyNumber?.toString() || '',
                               notes: member.notes || ''
@@ -1834,7 +1855,7 @@ export default function LeagueManagement() {
                             <div className="flex items-center gap-2">
                               <p className="font-medium">{formatUserName(member.user)}</p>
                               {!selectedTeam.isFreeAgents && member.userId === selectedTeam.captainId && (
-                                <Crown className="w-4 h-4 text-warning" title="Team Captain" />
+                                <Crown className="w-4 h-4 text-warning" />
                               )}
                             </div>
                             <div className="text-sm text-muted-foreground">
@@ -2701,7 +2722,7 @@ export default function LeagueManagement() {
                                   head_cell: "text-black font-medium text-base p-2",
                                   table: "w-full border-spacing-1",
                                   cell: "text-center p-1",
-                                }}
+                                } as any}
                               />
                             </div>
                           )}
@@ -2914,14 +2935,14 @@ export default function LeagueManagement() {
                         <div className="flex items-center justify-center space-x-4">
                           <div className="text-center">
                             <p className="text-sm text-muted-foreground">
-                              {teams.find(t => t.id === selectedGame.homeTeamId)?.name || 'Home'}
+                              {teams.find((t: Team) => t.id === selectedGame.homeTeamId)?.name || 'Home'}
                             </p>
                             <p className="text-2xl font-bold text-green-600">{selectedGame.homeScore}</p>
                           </div>
                           <div className="text-xl font-bold text-muted-foreground">-</div>
                           <div className="text-center">
                             <p className="text-sm text-muted-foreground">
-                              {teams.find(t => t.id === selectedGame.awayTeamId)?.name || 'Away'}
+                              {teams.find((t: Team) => t.id === selectedGame.awayTeamId)?.name || 'Away'}
                             </p>
                             <p className="text-2xl font-bold text-green-600">{selectedGame.awayScore}</p>
                           </div>
@@ -2948,14 +2969,14 @@ export default function LeagueManagement() {
                                   <div className="flex items-center space-x-4">
                                     <div className="text-center">
                                       <p className="text-xs text-muted-foreground">
-                                        {teams.find(t => t.id === selectedGame.homeTeamId)?.name || 'Home'}
+                                        {teams.find((t: Team) => t.id === selectedGame.homeTeamId)?.name || 'Home'}
                                       </p>
                                       <p className="text-lg font-bold">{submission.homeScore}</p>
                                     </div>
                                     <div className="text-sm font-bold text-muted-foreground">-</div>
                                     <div className="text-center">
                                       <p className="text-xs text-muted-foreground">
-                                        {teams.find(t => t.id === selectedGame.awayTeamId)?.name || 'Away'}
+                                        {teams.find((t: Team) => t.id === selectedGame.awayTeamId)?.name || 'Away'}
                                       </p>
                                       <p className="text-lg font-bold">{submission.awayScore}</p>
                                     </div>
@@ -3007,7 +3028,7 @@ export default function LeagueManagement() {
                           <div className="grid grid-cols-2 gap-3 mb-3">
                             <div>
                               <Label htmlFor="commissionerHomeScore" className="text-xs font-medium">
-                                {teams.find(t => t.id === selectedGame.homeTeamId)?.name || 'Home'} Score
+                                {teams.find((t: Team) => t.id === selectedGame.homeTeamId)?.name || 'Home'} Score
                               </Label>
                               <Input
                                 id="commissionerHomeScore"
@@ -3021,7 +3042,7 @@ export default function LeagueManagement() {
                             </div>
                             <div>
                               <Label htmlFor="commissionerAwayScore" className="text-xs font-medium">
-                                {teams.find(t => t.id === selectedGame.awayTeamId)?.name || 'Away'} Score
+                                {teams.find((t: Team) => t.id === selectedGame.awayTeamId)?.name || 'Away'} Score
                               </Label>
                               <Input
                                 id="commissionerAwayScore"
@@ -3121,8 +3142,8 @@ export default function LeagueManagement() {
               <div className="bg-muted p-4 rounded-lg mb-6">
                 <p className="text-sm font-medium mb-1">
                   {(() => {
-                    const homeTeam = teams.find(t => t.id === selectedGame.homeTeamId);
-                    const awayTeam = teams.find(t => t.id === selectedGame.awayTeamId);
+                    const homeTeam = teams.find((t: Team) => t.id === selectedGame.homeTeamId);
+                    const awayTeam = teams.find((t: Team) => t.id === selectedGame.awayTeamId);
                     return `${homeTeam?.name || 'Unknown'} vs ${awayTeam?.name || 'Unknown'}`;
                   })()}
                 </p>
@@ -3182,7 +3203,7 @@ export default function LeagueManagement() {
               <div className="bg-muted p-4 rounded-lg mb-6">
                 <p className="text-sm font-medium mb-1">
                   {(() => {
-                    const team = teams.find(t => t.id === teamToDelete);
+                    const team = teams.find((t: Team) => t.id === teamToDelete);
                     return team?.name || 'Unknown Team';
                   })()}
                 </p>
