@@ -282,6 +282,7 @@ export default function Calendar() {
                       
                       return (
                         <div className="flex gap-1">
+                          {/* Green checkmark button - always shown */}
                           <Button
                             size="sm"
                             variant="outline"
@@ -300,24 +301,27 @@ export default function Calendar() {
                           >
                             <Check className="w-4 h-4" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className={`h-8 w-8 p-0 ${userStatus === 'checked_out' ? 'bg-red-600 text-white border-red-600' : 'bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50'}`}
-                            onClick={() => {
-                              // Find which of user's teams is playing in this game
-                              const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
-                              const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
-                                              userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
-                              if (userTeam) {
-                                checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                              }
-                            }}
-                            disabled={checkOutMutation.isPending || userStatus === 'checked_out'}
-                            data-testid={`button-check-out-${game.id}`}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
+                          {/* Red X button - only shown when user is checked in */}
+                          {userStatus === 'checked_in' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0 bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
+                              onClick={() => {
+                                // Find which of user's teams is playing in this game
+                                const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+                                const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
+                                                userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
+                                if (userTeam) {
+                                  checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                                }
+                              }}
+                              disabled={checkOutMutation.isPending}
+                              data-testid={`button-check-out-${game.id}`}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       );
                     })()}
