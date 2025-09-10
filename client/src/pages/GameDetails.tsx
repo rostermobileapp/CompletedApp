@@ -2,7 +2,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Check, X, ArrowLeft, MapPin, Clock, MessageSquare, Target } from "lucide-react";
+import { Trophy, Check, X, ArrowLeft, MapPin, Clock, MessageSquare, Target, Users } from "lucide-react";
+import { RSVPButtons } from "@/components/RSVPButtons";
+import { RSVPSummary } from "@/components/RSVPSummary";
+import { RSVPDetailModal } from "@/components/RSVPDetailModal";
+import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
+import { SubstituteRequestsDashboard } from "@/components/SubstituteRequestsDashboard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -25,6 +30,9 @@ export default function GameDetails() {
   const [notes, setNotes] = useState("");
   const [homeScore, setHomeScore] = useState("");
   const [awayScore, setAwayScore] = useState("");
+  const [showRSVPModal, setShowRSVPModal] = useState(false);
+  const [showSubstituteModal, setShowSubstituteModal] = useState(false);
+  const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string } | null>(null);
 
   // Fetch user's teams
   const { data: userTeams } = useQuery({
@@ -213,6 +221,9 @@ export default function GameDetails() {
   // Check if user is commissioner
   const isCommissioner = league?.commissionerId === (user as any)?.id;
   
+  // Check if game is in the future for RSVP purposes
+  const isUpcomingGame = new Date(game.scheduledAt) > new Date();
+  
   const canSubmitScore = (isCaptain || isCommissioner) && isScoreSubmissionAvailable;
 
   // Check if game is already completed
@@ -293,6 +304,47 @@ export default function GameDetails() {
           </div>
         </div>
 
+        {/* RSVP Section */}
+        {!isGameCompleted && (
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              RSVP & Attendance
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Player RSVP Buttons */}
+              {user && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Your Response:</p>
+                  <RSVPButtons 
+                    gameId={game.id} 
+                    userId={(user as any).id}
+                  />
+                </div>
+              )}
+              
+              {/* Captain/Commissioner Summary */}
+              {(isCaptain || isCommissioner) && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Team Attendance:</p>
+                  <RSVPSummary 
+                    gameId={game.id}
+                    onViewDetails={() => setShowRSVPModal(true)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Substitute Requests Dashboard for Commissioners */}
+        {isCommissioner && (
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h3 className="text-lg font-semibold mb-4">Substitute Requests</h3>
+            <SubstituteRequestsDashboard />
+          </div>
+        )}
 
         {/* Beverage Responsibility */}
         <div className="bg-card rounded-xl border border-border p-6">
@@ -531,6 +583,35 @@ export default function GameDetails() {
           </div>
         )}
       </div>
+      
+      {/* RSVP Detail Modal */}
+      <RSVPDetailModal
+        gameId={game.id}
+        isOpen={showRSVPModal}
+        onClose={() => setShowRSVPModal(false)}
+        onRequestSubstitute={(playerId, playerName) => {
+          setSubstituteRequestData({ playerId, playerName });
+          setShowRSVPModal(false);
+          setShowSubstituteModal(true);
+        }}
+        showSubstituteButtons={isCaptain}
+      />
+      
+      {/* Substitute Request Modal */}
+      {substituteRequestData && (
+        <SubstituteRequestModal
+          gameId={game.id}
+          gameDate={game.scheduledAt}
+          leagueId={game.leagueId}
+          originalPlayerId={substituteRequestData.playerId}
+          originalPlayerName={substituteRequestData.playerName}
+          isOpen={showSubstituteModal}
+          onClose={() => {
+            setShowSubstituteModal(false);
+            setSubstituteRequestData(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { format, isBefore, isAfter, addHours } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Trophy, ArrowLeft } from "lucide-react";
+import { RSVPButtons } from "@/components/RSVPButtons";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -168,52 +169,63 @@ export default function Calendar() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {/* Beverage Duty Icon - Left side */}
-                    {(() => {
-                      // Show beverage icon if user has beverage duty
-                      const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
-                      
-                      return hasBeverageDuty ? (
-                        <div className="flex items-center">
+                  <div className="flex flex-col items-end gap-2">
+                    {/* RSVP Buttons for upcoming games */}
+                    {!isCompleted && !isPastGame && user && (
+                      <RSVPButtons 
+                        gameId={game.id} 
+                        userId={(user as any).id}
+                        className="mb-1"
+                      />
+                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      {/* Beverage Duty Icon - Left side */}
+                      {(() => {
+                        // Show beverage icon if user has beverage duty
+                        const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
+                        
+                        return hasBeverageDuty ? (
+                          <div className="flex items-center">
+                            <img 
+                              src={beverageJarUrl}
+                              alt="Beverage Duty"
+                              className="h-8 w-auto"
+                              style={{ aspectRatio: '9/16' }}
+                              data-testid={`icon-beverage-duty-${game.id}`}
+                            />
+                          </div>
+                        ) : null;
+                      })()}
+                      {/* Claim Beverage Duty Button */}
+                      {(() => {
+                        // Show claim button only if no one has claimed beverage duty
+                        const noBeverageDutyClaimed = !(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
+                        
+                        return noBeverageDutyClaimed;
+                      })() && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
+                          onClick={() => {
+                            const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
+                            if (userTeam && primaryTeam) {
+                              claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                            }
+                          }}
+                          disabled={claimBeverageDutyMutation.isPending}
+                          data-testid={`button-claim-beverage-duty-${game.id}`}
+                        >
                           <img 
                             src={beverageJarUrl}
-                            alt="Beverage Duty"
-                            className="h-8 w-auto"
+                            alt="Claim Beverage Duty"
+                            className="h-4 w-auto"
                             style={{ aspectRatio: '9/16' }}
-                            data-testid={`icon-beverage-duty-${game.id}`}
                           />
-                        </div>
-                      ) : null;
-                    })()}
-                    {/* Claim Beverage Duty Button */}
-                    {(() => {
-                      // Show claim button only if no one has claimed beverage duty
-                      const noBeverageDutyClaimed = !(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
-                      
-                      return noBeverageDutyClaimed;
-                    })() && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
-                        onClick={() => {
-                          const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
-                          if (userTeam && primaryTeam) {
-                            claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                          }
-                        }}
-                        disabled={claimBeverageDutyMutation.isPending}
-                        data-testid={`button-claim-beverage-duty-${game.id}`}
-                      >
-                        <img 
-                          src={beverageJarUrl}
-                          alt="Claim Beverage Duty"
-                          className="h-4 w-auto"
-                          style={{ aspectRatio: '9/16' }}
-                        />
-                      </Button>
-                    )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
