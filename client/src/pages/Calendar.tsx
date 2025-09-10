@@ -38,7 +38,10 @@ export default function Calendar() {
   // Check in mutation
   const checkInMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest("POST", `/api/games/${gameId}/check-in`, { teamId });
+      console.log('Checking into game:', gameId, 'teamId:', teamId);
+      const response = await apiRequest("POST", `/api/games/${gameId}/check-in`, { teamId });
+      console.log('Check-in response:', response);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -62,7 +65,10 @@ export default function Calendar() {
   // Check out mutation
   const checkOutMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest("POST", `/api/games/${gameId}/check-out`, {});
+      console.log('Checking out of game:', gameId, 'teamId:', teamId);
+      const response = await apiRequest("POST", `/api/games/${gameId}/check-out`, {});
+      console.log('Check-out response:', response);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -280,6 +286,9 @@ export default function Calendar() {
                       const userStatus = Array.isArray(userAttendanceStatuses) ? 
                         userAttendanceStatuses.find((status: any) => status.gameId === game.id)?.status : null;
                       
+                      // Debug logging for buttons
+                      console.log(`Game ${game.id} buttons - userStatus:`, userStatus, 'userAttendanceStatuses:', userAttendanceStatuses);
+                      
                       return (
                         <div className="flex gap-1">
                           {/* Green checkmark button - always shown */}
@@ -292,6 +301,7 @@ export default function Calendar() {
                               const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
                               const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
                                               userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
+                              console.log('Check-in button clicked - userTeam:', userTeam, 'gameId:', game.id);
                               if (userTeam) {
                                 checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                               }
@@ -312,6 +322,7 @@ export default function Calendar() {
                                 const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
                                 const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
                                                 userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
+                                console.log('Check-out button clicked - userTeam:', userTeam, 'gameId:', game.id);
                                 if (userTeam) {
                                   checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                                 }
