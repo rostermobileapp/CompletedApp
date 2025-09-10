@@ -1014,7 +1014,7 @@ export default function Dashboard() {
       {selectedLeagueMembership?.isCaptain && selectedLeagueId && (
         <CaptainToDo 
           leagueId={selectedLeagueId} 
-          userTeams={userTeams} 
+          userTeams={userTeams as any[]} 
           onNavigate={navigate}
           onOpenScoreModal={(game) => {
             setSelectedGameForScore(game);
