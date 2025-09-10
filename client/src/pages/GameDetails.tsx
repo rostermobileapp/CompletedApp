@@ -258,8 +258,11 @@ export default function GameDetails() {
     );
   }
 
-  const opponentTeam = game.homeTeam?.id === primaryTeam?.id ? game.awayTeam : game.homeTeam;
-  const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
+  // Find which of user's teams is playing in this game
+  const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+  const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
+                   userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
+  const opponentTeam = userTeam?.id === game.homeTeam?.id ? game.awayTeam : game.homeTeam;
   const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
   const beverageDutyClaimed = !!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
   const beverageDutyClaimedByOther = beverageDutyClaimed && !hasBeverageDuty;
@@ -392,7 +395,7 @@ export default function GameDetails() {
                   variant="outline"
                   className="bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50"
                   onClick={() => {
-                    if (userTeam && primaryTeam) {
+                    if (userTeam) {
                       checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                     }
                   }}
@@ -406,7 +409,7 @@ export default function GameDetails() {
                   variant="outline"
                   className="bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
                   onClick={() => {
-                    if (userTeam && primaryTeam) {
+                    if (userTeam) {
                       checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                     }
                   }}
@@ -426,7 +429,7 @@ export default function GameDetails() {
                   variant="outline"
                   className="bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50"
                   onClick={() => {
-                    if (userTeam && primaryTeam) {
+                    if (userTeam) {
                       checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                     }
                   }}
@@ -440,7 +443,7 @@ export default function GameDetails() {
                   variant="outline"
                   className="bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
                   onClick={() => {
-                    if (userTeam && primaryTeam) {
+                    if (userTeam) {
                       checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                     }
                   }}
@@ -478,7 +481,7 @@ export default function GameDetails() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    if (userTeam && primaryTeam) {
+                    if (userTeam) {
                       releaseBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                     }
                   }}
@@ -522,7 +525,7 @@ export default function GameDetails() {
                 <Button
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                   onClick={() => {
-                    if (userTeam && primaryTeam) {
+                    if (userTeam) {
                       claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                     }
                   }}

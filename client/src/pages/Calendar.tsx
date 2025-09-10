@@ -301,8 +301,11 @@ export default function Calendar() {
                               variant="outline"
                               className="h-8 w-8 p-0 bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50"
                               onClick={() => {
-                                const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
-                                if (userTeam && primaryTeam) {
+                                // Find which of user's teams is playing in this game
+                                const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+                                const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
+                                                userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
+                                if (userTeam) {
                                   checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                                 }
                               }}
@@ -316,8 +319,11 @@ export default function Calendar() {
                               variant="outline"
                               className="h-8 w-8 p-0 bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
                               onClick={() => {
-                                const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
-                                if (userTeam && primaryTeam) {
+                                // Find which of user's teams is playing in this game
+                                const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+                                const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
+                                                userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
+                                if (userTeam) {
                                   checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                                 }
                               }}
