@@ -80,7 +80,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
             ? "bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-lg scale-105" 
             : currentStatus === 'not_attending'
             ? "border-green-300 text-green-300 opacity-50 cursor-not-allowed"
-            : "border-green-600 text-green-600 hover:bg-green-50 hover:shadow-md"
+            : "border-green-600 text-green-600 hover:bg-green-600 hover:text-white hover:shadow-md"
         )}
         data-testid="button-attending"
       >
@@ -102,7 +102,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
             ? "bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-lg scale-105" 
             : currentStatus === 'attending'
             ? "border-red-300 text-red-300 opacity-50 cursor-not-allowed"
-            : "border-red-600 text-red-600 hover:bg-red-50 hover:shadow-md"
+            : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white hover:shadow-md"
         )}
         data-testid="button-not-attending"
       >

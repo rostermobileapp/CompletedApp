@@ -1013,8 +1013,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Game not found' });
       }
 
+      // Debug logging
+      console.log('RSVP Debug:', {
+        gameId,
+        userId,
+        teamId,
+        homeTeamId: game.homeTeamId,
+        awayTeamId: game.awayTeamId
+      });
+
       // Verify the team is playing in this game
       if (game.homeTeamId !== teamId && game.awayTeamId !== teamId) {
+        console.log('Team validation failed - team not in game');
         return res.status(403).json({ message: 'Team is not playing in this game' });
       }
 
@@ -1022,7 +1032,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamMembers = await storage.getTeamMembers(teamId);
       const isOnTeam = teamMembers.some(member => member.userId === userId);
       
+      console.log('User team validation:', {
+        teamMembers: teamMembers.map(m => ({ userId: m.userId, name: m.user?.email })),
+        isOnTeam
+      });
+      
       if (!isOnTeam) {
+        console.log('User validation failed - not on team');
         return res.status(403).json({ message: 'You must be on this team to RSVP' });
       }
 
