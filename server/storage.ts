@@ -48,7 +48,7 @@ import {
   type ImportedSchedule,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, alias } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -1645,32 +1645,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSubstituteRequests(status?: string): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User })[]> {
-    const query = db
-      .select()
-      .from(substituteRequests)
-      .leftJoin(games, eq(substituteRequests.gameId, games.id))
-      .leftJoin(users, eq(substituteRequests.originalPlayerId, users.id))
-      .leftJoin(teams, eq(games.homeTeamId, teams.id))
-      .leftJoin(teams, eq(games.awayTeamId, teams.id));
+    // Simplified approach - get requests and populate via separate queries
+    let query = db.select().from(substituteRequests);
+    
+    if (status) {
+      query = query.where(eq(substituteRequests.status, status as any));
+    }
 
-    const requests = await (status 
-      ? query.where(eq(substituteRequests.status, status as any))
-      : query);
-
+    const requests = await query;
+    
     const result = [];
     for (const request of requests) {
-      const game = await this.getGameById(request.substitute_requests.gameId);
-      const originalPlayer = await this.getUser(request.substitute_requests.originalPlayerId);
-      const requestedByUser = await this.getUser(request.substitute_requests.requestedBy);
+      const game = await this.getGameById(request.gameId);
+      const originalPlayer = await this.getUser(request.originalPlayerId);
+      const requestedByUser = await this.getUser(request.requestedBy);
       let substitutePlayer = undefined;
       
-      if (request.substitute_requests.substitutePlayerId) {
-        substitutePlayer = await this.getUser(request.substitute_requests.substitutePlayerId);
+      if (request.substitutePlayerId) {
+        substitutePlayer = await this.getUser(request.substitutePlayerId);
       }
 
       if (game && originalPlayer && requestedByUser) {
         result.push({
-          ...request.substitute_requests,
+          ...request,
           game,
           originalPlayer,
           substitutePlayer,
