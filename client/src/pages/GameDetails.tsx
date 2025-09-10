@@ -200,6 +200,16 @@ export default function GameDetails() {
 
   // Find which of user's teams is playing in this game
   const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+  
+  // Debug logging for team detection (temporary)
+  console.log('GameDetails Team Debug:', {
+    userTeamIds,
+    homeTeamId: game.homeTeam?.id,
+    awayTeamId: game.awayTeam?.id,
+    homeTeamIncluded: userTeamIds.includes(game.homeTeam?.id),
+    awayTeamIncluded: userTeamIds.includes(game.awayTeam?.id)
+  });
+  
   const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
                    userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
   const opponentTeam = userTeam?.id === game.homeTeam?.id ? game.awayTeam : game.homeTeam;
