@@ -38,7 +38,7 @@ export default function Calendar() {
   // Check in mutation
   const checkInMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/check-in`, "POST", { teamId });
+      await apiRequest("POST", `/api/games/${gameId}/check-in`, { teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -60,7 +60,7 @@ export default function Calendar() {
   // Check out mutation
   const checkOutMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/check-out`, "POST", {});
+      await apiRequest("POST", `/api/games/${gameId}/check-out`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -82,7 +82,7 @@ export default function Calendar() {
   // Claim beverage duty mutation
   const claimBeverageDutyMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest(`/api/games/${gameId}/beverage-duty`, "POST", { teamId });
+      await apiRequest("POST", `/api/games/${gameId}/beverage-duty`, { teamId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
