@@ -1054,9 +1054,7 @@ export default function Dashboard() {
                   <Settings className="w-5 h-5 text-white" />
                 </div>
                 <div className="text-left">
-                  <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">
-                    Commissioner Tasks
-                  </h3>
+                  <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">To-Do List</h3>
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">
                     {commissionerTodoData.total === 0 ? (
                       'All caught up! No pending tasks.'
@@ -1080,7 +1078,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
       {/* Commissioner To-Do Section */}
       {tier === 'commissioner' && selectedLeagueId && (
         <CommissionerToDo 
@@ -1292,14 +1289,12 @@ export default function Dashboard() {
           )}
         </DialogContent>
       </Dialog>
-
       {/* Standings Modal */}
       <StandingsModal
         isOpen={showStandingsModal}
         onClose={() => setShowStandingsModal(false)}
         leagueId={selectedLeagueId}
       />
-
       {/* Commissioner To-Do Modal */}
       <CommissionerToDoModal 
         isOpen={showCommissionerToDoModal}
