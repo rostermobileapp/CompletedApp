@@ -10,6 +10,7 @@ import {
   boolean,
   pgEnum,
   decimal,
+  unique,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -196,7 +197,10 @@ export const gameAttendance = pgTable("game_attendance", {
   checkedOutAt: timestamp("checked_out_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Unique constraint to ensure one attendance record per user per game
+  uniqueUserGame: unique().on(table.gameId, table.userId),
+}));
 
 // Messages table
 export const messages = pgTable("messages", {
