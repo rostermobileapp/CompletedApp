@@ -1062,7 +1062,10 @@ export class DatabaseStorage implements IStorage {
 
   async getUserTeamForGame(gameId: string, userId: string): Promise<any | null> {
     // Get the game to find which teams are playing
-    const game = await this.getGame(gameId);
+    const [game] = await db
+      .select()
+      .from(games)
+      .where(eq(games.id, gameId));
     if (!game) return null;
     
     // Get user's teams
