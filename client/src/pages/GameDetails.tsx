@@ -18,6 +18,7 @@ import { useLocation, useRoute } from "wouter";
 import { useState } from "react";
 import * as React from "react";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
+import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User } from "@shared/schema";
 
 export default function GameDetails() {
   const { user } = useAuth();
@@ -30,12 +31,15 @@ export default function GameDetails() {
   const [notes, setNotes] = useState("");
   const [homeScore, setHomeScore] = useState("");
   const [awayScore, setAwayScore] = useState("");
+  const [isEditingScore, setIsEditingScore] = useState(false);
+  const [editHomeScore, setEditHomeScore] = useState("");
+  const [editAwayScore, setEditAwayScore] = useState("");
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
   const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string } | null>(null);
 
   // Fetch user's teams
-  const { data: userTeams } = useQuery({
+  const { data: userTeams } = useQuery<UserTeam[]>({
     queryKey: ["/api/user/teams"],
   });
 
@@ -43,32 +47,32 @@ export default function GameDetails() {
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
 
   // Fetch specific game details
-  const { data: game, isLoading: gameLoading } = useQuery({
+  const { data: game, isLoading: gameLoading } = useQuery<GameWithTeams>({
     queryKey: [`/api/games/${gameId}`],
     enabled: !!gameId,
   });
 
 
   // Fetch team members to get names for beverage duty
-  const { data: homeTeamMembers } = useQuery({
+  const { data: homeTeamMembers } = useQuery<TeamMemberWithUser[]>({
     queryKey: [`/api/teams/${game?.homeTeam?.id}/members`],
     enabled: !!game?.homeTeam?.id,
   });
 
-  const { data: awayTeamMembers } = useQuery({
+  const { data: awayTeamMembers } = useQuery<TeamMemberWithUser[]>({
     queryKey: [`/api/teams/${game?.awayTeam?.id}/members`],
     enabled: !!game?.awayTeam?.id,
   });
 
 
   // Fetch score submissions
-  const { data: scoreSubmissions } = useQuery({
+  const { data: scoreSubmissions } = useQuery<GameScoreSubmission[]>({
     queryKey: [`/api/games/${gameId}/score-submissions`],
     enabled: !!gameId,
   });
 
   // Fetch league details for commissioner check
-  const { data: league } = useQuery({
+  const { data: league } = useQuery<League>({
     queryKey: [`/api/leagues/${game?.leagueId}`],
     enabled: !!game?.leagueId,
   });
@@ -145,9 +149,10 @@ export default function GameDetails() {
   // Submit score mutation
   const submitScoreMutation = useMutation({
     mutationFn: async ({ gameId, homeScore, awayScore }: { gameId: string; homeScore: number; awayScore: number }) => {
-      return await apiRequest("POST", `/api/games/${gameId}/submit-score`, { homeScore, awayScore });
+      const response = await apiRequest("POST", `/api/games/${gameId}/submit-score`, { homeScore, awayScore });
+      return await response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { message: string }) => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/score-submissions`] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
@@ -199,7 +204,7 @@ export default function GameDetails() {
   }
 
   // Find which of user's teams is playing in this game
-  const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+  const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team) => team.id) : [];
   
   // Debug logging for team detection (temporary)
   console.log('GameDetails Team Debug:', {
@@ -213,7 +218,7 @@ export default function GameDetails() {
   const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
                    userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
   const opponentTeam = userTeam?.id === game.homeTeam?.id ? game.awayTeam : game.homeTeam;
-  const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
+  const hasBeverageDuty = game.homeBeverageDutyUserId === (user as User)?.id || game.awayBeverageDutyUserId === (user as User)?.id;
   const beverageDutyClaimed = !!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
   const beverageDutyClaimedByOther = beverageDutyClaimed && !hasBeverageDuty;
 
@@ -224,12 +229,12 @@ export default function GameDetails() {
   const isScoreSubmissionAvailable = now >= oneHourAfterStart;
 
   // Check if user is a captain or commissioner
-  const isHomeCaptain = homeTeamMembers?.some((member: any) => member.userId === (user as any)?.id && member.isCaptain);
-  const isAwayCaptain = awayTeamMembers?.some((member: any) => member.userId === (user as any)?.id && member.isCaptain);
+  const isHomeCaptain = homeTeamMembers?.some((member) => member.userId === (user as User)?.id && member.isCaptain);
+  const isAwayCaptain = awayTeamMembers?.some((member) => member.userId === (user as User)?.id && member.isCaptain);
   const isCaptain = isHomeCaptain || isAwayCaptain;
   
   // Check if user is commissioner
-  const isCommissioner = league?.commissionerId === (user as any)?.id;
+  const isCommissioner = league?.commissionerId === (user as User)?.id;
   
   // Check if game is in the future for RSVP purposes
   const isUpcomingGame = new Date(game.scheduledAt) > new Date();
@@ -241,19 +246,19 @@ export default function GameDetails() {
 
   // Get existing submissions for display
   const userSubmissions = Array.isArray(scoreSubmissions) 
-    ? scoreSubmissions.filter((submission: any) => submission.submittedBy === (user as any)?.id)
+    ? scoreSubmissions.filter((submission) => submission.submittedBy === (user as User)?.id)
     : [];
   const latestUserSubmission = userSubmissions.length > 0 ? userSubmissions[userSubmissions.length - 1] : null;
   
   // Check if the claimed user actually exists in team members
   const allTeamMembers = [...(homeTeamMembers || []), ...(awayTeamMembers || [])];
   const beverageDutyClaimantId = game.homeBeverageDutyUserId || game.awayBeverageDutyUserId;
-  const claimantExists = beverageDutyClaimantId ? allTeamMembers.some((member: any) => member.user?.id === beverageDutyClaimantId) : false;
+  const validBeverageDutyClaimantId = beverageDutyClaimantId === (user as User)?.id;
+  const claimantExists = beverageDutyClaimantId ? allTeamMembers.some((member) => member.user?.id === beverageDutyClaimantId) : false;
   
   // If duty is claimed but claimant doesn't exist in team members, treat as unclaimed
-  const validBeverageDutyClaimed = beverageDutyClaimed && (claimantExists || beverageDutyClaimantId === (user as any)?.id);
+  const validBeverageDutyClaimed = beverageDutyClaimed && (claimantExists || validBeverageDutyClaimantId);
   const validBeverageDutyClaimedByOther = validBeverageDutyClaimed && !hasBeverageDuty;
-
 
   return (
     <div className="min-h-screen bg-background">
@@ -329,7 +334,7 @@ export default function GameDetails() {
                   <p className="text-sm font-medium text-muted-foreground mb-2">Your Response:</p>
                   <RSVPButtons 
                     gameId={game.id} 
-                    userId={(user as any).id}
+                    userId={(user as User).id}
                     userTeamId={userTeam.id}
                   />
                 </div>
@@ -482,25 +487,160 @@ export default function GameDetails() {
             </h3>
             
             {isGameCompleted ? (
-              <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                <div className="flex items-center justify-center space-x-4">
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground">{game.homeTeam?.name}</p>
-                    <p className="text-3xl font-bold text-green-600" data-testid="text-final-home-score">
-                      {game.homeScore}
-                    </p>
+              <div className="space-y-4">
+                {/* Score Management Section for Commissioners */}
+                {isCommissioner && (
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Target className="w-5 h-5 text-blue-600" />
+                      <h4 className="text-lg font-semibold text-blue-600">Score Management</h4>
+                    </div>
+                    
+                    {isEditingScore ? (
+                      <div className="space-y-4">
+                        <div className="text-center text-sm text-blue-600 font-medium mb-3">
+                          Final Score:
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 items-center">
+                          <div className="text-center">
+                            <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                              {game.homeTeam?.name}
+                            </label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={editHomeScore}
+                              onChange={(e) => setEditHomeScore(e.target.value)}
+                              className="text-center text-2xl font-bold"
+                              placeholder="0"
+                              data-testid="input-edit-final-home-score"
+                            />
+                          </div>
+                          <div className="text-center text-2xl font-bold text-muted-foreground">
+                            -
+                          </div>
+                          <div className="text-center">
+                            <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                              {game.awayTeam?.name}
+                            </label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={editAwayScore}
+                              onChange={(e) => setEditAwayScore(e.target.value)}
+                              className="text-center text-2xl font-bold"
+                              placeholder="0"
+                              data-testid="input-edit-final-away-score"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-3 mt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsEditingScore(false);
+                              setEditHomeScore("");
+                              setEditAwayScore("");
+                            }}
+                            className="flex-1"
+                            data-testid="button-cancel-score-edit"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              const home = parseInt(editHomeScore);
+                              const away = parseInt(editAwayScore);
+                              
+                              if (isNaN(home) || isNaN(away) || home < 0 || away < 0) {
+                                toast({
+                                  title: "Invalid Score",
+                                  description: "Please enter valid scores (numbers only).",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              
+                              submitScoreMutation.mutate(
+                                { gameId: game.id, homeScore: home, awayScore: away },
+                                {
+                                  onSuccess: () => {
+                                    setIsEditingScore(false);
+                                    setEditHomeScore("");
+                                    setEditAwayScore("");
+                                  }
+                                }
+                              );
+                            }}
+                            disabled={submitScoreMutation.isPending || !editHomeScore || !editAwayScore}
+                            className="flex-1"
+                            data-testid="button-save-score-changes"
+                          >
+                            {submitScoreMutation.isPending ? "Saving..." : "Save Changes"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="text-center text-sm text-blue-600 font-medium">
+                          Final Score:
+                        </div>
+                        <div className="flex items-center justify-center space-x-4">
+                          <div className="text-center">
+                            <p className="text-sm text-blue-700 dark:text-blue-300">{game.homeTeam?.name}</p>
+                            <p className="text-3xl font-bold text-blue-600">
+                              {game.homeScore}
+                            </p>
+                          </div>
+                          <div className="text-2xl font-bold text-blue-600">-</div>
+                          <div className="text-center">
+                            <p className="text-sm text-blue-700 dark:text-blue-300">{game.awayTeam?.name}</p>
+                            <p className="text-3xl font-bold text-blue-600">
+                              {game.awayScore}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsEditingScore(true);
+                              setEditHomeScore(game.homeScore?.toString() || "");
+                              setEditAwayScore(game.awayScore?.toString() || "");
+                            }}
+                            className="flex items-center gap-2"
+                            data-testid="button-edit-final-score"
+                          >
+                            <Target className="w-4 h-4" />
+                            Edit Score
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-2xl font-bold text-muted-foreground">-</div>
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground">{game.awayTeam?.name}</p>
-                    <p className="text-3xl font-bold text-green-600" data-testid="text-final-away-score">
-                      {game.awayScore}
-                    </p>
+                )}
+                
+                {/* Final Score Display for All Users */}
+                <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="flex items-center justify-center space-x-4">
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">{game.homeTeam?.name}</p>
+                      <p className="text-3xl font-bold text-green-600" data-testid="text-final-home-score">
+                        {game.homeScore}
+                      </p>
+                    </div>
+                    <div className="text-2xl font-bold text-muted-foreground">-</div>
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">{game.awayTeam?.name}</p>
+                      <p className="text-3xl font-bold text-green-600" data-testid="text-final-away-score">
+                        {game.awayScore}
+                      </p>
+                    </div>
                   </div>
+                  <p className="text-center text-sm text-green-600 mt-2 font-medium">
+                    Game Complete
+                  </p>
                 </div>
-                <p className="text-center text-sm text-green-600 mt-2 font-medium">
-                  Game Complete
-                </p>
               </div>
             ) : canSubmitScore ? (
               <div className="space-y-4">
@@ -614,7 +754,7 @@ export default function GameDetails() {
       {substituteRequestData && (
         <SubstituteRequestModal
           gameId={game.id}
-          gameDate={game.scheduledAt}
+          gameDate={format(new Date(game.scheduledAt), 'yyyy-MM-dd')}
           leagueId={game.leagueId}
           originalPlayerId={substituteRequestData.playerId}
           originalPlayerName={substituteRequestData.playerName}

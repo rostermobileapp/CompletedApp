@@ -773,3 +773,16 @@ export type GameRsvp = typeof gameRsvps.$inferSelect;
 export type InsertGameRsvp = z.infer<typeof insertGameRsvpSchema>;
 export type SubstituteRequest = typeof substituteRequests.$inferSelect;
 export type InsertSubstituteRequest = z.infer<typeof insertSubstituteRequestSchema>;
+
+// Extended types with relationships
+export type GameWithTeams = Game & {
+  homeTeam: Team;
+  awayTeam: Team;
+};
+
+export type TeamMemberWithUser = TeamMembership & {
+  user: User;
+  isCaptain?: boolean;
+};
+
+export type UserTeam = Team;
