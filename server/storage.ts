@@ -7,7 +7,6 @@ import {
   teamMemberships,
   games,
   gameScoreSubmissions,
-  gameAttendance,
   messages,
   playerImports,
   importedPlayers,
@@ -103,12 +102,6 @@ export interface IStorage {
   saveGameNotes(gameId: string, userId: string, teamId: string, notes: string): Promise<any>;
   deleteGame(id: string): Promise<void>;
   
-  // Attendance operations
-  checkInToGame(gameId: string, userId: string, teamId: string): Promise<any>;
-  checkOutFromGame(gameId: string, userId: string): Promise<any>;
-  getGameAttendance(gameId: string): Promise<any[]>;
-  getUserAttendanceStatuses(userId: string): Promise<any[]>;
-  getCaptainAttendanceOverview(userId: string): Promise<any[]>;
   
   // Message operations
   sendMessage(message: InsertMessage): Promise<Message>;
@@ -1036,181 +1029,12 @@ export class DatabaseStorage implements IStorage {
     return updatedGame;
   }
 
-  // Attendance operations
-  async checkInToGame(gameId: string, userId: string, teamId: string): Promise<any> {
-    const [attendance] = await db
-      .insert(gameAttendance)
-      .values({
-        gameId,
-        userId,
-        teamId,
-        status: 'checked_in',
-        checkedInAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [gameAttendance.gameId, gameAttendance.userId],
-        set: {
-          status: 'checked_in',
-          checkedInAt: new Date(),
-          checkedOutAt: null,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return attendance;
-  }
 
-  async getUserTeamForGame(gameId: string, userId: string): Promise<any | null> {
-    // Get the game to find which teams are playing
-    const [game] = await db
-      .select()
-      .from(games)
-      .where(eq(games.id, gameId));
-    if (!game) return null;
-    
-    // Get user's teams
-    const userTeams = await this.getUserTeams(userId);
-    
-    // Find which team the user is on for this game
-    const userTeam = userTeams.find(team => 
-      team.id === game.homeTeamId || team.id === game.awayTeamId
-    );
-    
-    return userTeam || null;
-  }
 
-  async checkOutFromGame(gameId: string, userId: string): Promise<any> {
-    // First, try to get the user's team for this game
-    const userTeam = await this.getUserTeamForGame(gameId, userId);
-    
-    const [attendance] = await db
-      .insert(gameAttendance)
-      .values({
-        gameId,
-        userId,
-        teamId: userTeam?.id || '', // Use empty string if no team found
-        status: 'checked_out',
-        checkedOutAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [gameAttendance.gameId, gameAttendance.userId],
-        set: {
-          status: 'checked_out',
-          checkedOutAt: new Date(),
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return attendance;
-  }
 
-  async getGameAttendance(gameId: string): Promise<any[]> {
-    const attendance = await db
-      .select()
-      .from(gameAttendance)
-      .innerJoin(users, eq(gameAttendance.userId, users.id))
-      .where(eq(gameAttendance.gameId, gameId));
-    
-    return attendance.map(a => ({
-      ...a.game_attendance,
-      user: a.users
-    }));
-  }
 
-  async getUserAttendanceStatus(gameId: string, userId: string): Promise<any | null> {
-    const [attendance] = await db
-      .select()
-      .from(gameAttendance)
-      .where(
-        and(
-          eq(gameAttendance.gameId, gameId),
-          eq(gameAttendance.userId, userId)
-        )
-      );
-    return attendance || null;
-  }
 
-  async getCaptainAttendanceOverview(userId: string): Promise<any[]> {
-    // Get teams where user is captain
-    const captainTeams = await db
-      .select({ id: teams.id, name: teams.name })
-      .from(teams)
-      .where(eq(teams.captainId, userId));
 
-    // Get league memberships where user is captain
-    const captainMemberships = await db
-      .select({ 
-        teamId: leagueMemberships.assignedTeamId,
-        teamName: teams.name 
-      })
-      .from(leagueMemberships)
-      .innerJoin(teams, eq(leagueMemberships.assignedTeamId, teams.id))
-      .where(
-        and(
-          eq(leagueMemberships.userId, userId),
-          eq(leagueMemberships.isCaptain, true)
-        )
-      );
-
-    // Combine all teams where user is captain
-    const allCaptainTeams = [
-      ...captainTeams.map(t => ({ id: t.id, name: t.name })),
-      ...captainMemberships.map(m => ({ id: m.teamId!, name: m.teamName }))
-    ];
-
-    const attendanceOverview = [];
-
-    for (const team of allCaptainTeams) {
-      // Get upcoming games for this team
-      const upcomingGames = await this.getTeamGames(team.id);
-      const upcomingOnly = upcomingGames.filter(game => new Date(game.scheduledAt) > new Date());
-
-      for (const game of upcomingOnly.slice(0, 5)) { // Limit to next 5 games
-        const attendance = await this.getGameAttendance(game.id);
-        const checkedInCount = attendance.filter(a => a.status === 'checked_in').length;
-        const checkedOutCount = attendance.filter(a => a.status === 'checked_out').length;
-        const totalRoster = await this.getTeamMembers(team.id);
-        
-        attendanceOverview.push({
-          gameId: game.id,
-          teamId: team.id,
-          teamName: team.name,
-          opponent: game.homeTeam?.id === team.id ? game.awayTeam?.name : game.homeTeam?.name,
-          scheduledAt: game.scheduledAt,
-          checkedInCount,
-          checkedOutCount,
-          totalRoster: totalRoster.length,
-          attendanceRate: totalRoster.length > 0 ? Math.round((checkedInCount / totalRoster.length) * 100) : 0
-        });
-      }
-    }
-
-    return attendanceOverview.sort((a, b) => 
-      new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
-    );
-  }
-
-  async getUserAttendanceStatuses(userId: string): Promise<any[]> {
-    const userTeams = await this.getUserTeams(userId);
-    const statuses = [];
-
-    for (const team of userTeams) {
-      const games = await this.getTeamGames(team.id);
-      const upcomingGames = games.filter(game => new Date(game.scheduledAt) > new Date());
-      
-      for (const game of upcomingGames.slice(0, 5)) {
-        const attendance = await this.getUserAttendanceStatus(game.id, userId);
-        statuses.push({
-          gameId: game.id,
-          teamId: team.id,
-          status: attendance?.status || null,
-          scheduledAt: game.scheduledAt
-        });
-      }
-    }
-
-    return statuses;
-  }
 
   async getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
     const result = await db.execute(sql`
