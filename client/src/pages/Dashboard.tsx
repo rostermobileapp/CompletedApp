@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, Target, AlertCircle } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, Target, AlertCircle, Settings, UserCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,233 @@ import { format } from 'date-fns';
 import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
+
+// Commissioner To-Do Modal Component
+function CommissionerToDoModal({ isOpen, onClose, leagueId }: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  leagueId: string | null; 
+}) {
+  // Fetch pending league member approvals
+  const { data: pendingMembers = [], isLoading: pendingMembersLoading } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'pending-members'],
+    queryFn: async () => {
+      if (!leagueId) return [];
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/pending-members`);
+      return response.json();
+    },
+    enabled: !!leagueId && isOpen,
+  });
+
+  // Fetch games that need score verification
+  const { data: gamesNeedingVerification = [], isLoading: gamesLoading } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'games-needing-verification-modal'],
+    queryFn: async () => {
+      if (!leagueId) return [];
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
+      const allGames = await response.json();
+      
+      if (!Array.isArray(allGames)) return [];
+      
+      const gamesNeedingVerification = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      for (const game of allGames) {
+        const gameDate = new Date(game.scheduledAt);
+        gameDate.setHours(0, 0, 0, 0);
+        
+        if (gameDate >= today) continue;
+        
+        try {
+          const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
+          const submissions = await submissionsResponse.json();
+          
+          if (!Array.isArray(submissions)) continue;
+          
+          const submissionCount = submissions.length;
+          let needsVerification = false;
+          let reason = '';
+          
+          if (submissionCount === 0) {
+            needsVerification = true;
+            reason = 'No score submissions';
+          } else if (submissionCount === 1) {
+            needsVerification = true;
+            reason = 'Missing one team submission';
+          } else if (submissionCount === 2) {
+            const [sub1, sub2] = submissions;
+            if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
+              needsVerification = true;
+              reason = `Mismatched scores: ${sub1.homeScore}-${sub1.awayScore} vs ${sub2.homeScore}-${sub2.awayScore}`;
+            }
+          }
+          
+          if (needsVerification) {
+            gamesNeedingVerification.push({ ...game, reason });
+          }
+        } catch (error) {
+          continue;
+        }
+      }
+      
+      return gamesNeedingVerification;
+    },
+    enabled: !!leagueId && isOpen,
+  });
+
+  const totalTasks = (Array.isArray(pendingMembers) ? pendingMembers.length : 0) + 
+                     (Array.isArray(gamesNeedingVerification) ? gamesNeedingVerification.length : 0);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-card rounded-lg border border-border w-full max-w-6xl h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-border">
+          <h2 className="text-2xl font-semibold text-center">Commissioner To-Do List</h2>
+          <p className="text-center text-muted-foreground mt-1">
+            {totalTasks} task{totalTasks === 1 ? '' : 's'} requiring your attention
+          </p>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {(pendingMembersLoading || gamesLoading) ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                <p className="text-muted-foreground">Loading tasks...</p>
+              </div>
+            </div>
+          ) : totalTasks === 0 ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <Check className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <p className="text-lg font-medium text-green-600">All caught up!</p>
+                <p className="text-muted-foreground">No pending tasks at this time.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Pending Member Approvals Section */}
+              {Array.isArray(pendingMembers) && pendingMembers.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <UserCheck className="w-5 h-5 text-blue-600" />
+                    <h3 className="text-lg font-semibold text-blue-600">
+                      Pending Player Approvals ({pendingMembers.length})
+                    </h3>
+                  </div>
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="space-y-3">
+                      {pendingMembers.map((member: any) => (
+                        <div 
+                          key={member.id}
+                          className="bg-white dark:bg-card border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-center justify-between"
+                          data-testid={`pending-member-${member.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                              <span className="text-blue-600 text-sm font-medium">
+                                {member.user?.firstName?.charAt(0) || '?'}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-medium">
+                                {member.user?.firstName || 'Unknown'} {member.user?.lastName || 'User'}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {member.user?.email}
+                              </p>
+                              {member.assignedTeam && (
+                                <p className="text-sm text-blue-600">
+                                  Assigned to: {member.assignedTeam.name}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            onClick={() => navigate(`/league-management?league=${leagueId}`)}
+                            data-testid={`button-review-member-${member.id}`}
+                          >
+                            Review
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Games Needing Score Verification Section */}
+              {Array.isArray(gamesNeedingVerification) && gamesNeedingVerification.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <BarChart3 className="w-5 h-5 text-orange-600" />
+                    <h3 className="text-lg font-semibold text-orange-600">
+                      Score Verifications ({gamesNeedingVerification.length})
+                    </h3>
+                  </div>
+                  <div className="bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+                    <div className="space-y-3">
+                      {gamesNeedingVerification.map((game: any) => (
+                        <div 
+                          key={game.id}
+                          className="bg-white dark:bg-card border border-orange-200 dark:border-orange-800 rounded-lg p-3 flex items-center justify-between"
+                          data-testid={`verification-game-${game.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <AlertCircle className="w-5 h-5 text-orange-500" />
+                            <div>
+                              <p className="font-medium">
+                                {game.homeTeam?.name} vs {game.awayTeam?.name}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {format(new Date(game.scheduledAt), 'MMM d, yyyy • h:mm a')}
+                              </p>
+                              <p className="text-sm text-orange-600">
+                                {game.reason}
+                              </p>
+                            </div>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="bg-orange-600 hover:bg-orange-700 text-white"
+                            onClick={() => navigate(`/league-management?league=${leagueId}`)}
+                            data-testid={`button-verify-game-${game.id}`}
+                          >
+                            Verify
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer with Close Button */}
+        <div className="p-6 border-t border-border">
+          <div className="flex justify-center">
+            <Button 
+              onClick={onClose}
+              className="px-8 py-2"
+              data-testid="button-close-commissioner-todo"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Standings Modal Component
 function StandingsModal({ isOpen, onClose, leagueId }: { 
@@ -401,6 +628,9 @@ export default function Dashboard() {
   // Standings modal state
   const [showStandingsModal, setShowStandingsModal] = useState(false);
   
+  // Commissioner To-Do modal state
+  const [showCommissionerToDoModal, setShowCommissionerToDoModal] = useState(false);
+  
   const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
     select: (games) => {
@@ -532,6 +762,75 @@ export default function Dashboard() {
       });
     }
   };
+
+  // Fetch commissioner to-do data for the permanent bar
+  const { data: commissionerTodoData } = useQuery({
+    queryKey: ['/api/commissioner/todo-summary', selectedLeagueId],
+    queryFn: async () => {
+      if (!selectedLeagueId || tier !== 'commissioner') return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
+      
+      try {
+        // Fetch pending members
+        const pendingMembersResponse = await apiRequest('GET', `/api/leagues/${selectedLeagueId}/pending-members`);
+        const pendingMembers = await pendingMembersResponse.json();
+        
+        // Fetch games needing verification
+        const gamesResponse = await apiRequest('GET', `/api/leagues/${selectedLeagueId}/games`);
+        const allGames = await gamesResponse.json();
+        
+        let gamesNeedingVerification = 0;
+        if (Array.isArray(allGames)) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          for (const game of allGames) {
+            const gameDate = new Date(game.scheduledAt);
+            gameDate.setHours(0, 0, 0, 0);
+            
+            if (gameDate >= today) continue;
+            
+            try {
+              const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
+              const submissions = await submissionsResponse.json();
+              
+              if (!Array.isArray(submissions)) continue;
+              
+              const submissionCount = submissions.length;
+              let needsVerification = false;
+              
+              if (submissionCount === 0 || submissionCount === 1) {
+                needsVerification = true;
+              } else if (submissionCount === 2) {
+                const [sub1, sub2] = submissions;
+                if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
+                  needsVerification = true;
+                }
+              }
+              
+              if (needsVerification) {
+                gamesNeedingVerification++;
+              }
+            } catch (error) {
+              continue;
+            }
+          }
+        }
+        
+        const pendingMembersCount = Array.isArray(pendingMembers) ? pendingMembers.length : 0;
+        const total = pendingMembersCount + gamesNeedingVerification;
+        
+        return {
+          pendingMembers: pendingMembersCount,
+          gamesNeedingVerification,
+          total
+        };
+      } catch (error) {
+        return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
+      }
+    },
+    enabled: !!selectedLeagueId && tier === 'commissioner',
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="dashboard-page">
@@ -722,6 +1021,41 @@ export default function Dashboard() {
           }}
         />
       )}
+      {/* Permanent Commissioner To-Do Bar */}
+      {tier === 'commissioner' && selectedLeagueId && commissionerTodoData && commissionerTodoData.total > 0 && (
+        <div className="px-6 mb-4">
+          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950 dark:to-orange-950 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 shadow-sm">
+            <button
+              onClick={() => setShowCommissionerToDoModal(true)}
+              className="w-full flex items-center justify-between hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors rounded-lg p-2"
+              data-testid="button-commissioner-todo-permanent"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center">
+                  <Settings className="w-5 h-5 text-white" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">
+                    Commissioner Tasks
+                  </h3>
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    {commissionerTodoData.pendingMembers > 0 && `${commissionerTodoData.pendingMembers} pending approval${commissionerTodoData.pendingMembers === 1 ? '' : 's'}`}
+                    {commissionerTodoData.pendingMembers > 0 && commissionerTodoData.gamesNeedingVerification > 0 && ' • '}
+                    {commissionerTodoData.gamesNeedingVerification > 0 && `${commissionerTodoData.gamesNeedingVerification} score verification${commissionerTodoData.gamesNeedingVerification === 1 ? '' : 's'}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-bold">{commissionerTodoData.total}</span>
+                </div>
+                <ChevronDown className="w-4 h-4 text-yellow-600" />
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Commissioner To-Do Section */}
       {tier === 'commissioner' && selectedLeagueId && (
         <CommissionerToDo 
@@ -938,6 +1272,13 @@ export default function Dashboard() {
       <StandingsModal
         isOpen={showStandingsModal}
         onClose={() => setShowStandingsModal(false)}
+        leagueId={selectedLeagueId}
+      />
+
+      {/* Commissioner To-Do Modal */}
+      <CommissionerToDoModal 
+        isOpen={showCommissionerToDoModal}
+        onClose={() => setShowCommissionerToDoModal(false)}
         leagueId={selectedLeagueId}
       />
     </div>
