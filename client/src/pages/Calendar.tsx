@@ -2,8 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format, isBefore, isAfter, addHours } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, ArrowLeft } from "lucide-react";
+import { Trophy, ArrowLeft, Check, X, Clock } from "lucide-react";
 import { RSVPButtons } from "@/components/RSVPButtons";
+import { RSVPStatusIcon } from "@/components/RSVPStatusIcon";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -170,6 +171,11 @@ export default function Calendar() {
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-2">
+                    {/* RSVP Status Icon */}
+                    {!isCompleted && !isPastGame && user && (
+                      <RSVPStatusIcon gameId={game.id} userId={(user as any).id} />
+                    )}
+                    
                     {/* RSVP Buttons for upcoming games */}
                     {!isCompleted && !isPastGame && user && (
                       <RSVPButtons 

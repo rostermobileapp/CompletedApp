@@ -64,34 +64,44 @@ export function RSVPButtons({ gameId, userId, className }: RSVPButtonsProps) {
         variant={currentStatus === 'attending' ? "default" : "outline"}
         size="sm"
         onClick={() => rsvpMutation.mutate('attending')}
-        disabled={isLoading}
+        disabled={isLoading || currentStatus === 'not_attending'}
         className={cn(
-          "flex items-center gap-1 transition-all",
+          "flex items-center gap-1 transition-all border-2",
           currentStatus === 'attending' 
-            ? "bg-green-600 hover:bg-green-700 text-white" 
-            : "border-green-600 text-green-600 hover:bg-green-50"
+            ? "bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-lg scale-105" 
+            : currentStatus === 'not_attending'
+            ? "border-green-300 text-green-300 opacity-50 cursor-not-allowed"
+            : "border-green-600 text-green-600 hover:bg-green-50 hover:shadow-md"
         )}
         data-testid="button-attending"
       >
-        <Check className="h-4 w-4" />
-        {currentStatus === 'attending' ? 'Attending' : 'Going'}
+        <Check className={cn(
+          "h-4 w-4",
+          currentStatus === 'attending' ? "animate-pulse" : ""
+        )} />
+        {currentStatus === 'attending' ? '✓ Attending' : 'Going'}
       </Button>
       
       <Button
         variant={currentStatus === 'not_attending' ? "default" : "outline"}
         size="sm"
         onClick={() => rsvpMutation.mutate('not_attending')}
-        disabled={isLoading}
+        disabled={isLoading || currentStatus === 'attending'}
         className={cn(
-          "flex items-center gap-1 transition-all",
+          "flex items-center gap-1 transition-all border-2",
           currentStatus === 'not_attending' 
-            ? "bg-red-600 hover:bg-red-700 text-white" 
-            : "border-red-600 text-red-600 hover:bg-red-50"
+            ? "bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-lg scale-105" 
+            : currentStatus === 'attending'
+            ? "border-red-300 text-red-300 opacity-50 cursor-not-allowed"
+            : "border-red-600 text-red-600 hover:bg-red-50 hover:shadow-md"
         )}
         data-testid="button-not-attending"
       >
-        <X className="h-4 w-4" />
-        {currentStatus === 'not_attending' ? 'Not Going' : 'Can\'t Go'}
+        <X className={cn(
+          "h-4 w-4",
+          currentStatus === 'not_attending' ? "animate-pulse" : ""
+        )} />
+        {currentStatus === 'not_attending' ? '✗ Not Going' : 'Can\'t Go'}
       </Button>
     </div>
   );
