@@ -577,6 +577,9 @@ export default function LeagueManagement() {
   // Score management state
   const [commissionerHomeScore, setCommissionerHomeScore] = useState('');
   const [commissionerAwayScore, setCommissionerAwayScore] = useState('');
+  const [isEditingGameScore, setIsEditingGameScore] = useState(false);
+  const [editGameHomeScore, setEditGameHomeScore] = useState('');
+  const [editGameAwayScore, setEditGameAwayScore] = useState('');
   const datePickerRef = React.useRef<HTMLDivElement>(null);
   const timePickerRef = React.useRef<HTMLDivElement>(null);
   
@@ -653,6 +656,11 @@ export default function LeagueManagement() {
   // Get league ID and edit mode from URL params
   const leagueId = new URLSearchParams(window.location.search).get('league') || '';
   const editMode = new URLSearchParams(window.location.search).get('edit') === 'true';
+  
+  // Fetch current user for commissioner checks
+  const { data: user } = useQuery({
+    queryKey: ['/api/auth/user'],
+  });
   
   // Fetch user's leagues for selection
   const { data: userLeagues = [] } = useQuery({
@@ -2931,23 +2939,130 @@ export default function LeagueManagement() {
                     
                     {/* Current Game Score */}
                     {selectedGame.isCompleted || (selectedGame.homeScore !== null && selectedGame.awayScore !== null) ? (
-                      <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
-                        <p className="text-sm font-medium text-green-600 mb-2">Final Score:</p>
-                        <div className="flex items-center justify-center space-x-4">
-                          <div className="text-center">
-                            <p className="text-sm text-muted-foreground">
-                              {teams.find((t: Team) => t.id === selectedGame.homeTeamId)?.name || 'Home'}
-                            </p>
-                            <p className="text-2xl font-bold text-green-600">{selectedGame.homeScore}</p>
+                      <div className="space-y-4 mb-4">
+                        {isEditingGameScore && league?.commissionerId === user?.id ? (
+                          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                            <p className="text-sm font-medium text-blue-600 mb-3 text-center">Edit Final Score:</p>
+                            <div className="grid grid-cols-3 gap-3 items-center mb-4">
+                              <div className="text-center">
+                                <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                                  {teams.find((t: Team) => t.id === selectedGame.homeTeamId)?.name || 'Home'}
+                                </label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={editGameHomeScore}
+                                  onChange={(e) => setEditGameHomeScore(e.target.value)}
+                                  className="text-center text-xl font-bold"
+                                  placeholder="0"
+                                  data-testid="input-edit-game-home-score"
+                                />
+                              </div>
+                              <div className="text-center text-xl font-bold text-muted-foreground">
+                                -
+                              </div>
+                              <div className="text-center">
+                                <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                                  {teams.find((t: Team) => t.id === selectedGame.awayTeamId)?.name || 'Away'}
+                                </label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={editGameAwayScore}
+                                  onChange={(e) => setEditGameAwayScore(e.target.value)}
+                                  className="text-center text-xl font-bold"
+                                  placeholder="0"
+                                  data-testid="input-edit-game-away-score"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-3">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setIsEditingGameScore(false);
+                                  setEditGameHomeScore('');
+                                  setEditGameAwayScore('');
+                                }}
+                                className="flex-1"
+                                data-testid="button-cancel-game-score-edit"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  const home = parseInt(editGameHomeScore);
+                                  const away = parseInt(editGameAwayScore);
+                                  
+                                  if (isNaN(home) || isNaN(away) || home < 0 || away < 0 || editGameHomeScore.trim() === '' || editGameAwayScore.trim() === '') {
+                                    toast({
+                                      title: "Invalid Score",
+                                      description: "Please enter valid scores (numbers only, 0 or greater).",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+                                  
+                                  commissionerScoreOverrideMutation.mutate(
+                                    { gameId: selectedGame.id, homeScore: home, awayScore: away },
+                                    {
+                                      onSuccess: () => {
+                                        setIsEditingGameScore(false);
+                                        setEditGameHomeScore('');
+                                        setEditGameAwayScore('');
+                                        // Invalidate related queries
+                                        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games'] });
+                                        queryClient.invalidateQueries({ queryKey: [`/api/games/${selectedGame.id}/score-submissions`] });
+                                      }
+                                    }
+                                  );
+                                }}
+                                disabled={commissionerScoreOverrideMutation.isPending || !editGameHomeScore.trim() || !editGameAwayScore.trim() || isNaN(parseInt(editGameHomeScore)) || isNaN(parseInt(editGameAwayScore)) || parseInt(editGameHomeScore) < 0 || parseInt(editGameAwayScore) < 0}
+                                className="flex-1"
+                                data-testid="button-save-game-score-changes"
+                              >
+                                {commissionerScoreOverrideMutation.isPending ? "Saving..." : "Update Score"}
+                              </Button>
+                            </div>
                           </div>
-                          <div className="text-xl font-bold text-muted-foreground">-</div>
-                          <div className="text-center">
-                            <p className="text-sm text-muted-foreground">
-                              {teams.find((t: Team) => t.id === selectedGame.awayTeamId)?.name || 'Away'}
-                            </p>
-                            <p className="text-2xl font-bold text-green-600">{selectedGame.awayScore}</p>
+                        ) : (
+                          <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-sm font-medium text-green-600">Final Score:</p>
+                              {league?.commissionerId === user?.id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setIsEditingGameScore(true);
+                                    setEditGameHomeScore(selectedGame.homeScore?.toString() || '0');
+                                    setEditGameAwayScore(selectedGame.awayScore?.toString() || '0');
+                                  }}
+                                  className="flex items-center gap-2 text-xs"
+                                  data-testid="button-edit-game-score"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                  Edit
+                                </Button>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-center space-x-4">
+                              <div className="text-center">
+                                <p className="text-sm text-muted-foreground">
+                                  {teams.find((t: Team) => t.id === selectedGame.homeTeamId)?.name || 'Home'}
+                                </p>
+                                <p className="text-2xl font-bold text-green-600">{selectedGame.homeScore}</p>
+                              </div>
+                              <div className="text-xl font-bold text-muted-foreground">-</div>
+                              <div className="text-center">
+                                <p className="text-sm text-muted-foreground">
+                                  {teams.find((t: Team) => t.id === selectedGame.awayTeamId)?.name || 'Away'}
+                                </p>
+                                <p className="text-2xl font-bold text-green-600">{selectedGame.awayScore}</p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     ) : (
                       <div className="mb-4">
