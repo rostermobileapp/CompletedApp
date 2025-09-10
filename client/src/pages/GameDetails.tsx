@@ -40,10 +40,6 @@ export default function GameDetails() {
     enabled: !!gameId,
   });
 
-  // Fetch user attendance statuses
-  const { data: userAttendanceStatuses } = useQuery({
-    queryKey: ["/api/user/attendance-statuses"],
-  });
 
   // Fetch team members to get names for beverage duty
   const { data: homeTeamMembers } = useQuery({
@@ -56,11 +52,6 @@ export default function GameDetails() {
     enabled: !!game?.awayTeam?.id,
   });
 
-  // Fetch game attendance to get notes
-  const { data: gameAttendance } = useQuery({
-    queryKey: [`/api/games/${gameId}/attendance`],
-    enabled: !!gameId,
-  });
 
   // Fetch score submissions
   const { data: scoreSubmissions } = useQuery({
@@ -74,71 +65,8 @@ export default function GameDetails() {
     enabled: !!game?.leagueId,
   });
 
-  // Get current user's notes from attendance data
-  const userAttendance = Array.isArray(gameAttendance) ? 
-    gameAttendance.find((attendance: any) => attendance.userId === (user as any)?.id) : null;
-  const existingNotes = userAttendance?.notes || "";
 
-  // Update notes state when existing notes are loaded
-  React.useEffect(() => {
-    if (existingNotes && notes === "") {
-      setNotes(existingNotes);
-    }
-  }, [existingNotes, notes]);
 
-  // Get current attendance status for this game
-  const currentStatus = Array.isArray(userAttendanceStatuses) ? 
-    userAttendanceStatuses.find((status: any) => status.gameId === gameId)?.status : null;
-
-  // Check in mutation
-  const checkInMutation = useMutation({
-    mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest("POST", `/api/games/${gameId}/check-in`, { teamId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user/attendance-statuses"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/attendance`] });
-      queryClient.refetchQueries({ queryKey: ["/api/user/attendance-statuses"] });
-      toast({
-        title: "Checked In",
-        description: "You've successfully checked in to this game.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to check in. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Check out mutation
-  const checkOutMutation = useMutation({
-    mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest("POST", `/api/games/${gameId}/check-out`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user/attendance-statuses"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/attendance`] });
-      queryClient.refetchQueries({ queryKey: ["/api/user/attendance-statuses"] });
-      toast({
-        title: "Checked Out",
-        description: "You've successfully checked out of this game.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to check out. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
 
   // Claim beverage duty mutation
   const claimBeverageDutyMutation = useMutation({
@@ -365,102 +293,6 @@ export default function GameDetails() {
           </div>
         </div>
 
-        {/* Attendance Status */}
-        <div className="bg-card rounded-xl border border-border p-6">
-          <h3 className="text-lg font-semibold mb-4" data-testid="text-attendance-title">Attendance Status</h3>
-          
-          {currentStatus ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {currentStatus === 'checked_in' ? (
-                  <>
-                    <div className="bg-green-500/50 text-white w-10 h-10 rounded-lg flex items-center justify-center">
-                      <Check className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-green-600" data-testid="text-status-checked-in">Checked In</p>
-                      <p className="text-sm text-muted-foreground">You're attending this game</p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="bg-red-500/50 text-white w-10 h-10 rounded-lg flex items-center justify-center">
-                      <X className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-red-600" data-testid="text-status-checked-out">Checked Out</p>
-                      <p className="text-sm text-muted-foreground">You're not attending this game</p>
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="flex flex-col gap-2">
-                <Button
-                  variant="outline"
-                  className="bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50"
-                  onClick={() => {
-                    if (userTeam) {
-                      checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                    }
-                  }}
-                  disabled={checkInMutation.isPending || currentStatus === 'checked_in'}
-                  data-testid="button-check-in"
-                >
-                  <Check className="w-4 h-4 mr-2" />
-                  Check In
-                </Button>
-                <Button
-                  variant="outline"
-                  className="bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
-                  onClick={() => {
-                    if (userTeam) {
-                      checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                    }
-                  }}
-                  disabled={checkOutMutation.isPending || currentStatus === 'checked_out'}
-                  data-testid="button-check-out"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Check Out
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="bg-green-500/50 text-white hover:bg-green-600/50 border-green-500/50"
-                  onClick={() => {
-                    if (userTeam) {
-                      checkInMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                    }
-                  }}
-                  disabled={checkInMutation.isPending}
-                  data-testid="button-check-in"
-                >
-                  <Check className="w-4 h-4 mr-2" />
-                  Check In
-                </Button>
-                <Button
-                  variant="outline"
-                  className="bg-red-500/50 text-white hover:bg-red-600/50 border-red-500/50"
-                  onClick={() => {
-                    if (userTeam) {
-                      checkOutMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                    }
-                  }}
-                  disabled={checkOutMutation.isPending}
-                  data-testid="button-check-out"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Check Out
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Beverage Responsibility */}
         <div className="bg-card rounded-xl border border-border p-6">

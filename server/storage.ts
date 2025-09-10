@@ -1363,11 +1363,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteGame(id: string): Promise<void> {
     try {
-      // First delete all related attendance records
-      console.log(`Deleting attendance records for game ${id}`);
-      const deletedAttendance = await db.delete(gameAttendance).where(eq(gameAttendance.gameId, id));
-      console.log(`Deleted ${deletedAttendance.rowCount || 0} attendance records`);
-      
       // Then delete the game
       console.log(`Deleting game ${id}`);
       const deletedGame = await db.delete(games).where(eq(games.id, id));
@@ -1384,11 +1379,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTeam(teamId: string): Promise<void> {
     try {
-      // First delete all related attendance records for this team
-      console.log(`Deleting attendance records for team ${teamId}`);
-      const deletedAttendance = await db.delete(gameAttendance).where(eq(gameAttendance.teamId, teamId));
-      console.log(`Deleted ${deletedAttendance.rowCount || 0} attendance records for team`);
-
       // Delete team memberships (players on the team)
       console.log(`Deleting team memberships for team ${teamId}`);
       const deletedMemberships = await db.delete(teamMemberships).where(eq(teamMemberships.teamId, teamId));
