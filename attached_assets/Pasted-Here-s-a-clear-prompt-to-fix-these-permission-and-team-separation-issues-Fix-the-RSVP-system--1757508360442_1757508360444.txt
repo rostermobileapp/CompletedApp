@@ -1,0 +1,43 @@
+Here's a clear prompt to fix these permission and team separation issues:
+
+**"Fix the RSVP system - there are critical permission and team separation issues:
+1. Fix Commissioner Permissions
+
+Problem: Commissioners can see all RSVPs in regular game views
+Solution: Commissioners should see RSVPs like normal team members when viewing games. Only show "all league RSVPs" in a separate "League Management" dashboard/screen
+Implementation: Separate the commissioner league overview from the regular game viewing experience
+
+2. Fix Team Separation - CRITICAL
+Current Problem: The RSVP system is mixing all players together regardless of teams
+Required Fix:
+
+Player RSVP: Players should ONLY see RSVP options on games where THEIR team is playing
+Captain View: Team captains should ONLY see RSVP data for their own team members
+Substitute Requests: Captains can ONLY request substitutes for their own team's non-attending players
+
+3. Specific Technical Changes Needed:
+Database/API Filters:
+
+Filter RSVPs by teamId - only show team members for that specific team
+Game RSVP queries must check: WHERE gameId = ? AND teamId = ?
+Available substitutes must exclude players from BOTH teams playing that game
+
+UI Logic:
+
+RSVP buttons only appear if current user's team is playing in that game
+Captain substitute requests only show their team's non-attending players
+RSVP counts separated by team: "Team A: 8 attending, 2 not attending | Team B: 9 attending, 1 not attending"
+
+Permission Checks:
+
+Verify user is on the team before showing RSVP options
+Captains can only request substitutes for their own team
+Commissioner league management should be separate screen/route
+
+4. Expected Behavior:
+
+Player on Team A sees RSVP buttons only on games where Team A plays
+Captain of Team A sees only Team A's RSVP data and can only request substitutes for Team A players
+Commissioner sees normal team member experience PLUS separate league management dashboard
+
+Please fix these team separation issues immediately - the current system is mixing teams together incorrectly."**

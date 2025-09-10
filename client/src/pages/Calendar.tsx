@@ -177,10 +177,11 @@ export default function Calendar() {
                     )}
                     
                     {/* RSVP Buttons for upcoming games */}
-                    {!isCompleted && !isPastGame && user && (
+                    {!isCompleted && !isPastGame && user && primaryTeam && (game.homeTeam?.id === primaryTeam.id || game.awayTeam?.id === primaryTeam.id) && (
                       <RSVPButtons 
                         gameId={game.id} 
                         userId={(user as any).id}
+                        userTeamId={primaryTeam.id}
                         className="mb-1"
                       />
                     )}

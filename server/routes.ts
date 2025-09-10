@@ -993,7 +993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.gameId;
       const userId = req.user.claims.sub;
-      const { status } = req.body;
+      const { status, teamId } = req.body;
       
       if (!userId) {
         return res.status(401).json({ message: 'User ID not found' });
@@ -1003,24 +1003,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Valid status (attending/not_attending) is required' });
       }
 
+      if (!teamId) {
+        return res.status(400).json({ message: 'Team ID is required' });
+      }
+
       // Verify the game exists
       const game = await storage.getGameById(gameId);
       if (!game) {
         return res.status(404).json({ message: 'Game not found' });
       }
 
-      // Verify user is on one of the teams
-      const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
-      const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
-      const isOnTeam = [...homeTeamMembers, ...awayTeamMembers].some(member => member.userId === userId);
+      // Verify the team is playing in this game
+      if (game.homeTeamId !== teamId && game.awayTeamId !== teamId) {
+        return res.status(403).json({ message: 'Team is not playing in this game' });
+      }
+
+      // Verify user is on the specified team
+      const teamMembers = await storage.getTeamMembers(teamId);
+      const isOnTeam = teamMembers.some(member => member.userId === userId);
       
       if (!isOnTeam) {
-        return res.status(403).json({ message: 'You must be on one of the teams to RSVP' });
+        return res.status(403).json({ message: 'You must be on this team to RSVP' });
       }
 
       const rsvpData = insertGameRsvpSchema.parse({
         gameId,
         userId,
+        teamId,
         status,
       });
 
@@ -1036,6 +1045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.gameId;
       const userId = req.user.claims.sub;
+      const { teamId } = req.query;
       
       if (!userId) {
         return res.status(401).json({ message: 'User ID not found' });
@@ -1057,15 +1067,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isHomeCaptain = homeTeamMembers.some(m => m.userId === userId && m.isCaptain);
       const isAwayCaptain = awayTeamMembers.some(m => m.userId === userId && m.isCaptain);
       
-      if (!isCommissioner && !isHomeCaptain && !isAwayCaptain) {
-        return res.status(403).json({ message: 'Captain or Commissioner access required' });
-      }
+      // For team-specific access
+      if (teamId) {
+        // Verify user is captain of the requested team or commissioner
+        const requestedTeamMembers = await storage.getTeamMembers(teamId as string);
+        const isCaptainOfRequestedTeam = requestedTeamMembers.some(m => m.userId === userId && m.isCaptain);
+        
+        if (!isCommissioner && !isCaptainOfRequestedTeam) {
+          return res.status(403).json({ message: 'Captain or Commissioner access required for this team' });
+        }
+        
+        const summary = await storage.getTeamRsvpSummary(gameId, teamId as string);
+        res.json(summary);
+      } else {
+        // General access - require captain of either team or commissioner
+        if (!isCommissioner && !isHomeCaptain && !isAwayCaptain) {
+          return res.status(403).json({ message: 'Captain or Commissioner access required' });
+        }
 
-      const summary = await storage.getGameRsvpSummary(gameId);
-      res.json(summary);
+        const summary = await storage.getGameRsvpSummaryByTeams(gameId);
+        res.json(summary);
+      }
     } catch (error) {
       console.error('Error fetching RSVP summary:', error);
       res.status(500).json({ message: 'Failed to fetch RSVP summary' });
+    }
+  });
+
+  app.get('/api/games/:gameId/rsvp', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const userId = req.user.claims.sub;
+      const { teamId } = req.query;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      if (teamId) {
+        // Get RSVP for specific team
+        const rsvp = await storage.getUserTeamRsvp(gameId, userId, teamId as string);
+        if (!rsvp) {
+          return res.status(404).json({ message: 'RSVP not found' });
+        }
+        res.json(rsvp);
+      } else {
+        // Get all RSVPs for user in this game (they might be on multiple teams)
+        const rsvps = await storage.getUserGameRsvps(gameId, userId);
+        res.json(rsvps);
+      }
+    } catch (error) {
+      console.error('Error fetching user RSVP:', error);
+      res.status(500).json({ message: 'Failed to fetch RSVP' });
     }
   });
 

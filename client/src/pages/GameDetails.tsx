@@ -314,12 +314,13 @@ export default function GameDetails() {
             
             <div className="space-y-4">
               {/* Player RSVP Buttons */}
-              {user && (
+              {user && userTeam && (
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-2">Your Response:</p>
                   <RSVPButtons 
                     gameId={game.id} 
                     userId={(user as any).id}
+                    userTeamId={userTeam.id}
                   />
                 </div>
               )}
@@ -330,6 +331,8 @@ export default function GameDetails() {
                   <p className="text-sm font-medium text-muted-foreground mb-2">Team Attendance:</p>
                   <RSVPSummary 
                     gameId={game.id}
+                    teamId={isCaptain && userTeam ? userTeam.id : undefined}
+                    showTeamSeparation={isCommissioner && !isCaptain}
                     onViewDetails={() => setShowRSVPModal(true)}
                   />
                 </div>

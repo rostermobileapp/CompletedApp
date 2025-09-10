@@ -9,19 +9,25 @@ import { apiRequest } from "@/lib/queryClient";
 interface RSVPButtonsProps {
   gameId: string;
   userId: string;
+  userTeamId?: string; // The team the user is on for this game
   className?: string;
 }
 
-export function RSVPButtons({ gameId, userId, className }: RSVPButtonsProps) {
+export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButtonsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get current RSVP status
+  // Don't show RSVP buttons if user's team isn't specified
+  if (!userTeamId) {
+    return null;
+  }
+
+  // Get current RSVP status for this specific team
   const { data: currentRsvp } = useQuery({
-    queryKey: [`/api/games/${gameId}/rsvp`, userId],
+    queryKey: [`/api/games/${gameId}/rsvp`, userId, userTeamId],
     queryFn: async () => {
       try {
-        const response = await fetch(`/api/games/${gameId}/rsvp?userId=${userId}`);
+        const response = await fetch(`/api/games/${gameId}/rsvp?teamId=${userTeamId}`);
         if (response.status === 404) return null;
         if (!response.ok) throw new Error('Failed to fetch RSVP');
         return response.json();
@@ -31,13 +37,16 @@ export function RSVPButtons({ gameId, userId, className }: RSVPButtonsProps) {
     },
   });
 
-  // RSVP mutation
+  // RSVP mutation with team awareness
   const rsvpMutation = useMutation({
     mutationFn: async (status: 'attending' | 'not_attending') => {
-      await apiRequest("POST", `/api/games/${gameId}/rsvp`, { status });
+      await apiRequest("POST", `/api/games/${gameId}/rsvp`, { 
+        status, 
+        teamId: userTeamId 
+      });
     },
     onSuccess: (_, status) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/rsvp`, userId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/rsvp`, userId, userTeamId] });
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/rsvp-summary`] });
       toast({
         title: "RSVP Updated",

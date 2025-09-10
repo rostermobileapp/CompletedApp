@@ -7,15 +7,21 @@ import { cn } from "@/lib/utils";
 
 interface RSVPSummaryProps {
   gameId: string;
+  teamId?: string; // If specified, show only this team's RSVP data
+  showTeamSeparation?: boolean; // If true, show both teams separately
   onViewDetails?: () => void;
   className?: string;
 }
 
-export function RSVPSummary({ gameId, onViewDetails, className }: RSVPSummaryProps) {
+export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails, className }: RSVPSummaryProps) {
   const { data: rsvpSummary, isLoading } = useQuery({
-    queryKey: [`/api/games/${gameId}/rsvp-summary`],
+    queryKey: [`/api/games/${gameId}/rsvp-summary`, teamId, showTeamSeparation],
     queryFn: async () => {
-      const response = await fetch(`/api/games/${gameId}/rsvp-summary`);
+      let url = `/api/games/${gameId}/rsvp-summary`;
+      if (teamId) {
+        url += `?teamId=${teamId}`;
+      }
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Failed to fetch RSVP summary');
       }
@@ -40,6 +46,72 @@ export function RSVPSummary({ gameId, onViewDetails, className }: RSVPSummaryPro
     return null;
   }
 
+  // Handle team-separated data
+  if (showTeamSeparation && rsvpSummary.homeTeam && rsvpSummary.awayTeam) {
+    return (
+      <div className={cn("space-y-3", className)} data-testid="rsvp-summary-teams">
+        <div className="text-sm font-medium">RSVP Status by Team</div>
+        
+        {/* Home Team */}
+        <Card className="">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Home Team
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary" className="bg-green-100 text-green-700">
+                <UserCheck className="h-3 w-3 mr-1" />
+                {rsvpSummary.homeTeam.attending?.length || 0} attending
+              </Badge>
+              <Badge variant="secondary" className="bg-red-100 text-red-700">
+                <UserX className="h-3 w-3 mr-1" />
+                {rsvpSummary.homeTeam.notAttending?.length || 0} not attending
+              </Badge>
+              {(rsvpSummary.homeTeam.noResponse?.length || 0) > 0 && (
+                <Badge variant="outline">
+                  <Users className="h-3 w-3 mr-1" />
+                  {rsvpSummary.homeTeam.noResponse?.length || 0} no response
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Away Team */}
+        <Card className="">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Away Team
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary" className="bg-green-100 text-green-700">
+                <UserCheck className="h-3 w-3 mr-1" />
+                {rsvpSummary.awayTeam.attending?.length || 0} attending
+              </Badge>
+              <Badge variant="secondary" className="bg-red-100 text-red-700">
+                <UserX className="h-3 w-3 mr-1" />
+                {rsvpSummary.awayTeam.notAttending?.length || 0} not attending
+              </Badge>
+              {(rsvpSummary.awayTeam.noResponse?.length || 0) > 0 && (
+                <Badge variant="outline">
+                  <Users className="h-3 w-3 mr-1" />
+                  {rsvpSummary.awayTeam.noResponse?.length || 0} no response
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Handle single team or legacy data
   const attendingCount = rsvpSummary.attending?.length || 0;
   const notAttendingCount = rsvpSummary.notAttending?.length || 0;
   const noResponseCount = rsvpSummary.noResponse?.length || 0;
@@ -50,7 +122,7 @@ export function RSVPSummary({ gameId, onViewDetails, className }: RSVPSummaryPro
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Users className="h-4 w-4" />
-          RSVP Status
+          {teamId ? "Team RSVP Status" : "RSVP Status"}
         </CardTitle>
         <CardDescription className="text-xs">
           {totalPlayers} total player{totalPlayers !== 1 ? 's' : ''}

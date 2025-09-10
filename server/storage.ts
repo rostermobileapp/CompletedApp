@@ -111,7 +111,11 @@ export interface IStorage {
   // RSVP operations
   createOrUpdateRsvp(rsvp: InsertGameRsvp): Promise<GameRsvp>;
   getGameRsvp(gameId: string, userId: string): Promise<GameRsvp | undefined>;
+  getUserTeamRsvp(gameId: string, userId: string, teamId: string): Promise<GameRsvp | undefined>;
+  getUserGameRsvps(gameId: string, userId: string): Promise<GameRsvp[]>;
   getGameRsvpSummary(gameId: string): Promise<{ attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }>;
+  getTeamRsvpSummary(gameId: string, teamId: string): Promise<{ attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }>;
+  getGameRsvpSummaryByTeams(gameId: string): Promise<{ homeTeam: { teamId: string; attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }; awayTeam: { teamId: string; attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] } }>;
   getAvailablePlayers(date: Date, leagueId: string): Promise<User[]>;
   
   // Substitute request operations
@@ -1536,14 +1540,22 @@ export class DatabaseStorage implements IStorage {
     const [existingRsvp] = await db
       .select()
       .from(gameRsvps)
-      .where(and(eq(gameRsvps.gameId, rsvp.gameId), eq(gameRsvps.userId, rsvp.userId)))
+      .where(and(
+        eq(gameRsvps.gameId, rsvp.gameId), 
+        eq(gameRsvps.userId, rsvp.userId),
+        eq(gameRsvps.teamId, rsvp.teamId)
+      ))
       .limit(1);
 
     if (existingRsvp) {
       const [updatedRsvp] = await db
         .update(gameRsvps)
         .set({ status: rsvp.status, updatedAt: new Date() })
-        .where(and(eq(gameRsvps.gameId, rsvp.gameId), eq(gameRsvps.userId, rsvp.userId)))
+        .where(and(
+          eq(gameRsvps.gameId, rsvp.gameId), 
+          eq(gameRsvps.userId, rsvp.userId),
+          eq(gameRsvps.teamId, rsvp.teamId)
+        ))
         .returning();
       return updatedRsvp;
     } else {
@@ -1596,6 +1608,80 @@ export class DatabaseStorage implements IStorage {
       .map(member => member.user);
 
     return { attending, notAttending, noResponse };
+  }
+
+  async getUserTeamRsvp(gameId: string, userId: string, teamId: string): Promise<GameRsvp | undefined> {
+    const [rsvp] = await db
+      .select()
+      .from(gameRsvps)
+      .where(and(
+        eq(gameRsvps.gameId, gameId), 
+        eq(gameRsvps.userId, userId),
+        eq(gameRsvps.teamId, teamId)
+      ))
+      .limit(1);
+    return rsvp;
+  }
+
+  async getUserGameRsvps(gameId: string, userId: string): Promise<GameRsvp[]> {
+    const rsvps = await db
+      .select()
+      .from(gameRsvps)
+      .where(and(
+        eq(gameRsvps.gameId, gameId), 
+        eq(gameRsvps.userId, userId)
+      ));
+    return rsvps;
+  }
+
+  async getTeamRsvpSummary(gameId: string, teamId: string): Promise<{ attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }> {
+    // Get all RSVPs for this game and team
+    const rsvps = await db
+      .select()
+      .from(gameRsvps)
+      .leftJoin(users, eq(gameRsvps.userId, users.id))
+      .where(and(
+        eq(gameRsvps.gameId, gameId),
+        eq(gameRsvps.teamId, teamId)
+      ));
+
+    const attending = rsvps
+      .filter(r => r.game_rsvps.status === 'attending')
+      .map(r => ({ ...r.game_rsvps, user: r.users! }));
+
+    const notAttending = rsvps
+      .filter(r => r.game_rsvps.status === 'not_attending')
+      .map(r => ({ ...r.game_rsvps, user: r.users! }));
+
+    // Get team members to find no response users
+    const teamMembers = await this.getTeamMembers(teamId);
+    const rsvpUserIds = rsvps.map(r => r.game_rsvps.userId);
+    const noResponse = teamMembers
+      .filter(member => !rsvpUserIds.includes(member.userId))
+      .map(member => member.user);
+
+    return { attending, notAttending, noResponse };
+  }
+
+  async getGameRsvpSummaryByTeams(gameId: string): Promise<{ homeTeam: { teamId: string; attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }; awayTeam: { teamId: string; attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] } }> {
+    const game = await this.getGameById(gameId);
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    const homeTeamSummary = await this.getTeamRsvpSummary(gameId, game.homeTeamId);
+    const awayTeamSummary = await this.getTeamRsvpSummary(gameId, game.awayTeamId);
+
+    return {
+      homeTeam: {
+        teamId: game.homeTeamId,
+        ...homeTeamSummary
+      },
+      awayTeam: {
+        teamId: game.awayTeamId,
+        ...awayTeamSummary
+      }
+    };
   }
 
   async getAvailablePlayers(date: Date, leagueId: string): Promise<User[]> {

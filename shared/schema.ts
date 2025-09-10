@@ -205,11 +205,12 @@ export const gameRsvps = pgTable("game_rsvps", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").references(() => games.id).notNull(),
   userId: varchar("user_id").references(() => users.id).notNull(),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
   status: rsvpStatusEnum("status").default("no_response").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
-  unique("unique_game_user_rsvp").on(table.gameId, table.userId),
+  unique("unique_game_user_team_rsvp").on(table.gameId, table.userId, table.teamId),
 ]);
 
 // Substitute requests table
