@@ -819,13 +819,6 @@ export default function Dashboard() {
         const pendingMembersCount = Array.isArray(pendingMembers) ? pendingMembers.length : 0;
         const total = pendingMembersCount + gamesNeedingVerification;
         
-        console.log('Commissioner TODO Debug:', {
-          tier,
-          selectedLeagueId,
-          pendingMembersCount,
-          gamesNeedingVerification,
-          total
-        });
         
         return {
           pendingMembers: pendingMembersCount,
@@ -1030,48 +1023,23 @@ export default function Dashboard() {
         />
       )}
       {/* Permanent Commissioner To-Do Bar */}
-      {(() => {
-        console.log('Commissioner To-Do Bar Debug:', {
-          tier,
-          isCommissioner: tier === 'commissioner',
-          selectedLeagueId,
-          commissionerTodoData,
-          shouldShow: tier === 'commissioner' && selectedLeagueId && commissionerTodoData
-        });
-        return null;
-      })()}
       {tier === 'commissioner' && selectedLeagueId && commissionerTodoData && (
         <div className="px-6 mb-4">
-          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950 dark:to-orange-950 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 shadow-sm">
+          <div className="bg-black dark:bg-black border border-gray-600 rounded-lg">
             <button
               onClick={() => setShowCommissionerToDoModal(true)}
-              className="w-full flex items-center justify-between hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors rounded-lg p-2"
+              className="w-full flex items-center justify-between hover:bg-gray-800 transition-colors rounded-lg px-3 py-2"
               data-testid="button-commissioner-todo-permanent"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center">
-                  <Settings className="w-5 h-5 text-white" />
-                </div>
-                <div className="text-left">
-                  <h3 className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">To-Do List</h3>
-                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                    {commissionerTodoData.total === 0 ? (
-                      ''
-                    ) : (
-                      <>
-                        {commissionerTodoData.pendingMembers > 0 && `${commissionerTodoData.pendingMembers} pending approval${commissionerTodoData.pendingMembers === 1 ? '' : 's'}`}
-                        {commissionerTodoData.pendingMembers > 0 && commissionerTodoData.gamesNeedingVerification > 0 && ' • '}
-                        {commissionerTodoData.gamesNeedingVerification > 0 && `${commissionerTodoData.gamesNeedingVerification} score verification${commissionerTodoData.gamesNeedingVerification === 1 ? '' : 's'}`}
-                      </>
-                    )}
-                  </p>
-                </div>
+                <Settings className="w-4 h-4 text-white" />
+                <span className="text-white font-medium text-sm">Commissioner Tasks</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">{commissionerTodoData.total}</span>
+                <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">{commissionerTodoData.total}</span>
                 </div>
-                <ChevronDown className="w-4 h-4 text-yellow-600" />
+                <ChevronDown className="w-4 h-4 text-white" />
               </div>
             </button>
           </div>
