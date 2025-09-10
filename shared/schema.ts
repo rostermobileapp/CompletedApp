@@ -54,6 +54,20 @@ export const membershipStatusEnum = pgEnum("membership_status", [
   "inactive"
 ]);
 
+// RSVP status enum
+export const rsvpStatusEnum = pgEnum("rsvp_status", [
+  "attending",
+  "not_attending",
+  "no_response"
+]);
+
+// Substitute request status enum
+export const substituteRequestStatusEnum = pgEnum("substitute_request_status", [
+  "pending",
+  "approved",
+  "denied"
+]);
+
 // Users table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -184,6 +198,31 @@ export const gameScoreSubmissions = pgTable("game_score_submissions", {
   awayScore: integer("away_score").notNull(),
   isCommissionerOverride: boolean("is_commissioner_override").default(false).notNull(),
   submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+});
+
+// Game RSVPs table
+export const gameRsvps = pgTable("game_rsvps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: varchar("game_id").references(() => games.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  status: rsvpStatusEnum("status").default("no_response").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_game_user_rsvp").on(table.gameId, table.userId),
+]);
+
+// Substitute requests table
+export const substituteRequests = pgTable("substitute_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: varchar("game_id").references(() => games.id).notNull(),
+  originalPlayerId: varchar("original_player_id").references(() => users.id).notNull(),
+  substitutePlayerId: varchar("substitute_player_id").references(() => users.id),
+  requestedBy: varchar("requested_by").references(() => users.id).notNull(),
+  status: substituteRequestStatusEnum("status").default("pending").notNull(),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 
@@ -416,7 +455,7 @@ export const teamMembershipsRelations = relations(teamMemberships, ({ one }) => 
   }),
 }));
 
-export const gamesRelations = relations(games, ({ one }) => ({
+export const gamesRelations = relations(games, ({ one, many }) => ({
   league: one(leagues, {
     fields: [games.leagueId],
     references: [leagues.id],
@@ -435,6 +474,8 @@ export const gamesRelations = relations(games, ({ one }) => ({
     references: [teams.id],
     relationName: "awayTeam",
   }),
+  rsvps: many(gameRsvps),
+  substituteRequests: many(substituteRequests),
 }));
 
 export const messagesRelations = relations(messages, ({ one }) => ({
@@ -536,6 +577,44 @@ export const importedSchedulesRelations = relations(importedSchedules, ({ one })
   game: one(games, {
     fields: [importedSchedules.gameId],
     references: [games.id],
+  }),
+}));
+
+export const gameRsvpsRelations = relations(gameRsvps, ({ one }) => ({
+  game: one(games, {
+    fields: [gameRsvps.gameId],
+    references: [games.id],
+  }),
+  user: one(users, {
+    fields: [gameRsvps.userId],
+    references: [users.id],
+  }),
+}));
+
+export const substituteRequestsRelations = relations(substituteRequests, ({ one }) => ({
+  game: one(games, {
+    fields: [substituteRequests.gameId],
+    references: [games.id],
+  }),
+  originalPlayer: one(users, {
+    fields: [substituteRequests.originalPlayerId],
+    references: [users.id],
+    relationName: "originalPlayer",
+  }),
+  substitutePlayer: one(users, {
+    fields: [substituteRequests.substitutePlayerId],
+    references: [users.id],
+    relationName: "substitutePlayer",
+  }),
+  requestedByUser: one(users, {
+    fields: [substituteRequests.requestedBy],
+    references: [users.id],
+    relationName: "requestedBy",
+  }),
+  approver: one(users, {
+    fields: [substituteRequests.approvedBy],
+    references: [users.id],
+    relationName: "approver",
   }),
 }));
 
@@ -644,6 +723,17 @@ export const insertImportedScheduleSchema = createInsertSchema(importedSchedules
   createdAt: true,
 });
 
+export const insertGameRsvpSchema = createInsertSchema(gameRsvps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSubstituteRequestSchema = createInsertSchema(substituteRequests).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -678,3 +768,7 @@ export type ScheduleImport = typeof scheduleImports.$inferSelect;
 export type InsertScheduleImport = z.infer<typeof insertScheduleImportSchema>;
 export type ImportedSchedule = typeof importedSchedules.$inferSelect;
 export type InsertImportedSchedule = z.infer<typeof insertImportedScheduleSchema>;
+export type GameRsvp = typeof gameRsvps.$inferSelect;
+export type InsertGameRsvp = z.infer<typeof insertGameRsvpSchema>;
+export type SubstituteRequest = typeof substituteRequests.$inferSelect;
+export type InsertSubstituteRequest = z.infer<typeof insertSubstituteRequestSchema>;
