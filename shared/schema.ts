@@ -239,6 +239,65 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Announcements table
+export const announcements = pgTable("announcements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  authorId: varchar("author_id").references(() => users.id).notNull(),
+  content: text("content").notNull(),
+  isPinned: boolean("is_pinned").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Announcement attachments table
+export const announcementAttachments = pgTable("announcement_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
+  type: varchar("type").notNull(), // 'image', 'video', 'gif', 'link'
+  url: varchar("url").notNull(),
+  filename: varchar("filename"),
+  fileSize: integer("file_size"),
+  mimeType: varchar("mime_type"),
+  linkTitle: varchar("link_title"),
+  linkDescription: text("link_description"),
+  linkImage: varchar("link_image"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Announcement reactions table
+export const announcementReactions = pgTable("announcement_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  emoji: varchar("emoji").notNull(), // Store emoji as string
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_announcement_user_emoji").on(table.announcementId, table.userId, table.emoji),
+]);
+
+// Announcement polls table
+export const announcementPolls = pgTable("announcement_polls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
+  question: text("question").notNull(),
+  options: jsonb("options").notNull(), // Array of poll options
+  allowMultiple: boolean("allow_multiple").default(false).notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Announcement poll votes table
+export const announcementPollVotes = pgTable("announcement_poll_votes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pollId: varchar("poll_id").references(() => announcementPolls.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  optionIndex: integer("option_index").notNull(), // Index of selected option in options array
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_poll_user_vote").on(table.pollId, table.userId, table.optionIndex),
+]);
+
 // Draft status enum
 export const draftStatusEnum = pgEnum("draft_status", [
   "created",
@@ -500,6 +559,57 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
+export const announcementsRelations = relations(announcements, ({ one, many }) => ({
+  league: one(leagues, {
+    fields: [announcements.leagueId],
+    references: [leagues.id],
+  }),
+  author: one(users, {
+    fields: [announcements.authorId],
+    references: [users.id],
+  }),
+  attachments: many(announcementAttachments),
+  reactions: many(announcementReactions),
+  polls: many(announcementPolls),
+}));
+
+export const announcementAttachmentsRelations = relations(announcementAttachments, ({ one }) => ({
+  announcement: one(announcements, {
+    fields: [announcementAttachments.announcementId],
+    references: [announcements.id],
+  }),
+}));
+
+export const announcementReactionsRelations = relations(announcementReactions, ({ one }) => ({
+  announcement: one(announcements, {
+    fields: [announcementReactions.announcementId],
+    references: [announcements.id],
+  }),
+  user: one(users, {
+    fields: [announcementReactions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const announcementPollsRelations = relations(announcementPolls, ({ one, many }) => ({
+  announcement: one(announcements, {
+    fields: [announcementPolls.announcementId],
+    references: [announcements.id],
+  }),
+  votes: many(announcementPollVotes),
+}));
+
+export const announcementPollVotesRelations = relations(announcementPollVotes, ({ one }) => ({
+  poll: one(announcementPolls, {
+    fields: [announcementPollVotes.pollId],
+    references: [announcementPolls.id],
+  }),
+  user: one(users, {
+    fields: [announcementPollVotes.userId],
+    references: [users.id],
+  }),
+}));
+
 export const playerImportsRelations = relations(playerImports, ({ one, many }) => ({
   league: one(leagues, {
     fields: [playerImports.leagueId],
@@ -735,6 +845,32 @@ export const insertSubstituteRequestSchema = createInsertSchema(substituteReques
   createdAt: true,
 });
 
+export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAnnouncementAttachmentSchema = createInsertSchema(announcementAttachments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAnnouncementReactionSchema = createInsertSchema(announcementReactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAnnouncementPollSchema = createInsertSchema(announcementPolls).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAnnouncementPollVoteSchema = createInsertSchema(announcementPollVotes).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -773,6 +909,16 @@ export type GameRsvp = typeof gameRsvps.$inferSelect;
 export type InsertGameRsvp = z.infer<typeof insertGameRsvpSchema>;
 export type SubstituteRequest = typeof substituteRequests.$inferSelect;
 export type InsertSubstituteRequest = z.infer<typeof insertSubstituteRequestSchema>;
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type AnnouncementAttachment = typeof announcementAttachments.$inferSelect;
+export type InsertAnnouncementAttachment = z.infer<typeof insertAnnouncementAttachmentSchema>;
+export type AnnouncementReaction = typeof announcementReactions.$inferSelect;
+export type InsertAnnouncementReaction = z.infer<typeof insertAnnouncementReactionSchema>;
+export type AnnouncementPoll = typeof announcementPolls.$inferSelect;
+export type InsertAnnouncementPoll = z.infer<typeof insertAnnouncementPollSchema>;
+export type AnnouncementPollVote = typeof announcementPollVotes.$inferSelect;
+export type InsertAnnouncementPollVote = z.infer<typeof insertAnnouncementPollVoteSchema>;
 
 // Extended types with relationships
 export type GameWithTeams = Game & {
