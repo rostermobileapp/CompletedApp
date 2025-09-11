@@ -146,7 +146,7 @@ export interface IStorage {
 
   // Announcement operations
   createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
-  getLeagueAnnouncements(leagueId: string): Promise<(Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]>;
+  getLeagueAnnouncements(leagueId: string, options?: { limit?: number; offset?: number; orderBy?: string; orderDirection?: 'asc' | 'desc' }): Promise<{ announcements: (Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]; total: number }>;
   getAnnouncement(id: string): Promise<(Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] }) | undefined>;
   updateAnnouncement(id: string, updates: Partial<Announcement>): Promise<Announcement>;
   deleteAnnouncement(id: string): Promise<void>;
@@ -1822,12 +1822,37 @@ export class DatabaseStorage implements IStorage {
     return newAnnouncement;
   }
 
-  async getLeagueAnnouncements(leagueId: string): Promise<(Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]> {
-    const leagueAnnouncements = await db
+  async getLeagueAnnouncements(leagueId: string, options?: { limit?: number; offset?: number; orderBy?: string; orderDirection?: 'asc' | 'desc' }): Promise<{ announcements: (Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]; total: number }> {
+    // First get the total count
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(announcements)
+      .where(eq(announcements.leagueId, leagueId));
+    
+    const total = countResult.count;
+    
+    // Then get the paginated announcements
+    let query = db
       .select()
       .from(announcements)
-      .where(eq(announcements.leagueId, leagueId))
-      .orderBy(desc(announcements.createdAt));
+      .where(eq(announcements.leagueId, leagueId));
+    
+    // Apply ordering
+    if (options?.orderDirection === 'asc') {
+      query = query.orderBy(asc(announcements.createdAt));
+    } else {
+      query = query.orderBy(desc(announcements.createdAt));
+    }
+    
+    // Apply pagination
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+    if (options?.offset) {
+      query = query.offset(options.offset);
+    }
+    
+    const leagueAnnouncements = await query;
 
     const result = [];
     for (const announcement of leagueAnnouncements) {
@@ -1836,7 +1861,7 @@ export class DatabaseStorage implements IStorage {
         result.push(enrichedAnnouncement);
       }
     }
-    return result;
+    return { announcements: result, total };
   }
 
   async getAnnouncement(id: string): Promise<(Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] }) | undefined> {
