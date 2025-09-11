@@ -14,6 +14,16 @@ import {
   insertGameRsvpSchema,
   insertSubstituteRequestSchema,
   insertMessageSchema,
+  insertAnnouncementSchema,
+  insertAnnouncementAttachmentSchema,
+  insertAnnouncementReactionSchema,
+  insertAnnouncementPollSchema,
+  insertAnnouncementPollVoteSchema,
+  createAnnouncementRequestSchema,
+  updateAnnouncementRequestSchema,
+  createAnnouncementReactionRequestSchema,
+  createAnnouncementPollRequestSchema,
+  createAnnouncementPollVoteRequestSchema,
 } from "@shared/schema";
 import Stripe from "stripe";
 import multer from "multer";
@@ -2105,6 +2115,283 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error merging player:', error);
       res.status(500).json({ message: 'Failed to merge player' });
+    }
+  });
+
+  // Announcement routes
+  
+  // Get announcements for a league
+  app.get('/api/leagues/:leagueId/announcements', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+
+      // Check if user is member of the league
+      const membership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Parse and validate query parameters
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20)); // Default 20, max 50
+      const orderBy = req.query.orderBy === 'createdAt' ? 'createdAt' : 'createdAt'; // Only support createdAt for now
+      const orderDirection = req.query.orderDirection === 'asc' ? 'asc' : 'desc'; // Default desc (newest first)
+      const offset = (page - 1) * limit;
+
+      const result = await storage.getLeagueAnnouncements(leagueId, {
+        limit,
+        offset,
+        orderBy,
+        orderDirection,
+      });
+
+      res.json({
+        announcements: result.announcements,
+        pagination: {
+          page,
+          limit,
+          total: result.total,
+          totalPages: Math.ceil(result.total / limit),
+          hasNext: page * limit < result.total,
+          hasPrev: page > 1,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+      res.status(500).json({ message: 'Failed to fetch announcements' });
+    }
+  });
+
+  // Create announcement (commissioner only)
+  app.post('/api/leagues/:leagueId/announcements', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+
+      // Check if user is commissioner
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can create announcements' });
+      }
+
+      const announcementData = createAnnouncementRequestSchema.parse(req.body);
+      const announcement = await storage.createAnnouncement({
+        ...announcementData,
+        leagueId,
+        authorId: userId,
+      });
+
+      res.json(announcement);
+    } catch (error) {
+      console.error('Error creating announcement:', error);
+      res.status(500).json({ message: 'Failed to create announcement' });
+    }
+  });
+
+  // Update announcement (commissioner only)
+  app.patch('/api/announcements/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const announcementId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Get announcement to check permissions
+      const announcement = await storage.getAnnouncement(announcementId);
+      if (!announcement) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      // Check if user is commissioner of the league
+      const league = await storage.getLeague(announcement.leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can edit announcements' });
+      }
+
+      const updates = updateAnnouncementRequestSchema.parse(req.body);
+      const updatedAnnouncement = await storage.updateAnnouncement(announcementId, updates);
+      res.json(updatedAnnouncement);
+    } catch (error) {
+      console.error('Error updating announcement:', error);
+      res.status(500).json({ message: 'Failed to update announcement' });
+    }
+  });
+
+  // Delete announcement (commissioner only)
+  app.delete('/api/announcements/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const announcementId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Get announcement to check permissions
+      const announcement = await storage.getAnnouncement(announcementId);
+      if (!announcement) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      // Check if user is commissioner of the league
+      const league = await storage.getLeague(announcement.leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can delete announcements' });
+      }
+
+      await storage.deleteAnnouncement(announcementId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+      res.status(500).json({ message: 'Failed to delete announcement' });
+    }
+  });
+
+  // Add reaction to announcement
+  app.post('/api/announcements/:id/reactions', isAuthenticated, async (req: any, res) => {
+    try {
+      const announcementId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { emoji } = req.body;
+
+      if (!emoji) {
+        return res.status(400).json({ message: 'Emoji is required' });
+      }
+
+      // Check if announcement exists and user has access
+      const announcement = await storage.getAnnouncement(announcementId);
+      if (!announcement) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const reaction = await storage.addAnnouncementReaction({
+        announcementId,
+        userId,
+        emoji,
+      });
+
+      res.json(reaction);
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+      res.status(500).json({ message: 'Failed to add reaction' });
+    }
+  });
+
+  // Remove reaction from announcement
+  app.delete('/api/announcements/:id/reactions', isAuthenticated, async (req: any, res) => {
+    try {
+      const announcementId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { emoji } = req.body;
+
+      if (!emoji) {
+        return res.status(400).json({ message: 'Emoji is required' });
+      }
+
+      await storage.removeAnnouncementReaction(announcementId, userId, emoji);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error removing reaction:', error);
+      res.status(500).json({ message: 'Failed to remove reaction' });
+    }
+  });
+
+  // Create poll for announcement (commissioner only)
+  app.post('/api/announcements/:id/polls', isAuthenticated, async (req: any, res) => {
+    try {
+      const announcementId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Get announcement to check permissions
+      const announcement = await storage.getAnnouncement(announcementId);
+      if (!announcement) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      // Check if user is commissioner of the league
+      const league = await storage.getLeague(announcement.leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can create polls' });
+      }
+
+      const pollData = createAnnouncementPollRequestSchema.parse(req.body);
+      const poll = await storage.createAnnouncementPoll({
+        ...pollData,
+        announcementId,
+      });
+
+      res.json(poll);
+    } catch (error) {
+      console.error('Error creating poll:', error);
+      res.status(500).json({ message: 'Failed to create poll' });
+    }
+  });
+
+  // Vote on poll
+  app.post('/api/polls/:id/votes', isAuthenticated, async (req: any, res) => {
+    try {
+      const pollId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { optionIndex } = req.body;
+
+      if (optionIndex === undefined || optionIndex < 0) {
+        return res.status(400).json({ message: 'Valid option index is required' });
+      }
+
+      const voteData = insertAnnouncementPollVoteSchema.parse({
+        pollId,
+        userId,
+        optionIndex,
+      });
+
+      const vote = await storage.voteOnPoll(voteData);
+      res.json(vote);
+    } catch (error) {
+      console.error('Error voting on poll:', error);
+      res.status(500).json({ message: 'Failed to vote on poll' });
+    }
+  });
+
+  // Get poll results
+  app.get('/api/polls/:id/results', isAuthenticated, async (req: any, res) => {
+    try {
+      const pollId = req.params.id;
+      const results = await storage.getPollResults(pollId);
+      res.json(results);
+    } catch (error) {
+      console.error('Error getting poll results:', error);
+      res.status(500).json({ message: 'Failed to get poll results' });
+    }
+  });
+
+  // Add attachment to announcement (commissioner only)
+  app.post('/api/announcements/:id/attachments', isAuthenticated, async (req: any, res) => {
+    try {
+      const announcementId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Get announcement to check permissions
+      const announcement = await storage.getAnnouncement(announcementId);
+      if (!announcement) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      // Check if user is commissioner of the league
+      const league = await storage.getLeague(announcement.leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can add attachments' });
+      }
+
+      const attachmentData = insertAnnouncementAttachmentSchema.parse(req.body);
+      const attachment = await storage.createAnnouncementAttachment({
+        ...attachmentData,
+        announcementId,
+      });
+
+      res.json(attachment);
+    } catch (error) {
+      console.error('Error adding attachment:', error);
+      res.status(500).json({ message: 'Failed to add attachment' });
     }
   });
 

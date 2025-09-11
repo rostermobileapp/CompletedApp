@@ -871,6 +871,49 @@ export const insertAnnouncementPollVoteSchema = createInsertSchema(announcementP
   createdAt: true,
 });
 
+// Client-safe request schemas (omit server-controlled fields)
+export const createAnnouncementRequestSchema = createInsertSchema(announcements).omit({
+  id: true,
+  leagueId: true,  // Server-controlled
+  authorId: true,  // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateAnnouncementRequestSchema = createInsertSchema(announcements).omit({
+  id: true,
+  leagueId: true,  // Server-controlled
+  authorId: true,  // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+}).partial(); // Make all fields optional for updates
+
+export const createAnnouncementAttachmentRequestSchema = createInsertSchema(announcementAttachments).omit({
+  id: true,
+  announcementId: true, // Server-controlled
+  createdAt: true,
+});
+
+export const createAnnouncementReactionRequestSchema = createInsertSchema(announcementReactions).omit({
+  id: true,
+  announcementId: true, // Server-controlled
+  userId: true,         // Server-controlled
+  createdAt: true,
+});
+
+export const createAnnouncementPollRequestSchema = createInsertSchema(announcementPolls).omit({
+  id: true,
+  announcementId: true, // Server-controlled
+  createdAt: true,
+});
+
+export const createAnnouncementPollVoteRequestSchema = createInsertSchema(announcementPollVotes).omit({
+  id: true,
+  pollId: true,    // Server-controlled
+  userId: true,    // Server-controlled
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -919,6 +962,12 @@ export type AnnouncementPoll = typeof announcementPolls.$inferSelect;
 export type InsertAnnouncementPoll = z.infer<typeof insertAnnouncementPollSchema>;
 export type AnnouncementPollVote = typeof announcementPollVotes.$inferSelect;
 export type InsertAnnouncementPollVote = z.infer<typeof insertAnnouncementPollVoteSchema>;
+export type CreateAnnouncementRequest = z.infer<typeof createAnnouncementRequestSchema>;
+export type UpdateAnnouncementRequest = z.infer<typeof updateAnnouncementRequestSchema>;
+export type CreateAnnouncementAttachmentRequest = z.infer<typeof createAnnouncementAttachmentRequestSchema>;
+export type CreateAnnouncementReactionRequest = z.infer<typeof createAnnouncementReactionRequestSchema>;
+export type CreateAnnouncementPollRequest = z.infer<typeof createAnnouncementPollRequestSchema>;
+export type CreateAnnouncementPollVoteRequest = z.infer<typeof createAnnouncementPollVoteRequestSchema>;
 
 // Extended types with relationships
 export type GameWithTeams = Game & {
