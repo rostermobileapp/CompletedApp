@@ -144,10 +144,12 @@ function CreateAnnouncementModal({
 
   const handleGetUploadParameters = async () => {
     const response = await apiRequest('POST', '/api/announcement-media/upload');
-    const { uploadURL } = await response.json();
+    const { uploadURL, resourcePath } = await response.json();
     return {
       method: 'PUT' as const,
       url: uploadURL,
+      // Store the resourcePath in metadata so we can access it later
+      meta: { resourcePath }
     };
   };
 
@@ -164,11 +166,12 @@ function CreateAnnouncementModal({
           type = 'video';
         }
 
-        // Use resourcePath if available (from our backend), otherwise fallback to uploadURL
-        const resourcePath = file.meta?.resourcePath || file.uploadURL;
+        // Use resourcePath from our stored metadata (the proxied URL)
+        const resourcePath = file.meta?.resourcePath;
+        console.log('🔍 Upload complete - resourcePath:', resourcePath, 'uploadURL:', file.uploadURL);
 
         return {
-          url: resourcePath,
+          url: resourcePath || file.uploadURL, // Fallback to uploadURL if resourcePath is missing
           type,
           fileName
         };
@@ -573,11 +576,15 @@ function AnnouncementCard({
           <div className="grid grid-cols-2 gap-2">
             {announcement.attachments.map((attachment) => (
               <div key={attachment.id} className="rounded-lg overflow-hidden border">
-                {attachment.type === 'image' && (
+                {(attachment.type === 'image' || attachment.type === 'gif') && (
                   <img 
                     src={attachment.url} 
-                    alt={attachment.fileName}
+                    alt={attachment.fileName || 'Attachment'}
                     className="w-full h-48 object-cover"
+                    onError={(e) => {
+                      console.error('Failed to load image:', attachment.url);
+                      console.error('Attachment data:', attachment);
+                    }}
                   />
                 )}
                 {attachment.type === 'video' && (
@@ -603,6 +610,7 @@ function AnnouncementCard({
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
+                {console.log('🔍 Poll data:', announcement.poll)}
                 {announcement.poll.options.map((option, index) => {
                   const votes = announcement.poll!.votes.filter(v => v.optionIndex === index).length;
                   const totalVotes = announcement.poll!.votes.length;
