@@ -11,6 +11,7 @@ import {
   substituteRequests,
   messages,
   announcements,
+  announcementReadStatus,
   announcementAttachments,
   announcementReactions,
   announcementPolls,
@@ -158,6 +159,10 @@ export interface IStorage {
   // Announcement reaction operations
   addAnnouncementReaction(reaction: InsertAnnouncementReaction): Promise<AnnouncementReaction>;
   removeAnnouncementReaction(announcementId: string, userId: string, emoji: string): Promise<void>;
+  
+  // Announcement read status operations
+  markAnnouncementAsRead(announcementId: string, userId: string): Promise<void>;
+  getUnreadAnnouncementCount(leagueId: string, userId: string): Promise<number>;
   
   // Announcement poll operations
   createAnnouncementPoll(poll: InsertAnnouncementPoll): Promise<AnnouncementPoll>;
@@ -1955,6 +1960,43 @@ export class DatabaseStorage implements IStorage {
           eq(announcementReactions.emoji, emoji)
         )
       );
+  }
+
+  // Announcement read status operations
+  async markAnnouncementAsRead(announcementId: string, userId: string): Promise<void> {
+    // Use INSERT ... ON CONFLICT DO NOTHING to avoid duplicate entries
+    await db
+      .insert(announcementReadStatus)
+      .values({
+        announcementId,
+        userId,
+        readAt: new Date(),
+      })
+      .onConflictDoNothing();
+  }
+
+  async getUnreadAnnouncementCount(leagueId: string, userId: string): Promise<number> {
+    // Count announcements that user has NOT read (direct query, no pre-filtering needed)
+    const [result] = await db
+      .select({ 
+        count: sql<number>`CAST(COUNT(*) AS INTEGER)` 
+      })
+      .from(announcements)
+      .leftJoin(
+        announcementReadStatus, 
+        and(
+          eq(announcementReadStatus.announcementId, announcements.id),
+          eq(announcementReadStatus.userId, userId)
+        )
+      )
+      .where(
+        and(
+          eq(announcements.leagueId, leagueId),
+          isNull(announcementReadStatus.id)
+        )
+      );
+
+    return result.count;
   }
 
   // Announcement poll operations

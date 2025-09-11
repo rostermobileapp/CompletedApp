@@ -2133,23 +2133,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
 
-      // For simplicity, count announcements from the last 7 days as "unread"
-      // In a real app, you'd track user's last read timestamp
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      // Get actual unread count using proper read tracking
+      const unreadCount = await storage.getUnreadAnnouncementCount(leagueId, userId);
       
-      const result = await storage.getLeagueAnnouncements(leagueId, {
-        limit: 100, // Get recent announcements
-        offset: 0,
-        orderBy: 'createdAt',
-        orderDirection: 'desc',
-      });
-
-      const recentCount = result.announcements.filter(
-        announcement => new Date(announcement.createdAt) > sevenDaysAgo
-      ).length;
-
-      res.json({ count: recentCount });
+      res.json({ count: unreadCount });
     } catch (error) {
       console.error('Error getting unread announcement count:', error);
       res.status(500).json({ message: 'Failed to get unread count' });
@@ -2168,9 +2155,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
 
-      // For now, we'll just return success
-      // In a real app, you'd store user's lastReadTimestamp in a user_preferences table
-      console.log(`📖 Marking announcements as read for user ${userId} in league ${leagueId}`);
+      // Mark ALL announcements in the league as read for this user using bulk insert
+      const result = await db.execute(sql`
+        INSERT INTO announcement_read_status (id, announcement_id, user_id, read_at)
+        SELECT gen_random_uuid(), id, ${userId}, NOW()
+        FROM announcements 
+        WHERE league_id = ${leagueId}
+        ON CONFLICT (announcement_id, user_id) DO NOTHING
+      `);
+
+      console.log(`📖 Bulk marked announcements as read for user ${userId} in league ${leagueId}`);
       
       res.json({ success: true });
     } catch (error) {

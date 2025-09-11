@@ -298,6 +298,16 @@ export const announcementPollVotes = pgTable("announcement_poll_votes", {
   unique("unique_poll_user_vote").on(table.pollId, table.userId, table.optionIndex),
 ]);
 
+// Announcement read status table - tracks which announcements each user has read
+export const announcementReadStatus = pgTable("announcement_read_status", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  readAt: timestamp("read_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_announcement_user_read").on(table.announcementId, table.userId),
+]);
+
 // Draft status enum
 export const draftStatusEnum = pgEnum("draft_status", [
   "created",
