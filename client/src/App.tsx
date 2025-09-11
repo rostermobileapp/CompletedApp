@@ -22,6 +22,7 @@ import LeagueManagement from "@/pages/LeagueManagement";
 import LeagueList from "@/pages/LeagueList";
 import Calendar from "@/pages/Calendar";
 import GameDetails from "@/pages/GameDetails";
+import Announcements from "@/pages/Announcements";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -63,6 +64,7 @@ function Router() {
             <Route path="/league-list" component={LeagueList} />
             <Route path="/calendar" component={Calendar} />
             <Route path="/game/:id" component={GameDetails} />
+            <Route path="/announcements" component={Announcements} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>
