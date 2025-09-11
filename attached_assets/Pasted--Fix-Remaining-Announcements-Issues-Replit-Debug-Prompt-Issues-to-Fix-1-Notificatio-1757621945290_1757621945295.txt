@@ -1,0 +1,495 @@
+# Fix Remaining Announcements Issues - Replit Debug Prompt
+
+## Issues to Fix
+
+### 1. Notification Bell Not Resetting to Zero
+**Problem:** Bell icon count doesn't reset when user views announcements page.
+
+**Solution Required:**
+
+#### Mark as Read When User Visits Announcements Page:
+```javascript
+// Add this to the announcements page JavaScript (when page loads)
+document.addEventListener('DOMContentLoaded', async function() {
+    // Load posts
+    await loadAndDisplayPosts();
+    
+    // Mark announcements as read
+    await markAnnouncementsAsRead();
+});
+
+// Function to mark announcements as read
+async function markAnnouncementsAsRead() {
+    try {
+        const response = await fetch('/api/announcements/mark-read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            console.log('✅ Announcements marked as read');
+            // Update home page notification count if user returns to home
+            if (window.opener) {
+                // If opened in new window/tab, update parent
+                window.opener.postMessage('announcements-read', '*');
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error marking announcements as read:', error);
+    }
+}
+```
+
+#### Backend API to Track Read Status:
+```javascript
+// You need a user tracking system. Add this to your database schema:
+// users table: { userId, lastReadTimestamp }
+
+app.post('/api/announcements/mark-read', (req, res) => {
+    const userId = req.user.id; // Get from session/auth
+    const currentTime = new Date().toISOString();
+    
+    // Update or create user's last read timestamp
+    updateUserLastRead(userId, currentTime);
+    
+    res.json({ success: true });
+});
+
+app.get('/api/announcements/unread-count', (req, res) => {
+    const userId = req.user.id; // Get from session/auth
+    const userLastRead = getUserLastRead(userId);
+    
+    // Count announcements created after user's last read time
+    const unreadCount = countAnnouncementsAfter(userLastRead);
+    
+    res.json({ count: unreadCount });
+});
+
+// Helper functions to implement:
+function updateUserLastRead(userId, timestamp) {
+    // Update database: UPDATE users SET lastReadTimestamp = ? WHERE userId = ?
+}
+
+function getUserLastRead(userId) {
+    // Query database: SELECT lastReadTimestamp FROM users WHERE userId = ?
+    // Return timestamp or null if never read
+}
+
+function countAnnouncementsAfter(timestamp) {
+    if (!timestamp) {
+        // If user never read, count all announcements
+        return getAllAnnouncementsCount();
+    }
+    // COUNT(*) FROM announcements WHERE createdAt > ?
+}
+```
+
+#### Update Home Page to Listen for Read Status:
+```javascript
+// Add this to home page JavaScript
+window.addEventListener('message', function(event) {
+    if (event.data === 'announcements-read') {
+        // Update notification count immediately
+        updateNotificationCount();
+    }
+});
+
+// Also update when user returns to home page (visibility change)
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        updateNotificationCount();
+    }
+});
+```
+
+### 2. Emoji Reactions Not Showing Running Total
+**Problem:** Other users can't see emoji reaction counts from all users.
+
+**Fix Required:**
+
+#### Backend: Store Reactions Correctly
+```javascript
+// Make sure your post schema stores reactions like this:
+{
+    id: "post_id",
+    content: "post content",
+    reactions: {
+        "👍": ["user1", "user2", "user3"],  // Array of user IDs who reacted
+        "❤️": ["user2", "user4"],
+        "😂": ["user1"]
+    }
+}
+
+// API endpoint to add/remove reactions
+app.post('/api/announcements/:postId/react', (req, res) => {
+    const { postId } = req.params;
+    const { emoji, action } = req.body; // action: 'add' or 'remove'
+    const userId = req.user.id; // Get from session/auth
+    
+    const post = getPostById(postId);
+    if (!post.reactions) post.reactions = {};
+    if (!post.reactions[emoji]) post.reactions[emoji] = [];
+    
+    if (action === 'add') {
+        // Add user to reaction if not already there
+        if (!post.reactions[emoji].includes(userId)) {
+            post.reactions[emoji].push(userId);
+        }
+    } else if (action === 'remove') {
+        // Remove user from reaction
+        post.reactions[emoji] = post.reactions[emoji].filter(id => id !== userId);
+        // Clean up empty reaction arrays
+        if (post.reactions[emoji].length === 0) {
+            delete post.reactions[emoji];
+        }
+    }
+    
+    // Save updated post to database
+    updatePost(postId, { reactions: post.reactions });
+    
+    // Return updated reactions
+    res.json({ reactions: post.reactions });
+});
+```
+
+#### Frontend: Display Reaction Counts
+```javascript
+function createPostElement(post) {
+    const postDiv = document.createElement('div');
+    postDiv.className = 'post-card';
+    
+    // Create reactions display
+    let reactionsHTML = '';
+    if (post.reactions && Object.keys(post.reactions).length > 0) {
+        reactionsHTML = '<div class="post-reactions-display">';
+        
+        for (const [emoji, users] of Object.entries(post.reactions)) {
+            const count = users.length;
+            if (count > 0) {
+                reactionsHTML += `
+                    <span class="reaction-item">
+                        ${emoji} ${count}
+                    </span>
+                `;
+            }
+        }
+        reactionsHTML += '</div>';
+    }
+    
+    // Create reaction buttons
+    const reactionButtons = `
+        <div class="post-reactions-buttons">
+            <button onclick="toggleReaction('${post.id}', '👍')">👍</button>
+            <button onclick="toggleReaction('${post.id}', '❤️')">❤️</button>
+            <button onclick="toggleReaction('${post.id}', '😂')">😂</button>
+            <button onclick="toggleReaction('${post.id}', '😮')">😮</button>
+            <button onclick="toggleReaction('${post.id}', '😢')">😢</button>
+            <button onclick="toggleReaction('${post.id}', '😡')">😡</button>
+        </div>
+    `;
+    
+    postDiv.innerHTML = `
+        <div class="post-content">${post.content}</div>
+        ${reactionsHTML}
+        ${reactionButtons}
+    `;
+    
+    return postDiv;
+}
+
+// Function to toggle reactions
+async function toggleReaction(postId, emoji) {
+    const userId = getCurrentUserId(); // You need to implement this
+    const post = getPostFromDOM(postId); // Get current post data
+    
+    // Check if user already reacted with this emoji
+    const hasReacted = post.reactions && post.reactions[emoji] && post.reactions[emoji].includes(userId);
+    const action = hasReacted ? 'remove' : 'add';
+    
+    try {
+        const response = await fetch(`/api/announcements/${postId}/react`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ emoji, action })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            // Update the post display with new reaction counts
+            updatePostReactions(postId, data.reactions);
+        }
+    } catch (error) {
+        console.error('Error toggling reaction:', error);
+    }
+}
+
+// Function to update reaction display
+function updatePostReactions(postId, reactions) {
+    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+    const reactionsDisplay = postElement.querySelector('.post-reactions-display');
+    
+    let reactionsHTML = '';
+    if (reactions && Object.keys(reactions).length > 0) {
+        reactionsHTML = '<div class="post-reactions-display">';
+        
+        for (const [emoji, users] of Object.entries(reactions)) {
+            const count = users.length;
+            if (count > 0) {
+                reactionsHTML += `
+                    <span class="reaction-item">
+                        ${emoji} ${count}
+                    </span>
+                `;
+            }
+        }
+        reactionsHTML += '</div>';
+    }
+    
+    if (reactionsDisplay) {
+        reactionsDisplay.outerHTML = reactionsHTML;
+    } else if (reactionsHTML) {
+        // Insert reactions display if it doesn't exist
+        const contentDiv = postElement.querySelector('.post-content');
+        contentDiv.insertAdjacentHTML('afterend', reactionsHTML);
+    }
+}
+```
+
+#### CSS for Reactions Display:
+```css
+.post-reactions-display {
+    margin: 10px 0;
+    padding: 5px 0;
+}
+
+.reaction-item {
+    display: inline-block;
+    margin-right: 15px;
+    padding: 5px 10px;
+    background: #f1f3f4;
+    border-radius: 15px;
+    font-size: 14px;
+}
+
+.post-reactions-buttons {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e1e8ed;
+}
+
+.post-reactions-buttons button {
+    background: none;
+    border: none;
+    font-size: 18px;
+    margin-right: 10px;
+    padding: 5px;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.post-reactions-buttons button:hover {
+    background: #f1f3f4;
+}
+```
+
+### 3. Attachments Still Not Working
+**Problem:** Pictures and polls not displaying despite text working.
+
+**Debug Steps Required:**
+
+#### A. Check if Attachments Data Exists:
+```javascript
+// Add debugging to see what's in the post data
+function createPostElement(post) {
+    console.log("📝 Creating post element for:", post);
+    console.log("📎 Attachments:", post.attachments);
+    console.log("📊 Poll:", post.poll);
+    
+    // ... rest of function
+}
+
+// Also debug the backend response
+app.get('/api/announcements', (req, res) => {
+    const posts = getAllPosts();
+    console.log("📤 Sending posts:", posts);
+    
+    // Check if attachments and polls are included
+    posts.forEach(post => {
+        console.log(`Post ${post.id} attachments:`, post.attachments);
+        console.log(`Post ${post.id} poll:`, post.poll);
+    });
+    
+    res.json(posts);
+});
+```
+
+#### B. Fix Post Creation to Include Attachments:
+```javascript
+// Make sure post creation includes attachments
+app.post('/api/announcements', (req, res) => {
+    const { content, attachments, poll } = req.body;
+    
+    const newPost = {
+        id: generateUniqueId(),
+        content: content,
+        attachments: attachments || {}, // Make sure this is included
+        poll: poll || null, // Make sure this is included
+        createdAt: new Date().toISOString(),
+        reactions: {},
+        isPinned: false
+    };
+    
+    console.log("💾 Saving post with attachments:", newPost);
+    
+    savePost(newPost);
+    res.json({ success: true, post: newPost });
+});
+```
+
+#### C. Fix Frontend Attachment Handling:
+```javascript
+function createPostElement(post) {
+    const postDiv = document.createElement('div');
+    postDiv.className = 'post-card';
+    postDiv.setAttribute('data-post-id', post.id);
+    
+    let attachmentsHTML = '';
+    
+    console.log("🔍 Checking attachments for post:", post.id, post.attachments);
+    
+    // Handle Images - Check multiple possible data structures
+    if (post.attachments) {
+        // Check for images array
+        if (post.attachments.images && Array.isArray(post.attachments.images) && post.attachments.images.length > 0) {
+            console.log("🖼️ Found images:", post.attachments.images);
+            attachmentsHTML += '<div class="post-images">';
+            post.attachments.images.forEach(imageUrl => {
+                attachmentsHTML += `<img src="${imageUrl}" class="post-image" alt="Attachment" onerror="console.error('Failed to load image:', this.src)">`;
+            });
+            attachmentsHTML += '</div>';
+        }
+        
+        // Check for videos array
+        if (post.attachments.videos && Array.isArray(post.attachments.videos) && post.attachments.videos.length > 0) {
+            console.log("🎥 Found videos:", post.attachments.videos);
+            attachmentsHTML += '<div class="post-videos">';
+            post.attachments.videos.forEach(videoUrl => {
+                attachmentsHTML += `<video controls class="post-video"><source src="${videoUrl}"></video>`;
+            });
+            attachmentsHTML += '</div>';
+        }
+    }
+    
+    // Handle Polls
+    let pollHTML = '';
+    if (post.poll && post.poll.question) {
+        console.log("📊 Found poll:", post.poll);
+        
+        const totalVotes = post.poll.totalVotes || calculateTotalVotes(post.poll.votes || {});
+        
+        pollHTML = `
+            <div class="poll-container">
+                <h4 class="poll-question">${post.poll.question}</h4>
+                <div class="poll-options">
+                    ${post.poll.options.map((option, index) => {
+                        const optionKey = `option${index}`;
+                        const votes = post.poll.votes[optionKey] || [];
+                        const voteCount = Array.isArray(votes) ? votes.length : 0;
+                        const percentage = totalVotes > 0 ? (voteCount / totalVotes * 100).toFixed(1) : 0;
+                        
+                        return `
+                            <div class="poll-option" onclick="voteInPoll('${post.id}', ${index})">
+                                <span class="poll-option-text">${option}</span>
+                                <div class="poll-bar">
+                                    <div class="poll-bar-fill" style="width: ${percentage}%"></div>
+                                </div>
+                                <span class="poll-percentage">${percentage}% (${voteCount})</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="poll-info">Total votes: ${totalVotes}</div>
+            </div>
+        `;
+    } else {
+        console.log("❌ No poll found or missing question");
+    }
+    
+    postDiv.innerHTML = `
+        <div class="post-content">${post.content}</div>
+        ${attachmentsHTML}
+        ${pollHTML}
+        <div class="post-reactions-section">
+            <!-- reactions go here -->
+        </div>
+    `;
+    
+    return postDiv;
+}
+
+function calculateTotalVotes(votes) {
+    let total = 0;
+    Object.values(votes).forEach(voteArray => {
+        if (Array.isArray(voteArray)) {
+            total += voteArray.length;
+        }
+    });
+    return total;
+}
+```
+
+#### D. Test File Upload Separately:
+```javascript
+// Add a separate test for file upload
+async function testFileUpload() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.click();
+    
+    fileInput.onchange = async function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                console.log("📤 Upload result:", result);
+                
+                // Test if the URL works
+                const testImg = document.createElement('img');
+                testImg.src = result.url;
+                testImg.onload = () => console.log("✅ Image loads successfully");
+                testImg.onerror = () => console.error("❌ Image failed to load");
+                
+            } catch (error) {
+                console.error("❌ Upload failed:", error);
+            }
+        }
+    };
+}
+
+// Call this function to test uploads
+// testFileUpload();
+```
+
+## Critical Debug Questions to Answer:
+
+1. **Are attachments being saved to the database?** Check the database directly
+2. **Are attachments being returned by the GET API?** Check network tab in browser
+3. **Are image/video URLs accessible?** Try opening them directly in browser
+4. **Is the HTML being generated?** Check if `attachmentsHTML` and `pollHTML` have content
+5. **Are there CSS issues hiding the content?** Check if elements exist in DOM but are hidden
+
+## Immediate Test Steps:
+1. Add `console.log` statements to track attachment data flow
+2. Check browser Network tab when loading posts
+3. Inspect DOM elements to see if attachment HTML exists
+4. Test file upload endpoint separately
+5. Verify database contains attachment data

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 import { 
@@ -693,6 +693,21 @@ export default function Announcements() {
     queryKey: ['/api/leagues', leagueId, 'announcements'],
     enabled: !!leagueId,
   });
+
+  // Mark announcements as read when page loads
+  useEffect(() => {
+    if (leagueId && data?.announcements) {
+      const markAsRead = async () => {
+        try {
+          await apiRequest('POST', `/api/leagues/${leagueId}/announcements/mark-read`);
+          console.log('📖 Announcements marked as read');
+        } catch (error) {
+          console.error('Failed to mark announcements as read:', error);
+        }
+      };
+      markAsRead();
+    }
+  }, [leagueId, data?.announcements]);
 
   // Normalize the data to handle both array and object responses
   const announcements: Announcement[] = Array.isArray(data) ? data : (data?.announcements ?? []);

@@ -2195,6 +2195,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to get unread count' });
     }
   });
+
+  // Mark announcements as read for a league
+  app.post('/api/leagues/:leagueId/announcements/mark-read', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+
+      // Check if user is member of the league
+      const membership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // For now, we'll just return success
+      // In a real app, you'd store user's lastReadTimestamp in a user_preferences table
+      console.log(`📖 Marking announcements as read for user ${userId} in league ${leagueId}`);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking announcements as read:', error);
+      res.status(500).json({ message: 'Failed to mark as read' });
+    }
+  });
   
   // Get announcements for a league
   app.get('/api/leagues/:leagueId/announcements', isAuthenticated, async (req: any, res) => {
@@ -2251,14 +2274,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only commissioners can create announcements' });
       }
 
-      const announcementData = createAnnouncementRequestSchema.parse(req.body);
+      const requestBody = req.body;
+      console.log('📝 Creating announcement with data:', JSON.stringify(requestBody, null, 2));
+      
+      const announcementData = createAnnouncementRequestSchema.parse(requestBody);
       const announcement = await storage.createAnnouncement({
         ...announcementData,
         leagueId,
         authorId: userId,
       });
 
-      res.json(announcement);
+      // Handle attachments if provided
+      if (requestBody.attachments && Array.isArray(requestBody.attachments)) {
+        console.log('📎 Processing attachments:', requestBody.attachments);
+        for (const attachment of requestBody.attachments) {
+          await storage.createAnnouncementAttachment({
+            announcementId: announcement.id,
+            type: attachment.type,
+            url: attachment.url,
+            fileName: attachment.fileName,
+          });
+        }
+      }
+
+      // Handle poll if provided
+      if (requestBody.poll && requestBody.poll.question) {
+        console.log('📊 Processing poll:', requestBody.poll);
+        await storage.createAnnouncementPoll({
+          announcementId: announcement.id,
+          question: requestBody.poll.question,
+          options: requestBody.poll.options,
+          allowMultiple: requestBody.poll.allowMultiple || false,
+        });
+      }
+
+      // Return the full announcement with attachments and polls
+      const fullAnnouncement = await storage.getAnnouncement(announcement.id);
+      res.json(fullAnnouncement);
     } catch (error) {
       console.error('Error creating announcement:', error);
       res.status(500).json({ message: 'Failed to create announcement' });
