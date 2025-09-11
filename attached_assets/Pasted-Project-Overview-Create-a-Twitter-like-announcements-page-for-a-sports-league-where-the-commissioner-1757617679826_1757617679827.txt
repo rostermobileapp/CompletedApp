@@ -1,0 +1,177 @@
+Project Overview
+Create a Twitter-like announcements page for a sports league where the commissioner can post announcements and league members can interact with them through reactions and polls.
+Core Features Required
+Page Structure
+
+New standalone page accessed via the existing "announcements" card on the home page
+Single-thread Twitter-style layout with chronological posts
+Responsive design that works on desktop and mobile
+
+Commissioner Posting Features
+
+Character limit: 280 characters per post (with live counter)
+Rich text composer with formatting options
+Attachment support:
+
+Image uploads (JPG, PNG, GIF)
+GIF integration (via GIPHY API or similar)
+Video uploads (MP4, MOV)
+Poll creation tool
+Clickable link embedding with preview cards
+
+
+Post scheduling (optional but nice-to-have)
+Draft saving functionality
+
+Post Display Features
+
+Individual card design for each post
+Timestamp for each announcement
+Media preview within cards (images, videos, GIFs)
+Link previews with thumbnails and descriptions
+Poll display with voting interface
+Reaction counter showing emoji counts
+
+User Interaction Features
+
+Emoji reactions: Quick reaction bar with common emojis (👍, ❤️, 😂, 😮, 😢, 😡)
+Custom emoji picker for additional reactions
+Poll voting: One-time voting per user with results visualization
+Real-time updates for reactions and poll results
+
+Technical Requirements
+Frontend
+
+Framework: HTML/CSS/JavaScript (vanilla) or React/Vue.js
+Styling: Modern, clean UI similar to Twitter cards
+Responsive: Mobile-first design
+Icons: Use Font Awesome or similar icon library
+Animations: Smooth transitions for interactions
+
+Backend
+
+Database: Store posts, reactions, poll votes, and user data
+Authentication: User identification for reactions/voting
+File Upload: Handle media attachments
+API Endpoints:
+
+POST /announcements (create new post)
+GET /announcements (fetch all posts)
+POST /reactions (add/remove reaction)
+POST /poll-vote (submit poll vote)
+GET /poll-results (get current poll results)
+
+
+
+Data Structure Examples
+javascript// Post Schema
+{
+  id: "unique_id",
+  content: "Announcement text (max 280 chars)",
+  authorId: "commissioner_id",
+  timestamp: "2024-01-15T10:30:00Z",
+  attachments: {
+    images: ["url1", "url2"],
+    videos: ["video_url"],
+    gifs: ["gif_url"],
+    links: [{url: "link", title: "title", description: "desc", image: "preview"}]
+  },
+  poll: {
+    question: "Poll question",
+    options: ["Option 1", "Option 2", "Option 3"],
+    votes: {"option1": ["user1", "user2"], "option2": ["user3"]},
+    allowMultiple: false,
+    expiresAt: "2024-01-20T10:30:00Z"
+  },
+  reactions: {
+    "👍": ["user1", "user2"],
+    "❤️": ["user3"],
+    "😂": ["user1", "user4"]
+  }
+}
+UI/UX Requirements
+Visual Design
+
+Card-based layout with subtle shadows and borders
+Twitter-like color scheme: Blues and whites with dark mode support
+Clear typography: Easy to read fonts, proper hierarchy
+Interactive elements: Hover states, click feedback
+Loading states: Skeleton loaders while content loads
+
+User Experience
+
+Infinite scroll or pagination for older posts
+Real-time updates without page refresh
+Quick actions: Easy emoji reactions, one-click poll voting
+Error handling: User-friendly error messages
+Confirmation dialogs: For important actions like deleting posts
+
+Content Management
+Commissioner Tools
+
+Rich text editor with basic formatting (bold, italic, links)
+Media upload drag-and-drop interface
+Poll builder with multiple choice options
+Post preview before publishing
+Edit/Delete posts functionality
+Pin important announcements to top
+
+Moderation Features
+
+Post visibility: Public to all league members
+Comment control: Enable/disable if comments are added later
+Reaction management: Remove inappropriate reactions
+
+Integration Requirements
+Home Page Integration
+
+Update existing announcements card to link to new page
+Recent announcements preview on home page (last 3 posts)
+Notification badge for new unread announcements
+
+External Services
+
+GIPHY API: For GIF selection
+Link preview service: For URL metadata
+File storage: Cloud storage for uploaded media
+Push notifications: For new announcements (optional)
+
+Performance Considerations
+
+Image optimization: Compress uploaded images
+Lazy loading: Load images as user scrolls
+Caching: Cache frequently accessed data
+Database indexing: Optimize queries for timeline
+
+Security & Privacy
+
+Input sanitization: Prevent XSS attacks
+File upload validation: Check file types and sizes
+Rate limiting: Prevent spam posting
+User authentication: Verify user permissions
+
+Testing Checklist
+
+ Post creation with all attachment types
+ Emoji reactions work correctly
+ Poll voting and results display
+ Mobile responsiveness
+ Real-time updates
+ Error handling
+ Performance with many posts
+
+Deployment Notes
+
+Environment variables: Store API keys securely
+Database setup: Initialize required tables/collections
+File storage configuration: Set up media upload destination
+SSL certificate: Ensure HTTPS for security
+
+Optional Enhancements
+
+Search functionality: Find specific announcements
+Categories/Tags: Organize different types of announcements
+Email notifications: Send digest emails to members
+Analytics dashboard: Track engagement metrics
+Comment system: Allow replies to announcements
+Rich embeds: Support for YouTube, Twitter embeds
