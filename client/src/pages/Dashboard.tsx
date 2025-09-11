@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
-import { useLocation } from 'wouter';
+import { useLocation, Link } from 'wouter';
 import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, Target, AlertCircle, Settings, UserCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -905,15 +905,17 @@ export default function Dashboard() {
       <div className="px-6 mb-6">
         <div className="grid grid-cols-3 gap-3">
           {/* Announcements Card */}
-          <div className="bg-card rounded-xl border border-border p-5 min-h-[72px] relative" data-testid="card-announcements">
-            <div className="h-full flex flex-col items-center justify-center">
-              <Megaphone className="w-8 h-8 text-orange-500 mb-3" />
-              <p className="text-xs font-medium">Announcements</p>
+          <Link href="/announcements">
+            <div className="bg-card rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors" data-testid="card-announcements">
+              <div className="h-full flex flex-col items-center justify-center">
+                <Megaphone className="w-8 h-8 text-orange-500 mb-3" />
+                <p className="text-xs font-medium">Announcements</p>
+              </div>
+              <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">3</span>
+              </div>
             </div>
-            <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">3</span>
-            </div>
-          </div>
+          </Link>
 
           {/* Stats Card */}
           <div className="bg-card rounded-xl border border-border p-5 min-h-[72px]" data-testid="card-stats">

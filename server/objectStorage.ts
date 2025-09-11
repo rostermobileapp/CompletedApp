@@ -270,6 +270,82 @@ export class ObjectStorageService {
     
     return file;
   }
+
+  // Gets the upload URL for announcement media upload
+  async getAnnouncementMediaUploadURL(): Promise<string> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    if (!privateObjectDir) {
+      throw new Error(
+        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
+          "tool and set PRIVATE_OBJECT_DIR env var."
+      );
+    }
+
+    const objectId = randomUUID();
+    const fullPath = `${privateObjectDir}/announcement-media/${objectId}`;
+
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+
+    // Sign URL for PUT method with TTL
+    return signObjectURL({
+      bucketName,
+      objectName,
+      method: "PUT",
+      ttlSec: 900,
+    });
+  }
+
+  normalizeAnnouncementMediaPath(
+    rawPath: string,
+  ): string {
+    if (!rawPath.startsWith("https://storage.googleapis.com/")) {
+      return rawPath;
+    }
+  
+    // Extract the path from the URL by removing query parameters and domain
+    const url = new URL(rawPath);
+    const rawObjectPath = url.pathname;
+  
+    let announcementMediaDir = this.getPrivateObjectDir();
+    if (!announcementMediaDir.endsWith("/")) {
+      announcementMediaDir = `${announcementMediaDir}/`;
+    }
+    announcementMediaDir += "announcement-media/";
+  
+    if (!rawObjectPath.startsWith(announcementMediaDir)) {
+      return rawObjectPath;
+    }
+  
+    // Extract the entity ID from the path
+    const entityId = rawObjectPath.slice(announcementMediaDir.length);
+    return `/announcement-media/${entityId}`;
+  }
+
+  // Get announcement media file for serving
+  async getAnnouncementMediaFile(announcementMediaPath: string): Promise<File> {
+    if (!announcementMediaPath.startsWith("/announcement-media/")) {
+      throw new ObjectNotFoundError();
+    }
+
+    const entityId = announcementMediaPath.slice("/announcement-media/".length);
+    let announcementMediaDir = this.getPrivateObjectDir();
+    if (!announcementMediaDir.endsWith("/")) {
+      announcementMediaDir = `${announcementMediaDir}/`;
+    }
+    announcementMediaDir += "announcement-media/";
+    
+    const objectPath = `${announcementMediaDir}${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(objectPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    
+    const [exists] = await file.exists();
+    if (!exists) {
+      throw new ObjectNotFoundError();
+    }
+    
+    return file;
+  }
 }
 
 function parseObjectPath(path: string): {

@@ -34,6 +34,7 @@ import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { ObjectUploader } from '@/components/ObjectUploader';
 
 // Types
 type AnnouncementReaction = {
@@ -112,6 +113,7 @@ function CreateAnnouncementModal({
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [allowMultiple, setAllowMultiple] = useState(false);
+  const [attachments, setAttachments] = useState<{ url: string; type: 'image' | 'video' | 'gif'; fileName?: string }[]>([]);
   const { toast } = useToast();
 
   const createAnnouncementMutation = useMutation({
@@ -137,6 +139,48 @@ function CreateAnnouncementModal({
     setPollQuestion('');
     setPollOptions(['', '']);
     setAllowMultiple(false);
+    setAttachments([]);
+  };
+
+  const handleGetUploadParameters = async () => {
+    const response = await apiRequest('POST', '/api/announcement-media/upload');
+    const { uploadURL } = await response.json();
+    return {
+      method: 'PUT' as const,
+      url: uploadURL,
+    };
+  };
+
+  const handleUploadComplete = (result: any) => {
+    if (result.successful && result.successful.length > 0) {
+      const newAttachments = result.successful.map((file: any) => {
+        const fileName = file.name || 'untitled';
+        
+        // Determine file type based on file extension or mime type
+        let type: 'image' | 'video' | 'gif' = 'image';
+        if (fileName.toLowerCase().endsWith('.gif')) {
+          type = 'gif';
+        } else if (fileName.toLowerCase().match(/\.(mp4|webm|mov|avi)$/)) {
+          type = 'video';
+        }
+
+        // Use resourcePath if available (from our backend), otherwise fallback to uploadURL
+        const resourcePath = file.meta?.resourcePath || file.uploadURL;
+
+        return {
+          url: resourcePath,
+          type,
+          fileName
+        };
+      });
+
+      setAttachments(prev => [...prev, ...newAttachments]);
+      toast({ title: 'Media uploaded successfully!' });
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = () => {
@@ -144,7 +188,12 @@ function CreateAnnouncementModal({
 
     const announcementData: any = {
       content: content.trim(),
-      isPinned
+      isPinned,
+      attachments: attachments.map(att => ({
+        type: att.type,
+        url: att.url,
+        fileName: att.fileName
+      }))
     };
 
     if (showPollCreator && pollQuestion.trim() && pollOptions.some(opt => opt.trim())) {
@@ -219,6 +268,70 @@ function CreateAnnouncementModal({
               <Pin className="w-4 h-4" />
               Pin this announcement
             </Label>
+          </div>
+
+          {/* Media Upload */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <ObjectUploader
+                maxNumberOfFiles={4}
+                maxFileSize={50 * 1024 * 1024} // 50MB
+                onGetUploadParameters={handleGetUploadParameters}
+                onComplete={handleUploadComplete}
+              >
+                <div className="flex items-center gap-1">
+                  <ImageIcon className="w-4 h-4" />
+                  Add Media
+                </div>
+              </ObjectUploader>
+              <span className="text-xs text-muted-foreground">
+                Images, videos, GIFs (max 4 files, 50MB each)
+              </span>
+            </div>
+
+            {/* Attachment Previews */}
+            {attachments.length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {attachments.map((attachment, index) => (
+                  <div key={index} className="relative border rounded-lg overflow-hidden">
+                    {attachment.type === 'image' && (
+                      <img 
+                        src={attachment.url} 
+                        alt={attachment.fileName}
+                        className="w-full h-24 object-cover"
+                      />
+                    )}
+                    {attachment.type === 'video' && (
+                      <video 
+                        src={attachment.url}
+                        className="w-full h-24 object-cover"
+                        muted
+                      />
+                    )}
+                    {attachment.type === 'gif' && (
+                      <img 
+                        src={attachment.url} 
+                        alt={attachment.fileName}
+                        className="w-full h-24 object-cover"
+                      />
+                    )}
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-1 right-1 h-6 w-6 p-0"
+                      onClick={() => removeAttachment(index)}
+                      data-testid={`button-remove-attachment-${index}`}
+                    >
+                      ×
+                    </Button>
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 truncate">
+                      {attachment.fileName}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Poll Creator Toggle */}
@@ -366,9 +479,48 @@ function AnnouncementCard({
     }
   });
 
+  const voteOnPollMutation = useMutation({
+    mutationFn: async ({ pollId, optionIndex }: { pollId: string; optionIndex: number }) => {
+      const response = await apiRequest('POST', `/api/polls/${pollId}/votes`, { optionIndex });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      toast({ title: 'Vote recorded successfully!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to record vote', variant: 'destructive' });
+    }
+  });
+
   const handleReaction = (emoji: string) => {
     const isRemoving = userReactions.includes(emoji);
     toggleReactionMutation.mutate({ emoji, isRemoving });
+  };
+
+  const handlePollVote = (pollId: string, optionIndex: number, allowMultiple: boolean) => {
+    // For single-choice polls, check if user already voted on a different option
+    if (!allowMultiple && announcement.poll) {
+      const userCurrentVotes = announcement.poll.votes.filter(v => v.userId === currentUserId);
+      const hasVotedOnOption = userCurrentVotes.some(v => v.optionIndex === optionIndex);
+      
+      // If they clicked the same option they already voted on, don't do anything
+      if (hasVotedOnOption) {
+        return;
+      }
+      
+      // If they have votes on other options, show a warning for single-choice
+      if (userCurrentVotes.length > 0 && !hasVotedOnOption) {
+        toast({ 
+          title: 'Single choice poll', 
+          description: 'You can only vote for one option in this poll.',
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
+    
+    voteOnPollMutation.mutate({ pollId, optionIndex });
   };
 
   return (
@@ -462,6 +614,8 @@ function AnnouncementCard({
                       <Button
                         variant={userVoted ? "default" : "ghost"}
                         className="w-full justify-start h-auto p-3"
+                        onClick={() => handlePollVote(announcement.poll!.id, index, announcement.poll!.allowMultiple)}
+                        disabled={voteOnPollMutation.isPending}
                         data-testid={`button-poll-option-${index}`}
                       >
                         <div className="flex items-center justify-between w-full">
@@ -497,8 +651,6 @@ function AnnouncementCard({
           {REACTION_EMOJIS.map(({ emoji, label }) => {
             const count = reactionCounts[emoji] || 0;
             const userReacted = userReactions.includes(emoji);
-            
-            if (count === 0 && !userReacted) return null;
 
             return (
               <Button
@@ -507,6 +659,7 @@ function AnnouncementCard({
                 size="sm"
                 onClick={() => handleReaction(emoji)}
                 className="h-8 px-2 text-sm"
+                title={label}
                 data-testid={`button-reaction-${emoji}`}
               >
                 <span className="mr-1">{emoji}</span>
@@ -514,28 +667,6 @@ function AnnouncementCard({
               </Button>
             );
           })}
-          
-          {/* Add Reaction Button */}
-          <div className="flex gap-1">
-            {REACTION_EMOJIS.map(({ emoji, label }) => {
-              const userReacted = userReactions.includes(emoji);
-              if (userReacted) return null;
-              
-              return (
-                <Button
-                  key={emoji}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleReaction(emoji)}
-                  className="h-8 w-8 p-0 text-lg hover:scale-110 transition-transform"
-                  title={label}
-                  data-testid={`button-add-reaction-${emoji}`}
-                >
-                  {emoji}
-                </Button>
-              );
-            })}
-          </div>
         </div>
       </CardContent>
     </Card>
@@ -558,10 +689,14 @@ export default function Announcements() {
   const isCommissioner = currentLeague?.commissionerId === user?.id;
 
   // Fetch announcements
-  const { data: announcements = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery<{ announcements: Announcement[]; pagination?: { page: number; pageSize: number; total: number } }>({
     queryKey: ['/api/leagues', leagueId, 'announcements'],
-    enabled: !!leagueId
+    enabled: !!leagueId,
   });
+
+  // Normalize the data to handle both array and object responses
+  const announcements: Announcement[] = Array.isArray(data) ? data : (data?.announcements ?? []);
+  const pagination = Array.isArray(data) ? undefined : data?.pagination;
 
   if (!user) {
     navigate('/');
