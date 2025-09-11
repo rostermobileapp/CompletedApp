@@ -10,6 +10,11 @@ import {
   gameRsvps,
   substituteRequests,
   messages,
+  announcements,
+  announcementAttachments,
+  announcementReactions,
+  announcementPolls,
+  announcementPollVotes,
   playerImports,
   importedPlayers,
   playerMergeRequests,
@@ -37,6 +42,16 @@ import {
   type InsertSubstituteRequest,
   type Message,
   type InsertMessage,
+  type Announcement,
+  type InsertAnnouncement,
+  type AnnouncementAttachment,
+  type InsertAnnouncementAttachment,
+  type AnnouncementReaction,
+  type InsertAnnouncementReaction,
+  type AnnouncementPoll,
+  type InsertAnnouncementPoll,
+  type AnnouncementPollVote,
+  type InsertAnnouncementPollVote,
   type PlayerImport,
   type InsertPlayerImport,
   type ImportedPlayer,
@@ -48,7 +63,7 @@ import {
   type ImportedSchedule,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, alias } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -128,6 +143,26 @@ export interface IStorage {
   sendMessage(message: InsertMessage): Promise<Message>;
   getTeamMessages(teamId: string): Promise<(Message & { sender: User })[]>;
   getDirectMessages(userId1: string, userId2: string): Promise<(Message & { sender: User })[]>;
+
+  // Announcement operations
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  getLeagueAnnouncements(leagueId: string): Promise<(Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]>;
+  getAnnouncement(id: string): Promise<(Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] }) | undefined>;
+  updateAnnouncement(id: string, updates: Partial<Announcement>): Promise<Announcement>;
+  deleteAnnouncement(id: string): Promise<void>;
+  
+  // Announcement attachment operations
+  createAnnouncementAttachment(attachment: InsertAnnouncementAttachment): Promise<AnnouncementAttachment>;
+  deleteAnnouncementAttachment(id: string): Promise<void>;
+  
+  // Announcement reaction operations
+  addAnnouncementReaction(reaction: InsertAnnouncementReaction): Promise<AnnouncementReaction>;
+  removeAnnouncementReaction(announcementId: string, userId: string, emoji: string): Promise<void>;
+  
+  // Announcement poll operations
+  createAnnouncementPoll(poll: InsertAnnouncementPoll): Promise<AnnouncementPoll>;
+  voteOnPoll(vote: InsertAnnouncementPollVote): Promise<AnnouncementPollVote>;
+  getPollResults(pollId: string): Promise<(AnnouncementPollVote & { user: User })[]>;
   
   // Bulk import operations
   createPlayerImport(importData: InsertPlayerImport): Promise<PlayerImport>;
@@ -523,6 +558,15 @@ export class DatabaseStorage implements IStorage {
     return membership;
   }
 
+  async updatePlayerSkillRating(membershipId: string, skillRating: number): Promise<LeagueMembership> {
+    const [membership] = await db
+      .update(leagueMemberships)
+      .set({ skillLevel: skillRating.toString() })
+      .where(eq(leagueMemberships.id, membershipId))
+      .returning();
+    return membership;
+  }
+
   async deleteLeagueMembership(membershipId: string): Promise<void> {
     // First, get the membership to find the user ID and team ID
     const [membership] = await db
@@ -554,13 +598,13 @@ export class DatabaseStorage implements IStorage {
       const gameIds = teamGames.map(g => g.id);
       
       if (gameIds.length > 0) {
-        // Remove attendance records for these games
+        // Remove RSVP records for these games
         await db
-          .delete(gameAttendance)
+          .delete(gameRsvps)
           .where(
             and(
-              eq(gameAttendance.userId, membership.userId),
-              inArray(gameAttendance.gameId, gameIds)
+              eq(gameRsvps.userId, membership.userId),
+              inArray(gameRsvps.gameId, gameIds)
             )
           );
         
@@ -1770,6 +1814,143 @@ export class DatabaseStorage implements IStorage {
       .where(eq(substituteRequests.id, requestId))
       .returning();
     return updatedRequest;
+  }
+
+  // Announcement operations
+  async createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement> {
+    const [newAnnouncement] = await db.insert(announcements).values(announcement).returning();
+    return newAnnouncement;
+  }
+
+  async getLeagueAnnouncements(leagueId: string): Promise<(Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]> {
+    const leagueAnnouncements = await db
+      .select()
+      .from(announcements)
+      .where(eq(announcements.leagueId, leagueId))
+      .orderBy(desc(announcements.createdAt));
+
+    const result = [];
+    for (const announcement of leagueAnnouncements) {
+      const enrichedAnnouncement = await this.getAnnouncement(announcement.id);
+      if (enrichedAnnouncement) {
+        result.push(enrichedAnnouncement);
+      }
+    }
+    return result;
+  }
+
+  async getAnnouncement(id: string): Promise<(Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] }) | undefined> {
+    const [announcement] = await db.select().from(announcements).where(eq(announcements.id, id));
+    if (!announcement) return undefined;
+
+    const author = await this.getUser(announcement.authorId);
+    if (!author) return undefined;
+
+    const attachments = await db
+      .select()
+      .from(announcementAttachments)
+      .where(eq(announcementAttachments.announcementId, id));
+
+    const reactionResults = await db
+      .select()
+      .from(announcementReactions)
+      .innerJoin(users, eq(announcementReactions.userId, users.id))
+      .where(eq(announcementReactions.announcementId, id));
+    
+    const reactions = reactionResults.map(r => ({ ...r.announcement_reactions, user: r.users }));
+
+    const pollResults = await db
+      .select()
+      .from(announcementPolls)
+      .where(eq(announcementPolls.announcementId, id));
+
+    const polls = [];
+    for (const poll of pollResults) {
+      const voteResults = await db
+        .select()
+        .from(announcementPollVotes)
+        .innerJoin(users, eq(announcementPollVotes.userId, users.id))
+        .where(eq(announcementPollVotes.pollId, poll.id));
+      
+      const votes = voteResults.map(v => ({ ...v.announcement_poll_votes, user: v.users }));
+      polls.push({ ...poll, votes });
+    }
+
+    return { ...announcement, author, attachments, reactions, polls };
+  }
+
+  async updateAnnouncement(id: string, updates: Partial<Announcement>): Promise<Announcement> {
+    const [announcement] = await db
+      .update(announcements)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(announcements.id, id))
+      .returning();
+    return announcement;
+  }
+
+  async deleteAnnouncement(id: string): Promise<void> {
+    // Delete associated data first
+    await db.delete(announcementAttachments).where(eq(announcementAttachments.announcementId, id));
+    await db.delete(announcementReactions).where(eq(announcementReactions.announcementId, id));
+    
+    // Delete poll votes first, then polls
+    const polls = await db.select().from(announcementPolls).where(eq(announcementPolls.announcementId, id));
+    for (const poll of polls) {
+      await db.delete(announcementPollVotes).where(eq(announcementPollVotes.pollId, poll.id));
+    }
+    await db.delete(announcementPolls).where(eq(announcementPolls.announcementId, id));
+    
+    // Finally delete the announcement
+    await db.delete(announcements).where(eq(announcements.id, id));
+  }
+
+  // Announcement attachment operations
+  async createAnnouncementAttachment(attachment: InsertAnnouncementAttachment): Promise<AnnouncementAttachment> {
+    const [newAttachment] = await db.insert(announcementAttachments).values(attachment).returning();
+    return newAttachment;
+  }
+
+  async deleteAnnouncementAttachment(id: string): Promise<void> {
+    await db.delete(announcementAttachments).where(eq(announcementAttachments.id, id));
+  }
+
+  // Announcement reaction operations
+  async addAnnouncementReaction(reaction: InsertAnnouncementReaction): Promise<AnnouncementReaction> {
+    const [newReaction] = await db.insert(announcementReactions).values(reaction).returning();
+    return newReaction;
+  }
+
+  async removeAnnouncementReaction(announcementId: string, userId: string, emoji: string): Promise<void> {
+    await db
+      .delete(announcementReactions)
+      .where(
+        and(
+          eq(announcementReactions.announcementId, announcementId),
+          eq(announcementReactions.userId, userId),
+          eq(announcementReactions.emoji, emoji)
+        )
+      );
+  }
+
+  // Announcement poll operations
+  async createAnnouncementPoll(poll: InsertAnnouncementPoll): Promise<AnnouncementPoll> {
+    const [newPoll] = await db.insert(announcementPolls).values(poll).returning();
+    return newPoll;
+  }
+
+  async voteOnPoll(vote: InsertAnnouncementPollVote): Promise<AnnouncementPollVote> {
+    const [newVote] = await db.insert(announcementPollVotes).values(vote).returning();
+    return newVote;
+  }
+
+  async getPollResults(pollId: string): Promise<(AnnouncementPollVote & { user: User })[]> {
+    const results = await db
+      .select()
+      .from(announcementPollVotes)
+      .innerJoin(users, eq(announcementPollVotes.userId, users.id))
+      .where(eq(announcementPollVotes.pollId, pollId));
+    
+    return results.map(r => ({ ...r.announcement_poll_votes, user: r.users }));
   }
 }
 
