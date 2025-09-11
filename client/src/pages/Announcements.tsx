@@ -15,8 +15,6 @@ import {
   BarChart3,
   Pin,
   MoreHorizontal,
-  Image as ImageIcon,
-  Video,
   Calendar,
   Clock,
   Users
@@ -34,7 +32,6 @@ import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { ObjectUploader } from '@/components/ObjectUploader';
 
 // Types
 type AnnouncementReaction = {
@@ -48,12 +45,6 @@ type AnnouncementReaction = {
   };
 };
 
-type AnnouncementAttachment = {
-  id: string;
-  type: 'image' | 'video' | 'gif';
-  url: string;
-  fileName?: string;
-};
 
 type AnnouncementPoll = {
   id: string;
@@ -78,7 +69,6 @@ type Announcement = {
     lastName: string;
     profileImageUrl?: string;
   };
-  attachments: AnnouncementAttachment[];
   reactions: AnnouncementReaction[];
   poll?: AnnouncementPoll;
 };
@@ -113,7 +103,6 @@ function CreateAnnouncementModal({
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [allowMultiple, setAllowMultiple] = useState(false);
-  const [attachments, setAttachments] = useState<{ url: string; type: 'image' | 'video' | 'gif'; fileName?: string }[]>([]);
   const { toast } = useToast();
 
   const createAnnouncementMutation = useMutation({
@@ -139,52 +128,8 @@ function CreateAnnouncementModal({
     setPollQuestion('');
     setPollOptions(['', '']);
     setAllowMultiple(false);
-    setAttachments([]);
   };
 
-  const handleGetUploadParameters = async () => {
-    const response = await apiRequest('POST', '/api/announcement-media/upload');
-    const { uploadURL, resourcePath } = await response.json();
-    return {
-      method: 'PUT' as const,
-      url: uploadURL,
-      // Store the resourcePath in metadata so we can access it later
-      meta: { resourcePath }
-    };
-  };
-
-  const handleUploadComplete = (result: any) => {
-    if (result.successful && result.successful.length > 0) {
-      const newAttachments = result.successful.map((file: any) => {
-        const fileName = file.name || 'untitled';
-        
-        // Determine file type based on file extension or mime type
-        let type: 'image' | 'video' | 'gif' = 'image';
-        if (fileName.toLowerCase().endsWith('.gif')) {
-          type = 'gif';
-        } else if (fileName.toLowerCase().match(/\.(mp4|webm|mov|avi)$/)) {
-          type = 'video';
-        }
-
-        // Use resourcePath from our stored metadata (the proxied URL)
-        const resourcePath = file.meta?.resourcePath;
-        console.log('🔍 Upload complete - resourcePath:', resourcePath, 'uploadURL:', file.uploadURL);
-
-        return {
-          url: resourcePath || file.uploadURL, // Fallback to uploadURL if resourcePath is missing
-          type,
-          fileName
-        };
-      });
-
-      setAttachments(prev => [...prev, ...newAttachments]);
-      toast({ title: 'Media uploaded successfully!' });
-    }
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
 
   const handleSubmit = () => {
     if (!content.trim()) return;
@@ -192,11 +137,7 @@ function CreateAnnouncementModal({
     const announcementData: any = {
       content: content.trim(),
       isPinned,
-      attachments: attachments.map(att => ({
-        type: att.type,
-        url: att.url,
-        fileName: att.fileName
-      }))
+attachments: []
     };
 
     if (showPollCreator && pollQuestion.trim() && pollOptions.some(opt => opt.trim())) {
@@ -271,70 +212,6 @@ function CreateAnnouncementModal({
               <Pin className="w-4 h-4" />
               Pin this announcement
             </Label>
-          </div>
-
-          {/* Media Upload */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <ObjectUploader
-                maxNumberOfFiles={4}
-                maxFileSize={50 * 1024 * 1024} // 50MB
-                onGetUploadParameters={handleGetUploadParameters}
-                onComplete={handleUploadComplete}
-              >
-                <div className="flex items-center gap-1">
-                  <ImageIcon className="w-4 h-4" />
-                  Add Media
-                </div>
-              </ObjectUploader>
-              <span className="text-xs text-muted-foreground">
-                Images, videos, GIFs (max 4 files, 50MB each)
-              </span>
-            </div>
-
-            {/* Attachment Previews */}
-            {attachments.length > 0 && (
-              <div className="grid grid-cols-2 gap-2">
-                {attachments.map((attachment, index) => (
-                  <div key={index} className="relative border rounded-lg overflow-hidden">
-                    {attachment.type === 'image' && (
-                      <img 
-                        src={attachment.url} 
-                        alt={attachment.fileName}
-                        className="w-full h-24 object-cover"
-                      />
-                    )}
-                    {attachment.type === 'video' && (
-                      <video 
-                        src={attachment.url}
-                        className="w-full h-24 object-cover"
-                        muted
-                      />
-                    )}
-                    {attachment.type === 'gif' && (
-                      <img 
-                        src={attachment.url} 
-                        alt={attachment.fileName}
-                        className="w-full h-24 object-cover"
-                      />
-                    )}
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="absolute top-1 right-1 h-6 w-6 p-0"
-                      onClick={() => removeAttachment(index)}
-                      data-testid={`button-remove-attachment-${index}`}
-                    >
-                      ×
-                    </Button>
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 truncate">
-                      {attachment.fileName}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Poll Creator Toggle */}
@@ -571,33 +448,6 @@ function AnnouncementCard({
           {announcement.content}
         </p>
 
-        {/* Attachments */}
-        {announcement.attachments.length > 0 && (
-          <div className="grid grid-cols-2 gap-2">
-            {announcement.attachments.map((attachment) => (
-              <div key={attachment.id} className="rounded-lg overflow-hidden border">
-                {(attachment.type === 'image' || attachment.type === 'gif') && (
-                  <img 
-                    src={attachment.url} 
-                    alt={attachment.fileName || 'Attachment'}
-                    className="w-full h-48 object-cover"
-                    onError={(e) => {
-                      console.error('Failed to load image:', attachment.url);
-                      console.error('Attachment data:', attachment);
-                    }}
-                  />
-                )}
-                {attachment.type === 'video' && (
-                  <video 
-                    src={attachment.url} 
-                    controls
-                    className="w-full h-48 object-cover"
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Poll */}
         {announcement.poll && (
@@ -610,7 +460,6 @@ function AnnouncementCard({
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {console.log('🔍 Poll data:', announcement.poll)}
                 {announcement.poll.options.map((option, index) => {
                   const votes = announcement.poll!.votes.filter(v => v.optionIndex === index).length;
                   const totalVotes = announcement.poll!.votes.length;

@@ -2118,46 +2118,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Announcement media upload routes (commissioner only)
-  app.post("/api/announcement-media/upload", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      
-      // This is a simplified check - in a real app, you'd check if user is commissioner of any league
-      // For now, we'll allow authenticated users to upload (the announcement creation will check commissioner status)
-      
-      const { ObjectStorageService } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getAnnouncementMediaUploadURL();
-      
-      // Get the object path from the upload URL to create a stable server path
-      const urlObj = new URL(uploadURL);
-      const objectPath = urlObj.pathname;
-      const stableUrl = `/announcement-media${objectPath}`;
-      
-      res.json({ uploadURL, resourcePath: stableUrl });
-    } catch (error) {
-      console.error("Error getting announcement media upload URL:", error);
-      res.status(500).json({ error: "Failed to get upload URL" });
-    }
-  });
-
-  // Serve announcement media
-  app.get("/announcement-media/:objectPath(*)", async (req, res) => {
-    try {
-      const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
-      const fullPath = `/announcement-media/${req.params.objectPath}`;
-      const objectFile = await objectStorageService.getAnnouncementMediaFile(fullPath);
-      await objectStorageService.downloadObject(objectFile, res);
-    } catch (error) {
-      console.error("Error serving announcement media:", error);
-      if (error.name === 'ObjectNotFoundError') {
-        return res.sendStatus(404);
-      }
-      return res.sendStatus(500);
-    }
-  });
 
   // Announcement routes
 
