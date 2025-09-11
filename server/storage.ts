@@ -1837,11 +1837,11 @@ export class DatabaseStorage implements IStorage {
       .from(announcements)
       .where(eq(announcements.leagueId, leagueId));
     
-    // Apply ordering
+    // Apply ordering - pinned posts first, then by date
     if (options?.orderDirection === 'asc') {
-      query = query.orderBy(asc(announcements.createdAt));
+      query = query.orderBy(desc(announcements.isPinned), asc(announcements.createdAt));
     } else {
-      query = query.orderBy(desc(announcements.createdAt));
+      query = query.orderBy(desc(announcements.isPinned), desc(announcements.createdAt));
     }
     
     // Apply pagination

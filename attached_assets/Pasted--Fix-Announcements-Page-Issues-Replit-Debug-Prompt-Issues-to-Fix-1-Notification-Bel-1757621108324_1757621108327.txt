@@ -1,0 +1,387 @@
+# Fix Announcements Page Issues - Replit Debug Prompt
+
+## Issues to Fix
+
+### 1. Notification Bell Icon on Home Page
+**Problem:** Need a notification bell with count showing new announcements on the home page "Announcements" card.
+
+**Implementation Required:**
+
+#### Home Page HTML Update:
+```html
+<!-- Update the existing announcements card on home page -->
+<div class="announcements-card">
+    <h3>Announcements</h3>
+    <!-- Add notification bell with badge -->
+    <div class="notification-bell">
+        <i class="fas fa-bell"></i>
+        <span class="notification-badge" id="announcement-count">0</span>
+    </div>
+    <!-- Rest of card content -->
+</div>
+```
+
+#### CSS for Notification Bell:
+```css
+.notification-bell {
+    position: relative;
+    display: inline-block;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ff4444;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.notification-badge.hidden {
+    display: none;
+}
+```
+
+#### JavaScript for Notification Count:
+```javascript
+// Function to check and update notification count on home page
+async function updateNotificationCount() {
+    try {
+        const response = await fetch('/api/announcements/unread-count');
+        const data = await response.json();
+        const badge = document.getElementById('announcement-count');
+        
+        if (data.count > 0) {
+            badge.textContent = data.count;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Error fetching notification count:', error);
+    }
+}
+
+// Call on page load and periodically
+updateNotificationCount();
+setInterval(updateNotificationCount, 30000); // Check every 30 seconds
+```
+
+#### Backend API Endpoint Needed:
+```javascript
+// Add this endpoint to track unread announcements
+app.get('/api/announcements/unread-count', (req, res) => {
+    // Logic to count unread announcements for current user
+    // You'll need to track last_read timestamp per user
+    const unreadCount = getUnreadAnnouncementsCount(userId);
+    res.json({ count: unreadCount });
+});
+
+// Mark announcements as read when user visits announcements page
+app.post('/api/announcements/mark-read', (req, res) => {
+    // Update user's last_read timestamp
+    updateLastReadTimestamp(userId);
+    res.json({ success: true });
+});
+```
+
+### 2. Pin Function Not Working
+**Problem:** Pinned posts are not staying at the top of the thread.
+
+**Fix Required:**
+
+#### Database Schema Update:
+```javascript
+// Ensure your post schema includes:
+{
+    id: "unique_id",
+    content: "post content",
+    isPinned: false, // Add this field if missing
+    pinnedAt: null,  // Add timestamp when pinned
+    createdAt: "timestamp",
+    // ... other fields
+}
+```
+
+#### Backend API Fix:
+```javascript
+// Pin/Unpin endpoint
+app.post('/api/announcements/:id/pin', (req, res) => {
+    const postId = req.params.id;
+    const { isPinned } = req.body;
+    
+    // Update post in database
+    const updatedPost = updatePost(postId, {
+        isPinned: isPinned,
+        pinnedAt: isPinned ? new Date().toISOString() : null
+    });
+    
+    res.json(updatedPost);
+});
+
+// Fix the GET endpoint to sort pinned posts first:
+app.get('/api/announcements', (req, res) => {
+    const posts = getAllPosts();
+    
+    // Sort: pinned posts first (by pinnedAt desc), then regular posts by createdAt desc
+    const sortedPosts = posts.sort((a, b) => {
+        // First, sort by pinned status
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        
+        // If both pinned, sort by pinnedAt (most recently pinned first)
+        if (a.isPinned && b.isPinned) {
+            return new Date(b.pinnedAt) - new Date(a.pinnedAt);
+        }
+        
+        // If both not pinned, sort by createdAt (newest first)
+        return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+    
+    res.json(sortedPosts);
+});
+```
+
+#### Frontend Pin Display:
+```javascript
+// Update the post rendering to show pin icon
+function createPostElement(post) {
+    const postDiv = document.createElement('div');
+    postDiv.className = `post-card ${post.isPinned ? 'pinned-post' : ''}`;
+    
+    const pinIcon = post.isPinned ? '<i class="fas fa-thumbtack pin-icon"></i>' : '';
+    
+    postDiv.innerHTML = `
+        ${pinIcon}
+        <div class="post-header">
+            <span class="post-time">${formatTime(post.createdAt)}</span>
+            <button class="pin-btn" onclick="togglePin('${post.id}', ${!post.isPinned})">
+                ${post.isPinned ? 'Unpin' : 'Pin'}
+            </button>
+        </div>
+        <!-- rest of post content -->
+    `;
+    
+    return postDiv;
+}
+
+// Pin toggle function
+async function togglePin(postId, shouldPin) {
+    try {
+        const response = await fetch(`/api/announcements/${postId}/pin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isPinned: shouldPin })
+        });
+        
+        if (response.ok) {
+            // Refresh posts to show new order
+            await loadAndDisplayPosts();
+        }
+    } catch (error) {
+        console.error('Error toggling pin:', error);
+    }
+}
+```
+
+#### CSS for Pinned Posts:
+```css
+.pinned-post {
+    border-left: 4px solid #1da1f2;
+    background: #f8f9fa;
+}
+
+.pin-icon {
+    color: #1da1f2;
+    margin-right: 8px;
+}
+```
+
+### 3. Attachments Not Displaying
+**Problem:** Pictures and polls are not showing up in posts.
+
+**Fix Required:**
+
+#### Frontend Post Rendering Fix:
+```javascript
+function createPostElement(post) {
+    const postDiv = document.createElement('div');
+    postDiv.className = 'post-card';
+    
+    let attachmentsHTML = '';
+    
+    // Handle Images
+    if (post.attachments && post.attachments.images && post.attachments.images.length > 0) {
+        attachmentsHTML += '<div class="post-images">';
+        post.attachments.images.forEach(imageUrl => {
+            attachmentsHTML += `<img src="${imageUrl}" class="post-image" alt="Attachment">`;
+        });
+        attachmentsHTML += '</div>';
+    }
+    
+    // Handle Videos
+    if (post.attachments && post.attachments.videos && post.attachments.videos.length > 0) {
+        attachmentsHTML += '<div class="post-videos">';
+        post.attachments.videos.forEach(videoUrl => {
+            attachmentsHTML += `<video controls class="post-video"><source src="${videoUrl}"></video>`;
+        });
+        attachmentsHTML += '</div>';
+    }
+    
+    // Handle Polls
+    let pollHTML = '';
+    if (post.poll) {
+        pollHTML = `
+            <div class="poll-container">
+                <h4 class="poll-question">${post.poll.question}</h4>
+                <div class="poll-options">
+                    ${post.poll.options.map((option, index) => {
+                        const votes = post.poll.votes[`option${index + 1}`] || [];
+                        const percentage = post.poll.totalVotes ? (votes.length / post.poll.totalVotes * 100).toFixed(1) : 0;
+                        return `
+                            <div class="poll-option" onclick="voteInPoll('${post.id}', ${index})">
+                                <span class="poll-option-text">${option}</span>
+                                <div class="poll-bar">
+                                    <div class="poll-bar-fill" style="width: ${percentage}%"></div>
+                                </div>
+                                <span class="poll-percentage">${percentage}%</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="poll-info">${post.poll.totalVotes || 0} votes</div>
+            </div>
+        `;
+    }
+    
+    postDiv.innerHTML = `
+        <div class="post-content">${post.content}</div>
+        ${attachmentsHTML}
+        ${pollHTML}
+        <div class="post-reactions">
+            <!-- reaction buttons -->
+        </div>
+    `;
+    
+    return postDiv;
+}
+```
+
+#### CSS for Attachments:
+```css
+.post-images {
+    margin: 10px 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.post-image {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.post-videos {
+    margin: 10px 0;
+}
+
+.post-video {
+    width: 100%;
+    max-width: 500px;
+    border-radius: 8px;
+}
+
+.poll-container {
+    margin: 15px 0;
+    padding: 15px;
+    border: 1px solid #e1e8ed;
+    border-radius: 8px;
+}
+
+.poll-question {
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.poll-option {
+    margin: 8px 0;
+    padding: 10px;
+    border: 1px solid #ccd6dd;
+    border-radius: 20px;
+    cursor: pointer;
+    position: relative;
+}
+
+.poll-bar {
+    height: 4px;
+    background: #e1e8ed;
+    border-radius: 2px;
+    margin: 5px 0;
+}
+
+.poll-bar-fill {
+    height: 100%;
+    background: #1da1f2;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+```
+
+#### Backend File Upload Fix:
+```javascript
+// Make sure file upload is properly configured
+const multer = require('multer');
+const path = require('path');
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// File upload endpoint
+app.post('/api/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
+});
+
+// Serve uploaded files
+app.use('/uploads', express.static('uploads'));
+```
+
+## Testing Checklist
+After implementing these fixes:
+
+- [ ] Home page shows notification bell with correct count
+- [ ] Pinned posts appear at top of announcements page
+- [ ] Pin/unpin functionality works correctly
+- [ ] Images display in posts
+- [ ] Videos play correctly
+- [ ] Polls show with voting interface
+- [ ] Poll voting works and updates percentages
+- [ ] File uploads work for images/videos
+
+## Debug Steps
+1. Check browser console for JavaScript errors
+2. Verify API endpoints return correct data structure
+3. Test file upload functionality separately
+4. Confirm database stores attachment and poll data correctly
+5. Verify CSS is loading for attachment styling

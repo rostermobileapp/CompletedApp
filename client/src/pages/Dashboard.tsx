@@ -17,6 +17,30 @@ import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
+// Notification Badge Component
+function AnnouncementBadge({ leagueId }: { leagueId: string | null }) {
+  const { data: unreadCount } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'announcements', 'unread-count'],
+    queryFn: async () => {
+      if (!leagueId) return 0;
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/announcements/unread-count`);
+      return response.json();
+    },
+    enabled: !!leagueId,
+    refetchInterval: 30000, // Check every 30 seconds
+  });
+
+  if (!unreadCount || unreadCount.count === 0) {
+    return null;
+  }
+
+  return (
+    <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+      <span className="text-white text-xs font-bold">{unreadCount.count}</span>
+    </div>
+  );
+}
+
 // Needs Attention Modal Component
 function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: { 
   isOpen: boolean; 
@@ -911,9 +935,7 @@ export default function Dashboard() {
                 <Megaphone className="w-8 h-8 text-orange-500 mb-3" />
                 <p className="text-xs font-medium">Announcements</p>
               </div>
-              <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">3</span>
-              </div>
+              <AnnouncementBadge leagueId={selectedLeagueId} />
             </div>
           </Link>
 

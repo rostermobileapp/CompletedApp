@@ -2160,6 +2160,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Announcement routes
+
+  // Get unread announcements count for a league
+  app.get('/api/leagues/:leagueId/announcements/unread-count', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+
+      // Check if user is member of the league
+      const membership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // For simplicity, count announcements from the last 7 days as "unread"
+      // In a real app, you'd track user's last read timestamp
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const result = await storage.getLeagueAnnouncements(leagueId, {
+        limit: 100, // Get recent announcements
+        offset: 0,
+        orderBy: 'createdAt',
+        orderDirection: 'desc',
+      });
+
+      const recentCount = result.announcements.filter(
+        announcement => new Date(announcement.createdAt) > sevenDaysAgo
+      ).length;
+
+      res.json({ count: recentCount });
+    } catch (error) {
+      console.error('Error getting unread announcement count:', error);
+      res.status(500).json({ message: 'Failed to get unread count' });
+    }
+  });
   
   // Get announcements for a league
   app.get('/api/leagues/:leagueId/announcements', isAuthenticated, async (req: any, res) => {
