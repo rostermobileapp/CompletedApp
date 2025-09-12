@@ -16,6 +16,8 @@ import {
   announcementReactions,
   announcementPolls,
   announcementPollVotes,
+  scrimmages,
+  scrimmageRequests,
   playerImports,
   importedPlayers,
   playerMergeRequests,
@@ -53,6 +55,10 @@ import {
   type InsertAnnouncementPoll,
   type AnnouncementPollVote,
   type InsertAnnouncementPollVote,
+  type Scrimmage,
+  type InsertScrimmage,
+  type ScrimmageRequest,
+  type InsertScrimmageRequest,
   type PlayerImport,
   type InsertPlayerImport,
   type ImportedPlayer,
@@ -183,6 +189,22 @@ export interface IStorage {
   createImportedSchedules(importId: string, leagueId: string, schedules: any[]): Promise<ImportedSchedule[]>;
   getScheduleImports(leagueId: string): Promise<ScheduleImport[]>;
   getImportedSchedules(importId: string): Promise<ImportedSchedule[]>;
+
+  // Scrimmage operations
+  createScrimmage(scrimmageData: InsertScrimmage): Promise<Scrimmage>;
+  getScrimmage(scrimmageId: string): Promise<Scrimmage | undefined>;
+  getLeagueScrimmages(leagueId: string): Promise<(Scrimmage & { creator: User; requestCount: number })[]>;
+  getUserScrimmages(userId: string): Promise<(Scrimmage & { creator: User; requestCount: number })[]>;
+  updateScrimmage(scrimmageId: string, updates: Partial<InsertScrimmage>): Promise<Scrimmage>;
+  deleteScrimmage(scrimmageId: string): Promise<void>;
+  
+  // Scrimmage request operations
+  createScrimmageRequest(requestData: InsertScrimmageRequest): Promise<ScrimmageRequest>;
+  getScrimmageRequests(scrimmageId: string): Promise<(ScrimmageRequest & { player: User })[]>;
+  getScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | undefined>;
+  updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date): Promise<ScrimmageRequest>;
+  deleteScrimmageRequest(requestId: string): Promise<void>;
+  getScrimmageRequestsByPlayer(playerId: string): Promise<(ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2018,6 +2040,154 @@ export class DatabaseStorage implements IStorage {
       .where(eq(announcementPollVotes.pollId, pollId));
     
     return results.map(r => ({ ...r.announcement_poll_votes, user: r.users }));
+  }
+
+  // Scrimmage operations
+  async createScrimmage(scrimmageData: InsertScrimmage): Promise<Scrimmage> {
+    const [newScrimmage] = await db.insert(scrimmages).values(scrimmageData).returning();
+    return newScrimmage;
+  }
+
+  async getScrimmage(scrimmageId: string): Promise<Scrimmage | undefined> {
+    const [scrimmage] = await db
+      .select()
+      .from(scrimmages)
+      .where(eq(scrimmages.id, scrimmageId));
+    return scrimmage;
+  }
+
+  async getLeagueScrimmages(leagueId: string): Promise<(Scrimmage & { creator: User; requestCount: number })[]> {
+    const results = await db
+      .select({
+        scrimmage: scrimmages,
+        creator: users,
+        requestCount: sql<number>`CAST(COUNT(${scrimmageRequests.id}) AS INTEGER)`
+      })
+      .from(scrimmages)
+      .innerJoin(users, eq(scrimmages.creatorId, users.id))
+      .leftJoin(scrimmageRequests, and(
+        eq(scrimmageRequests.scrimmageId, scrimmages.id),
+        eq(scrimmageRequests.status, 'pending')
+      ))
+      .where(eq(scrimmages.leagueId, leagueId))
+      .groupBy(scrimmages.id, users.id)
+      .orderBy(desc(scrimmages.dateTime));
+
+    return results.map(r => ({
+      ...r.scrimmage,
+      creator: r.creator,
+      requestCount: r.requestCount
+    }));
+  }
+
+  async getUserScrimmages(userId: string): Promise<(Scrimmage & { creator: User; requestCount: number })[]> {
+    const results = await db
+      .select({
+        scrimmage: scrimmages,
+        creator: users,
+        requestCount: sql<number>`CAST(COUNT(${scrimmageRequests.id}) AS INTEGER)`
+      })
+      .from(scrimmages)
+      .innerJoin(users, eq(scrimmages.creatorId, users.id))
+      .leftJoin(scrimmageRequests, and(
+        eq(scrimmageRequests.scrimmageId, scrimmages.id),
+        eq(scrimmageRequests.status, 'pending')
+      ))
+      .where(eq(scrimmages.creatorId, userId))
+      .groupBy(scrimmages.id, users.id)
+      .orderBy(desc(scrimmages.dateTime));
+
+    return results.map(r => ({
+      ...r.scrimmage,
+      creator: r.creator,
+      requestCount: r.requestCount
+    }));
+  }
+
+  async updateScrimmage(scrimmageId: string, updates: Partial<InsertScrimmage>): Promise<Scrimmage> {
+    const [updatedScrimmage] = await db
+      .update(scrimmages)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(scrimmages.id, scrimmageId))
+      .returning();
+    return updatedScrimmage;
+  }
+
+  async deleteScrimmage(scrimmageId: string): Promise<void> {
+    // Delete associated requests first to avoid referential integrity issues
+    await db.delete(scrimmageRequests).where(eq(scrimmageRequests.scrimmageId, scrimmageId));
+    // Then delete the scrimmage
+    await db.delete(scrimmages).where(eq(scrimmages.id, scrimmageId));
+  }
+
+  // Scrimmage request operations
+  async createScrimmageRequest(requestData: InsertScrimmageRequest): Promise<ScrimmageRequest> {
+    const [newRequest] = await db.insert(scrimmageRequests).values(requestData).returning();
+    return newRequest;
+  }
+
+  async getScrimmageRequests(scrimmageId: string): Promise<(ScrimmageRequest & { player: User })[]> {
+    const results = await db
+      .select()
+      .from(scrimmageRequests)
+      .innerJoin(users, eq(scrimmageRequests.playerId, users.id))
+      .where(eq(scrimmageRequests.scrimmageId, scrimmageId))
+      .orderBy(scrimmageRequests.requestedAt);
+
+    return results.map(r => ({ ...r.scrimmage_requests, player: r.users }));
+  }
+
+  async getScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | undefined> {
+    const [request] = await db
+      .select()
+      .from(scrimmageRequests)
+      .where(and(
+        eq(scrimmageRequests.scrimmageId, scrimmageId),
+        eq(scrimmageRequests.playerId, playerId)
+      ));
+    return request;
+  }
+
+  async updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date): Promise<ScrimmageRequest> {
+    const updateData: Partial<InsertScrimmageRequest> = { status };
+    
+    if (status === 'approved') {
+      updateData.approvedAt = timestamp || new Date();
+    } else if (status === 'dismissed') {
+      updateData.dismissedAt = timestamp || new Date();
+    }
+
+    const [updatedRequest] = await db
+      .update(scrimmageRequests)
+      .set(updateData)
+      .where(and(
+        eq(scrimmageRequests.id, requestId),
+        eq(scrimmageRequests.status, 'pending')
+      ))
+      .returning();
+    return updatedRequest;
+  }
+
+  async deleteScrimmageRequest(requestId: string): Promise<void> {
+    await db.delete(scrimmageRequests).where(eq(scrimmageRequests.id, requestId));
+  }
+
+  async getScrimmageRequestsByPlayer(playerId: string): Promise<(ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[]> {
+    const results = await db
+      .select()
+      .from(scrimmageRequests)
+      .innerJoin(scrimmages, eq(scrimmageRequests.scrimmageId, scrimmages.id))
+      .innerJoin(users, eq(scrimmages.creatorId, users.id))
+      .where(eq(scrimmageRequests.playerId, playerId))
+      .orderBy(desc(scrimmageRequests.requestedAt));
+
+    return results.map(r => ({
+      ...r.scrimmage_requests,
+      scrimmage: {
+        ...r.scrimmages,
+        creator: r.users
+      }
+    }));
   }
 }
 
