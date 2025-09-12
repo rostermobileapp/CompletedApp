@@ -1,0 +1,144 @@
+# Drop-in Scrimmage Feature Implementation
+
+## Overview
+Implement a comprehensive drop-in scrimmage system that allows Player Plus and higher tier users to create scrimmages and manage player admissions through a request/approval workflow.
+
+## Core Requirements
+
+### 1. Scrimmage Creation (Player Plus+ Only)
+- Add "Create Scrimmage" option to Player Plus and higher tier accounts
+- Required fields for scrimmage creation:
+  - Date and time
+  - Location/venue
+  - Maximum number of players
+  - Skill level requirements (optional)
+  - Additional notes/requirements (optional)
+- Save scrimmage with status: "Open for Requests"
+
+### 2. Announcement System
+- When a scrimmage is created, automatically add notification to "Announcements" card for all eligible players
+- Announcement should include:
+  - Scrimmage details (date, time, location)
+  - "Request to Join" button
+  - Creator's name/username
+  - Spots available counter
+
+### 3. Player Request System
+- Players can click "Request to Join" from announcement
+- Store requests with:
+  - Player ID and profile info
+  - Timestamp of request (for ordering)
+  - Status: "Pending", "Approved", "Dismissed"
+- Players can only submit one request per scrimmage
+- Show confirmation message: "Request submitted - waiting for approval"
+
+### 4. Creator Management Dashboard
+- Create dedicated scrimmage management interface for creators
+- Display all pending requests in **chronological order** (first requested = first listed)
+- For each request, show:
+  - Player name and profile picture
+  - Request timestamp
+  - Player stats/rating if available
+  - "Approve" button (green)
+  - "Dismiss" button (red)
+- Real-time counter of approved players vs. total spots
+- Clear visual distinction between pending, approved, and dismissed requests
+
+### 5. Approval Workflow
+- When creator clicks "Approve":
+  - Change request status to "Approved"
+  - Move to "Approved Players" section
+  - Update spots counter
+  - Keep chronological ordering intact
+- When creator clicks "Dismiss":
+  - Change request status to "Dismissed" 
+  - Move to separate "Dismissed" section (collapsible)
+  - Request can be un-dismissed if needed
+
+### 6. Confirmation System
+- Add "Send Confirmations" button (only active when creator is ready)
+- Button should be prominent and clearly indicate final action
+- When clicked, trigger dual notification system:
+
+#### For Approved Players:
+- Send notification: "You're confirmed for [Scrimmage Details]"
+- Include final roster list
+- Add to their personal calendar/schedule
+- Provide creator's contact info for coordination
+
+#### For Non-Selected Players:
+- Send notification: "Thanks for your interest - this scrimmage is now full"
+- Keep it positive and encouraging
+- Suggest they watch for future scrimmages
+
+### 7. Status Management
+- After confirmations sent, change scrimmage status to "Roster Confirmed"
+- Lock the roster (no more approvals/dismissals)
+- Archive the request management interface
+- Show final roster to creator with contact details
+
+## Technical Implementation Notes
+
+### Database Schema Additions
+```sql
+-- Scrimmages table
+CREATE TABLE scrimmages (
+    id UUID PRIMARY KEY,
+    creator_id UUID REFERENCES users(id),
+    title VARCHAR(255),
+    date_time TIMESTAMP,
+    location VARCHAR(255),
+    max_players INTEGER,
+    skill_level VARCHAR(50),
+    notes TEXT,
+    status VARCHAR(50) DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Scrimmage requests table
+CREATE TABLE scrimmage_requests (
+    id UUID PRIMARY KEY,
+    scrimmage_id UUID REFERENCES scrimmages(id),
+    player_id UUID REFERENCES users(id),
+    status VARCHAR(50) DEFAULT 'pending',
+    requested_at TIMESTAMP DEFAULT NOW(),
+    approved_at TIMESTAMP NULL
+);
+```
+
+### Key Components to Build
+1. `ScrimmageCreationModal` - Form for creating scrimmages
+2. `ScrimmageAnnouncement` - Card component for announcements
+3. `ScrimmageManagementDashboard` - Creator's approval interface
+4. `PlayerRequestCard` - Individual request display component
+5. `ConfirmationService` - Handles dual notification system
+
+### User Experience Considerations
+- **Performance**: Implement real-time updates for request status changes
+- **Mobile-first**: Ensure all interfaces work seamlessly on mobile devices
+- **Accessibility**: Proper ARIA labels and keyboard navigation
+- **Error Handling**: Clear messaging for edge cases (scrimmage full, already requested, etc.)
+- **Permissions**: Strict validation of Player Plus+ tier requirements
+
+### Edge Cases to Handle
+- Creator cancels scrimmage after requests submitted
+- Player cancels their request before approval
+- Maximum players reached during approval process
+- Creator tries to approve more players than spots available
+- Timezone handling for scrimmage times
+- Duplicate request prevention
+
+## Success Metrics
+- Number of scrimmages created per week
+- Average time from creation to confirmation
+- Player engagement rate with announcements
+- Creator satisfaction with management tools
+- Player retention rate for confirmed scrimmages
+
+## Future Enhancements (Phase 2)
+- Auto-approval based on criteria
+- Waitlist functionality
+- Recurring scrimmages
+- Player rating integration
+- Payment integration for paid scrimmages
+- Group messaging for confirmed players

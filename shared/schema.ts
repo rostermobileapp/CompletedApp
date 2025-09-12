@@ -68,6 +68,20 @@ export const substituteRequestStatusEnum = pgEnum("substitute_request_status", [
   "denied"
 ]);
 
+// Scrimmage status enum
+export const scrimmageStatusEnum = pgEnum("scrimmage_status", [
+  "open",
+  "roster_confirmed",
+  "cancelled"
+]);
+
+// Scrimmage request status enum
+export const scrimmageRequestStatusEnum = pgEnum("scrimmage_request_status", [
+  "pending",
+  "approved",
+  "dismissed"
+]);
+
 // Users table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -306,6 +320,36 @@ export const announcementReadStatus = pgTable("announcement_read_status", {
   readAt: timestamp("read_at").defaultNow().notNull(),
 }, (table) => [
   unique("unique_announcement_user_read").on(table.announcementId, table.userId),
+]);
+
+// Scrimmages table
+export const scrimmages = pgTable("scrimmages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  title: varchar("title").notNull(),
+  dateTime: timestamp("date_time").notNull(),
+  location: varchar("location").notNull(),
+  maxPlayers: integer("max_players").notNull(),
+  skillLevel: varchar("skill_level"), // Optional skill level requirement
+  notes: text("notes"), // Additional notes/requirements
+  status: scrimmageStatusEnum("status").default("open").notNull(),
+  announcementId: varchar("announcement_id").references(() => announcements.id), // Link to auto-created announcement
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Scrimmage requests table
+export const scrimmageRequests = pgTable("scrimmage_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scrimmageId: varchar("scrimmage_id").references(() => scrimmages.id).notNull(),
+  playerId: varchar("player_id").references(() => users.id).notNull(),
+  status: scrimmageRequestStatusEnum("status").default("pending").notNull(),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  approvedAt: timestamp("approved_at"),
+  dismissedAt: timestamp("dismissed_at"),
+}, (table) => [
+  unique("unique_scrimmage_player_request").on(table.scrimmageId, table.playerId),
 ]);
 
 // Draft status enum
@@ -620,6 +664,34 @@ export const announcementPollVotesRelations = relations(announcementPollVotes, (
   }),
 }));
 
+// Scrimmage relations
+export const scrimmagesRelations = relations(scrimmages, ({ one, many }) => ({
+  league: one(leagues, {
+    fields: [scrimmages.leagueId],
+    references: [leagues.id],
+  }),
+  creator: one(users, {
+    fields: [scrimmages.creatorId],
+    references: [users.id],
+  }),
+  announcement: one(announcements, {
+    fields: [scrimmages.announcementId],
+    references: [announcements.id],
+  }),
+  requests: many(scrimmageRequests),
+}));
+
+export const scrimmageRequestsRelations = relations(scrimmageRequests, ({ one }) => ({
+  scrimmage: one(scrimmages, {
+    fields: [scrimmageRequests.scrimmageId],
+    references: [scrimmages.id],
+  }),
+  player: one(users, {
+    fields: [scrimmageRequests.playerId],
+    references: [users.id],
+  }),
+}));
+
 export const playerImportsRelations = relations(playerImports, ({ one, many }) => ({
   league: one(leagues, {
     fields: [playerImports.leagueId],
@@ -881,6 +953,17 @@ export const insertAnnouncementPollVoteSchema = createInsertSchema(announcementP
   createdAt: true,
 });
 
+export const insertScrimmageSchema = createInsertSchema(scrimmages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertScrimmageRequestSchema = createInsertSchema(scrimmageRequests).omit({
+  id: true,
+  requestedAt: true,
+});
+
 // Client-safe request schemas (omit server-controlled fields)
 export const createAnnouncementRequestSchema = createInsertSchema(announcements).omit({
   id: true,
@@ -922,6 +1005,24 @@ export const createAnnouncementPollVoteRequestSchema = createInsertSchema(announ
   pollId: true,    // Server-controlled
   userId: true,    // Server-controlled
   createdAt: true,
+});
+
+export const createScrimmageRequestSchema = createInsertSchema(scrimmages).omit({
+  id: true,
+  leagueId: true,     // Server-controlled
+  creatorId: true,    // Server-controlled
+  announcementId: true, // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createScrimmageJoinRequestSchema = createInsertSchema(scrimmageRequests).omit({
+  id: true,
+  scrimmageId: true,  // Server-controlled
+  playerId: true,     // Server-controlled
+  requestedAt: true,
+  approvedAt: true,
+  dismissedAt: true,
 });
 
 // Types
@@ -978,6 +1079,12 @@ export type CreateAnnouncementAttachmentRequest = z.infer<typeof createAnnouncem
 export type CreateAnnouncementReactionRequest = z.infer<typeof createAnnouncementReactionRequestSchema>;
 export type CreateAnnouncementPollRequest = z.infer<typeof createAnnouncementPollRequestSchema>;
 export type CreateAnnouncementPollVoteRequest = z.infer<typeof createAnnouncementPollVoteRequestSchema>;
+export type Scrimmage = typeof scrimmages.$inferSelect;
+export type InsertScrimmage = z.infer<typeof insertScrimmageSchema>;
+export type ScrimmageRequest = typeof scrimmageRequests.$inferSelect;
+export type InsertScrimmageRequest = z.infer<typeof insertScrimmageRequestSchema>;
+export type CreateScrimmageRequest = z.infer<typeof createScrimmageRequestSchema>;
+export type CreateScrimmageJoinRequest = z.infer<typeof createScrimmageJoinRequestSchema>;
 
 // Extended types with relationships
 export type GameWithTeams = Game & {
