@@ -1,0 +1,188 @@
+# Drop-in Scrimmage Feature Implementation
+
+## Overview
+Implement a comprehensive drop-in scrimmage system that allows Player Plus and higher tier users to create scrimmages and manage player admissions through a request/approval workflow.
+
+## UI/UX Integration Points
+
+### Navigation & Placement
+- **Location**: Place in existing "League Features" section
+- **Action Required**: Remove current "League Standings" placeholder option
+- **Replace With**: "Schedule Scrimmage / Practice" option
+- **Access Level**: Only visible to Player Plus and higher tier users
+
+### Screen Flow Integration
+- **Entry Point**: "Schedule Scrimmage / Practice" button in League Features
+- **Screen Design**: Model after existing "Schedule Game" feature from commissioner tools
+- **Reuse Components**: Leverage existing member selection and rink selection interfaces
+
+## Core Requirements
+
+### 1. Scrimmage Creation Screen (Player Plus+ Only)
+- **Access Path**: League Features → "Schedule Scrimmage / Practice"
+- **Screen Template**: Use existing "Schedule Game" interface as foundation
+- **Member Selection**: Reuse existing league member selection component
+  - Multi-select interface for choosing which league members to notify
+  - Search/filter functionality for large leagues
+  - "Select All" / "Select None" options
+- **Rink Selection**: Integrate existing rink selection component
+  - Dropdown or searchable list of available rinks
+  - Should pull from same rink database as commissioner tools
+- **Additional Fields**:
+  - Date and time picker
+  - Maximum number of players (default based on rink capacity)
+  - Skill level requirements (optional dropdown)
+  - Additional notes/requirements (text area)
+- Save scrimmage with status: "Open for Requests"
+
+### 2. Targeted Announcement System
+- When scrimmage is created, send notifications **only to selected league members**
+- Announcement delivery method:
+  - Add to "Announcements" card for selected players only
+  - Optional: Push notification to selected members' devices
+- Announcement content:
+  - Scrimmage details (date, time, selected rink)
+  - "Request to Join" button
+  - Creator's name/username
+  - Spots available counter
+  - Note: "You were invited to this scrimmage"
+
+### 3. Player Request System
+- Players can click "Request to Join" from announcement
+- Store requests with:
+  - Player ID and profile info
+  - Timestamp of request (for ordering)
+  - Status: "Pending", "Approved", "Dismissed"
+- Players can only submit one request per scrimmage
+- Show confirmation message: "Request submitted - waiting for approval"
+
+### 4. Creator Management Dashboard
+- Create dedicated scrimmage management interface for creators
+- Display all pending requests in **chronological order** (first requested = first listed)
+- For each request, show:
+  - Player name and profile picture
+  - Request timestamp
+  - Player stats/rating if available
+  - "Approve" button (green)
+  - "Dismiss" button (red)
+- Real-time counter of approved players vs. total spots
+- Clear visual distinction between pending, approved, and dismissed requests
+
+### 5. Approval Workflow
+- When creator clicks "Approve":
+  - Change request status to "Approved"
+  - Move to "Approved Players" section
+  - Update spots counter
+  - Keep chronological ordering intact
+- When creator clicks "Dismiss":
+  - Change request status to "Dismissed" 
+  - Move to separate "Dismissed" section (collapsible)
+  - Request can be un-dismissed if needed
+
+### 6. Confirmation System
+- Add "Send Confirmations" button (only active when creator is ready)
+- Button should be prominent and clearly indicate final action
+- When clicked, trigger dual notification system:
+
+#### For Approved Players:
+- Send notification: "You're confirmed for [Scrimmage Details]"
+- Include final roster list
+- Add to their personal calendar/schedule
+- Provide creator's contact info for coordination
+
+#### For Non-Selected Players:
+- Send notification: "Thanks for your interest - this scrimmage is now full"
+- Keep it positive and encouraging
+- Suggest they watch for future scrimmages
+
+### 7. Status Management
+- After confirmations sent, change scrimmage status to "Roster Confirmed"
+- Lock the roster (no more approvals/dismissals)
+- Archive the request management interface
+- Show final roster to creator with contact details
+
+## Technical Implementation Notes
+
+### Database Schema Additions
+```sql
+-- Scrimmages table
+CREATE TABLE scrimmages (
+    id UUID PRIMARY KEY,
+    creator_id UUID REFERENCES users(id),
+    league_id UUID REFERENCES leagues(id),
+    title VARCHAR(255),
+    date_time TIMESTAMP,
+    rink_id UUID REFERENCES rinks(id),
+    max_players INTEGER,
+    skill_level VARCHAR(50),
+    notes TEXT,
+    status VARCHAR(50) DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Scrimmage invitations (tracks who was invited)
+CREATE TABLE scrimmage_invitations (
+    id UUID PRIMARY KEY,
+    scrimmage_id UUID REFERENCES scrimmages(id),
+    player_id UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Scrimmage requests table
+CREATE TABLE scrimmage_requests (
+    id UUID PRIMARY KEY,
+    scrimmage_id UUID REFERENCES scrimmages(id),
+    player_id UUID REFERENCES users(id),
+    status VARCHAR(50) DEFAULT 'pending',
+    requested_at TIMESTAMP DEFAULT NOW(),
+    approved_at TIMESTAMP NULL
+);
+```
+
+### Key Components to Build
+1. **League Features Enhancement**
+   - Remove `LeagueStandings` placeholder component
+   - Replace with `ScheduleScrimmageButton` component
+   - Update League Features navigation array
+
+2. **Scrimmage Creation Flow**
+   - `ScrimmageCreationScreen` - Main creation interface
+   - `MemberSelectionComponent` - Reuse existing member picker from commissioner tools
+   - `RinkSelectionComponent` - Reuse existing rink picker from commissioner tools
+   - `ScrimmageDetailsForm` - Date, time, max players, notes
+
+3. **Management & Notifications**
+   - `ScrimmageAnnouncement` - Card component for announcements (targeted)
+   - `ScrimmageManagementDashboard` - Creator's approval interface
+   - `PlayerRequestCard` - Individual request display component
+   - `ConfirmationService` - Handles dual notification system
+
+### User Experience Considerations
+- **Performance**: Implement real-time updates for request status changes
+- **Mobile-first**: Ensure all interfaces work seamlessly on mobile devices
+- **Accessibility**: Proper ARIA labels and keyboard navigation
+- **Error Handling**: Clear messaging for edge cases (scrimmage full, already requested, etc.)
+- **Permissions**: Strict validation of Player Plus+ tier requirements
+
+### Edge Cases to Handle
+- Creator cancels scrimmage after requests submitted
+- Player cancels their request before approval
+- Maximum players reached during approval process
+- Creator tries to approve more players than spots available
+- Timezone handling for scrimmage times
+- Duplicate request prevention
+
+## Success Metrics
+- Number of scrimmages created per week
+- Average time from creation to confirmation
+- Player engagement rate with announcements
+- Creator satisfaction with management tools
+- Player retention rate for confirmed scrimmages
+
+## Future Enhancements (Phase 2)
+- Auto-approval based on criteria
+- Waitlist functionality
+- Recurring scrimmages
+- Player rating integration
+- Payment integration for paid scrimmages
+- Group messaging for confirmed players
