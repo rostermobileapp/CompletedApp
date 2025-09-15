@@ -322,6 +322,17 @@ export const announcementReadStatus = pgTable("announcement_read_status", {
   unique("unique_announcement_user_read").on(table.announcementId, table.userId),
 ]);
 
+// Announcement visibility table - tracks who can see targeted announcements
+// If no records exist for an announcement, it's visible to all league members (default behavior)
+export const announcementVisibility = pgTable("announcement_visibility", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_announcement_user_visibility").on(table.announcementId, table.userId),
+]);
+
 // Scrimmages table
 export const scrimmages = pgTable("scrimmages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -971,6 +982,8 @@ export const createAnnouncementRequestSchema = createInsertSchema(announcements)
   authorId: true,  // Server-controlled
   createdAt: true,
   updatedAt: true,
+}).extend({
+  targetUserIds: z.array(z.string()).optional(), // For creating targeted announcements
 });
 
 export const updateAnnouncementRequestSchema = createInsertSchema(announcements).omit({
@@ -979,6 +992,8 @@ export const updateAnnouncementRequestSchema = createInsertSchema(announcements)
   authorId: true,  // Server-controlled
   createdAt: true,
   updatedAt: true,
+}).extend({
+  targetUserIds: z.array(z.string()).optional(), // For updating targeted announcements
 }).partial(); // Make all fields optional for updates
 
 export const createAnnouncementAttachmentRequestSchema = createInsertSchema(announcementAttachments).omit({

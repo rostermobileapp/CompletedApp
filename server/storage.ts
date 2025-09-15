@@ -12,6 +12,7 @@ import {
   messages,
   announcements,
   announcementReadStatus,
+  announcementVisibility,
   announcementAttachments,
   announcementReactions,
   announcementPolls,
@@ -153,7 +154,7 @@ export interface IStorage {
 
   // Announcement operations
   createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
-  getLeagueAnnouncements(leagueId: string, options?: { limit?: number; offset?: number; orderBy?: string; orderDirection?: 'asc' | 'desc' }): Promise<{ announcements: (Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]; total: number }>;
+  getLeagueAnnouncements(leagueId: string, options?: { limit?: number; offset?: number; orderBy?: string; orderDirection?: 'asc' | 'desc' }, userId?: string): Promise<{ announcements: (Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]; total: number }>;
   getAnnouncement(id: string): Promise<(Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] }) | undefined>;
   updateAnnouncement(id: string, updates: Partial<Announcement>): Promise<Announcement>;
   deleteAnnouncement(id: string): Promise<void>;
@@ -174,6 +175,11 @@ export interface IStorage {
   createAnnouncementPoll(poll: InsertAnnouncementPoll): Promise<AnnouncementPoll>;
   voteOnPoll(vote: InsertAnnouncementPollVote): Promise<AnnouncementPollVote>;
   getPollResults(pollId: string): Promise<(AnnouncementPollVote & { user: User })[]>;
+  
+  // Announcement visibility operations (for targeted announcements)
+  createAnnouncementVisibility(announcementId: string, userIds: string[]): Promise<void>;
+  getAnnouncementVisibility(announcementId: string): Promise<string[]>;
+  isAnnouncementVisibleToUser(announcementId: string, userId: string): Promise<boolean>;
   
   // Bulk import operations
   createPlayerImport(importData: InsertPlayerImport): Promise<PlayerImport>;
@@ -1849,20 +1855,40 @@ export class DatabaseStorage implements IStorage {
     return newAnnouncement;
   }
 
-  async getLeagueAnnouncements(leagueId: string, options?: { limit?: number; offset?: number; orderBy?: string; orderDirection?: 'asc' | 'desc' }): Promise<{ announcements: (Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]; total: number }> {
-    // First get the total count
+  async getLeagueAnnouncements(leagueId: string, options?: { limit?: number; offset?: number; orderBy?: string; orderDirection?: 'asc' | 'desc' }, userId?: string): Promise<{ announcements: (Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]; total: number }> {
+    // Build visibility filter condition
+    // Logic: Show announcements that either have no visibility restrictions OR user is explicitly allowed
+    const visibilityFilter = userId ? sql`(
+      NOT EXISTS (
+        SELECT 1 FROM ${announcementVisibility} av 
+        WHERE av.announcement_id = ${announcements.id}
+      )
+      OR 
+      EXISTS (
+        SELECT 1 FROM ${announcementVisibility} av 
+        WHERE av.announcement_id = ${announcements.id} AND av.user_id = ${userId}
+      )
+    )` : sql`1=1`; // If no userId provided, show all (for commissioner access)
+
+    // First get the total count with visibility filtering
     const [countResult] = await db
       .select({ count: sql<number>`count(*)` })
       .from(announcements)
-      .where(eq(announcements.leagueId, leagueId));
+      .where(and(
+        eq(announcements.leagueId, leagueId),
+        visibilityFilter
+      ));
     
     const total = countResult.count;
     
-    // Then get the paginated announcements
+    // Then get the paginated announcements with visibility filtering
     let query = db
       .select()
       .from(announcements)
-      .where(eq(announcements.leagueId, leagueId));
+      .where(and(
+        eq(announcements.leagueId, leagueId),
+        visibilityFilter
+      ));
     
     // Apply ordering - pinned posts first, then by date
     if (options?.orderDirection === 'asc') {
@@ -1998,7 +2024,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUnreadAnnouncementCount(leagueId: string, userId: string): Promise<number> {
-    // Count announcements that user has NOT read (direct query, no pre-filtering needed)
+    // Build visibility filter condition
+    const visibilityFilter = sql`(
+      NOT EXISTS (
+        SELECT 1 FROM ${announcementVisibility} av 
+        WHERE av.announcement_id = ${announcements.id}
+      )
+      OR 
+      EXISTS (
+        SELECT 1 FROM ${announcementVisibility} av 
+        WHERE av.announcement_id = ${announcements.id} AND av.user_id = ${userId}
+      )
+    )`;
+
+    // Count announcements that user has NOT read AND can see (respecting visibility)
     const [result] = await db
       .select({ 
         count: sql<number>`CAST(COUNT(*) AS INTEGER)` 
@@ -2014,7 +2053,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(announcements.leagueId, leagueId),
-          isNull(announcementReadStatus.id)
+          isNull(announcementReadStatus.id),
+          visibilityFilter
         )
       );
 
@@ -2040,6 +2080,53 @@ export class DatabaseStorage implements IStorage {
       .where(eq(announcementPollVotes.pollId, pollId));
     
     return results.map(r => ({ ...r.announcement_poll_votes, user: r.users }));
+  }
+
+  // Announcement visibility operations (for targeted announcements)
+  async createAnnouncementVisibility(announcementId: string, userIds: string[]): Promise<void> {
+    if (userIds.length === 0) return; // No users to add visibility for
+    
+    const visibilityRecords = userIds.map(userId => ({
+      announcementId,
+      userId,
+    }));
+    
+    await db.insert(announcementVisibility).values(visibilityRecords).onConflictDoNothing();
+  }
+
+  async getAnnouncementVisibility(announcementId: string): Promise<string[]> {
+    const results = await db
+      .select({ userId: announcementVisibility.userId })
+      .from(announcementVisibility)
+      .where(eq(announcementVisibility.announcementId, announcementId));
+    
+    return results.map(r => r.userId);
+  }
+
+  async isAnnouncementVisibleToUser(announcementId: string, userId: string): Promise<boolean> {
+    // Check if announcement has any visibility restrictions
+    const visibilityCount = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(announcementVisibility)
+      .where(eq(announcementVisibility.announcementId, announcementId));
+    
+    // If no visibility records exist, announcement is visible to all league members (default behavior)
+    if (visibilityCount[0].count === 0) {
+      return true;
+    }
+    
+    // If visibility records exist, check if user is in the list
+    const userVisibility = await db
+      .select()
+      .from(announcementVisibility)
+      .where(
+        and(
+          eq(announcementVisibility.announcementId, announcementId),
+          eq(announcementVisibility.userId, userId)
+        )
+      );
+    
+    return userVisibility.length > 0;
   }
 
   // Scrimmage operations

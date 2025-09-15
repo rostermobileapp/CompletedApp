@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { db } from "./db";
-import { leagueMemberships, importedPlayers, teams } from "@shared/schema";
+import { leagueMemberships, importedPlayers, teams, announcementPolls } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import {
   insertLeagueSchema,
@@ -2158,12 +2158,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
 
-      // Mark ALL announcements in the league as read for this user using bulk insert
+      // Mark ALL visible announcements in the league as read for this user using bulk insert
+      // Only mark announcements that the user can actually see (respecting visibility rules)
       const result = await db.execute(sql`
         INSERT INTO announcement_read_status (id, announcement_id, user_id, read_at)
-        SELECT gen_random_uuid(), id, ${userId}, NOW()
-        FROM announcements 
-        WHERE league_id = ${leagueId}
+        SELECT gen_random_uuid(), a.id, ${userId}, NOW()
+        FROM announcements a 
+        WHERE a.league_id = ${leagueId}
+        AND (
+          NOT EXISTS (
+            SELECT 1 FROM announcement_visibility av 
+            WHERE av.announcement_id = a.id
+          )
+          OR 
+          EXISTS (
+            SELECT 1 FROM announcement_visibility av 
+            WHERE av.announcement_id = a.id AND av.user_id = ${userId}
+          )
+        )
         ON CONFLICT (announcement_id, user_id) DO NOTHING
       `);
 
@@ -2195,13 +2207,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orderDirection = req.query.orderDirection === 'asc' ? 'asc' : 'desc'; // Default desc (newest first)
       const offset = (page - 1) * limit;
 
+      // Get announcements with visibility filtering handled at SQL level
       const result = await storage.getLeagueAnnouncements(leagueId, {
         limit,
         offset,
         orderBy,
         orderDirection,
-      });
+      }, userId);
 
+      // Pagination is now accurate since visibility filtering happens in SQL
       res.json({
         announcements: result.announcements,
         pagination: {
@@ -2234,12 +2248,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requestBody = req.body;
       console.log('📝 Creating announcement with data:', JSON.stringify(requestBody, null, 2));
       
-      const announcementData = createAnnouncementRequestSchema.parse(requestBody);
-      const announcement = await storage.createAnnouncement({
-        ...announcementData,
-        leagueId,
-        authorId: userId,
-      });
+      const { targetUserIds, ...announcementData } = createAnnouncementRequestSchema.parse(requestBody);
+      
+      let announcement;
+      
+      // Validate targetUserIds if provided - ensure they are league members
+      if (targetUserIds && targetUserIds.length > 0) {
+        console.log('🎯 Validating targeted announcement user IDs:', targetUserIds);
+        const validUserIds = [];
+        for (const targetUserId of targetUserIds) {
+          const membership = await storage.getUserLeagueMembership(targetUserId, leagueId);
+          if (membership && membership.status === 'approved') {
+            validUserIds.push(targetUserId);
+          } else {
+            console.warn(`⚠️ User ${targetUserId} is not an approved member of league ${leagueId}, excluding from targets`);
+          }
+        }
+        
+        if (validUserIds.length === 0) {
+          return res.status(400).json({ message: 'None of the specified users are valid league members' });
+        }
+        
+        // Create announcement
+        announcement = await storage.createAnnouncement({
+          ...announcementData,
+          leagueId,
+          authorId: userId,
+        });
+        
+        // Create visibility records for targeted users
+        console.log(`🔒 Creating visibility records for ${validUserIds.length} users`);
+        await storage.createAnnouncementVisibility(announcement.id, validUserIds);
+        
+        console.log(`✅ Created targeted announcement ${announcement.id} for users: ${validUserIds.join(', ')}`);
+      } else {
+        // Create regular public announcement (visible to all league members)
+        announcement = await storage.createAnnouncement({
+          ...announcementData,
+          leagueId,
+          authorId: userId,
+        });
+        
+        console.log(`📢 Created public announcement ${announcement.id}`);
+      }
 
       // Handle attachments if provided
       if (requestBody.attachments && Array.isArray(requestBody.attachments)) {
@@ -2292,6 +2343,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only commissioners can edit announcements' });
       }
 
+      // Commissioners can see and edit all announcements in their leagues regardless of visibility
+
       const updates = updateAnnouncementRequestSchema.parse(req.body);
       const updatedAnnouncement = await storage.updateAnnouncement(announcementId, updates);
       res.json(updatedAnnouncement);
@@ -2318,6 +2371,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!league || league.commissionerId !== userId) {
         return res.status(403).json({ message: 'Only commissioners can delete announcements' });
       }
+
+      // Commissioners can see and delete all announcements in their leagues regardless of visibility
 
       await storage.deleteAnnouncement(announcementId);
       res.json({ success: true });
@@ -2349,6 +2404,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
 
+      // Check if announcement is visible to this user (targeted visibility)
+      const isVisible = await storage.isAnnouncementVisibleToUser(announcementId, userId);
+      if (!isVisible) {
+        return res.status(404).json({ message: 'Announcement not found' }); // Return 404 to not reveal existence
+      }
+
       const reaction = await storage.addAnnouncementReaction({
         announcementId,
         userId,
@@ -2371,6 +2432,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!emoji) {
         return res.status(400).json({ message: 'Emoji is required' });
+      }
+
+      // Check if announcement exists and user has access (visibility check)
+      const announcement = await storage.getAnnouncement(announcementId);
+      if (!announcement) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Check if announcement is visible to this user (targeted visibility)
+      const isVisible = await storage.isAnnouncementVisibleToUser(announcementId, userId);
+      if (!isVisible) {
+        return res.status(404).json({ message: 'Announcement not found' }); // Return 404 to not reveal existence
       }
 
       await storage.removeAnnouncementReaction(announcementId, userId, emoji);
@@ -2399,6 +2477,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only commissioners can create polls' });
       }
 
+      // Commissioners can create polls on all announcements in their leagues regardless of visibility
+
       const pollData = createAnnouncementPollRequestSchema.parse(req.body);
       const poll = await storage.createAnnouncementPoll({
         ...pollData,
@@ -2423,6 +2503,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Valid option index is required' });
       }
 
+      // First get the poll to find the announcement it belongs to
+      try {
+        const polls = await db.select().from(announcementPolls).where(eq(announcementPolls.id, pollId));
+        if (polls.length === 0) {
+          return res.status(404).json({ message: 'Poll not found' });
+        }
+        
+        const announcement = await storage.getAnnouncement(polls[0].announcementId);
+        if (!announcement) {
+          return res.status(404).json({ message: 'Announcement not found' });
+        }
+
+        const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
+        if (!membership || membership.status !== 'approved') {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Check if announcement is visible to this user (targeted visibility)
+        const isVisible = await storage.isAnnouncementVisibleToUser(announcement.id, userId);
+        if (!isVisible) {
+          return res.status(404).json({ message: 'Poll not found' }); // Return 404 to not reveal existence
+        }
+      } catch (error) {
+        console.error('Error checking poll visibility:', error);
+        return res.status(404).json({ message: 'Poll not found' });
+      }
+
       const voteData = insertAnnouncementPollVoteSchema.parse({
         pollId,
         userId,
@@ -2441,6 +2548,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/polls/:id/results', isAuthenticated, async (req: any, res) => {
     try {
       const pollId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // First get the poll to find the announcement it belongs to
+      const polls = await db.select().from(announcementPolls).where(eq(announcementPolls.id, pollId));
+      if (polls.length === 0) {
+        return res.status(404).json({ message: 'Poll not found' });
+      }
+      
+      const announcement = await storage.getAnnouncement(polls[0].announcementId);
+      if (!announcement) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Check if announcement is visible to this user (targeted visibility)
+      const isVisible = await storage.isAnnouncementVisibleToUser(announcement.id, userId);
+      if (!isVisible) {
+        return res.status(404).json({ message: 'Poll not found' }); // Return 404 to not reveal existence
+      }
+
       const results = await storage.getPollResults(pollId);
       res.json(results);
     } catch (error) {
