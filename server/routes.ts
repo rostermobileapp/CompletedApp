@@ -24,6 +24,9 @@ import {
   createAnnouncementReactionRequestSchema,
   createAnnouncementPollRequestSchema,
   createAnnouncementPollVoteRequestSchema,
+  insertScrimmageSchema,
+  insertScrimmageRequestSchema,
+  updateScrimmageRequestSchema,
 } from "@shared/schema";
 import Stripe from "stripe";
 import multer from "multer";
@@ -2474,6 +2477,490 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error adding attachment:', error);
       res.status(500).json({ message: 'Failed to add attachment' });
+    }
+  });
+
+  // ========== SCRIMMAGE ROUTES ==========
+
+  // Create scrimmage (Player Plus+ only)
+  app.post('/api/scrimmages', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Check Player Plus+ subscription - strict validation
+      if (!['player_plus', 'commissioner'].includes(user.subscriptionTier)) {
+        return res.status(403).json({ message: "Player Plus or Commissioner subscription required to create scrimmages" });
+      }
+
+      // Validate input data with proper schema
+      let scrimmageData;
+      try {
+        scrimmageData = insertScrimmageSchema.parse({
+          ...req.body,
+          creatorId: userId,
+        });
+      } catch (validationError) {
+        console.error('Validation error creating scrimmage:', validationError);
+        return res.status(400).json({ message: "Invalid scrimmage data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
+      }
+
+      // Business invariants validation
+      if (scrimmageData.maxPlayers < 2) {
+        return res.status(400).json({ message: "Maximum players must be at least 2" });
+      }
+      if (scrimmageData.maxPlayers > 50) {
+        return res.status(400).json({ message: "Maximum players cannot exceed 50" });
+      }
+      
+      // Ensure scrimmage is scheduled in the future
+      const now = new Date();
+      if (scrimmageData.dateTime <= now) {
+        return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
+      }
+      
+      // Verify league exists and user is a member
+      const league = await storage.getLeague(scrimmageData.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      const membership = await storage.getUserLeagueMembership(userId, scrimmageData.leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: "Must be an approved league member to create scrimmages" });
+      }
+
+      const scrimmage = await storage.createScrimmage(scrimmageData);
+      res.status(201).json(scrimmage);
+    } catch (error) {
+      console.error('Error creating scrimmage:', error);
+      res.status(500).json({ message: 'Failed to create scrimmage' });
+    }
+  });
+
+  // Get league scrimmages
+  app.get('/api/leagues/:id/scrimmages', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      // Validate league exists
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      // Verify user is a member of the league
+      const membership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: "Must be a league member to view scrimmages" });
+      }
+      
+      const scrimmages = await storage.getLeagueScrimmages(leagueId);
+      res.json(scrimmages);
+    } catch (error) {
+      console.error('Error fetching league scrimmages:', error);
+      res.status(500).json({ message: 'Failed to fetch league scrimmages' });
+    }
+  });
+
+  // Get user's created scrimmages
+  app.get('/api/users/scrimmages', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const scrimmages = await storage.getUserScrimmages(userId);
+      res.json(scrimmages);
+    } catch (error) {
+      console.error('Error fetching user scrimmages:', error);
+      res.status(500).json({ message: 'Failed to fetch user scrimmages' });
+    }
+  });
+
+  // Get single scrimmage details
+  app.get('/api/scrimmages/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      
+      // Verify user is a member of the league
+      const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: "Must be a league member to view scrimmage details" });
+      }
+
+      res.json(scrimmage);
+    } catch (error) {
+      console.error('Error fetching scrimmage:', error);
+      res.status(500).json({ message: 'Failed to fetch scrimmage' });
+    }
+  });
+
+  // Update scrimmage (Creator only)
+  app.put('/api/scrimmages/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Get scrimmage to check ownership and current state
+      const existingScrimmage = await storage.getScrimmage(scrimmageId);
+      if (!existingScrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+
+      if (existingScrimmage.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only the creator can update this scrimmage' });
+      }
+      
+      // Business invariant: Cannot edit scrimmage that has already started or ended
+      const now = new Date();
+      if (existingScrimmage.dateTime <= now) {
+        return res.status(409).json({ message: 'Cannot update scrimmage that has already started or ended' });
+      }
+      
+      // Business invariant: Cannot edit scrimmage that is cancelled
+      if (existingScrimmage.status === 'cancelled') {
+        return res.status(409).json({ message: 'Cannot update cancelled scrimmage' });
+      }
+
+      // Validate input data with proper Zod schema
+      let updateData;
+      try {
+        updateData = updateScrimmageRequestSchema.parse(req.body);
+      } catch (validationError) {
+        console.error('Validation error updating scrimmage:', validationError);
+        return res.status(400).json({ message: "Invalid update data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
+      }
+      
+      // Business invariants validation
+      if (updateData.maxPlayers !== undefined) {
+        if (updateData.maxPlayers < 2) {
+          return res.status(400).json({ message: "Maximum players must be at least 2" });
+        }
+        if (updateData.maxPlayers > 50) {
+          return res.status(400).json({ message: "Maximum players cannot exceed 50" });
+        }
+        
+        // Get current accepted players count
+        const acceptedRequests = await storage.getScrimmageRequests(scrimmageId);
+        const acceptedCount = acceptedRequests.filter(req => req.status === 'approved').length;
+        
+        if (updateData.maxPlayers < acceptedCount) {
+          return res.status(409).json({ 
+            message: `Cannot reduce max players to ${updateData.maxPlayers}. There are already ${acceptedCount} accepted players.` 
+          });
+        }
+      }
+      
+      // DateTime editing restrictions
+      if (updateData.dateTime !== undefined) {
+        if (updateData.dateTime <= now) {
+          return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
+        }
+        
+        // Don't allow changing date if it's less than 24 hours away
+        const hoursUntilExisting = (existingScrimmage.dateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+        if (hoursUntilExisting < 24) {
+          return res.status(409).json({ message: "Cannot change scrimmage date less than 24 hours before scheduled time" });
+        }
+      }
+
+      const updatedScrimmage = await storage.updateScrimmage(scrimmageId, updateData);
+      res.json(updatedScrimmage);
+    } catch (error) {
+      console.error('Error updating scrimmage:', error);
+      res.status(500).json({ message: 'Failed to update scrimmage' });
+    }
+  });
+
+  // Delete scrimmage (Creator only)
+  app.delete('/api/scrimmages/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Get scrimmage to check ownership and status
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+
+      if (scrimmage.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only the creator can delete this scrimmage' });
+      }
+      
+      // Business invariant: Cannot delete scrimmage that has already started
+      const now = new Date();
+      if (scrimmage.dateTime <= now) {
+        return res.status(409).json({ message: 'Cannot delete scrimmage that has already started or ended' });
+      }
+      
+      // Check if there are accepted players
+      const acceptedRequests = await storage.getScrimmageRequests(scrimmageId);
+      const hasAcceptedPlayers = acceptedRequests.some(req => req.status === 'approved');
+      
+      if (hasAcceptedPlayers) {
+        // Don't allow deletion if less than 24 hours away and has accepted players
+        const hoursUntil = (scrimmage.dateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+        if (hoursUntil < 24) {
+          return res.status(409).json({ 
+            message: 'Cannot delete scrimmage with accepted players less than 24 hours before scheduled time. Consider cancelling instead.' 
+          });
+        }
+      }
+
+      await storage.deleteScrimmage(scrimmageId);
+      res.json({ message: 'Scrimmage deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting scrimmage:', error);
+      res.status(500).json({ message: 'Failed to delete scrimmage' });
+    }
+  });
+
+  // Create scrimmage request (join request)
+  app.post('/api/scrimmages/:id/requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Check if scrimmage exists and get details
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      
+      // Business invariant: Cannot join own scrimmage
+      if (scrimmage.creatorId === userId) {
+        return res.status(400).json({ message: 'Cannot join your own scrimmage' });
+      }
+      
+      // Business invariant: Cannot join scrimmage that has passed or is imminent
+      const now = new Date();
+      if (scrimmage.dateTime <= now) {
+        return res.status(409).json({ message: 'Cannot join scrimmage that has already started or ended' });
+      }
+      
+      // Cannot join cancelled scrimmage
+      if (scrimmage.status === 'cancelled') {
+        return res.status(409).json({ message: 'Cannot join cancelled scrimmage' });
+      }
+      
+      // Verify user is a member of the league
+      const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: "Must be an approved league member to join scrimmages" });
+      }
+
+      // Check if user already has a request for this scrimmage
+      const existingRequest = await storage.getScrimmageRequest(scrimmageId, userId);
+      if (existingRequest) {
+        return res.status(409).json({ message: 'Request already exists for this scrimmage' });
+      }
+      
+      // Check if scrimmage is already at capacity
+      const currentRequests = await storage.getScrimmageRequests(scrimmageId);
+      const acceptedCount = currentRequests.filter(req => req.status === 'approved').length;
+      
+      if (acceptedCount >= scrimmage.maxPlayers) {
+        return res.status(409).json({ message: 'Scrimmage is already at full capacity' });
+      }
+
+      // Validate request data
+      let requestData;
+      try {
+        requestData = insertScrimmageRequestSchema.parse({
+          scrimmageId,
+          playerId: userId,
+          status: 'pending',
+        });
+      } catch (validationError) {
+        console.error('Validation error creating scrimmage request:', validationError);
+        return res.status(400).json({ message: "Invalid request data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
+      }
+
+      const request = await storage.createScrimmageRequest(requestData);
+      res.status(201).json(request);
+    } catch (error) {
+      console.error('Error creating scrimmage request:', error);
+      res.status(500).json({ message: 'Failed to create scrimmage request' });
+    }
+  });
+
+  // Get scrimmage requests (Creator only)
+  app.get('/api/scrimmages/:id/requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get scrimmage to check ownership
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+
+      if (scrimmage.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only the creator can view requests' });
+      }
+
+      const requests = await storage.getScrimmageRequests(scrimmageId);
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching scrimmage requests:', error);
+      res.status(500).json({ message: 'Failed to fetch scrimmage requests' });
+    }
+  });
+
+  // Update scrimmage request status (Creator only)
+  app.put('/api/scrimmage-requests/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { status } = req.body;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Validate status input
+      if (!status || !['approved', 'dismissed'].includes(status)) {
+        return res.status(400).json({ message: 'Status must be "approved" or "dismissed"' });
+      }
+
+      // Get the request first
+      const allRequests = await storage.getScrimmageRequests(requestId);
+      const request = allRequests.find(r => r.id === requestId);
+      
+      if (!request) {
+        return res.status(404).json({ message: 'Request not found' });
+      }
+      
+      // Business invariant: Cannot modify already processed requests
+      if (request.status !== 'pending') {
+        return res.status(409).json({ message: `Request has already been ${request.status}` });
+      }
+
+      const scrimmage = await storage.getScrimmage(request.scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      
+      if (scrimmage.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only the creator can update request status' });
+      }
+      
+      // Business invariant: Cannot approve requests for scrimmages that have passed
+      const now = new Date();
+      if (scrimmage.dateTime <= now && status === 'approved') {
+        return res.status(409).json({ message: 'Cannot approve requests for scrimmages that have already started' });
+      }
+      
+      // Business invariant: Cannot approve if at capacity
+      if (status === 'approved') {
+        const currentRequests = await storage.getScrimmageRequests(scrimmage.id);
+        const approvedCount = currentRequests.filter(req => req.status === 'approved').length;
+        
+        if (approvedCount >= scrimmage.maxPlayers) {
+          return res.status(409).json({ message: 'Cannot approve request - scrimmage is at full capacity' });
+        }
+      }
+
+      const updatedRequest = await storage.updateScrimmageRequestStatus(requestId, status);
+      res.json(updatedRequest);
+    } catch (error) {
+      console.error('Error updating request status:', error);
+      res.status(500).json({ message: 'Failed to update request status' });
+    }
+  });
+
+  // Delete scrimmage request
+  app.delete('/api/scrimmage-requests/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get all requests to find this one and check permissions
+      const requests = await storage.getScrimmageRequests(requestId);
+      const request = requests.find(r => r.id === requestId);
+      
+      if (!request) {
+        return res.status(404).json({ message: 'Request not found' });
+      }
+
+      const scrimmage = await storage.getScrimmage(request.scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      
+      // Allow deletion if user is the requester or the scrimmage creator
+      if (request.playerId !== userId && scrimmage.creatorId !== userId) {
+        return res.status(403).json({ message: 'Unauthorized to delete this request' });
+      }
+      
+      // Business invariant: Cannot delete approved request less than 24 hours before scrimmage
+      if (request.status === 'approved' && request.playerId === userId) {
+        const now = new Date();
+        const hoursUntil = (scrimmage.dateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursUntil < 24) {
+          return res.status(409).json({ 
+            message: 'Cannot withdraw from approved scrimmage less than 24 hours before scheduled time' 
+          });
+        }
+      }
+
+      await storage.deleteScrimmageRequest(requestId);
+      res.json({ message: 'Request deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      res.status(500).json({ message: 'Failed to delete request' });
+    }
+  });
+
+  // Get player's scrimmage requests
+  app.get('/api/users/scrimmage-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const requests = await storage.getScrimmageRequestsByPlayer(userId);
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching player requests:', error);
+      res.status(500).json({ message: 'Failed to fetch player requests' });
     }
   });
 

@@ -1025,6 +1025,17 @@ export const createScrimmageJoinRequestSchema = createInsertSchema(scrimmageRequ
   dismissedAt: true,
 });
 
+export const updateScrimmageRequestSchema = createInsertSchema(scrimmages).omit({
+  id: true,
+  leagueId: true,     // Server-controlled
+  creatorId: true,    // Server-controlled
+  announcementId: true, // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+}).partial().extend({
+  dateTime: z.string().transform((val) => new Date(val)).optional(),
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1084,6 +1095,7 @@ export type InsertScrimmage = z.infer<typeof insertScrimmageSchema>;
 export type ScrimmageRequest = typeof scrimmageRequests.$inferSelect;
 export type InsertScrimmageRequest = z.infer<typeof insertScrimmageRequestSchema>;
 export type CreateScrimmageRequest = z.infer<typeof createScrimmageRequestSchema>;
+export type UpdateScrimmageRequest = z.infer<typeof updateScrimmageRequestSchema>;
 export type CreateScrimmageJoinRequest = z.infer<typeof createScrimmageJoinRequestSchema>;
 
 // Extended types with relationships
