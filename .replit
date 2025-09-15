@@ -40,3 +40,7 @@ integrations = ["javascript_websocket==1.0.0", "javascript_object_storage==1.0.0
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 38081
+externalPort = 3000
