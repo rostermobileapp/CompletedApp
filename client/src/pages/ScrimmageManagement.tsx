@@ -375,7 +375,7 @@ export default function ScrimmageManagement() {
                             {rosterData.approvedPlayers.map((request) => (
                               <div
                                 key={request.id}
-                                className="flex items-center gap-3 p-3 rounded-lg border bg-green-50 dark:bg-green-950/20"
+                                className="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-white text-black border"
                                 data-testid={`roster-player-${request.id}`}
                               >
                                 <Avatar className="h-8 w-8">
@@ -385,17 +385,17 @@ export default function ScrimmageManagement() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1">
-                                  <p className="font-medium">
+                                  <p className="font-medium text-black">
                                     {request.player.firstName} {request.player.lastName}
                                   </p>
                                 </div>
-                                <Badge variant="default" className="bg-green-600 text-xs">
+                                <Badge className="bg-green-600 text-white text-xs hover:bg-green-600">
                                   ✓ Confirmed
                                 </Badge>
                               </div>
                             ))}
-                            <div className="mt-4 pt-4 border-t border-border text-center">
-                              <p className="text-sm text-muted-foreground">
+                            <div className="mt-4 pt-4 border-t border-gray-600 text-center">
+                              <p className="text-sm text-white">
                                 {rosterData.approvedPlayers.length} of {scrimmage.maxPlayers} players confirmed
                               </p>
                             </div>
