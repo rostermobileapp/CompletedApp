@@ -3257,6 +3257,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete scrimmage and notify confirmed players
+  app.delete('/api/scrimmages/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get the scrimmage
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      
+      // Only creator can delete
+      if (scrimmage.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only the creator can cancel the scrimmage' });
+      }
+      
+      // Get approved players before deleting
+      const requests = await storage.getScrimmageRequests(scrimmageId);
+      const approvedRequests = requests.filter(req => req.status === 'approved');
+      
+      // Delete the scrimmage (this will cascade delete requests)
+      await storage.deleteScrimmage(scrimmageId);
+      
+      // Send cancellation notification to approved players
+      if (approvedRequests.length > 0) {
+        const targetUserIds = approvedRequests.map(req => req.playerId);
+        const announcementContent = `❌ Scrimmage Cancelled: "${scrimmage.title}" scheduled for ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location} has been cancelled by the organizer.`;
+        
+        try {
+          // Create announcement
+          const announcement = await storage.createAnnouncement({
+            content: announcementContent,
+            leagueId: scrimmage.leagueId,
+            authorId: userId,
+            isPinned: false,
+          });
+          
+          // Create visibility records for approved players
+          await storage.createAnnouncementVisibility(announcement.id, targetUserIds);
+          
+          console.log(`✅ Cancelled scrimmage ${scrimmageId} and sent notifications to ${targetUserIds.length} players`);
+        } catch (announcementError) {
+          console.error('Error sending cancellation notifications:', announcementError);
+          // Don't fail the deletion if announcement fails
+        }
+      }
+      
+      res.json({ message: 'Scrimmage cancelled successfully' });
+    } catch (error) {
+      console.error('Error deleting scrimmage:', error);
+      res.status(500).json({ message: 'Failed to cancel scrimmage' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

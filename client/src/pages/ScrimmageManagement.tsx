@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Clock, MapPin, Users, Check, X, Calendar, Crown } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Users, Check, X, Calendar, Crown, Trash2, Eye } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
@@ -97,6 +97,29 @@ export default function ScrimmageManagement() {
     },
   });
 
+  // Mutation to delete scrimmage
+  const deleteMutation = useMutation({
+    mutationFn: async (scrimmageId: string) => {
+      const response = await apiRequest('DELETE', `/api/scrimmages/${scrimmageId}`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Scrimmage Cancelled',
+        description: 'The scrimmage has been cancelled and players have been notified.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
+      setSelectedScrimmage(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to cancel scrimmage',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const formatDateTime = (dateTime: string | Date) => {
     const date = typeof dateTime === 'string' ? new Date(dateTime) : dateTime;
     return {
@@ -117,7 +140,6 @@ export default function ScrimmageManagement() {
     return (
       <SubscriptionGate 
         requiredTier="player_plus"
-        feature="scrimmage management"
         onUpgrade={() => navigate('/subscription')}
       />
     );
@@ -278,6 +300,39 @@ export default function ScrimmageManagement() {
                         data-testid={`button-manage-${scrimmage.id}`}
                       >
                         {isSelected ? 'Hide Details' : 'Manage Requests'}
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Set the selected scrimmage and show approved tab
+                          setSelectedScrimmage(scrimmage.id);
+                          // Focus on approved tab after a brief delay
+                          setTimeout(() => {
+                            const approvedTab = document.querySelector('[value="approved"]') as HTMLButtonElement;
+                            if (approvedTab) approvedTab.click();
+                          }, 100);
+                        }}
+                        data-testid={`button-view-roster-${scrimmage.id}`}
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View Roster
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm('Are you sure you want to cancel this scrimmage? All confirmed players will be notified.')) {
+                            deleteMutation.mutate(scrimmage.id);
+                          }
+                        }}
+                        disabled={deleteMutation.isPending}
+                        className="text-destructive hover:text-destructive border-destructive/20 hover:border-destructive"
+                        data-testid={`button-delete-${scrimmage.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                     
