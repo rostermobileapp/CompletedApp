@@ -148,9 +148,9 @@ export interface IStorage {
   
   // Substitute request operations (enhanced for multi-level approval)
   createSubstituteRequest(request: InsertSubstituteRequest): Promise<SubstituteRequest>;
-  getSubstituteRequests(options?: { status?: string; gameId?: string; userId?: string; requestingTeamId?: string }): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] })[]>;
+  getSubstituteRequests(options?: { status?: string; gameId?: string; userId?: string; requestingTeamId?: string; leagueIds?: string[] }): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] })[]>;
   getSubstituteRequest(requestId: string): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] }) | undefined>;
-  expireSubstituteRequests(): Promise<SubstituteRequest[]>;
+  expireSubstituteRequests(leagueIds?: string[]): Promise<SubstituteRequest[]>;
   
   // Controlled substitute request updates (SECURITY: No direct status updates allowed)
   updateSubstituteRequestNonStatusFields(requestId: string, updates: { reason?: string; expiresAt?: Date; substitutePlayerId?: string }): Promise<SubstituteRequest>;
@@ -2033,7 +2033,7 @@ export class DatabaseStorage implements IStorage {
     return newRequest;
   }
 
-  async getSubstituteRequests(options?: { status?: string; gameId?: string; userId?: string; requestingTeamId?: string }): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] })[]> {
+  async getSubstituteRequests(options?: { status?: string; gameId?: string; userId?: string; requestingTeamId?: string; leagueIds?: string[] }): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] })[]> {
     // Build dynamic query based on options
     let query = db.select().from(substituteRequests);
     let conditions: any[] = [];
@@ -2069,6 +2069,13 @@ export class DatabaseStorage implements IStorage {
     const result = [];
     for (const request of requests) {
       const game = await this.getGameById(request.gameId);
+      
+      // Apply league filtering if specified (for commissioner authorization)
+      if (options?.leagueIds && options.leagueIds.length > 0) {
+        if (!game || !options.leagueIds.includes(game.leagueId)) {
+          continue; // Skip requests not in commissioner's leagues
+        }
+      }
       const originalPlayer = await this.getUser(request.originalPlayerId);
       const requestedByUser = await this.getUser(request.requestedBy);
       let substitutePlayer = undefined;
@@ -2196,19 +2203,30 @@ export class DatabaseStorage implements IStorage {
     return undefined;
   }
 
-  async expireSubstituteRequests(): Promise<SubstituteRequest[]> {
+  async expireSubstituteRequests(leagueIds?: string[]): Promise<SubstituteRequest[]> {
+    let conditions = [
+      sql`${substituteRequests.expiresAt} < NOW()`,
+      sql`${substituteRequests.status} NOT IN ('approved', 'denied', 'expired')`
+    ];
+    
+    // If leagueIds are specified, only expire requests from those leagues
+    if (leagueIds && leagueIds.length > 0) {
+      // Need to join with games table to filter by league
+      const gameSubquery = db
+        .select({ id: games.id })
+        .from(games)
+        .where(inArray(games.leagueId, leagueIds));
+      
+      conditions.push(sql`${substituteRequests.gameId} IN (${gameSubquery})`);
+    }
+
     const expiredRequests = await db
       .update(substituteRequests)
       .set({
         status: "expired",
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          sql`${substituteRequests.expiresAt} < NOW()`,
-          sql`${substituteRequests.status} NOT IN ('approved', 'denied', 'expired')`
-        )
-      )
+      .where(and(...conditions))
       .returning();
 
     return expiredRequests;

@@ -28,6 +28,11 @@ import {
   insertScrimmageSchema,
   insertScrimmageRequestSchema,
   updateScrimmageRequestSchema,
+  createSubstituteRequestSchema,
+  getSubstituteRequestsQuerySchema,
+  approveSubstituteRequestSchema,
+  getPendingApprovalsQuerySchema,
+  updateSubstituteRequestSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import Stripe from "stripe";
@@ -1257,20 +1262,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Substitute request routes
+  // Substitute request routes (Multi-level approval workflow)
   app.post('/api/substitute-requests', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { gameId, originalPlayerId, substitutePlayerId } = req.body;
       
       if (!userId) {
         return res.status(401).json({ message: 'User ID not found' });
       }
 
-      // Verify the game exists
+      // Validate input with Zod schema
+      const validatedData = createSubstituteRequestSchema.parse(req.body);
+      const { gameId, originalPlayerId, substitutePlayerId, reason, expiresAt } = validatedData;
+      
+      // Verify the game exists and get league info
       const game = await storage.getGameById(gameId);
       if (!game) {
         return res.status(404).json({ message: 'Game not found' });
+      }
+      
+      // Get league to verify commissioner ownership if needed
+      const league = await storage.getLeague(game.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
       }
 
       // Check if user is captain of either team
@@ -1283,17 +1297,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Captain access required' });
       }
 
+      // Determine requesting team
+      const requestingTeamId = isHomeCaptain ? game.homeTeamId : game.awayTeamId;
+      
+      // SECURITY: Validate that originalPlayer belongs to requesting team
+      const requestingTeamMembers = await storage.getTeamMembers(requestingTeamId);
+      const requestingLeagueMembers = await storage.getLeagueMembers(game.leagueId);
+      const originalPlayerOnTeam = requestingTeamMembers.some(m => m.userId === originalPlayerId) ||
+        requestingLeagueMembers.some(m => m.userId === originalPlayerId && m.assignedTeamId === requestingTeamId);
+      
+      if (!originalPlayerOnTeam) {
+        return res.status(403).json({ message: 'Original player must be on your team' });
+      }
+      
+      // SECURITY: If substitute player specified, validate they exist and are league members
+      if (substitutePlayerId) {
+        const substitutePlayer = await storage.getUser(substitutePlayerId);
+        if (!substitutePlayer) {
+          return res.status(400).json({ message: 'Substitute player not found' });
+        }
+        
+        const substituteInLeague = requestingLeagueMembers.some(m => m.userId === substitutePlayerId);
+        if (!substituteInLeague) {
+          return res.status(403).json({ message: 'Substitute player must be a league member' });
+        }
+      }
+
       const requestData = insertSubstituteRequestSchema.parse({
         gameId,
         originalPlayerId,
         substitutePlayerId,
         requestedBy: userId,
+        requestingTeamId,
+        reason,
+        status: 'pending_opponent_approval',
+        expiresAt: expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
       });
 
       const request = await storage.createSubstituteRequest(requestData);
       res.json(request);
     } catch (error) {
       console.error('Error creating substitute request:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
       res.status(500).json({ message: 'Failed to create substitute request' });
     }
   });
@@ -1301,51 +1348,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/substitute-requests', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { status } = req.query;
       
       if (!userId) {
         return res.status(401).json({ message: 'User ID not found' });
       }
 
-      // Check if user is commissioner
+      // Validate query parameters with Zod
+      const queryData = getSubstituteRequestsQuerySchema.parse(req.query);
+      const { status, gameId, requestingTeamId } = queryData;
+      
+      // Get user to check permissions
       const user = await storage.getUser(userId);
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: 'Commissioner access required' });
+      if (!user) {
+        return res.status(401).json({ message: 'User not found' });
       }
 
-      const requests = await storage.getSubstituteRequests(status as string);
+      const isCommissioner = user.subscriptionTier === 'commissioner';
+      
+      let options: any;
+      
+      if (isCommissioner) {
+        // CRITICAL SECURITY FIX: Commissioners can only see requests from leagues they own
+        const commissionerLeagues = await storage.getLeaguesByCommissioner(userId);
+        const ownedLeagueIds = commissionerLeagues.map(league => league.id);
+        
+        if (ownedLeagueIds.length === 0) {
+          return res.json([]); // No leagues owned, no requests to see
+        }
+        
+        options = {
+          status,
+          gameId,
+          requestingTeamId,
+          leagueIds: ownedLeagueIds, // Restrict to owned leagues only
+        };
+      } else {
+        // Non-commissioners can only see requests they're involved with
+        options = {
+          status,
+          gameId,
+          userId, // This will filter for requests where user is involved
+        };
+      }
+
+      const requests = await storage.getSubstituteRequests(options);
       res.json(requests);
     } catch (error) {
       console.error('Error fetching substitute requests:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid query parameters', errors: error.errors });
+      }
       res.status(500).json({ message: 'Failed to fetch substitute requests' });
     }
   });
 
-  app.put('/api/substitute-requests/:id', isAuthenticated, async (req: any, res) => {
+  // Get single substitute request with full details
+  app.get('/api/substitute-requests/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const requestId = req.params.id;
-      const { status, reason } = req.body;
       
       if (!userId) {
         return res.status(401).json({ message: 'User ID not found' });
       }
 
-      if (!status || !['approved', 'denied'].includes(status)) {
-        return res.status(400).json({ message: 'Valid status (approved/denied) is required' });
+      const request = await storage.getSubstituteRequest(requestId);
+      if (!request) {
+        return res.status(404).json({ message: 'Substitute request not found' });
       }
 
-      // Check if user is commissioner
+      // Check if user has permission to view this request
+      const user = await storage.getUser(userId);
+      const isInvolved = request.requestedBy === userId ||
+                       request.originalPlayerId === userId ||
+                       request.substitutePlayerId === userId;
+      
+      // Check if user is captain of involved teams
+      const homeTeam = await storage.getTeam(request.game.homeTeamId);
+      const awayTeam = await storage.getTeam(request.game.awayTeamId);
+      const isCaptain = (homeTeam && homeTeam.captainId === userId) ||
+                       (awayTeam && awayTeam.captainId === userId);
+      
+      // CRITICAL SECURITY FIX: Only the league's commissioner can access, not any commissioner
+      const league = await storage.getLeague(request.game.leagueId);
+      const isLeagueCommissioner = league && league.commissionerId === userId;
+
+      if (!isLeagueCommissioner && !isInvolved && !isCaptain) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      res.json(request);
+    } catch (error) {
+      console.error('Error fetching substitute request:', error);
+      res.status(500).json({ message: 'Failed to fetch substitute request' });
+    }
+  });
+
+  // Process approval (opposing captain → commissioner → substitute player workflow)
+  app.post('/api/substitute-requests/:id/approve', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requestId = req.params.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      // Validate input with Zod schema
+      const validatedData = approveSubstituteRequestSchema.parse(req.body);
+      const { approverType, status, comments } = validatedData;
+
+      const result = await storage.processApproval(
+        requestId,
+        userId,
+        approverType,
+        status,
+        comments
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Error processing approval:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      res.status(500).json({ 
+        message: 'Failed to process approval',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Get pending approvals for current user
+  app.get('/api/substitute-requests/pending-approvals', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      // Validate query parameters with Zod
+      const queryData = getPendingApprovalsQuerySchema.parse(req.query);
+      const { approverType } = queryData;
+
+      const pendingApprovals = await storage.getUserPendingApprovals(
+        userId,
+        approverType
+      );
+      
+      res.json(pendingApprovals);
+    } catch (error) {
+      console.error('Error fetching pending approvals:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid query parameters', errors: error.errors });
+      }
+      res.status(500).json({ message: 'Failed to fetch pending approvals' });
+    }
+  });
+
+  // Update non-status fields (reason, expiry, substitute player)
+  app.patch('/api/substitute-requests/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requestId = req.params.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      // Validate input with Zod schema
+      const validatedUpdates = updateSubstituteRequestSchema.parse(req.body);
+      
+      if (Object.keys(validatedUpdates).length === 0) {
+        return res.status(400).json({ message: 'No valid updates provided' });
+      }
+
+      // Get the request to check permissions
+      const request = await storage.getSubstituteRequest(requestId);
+      if (!request) {
+        return res.status(404).json({ message: 'Substitute request not found' });
+      }
+
+      // CRITICAL SECURITY FIX: Only the requester or the league's commissioner can update
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(request.game.leagueId);
+      const isLeagueCommissioner = league && league.commissionerId === userId;
+      const isRequester = request.requestedBy === userId;
+
+      if (!isLeagueCommissioner && !isRequester) {
+        return res.status(403).json({ message: 'Permission denied' });
+      }
+      
+      // SECURITY: If substitute player is being updated, validate they exist and are league members
+      if (validatedUpdates.substitutePlayerId) {
+        const substitutePlayer = await storage.getUser(validatedUpdates.substitutePlayerId);
+        if (!substitutePlayer) {
+          return res.status(400).json({ message: 'Substitute player not found' });
+        }
+        
+        const leagueMembers = await storage.getLeagueMembers(request.game.leagueId);
+        const substituteInLeague = leagueMembers.some(m => m.userId === validatedUpdates.substitutePlayerId);
+        if (!substituteInLeague) {
+          return res.status(403).json({ message: 'Substitute player must be a league member' });
+        }
+      }
+
+      const updatedRequest = await storage.updateSubstituteRequestNonStatusFields(requestId, validatedUpdates);
+      res.json(updatedRequest);
+    } catch (error) {
+      console.error('Error updating substitute request:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid update data', errors: error.errors });
+      }
+      res.status(500).json({ message: 'Failed to update substitute request' });
+    }
+  });
+
+  // Expire old substitute requests
+  app.post('/api/substitute-requests/expire', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      // Only commissioners can manually trigger expiration
       const user = await storage.getUser(userId);
       if (!user || user.subscriptionTier !== 'commissioner') {
         return res.status(403).json({ message: 'Commissioner access required' });
       }
 
-      const updatedRequest = await storage.updateSubstituteRequest(requestId, status, userId, reason);
-      res.json(updatedRequest);
+      // CRITICAL SECURITY FIX: Commissioners can only expire requests from leagues they own
+      const commissionerLeagues = await storage.getLeaguesByCommissioner(userId);
+      const ownedLeagueIds = commissionerLeagues.map(league => league.id);
+      
+      if (ownedLeagueIds.length === 0) {
+        return res.json({ 
+          message: 'No requests to expire - no leagues owned',
+          expiredRequests: [] 
+        });
+      }
+
+      const expiredRequests = await storage.expireSubstituteRequests(ownedLeagueIds);
+      res.json({ 
+        message: `Expired ${expiredRequests.length} requests from your leagues`,
+        expiredRequests 
+      });
     } catch (error) {
-      console.error('Error updating substitute request:', error);
-      res.status(500).json({ message: 'Failed to update substitute request' });
+      console.error('Error expiring substitute requests:', error);
+      res.status(500).json({ message: 'Failed to expire substitute requests' });
     }
   });
 

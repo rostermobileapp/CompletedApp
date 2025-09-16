@@ -1107,6 +1107,41 @@ export const updateScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   dateTime: z.string().transform((val) => new Date(val)).optional(),
 });
 
+// Substitute request API validation schemas
+export const createSubstituteRequestSchema = createInsertSchema(substituteRequests).omit({
+  id: true,
+  requestedBy: true,      // Server-controlled
+  requestingTeamId: true, // Server-controlled
+  status: true,           // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+  finalizedAt: true,
+}).extend({
+  expiresAt: z.string().transform((val) => new Date(val)).optional(),
+});
+
+export const getSubstituteRequestsQuerySchema = z.object({
+  status: z.enum(['pending_opponent_approval', 'pending_commissioner_approval', 'pending_substitute_approval', 'approved', 'denied', 'expired']).optional(),
+  gameId: z.string().optional(),
+  requestingTeamId: z.string().optional(),
+});
+
+export const approveSubstituteRequestSchema = z.object({
+  approverType: z.enum(['opposing_captain', 'commissioner', 'substitute_player']),
+  status: z.enum(['approved', 'denied']),
+  comments: z.string().optional(),
+});
+
+export const getPendingApprovalsQuerySchema = z.object({
+  approverType: z.enum(['opposing_captain', 'commissioner', 'substitute_player']).optional(),
+});
+
+export const updateSubstituteRequestSchema = z.object({
+  reason: z.string().optional(),
+  expiresAt: z.string().transform((val) => new Date(val)).optional(),
+  substitutePlayerId: z.string().optional(),
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
