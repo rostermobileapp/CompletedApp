@@ -1,0 +1,131 @@
+# Player Substitution Feature - Development Requirements
+
+## Overview
+Build a comprehensive player substitution system that allows team captains to request substitute players when team members cannot attend games, with multi-level approval workflow.
+
+## Core Feature Flow
+
+### 1. Game Card Enhancement
+- **Current State**: Players marked as "not attending" appear in a list
+- **New Requirement**: Add "View Details" button to game cards
+- **Pop-up Display**: Show all players with RSVP status beside each name
+- **Substitution Button**: Add transfer/switch icon button next to each "NOT attending" player
+
+### 2. Substitution Request Interface
+When substitution button is clicked, open a new window with:
+
+#### Left Column: "Players Unable to Attend"
+- Display team players who marked "not attending" for this specific game
+- Show: Player Name | Skill Level | Position
+- Allow selection for substitution matching
+
+#### Right Column: "Available Substitute Players" 
+- **Critical Logic**: Only show players who have NO game scheduled for that same week
+- Show: Player Name | Skill Level | Position
+- Allow selection for substitution matching
+
+#### Matching Interface
+- Enable captain to pair left column player (absent) with right column player (substitute)
+- Visual indication of matched pairs
+- Submit button to initiate approval workflow
+
+### 3. Multi-Level Approval Workflow
+
+#### Step 1: Opposing Team Captain Review
+- Notification sent to opposing team captain
+- Display substitution request with:
+  - Original player details (name, skill, position)
+  - Proposed substitute details (name, skill, position)
+- Approve/Deny options with comment field
+
+#### Step 2: Commissioner Review (if opposing captain approves)
+- Same display format as opposing captain
+- Final approval authority
+- Approve/Deny with comments
+
+#### Step 3: Substitute Player Confirmation (if commissioner approves)
+- Notification sent to proposed substitute player
+- Show game details: date, time, opponent, position needed
+- Accept/Decline options
+
+### 4. System Updates Upon Final Approval
+- Remove original player from game attendance
+- Add substitute player to game attendance list
+- Mark substitute player as "SUB" in game roster
+- Update substitute player's schedule to show new game
+- Send confirmations to all parties involved
+
+## Technical Requirements
+
+### Database Schema Updates
+```sql
+-- New tables needed
+substitution_requests (
+  id, game_id, original_player_id, substitute_player_id, 
+  requesting_captain_id, status, created_at, updated_at
+)
+
+substitution_approvals (
+  id, substitution_request_id, approver_id, approver_type,
+  status, comments, approved_at
+)
+```
+
+### Key Functions to Implement
+1. `getAvailableSubstitutes(week, excludeTeamId)` - Returns players with no games that week
+2. `createSubstitutionRequest(gameId, originalPlayerId, substitutePlayerId)`
+3. `processApproval(requestId, approverId, status, comments)`
+4. `finalizeSubstitution(requestId)` - Updates game rosters and schedules
+5. `sendNotifications()` - Handle all notification types
+
+### UI Components Needed
+- Enhanced game card with "View Details" modal
+- Player list with RSVP status display
+- Substitution request interface with dual columns
+- Approval interface for captains and commissioner
+- Substitute player acceptance interface
+
+### Notification System
+- Email/in-app notifications for:
+  - Opposing captain approval request
+  - Commissioner approval request  
+  - Substitute player game invitation
+  - Confirmation messages to all parties
+
+### Status Tracking
+Track substitution request states:
+- PENDING_OPPONENT_APPROVAL
+- PENDING_COMMISSIONER_APPROVAL  
+- PENDING_SUBSTITUTE_APPROVAL
+- APPROVED
+- DENIED
+- EXPIRED
+
+## Validation Rules
+- Only team captains can request substitutions
+- Substitute must have no game that week
+- Cannot substitute after game start time
+- Skill level restrictions (if applicable)
+- Position compatibility checks
+
+## Edge Cases to Handle
+- Substitute player becomes unavailable during approval process
+- Multiple substitution requests for same player
+- Original player changes RSVP during approval process
+- Game cancellation during substitution process
+
+## Testing Scenarios
+1. Happy path: Full approval workflow completion
+2. Denial at opposing captain level
+3. Denial at commissioner level  
+4. Substitute player declines invitation
+5. Concurrent substitution requests
+6. Late substitution requests (near game time)
+
+## Success Metrics
+- Substitution request completion rate
+- Average approval time
+- User satisfaction with process
+- Reduction in forfeit games due to insufficient players
+
+Build this feature with clear user feedback at each step, robust error handling, and comprehensive logging for audit purposes.
