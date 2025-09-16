@@ -9,6 +9,7 @@ import {
   gameScoreSubmissions,
   gameRsvps,
   substituteRequests,
+  substitutionApprovals,
   messages,
   announcements,
   announcementReadStatus,
@@ -44,6 +45,8 @@ import {
   type InsertGameRsvp,
   type SubstituteRequest,
   type InsertSubstituteRequest,
+  type SubstitutionApproval,
+  type InsertSubstitutionApproval,
   type Message,
   type InsertMessage,
   type Announcement,
@@ -143,10 +146,20 @@ export interface IStorage {
   getGameRsvpSummaryByTeams(gameId: string): Promise<{ homeTeam: { teamId: string; attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }; awayTeam: { teamId: string; attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] } }>;
   getAvailablePlayers(date: Date, leagueId: string): Promise<User[]>;
   
-  // Substitute request operations
+  // Substitute request operations (enhanced for multi-level approval)
   createSubstituteRequest(request: InsertSubstituteRequest): Promise<SubstituteRequest>;
-  getSubstituteRequests(status?: string): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User })[]>;
-  updateSubstituteRequest(requestId: string, status: string, approverId?: string, reason?: string): Promise<SubstituteRequest>;
+  getSubstituteRequests(options?: { status?: string; gameId?: string; userId?: string; requestingTeamId?: string }): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] })[]>;
+  getSubstituteRequest(requestId: string): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] }) | undefined>;
+  expireSubstituteRequests(): Promise<SubstituteRequest[]>;
+  
+  // Controlled substitute request updates (SECURITY: No direct status updates allowed)
+  updateSubstituteRequestNonStatusFields(requestId: string, updates: { reason?: string; expiresAt?: Date; substitutePlayerId?: string }): Promise<SubstituteRequest>;
+  
+  // Substitution approval operations
+  createSubstitutionApproval(approval: InsertSubstitutionApproval): Promise<SubstitutionApproval>;
+  getSubstitutionApprovals(requestId: string): Promise<(SubstitutionApproval & { approver: User })[]>;
+  getUserPendingApprovals(userId: string, approverType?: 'opposing_captain' | 'commissioner' | 'substitute_player'): Promise<(SubstitutionApproval & { substitutionRequest: SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User } })[]>;
+  processApproval(requestId: string, approverId: string, approverType: 'opposing_captain' | 'commissioner' | 'substitute_player', status: 'approved' | 'denied', comments?: string): Promise<{ approval: SubstitutionApproval; updatedRequest: SubstituteRequest }>;
   
   
   // Message operations
@@ -2012,20 +2025,46 @@ export class DatabaseStorage implements IStorage {
   async createSubstituteRequest(request: InsertSubstituteRequest): Promise<SubstituteRequest> {
     const [newRequest] = await db
       .insert(substituteRequests)
-      .values(request)
+      .values({
+        ...request,
+        updatedAt: new Date(),
+      })
       .returning();
     return newRequest;
   }
 
-  async getSubstituteRequests(status?: string): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User })[]> {
-    // Simplified approach - get requests and populate via separate queries
+  async getSubstituteRequests(options?: { status?: string; gameId?: string; userId?: string; requestingTeamId?: string }): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] })[]> {
+    // Build dynamic query based on options
     let query = db.select().from(substituteRequests);
+    let conditions: any[] = [];
     
-    if (status) {
-      query = query.where(eq(substituteRequests.status, status as any));
+    if (options?.status) {
+      conditions.push(eq(substituteRequests.status, options.status as any));
+    }
+    
+    if (options?.gameId) {
+      conditions.push(eq(substituteRequests.gameId, options.gameId));
+    }
+    
+    if (options?.userId) {
+      conditions.push(
+        or(
+          eq(substituteRequests.requestedBy, options.userId),
+          eq(substituteRequests.originalPlayerId, options.userId),
+          eq(substituteRequests.substitutePlayerId, options.userId)
+        )
+      );
+    }
+    
+    if (options?.requestingTeamId) {
+      conditions.push(eq(substituteRequests.requestingTeamId, options.requestingTeamId));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
     }
 
-    const requests = await query;
+    const requests = await query.orderBy(desc(substituteRequests.createdAt));
     
     const result = [];
     for (const request of requests) {
@@ -2038,6 +2077,15 @@ export class DatabaseStorage implements IStorage {
         substitutePlayer = await this.getUser(request.substitutePlayerId);
       }
 
+      // Get requesting team if available
+      let requestingTeam = undefined;
+      if (request.requestingTeamId) {
+        requestingTeam = await this.getTeam(request.requestingTeamId);
+      }
+
+      // Get approvals for this request
+      const approvals = await this.getSubstitutionApprovals(request.id);
+
       if (game && originalPlayer && requestedByUser) {
         result.push({
           ...request,
@@ -2045,6 +2093,16 @@ export class DatabaseStorage implements IStorage {
           originalPlayer,
           substitutePlayer,
           requestedByUser,
+          requestingTeam,
+          approvals: approvals.map(a => ({
+            id: a.id,
+            substitutionRequestId: a.substitutionRequestId,
+            approverId: a.approverId,
+            approverType: a.approverType,
+            status: a.status,
+            comments: a.comments,
+            approvedAt: a.approvedAt,
+          })),
         });
       }
     }
@@ -2052,17 +2110,367 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async updateSubstituteRequest(requestId: string, status: string, approverId?: string, reason?: string): Promise<SubstituteRequest> {
-    const updateData: any = { status };
-    if (approverId) updateData.approvedBy = approverId;
-    if (reason) updateData.reason = reason;
-
+  // SECURITY: Controlled update method that prevents status manipulation
+  async updateSubstituteRequestNonStatusFields(requestId: string, updates: { reason?: string; expiresAt?: Date; substitutePlayerId?: string }): Promise<SubstituteRequest> {
+    // Only allow updates to non-workflow-critical fields
+    const safeUpdates = {
+      ...(updates.reason !== undefined && { reason: updates.reason }),
+      ...(updates.expiresAt !== undefined && { expiresAt: updates.expiresAt }),
+      ...(updates.substitutePlayerId !== undefined && { substitutePlayerId: updates.substitutePlayerId }),
+      updatedAt: new Date(),
+    };
+    
     const [updatedRequest] = await db
       .update(substituteRequests)
-      .set(updateData)
+      .set(safeUpdates)
       .where(eq(substituteRequests.id, requestId))
       .returning();
     return updatedRequest;
+  }
+
+  // SECURITY: Internal method for controlled status updates (only used by processApproval)
+  private async updateSubstituteRequestStatus(requestId: string, status: 'pending_opponent_approval' | 'pending_commissioner_approval' | 'pending_substitute_approval' | 'approved' | 'denied' | 'expired', finalizedAt?: Date): Promise<SubstituteRequest> {
+    const updates: any = {
+      status,
+      updatedAt: new Date(),
+    };
+    
+    if (finalizedAt) {
+      updates.finalizedAt = finalizedAt;
+    }
+    
+    const [updatedRequest] = await db
+      .update(substituteRequests)
+      .set(updates)
+      .where(eq(substituteRequests.id, requestId))
+      .returning();
+    return updatedRequest;
+  }
+
+  async getSubstituteRequest(requestId: string): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] }) | undefined> {
+    const [request] = await db
+      .select()
+      .from(substituteRequests)
+      .where(eq(substituteRequests.id, requestId));
+
+    if (!request) return undefined;
+
+    const game = await this.getGameById(request.gameId);
+    const originalPlayer = await this.getUser(request.originalPlayerId);
+    const requestedByUser = await this.getUser(request.requestedBy);
+    let substitutePlayer = undefined;
+    
+    if (request.substitutePlayerId) {
+      substitutePlayer = await this.getUser(request.substitutePlayerId);
+    }
+
+    // Get requesting team if available
+    let requestingTeam = undefined;
+    if (request.requestingTeamId) {
+      requestingTeam = await this.getTeam(request.requestingTeamId);
+    }
+
+    // Get approvals for this request
+    const approvals = await this.getSubstitutionApprovals(request.id);
+
+    if (game && originalPlayer && requestedByUser) {
+      return {
+        ...request,
+        game,
+        originalPlayer,
+        substitutePlayer,
+        requestedByUser,
+        requestingTeam,
+        approvals: approvals.map(a => ({
+          id: a.id,
+          substitutionRequestId: a.substitutionRequestId,
+          approverId: a.approverId,
+          approverType: a.approverType,
+          status: a.status,
+          comments: a.comments,
+          approvedAt: a.approvedAt,
+        })),
+      };
+    }
+
+    return undefined;
+  }
+
+  async expireSubstituteRequests(): Promise<SubstituteRequest[]> {
+    const expiredRequests = await db
+      .update(substituteRequests)
+      .set({
+        status: "expired",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          sql`${substituteRequests.expiresAt} < NOW()`,
+          sql`${substituteRequests.status} NOT IN ('approved', 'denied', 'expired')`
+        )
+      )
+      .returning();
+
+    return expiredRequests;
+  }
+
+  // Substitution approval operations
+  async createSubstitutionApproval(approval: InsertSubstitutionApproval): Promise<SubstitutionApproval> {
+    const [newApproval] = await db
+      .insert(substitutionApprovals)
+      .values(approval)
+      .returning();
+    return newApproval;
+  }
+
+  async getSubstitutionApprovals(requestId: string): Promise<(SubstitutionApproval & { approver: User })[]> {
+    const result = await db
+      .select()
+      .from(substitutionApprovals)
+      .innerJoin(users, eq(substitutionApprovals.approverId, users.id))
+      .where(eq(substitutionApprovals.substitutionRequestId, requestId))
+      .orderBy(desc(substitutionApprovals.approvedAt));
+
+    return result.map(r => ({ ...r.substitution_approvals, approver: r.users }));
+  }
+
+  async getUserPendingApprovals(userId: string, approverType?: 'opposing_captain' | 'commissioner' | 'substitute_player'): Promise<(SubstitutionApproval & { substitutionRequest: SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User } })[]> {
+    // For pending approvals, we need to find requests where:
+    // 1. The request is in a status that requires this user's approval
+    // 2. There's no existing approval from this user for this stage
+    
+    let conditions: any[] = [];
+    
+    if (approverType === "opposing_captain") {
+      conditions.push(eq(substituteRequests.status, "pending_opponent_approval"));
+    } else if (approverType === "commissioner") {
+      conditions.push(eq(substituteRequests.status, "pending_commissioner_approval"));
+    } else if (approverType === "substitute_player") {
+      conditions.push(eq(substituteRequests.status, "pending_substitute_approval"));
+    } else {
+      // If no specific type, get all pending for this user
+      conditions.push(
+        or(
+          eq(substituteRequests.status, "pending_opponent_approval"),
+          eq(substituteRequests.status, "pending_commissioner_approval"),
+          eq(substituteRequests.status, "pending_substitute_approval")
+        )
+      );
+    }
+
+    // Get requests that need approval from this user
+    const requests = await db
+      .select()
+      .from(substituteRequests)
+      .where(and(...conditions));
+
+    const result = [];
+
+    for (const request of requests) {
+      // Check if user already approved this request at this stage
+      const existingApproval = await db
+        .select()
+        .from(substitutionApprovals)
+        .where(
+          and(
+            eq(substitutionApprovals.substitutionRequestId, request.id),
+            eq(substitutionApprovals.approverId, userId),
+            approverType ? eq(substitutionApprovals.approverType, approverType as any) : sql`1=1`
+          )
+        );
+
+      // Only include if no existing approval
+      if (existingApproval.length === 0) {
+        const game = await this.getGameById(request.gameId);
+        const originalPlayer = await this.getUser(request.originalPlayerId);
+        let substitutePlayer = undefined;
+        
+        if (request.substitutePlayerId) {
+          substitutePlayer = await this.getUser(request.substitutePlayerId);
+        }
+
+        if (game && originalPlayer) {
+          // Create a mock approval object for the return type
+          const mockApproval = {
+            id: '',
+            substitutionRequestId: request.id,
+            approverId: userId,
+            approverType: approverType as any,
+            status: 'approved' as any,
+            comments: null,
+            approvedAt: new Date(),
+            substitutionRequest: {
+              ...request,
+              game,
+              originalPlayer,
+              substitutePlayer,
+            }
+          };
+          result.push(mockApproval);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  async processApproval(
+    requestId: string, 
+    approverId: string, 
+    approverType: 'opposing_captain' | 'commissioner' | 'substitute_player', 
+    status: 'approved' | 'denied', 
+    comments?: string
+  ): Promise<{ approval: SubstitutionApproval; updatedRequest: SubstituteRequest }> {
+    
+    return await db.transaction(async (tx) => {
+      // 1. Get the current request with all related data
+      const request = await this.getSubstituteRequest(requestId);
+      if (!request) {
+        throw new Error(`Substitute request ${requestId} not found`);
+      }
+
+      // 2. SECURITY: Validate workflow state transition
+      const expectedStatus = this.getExpectedStatusForApproverType(approverType);
+      if (request.status !== expectedStatus) {
+        throw new Error(`Invalid workflow state: request is ${request.status}, expected ${expectedStatus} for ${approverType}`);
+      }
+
+      // 3. SECURITY: Validate approver authorization
+      await this.validateApproverAuthorization(approverId, approverType, request);
+
+      // 4. SECURITY: Check for duplicate approvals
+      const existingApprovals = await tx
+        .select()
+        .from(substitutionApprovals)
+        .where(
+          and(
+            eq(substitutionApprovals.substitutionRequestId, requestId),
+            eq(substitutionApprovals.approverId, approverId),
+            eq(substitutionApprovals.approverType, approverType)
+          )
+        );
+      
+      if (existingApprovals.length > 0) {
+        throw new Error(`Approver ${approverId} has already provided approval for this request at stage ${approverType}`);
+      }
+
+      // 5. Create the approval record
+      const [approval] = await tx
+        .insert(substitutionApprovals)
+        .values({
+          substitutionRequestId: requestId,
+          approverId,
+          approverType,
+          status,
+          comments,
+        })
+        .returning();
+
+      // 6. SECURITY: Determine next status based on CURRENT status and approval decision
+      const nextStatus = this.deriveNextStatus(request.status, approverType, status);
+      const finalizedAt = (nextStatus === 'approved' || nextStatus === 'denied') ? new Date() : undefined;
+
+      // 7. Update the substitute request status using controlled method
+      const [updatedRequest] = await tx
+        .update(substituteRequests)
+        .set({
+          status: nextStatus,
+          updatedAt: new Date(),
+          ...(finalizedAt && { finalizedAt }),
+        })
+        .where(eq(substituteRequests.id, requestId))
+        .returning();
+
+      return { approval, updatedRequest };
+    });
+  }
+
+  // SECURITY: Validate that the approver has authority for this approval type
+  private async validateApproverAuthorization(
+    approverId: string, 
+    approverType: 'opposing_captain' | 'commissioner' | 'substitute_player',
+    request: SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team } }
+  ): Promise<void> {
+    switch (approverType) {
+      case 'opposing_captain':
+        // Find the opposing team and validate captain
+        const opposingTeamId = request.requestingTeamId === request.game.homeTeamId 
+          ? request.game.awayTeamId 
+          : request.game.homeTeamId;
+        
+        const opposingTeam = await this.getTeam(opposingTeamId);
+        if (!opposingTeam || opposingTeam.captainId !== approverId) {
+          throw new Error(`User ${approverId} is not the captain of the opposing team`);
+        }
+        break;
+
+      case 'commissioner':
+        // Validate commissioner of the league
+        const league = await this.getLeague(request.game.leagueId);
+        if (!league || league.commissionerId !== approverId) {
+          throw new Error(`User ${approverId} is not the commissioner of this league`);
+        }
+        break;
+
+      case 'substitute_player':
+        // Validate substitute player
+        if (!request.substitutePlayerId || request.substitutePlayerId !== approverId) {
+          throw new Error(`User ${approverId} is not the designated substitute player`);
+        }
+        break;
+
+      default:
+        throw new Error(`Invalid approver type: ${approverType}`);
+    }
+  }
+
+  // SECURITY: Get expected status for approver type to validate workflow
+  private getExpectedStatusForApproverType(approverType: 'opposing_captain' | 'commissioner' | 'substitute_player'): string {
+    switch (approverType) {
+      case 'opposing_captain':
+        return 'pending_opponent_approval';
+      case 'commissioner':
+        return 'pending_commissioner_approval';
+      case 'substitute_player':
+        return 'pending_substitute_approval';
+      default:
+        throw new Error(`Invalid approver type: ${approverType}`);
+    }
+  }
+
+  // SECURITY: Derive next status from current state and approval decision
+  private deriveNextStatus(
+    currentStatus: string, 
+    approverType: 'opposing_captain' | 'commissioner' | 'substitute_player', 
+    decision: 'approved' | 'denied'
+  ): 'pending_opponent_approval' | 'pending_commissioner_approval' | 'pending_substitute_approval' | 'approved' | 'denied' | 'expired' {
+    if (decision === 'denied') {
+      return 'denied';
+    }
+
+    // Only allow approved decisions to advance workflow
+    switch (approverType) {
+      case 'opposing_captain':
+        if (currentStatus !== 'pending_opponent_approval') {
+          throw new Error(`Invalid transition: cannot process opposing_captain approval from status ${currentStatus}`);
+        }
+        return 'pending_commissioner_approval';
+        
+      case 'commissioner':
+        if (currentStatus !== 'pending_commissioner_approval') {
+          throw new Error(`Invalid transition: cannot process commissioner approval from status ${currentStatus}`);
+        }
+        return 'pending_substitute_approval';
+        
+      case 'substitute_player':
+        if (currentStatus !== 'pending_substitute_approval') {
+          throw new Error(`Invalid transition: cannot process substitute_player approval from status ${currentStatus}`);
+        }
+        return 'approved';
+        
+      default:
+        throw new Error(`Invalid approver type: ${approverType}`);
+    }
   }
 
   // Announcement operations
