@@ -19,6 +19,7 @@ import {
   Clock,
   Users
 } from 'lucide-react';
+import { ScrimmageRSVPButtons } from '@/components/ScrimmageRSVPButtons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -335,6 +336,32 @@ function AnnouncementCard({
 }) {
   const { toast } = useToast();
 
+  // Check if this is a scrimmage invitation
+  const isScrimmageInvitation = announcement.content.includes('🏒 You\'re Invited!');
+  
+  // Get all scrimmages for the league to find the matching one
+  const { data: leagueScrimmages = [] } = useQuery({
+    queryKey: ["/api/leagues", leagueId, "scrimmages"],
+    enabled: isScrimmageInvitation
+  }) as { data: any[] };
+
+  // Try to match the scrimmage based on title from announcement content
+  const extractScrimmageTitle = (content: string) => {
+    // Parse: "🏒 You're Invited! "Title" on Date at Location. Click to RSVP!"
+    const match = content.match(/🏒 You're Invited! "([^"]+)" on/);
+    return match ? match[1] : null;
+  };
+
+  const scrimmageTitle = isScrimmageInvitation ? extractScrimmageTitle(announcement.content) : null;
+  
+  // Find matching scrimmage by title and author
+  const matchingScrimmage = isScrimmageInvitation && scrimmageTitle 
+    ? leagueScrimmages.find((scrimmage: any) => 
+        scrimmage.title === scrimmageTitle && 
+        scrimmage.creatorId === announcement.author.id
+      )
+    : null;
+
   // Group reactions by emoji
   const reactionCounts = announcement.reactions.reduce((acc, reaction) => {
     acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
@@ -503,28 +530,41 @@ function AnnouncementCard({
 
         <Separator />
 
-        {/* Reactions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {REACTION_EMOJIS.map(({ emoji, label }) => {
-            const count = reactionCounts[emoji] || 0;
-            const userReacted = userReactions.includes(emoji);
+        {/* RSVP Buttons for Scrimmage Invitations or Regular Reactions */}
+        {isScrimmageInvitation && matchingScrimmage ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Users className="w-4 h-4" />
+              <span>RSVP to this scrimmage:</span>
+            </div>
+            <ScrimmageRSVPButtons 
+              scrimmageId={matchingScrimmage.id} 
+              className="justify-start" 
+            />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-wrap">
+            {REACTION_EMOJIS.map(({ emoji, label }) => {
+              const count = reactionCounts[emoji] || 0;
+              const userReacted = userReactions.includes(emoji);
 
-            return (
-              <Button
-                key={emoji}
-                variant={userReacted ? "default" : "ghost"}
-                size="sm"
-                onClick={() => handleReaction(emoji)}
-                className="h-8 px-2 text-sm"
-                title={label}
-                data-testid={`button-reaction-${emoji}`}
-              >
-                <span className="mr-1">{emoji}</span>
-                {count > 0 && <span>{count}</span>}
-              </Button>
-            );
-          })}
-        </div>
+              return (
+                <Button
+                  key={emoji}
+                  variant={userReacted ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => handleReaction(emoji)}
+                  className="h-8 px-2 text-sm"
+                  title={label}
+                  data-testid={`button-reaction-${emoji}`}
+                >
+                  <span className="mr-1">{emoji}</span>
+                  {count > 0 && <span>{count}</span>}
+                </Button>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
