@@ -3229,25 +3229,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedScrimmage = await storage.updateScrimmage(scrimmageId, { status: 'roster_confirmed' });
       
       // Send targeted announcement to approved players
-      const targetUserIds = approvedRequests.map(req => req.playerId);
-      const announcementContent = `🏒 Scrimmage Confirmed! Your spot in "${scrimmage.title}" has been confirmed for ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location}. See you on the ice!`;
+      const approvedUserIds = approvedRequests.map(req => req.playerId);
+      const approvedAnnouncementContent = `🏒 Scrimmage Confirmed! Your spot in "${scrimmage.title}" has been confirmed for ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location}. See you on the ice!`;
       
       try {
-        // Create announcement
-        const announcement = await storage.createAnnouncement({
-          content: announcementContent,
+        // Create announcement for approved players
+        const approvedAnnouncement = await storage.createAnnouncement({
+          content: approvedAnnouncementContent,
           leagueId: scrimmage.leagueId,
           authorId: userId,
           isPinned: false,
         });
         
         // Create visibility records for approved players
-        await storage.createAnnouncementVisibility(announcement.id, targetUserIds);
+        await storage.createAnnouncementVisibility(approvedAnnouncement.id, approvedUserIds);
         
-        console.log(`✅ Finalized scrimmage ${scrimmageId} and sent notifications to ${targetUserIds.length} players`);
+        console.log(`✅ Sent confirmation notifications to ${approvedUserIds.length} approved players`);
       } catch (announcementError) {
-        console.error('Error sending finalization notifications:', announcementError);
+        console.error('Error sending confirmation notifications:', announcementError);
         // Don't fail the finalization if announcement fails
+      }
+
+      // Send targeted announcement to non-approved players
+      const nonApprovedRequests = requests.filter(req => req.status !== 'approved');
+      const nonApprovedUserIds = nonApprovedRequests.map(req => req.playerId);
+      
+      if (nonApprovedUserIds.length > 0) {
+        const noticeAnnouncementContent = `NOTICE - The Skate for ${format(scrimmage.dateTime, 'MMM d')} is full at this time`;
+        
+        try {
+          // Create announcement for non-approved players
+          const noticeAnnouncement = await storage.createAnnouncement({
+            content: noticeAnnouncementContent,
+            leagueId: scrimmage.leagueId,
+            authorId: userId,
+            isPinned: false,
+          });
+          
+          // Create visibility records for non-approved players
+          await storage.createAnnouncementVisibility(noticeAnnouncement.id, nonApprovedUserIds);
+          
+          console.log(`✅ Sent notice notifications to ${nonApprovedUserIds.length} non-approved players`);
+        } catch (announcementError) {
+          console.error('Error sending notice notifications:', announcementError);
+          // Don't fail the finalization if announcement fails
+        }
       }
       
       res.json(updatedScrimmage);
