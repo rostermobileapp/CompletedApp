@@ -28,6 +28,7 @@ import {
   insertScrimmageRequestSchema,
   updateScrimmageRequestSchema,
 } from "@shared/schema";
+import { z } from "zod";
 import Stripe from "stripe";
 import multer from "multer";
 import Papa from "papaparse";
@@ -2635,6 +2636,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ========== SCRIMMAGE ROUTES ==========
 
+  // Custom schema for API request that handles string-to-Date conversion
+  const createScrimmageApiSchema = insertScrimmageSchema.extend({
+    dateTime: z.preprocess((val) => {
+      if (typeof val === 'string') {
+        return new Date(val);
+      }
+      return val;
+    }, z.date())
+  });
+
   // Create scrimmage (Player Plus+ only)
   app.post('/api/scrimmages', isAuthenticated, async (req: any, res) => {
     try {
@@ -2653,7 +2664,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate input data with proper schema
       let scrimmageData;
       try {
-        scrimmageData = insertScrimmageSchema.parse({
+        scrimmageData = createScrimmageApiSchema.parse({
           ...req.body,
           creatorId: userId,
         });

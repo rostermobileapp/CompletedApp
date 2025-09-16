@@ -88,7 +88,7 @@ export default function CreateScrimmage() {
         skillLevel: data.skillLevel,
         location: data.venue, // Map venue to location
         maxPlayers: data.maxParticipants, // Map maxParticipants to maxPlayers
-        dateTime: new Date(`${data.date}T${data.time}`).toISOString(), // Combine date and time
+        dateTime: new Date(`${data.date}T${data.time}`), // Combine date and time
         leagueId: selectedLeague.id, // Required by server
       };
 
