@@ -73,14 +73,13 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
         variant={currentStatus === 'attending' ? "default" : "outline"}
         size="sm"
         onClick={() => rsvpMutation.mutate('attending')}
-        disabled={isLoading || currentStatus === 'not_attending'}
+        disabled={isLoading}
         className={cn(
           "flex items-center gap-1 transition-all border-2",
           currentStatus === 'attending' 
             ? "bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-lg scale-105" 
-            : currentStatus === 'not_attending'
-            ? "border-green-300 text-green-300 opacity-50 cursor-not-allowed"
-            : "border-green-600 text-green-600 hover:bg-green-600 hover:text-white hover:shadow-md"
+            : "border-green-600 text-green-600 hover:bg-green-600 hover:text-white hover:shadow-md",
+          isLoading && "opacity-50 cursor-not-allowed"
         )}
         data-testid="button-attending"
       >
@@ -95,14 +94,13 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
         variant={currentStatus === 'not_attending' ? "default" : "outline"}
         size="sm"
         onClick={() => rsvpMutation.mutate('not_attending')}
-        disabled={isLoading || currentStatus === 'attending'}
+        disabled={isLoading}
         className={cn(
           "flex items-center gap-1 transition-all border-2",
           currentStatus === 'not_attending' 
             ? "bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-lg scale-105" 
-            : currentStatus === 'attending'
-            ? "border-red-300 text-red-300 opacity-50 cursor-not-allowed"
-            : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white hover:shadow-md"
+            : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white hover:shadow-md",
+          isLoading && "opacity-50 cursor-not-allowed"
         )}
         data-testid="button-not-attending"
       >
