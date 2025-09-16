@@ -25,6 +25,7 @@ import LeagueList from "@/pages/LeagueList";
 import Calendar from "@/pages/Calendar";
 import GameDetails from "@/pages/GameDetails";
 import Announcements from "@/pages/Announcements";
+import SubstituteConfirmations from "@/pages/SubstituteConfirmations";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -70,6 +71,7 @@ function Router() {
             <Route path="/game/:id" component={GameDetails} />
             <Route path="/scrimmage/:id" component={GameDetails} />
             <Route path="/announcements" component={Announcements} />
+            <Route path="/substitute-confirmations" component={SubstituteConfirmations} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>

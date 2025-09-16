@@ -1,6 +1,6 @@
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Users, BarChart3, UserPlus, Crown, Settings, Bell, Moon, Shield, LogOut, Plus, Calendar } from 'lucide-react';
+import { Users, BarChart3, UserPlus, Crown, Settings, Bell, Moon, Shield, LogOut, Plus, Calendar, CheckCircle } from 'lucide-react';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -32,6 +32,16 @@ export default function More() {
       locked: !hasAccess('player_plus'),
       requiredTier: 'PLUS',
       action: () => {/* TODO: Navigate to subs */},
+    },
+    {
+      icon: CheckCircle,
+      label: 'Substitute Confirmations',
+      locked: false,
+      requiredTier: null,
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/substitute-confirmations');
+      },
     },
   ];
 
