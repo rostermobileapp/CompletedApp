@@ -74,6 +74,29 @@ export default function ScrimmageManagement() {
     },
   });
 
+  // Mutation to finalize scrimmage roster
+  const finalizeMutation = useMutation({
+    mutationFn: async (scrimmageId: string) => {
+      const response = await apiRequest('PUT', `/api/scrimmages/${scrimmageId}/finalize`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Roster Finalized!',
+        description: 'Confirmation notifications have been sent to all approved players.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to finalize scrimmage',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const formatDateTime = (dateTime: string | Date) => {
     const date = typeof dateTime === 'string' ? new Date(dateTime) : dateTime;
     return {
@@ -383,6 +406,38 @@ export default function ScrimmageManagement() {
                                         </Badge>
                                       </div>
                                     ))}
+                                    
+                                    {/* Finalize Roster Button */}
+                                    <div className="border-t border-border pt-4 mt-4">
+                                      <div className="text-center">
+                                        <Button
+                                          onClick={() => finalizeMutation.mutate(selectedScrimmage!)}
+                                          disabled={finalizeMutation.isPending || scrimmages.find(s => s.id === selectedScrimmage)?.status === 'roster_confirmed'}
+                                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                                          data-testid="button-finalize-roster"
+                                        >
+                                          {finalizeMutation.isPending ? (
+                                            <>
+                                              <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                                              Finalizing...
+                                            </>
+                                          ) : scrimmages.find(s => s.id === selectedScrimmage)?.status === 'roster_confirmed' ? (
+                                            <>
+                                              <Check className="w-4 h-4 mr-2" />
+                                              Roster Finalized
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Check className="w-4 h-4 mr-2" />
+                                              Finalize Roster & Send Notifications
+                                            </>
+                                          )}
+                                        </Button>
+                                        <p className="text-xs text-muted-foreground mt-2">
+                                          This will confirm the roster and send notifications to all approved players
+                                        </p>
+                                      </div>
+                                    </div>
                                   </div>
                                 )}
                               </ScrollArea>

@@ -5,6 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { db } from "./db";
 import { leagueMemberships, importedPlayers, teams, announcementPolls } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { format } from "date-fns";
 import {
   insertLeagueSchema,
   insertTeamSchema,
@@ -3125,6 +3126,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching player requests:', error);
       res.status(500).json({ message: 'Failed to fetch player requests' });
+    }
+  });
+
+  // Finalize scrimmage roster and send confirmation notifications
+  app.put('/api/scrimmages/:id/finalize', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get the scrimmage
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      
+      // Only creator can finalize
+      if (scrimmage.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only the creator can finalize the scrimmage' });
+      }
+      
+      // Check if already finalized
+      if (scrimmage.status === 'roster_confirmed') {
+        return res.status(409).json({ message: 'Scrimmage roster is already finalized' });
+      }
+      
+      // Business rule: Cannot finalize if scrimmage has already started
+      const now = new Date();
+      if (scrimmage.dateTime <= now) {
+        return res.status(409).json({ message: 'Cannot finalize a scrimmage that has already started' });
+      }
+      
+      // Get approved players
+      const requests = await storage.getScrimmageRequests(scrimmageId);
+      const approvedRequests = requests.filter(req => req.status === 'approved');
+      
+      if (approvedRequests.length === 0) {
+        return res.status(400).json({ message: 'Cannot finalize scrimmage with no approved players' });
+      }
+      
+      // Update scrimmage status to finalized
+      const updatedScrimmage = await storage.updateScrimmage(scrimmageId, { status: 'roster_confirmed' });
+      
+      // Send targeted announcement to approved players
+      const targetUserIds = approvedRequests.map(req => req.playerId);
+      const announcementContent = `🏒 Scrimmage Confirmed! Your spot in "${scrimmage.title}" has been confirmed for ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location}. See you on the ice!`;
+      
+      try {
+        // Create announcement
+        const announcement = await storage.createAnnouncement({
+          content: announcementContent,
+          leagueId: scrimmage.leagueId,
+          authorId: userId,
+          isPinned: false,
+        });
+        
+        // Create visibility records for approved players
+        await storage.createAnnouncementVisibility(announcement.id, targetUserIds);
+        
+        console.log(`✅ Finalized scrimmage ${scrimmageId} and sent notifications to ${targetUserIds.length} players`);
+      } catch (announcementError) {
+        console.error('Error sending finalization notifications:', announcementError);
+        // Don't fail the finalization if announcement fails
+      }
+      
+      res.json(updatedScrimmage);
+    } catch (error) {
+      console.error('Error finalizing scrimmage:', error);
+      res.status(500).json({ message: 'Failed to finalize scrimmage' });
     }
   });
 
