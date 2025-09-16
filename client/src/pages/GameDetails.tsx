@@ -427,10 +427,13 @@ export default function GameDetails() {
   const now = Date.now();
   const isScoreSubmissionAvailable = now >= oneHourAfterStart;
 
-  // Check if user is a captain or commissioner
-  const isHomeCaptain = homeTeamMembers?.some((member) => member.userId === (user as User)?.id && member.isCaptain);
-  const isAwayCaptain = awayTeamMembers?.some((member) => member.userId === (user as User)?.id && member.isCaptain);
+  // Check if user is a captain or commissioner using team.captainId
+  const isHomeCaptain = game.homeTeam?.captainId === (user as User)?.id;
+  const isAwayCaptain = game.awayTeam?.captainId === (user as User)?.id;
   const isCaptain = isHomeCaptain || isAwayCaptain;
+  
+  // Derive captain team ID directly from captain status for RSVPSummary
+  const captainTeamId = isHomeCaptain ? game.homeTeam?.id : isAwayCaptain ? game.awayTeam?.id : undefined;
   
   // Check if user is commissioner
   const isCommissioner = league?.commissionerId === (user as User)?.id;
@@ -545,7 +548,7 @@ export default function GameDetails() {
                   <p className="text-sm font-medium text-muted-foreground mb-2">Team Attendance:</p>
                   <RSVPSummary 
                     gameId={game.id}
-                    teamId={isCaptain && userTeam ? userTeam.id : undefined}
+                    teamId={isCaptain ? captainTeamId : undefined}
                     showTeamSeparation={isCommissioner && !isCaptain}
                     onViewDetails={() => setShowRSVPModal(true)}
                   />
