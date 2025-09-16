@@ -645,7 +645,6 @@ export default function LeagueManagement() {
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
   const [playerEditForm, setPlayerEditForm] = useState({
     assignedTeamId: '',
-    isCaptain: false,
     position: '',
     skillLevel: '',
     skillRating: 1,
@@ -1623,7 +1622,6 @@ export default function LeagueManagement() {
                         setSelectedPlayer(member);
                         setPlayerEditForm({
                           assignedTeamId: member.assignedTeamId || '',
-                          isCaptain: member.isCaptain || false,
                           position: member.position || '',
                           skillLevel: member.skillLevel || '',
                           skillRating: member.skillRating || 1,
@@ -1636,7 +1634,10 @@ export default function LeagueManagement() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{formatUserName(member.user)}</p>
-                          {member.isCaptain && <span className="w-4 h-4 text-warning font-bold text-sm flex items-center justify-center">C</span>}
+                          {/* Show captain badge if user is captain of their assigned team */}
+                          {member.assignedTeamId && teams.find((team: Team) => team.id === member.assignedTeamId)?.captainId === member.userId && (
+                            <span className="w-4 h-4 text-warning font-bold text-sm flex items-center justify-center">C</span>
+                          )}
                           {member.jerseyNumber && (
                             <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
                               #{member.jerseyNumber}
@@ -1855,7 +1856,7 @@ export default function LeagueManagement() {
                             setSelectedPlayer(member);
                             setPlayerEditForm({
                               assignedTeamId: member.assignedTeamId || '',
-                              isCaptain: member.userId === selectedTeam.captainId,
+                              // Captain status is now determined by team.captainId, not membership
                               position: member.position || '',
                               skillLevel: member.skillLevel || '',
                               skillRating: member.skillRating || 1,
@@ -2211,19 +2212,7 @@ export default function LeagueManagement() {
                   </select>
                 </div>
 
-                {/* Captain Role */}
-                <div>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={playerEditForm.isCaptain}
-                      onChange={(e) => setPlayerEditForm(prev => ({ ...prev, isCaptain: e.target.checked }))}
-                      className="rounded border-border"
-                    />
-                    <span className="text-sm font-medium">Team Captain</span>
-                    <Crown className="w-4 h-4 text-warning" />
-                  </label>
-                </div>
+                {/* Captain assignment is now handled at team level - see Teams tab */}
 
                 {/* Position */}
                 <div>
@@ -2293,7 +2282,6 @@ export default function LeagueManagement() {
                     onClick={() => {
                       const updates = {
                         assignedTeamId: playerEditForm.assignedTeamId || null,
-                        isCaptain: playerEditForm.isCaptain,
                         position: playerEditForm.position,
                         skillRating: playerEditForm.skillRating,
                         jerseyNumber: playerEditForm.jerseyNumber ? parseInt(playerEditForm.jerseyNumber) : null,
@@ -2318,7 +2306,7 @@ export default function LeagueManagement() {
                       if (confirm('Remove this player from their assigned team?')) {
                         updatePlayerMutation.mutate({
                           memberId: selectedPlayer.id,
-                          updates: { assignedTeamId: null, isCaptain: false }
+                          updates: { assignedTeamId: null }
                         });
                       }
                     }}
