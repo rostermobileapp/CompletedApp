@@ -2700,6 +2700,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const scrimmage = await storage.createScrimmage(scrimmageData);
+      
+      // Send invitation announcements to selected members
+      if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+        try {
+          const invitationContent = `🏒 You're Invited! "${scrimmage.title}" on ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location}. Click to RSVP!`;
+          
+          // Create announcement for the scrimmage invitation
+          const announcement = await storage.createAnnouncement({
+            content: invitationContent,
+            leagueId: scrimmage.leagueId,
+            authorId: userId,
+            isPinned: false,
+          });
+          
+          // Create visibility records for invited players
+          await storage.createAnnouncementVisibility(announcement.id, req.body.selectedMemberIds);
+          
+          console.log(`✅ Created scrimmage ${scrimmage.id} and sent invitations to ${req.body.selectedMemberIds.length} players`);
+        } catch (announcementError) {
+          console.error('Error sending scrimmage invitations:', announcementError);
+          // Don't fail the scrimmage creation if announcement fails
+        }
+      }
+      
       res.status(201).json(scrimmage);
     } catch (error) {
       console.error('Error creating scrimmage:', error);
