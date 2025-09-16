@@ -57,6 +57,16 @@ export default function More() {
       },
     },
     {
+      icon: Settings,
+      label: 'Manage Scrimmages',
+      locked: !hasAccess('player_plus'),
+      requiredTier: 'PLUS',
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/scrimmage-management');
+      },
+    },
+    {
       icon: Crown,
       label: 'League Management',
       locked: !hasAccess('commissioner'),

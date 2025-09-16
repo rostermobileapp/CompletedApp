@@ -1,0 +1,403 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Clock, MapPin, Users, Check, X, Calendar, Crown } from 'lucide-react';
+import { useLocation } from 'wouter';
+import { setPageTransitionDirection } from '@/components/PageTransition';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+import { format, formatDistanceToNow } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Scrimmage, ScrimmageRequest, User } from '@shared/schema';
+import { SubscriptionGate } from '@/components/SubscriptionGate';
+import { useSubscription } from '@/context/SubscriptionContext';
+
+// Extended types with relationships for UI
+type ScrimmageWithCreatorAndCount = Scrimmage & {
+  creator: User;
+  requestCount: number;
+};
+
+type ScrimmageRequestWithPlayer = ScrimmageRequest & {
+  player: User;
+};
+
+export default function ScrimmageManagement() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedScrimmage, setSelectedScrimmage] = useState<string | null>(null);
+  const { hasAccess } = useSubscription();
+
+  const handleBack = () => {
+    setPageTransitionDirection('down');
+    navigate('/more');
+  };
+
+  // Fetch user's created scrimmages with hierarchical cache keys
+  const { data: scrimmages = [], isLoading, error: scrimmagesError } = useQuery({
+    queryKey: ['/api/users', 'scrimmages'],
+  }) as { data: ScrimmageWithCreatorAndCount[], isLoading: boolean, error: any };
+
+  // Fetch requests for selected scrimmage with hierarchical cache keys
+  const { data: requests = [], isLoading: requestsLoading, error: requestsError } = useQuery({
+    queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'],
+    enabled: !!selectedScrimmage,
+  }) as { data: ScrimmageRequestWithPlayer[], isLoading: boolean, error: any };
+
+  // Mutation to approve/dismiss requests
+  const manageRequestMutation = useMutation({
+    mutationFn: async ({ requestId, status }: { requestId: string; status: 'approved' | 'dismissed' }) => {
+      const response = await apiRequest('PUT', `/api/scrimmage-requests/${requestId}/status`, { status });
+      return response.json();
+    },
+    onSuccess: (_, { status }) => {
+      toast({
+        title: status === 'approved' ? 'Request Approved' : 'Request Declined',
+        description: status === 'approved' 
+          ? 'Player has been added to the scrimmage'
+          : 'Request has been declined',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to process request',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const formatDateTime = (dateTime: string | Date) => {
+    const date = typeof dateTime === 'string' ? new Date(dateTime) : dateTime;
+    return {
+      date: format(date, 'MMM d, yyyy'),
+      time: format(date, 'h:mm a'),
+      relative: formatDistanceToNow(date, { addSuffix: true }),
+    };
+  };
+
+  const getPendingRequests = (requests: ScrimmageRequestWithPlayer[]) => 
+    requests.filter(r => r.status === 'pending');
+
+  const getApprovedRequests = (requests: ScrimmageRequestWithPlayer[]) => 
+    requests.filter(r => r.status === 'approved');
+
+  // Check access control
+  if (!hasAccess('player_plus')) {
+    return (
+      <SubscriptionGate 
+        requiredTier="player_plus"
+        feature="scrimmage management"
+        onUpgrade={() => navigate('/subscription')}
+      />
+    );
+  }
+
+  // Show error states
+  if (scrimmagesError) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
+          <div className="max-w-md mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleBack}
+                className="p-0 h-auto"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </Button>
+              <h1 className="text-lg font-semibold">Scrimmage Management</h1>
+              <div className="w-6" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="max-w-md mx-auto p-4">
+          <div className="bg-card rounded-xl border border-border p-8 text-center">
+            <h3 className="text-lg font-semibold mb-2 text-destructive">Error Loading Scrimmages</h3>
+            <p className="text-muted-foreground mb-4">
+              {scrimmagesError?.message || 'Failed to load your scrimmages. Please try again.'}
+            </p>
+            <Button onClick={() => window.location.reload()} data-testid="button-retry">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
+          <div className="max-w-md mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleBack}
+                className="p-0 h-auto"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </Button>
+              <h1 className="text-lg font-semibold">Scrimmage Management</h1>
+              <div className="w-6" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="max-w-md mx-auto p-4">
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-card rounded-xl border border-border p-6 animate-pulse">
+                <div className="h-6 bg-muted rounded w-3/4 mb-4"></div>
+                <div className="h-4 bg-muted rounded w-1/2 mb-2"></div>
+                <div className="h-4 bg-muted rounded w-2/3"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
+        <div className="max-w-md mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBack}
+              className="p-0 h-auto"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </Button>
+            <h1 className="text-lg font-semibold">Scrimmage Management</h1>
+            <div className="w-6" />
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-md mx-auto p-4">
+        {scrimmages.length === 0 ? (
+          <div className="bg-card rounded-xl border border-border p-8 text-center">
+            <Crown className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">No Scrimmages Created</h3>
+            <p className="text-muted-foreground mb-4">
+              You haven't created any scrimmages yet. Create your first scrimmage to start managing teams!
+            </p>
+            <Button onClick={() => navigate('/create-scrimmage')} data-testid="button-create-first-scrimmage">
+              Create Scrimmage
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {scrimmages.map((scrimmage) => {
+              const dateTime = formatDateTime(scrimmage.dateTime);
+              const pendingCount = scrimmage.requestCount;
+              const isSelected = selectedScrimmage === scrimmage.id;
+              
+              return (
+                <Card key={scrimmage.id} className="bg-card border border-border">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg">{scrimmage.title}</CardTitle>
+                        <CardDescription className="mt-2 space-y-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="w-4 h-4" />
+                            <span>{dateTime.date} at {dateTime.time}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <MapPin className="w-4 h-4" />
+                            <span>{scrimmage.location}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <Users className="w-4 h-4" />
+                            <span>Max {scrimmage.maxPlayers} players</span>
+                          </div>
+                        </CardDescription>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge variant={scrimmage.status === 'open' ? 'default' : 'secondary'}>
+                          {scrimmage.status}
+                        </Badge>
+                        {pendingCount > 0 && (
+                          <Badge variant="destructive" data-testid={`badge-pending-${scrimmage.id}`}>
+                            {pendingCount} pending
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="pt-0">
+                    <div className="flex gap-2">
+                      <Button
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedScrimmage(isSelected ? null : scrimmage.id)}
+                        data-testid={`button-manage-${scrimmage.id}`}
+                      >
+                        {isSelected ? 'Hide Details' : 'Manage Requests'}
+                      </Button>
+                    </div>
+                    
+                    {isSelected && (
+                      <div className="mt-4 border-t border-border pt-4">
+                        {requestsLoading ? (
+                          <div className="text-center py-4">
+                            <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                          </div>
+                        ) : requestsError ? (
+                          <div className="text-center py-8 text-destructive">
+                            <p className="font-medium mb-2">Error Loading Requests</p>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              {requestsError?.message || 'Failed to load requests'}
+                            </p>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] })}
+                            >
+                              Retry
+                            </Button>
+                          </div>
+                        ) : (
+                          <Tabs defaultValue="pending" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                              <TabsTrigger value="pending">
+                                Pending ({getPendingRequests(requests).length})
+                              </TabsTrigger>
+                              <TabsTrigger value="approved">
+                                Approved ({getApprovedRequests(requests).length})
+                              </TabsTrigger>
+                            </TabsList>
+                            
+                            <TabsContent value="pending" className="mt-4">
+                              <ScrollArea className="h-64">
+                                {getPendingRequests(requests).length === 0 ? (
+                                  <div className="text-center py-8 text-muted-foreground">
+                                    No pending requests
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {getPendingRequests(requests).map((request) => (
+                                      <div
+                                        key={request.id}
+                                        className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50"
+                                        data-testid={`request-${request.id}`}
+                                      >
+                                        <Avatar className="h-10 w-10">
+                                          <AvatarImage src={request.player.profileImageUrl || undefined} />
+                                          <AvatarFallback>
+                                            {request.player.firstName?.[0]}{request.player.lastName?.[0]}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                          <p className="font-medium">
+                                            {request.player.firstName} {request.player.lastName}
+                                          </p>
+                                          <p className="text-sm text-muted-foreground">
+                                            {formatDistanceToNow(new Date(request.requestedAt), { addSuffix: true })}
+                                          </p>
+                                        </div>
+                                        <div className="flex gap-1">
+                                          <Button
+                                            size="sm"
+                                            variant="default"
+                                            onClick={() => manageRequestMutation.mutate({ 
+                                              requestId: request.id, 
+                                              status: 'approved' 
+                                            })}
+                                            disabled={manageRequestMutation.isPending}
+                                            data-testid={`button-approve-${request.id}`}
+                                          >
+                                            <Check className="w-4 h-4" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => manageRequestMutation.mutate({ 
+                                              requestId: request.id, 
+                                              status: 'dismissed' 
+                                            })}
+                                            disabled={manageRequestMutation.isPending}
+                                            data-testid={`button-decline-${request.id}`}
+                                          >
+                                            <X className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </ScrollArea>
+                            </TabsContent>
+                            
+                            <TabsContent value="approved" className="mt-4">
+                              <ScrollArea className="h-64">
+                                {getApprovedRequests(requests).length === 0 ? (
+                                  <div className="text-center py-8 text-muted-foreground">
+                                    No approved players yet
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {getApprovedRequests(requests).map((request) => (
+                                      <div
+                                        key={request.id}
+                                        className="flex items-center gap-3 p-3 rounded-lg border bg-green-50 dark:bg-green-950/20"
+                                        data-testid={`approved-${request.id}`}
+                                      >
+                                        <Avatar className="h-10 w-10">
+                                          <AvatarImage src={request.player.profileImageUrl || undefined} />
+                                          <AvatarFallback>
+                                            {request.player.firstName?.[0]}{request.player.lastName?.[0]}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                          <p className="font-medium">
+                                            {request.player.firstName} {request.player.lastName}
+                                          </p>
+                                          <p className="text-sm text-muted-foreground">
+                                            Approved {formatDistanceToNow(new Date(request.approvedAt!), { addSuffix: true })}
+                                          </p>
+                                        </div>
+                                        <Badge variant="default" className="bg-green-600">
+                                          Approved
+                                        </Badge>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </ScrollArea>
+                            </TabsContent>
+                          </Tabs>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
