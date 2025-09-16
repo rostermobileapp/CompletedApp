@@ -117,7 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await objectStorageService.downloadObject(objectFile, res);
     } catch (error) {
       console.error("Error serving profile image:", error);
-      if (error.name === 'ObjectNotFoundError') {
+      if ((error as Error).name === 'ObjectNotFoundError') {
         return res.sendStatus(404);
       }
       return res.sendStatus(500);
@@ -147,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await objectStorageService.downloadObject(objectFile, res);
     } catch (error) {
       console.error("Error serving team logo:", error);
-      if (error.name === 'ObjectNotFoundError') {
+      if ((error as Error).name === 'ObjectNotFoundError') {
         return res.sendStatus(404);
       }
       return res.sendStatus(500);
@@ -430,6 +430,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(members);
     } catch (error) {
       console.error("Error fetching league members:", error);
+      res.status(500).json({ message: "Failed to fetch league members" });
+    }
+  });
+
+  // League members for scrimmage creation - accessible by Player Plus+ users who are members of the league
+  app.get("/api/leagues/:id/members-for-scrimmage", isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.id;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(leagueId);
+      
+      // Check if user has Player Plus+ access and is a member of this league
+      if (!league || !user || !['player_plus', 'commissioner'].includes(user.subscriptionTier)) {
+        return res.status(403).json({ message: "Player Plus+ access required" });
+      }
+      
+      // Check if user is a member of this league
+      const userMembership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!userMembership || userMembership.status !== 'approved') {
+        return res.status(403).json({ message: "You must be an approved member of this league" });
+      }
+      
+      const members = await storage.getLeagueMembers(leagueId);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching league members for scrimmage:", error);
       res.status(500).json({ message: "Failed to fetch league members" });
     }
   });
@@ -784,15 +811,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         submitterRole = 'commissioner';
       } else {
         // Check if user is captain of home team
-        const homeTeamMemberships = await storage.getTeamMembers(game.homeTeamId);
-        const homeTeamCaptain = homeTeamMemberships.find(m => m.userId === userId && m.isCaptain);
+        const leagueMembers = await storage.getLeagueMembers(game.leagueId);
+        const homeTeamCaptain = leagueMembers.find(m => m.userId === userId && m.assignedTeamId === game.homeTeamId && m.isCaptain);
         
         if (homeTeamCaptain) {
           submitterRole = 'home_captain';
         } else {
           // Check if user is captain of away team
-          const awayTeamMemberships = await storage.getTeamMembers(game.awayTeamId);
-          const awayTeamCaptain = awayTeamMemberships.find(m => m.userId === userId && m.isCaptain);
+          const awayTeamCaptain = leagueMembers.find(m => m.userId === userId && m.assignedTeamId === game.awayTeamId && m.isCaptain);
           
           if (awayTeamCaptain) {
             submitterRole = 'away_captain';
@@ -870,10 +896,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(game.leagueId);
       const isCommissioner = league && league.commissionerId === userId;
       
-      const homeTeamMemberships = await storage.getTeamMembers(game.homeTeamId);
-      const awayTeamMemberships = await storage.getTeamMembers(game.awayTeamId);
-      const isHomeCaptain = homeTeamMemberships.some(m => m.userId === userId && m.isCaptain);
-      const isAwayCaptain = awayTeamMemberships.some(m => m.userId === userId && m.isCaptain);
+      const leagueMembers = await storage.getLeagueMembers(game.leagueId);
+      const isHomeCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.homeTeamId && m.isCaptain);
+      const isAwayCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.awayTeamId && m.isCaptain);
       
       // For now, allow any authenticated user to access (simplified access control)
       // TODO: Implement proper team membership checking when teams have members
@@ -1075,16 +1100,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(game.leagueId);
       const isCommissioner = league && league.commissionerId === userId;
       
-      const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
-      const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
-      const isHomeCaptain = homeTeamMembers.some(m => m.userId === userId && m.isCaptain);
-      const isAwayCaptain = awayTeamMembers.some(m => m.userId === userId && m.isCaptain);
+      const leagueMembers = await storage.getLeagueMembers(game.leagueId);
+      const isHomeCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.homeTeamId && m.isCaptain);
+      const isAwayCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.awayTeamId && m.isCaptain);
       
       // For team-specific access
       if (teamId) {
         // Verify user is captain of the requested team or commissioner
-        const requestedTeamMembers = await storage.getTeamMembers(teamId as string);
-        const isCaptainOfRequestedTeam = requestedTeamMembers.some(m => m.userId === userId && m.isCaptain);
+        const isCaptainOfRequestedTeam = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === teamId && m.isCaptain);
         
         if (!isCommissioner && !isCaptainOfRequestedTeam) {
           return res.status(403).json({ message: 'Captain or Commissioner access required for this team' });
@@ -1188,10 +1211,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is captain
-      const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
-      const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
-      const isHomeCaptain = homeTeamMembers.some(m => m.userId === userId && m.isCaptain);
-      const isAwayCaptain = awayTeamMembers.some(m => m.userId === userId && m.isCaptain);
+      const leagueMembers = await storage.getLeagueMembers(game.leagueId);
+      const isHomeCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.homeTeamId && m.isCaptain);
+      const isAwayCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.awayTeamId && m.isCaptain);
       
       if (!isHomeCaptain && !isAwayCaptain) {
         return res.status(403).json({ message: 'Captain access required' });
@@ -1589,7 +1611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } catch (error) {
             console.error(`Failed to create user and membership for ${player.firstName} ${player.lastName}:`, error);
             // Add error to response so we can debug
-            errors.push(`Failed to create user for ${player.firstName} ${player.lastName}: ${error.message}`);
+            errors.push(`Failed to create user for ${player.firstName} ${player.lastName}: ${(error as Error).message}`);
           }
         }
       }

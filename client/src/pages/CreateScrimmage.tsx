@@ -65,14 +65,14 @@ export default function CreateScrimmage() {
   // Fetch league members for the selected league
   const selectedLeague = (userLeagues as any[])?.[0]; // Use first league for now
   const { data: leagueMembers = [], isLoading: membersLoading } = useQuery({
-    queryKey: [`/api/leagues/${selectedLeague?.id}/members`],
+    queryKey: [`/api/leagues/${selectedLeague?.id}/members-for-scrimmage`],
     enabled: !!selectedLeague?.id,
   });
 
   // Filter members based on search term
   const filteredMembers = (leagueMembers as any[]).filter((member: any) => 
-    `${member.firstName} ${member.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    member.user.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const createScrimmageRequest = useMutation({
@@ -143,6 +143,19 @@ export default function CreateScrimmage() {
     // Update form validation state
     form.setValue('selectedMemberIds', newSelection);
     // Trigger validation
+    form.trigger('selectedMemberIds');
+  };
+
+  const selectAllMembers = () => {
+    const allMemberIds = filteredMembers.map((member: any) => member.user.id);
+    setSelectedMemberIds(allMemberIds);
+    form.setValue('selectedMemberIds', allMemberIds);
+    form.trigger('selectedMemberIds');
+  };
+
+  const deselectAllMembers = () => {
+    setSelectedMemberIds([]);
+    form.setValue('selectedMemberIds', []);
     form.trigger('selectedMemberIds');
   };
 
@@ -339,11 +352,33 @@ export default function CreateScrimmage() {
             />
           </div>
 
-          {/* Selected count */}
-          <div className="mb-4">
+          {/* Selected count and bulk actions */}
+          <div className="mb-4 flex items-center justify-between">
             <p className="text-sm text-muted-foreground" data-testid="text-selected-count">
               {selectedMemberIds.length} member{selectedMemberIds.length !== 1 ? 's' : ''} selected
             </p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={selectAllMembers}
+                disabled={filteredMembers.length === 0}
+                data-testid="button-select-all"
+              >
+                Select All
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={deselectAllMembers}
+                disabled={selectedMemberIds.length === 0}
+                data-testid="button-deselect-all"
+              >
+                Deselect All
+              </Button>
+            </div>
           </div>
 
           {/* Member list */}
@@ -368,27 +403,27 @@ export default function CreateScrimmage() {
               <div className="space-y-2">
                 {filteredMembers.map((member: any) => (
                   <div
-                    key={member.id}
+                    key={member.user.id}
                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50"
-                    data-testid={`member-item-${member.id}`}
+                    data-testid={`member-item-${member.user.id}`}
                   >
                     <Checkbox
-                      checked={selectedMemberIds.includes(member.id)}
-                      onCheckedChange={() => toggleMemberSelection(member.id)}
-                      data-testid={`checkbox-member-${member.id}`}
+                      checked={selectedMemberIds.includes(member.user.id)}
+                      onCheckedChange={() => toggleMemberSelection(member.user.id)}
+                      data-testid={`checkbox-member-${member.user.id}`}
                     />
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={member.profileImageUrl || undefined} />
+                      <AvatarImage src={member.user.profileImageUrl || undefined} />
                       <AvatarFallback>
-                        {member.firstName?.[0]}{member.lastName?.[0]}
+                        {member.user.firstName?.[0]}{member.user.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <p className="font-medium" data-testid={`text-member-name-${member.id}`}>
-                        {member.firstName} {member.lastName}
+                      <p className="font-medium" data-testid={`text-member-name-${member.user.id}`}>
+                        {member.user.firstName} {member.user.lastName}
                       </p>
-                      <p className="text-sm text-muted-foreground" data-testid={`text-member-email-${member.id}`}>
-                        {member.email}
+                      <p className="text-sm text-muted-foreground" data-testid={`text-member-email-${member.user.id}`}>
+                        {member.user.email}
                       </p>
                     </div>
                   </div>
