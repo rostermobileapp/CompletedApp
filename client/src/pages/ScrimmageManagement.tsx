@@ -371,16 +371,16 @@ export default function ScrimmageManagement() {
                             <p>No players confirmed yet</p>
                           </div>
                         ) : (
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             {rosterData.approvedPlayers.map((request) => (
                               <div
                                 key={request.id}
                                 className="flex items-center gap-3 p-3 rounded-lg border bg-green-50 dark:bg-green-950/20"
                                 data-testid={`roster-player-${request.id}`}
                               >
-                                <Avatar className="h-10 w-10">
+                                <Avatar className="h-8 w-8">
                                   <AvatarImage src={request.player.profileImageUrl || undefined} />
-                                  <AvatarFallback>
+                                  <AvatarFallback className="text-xs">
                                     {request.player.firstName?.[0]}{request.player.lastName?.[0]}
                                   </AvatarFallback>
                                 </Avatar>
@@ -388,11 +388,8 @@ export default function ScrimmageManagement() {
                                   <p className="font-medium">
                                     {request.player.firstName} {request.player.lastName}
                                   </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Confirmed {formatDistanceToNow(new Date(request.approvedAt!), { addSuffix: true })}
-                                  </p>
                                 </div>
-                                <Badge variant="default" className="bg-green-600">
+                                <Badge variant="default" className="bg-green-600 text-xs">
                                   ✓ Confirmed
                                 </Badge>
                               </div>
