@@ -31,6 +31,7 @@ export default function ScrimmageManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedScrimmage, setSelectedScrimmage] = useState<string | null>(null);
+  const [viewRosterScrimmage, setViewRosterScrimmage] = useState<string | null>(null);
   const { hasAccess } = useSubscription();
 
   const handleBack = () => {
@@ -48,6 +49,12 @@ export default function ScrimmageManagement() {
     queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'],
     enabled: !!selectedScrimmage,
   }) as { data: ScrimmageRequestWithPlayer[], isLoading: boolean, error: any };
+
+  // Fetch approved players for roster view
+  const { data: rosterData, isLoading: rosterLoading, error: rosterError } = useQuery({
+    queryKey: ['/api/scrimmages', viewRosterScrimmage, 'approved-players'],
+    enabled: !!viewRosterScrimmage,
+  }) as { data: { scrimmage: any; approvedPlayers: ScrimmageRequestWithPlayer[] } | undefined, isLoading: boolean, error: any };
 
   // Mutation to approve/dismiss requests
   const manageRequestMutation = useMutation({
@@ -306,18 +313,17 @@ export default function ScrimmageManagement() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          // Set the selected scrimmage and show approved tab
-                          setSelectedScrimmage(scrimmage.id);
-                          // Focus on approved tab after a brief delay
-                          setTimeout(() => {
-                            const approvedTab = document.querySelector('[value="approved"]') as HTMLButtonElement;
-                            if (approvedTab) approvedTab.click();
-                          }, 100);
+                          if (viewRosterScrimmage === scrimmage.id) {
+                            setViewRosterScrimmage(null);
+                          } else {
+                            setSelectedScrimmage(null); // Close management view
+                            setViewRosterScrimmage(scrimmage.id); // Open roster view
+                          }
                         }}
                         data-testid={`button-view-roster-${scrimmage.id}`}
                       >
                         <Eye className="w-4 h-4 mr-1" />
-                        View Roster
+                        {viewRosterScrimmage === scrimmage.id ? 'Hide Roster' : 'View Roster'}
                       </Button>
                       
                       <Button
@@ -336,6 +342,72 @@ export default function ScrimmageManagement() {
                       </Button>
                     </div>
                     
+                    {/* Simple Roster View */}
+                    {viewRosterScrimmage === scrimmage.id && (
+                      <div className="mt-4 border-t border-border pt-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Users className="w-5 h-5 text-primary" />
+                          <h3 className="text-lg font-semibold">Confirmed Players</h3>
+                        </div>
+                        
+                        {rosterLoading ? (
+                          <div className="text-center py-4">
+                            <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                          </div>
+                        ) : rosterError ? (
+                          <div className="text-center py-4 text-destructive">
+                            <p className="text-sm mb-2">Error loading roster</p>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', viewRosterScrimmage, 'approved-players'] })}
+                            >
+                              Retry
+                            </Button>
+                          </div>
+                        ) : !rosterData?.approvedPlayers || rosterData.approvedPlayers.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                            <p>No players confirmed yet</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {rosterData.approvedPlayers.map((request) => (
+                              <div
+                                key={request.id}
+                                className="flex items-center gap-3 p-3 rounded-lg border bg-green-50 dark:bg-green-950/20"
+                                data-testid={`roster-player-${request.id}`}
+                              >
+                                <Avatar className="h-10 w-10">
+                                  <AvatarImage src={request.player.profileImageUrl || undefined} />
+                                  <AvatarFallback>
+                                    {request.player.firstName?.[0]}{request.player.lastName?.[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <p className="font-medium">
+                                    {request.player.firstName} {request.player.lastName}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Confirmed {formatDistanceToNow(new Date(request.approvedAt!), { addSuffix: true })}
+                                  </p>
+                                </div>
+                                <Badge variant="default" className="bg-green-600">
+                                  ✓ Confirmed
+                                </Badge>
+                              </div>
+                            ))}
+                            <div className="mt-4 pt-4 border-t border-border text-center">
+                              <p className="text-sm text-muted-foreground">
+                                {rosterData.approvedPlayers.length} of {scrimmage.maxPlayers} players confirmed
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Full Management View */}
                     {isSelected && (
                       <div className="mt-4 border-t border-border pt-4">
                         {requestsLoading ? (
