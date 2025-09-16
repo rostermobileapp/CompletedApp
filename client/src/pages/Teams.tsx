@@ -35,7 +35,7 @@ export default function Teams() {
     enabled: !!isAuthenticated,
   });
 
-  // Get user's league memberships for captain status
+  // Get user's league memberships (for league data, captain status now via teams.captainId)
   const { data: userLeagueMemberships = [] } = useQuery({
     queryKey: ['/api/user/league-memberships'],
     enabled: !!isAuthenticated,
@@ -46,7 +46,6 @@ export default function Teams() {
     queryKey: ['/api/games/attendance/captain-overview'],
     enabled: !!(user && (
       (userTeams as any[])?.some((team: any) => team.captainId === (user as any)?.id) ||
-      (userLeagueMemberships as any[])?.some((membership: any) => membership.isCaptain) ||
       (user as any)?.subscriptionTier === 'commissioner'
     )),
   });
@@ -139,13 +138,8 @@ export default function Teams() {
   const primaryTeam = (userTeams as any[])[0];
   const currentTeam = selectedTeam ? (userTeams as any[]).find((t: any) => t.id === selectedTeam) : primaryTeam;
   const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
-  // Check if user is captain in league membership for current team
-  const currentTeamMembership = (userLeagueMemberships as any[]).find((membership: any) => 
-    membership.assignedTeamId === currentTeam?.id && membership.isCaptain
-  );
-  const isLeagueMemberCaptain = !!currentTeamMembership;
   const isCommissioner = (user as any)?.subscriptionTier === 'commissioner';
-  const canUploadLogo = isTeamCaptain || isLeagueMemberCaptain || isCommissioner;
+  const canUploadLogo = isTeamCaptain || isCommissioner;
 
   // Filter games for current team only
   const teamGames = (upcomingGames as any[]).filter((game: any) => 
@@ -251,9 +245,6 @@ export default function Teams() {
                         </p>
                       </div>
                       {((team.captainId === (user as any)?.id) || 
-                        (userLeagueMemberships as any[]).find((membership: any) => 
-                          membership.assignedTeamId === team.id && membership.isCaptain
-                        ) || 
                         (user as any)?.subscriptionTier === 'commissioner') && (
                         <ObjectUploader
                           maxNumberOfFiles={1}
