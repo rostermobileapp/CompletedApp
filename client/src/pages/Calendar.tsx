@@ -11,6 +11,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useEffect, useRef } from "react";
 import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
+import { ScrimmageRSVPButtons } from "@/components/ScrimmageRSVPButtons";
+import { ScrimmageRSVPStatusIcon } from "@/components/ScrimmageRSVPStatusIcon";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 
 export default function Calendar() {
@@ -190,6 +192,20 @@ export default function Calendar() {
                             Scrimmage
                           </span>
                         </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        {/* RSVP Status Icon */}
+                        {user && event.userRole !== 'creator' && (
+                          <ScrimmageRSVPStatusIcon scrimmageId={event.id} />
+                        )}
+                        
+                        {/* RSVP Buttons for non-creators */}
+                        {user && event.userRole !== 'creator' && (
+                          <ScrimmageRSVPButtons 
+                            scrimmageId={event.id} 
+                            className="mb-1"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
