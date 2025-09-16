@@ -1059,10 +1059,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify user is on the specified team
+      // Check both direct team membership AND league membership with assigned team
       const teamMembers = await storage.getTeamMembers(teamId);
-      const isOnTeam = teamMembers.some(member => member.userId === userId);
+      const hasDirectTeamMembership = teamMembers.some(member => member.userId === userId);
       
-      if (!isOnTeam) {
+      // Also check if user has league membership with this team assigned
+      const leagueMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
+      const hasLeagueTeamAssignment = leagueMembership && leagueMembership.assignedTeamId === teamId;
+      
+      if (!hasDirectTeamMembership && !hasLeagueTeamAssignment) {
         return res.status(403).json({ message: 'You must be on this team to RSVP' });
       }
 
