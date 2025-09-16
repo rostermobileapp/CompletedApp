@@ -668,6 +668,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/teams/:id/captain", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const teamId = req.params.id;
+      const { captainId } = req.body;
+
+      // Get team and user info
+      const team = await storage.getTeam(teamId);
+      const user = await storage.getUser(userId);
+
+      if (!team) {
+        return res.status(404).json({ message: "Team not found" });
+      }
+
+      // Check authorization - only commissioner of the league can set team captain
+      const league = await storage.getLeague(team.leagueId);
+      const isCommissioner = league && league.commissionerId === userId;
+
+      if (!isCommissioner) {
+        return res.status(403).json({ message: "Only league commissioners can assign team captains" });
+      }
+
+      // Validate captainId if provided
+      if (captainId) {
+        const captainUser = await storage.getUser(captainId);
+        if (!captainUser) {
+          return res.status(400).json({ message: "Captain user not found" });
+        }
+
+        // Verify the captain user is a member of this team (either through team membership or league assignment)
+        const teamMembers = await storage.getTeamMembers(teamId);
+        const hasDirectMembership = teamMembers.some(member => member.userId === captainId);
+        
+        const leagueMembership = await storage.getUserLeagueMembership(captainId, team.leagueId);
+        const hasLeagueAssignment = leagueMembership && leagueMembership.assignedTeamId === teamId;
+
+        if (!hasDirectMembership && !hasLeagueAssignment) {
+          return res.status(400).json({ message: "User must be a member of this team to be assigned as captain" });
+        }
+      }
+
+      // Update team captain
+      const updatedTeam = await storage.setTeamCaptain(teamId, captainId || null);
+      res.json(updatedTeam);
+    } catch (error) {
+      console.error("Error setting team captain:", error);
+      res.status(500).json({ message: "Failed to set team captain" });
+    }
+  });
+
   // Game routes
   app.get("/api/user/games/upcoming", isAuthenticated, async (req: any, res) => {
     try {

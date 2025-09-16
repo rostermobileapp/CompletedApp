@@ -449,6 +449,15 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(teams).where(eq(teams.leagueId, leagueId));
   }
 
+  async setTeamCaptain(teamId: string, captainId: string | null): Promise<Team> {
+    const [team] = await db
+      .update(teams)
+      .set({ captainId })
+      .where(eq(teams.id, teamId))
+      .returning();
+    return team;
+  }
+
   async getTeam(id: string): Promise<Team | undefined> {
     const [team] = await db.select().from(teams).where(eq(teams.id, id));
     return team;
