@@ -1287,6 +1287,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'League not found' });
       }
 
+      // CRITICAL: Validate game hasn't started yet
+      const now = new Date();
+      if (game.scheduledAt && game.scheduledAt <= now) {
+        return res.status(409).json({ message: 'Cannot create substitute request for games that have already started or finished' });
+      }
+
       // Check if user is captain of either team
       const homeTeam = await storage.getTeam(game.homeTeamId);
       const awayTeam = await storage.getTeam(game.awayTeamId);
@@ -1300,6 +1306,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Determine requesting team
       const requestingTeamId = isHomeCaptain ? game.homeTeamId : game.awayTeamId;
       
+      // VALIDATION: Check for duplicate active substitute requests for the same original player
+      const existingRequests = await storage.getSubstituteRequests({ gameId });
+      const duplicateRequest = existingRequests.find(req => 
+        ['pending_opponent_approval', 'pending_commissioner_approval', 'pending_substitute_approval'].includes(req.status) &&
+        req.originalPlayerId === originalPlayerId && 
+        req.requestingTeamId === requestingTeamId
+      );
+      if (duplicateRequest) {
+        return res.status(409).json({ message: 'An active substitute request already exists for this player in this game' });
+      }
+
       // SECURITY: Validate that originalPlayer belongs to requesting team
       const requestingTeamMembers = await storage.getTeamMembers(requestingTeamId);
       const requestingLeagueMembers = await storage.getLeagueMembers(game.leagueId);
@@ -1320,6 +1337,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const substituteInLeague = requestingLeagueMembers.some(m => m.userId === substitutePlayerId);
         if (!substituteInLeague) {
           return res.status(403).json({ message: 'Substitute player must be a league member' });
+        }
+
+        // VALIDATION: Prevent substitute player from being the same as original player
+        if (substitutePlayerId === originalPlayerId) {
+          return res.status(400).json({ message: 'Substitute player cannot be the same as original player' });
+        }
+
+        // VALIDATION: Check if substitute player is already on either team for this game
+        const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
+        const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+        const substituteOnHomeTeam = homeTeamMembers.some(m => m.userId === substitutePlayerId);
+        const substituteOnAwayTeam = awayTeamMembers.some(m => m.userId === substitutePlayerId);
+        
+        if (substituteOnHomeTeam || substituteOnAwayTeam) {
+          return res.status(400).json({ message: 'Substitute player is already on one of the teams for this game' });
         }
       }
 
