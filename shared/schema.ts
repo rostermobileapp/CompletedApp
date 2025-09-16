@@ -63,9 +63,12 @@ export const rsvpStatusEnum = pgEnum("rsvp_status", [
 
 // Substitute request status enum
 export const substituteRequestStatusEnum = pgEnum("substitute_request_status", [
-  "pending",
+  "pending_opponent_approval",
+  "pending_commissioner_approval",
+  "pending_substitute_approval",
   "approved",
-  "denied"
+  "denied",
+  "expired"
 ]);
 
 // Scrimmage status enum
@@ -232,12 +235,45 @@ export const substituteRequests = pgTable("substitute_requests", {
   gameId: varchar("game_id").references(() => games.id).notNull(),
   originalPlayerId: varchar("original_player_id").references(() => users.id).notNull(),
   substitutePlayerId: varchar("substitute_player_id").references(() => users.id),
+  requestingTeamId: varchar("requesting_team_id").references(() => teams.id).notNull(),
   requestedBy: varchar("requested_by").references(() => users.id).notNull(),
-  status: substituteRequestStatusEnum("status").default("pending").notNull(),
-  approvedBy: varchar("approved_by").references(() => users.id),
+  status: substituteRequestStatusEnum("status").default("pending_opponent_approval").notNull(),
   reason: text("reason"),
+  expiresAt: timestamp("expires_at"),
+  finalizedAt: timestamp("finalized_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_substitute_requests_game_id").on(table.gameId),
+  index("idx_substitute_requests_requesting_team_id").on(table.requestingTeamId),
+]);
+
+// Substitute request approval status enum
+export const approverTypeEnum = pgEnum("approver_type", [
+  "opposing_captain",
+  "commissioner",
+  "substitute_player"
+]);
+
+// Approval status enum
+export const approvalStatusEnum = pgEnum("approval_status", [
+  "approved",
+  "denied"
+]);
+
+// Substitution approvals table
+export const substitutionApprovals = pgTable("substitution_approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  substitutionRequestId: varchar("substitution_request_id").references(() => substituteRequests.id).notNull(),
+  approverId: varchar("approver_id").references(() => users.id).notNull(),
+  approverType: approverTypeEnum("approver_type").notNull(),
+  status: approvalStatusEnum("status").notNull(),
+  comments: text("comments"),
+  approvedAt: timestamp("approved_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_approval_per_stage").on(table.substitutionRequestId, table.approverType),
+  index("idx_substitution_approvals_request_id").on(table.substitutionRequestId),
+]);
 
 
 // Messages table
@@ -794,7 +830,7 @@ export const gameRsvpsRelations = relations(gameRsvps, ({ one }) => ({
   }),
 }));
 
-export const substituteRequestsRelations = relations(substituteRequests, ({ one }) => ({
+export const substituteRequestsRelations = relations(substituteRequests, ({ one, many }) => ({
   game: one(games, {
     fields: [substituteRequests.gameId],
     references: [games.id],
@@ -814,10 +850,22 @@ export const substituteRequestsRelations = relations(substituteRequests, ({ one 
     references: [users.id],
     relationName: "requestedBy",
   }),
+  requestingTeam: one(teams, {
+    fields: [substituteRequests.requestingTeamId],
+    references: [teams.id],
+  }),
+  approvals: many(substitutionApprovals),
+}));
+
+// Substitution approvals relations
+export const substitutionApprovalsRelations = relations(substitutionApprovals, ({ one }) => ({
+  substitutionRequest: one(substituteRequests, {
+    fields: [substitutionApprovals.substitutionRequestId],
+    references: [substituteRequests.id],
+  }),
   approver: one(users, {
-    fields: [substituteRequests.approvedBy],
+    fields: [substitutionApprovals.approverId],
     references: [users.id],
-    relationName: "approver",
   }),
 }));
 
@@ -932,10 +980,6 @@ export const insertGameRsvpSchema = createInsertSchema(gameRsvps).omit({
   updatedAt: true,
 });
 
-export const insertSubstituteRequestSchema = createInsertSchema(substituteRequests).omit({
-  id: true,
-  createdAt: true,
-});
 
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
   id: true,
@@ -972,6 +1016,19 @@ export const insertScrimmageSchema = createInsertSchema(scrimmages).omit({
 export const insertScrimmageRequestSchema = createInsertSchema(scrimmageRequests).omit({
   id: true,
   requestedAt: true,
+});
+
+// Substitution request schemas
+export const insertSubstituteRequestSchema = createInsertSchema(substituteRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  finalizedAt: true,
+});
+
+export const insertSubstitutionApprovalSchema = createInsertSchema(substitutionApprovals).omit({
+  id: true,
+  approvedAt: true,
 });
 
 // Client-safe request schemas (omit server-controlled fields)
@@ -1088,6 +1145,8 @@ export type GameRsvp = typeof gameRsvps.$inferSelect;
 export type InsertGameRsvp = z.infer<typeof insertGameRsvpSchema>;
 export type SubstituteRequest = typeof substituteRequests.$inferSelect;
 export type InsertSubstituteRequest = z.infer<typeof insertSubstituteRequestSchema>;
+export type SubstitutionApproval = typeof substitutionApprovals.$inferSelect;
+export type InsertSubstitutionApproval = z.infer<typeof insertSubstitutionApprovalSchema>;
 export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type AnnouncementAttachment = typeof announcementAttachments.$inferSelect;
