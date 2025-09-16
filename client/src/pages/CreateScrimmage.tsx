@@ -69,10 +69,9 @@ export default function CreateScrimmage() {
     enabled: !!selectedLeague?.id,
   });
 
-  // Filter members based on search term
+  // Filter members based on search term (names only)
   const filteredMembers = (leagueMembers as any[]).filter((member: any) => 
-    `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const createScrimmageRequest = useMutation({
@@ -344,7 +343,7 @@ export default function CreateScrimmage() {
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search members..."
+              placeholder="Search by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -421,9 +420,6 @@ export default function CreateScrimmage() {
                     <div className="flex-1">
                       <p className="font-medium" data-testid={`text-member-name-${member.user.id}`}>
                         {member.user.firstName} {member.user.lastName}
-                      </p>
-                      <p className="text-sm text-muted-foreground" data-testid={`text-member-email-${member.user.id}`}>
-                        {member.user.email}
                       </p>
                     </div>
                   </div>

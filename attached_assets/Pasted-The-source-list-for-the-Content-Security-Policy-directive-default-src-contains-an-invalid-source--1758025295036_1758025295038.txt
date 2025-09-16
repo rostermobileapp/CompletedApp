@@ -1,0 +1,76 @@
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+23The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+23The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+Rosters:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+Rosters:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+Rosters:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-014a1ffdcde2d552.js:38 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+_app-014a1ffdcde2d552.js:38 [LaunchDarkly] LaunchDarkly client initialized
+Rosters:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+framework-8c57d7014dc04c0f.js:1 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this error
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'battery'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'layout-animations'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'navigation-override'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'oversized-images'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'publickey-credentials'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'speaker-selection'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'unoptimized-images'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'unsized-media'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Unrecognized feature: 'pointer-lock'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+framework-8c57d7014dc04c0f.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this warning
+dotdevproxy.pike.replit.dev/__reachability:1  Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+dotdevproxy.pike.replit.dev/__reachability:1  Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+dotdevproxy.pike.replit.dev/__reachability:1  Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+/repls:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+framework-8c57d7014dc04c0f.js:1 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+_ @ framework-8c57d7014dc04c0f.js:1Understand this error
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arh2%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.
