@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,7 +10,8 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X } from 'lucide-react';
+import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required').optional(),
@@ -71,6 +72,35 @@ export default function Profile() {
     onError: () => {
       toast({ 
         title: 'Failed to update profile photo', 
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  // Fetch user leagues
+  const { data: userLeagues } = useQuery({
+    queryKey: ['/api/user/leagues'],
+  });
+
+  // Leave league mutation
+  const leaveLeagueMutation = useMutation({
+    mutationFn: async (leagueId: string) => {
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/leave`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: 'Successfully left league',
+        description: data.message 
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/league-memberships'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to leave league', 
+        description: error.message || 'Please try again.',
         variant: 'destructive' 
       });
     },
@@ -320,6 +350,62 @@ export default function Profile() {
           </div>
         </div>
       </div>
+      
+      {/* League Management */}
+      {userLeagues && Array.isArray(userLeagues) && userLeagues.length > 0 && (
+        <div className="px-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4" data-testid="text-leagues-title">Your Leagues</h2>
+          <div className="space-y-3">
+            {userLeagues.map((league: any) => (
+              <div key={league.id} className="bg-card rounded-lg border border-border p-4" data-testid={`card-league-${league.id}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Users className="w-5 h-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium" data-testid={`text-league-name-${league.id}`}>{league.name}</p>
+                      <p className="text-sm text-muted-foreground" data-testid={`text-league-sport-${league.id}`}>{league.sport}</p>
+                    </div>
+                  </div>
+                  
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        className="px-3 py-1 text-sm text-destructive border border-destructive rounded-md hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+                        disabled={leaveLeagueMutation.isPending}
+                        data-testid={`button-leave-league-${league.id}`}
+                      >
+                        {leaveLeagueMutation.isPending ? 'Leaving...' : 'Leave'}
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent data-testid={`dialog-leave-league-${league.id}`}>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Leave League</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to leave "{league.name}"? This will:
+                          <br />• Remove you from your team
+                          <br />• Clear your game history and RSVPs
+                          <br />• Disconnect your profile from the league roster
+                          <br /><br />This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel data-testid={`button-cancel-leave-${league.id}`}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => leaveLeagueMutation.mutate(league.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          data-testid={`button-confirm-leave-${league.id}`}
+                        >
+                          Leave League
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
       {/* Settings */}
       <div className="px-6">
