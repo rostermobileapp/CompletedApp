@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format, isBefore, isAfter, addHours } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, ArrowLeft, Check, X, Clock } from "lucide-react";
+import { Trophy, ArrowLeft, Check, X, Clock, Users } from "lucide-react";
 import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPStatusIcon } from "@/components/RSVPStatusIcon";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useEffect, useRef } from "react";
+import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 
 export default function Calendar() {
@@ -31,6 +32,16 @@ export default function Calendar() {
   const { data: allGames, isLoading: gamesLoading } = useQuery({
     queryKey: ["/api/user/games/all"],
   });
+
+  // Fetch user's created scrimmages
+  const { data: createdScrimmages = [] } = useQuery({
+    queryKey: ["/api/users", "scrimmages"],
+  }) as { data: (Scrimmage & { creator: User })[] };
+
+  // Fetch user's scrimmage requests (to find approved ones they're participating in)
+  const { data: scrimmageRequests = [] } = useQuery({
+    queryKey: ["/api/users", "scrimmage-requests"],
+  }) as { data: (ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[] };
 
 
 
@@ -64,25 +75,51 @@ export default function Calendar() {
       }).sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
     : [];
 
-  // Find the index to scroll to (between last game and next game)
-  const currentTime = new Date();
-  const nextGameIndex = userGames.findIndex((game: any) => 
-    isAfter(new Date(game.scheduledAt), currentTime)
-  );
-  const scrollToIndex = nextGameIndex > 0 ? nextGameIndex - 1 : 0;
+  // Get user's relevant scrimmages (created + approved requests)
+  const userScrimmages = [
+    // User's created scrimmages
+    ...createdScrimmages.map(scrimmage => ({
+      ...scrimmage,
+      type: 'scrimmage' as const,
+      userRole: 'creator' as const,
+      scheduledAt: scrimmage.dateTime, // Match games field name
+    })),
+    // User's approved scrimmage requests
+    ...scrimmageRequests
+      .filter(request => request.status === 'approved')
+      .map(request => ({
+        ...request.scrimmage,
+        type: 'scrimmage' as const,
+        userRole: 'participant' as const,
+        scheduledAt: request.scrimmage.dateTime, // Match games field name
+      }))
+  ];
 
-  // Auto-scroll to position between last and next game
+  // Combine games and scrimmages, then sort chronologically
+  const allEvents = [
+    ...userGames.map((game: any) => ({ ...game, type: 'game' as const })),
+    ...userScrimmages
+  ].sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+
+  // Find the index to scroll to (between last event and next event)
+  const currentTime = new Date();
+  const nextEventIndex = allEvents.findIndex((event: any) => 
+    isAfter(new Date(event.scheduledAt), currentTime)
+  );
+  const scrollToIndex = nextEventIndex > 0 ? nextEventIndex - 1 : 0;
+
+  // Auto-scroll to position between last and next event
   useEffect(() => {
-    if (!gamesLoading && userGames.length > 0 && gamesListRef.current) {
-      const gameCards = gamesListRef.current.children;
-      if (gameCards[scrollToIndex]) {
-        gameCards[scrollToIndex].scrollIntoView({ 
+    if (!gamesLoading && allEvents.length > 0 && gamesListRef.current) {
+      const eventCards = gamesListRef.current.children;
+      if (eventCards[scrollToIndex]) {
+        eventCards[scrollToIndex].scrollIntoView({ 
           behavior: 'smooth', 
           block: 'center' 
         });
       }
     }
-  }, [gamesLoading, userGames.length, scrollToIndex]);
+  }, [gamesLoading, allEvents.length, scrollToIndex]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -117,9 +154,50 @@ export default function Calendar() {
               </div>
             ))}
           </div>
-        ) : userGames.length > 0 ? (
+        ) : allEvents.length > 0 ? (
           <div className="space-y-3" ref={gamesListRef}>
-            {userGames.map((game: any) => {
+            {allEvents.map((event: any) => {
+              // Handle scrimmage events
+              if (event.type === 'scrimmage') {
+                return (
+                  <div 
+                    key={`scrimmage-${event.id}`}
+                    className="bg-card rounded-xl border border-blue-200 dark:border-blue-800 p-4 relative cursor-pointer hover:bg-muted/50 transition-colors" 
+                    onClick={() => navigate(`/scrimmage-management`)}
+                    data-testid={`card-scrimmage-${event.id}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center relative">
+                        <Users className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold" data-testid={`text-scrimmage-title-${event.id}`}>
+                          {event.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${event.id}`}>
+                          {format(new Date(event.scheduledAt), 'MMM d • h:mm a')}
+                        </p>
+                        {event.location && (
+                          <p className="text-xs text-muted-foreground" data-testid={`text-scrimmage-location-${event.id}`}>
+                            {event.location}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
+                            {event.userRole === 'creator' ? 'Creator' : 'Participant'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Scrimmage
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Handle game events (existing logic)
+              const game = event;
               const isCompleted = game.isCompleted || (game.homeScore !== null && game.awayScore !== null);
               const isPastGame = isBefore(addHours(new Date(game.scheduledAt), 2), new Date());
               return (
@@ -240,9 +318,9 @@ export default function Calendar() {
             })}
           </div>
         ) : (
-          <div className="bg-card rounded-xl border border-border p-8 text-center" data-testid="empty-all-games">
+          <div className="bg-card rounded-xl border border-border p-8 text-center" data-testid="empty-all-events">
             <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No upcoming games scheduled</p>
+            <p className="text-muted-foreground">No upcoming games or scrimmages scheduled</p>
           </div>
         )}
       </div>
