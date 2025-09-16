@@ -3025,6 +3025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Update scrimmage request status (Creator only)
   app.put('/api/scrimmage-requests/:id/status', isAuthenticated, async (req: any, res) => {
+    console.log(`🔧 DEBUG: PUT /api/scrimmage-requests/${req.params.id}/status - Body:`, req.body);
     try {
       const requestId = req.params.id;
       const userId = req.user.claims.sub;
