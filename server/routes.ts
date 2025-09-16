@@ -2145,6 +2145,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Leave a league (reverse of player merge)
+  app.post('/api/leagues/:leagueId/leave', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Check if user is actually a member of this league
+      const membership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!membership) {
+        return res.status(404).json({ message: 'You are not a member of this league' });
+      }
+
+      // Leave the league (this will detach from imported player and clean up memberships)
+      await storage.leaveLeague(userId, leagueId);
+
+      res.json({ success: true, message: 'Successfully left the league' });
+    } catch (error) {
+      console.error('Error leaving league:', error);
+      res.status(500).json({ message: 'Failed to leave league' });
+    }
+  });
+
 
   // Announcement routes
 

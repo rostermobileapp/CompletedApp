@@ -115,6 +115,7 @@ export interface IStorage {
   getPendingLeagueMembers(leagueId: string): Promise<(LeagueMembership & { user: User })[]>;
   updatePlayerSkillRating(membershipId: string, skillRating: number): Promise<LeagueMembership>;
   deleteLeagueMembership(membershipId: string): Promise<void>;
+  leaveLeague(userId: string, leagueId: string): Promise<void>;
   requestTeamMembership(membership: InsertTeamMembership): Promise<TeamMembership>;
   approveTeamMembership(membershipId: string, approverId: string): Promise<TeamMembership>;
   getTeamMembers(teamId: string): Promise<(TeamMembership & { user: User })[]>;
@@ -694,6 +695,49 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(leagueMemberships)
       .where(eq(leagueMemberships.id, membershipId));
+  }
+
+  async leaveLeague(userId: string, leagueId: string): Promise<void> {
+    // Find the user's league membership
+    const [membership] = await db
+      .select()
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.leagueId, leagueId)
+        )
+      );
+
+    if (!membership) {
+      throw new Error('League membership not found');
+    }
+
+    // Find the imported player record that was merged with this user in this league
+    const [importedPlayer] = await db
+      .select()
+      .from(importedPlayers)
+      .where(
+        and(
+          eq(importedPlayers.leagueId, leagueId),
+          eq(importedPlayers.mergedWithUserId, userId)
+        )
+      );
+
+    // If there's a merged imported player, detach it (reverse the merge)
+    if (importedPlayer) {
+      await db
+        .update(importedPlayers)
+        .set({
+          mergedWithUserId: null,
+          isPlaceholder: true,
+          updatedAt: new Date()
+        })
+        .where(eq(importedPlayers.id, importedPlayer.id));
+    }
+
+    // Delete the league membership (this will also clean up team memberships via our existing logic)
+    await this.deleteLeagueMembership(membership.id);
   }
 
   async updateLeagueMember(membershipId: string, updates: Partial<LeagueMembership>): Promise<LeagueMembership> {
