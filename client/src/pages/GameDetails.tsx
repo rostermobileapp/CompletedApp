@@ -285,16 +285,16 @@ export default function GameDetails() {
                   <div 
                     key={request.id} 
                     className="flex items-center gap-3 p-3 bg-muted rounded-lg"
-                    data-testid={`player-${request.user.id}`}
+                    data-testid={`player-${request.user?.id || 'unknown'}`}
                   >
                     <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                       <span className="text-primary-foreground text-sm font-semibold">
-                        {request.user.firstName?.[0] || '?'}{request.user.lastName?.[0] || ''}
+                        {request.user?.firstName?.[0] || '?'}{request.user?.lastName?.[0] || ''}
                       </span>
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium" data-testid={`text-player-name-${request.user.id}`}>
-                        {request.user.firstName} {request.user.lastName}
+                      <p className="font-medium" data-testid={`text-player-name-${request.user?.id || 'unknown'}`}>
+                        {request.user?.firstName || 'Unknown'} {request.user?.lastName || 'Player'}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         Confirmed • {format(new Date(request.updatedAt || request.createdAt), 'MMM d')}

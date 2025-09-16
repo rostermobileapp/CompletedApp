@@ -1089,7 +1089,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
-                      {game.isScrimmage ? game.title : `vs ${game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}`}
+                      {game.isScrimmage ? game.scrimmageTitle : `vs ${game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}`}
                     </h3>
                     <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
                       {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
