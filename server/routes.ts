@@ -2994,6 +2994,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get approved players for scrimmage (Any league member)
+  app.get('/api/scrimmages/:id/approved-players', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      
+      // Verify user is a member of the league
+      const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: "Must be a league member to view scrimmage details" });
+      }
+
+      // Get only approved requests
+      const allRequests = await storage.getScrimmageRequests(scrimmageId);
+      const approvedPlayers = allRequests.filter(request => request.status === 'approved');
+      
+      res.json({
+        scrimmage,
+        approvedPlayers
+      });
+    } catch (error) {
+      console.error('Error fetching approved players:', error);
+      res.status(500).json({ message: 'Failed to fetch approved players' });
+    }
+  });
+
   // Get scrimmage requests (Creator only)
   app.get('/api/scrimmages/:id/requests', isAuthenticated, async (req: any, res) => {
     try {

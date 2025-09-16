@@ -68,6 +68,7 @@ function Router() {
             <Route path="/league-list" component={LeagueList} />
             <Route path="/calendar" component={Calendar} />
             <Route path="/game/:id" component={GameDetails} />
+            <Route path="/scrimmage/:id" component={GameDetails} />
             <Route path="/announcements" component={Announcements} />
             <Route component={NotFound} />
           </Switch>

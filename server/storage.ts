@@ -805,11 +805,8 @@ export class DatabaseStorage implements IStorage {
           eq(scrimmageRequests.playerId, userId),
           eq(scrimmageRequests.status, 'approved'),
           gte(scrimmages.dateTime, new Date()),
-          // Try both 'active' and 'roster_confirmed' statuses
-          or(
-            eq(scrimmages.status, 'roster_confirmed'),
-            eq(scrimmages.status, 'active')
-          )
+          // Only roster_confirmed scrimmages should show on schedule
+          eq(scrimmages.status, 'roster_confirmed')
         )
       )
       .orderBy(asc(scrimmages.dateTime));

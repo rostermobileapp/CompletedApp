@@ -24,9 +24,11 @@ export default function GameDetails() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [, params] = useRoute("/game/:id");
-  const gameId = params?.id;
+  const [, scrimmageParams] = useRoute("/scrimmage/:id");
+  const gameId = params?.id || scrimmageParams?.id;
+  const isScrimmage = location.includes('/scrimmage/');
 
   const [notes, setNotes] = useState("");
   const [homeScore, setHomeScore] = useState("");
@@ -49,7 +51,13 @@ export default function GameDetails() {
   // Fetch specific game details
   const { data: game, isLoading: gameLoading } = useQuery<GameWithTeams>({
     queryKey: [`/api/games/${gameId}`],
-    enabled: !!gameId,
+    enabled: !!gameId && !isScrimmage,
+  });
+
+  // Fetch scrimmage details and approved players
+  const { data: scrimmageData, isLoading: scrimmageLoading } = useQuery({
+    queryKey: [`/api/scrimmages/${gameId}/approved-players`],
+    enabled: !!gameId && isScrimmage,
   });
 
 
@@ -174,7 +182,7 @@ export default function GameDetails() {
     },
   });
 
-  if (gameLoading || !game) {
+  if ((isScrimmage && (scrimmageLoading || !scrimmageData)) || (!isScrimmage && (gameLoading || !game))) {
     return (
       <div className="min-h-screen bg-background">
         <div className="bg-card border-b border-border px-6 py-4">
@@ -191,12 +199,115 @@ export default function GameDetails() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-xl font-semibold">Game Details</h1>
+            <h1 className="text-xl font-semibold">{isScrimmage ? 'Scrimmage Details' : 'Game Details'}</h1>
           </div>
         </div>
         <div className="px-6 py-6">
           <div className="bg-card rounded-xl border border-border p-4 animate-pulse">
             <div className="h-32 bg-muted rounded"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Early return with scrimmage-specific UI if viewing a scrimmage
+  if (isScrimmage && scrimmageData) {
+    const { scrimmage, approvedPlayers } = scrimmageData as any;
+    
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="bg-card border-b border-border px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate("/calendar");
+              }}
+              className="p-2"
+              data-testid="button-back-scrimmage"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-xl font-semibold">Scrimmage Details</h1>
+          </div>
+        </div>
+
+        <div className="px-6 py-6 space-y-6">
+          {/* Scrimmage Info */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                <Trophy className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-semibold" data-testid="text-scrimmage-title">
+                  {scrimmage.title}
+                </h2>
+                <p className="text-sm text-muted-foreground" data-testid="text-scrimmage-date">
+                  {format(new Date(scrimmage.dateTime), 'EEEE, MMMM d • h:mm a')}
+                </p>
+              </div>
+            </div>
+
+            {scrimmage.location && (
+              <div className="flex items-center gap-2 mb-3">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground" data-testid="text-scrimmage-location">
+                  {scrimmage.location}
+                </p>
+              </div>
+            )}
+
+            {scrimmage.notes && (
+              <div className="mt-4 p-4 bg-muted rounded-lg">
+                <p className="text-sm" data-testid="text-scrimmage-notes">
+                  {scrimmage.notes}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Approved Players */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">
+                Confirmed Players ({approvedPlayers.length}/{scrimmage.maxPlayers})
+              </h3>
+            </div>
+
+            {approvedPlayers.length > 0 ? (
+              <div className="space-y-3">
+                {approvedPlayers.map((request: any) => (
+                  <div 
+                    key={request.id} 
+                    className="flex items-center gap-3 p-3 bg-muted rounded-lg"
+                    data-testid={`player-${request.user.id}`}
+                  >
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                      <span className="text-primary-foreground text-sm font-semibold">
+                        {request.user.firstName?.[0] || '?'}{request.user.lastName?.[0] || ''}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium" data-testid={`text-player-name-${request.user.id}`}>
+                        {request.user.firstName} {request.user.lastName}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Confirmed • {format(new Date(request.updatedAt || request.createdAt), 'MMM d')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-4">
+                No players confirmed yet
+              </p>
+            )}
           </div>
         </div>
       </div>
