@@ -634,6 +634,11 @@ export default function Dashboard() {
       return teams.filter(team => team.leagueId === selectedLeagueId);
     }
   });
+  
+  // Get all user teams (unfiltered) for captain checks across all leagues
+  const { data: userTeamsAll } = useQuery({
+    queryKey: ['/api/user/teams']
+  });
 
   const { data: userLeagueMemberships } = useQuery({
     queryKey: ['/api/user/league-memberships'],
@@ -681,6 +686,18 @@ export default function Dashboard() {
       : null;
 
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
+  
+  // Compute captain status for the selected league using team.captainId
+  const isTeamCaptainInSelectedLeague = React.useMemo(() => {
+    if (!selectedLeagueId || !Array.isArray(userTeams) || !(user as any)?.id) return false;
+    return userTeams.some(team => team.captainId === (user as any).id);
+  }, [selectedLeagueId, userTeams, (user as any)?.id]);
+  
+  // Helper to compute captain status for any league (for dropdown badges)
+  const isCaptainInLeague = React.useCallback((leagueId: string) => {
+    if (!Array.isArray(userTeamsAll) || !(user as any)?.id) return false;
+    return userTeamsAll.some(team => team.leagueId === leagueId && team.captainId === (user as any).id);
+  }, [userTeamsAll, (user as any)?.id]);
 
   // Fetch team record based on game scores
   const { data: teamRecord } = useQuery({
@@ -833,7 +850,7 @@ export default function Dashboard() {
             
             
             {/* Captain Badge */}
-            {selectedLeagueMembership?.isCaptain && (
+            {isTeamCaptainInSelectedLeague && (
               <span className="w-6 h-6 bg-warning text-black font-bold text-sm flex items-center justify-center rounded">
                 C
               </span>
@@ -911,7 +928,7 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2">
                         <Trophy className="w-4 h-4" />
                         <span className="font-medium text-sm">{league.name}</span>
-                        {membership?.isCaptain && (
+                        {isCaptainInLeague(league.id) && (
                           <span className="ml-auto w-4 h-4 bg-warning text-black font-bold text-xs flex items-center justify-center rounded">
                             C
                           </span>
@@ -994,7 +1011,7 @@ export default function Dashboard() {
         </div>
       )}
       {/* Captain To-Do Section */}
-      {selectedLeagueMembership?.isCaptain && selectedLeagueId && (
+      {isTeamCaptainInSelectedLeague && selectedLeagueId && (
         <CaptainToDo 
           leagueId={selectedLeagueId} 
           userTeams={userTeams as any[]} 
