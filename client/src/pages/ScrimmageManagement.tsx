@@ -383,7 +383,7 @@ export default function ScrimmageManagement() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1">
-                                  <p className="font-medium text-black">
+                                  <p className="font-medium text-[#ffffff] text-[14px]">
                                     {request.player.firstName} {request.player.lastName}
                                   </p>
                                 </div>
