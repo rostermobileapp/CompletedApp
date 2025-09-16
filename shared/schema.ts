@@ -161,7 +161,6 @@ export const leagueMemberships = pgTable("league_memberships", {
   approvedBy: varchar("approved_by").references(() => users.id),
   // Additional player management fields
   assignedTeamId: varchar("assigned_team_id").references(() => teams.id),
-  isCaptain: boolean("is_captain").default(false),
   position: varchar("position"),
   notes: text("notes"),
   jerseyNumber: integer("jersey_number"),
@@ -1121,7 +1120,6 @@ export type GameWithTeams = Game & {
 
 export type TeamMemberWithUser = TeamMembership & {
   user: User;
-  isCaptain?: boolean;
 };
 
 export type UserTeam = Team;
