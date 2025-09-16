@@ -1056,7 +1056,11 @@ export default function Dashboard() {
           <div className="space-y-3">
             {(upcomingGames as any[])
               .filter((game: any) => {
-                // Ensure we only show games for teams the user is currently on
+                // Always show scrimmages (user is already approved)
+                if (game.isScrimmage) {
+                  return true;
+                }
+                // For regular games, ensure we only show games for teams the user is currently on
                 const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
                 return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
               })

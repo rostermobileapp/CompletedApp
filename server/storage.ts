@@ -792,27 +792,6 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Get approved scrimmages for the user
-    console.log(`🏒 DEBUG: Looking for approved scrimmages for user ${userId}`);
-    
-    // First, let's see all scrimmage requests for this user
-    const allUserRequests = await db
-      .select({
-        request: scrimmageRequests,
-        scrimmage: scrimmages
-      })
-      .from(scrimmageRequests)
-      .innerJoin(scrimmages, eq(scrimmageRequests.scrimmageId, scrimmages.id))
-      .where(eq(scrimmageRequests.playerId, userId));
-      
-    console.log(`🏒 DEBUG: All scrimmage requests for user ${userId}:`, allUserRequests.map(r => ({
-      requestId: r.request.id,
-      requestStatus: r.request.status,
-      scrimmageId: r.scrimmage.id,
-      scrimmageTitle: r.scrimmage.title,
-      scrimmageStatus: r.scrimmage.status,
-      scrimmageDateTime: r.scrimmage.dateTime
-    })));
-
     const approvedScrimmages = await db
       .select({
         scrimmage: scrimmages,
@@ -834,13 +813,6 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(asc(scrimmages.dateTime));
-
-    console.log(`🏒 DEBUG: Found ${approvedScrimmages.length} approved scrimmages:`, approvedScrimmages.map(s => ({
-      id: s.scrimmage.id,
-      title: s.scrimmage.title,
-      dateTime: s.scrimmage.dateTime,
-      status: s.scrimmage.status
-    })));
 
     // Convert approved scrimmages to game-like format
     const scrimmagesAsGames = approvedScrimmages.map(({ scrimmage, creator }) => ({
