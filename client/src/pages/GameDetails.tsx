@@ -73,10 +73,10 @@ export default function GameDetails() {
   });
 
 
-  // Fetch score submissions
+  // Fetch score submissions (only for games, not scrimmages)
   const { data: scoreSubmissions } = useQuery<GameScoreSubmission[]>({
     queryKey: [`/api/games/${gameId}/score-submissions`],
-    enabled: !!gameId,
+    enabled: !!gameId && !isScrimmage,
   });
 
   // Fetch league details for commissioner check
