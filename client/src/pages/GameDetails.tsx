@@ -338,25 +338,25 @@ export default function GameDetails() {
             </div>
 
             {approvedPlayers.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {approvedPlayers.map((request: any) => (
                   <div 
                     key={request.id} 
-                    className="flex items-center gap-3 p-3 bg-muted rounded-lg"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-white text-black border"
                     data-testid={`player-${request.player?.id || 'unknown'}`}
                   >
-                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                      <span className="text-primary-foreground text-sm font-semibold">
+                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                      <span className="text-black text-xs font-semibold">
                         {request.player?.firstName?.[0] || '?'}{request.player?.lastName?.[0] || ''}
                       </span>
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium" data-testid={`text-player-name-${request.player?.id || 'unknown'}`}>
+                      <p className="font-medium text-black" data-testid={`text-player-name-${request.player?.id || 'unknown'}`}>
                         {request.player?.firstName || 'Unknown'} {request.player?.lastName || 'Player'}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        Confirmed • {format(new Date(request.updatedAt || request.createdAt), 'MMM d')}
-                      </p>
+                    </div>
+                    <div className="bg-green-600 text-white text-xs px-2 py-1 rounded">
+                      ✓ Confirmed
                     </div>
                   </div>
                 ))}
