@@ -1060,7 +1060,7 @@ export default function Dashboard() {
                 const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
                 return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
               })
-              .slice(0, 2).map((game: any) => (
+              .slice(0, 4).map((game: any) => (
               <div 
                 key={game.id} 
                 className="bg-card rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors" 

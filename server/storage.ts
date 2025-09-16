@@ -790,8 +790,70 @@ export class DatabaseStorage implements IStorage {
         awayTeam,
       });
     }
-    
-    return gamesWithTeams;
+
+    // Get approved scrimmages for the user
+    const approvedScrimmages = await db
+      .select({
+        scrimmage: scrimmages,
+        creator: users
+      })
+      .from(scrimmageRequests)
+      .innerJoin(scrimmages, eq(scrimmageRequests.scrimmageId, scrimmages.id))
+      .innerJoin(users, eq(scrimmages.creatorId, users.id))
+      .where(
+        and(
+          eq(scrimmageRequests.playerId, userId),
+          eq(scrimmageRequests.status, 'approved'),
+          gte(scrimmages.dateTime, new Date()),
+          eq(scrimmages.status, 'roster_confirmed')
+        )
+      )
+      .orderBy(asc(scrimmages.dateTime));
+
+    // Convert approved scrimmages to game-like format
+    const scrimmagesAsGames = approvedScrimmages.map(({ scrimmage, creator }) => ({
+      id: scrimmage.id,
+      createdAt: scrimmage.createdAt,
+      leagueId: scrimmage.leagueId,
+      seasonId: null,
+      homeTeamId: '',
+      awayTeamId: '',
+      scheduledAt: scrimmage.dateTime,
+      venue: scrimmage.location,
+      lockerRoom: null,
+      homeTeamLockerRoom: null,
+      awayTeamLockerRoom: null,
+      homeScore: null,
+      awayScore: null,
+      isCompleted: false,
+      homeBeverageDutyUserId: null,
+      homeBeverageDutyClaimedAt: null,
+      awayBeverageDutyUserId: null,
+      awayBeverageDutyClaimedAt: null,
+      updatedAt: scrimmage.updatedAt,
+      // Create pseudo teams for display
+      homeTeam: {
+        id: 'scrimmage-creator',
+        name: creator.firstName ? `${creator.firstName} ${creator.lastName || ''}`.trim() : creator.email || 'Creator',
+        leagueId: scrimmage.leagueId,
+        logoUrl: null,
+        isActive: true
+      },
+      awayTeam: {
+        id: 'scrimmage-participant',
+        name: 'Scrimmage',
+        leagueId: scrimmage.leagueId, 
+        logoUrl: null,
+        isActive: true
+      },
+      // Mark as scrimmage for frontend identification
+      isScrimmage: true,
+      scrimmageTitle: scrimmage.title
+    }));
+
+    // Combine regular games and scrimmages, then sort by scheduled time
+    const allEvents = [...gamesWithTeams, ...scrimmagesAsGames];
+    return allEvents.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
   }
 
   async getAllUserGames(userId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
