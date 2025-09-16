@@ -176,8 +176,11 @@ export default function Profile() {
               : (user as any)?.firstName || 'User'
             }
           </h2>
-          <p className="text-muted-foreground mb-3" data-testid="text-user-email">
+          <p className="text-muted-foreground mb-1" data-testid="text-user-email">
             {(user as any)?.email || 'No email provided'}
+          </p>
+          <p className="text-xs text-muted-foreground/70 mb-3" data-testid="text-user-id">
+            ID: {(user as any)?.id}
           </p>
           <div className="flex items-center justify-center gap-2 mb-4">
             <span 
