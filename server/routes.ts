@@ -628,11 +628,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let isLeagueMemberCaptain = false;
       if (team) {
         const leagueMemberships = await storage.getUserLeagueMemberships(userId);
-        isLeagueMemberCaptain = leagueMemberships.some(membership => 
-          membership.leagueId === team.leagueId && 
-          membership.isCaptain === true &&
-          membership.assignedTeamId === teamId
-        );
+        // Check if user is captain of the team through teams.captainId
+        isLeagueMemberCaptain = team.captainId === userId;
       }
       
       if (!team || (!isTeamCaptain && !isLeagueMemberCaptain && !isCommissioner)) {
@@ -864,13 +861,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Check if user is captain of home team
         const leagueMembers = await storage.getLeagueMembers(game.leagueId);
-        const homeTeamCaptain = leagueMembers.find(m => m.userId === userId && m.assignedTeamId === game.homeTeamId && m.isCaptain);
+        // Check if user is captain of the home team
+        const homeTeam = await storage.getTeam(game.homeTeamId);
+        const homeTeamCaptain = homeTeam && homeTeam.captainId === userId;
         
         if (homeTeamCaptain) {
           submitterRole = 'home_captain';
         } else {
           // Check if user is captain of away team
-          const awayTeamCaptain = leagueMembers.find(m => m.userId === userId && m.assignedTeamId === game.awayTeamId && m.isCaptain);
+          // Check if user is captain of the away team
+          const awayTeam = await storage.getTeam(game.awayTeamId);
+          const awayTeamCaptain = awayTeam && awayTeam.captainId === userId;
           
           if (awayTeamCaptain) {
             submitterRole = 'away_captain';
@@ -948,9 +949,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(game.leagueId);
       const isCommissioner = league && league.commissionerId === userId;
       
-      const leagueMembers = await storage.getLeagueMembers(game.leagueId);
-      const isHomeCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.homeTeamId && m.isCaptain);
-      const isAwayCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.awayTeamId && m.isCaptain);
+      // Check if user is captain of either team
+      const homeTeam = await storage.getTeam(game.homeTeamId);
+      const awayTeam = await storage.getTeam(game.awayTeamId);
+      const isHomeCaptain = homeTeam && homeTeam.captainId === userId;
+      const isAwayCaptain = awayTeam && awayTeam.captainId === userId;
       
       // For now, allow any authenticated user to access (simplified access control)
       // TODO: Implement proper team membership checking when teams have members
@@ -1157,14 +1160,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(game.leagueId);
       const isCommissioner = league && league.commissionerId === userId;
       
-      const leagueMembers = await storage.getLeagueMembers(game.leagueId);
-      const isHomeCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.homeTeamId && m.isCaptain);
-      const isAwayCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.awayTeamId && m.isCaptain);
+      // Check if user is captain of either team
+      const homeTeam = await storage.getTeam(game.homeTeamId);
+      const awayTeam = await storage.getTeam(game.awayTeamId);
+      const isHomeCaptain = homeTeam && homeTeam.captainId === userId;
+      const isAwayCaptain = awayTeam && awayTeam.captainId === userId;
       
       // For team-specific access
       if (teamId) {
         // Verify user is captain of the requested team or commissioner
-        const isCaptainOfRequestedTeam = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === teamId && m.isCaptain);
+        const requestedTeam = await storage.getTeam(teamId as string);
+        const isCaptainOfRequestedTeam = requestedTeam && requestedTeam.captainId === userId;
         
         if (!isCommissioner && !isCaptainOfRequestedTeam) {
           return res.status(403).json({ message: 'Captain or Commissioner access required for this team' });
@@ -1267,10 +1273,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Game not found' });
       }
 
-      // Check if user is captain
-      const leagueMembers = await storage.getLeagueMembers(game.leagueId);
-      const isHomeCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.homeTeamId && m.isCaptain);
-      const isAwayCaptain = leagueMembers.some(m => m.userId === userId && m.assignedTeamId === game.awayTeamId && m.isCaptain);
+      // Check if user is captain of either team
+      const homeTeam = await storage.getTeam(game.homeTeamId);
+      const awayTeam = await storage.getTeam(game.awayTeamId);
+      const isHomeCaptain = homeTeam && homeTeam.captainId === userId;
+      const isAwayCaptain = awayTeam && awayTeam.captainId === userId;
       
       if (!isHomeCaptain && !isAwayCaptain) {
         return res.status(403).json({ message: 'Captain access required' });

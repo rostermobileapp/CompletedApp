@@ -105,6 +105,7 @@ export interface IStorage {
   getTeam(id: string): Promise<Team | undefined>;
   getUserTeams(userId: string): Promise<Team[]>;
   updateTeamLogo(id: string, logoUrl: string): Promise<Team>;
+  setTeamCaptain(teamId: string, captainId: string | null): Promise<Team>;
   
   // Membership operations
   requestLeagueMembership(membership: InsertLeagueMembership): Promise<LeagueMembership>;
