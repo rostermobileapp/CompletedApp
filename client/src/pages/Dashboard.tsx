@@ -174,7 +174,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                               </span>
                             </div>
                             <div>
-                              <p className="font-medium">
+                              <p className="font-medium text-[#000000]">
                                 {member.user?.firstName || 'Unknown'} {member.user?.lastName || 'User'}
                               </p>
                               <p className="text-sm text-muted-foreground">
