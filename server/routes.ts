@@ -3041,8 +3041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get the request first
-      const allRequests = await storage.getScrimmageRequests(requestId);
-      const request = allRequests.find(r => r.id === requestId);
+      const request = await storage.getScrimmageRequestById(requestId);
       
       if (!request) {
         return res.status(404).json({ message: 'Request not found' });
@@ -3135,71 +3134,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update scrimmage request status (approve/decline)
-  app.put('/api/scrimmage-requests/:id/status', isAuthenticated, async (req: any, res) => {
-    try {
-      const requestId = req.params.id;
-      const userId = req.user.claims.sub;
-      const { status } = req.body;
-
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(401).json({ message: "User not found" });
-      }
-
-      // Validate status
-      if (!status || !['approved', 'dismissed'].includes(status)) {
-        return res.status(400).json({ message: 'Status must be "approved" or "dismissed"' });
-      }
-
-      // Get the request to check permissions
-      const request = await storage.getScrimmageRequestById(requestId);
-      if (!request) {
-        return res.status(404).json({ message: 'Request not found' });
-      }
-
-      // Get the scrimmage to verify creator permissions
-      const scrimmage = await storage.getScrimmage(request.scrimmageId);
-      if (!scrimmage) {
-        return res.status(404).json({ message: 'Scrimmage not found' });
-      }
-
-      // Only scrimmage creator can approve/decline requests
-      if (scrimmage.creatorId !== userId) {
-        return res.status(403).json({ message: 'Only the scrimmage creator can approve or decline requests' });
-      }
-
-      // Business invariant: Cannot approve if scrimmage has already started
-      const now = new Date();
-      if (scrimmage.dateTime <= now) {
-        return res.status(409).json({ message: 'Cannot update request status after scrimmage has started' });
-      }
-
-      // Business invariant: Cannot approve if scrimmage is cancelled
-      if (scrimmage.status === 'cancelled') {
-        return res.status(409).json({ message: 'Cannot approve request for cancelled scrimmage' });
-      }
-
-      // For approval: Check capacity
-      if (status === 'approved') {
-        const allRequests = await storage.getScrimmageRequests(request.scrimmageId);
-        const currentApproved = allRequests.filter(r => r.status === 'approved' && r.id !== requestId).length;
-        
-        if (currentApproved >= scrimmage.maxPlayers) {
-          return res.status(409).json({ message: 'Scrimmage is already at full capacity' });
-        }
-      }
-
-      // Update the request status
-      const updatedRequest = await storage.updateScrimmageRequestStatus(requestId, status);
-      
-      console.log(`✅ ${status === 'approved' ? 'Approved' : 'Declined'} scrimmage request ${requestId} for scrimmage ${scrimmage.title}`);
-      res.json(updatedRequest);
-    } catch (error) {
-      console.error('Error updating request status:', error);
-      res.status(500).json({ message: 'Failed to update request status' });
-    }
-  });
 
   // Get player's scrimmage requests
   app.get('/api/users/scrimmage-requests', isAuthenticated, async (req: any, res) => {
