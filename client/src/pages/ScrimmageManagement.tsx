@@ -244,7 +244,6 @@ export default function ScrimmageManagement() {
           </div>
         </div>
       </div>
-
       <div className="max-w-md mx-auto p-4">
         {scrimmages.length === 0 ? (
           <div className="bg-card rounded-xl border border-border p-8 text-center">
@@ -297,7 +296,6 @@ export default function ScrimmageManagement() {
                       </div>
                     </div>
                   </CardHeader>
-                  
                   <CardContent className="pt-0">
                     <div className="flex gap-2">
                       <Button
@@ -375,7 +373,7 @@ export default function ScrimmageManagement() {
                             {rosterData.approvedPlayers.map((request) => (
                               <div
                                 key={request.id}
-                                className="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-white text-black border"
+                                className="flex items-center gap-3 p-3 rounded-lg dark:bg-white border bg-[#000000] text-[#ffffff]"
                                 data-testid={`roster-player-${request.id}`}
                               >
                                 <Avatar className="h-8 w-8">
