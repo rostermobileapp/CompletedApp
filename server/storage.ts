@@ -2399,6 +2399,9 @@ export class DatabaseStorage implements IStorage {
         .where(eq(substituteRequests.id, requestId))
         .returning();
 
+      // 8. Send notifications for workflow progression
+      await this.createSubstitutionNotification(tx, request, updatedRequest, approverType, status);
+
       return { approval, updatedRequest };
     });
   }
@@ -2453,6 +2456,139 @@ export class DatabaseStorage implements IStorage {
         return 'pending_substitute_approval';
       default:
         throw new Error(`Invalid approver type: ${approverType}`);
+    }
+  }
+
+  // Create targeted notifications for substitution workflow progression
+  private async createSubstitutionNotification(
+    tx: any,
+    originalRequest: SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User },
+    updatedRequest: SubstituteRequest,
+    approverType: 'opposing_captain' | 'commissioner' | 'substitute_player',
+    decision: 'approved' | 'denied'
+  ): Promise<void> {
+    try {
+      const leagueId = originalRequest.game.leagueId;
+      
+      // Determine notification content and target based on workflow progression
+      let targetUserId: string | null = null;
+      let content = '';
+      
+      if (decision === 'denied') {
+        // Denial notifications - notify requesting team captain
+        const requestingTeam = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
+          ? originalRequest.game.homeTeam 
+          : originalRequest.game.awayTeam;
+        
+        if (requestingTeam.captainId) {
+          targetUserId = requestingTeam.captainId;
+          const approverRole = approverType === 'opposing_captain' ? 'opposing team captain' : 
+                              approverType === 'commissioner' ? 'league commissioner' : 'substitute player';
+          content = `🚫 Your substitution request for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game has been denied by the ${approverRole}.`;
+        }
+      } else if (decision === 'approved') {
+        // Approval notifications - notify next person in workflow
+        switch (updatedRequest.status) {
+          case 'pending_commissioner_approval':
+            // Opposing captain approved → notify commissioner
+            const league = await tx.select().from(leagues).where(eq(leagues.id, leagueId)).limit(1);
+            if (league[0]?.commissionerId) {
+              targetUserId = league[0].commissionerId;
+              content = `⚖️ Commissioner approval needed: A substitution request for the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game has been approved by the opposing team captain and now needs your approval as league commissioner.`;
+            }
+            break;
+            
+          case 'pending_substitute_approval':
+            // Commissioner approved → notify substitute player
+            if (originalRequest.substitutePlayer?.id) {
+              targetUserId = originalRequest.substitutePlayer.id;
+              content = `🏆 You've been requested as a substitute player! The ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game needs you to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName}. Please confirm your availability.`;
+            }
+            break;
+            
+          case 'approved':
+            // Substitute player confirmed → notify all parties
+            const allParticipants: string[] = [];
+            
+            // Add requesting team captain
+            const requestingTeam = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
+              ? originalRequest.game.homeTeam 
+              : originalRequest.game.awayTeam;
+            if (requestingTeam.captainId) {
+              allParticipants.push(requestingTeam.captainId);
+            }
+            
+            // Add opposing team captain
+            const opposingTeam = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
+              ? originalRequest.game.awayTeam 
+              : originalRequest.game.homeTeam;
+            if (opposingTeam.captainId) {
+              allParticipants.push(opposingTeam.captainId);
+            }
+            
+            // Add commissioner
+            const leagueData = await tx.select().from(leagues).where(eq(leagues.id, leagueId)).limit(1);
+            if (leagueData[0]?.commissionerId) {
+              allParticipants.push(leagueData[0].commissionerId);
+            }
+            
+            // Add original player
+            if (originalRequest.originalPlayerId) {
+              allParticipants.push(originalRequest.originalPlayerId);
+            }
+            
+            // Create notifications for all participants (multiple target users)
+            if (allParticipants.length > 0) {
+              const substitutePlayerName = originalRequest.substitutePlayer 
+                ? `${originalRequest.substitutePlayer.firstName} ${originalRequest.substitutePlayer.lastName}`
+                : 'the substitute player';
+              content = `✅ Substitution confirmed! ${substitutePlayerName} has confirmed they will substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game.`;
+              
+              // Create the announcement
+              const [announcement] = await tx
+                .insert(announcements)
+                .values({
+                  leagueId,
+                  authorId: originalRequest.requestedBy, // System notification from the requesting user
+                  content,
+                  isPinned: false,
+                })
+                .returning();
+              
+              // Create visibility records for all participants
+              const visibilityRecords = allParticipants.map(userId => ({
+                announcementId: announcement.id,
+                userId,
+              }));
+              
+              await tx.insert(announcementVisibility).values(visibilityRecords);
+              return; // Early return for multi-user notification
+            }
+            break;
+        }
+      }
+      
+      // Create single-user targeted notification
+      if (targetUserId && content) {
+        const [announcement] = await tx
+          .insert(announcements)
+          .values({
+            leagueId,
+            authorId: originalRequest.requestedBy, // System notification from the requesting user
+            content,
+            isPinned: false,
+          })
+          .returning();
+        
+        await tx.insert(announcementVisibility).values({
+          announcementId: announcement.id,
+          userId: targetUserId,
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error creating substitution notification:', error);
+      // Don't throw error - notification failure shouldn't break approval workflow
     }
   }
 
