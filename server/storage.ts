@@ -2235,6 +2235,14 @@ export class DatabaseStorage implements IStorage {
     return request;
   }
 
+  async getScrimmageRequestById(requestId: string): Promise<ScrimmageRequest | undefined> {
+    const [request] = await db
+      .select()
+      .from(scrimmageRequests)
+      .where(eq(scrimmageRequests.id, requestId));
+    return request;
+  }
+
   async updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date): Promise<ScrimmageRequest> {
     const updateData: Partial<InsertScrimmageRequest> = { status };
     
