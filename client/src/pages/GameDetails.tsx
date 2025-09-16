@@ -372,6 +372,36 @@ export default function GameDetails() {
     );
   }
 
+  // Return error if not loading and no game data (invalid route)
+  if (!gameLoading && !game) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="bg-card border-b border-border px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate("/calendar");
+              }}
+              className="p-2"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-xl font-semibold">Game Details</h1>
+          </div>
+        </div>
+        <div className="px-6 py-6">
+          <div className="bg-card rounded-xl border border-border p-6">
+            <p className="text-center text-muted-foreground">Game not found</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Find which of user's teams is playing in this game
   const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team) => team.id) : [];
   
