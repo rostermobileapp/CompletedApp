@@ -698,46 +698,125 @@ export class DatabaseStorage implements IStorage {
   }
 
   async leaveLeague(userId: string, leagueId: string): Promise<void> {
-    // Find the user's league membership
-    const [membership] = await db
-      .select()
-      .from(leagueMemberships)
-      .where(
-        and(
-          eq(leagueMemberships.userId, userId),
-          eq(leagueMemberships.leagueId, leagueId)
-        )
-      );
+    return await db.transaction(async (tx) => {
+      // Find the user's league membership
+      const [membership] = await tx
+        .select()
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.leagueId, leagueId)
+          )
+        );
 
-    if (!membership) {
-      throw new Error('League membership not found');
-    }
+      if (!membership) {
+        throw new Error('MEMBERSHIP_NOT_FOUND');
+      }
 
-    // Find the imported player record that was merged with this user in this league
-    const [importedPlayer] = await db
-      .select()
-      .from(importedPlayers)
-      .where(
-        and(
-          eq(importedPlayers.leagueId, leagueId),
-          eq(importedPlayers.mergedWithUserId, userId)
-        )
-      );
+      // Find the imported player record that was merged with this user in this league
+      const [importedPlayer] = await tx
+        .select()
+        .from(importedPlayers)
+        .where(
+          and(
+            eq(importedPlayers.leagueId, leagueId),
+            eq(importedPlayers.mergedWithUserId, userId)
+          )
+        );
 
-    // If there's a merged imported player, detach it (reverse the merge)
-    if (importedPlayer) {
-      await db
-        .update(importedPlayers)
+      // If there's a merged imported player, detach it (reverse the merge)
+      if (importedPlayer) {
+        await tx
+          .update(importedPlayers)
+          .set({
+            mergedWithUserId: null,
+            isPlaceholder: true,
+            updatedAt: new Date()
+          })
+          .where(eq(importedPlayers.id, importedPlayer.id));
+      }
+
+      // Get all teams in this league to clean up direct team memberships
+      const leagueTeams = await tx
+        .select({ id: teams.id })
+        .from(teams)
+        .where(eq(teams.leagueId, leagueId));
+
+      const leagueTeamIds = leagueTeams.map(t => t.id);
+
+      // Clean up direct team memberships for this user in this league's teams
+      if (leagueTeamIds.length > 0) {
+        await tx
+          .delete(teamMemberships)
+          .where(
+            and(
+              eq(teamMemberships.userId, userId),
+              inArray(teamMemberships.teamId, leagueTeamIds)
+            )
+          );
+      }
+
+      // Clean up ALL user data across the entire league (not just assigned team)
+      // Get all future games in this league
+      const leagueGames = await tx
+        .select({ id: games.id })
+        .from(games)
+        .where(
+          and(
+            eq(games.leagueId, leagueId),
+            gte(games.scheduledAt, new Date()) // Only future games
+          )
+        );
+
+      const leagueGameIds = leagueGames.map(g => g.id);
+
+      if (leagueGameIds.length > 0) {
+        // Remove ALL RSVP records for this user in any game in this league
+        await tx
+          .delete(gameRsvps)
+          .where(
+            and(
+              eq(gameRsvps.userId, userId),
+              inArray(gameRsvps.gameId, leagueGameIds)
+            )
+          );
+      }
+
+      // Remove ALL beverage duty assignments for this user in this league (both home and away)
+      await tx
+        .update(games)
         .set({
-          mergedWithUserId: null,
-          isPlaceholder: true,
-          updatedAt: new Date()
+          homeBeverageDutyUserId: null,
+          homeBeverageDutyClaimedAt: null
         })
-        .where(eq(importedPlayers.id, importedPlayer.id));
-    }
+        .where(
+          and(
+            eq(games.leagueId, leagueId),
+            eq(games.homeBeverageDutyUserId, userId),
+            gte(games.scheduledAt, new Date())
+          )
+        );
 
-    // Delete the league membership (this will also clean up team memberships via our existing logic)
-    await this.deleteLeagueMembership(membership.id);
+      await tx
+        .update(games)
+        .set({
+          awayBeverageDutyUserId: null,
+          awayBeverageDutyClaimedAt: null
+        })
+        .where(
+          and(
+            eq(games.leagueId, leagueId),
+            eq(games.awayBeverageDutyUserId, userId),
+            gte(games.scheduledAt, new Date())
+          )
+        );
+
+      // Finally, delete the league membership
+      await tx
+        .delete(leagueMemberships)
+        .where(eq(leagueMemberships.id, membership.id));
+    });
   }
 
   async updateLeagueMember(membershipId: string, updates: Partial<LeagueMembership>): Promise<LeagueMembership> {

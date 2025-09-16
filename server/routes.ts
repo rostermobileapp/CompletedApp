@@ -2157,13 +2157,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'You are not a member of this league' });
       }
 
+      // Check if user is the commissioner - prevent them from leaving their own league
+      const league = await storage.getLeague(leagueId);
+      if (league && league.commissionerId === userId) {
+        return res.status(403).json({ message: 'Commissioners cannot leave their own league. Please transfer commissioner role first.' });
+      }
+
       // Leave the league (this will detach from imported player and clean up memberships)
       await storage.leaveLeague(userId, leagueId);
 
       res.json({ success: true, message: 'Successfully left the league' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error leaving league:', error);
-      res.status(500).json({ message: 'Failed to leave league' });
+      
+      // Map internal error codes to user-friendly messages
+      if (error.message === 'MEMBERSHIP_NOT_FOUND') {
+        return res.status(404).json({ message: 'You are not a member of this league' });
+      }
+      
+      // Generic error for unexpected issues
+      res.status(500).json({ message: 'Unable to leave league. Please try again.' });
     }
   });
 
