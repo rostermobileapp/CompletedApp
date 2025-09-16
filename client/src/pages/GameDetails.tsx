@@ -212,7 +212,65 @@ export default function GameDetails() {
   }
 
   // Early return with scrimmage-specific UI if viewing a scrimmage
-  if (isScrimmage && scrimmageData) {
+  if (isScrimmage) {
+    if (scrimmageLoading) {
+      return (
+        <div className="min-h-screen bg-background pb-20">
+          <div className="bg-card border-b border-border px-6 py-4">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setPageTransitionDirection('down');
+                  navigate("/calendar");
+                }}
+                className="p-2"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <h1 className="text-xl font-semibold">Scrimmage Details</h1>
+            </div>
+          </div>
+          <div className="px-6 py-6">
+            <div className="bg-card rounded-xl border border-border p-4 animate-pulse">
+              <div className="h-32 bg-muted rounded"></div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (!scrimmageData) {
+      return (
+        <div className="min-h-screen bg-background pb-20">
+          <div className="bg-card border-b border-border px-6 py-4">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setPageTransitionDirection('down');
+                  navigate("/calendar");
+                }}
+                className="p-2"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <h1 className="text-xl font-semibold">Scrimmage Details</h1>
+            </div>
+          </div>
+          <div className="px-6 py-6">
+            <div className="bg-card rounded-xl border border-border p-6">
+              <p className="text-center text-muted-foreground">Scrimmage not found</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const { scrimmage, approvedPlayers } = scrimmageData as any;
     
     return (
