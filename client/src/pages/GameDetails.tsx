@@ -402,6 +402,12 @@ export default function GameDetails() {
     );
   }
 
+  // At this point, we know game is defined for non-scrimmage cases
+  // TypeScript type guard to ensure game is defined
+  if (!game) {
+    throw new Error("Game should be defined at this point in the component flow");
+  }
+
   // Find which of user's teams is playing in this game
   const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team) => team.id) : [];
   

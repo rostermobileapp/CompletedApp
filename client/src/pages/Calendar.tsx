@@ -5,11 +5,13 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Trophy, ArrowLeft, Check, X, Clock, Users } from "lucide-react";
 import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPStatusIcon } from "@/components/RSVPStatusIcon";
+import { RSVPDetailModal } from "@/components/RSVPDetailModal";
+import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
 import { ScrimmageRSVPButtons } from "@/components/ScrimmageRSVPButtons";
 import { ScrimmageRSVPStatusIcon } from "@/components/ScrimmageRSVPStatusIcon";
@@ -21,6 +23,37 @@ export default function Calendar() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const gamesListRef = useRef<HTMLDivElement>(null);
+  
+  // Modal state for RSVP details and substitute requests
+  const [showRSVPModal, setShowRSVPModal] = useState(false);
+  const [showSubstituteModal, setShowSubstituteModal] = useState(false);
+  const [selectedGameId, setSelectedGameId] = useState<string>("");
+  const [selectedGameData, setSelectedGameData] = useState<any>(null);
+  const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string } | null>(null);
+
+  // Handler functions for modal interactions
+  const handleViewDetails = (game: any) => {
+    setSelectedGameId(game.id);
+    setSelectedGameData(game);
+    setShowRSVPModal(true);
+  };
+
+  const handleRequestSubstitute = (playerId: string, playerName: string) => {
+    setSubstituteRequestData({ playerId, playerName });
+    setShowRSVPModal(false);
+    setShowSubstituteModal(true);
+  };
+
+  const handleCloseRSVPModal = () => {
+    setShowRSVPModal(false);
+    setSelectedGameId("");
+    setSelectedGameData(null);
+  };
+
+  const handleCloseSubstituteModal = () => {
+    setShowSubstituteModal(false);
+    setSubstituteRequestData(null);
+  };
 
   // Fetch user's teams
   const { data: userTeams } = useQuery({
@@ -219,8 +252,7 @@ export default function Calendar() {
               return (
               <div 
                 key={game.id} 
-                className="bg-card rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors" 
-                onClick={() => navigate(`/game/${game.id}`)}
+                className="bg-card rounded-xl border border-border p-4 relative hover:bg-muted/50 transition-colors" 
                 data-testid={`card-game-${game.id}`}
               >
                 <div className="flex items-center gap-4">
@@ -270,6 +302,23 @@ export default function Calendar() {
                       <RSVPStatusIcon gameId={game.id} userId={(user as any).id} />
                     )}
                     
+                    {/* View Details Button for upcoming games */}
+                    {!isCompleted && !isPastGame && user && primaryTeam && (game.homeTeam?.id === primaryTeam.id || game.awayTeam?.id === primaryTeam.id) && (
+                      <Button
+                        size="sm"
+                        variant="outline" 
+                        className="mb-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewDetails(game);
+                        }}
+                        data-testid={`button-view-details-${game.id}`}
+                      >
+                        <Users className="w-3 h-3 mr-1" />
+                        View Details
+                      </Button>
+                    )}
+
                     {/* RSVP Buttons for upcoming games */}
                     {!isCompleted && !isPastGame && user && primaryTeam && (game.homeTeam?.id === primaryTeam.id || game.awayTeam?.id === primaryTeam.id) && (
                       <RSVPButtons 
@@ -340,6 +389,30 @@ export default function Calendar() {
           </div>
         )}
       </div>
+
+      {/* RSVP Detail Modal */}
+      {showRSVPModal && selectedGameData && (
+        <RSVPDetailModal
+          gameId={selectedGameId}
+          isOpen={showRSVPModal}
+          onClose={handleCloseRSVPModal}
+          onRequestSubstitute={handleRequestSubstitute}
+          showSubstituteButtons={true}
+        />
+      )}
+
+      {/* Substitute Request Modal */}
+      {showSubstituteModal && selectedGameData && substituteRequestData && (
+        <SubstituteRequestModal
+          gameId={selectedGameId}
+          gameDate={selectedGameData.scheduledAt}
+          leagueId={selectedGameData.leagueId || selectedGameData.homeTeam?.leagueId || selectedGameData.awayTeam?.leagueId}
+          originalPlayerId={substituteRequestData.playerId}
+          originalPlayerName={substituteRequestData.playerName}
+          isOpen={showSubstituteModal}
+          onClose={handleCloseSubstituteModal}
+        />
+      )}
     </div>
   );
 }
