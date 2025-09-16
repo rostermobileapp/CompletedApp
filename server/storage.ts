@@ -611,6 +611,26 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Membership not found');
     }
     
+    // Get all teams in this league to clean up direct team memberships
+    const leagueTeams = await db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.leagueId, membership.leagueId));
+    
+    const leagueTeamIds = leagueTeams.map(t => t.id);
+    
+    // Clean up direct team memberships for this user in this league's teams
+    if (leagueTeamIds.length > 0) {
+      await db
+        .delete(teamMemberships)
+        .where(
+          and(
+            eq(teamMemberships.userId, membership.userId),
+            inArray(teamMemberships.teamId, leagueTeamIds)
+          )
+        );
+    }
+    
     // Clean up attendance records for this user's games in this league
     if (membership.assignedTeamId) {
       // Get all games for this team in this league
