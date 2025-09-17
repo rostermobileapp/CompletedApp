@@ -1200,7 +1200,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const summary = await storage.getGameRsvpSummaryByTeams(gameId);
-        res.json(summary);
+        
+        // Merge both teams' data into a flat structure for the frontend
+        const mergedSummary = {
+          attending: [...summary.homeTeam.attending, ...summary.awayTeam.attending],
+          notAttending: [...summary.homeTeam.notAttending, ...summary.awayTeam.notAttending],
+          noResponse: [...summary.homeTeam.noResponse, ...summary.awayTeam.noResponse]
+        };
+        
+        res.json(mergedSummary);
       }
     } catch (error) {
       console.error('Error fetching RSVP summary:', error);
