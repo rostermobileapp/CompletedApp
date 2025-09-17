@@ -74,7 +74,7 @@ import {
   type ImportedSchedule,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, not } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -934,12 +934,12 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(teamMemberships.teamId, teamId),
           eq(teamMemberships.status, "approved"),
-          not(users.email.like('%@placeholder.roster%')) // Exclude placeholder users
+          not(ilike(users.email, '%@placeholder.roster%')) // Exclude placeholder users
         )
       );
 
     // Get members from league memberships assigned to this team
-    const leagueMemberships = await db
+    const leagueMembershipResults = await db
       .select({
         team_memberships: {
           id: leagueMemberships.id,
@@ -960,14 +960,14 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(leagueMemberships.assignedTeamId, teamId),
           eq(leagueMemberships.status, "approved"),
-          not(users.email.like('%@placeholder.roster%')) // Exclude placeholder users
+          not(ilike(users.email, '%@placeholder.roster%')) // Exclude placeholder users
         )
       );
 
     // Combine and deduplicate members (in case a user appears in both sources)
     const allMembers = [
       ...directMemberships.map(r => ({ ...r.team_memberships, user: r.users })),
-      ...leagueMemberships.map(r => ({ ...r.team_memberships, user: r.users }))
+      ...leagueMembershipResults.map(r => ({ ...r.team_memberships, user: r.users }))
     ];
 
     // Remove duplicates based on userId
