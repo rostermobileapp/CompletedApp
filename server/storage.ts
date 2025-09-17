@@ -226,6 +226,9 @@ export interface IStorage {
   updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date): Promise<ScrimmageRequest>;
   deleteScrimmageRequest(requestId: string): Promise<void>;
   getScrimmageRequestsByPlayer(playerId: string): Promise<(ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[]>;
+  
+  // Player merge operations
+  mergeUsersInLeague(leagueId: string, fromUserId: string, toUserId: string, preserveName?: boolean): Promise<LeagueMembership>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -927,7 +930,10 @@ export class DatabaseStorage implements IStorage {
   async getTeamMembers(teamId: string): Promise<(TeamMembership & { user: User })[]> {
     // Get members from direct team memberships
     const directMemberships = await db
-      .select()
+      .select({
+        team_memberships: teamMemberships,
+        users: users
+      })
       .from(teamMemberships)
       .innerJoin(users, eq(teamMemberships.userId, users.id))
       .where(
@@ -943,7 +949,7 @@ export class DatabaseStorage implements IStorage {
         team_memberships: {
           id: leagueMemberships.id,
           userId: leagueMemberships.userId,
-          teamId: leagueMemberships.assignedTeamId,
+          teamId: sql<string>`${leagueMemberships.assignedTeamId}`,
           position: leagueMemberships.position,
           jerseyNumber: leagueMemberships.jerseyNumber,
           status: leagueMemberships.status,
@@ -958,7 +964,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(leagueMemberships.assignedTeamId, teamId),
-          eq(leagueMemberships.status, "approved")
+          eq(leagueMemberships.status, "approved"),
+          not(isNull(leagueMemberships.assignedTeamId))
         )
       );
 
@@ -1097,15 +1104,31 @@ export class DatabaseStorage implements IStorage {
         id: 'scrimmage-creator',
         name: creator.firstName ? `${creator.firstName} ${creator.lastName || ''}`.trim() : creator.email || 'Creator',
         leagueId: scrimmage.leagueId,
+        seasonId: null,
+        captainId: null,
         logoUrl: null,
-        isActive: true
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
       awayTeam: {
         id: 'scrimmage-participant',
         name: 'Scrimmage',
-        leagueId: scrimmage.leagueId, 
+        leagueId: scrimmage.leagueId,
+        seasonId: null,
+        captainId: null,
         logoUrl: null,
-        isActive: true
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
       // Mark as scrimmage for frontend identification
       isScrimmage: true,
@@ -1177,12 +1200,14 @@ export class DatabaseStorage implements IStorage {
         const teamScore = isHomeTeam ? game.homeScore : game.awayScore;
         const opponentScore = isHomeTeam ? game.awayScore : game.homeScore;
         
-        if (teamScore > opponentScore) {
-          wins++;
-        } else if (teamScore < opponentScore) {
-          losses++;
-        } else {
-          ties++;
+        if (teamScore !== null && opponentScore !== null) {
+          if (teamScore > opponentScore) {
+            wins++;
+          } else if (teamScore < opponentScore) {
+            losses++;
+          } else {
+            ties++;
+          }
         }
       }
     }
@@ -1245,12 +1270,14 @@ export class DatabaseStorage implements IStorage {
           goalsAgainst += opponentScore || 0;
           
           // Determine win/loss/tie
-          if (teamScore > opponentScore) {
-            wins++;
-          } else if (teamScore < opponentScore) {
-            losses++;
-          } else {
-            ties++;
+          if (teamScore !== null && opponentScore !== null) {
+            if (teamScore > opponentScore) {
+              wins++;
+            } else if (teamScore < opponentScore) {
+              losses++;
+            } else {
+              ties++;
+            }
           }
         }
       }
@@ -1293,11 +1320,13 @@ export class DatabaseStorage implements IStorage {
         ht.id as home_team_id, ht.name as home_team_name, ht.logo_url as home_team_logo_url,
         ht.league_id as home_team_league_id, ht.season_id as home_team_season_id,
         ht.captain_id as home_team_captain_id, ht.wins as home_team_wins, ht.losses as home_team_losses,
-        ht.ties as home_team_ties, ht.created_at as home_team_created_at, ht.updated_at as home_team_updated_at,
+        ht.ties as home_team_ties, ht.goals_for as home_team_goals_for, ht.goals_against as home_team_goals_against,
+        ht.created_at as home_team_created_at, ht.updated_at as home_team_updated_at,
         at.id as away_team_id, at.name as away_team_name, at.logo_url as away_team_logo_url,
         at.league_id as away_team_league_id, at.season_id as away_team_season_id,
         at.captain_id as away_team_captain_id, at.wins as away_team_wins, at.losses as away_team_losses,
-        at.ties as away_team_ties, at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
+        at.ties as away_team_ties, at.goals_for as away_team_goals_for, at.goals_against as away_team_goals_against,
+        at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
       FROM games g
       INNER JOIN teams ht ON g.home_team_id = ht.id
       INNER JOIN teams at ON g.away_team_id = at.id
@@ -1310,50 +1339,53 @@ export class DatabaseStorage implements IStorage {
     
     const row = result.rows[0];
     return {
-      id: row.id,
-      leagueId: row.league_id,
-      seasonId: row.season_id,
-      homeTeamId: row.home_team_id,
-      awayTeamId: row.away_team_id,
-      scheduledAt: row.scheduled_at,
-      venue: row.venue,
-      lockerRoom: row.locker_room,
-      homeTeamLockerRoom: row.home_team_locker_room,
-      awayTeamLockerRoom: row.away_team_locker_room,
-      homeScore: row.home_score,
-      awayScore: row.away_score,
-      isCompleted: row.is_completed,
-      homeBeverageDutyUserId: row.home_beverage_duty_user_id,
-      homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at,
-      awayBeverageDutyUserId: row.away_beverage_duty_user_id,
-      awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      id: row.id as string,
+      leagueId: row.league_id as string,
+      seasonId: row.season_id as string | null,
+      homeTeamId: row.home_team_id as string,
+      awayTeamId: row.away_team_id as string,
+      scheduledAt: row.scheduled_at as Date,
+      venue: row.venue as string | null,
+      lockerRoom: row.locker_room as string | null,
+      homeTeamLockerRoom: row.home_team_locker_room as string | null,
+      awayTeamLockerRoom: row.away_team_locker_room as string | null,
+      homeScore: row.home_score as number | null,
+      awayScore: row.away_score as number | null,
+      isCompleted: row.is_completed as boolean,
+      homeBeverageDutyUserId: row.home_beverage_duty_user_id as string | null,
+      homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at as Date | null,
+      awayBeverageDutyUserId: row.away_beverage_duty_user_id as string | null,
+      awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at as Date | null,
+      createdAt: row.created_at as Date,
       homeTeam: {
-        id: row.home_team_id,
-        name: row.home_team_name,
-        logoUrl: row.home_team_logo_url,
-        leagueId: row.home_team_league_id,
-        seasonId: row.home_team_season_id,
-        captainId: row.home_team_captain_id,
-        wins: row.home_team_wins,
-        losses: row.home_team_losses,
-        ties: row.home_team_ties,
-        createdAt: row.home_team_created_at,
-        updatedAt: row.home_team_updated_at,
+        id: row.home_team_id as string,
+        name: row.home_team_name as string,
+        logoUrl: row.home_team_logo_url as string | null,
+        leagueId: row.home_team_league_id as string,
+        seasonId: row.home_team_season_id as string | null,
+        captainId: row.home_team_captain_id as string | null,
+        wins: row.home_team_wins as number,
+        losses: row.home_team_losses as number,
+        ties: row.home_team_ties as number,
+        goalsFor: row.home_team_goals_for as number,
+        goalsAgainst: row.home_team_goals_against as number,
+        createdAt: row.home_team_created_at as Date,
+        updatedAt: row.home_team_updated_at as Date,
       },
       awayTeam: {
-        id: row.away_team_id,
-        name: row.away_team_name,
-        logoUrl: row.away_team_logo_url,
-        leagueId: row.away_team_league_id,
-        seasonId: row.away_team_season_id,
-        captainId: row.away_team_captain_id,
-        wins: row.away_team_wins,
-        losses: row.away_team_losses,
-        ties: row.away_team_ties,
-        createdAt: row.away_team_created_at,
-        updatedAt: row.away_team_updated_at,
+        id: row.away_team_id as string,
+        name: row.away_team_name as string,
+        logoUrl: row.away_team_logo_url as string | null,
+        leagueId: row.away_team_league_id as string,
+        seasonId: row.away_team_season_id as string | null,
+        captainId: row.away_team_captain_id as string | null,
+        wins: row.away_team_wins as number,
+        losses: row.away_team_losses as number,
+        ties: row.away_team_ties as number,
+        goalsFor: row.away_team_goals_for as number,
+        goalsAgainst: row.away_team_goals_against as number,
+        createdAt: row.away_team_created_at as Date,
+        updatedAt: row.away_team_updated_at as Date,
       },
     };
   }
@@ -1430,10 +1462,7 @@ export class DatabaseStorage implements IStorage {
   async updateGame(gameId: string, updates: Partial<InsertGame>): Promise<Game> {
     const [updatedGame] = await db
       .update(games)
-      .set({
-        ...updates,
-        updatedAt: new Date()
-      })
+      .set(updates)
       .where(eq(games.id, gameId))
       .returning();
     
@@ -1458,11 +1487,13 @@ export class DatabaseStorage implements IStorage {
         ht.id as home_team_id, ht.name as home_team_name, ht.logo_url as home_team_logo_url,
         ht.league_id as home_team_league_id, ht.season_id as home_team_season_id,
         ht.captain_id as home_team_captain_id, ht.wins as home_team_wins, ht.losses as home_team_losses,
-        ht.ties as home_team_ties, ht.created_at as home_team_created_at, ht.updated_at as home_team_updated_at,
+        ht.ties as home_team_ties, ht.goals_for as home_team_goals_for, ht.goals_against as home_team_goals_against,
+        ht.created_at as home_team_created_at, ht.updated_at as home_team_updated_at,
         at.id as away_team_id, at.name as away_team_name, at.logo_url as away_team_logo_url,
         at.league_id as away_team_league_id, at.season_id as away_team_season_id,
         at.captain_id as away_team_captain_id, at.wins as away_team_wins, at.losses as away_team_losses,
-        at.ties as away_team_ties, at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
+        at.ties as away_team_ties, at.goals_for as away_team_goals_for, at.goals_against as away_team_goals_against,
+        at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
       FROM games g
       INNER JOIN teams ht ON g.home_team_id = ht.id
       INNER JOIN teams at ON g.away_team_id = at.id
@@ -1471,47 +1502,53 @@ export class DatabaseStorage implements IStorage {
     `);
 
     return result.rows.map((row: any) => ({
-      id: row.id,
-      leagueId: row.league_id,
-      seasonId: row.season_id,
-      homeTeamId: row.home_team_id,
-      awayTeamId: row.away_team_id,
-      scheduledAt: row.scheduled_at,
-      venue: row.venue,
-      homeScore: row.home_score,
-      awayScore: row.away_score,
-      isCompleted: row.is_completed,
-      homeBeverageDutyUserId: row.home_beverage_duty_user_id,
-      homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at,
-      awayBeverageDutyUserId: row.away_beverage_duty_user_id,
-      awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      id: row.id as string,
+      leagueId: row.league_id as string,
+      seasonId: row.season_id as string | null,
+      homeTeamId: row.home_team_id as string,
+      awayTeamId: row.away_team_id as string,
+      scheduledAt: row.scheduled_at as Date,
+      venue: row.venue as string | null,
+      lockerRoom: row.locker_room as string | null,
+      homeTeamLockerRoom: row.home_team_locker_room as string | null,
+      awayTeamLockerRoom: row.away_team_locker_room as string | null,
+      homeScore: row.home_score as number | null,
+      awayScore: row.away_score as number | null,
+      isCompleted: row.is_completed as boolean,
+      homeBeverageDutyUserId: row.home_beverage_duty_user_id as string | null,
+      homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at as Date | null,
+      awayBeverageDutyUserId: row.away_beverage_duty_user_id as string | null,
+      awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at as Date | null,
+      createdAt: row.created_at as Date,
       homeTeam: {
-        id: row.home_team_id,
-        name: row.home_team_name,
-        logoUrl: row.home_team_logo_url,
-        leagueId: row.home_team_league_id,
-        seasonId: row.home_team_season_id,
-        captainId: row.home_team_captain_id,
-        wins: row.home_team_wins,
-        losses: row.home_team_losses,
-        ties: row.home_team_ties,
-        createdAt: row.home_team_created_at,
-        updatedAt: row.home_team_updated_at,
+        id: row.home_team_id as string,
+        name: row.home_team_name as string,
+        logoUrl: row.home_team_logo_url as string | null,
+        leagueId: row.home_team_league_id as string,
+        seasonId: row.home_team_season_id as string | null,
+        captainId: row.home_team_captain_id as string | null,
+        wins: row.home_team_wins as number,
+        losses: row.home_team_losses as number,
+        ties: row.home_team_ties as number,
+        goalsFor: row.home_team_goals_for as number,
+        goalsAgainst: row.home_team_goals_against as number,
+        createdAt: row.home_team_created_at as Date,
+        updatedAt: row.home_team_updated_at as Date,
       },
       awayTeam: {
-        id: row.away_team_id,
-        name: row.away_team_name,
-        logoUrl: row.away_team_logo_url,
-        leagueId: row.away_team_league_id,
-        seasonId: row.away_team_season_id,
-        captainId: row.away_team_captain_id,
-        wins: row.away_team_wins,
-        losses: row.away_team_losses,
-        ties: row.away_team_ties,
-        createdAt: row.away_team_created_at,
-        updatedAt: row.away_team_updated_at,
+        id: row.away_team_id as string,
+        name: row.away_team_name as string,
+        logoUrl: row.away_team_logo_url as string | null,
+        leagueId: row.away_team_league_id as string,
+        seasonId: row.away_team_season_id as string | null,
+        captainId: row.away_team_captain_id as string | null,
+        wins: row.away_team_wins as number,
+        losses: row.away_team_losses as number,
+        ties: row.away_team_ties as number,
+        goalsFor: row.away_team_goals_for as number,
+        goalsAgainst: row.away_team_goals_against as number,
+        createdAt: row.away_team_created_at as Date,
+        updatedAt: row.away_team_updated_at as Date,
       },
     }));
   }
@@ -1523,11 +1560,13 @@ export class DatabaseStorage implements IStorage {
         ht.id as home_team_id, ht.name as home_team_name, ht.logo_url as home_team_logo_url,
         ht.league_id as home_team_league_id, ht.season_id as home_team_season_id,
         ht.captain_id as home_team_captain_id, ht.wins as home_team_wins, ht.losses as home_team_losses,
-        ht.ties as home_team_ties, ht.created_at as home_team_created_at, ht.updated_at as home_team_updated_at,
+        ht.ties as home_team_ties, ht.goals_for as home_team_goals_for, ht.goals_against as home_team_goals_against,
+        ht.created_at as home_team_created_at, ht.updated_at as home_team_updated_at,
         at.id as away_team_id, at.name as away_team_name, at.logo_url as away_team_logo_url,
         at.league_id as away_team_league_id, at.season_id as away_team_season_id,
         at.captain_id as away_team_captain_id, at.wins as away_team_wins, at.losses as away_team_losses,
-        at.ties as away_team_ties, at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
+        at.ties as away_team_ties, at.goals_for as away_team_goals_for, at.goals_against as away_team_goals_against,
+        at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
       FROM games g
       INNER JOIN teams ht ON g.home_team_id = ht.id
       INNER JOIN teams at ON g.away_team_id = at.id
@@ -1536,47 +1575,53 @@ export class DatabaseStorage implements IStorage {
     `);
 
     return result.rows.map((row: any) => ({
-      id: row.id,
-      leagueId: row.league_id,
-      seasonId: row.season_id,
-      homeTeamId: row.home_team_id,
-      awayTeamId: row.away_team_id,
-      scheduledAt: row.scheduled_at,
-      venue: row.venue,
-      homeScore: row.home_score,
-      awayScore: row.away_score,
-      isCompleted: row.is_completed,
-      homeBeverageDutyUserId: row.home_beverage_duty_user_id,
-      homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at,
-      awayBeverageDutyUserId: row.away_beverage_duty_user_id,
-      awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      id: row.id as string,
+      leagueId: row.league_id as string,
+      seasonId: row.season_id as string | null,
+      homeTeamId: row.home_team_id as string,
+      awayTeamId: row.away_team_id as string,
+      scheduledAt: row.scheduled_at as Date,
+      venue: row.venue as string | null,
+      lockerRoom: row.locker_room as string | null,
+      homeTeamLockerRoom: row.home_team_locker_room as string | null,
+      awayTeamLockerRoom: row.away_team_locker_room as string | null,
+      homeScore: row.home_score as number | null,
+      awayScore: row.away_score as number | null,
+      isCompleted: row.is_completed as boolean,
+      homeBeverageDutyUserId: row.home_beverage_duty_user_id as string | null,
+      homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at as Date | null,
+      awayBeverageDutyUserId: row.away_beverage_duty_user_id as string | null,
+      awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at as Date | null,
+      createdAt: row.created_at as Date,
       homeTeam: {
-        id: row.home_team_id,
-        name: row.home_team_name,
-        logoUrl: row.home_team_logo_url,
-        leagueId: row.home_team_league_id,
-        seasonId: row.home_team_season_id,
-        captainId: row.home_team_captain_id,
-        wins: row.home_team_wins,
-        losses: row.home_team_losses,
-        ties: row.home_team_ties,
-        createdAt: row.home_team_created_at,
-        updatedAt: row.home_team_updated_at,
+        id: row.home_team_id as string,
+        name: row.home_team_name as string,
+        logoUrl: row.home_team_logo_url as string | null,
+        leagueId: row.home_team_league_id as string,
+        seasonId: row.home_team_season_id as string | null,
+        captainId: row.home_team_captain_id as string | null,
+        wins: row.home_team_wins as number,
+        losses: row.home_team_losses as number,
+        ties: row.home_team_ties as number,
+        goalsFor: row.home_team_goals_for as number,
+        goalsAgainst: row.home_team_goals_against as number,
+        createdAt: row.home_team_created_at as Date,
+        updatedAt: row.home_team_updated_at as Date,
       },
       awayTeam: {
-        id: row.away_team_id,
-        name: row.away_team_name,
-        logoUrl: row.away_team_logo_url,
-        leagueId: row.away_team_league_id,
-        seasonId: row.away_team_season_id,
-        captainId: row.away_team_captain_id,
-        wins: row.away_team_wins,
-        losses: row.away_team_losses,
-        ties: row.away_team_ties,
-        createdAt: row.away_team_created_at,
-        updatedAt: row.away_team_updated_at,
+        id: row.away_team_id as string,
+        name: row.away_team_name as string,
+        logoUrl: row.away_team_logo_url as string | null,
+        leagueId: row.away_team_league_id as string,
+        seasonId: row.away_team_season_id as string | null,
+        captainId: row.away_team_captain_id as string | null,
+        wins: row.away_team_wins as number,
+        losses: row.away_team_losses as number,
+        ties: row.away_team_ties as number,
+        goalsFor: row.away_team_goals_for as number,
+        goalsAgainst: row.away_team_goals_against as number,
+        createdAt: row.away_team_created_at as Date,
+        updatedAt: row.away_team_updated_at as Date,
       },
     }));
   }
@@ -2129,7 +2174,6 @@ export class DatabaseStorage implements IStorage {
 
   async getSubstituteRequests(options?: { status?: string; gameId?: string; userId?: string; requestingTeamId?: string; leagueIds?: string[] }): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] })[]> {
     // Build dynamic query based on options
-    let query = db.select().from(substituteRequests);
     let conditions: any[] = [];
     
     if (options?.status) {
@@ -2154,11 +2198,10 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(substituteRequests.requestingTeamId, options.requestingTeamId));
     }
     
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-
-    const requests = await query.orderBy(desc(substituteRequests.createdAt));
+    const baseQuery = db.select().from(substituteRequests);
+    const requests = conditions.length > 0 
+      ? await baseQuery.where(and(...conditions)).orderBy(desc(substituteRequests.createdAt))
+      : await baseQuery.orderBy(desc(substituteRequests.createdAt));
     
     const result = [];
     for (const request of requests) {
@@ -2753,31 +2796,30 @@ export class DatabaseStorage implements IStorage {
     
     const total = countResult.count;
     
-    // Then get the paginated announcements with visibility filtering
-    let query = db
+    // Build paginated announcement query
+    const baseQuery = db
       .select()
       .from(announcements)
       .where(and(
         eq(announcements.leagueId, leagueId),
         visibilityFilter
-      ));
+      ))
+      .orderBy(
+        desc(announcements.isPinned),
+        options?.orderDirection === 'asc' ? asc(announcements.createdAt) : desc(announcements.createdAt)
+      );
     
-    // Apply ordering - pinned posts first, then by date
-    if (options?.orderDirection === 'asc') {
-      query = query.orderBy(desc(announcements.isPinned), asc(announcements.createdAt));
+    // Apply pagination conditionally
+    let leagueAnnouncements;
+    if (options?.limit && options?.offset) {
+      leagueAnnouncements = await baseQuery.limit(options.limit).offset(options.offset);
+    } else if (options?.limit) {
+      leagueAnnouncements = await baseQuery.limit(options.limit);
+    } else if (options?.offset) {
+      leagueAnnouncements = await baseQuery.limit(1000).offset(options.offset);
     } else {
-      query = query.orderBy(desc(announcements.isPinned), desc(announcements.createdAt));
+      leagueAnnouncements = await baseQuery;
     }
-    
-    // Apply pagination
-    if (options?.limit) {
-      query = query.limit(options.limit);
-    }
-    if (options?.offset) {
-      query = query.offset(options.offset);
-    }
-    
-    const leagueAnnouncements = await query;
 
     const result = [];
     for (const announcement of leagueAnnouncements) {
@@ -3155,6 +3197,506 @@ export class DatabaseStorage implements IStorage {
         creator: r.users
       }
     }));
+  }
+
+  // Player merge operations
+  async mergeUsersInLeague(leagueId: string, fromUserId: string, toUserId: string, preserveName = true): Promise<LeagueMembership> {
+    return await db.transaction(async (tx) => {
+      // 1. Get both users' memberships in this league
+      const [fromMembership] = await tx
+        .select()
+        .from(leagueMemberships)
+        .where(and(eq(leagueMemberships.leagueId, leagueId), eq(leagueMemberships.userId, fromUserId)));
+      
+      const [toMembership] = await tx
+        .select()
+        .from(leagueMemberships)
+        .where(and(eq(leagueMemberships.leagueId, leagueId), eq(leagueMemberships.userId, toUserId)));
+
+      if (!fromMembership) {
+        throw new Error('Source user not found in league');
+      }
+
+      // 2. Get all teams in this league for scoping
+      const leagueTeams = await tx
+        .select({ id: teams.id })
+        .from(teams)
+        .where(eq(teams.leagueId, leagueId));
+      const leagueTeamIds = leagueTeams.map(t => t.id);
+
+      // 3. Handle teamMemberships merge with conflict resolution
+      const fromTeamMemberships = await tx
+        .select()
+        .from(teamMemberships)
+        .where(and(
+          eq(teamMemberships.userId, fromUserId),
+          inArray(teamMemberships.teamId, leagueTeamIds)
+        ));
+
+      const toTeamMemberships = await tx
+        .select()
+        .from(teamMemberships)
+        .where(and(
+          eq(teamMemberships.userId, toUserId),
+          inArray(teamMemberships.teamId, leagueTeamIds)
+        ));
+
+      // Merge team memberships, preferring existing toUser memberships
+      const teamMembershipsByTeam = new Map();
+      toTeamMemberships.forEach(tm => teamMembershipsByTeam.set(tm.teamId, tm));
+      
+      for (const fromTm of fromTeamMemberships) {
+        const existingTm = teamMembershipsByTeam.get(fromTm.teamId);
+        if (existingTm) {
+          // Update existing membership with merged data
+          await tx
+            .update(teamMemberships)
+            .set({
+              position: existingTm.position || fromTm.position,
+              jerseyNumber: existingTm.jerseyNumber || fromTm.jerseyNumber,
+              skillLevel: existingTm.skillLevel || fromTm.skillLevel,
+              status: existingTm.status !== 'pending' ? existingTm.status : fromTm.status,
+              joinedAt: existingTm.joinedAt || fromTm.joinedAt,
+              approvedBy: existingTm.approvedBy || fromTm.approvedBy,
+            })
+            .where(eq(teamMemberships.id, existingTm.id));
+        } else {
+          // Create new membership for toUser
+          await tx
+            .insert(teamMemberships)
+            .values({
+              userId: toUserId,
+              teamId: fromTm.teamId,
+              position: fromTm.position,
+              jerseyNumber: fromTm.jerseyNumber,
+              skillLevel: fromTm.skillLevel,
+              status: fromTm.status,
+              joinedAt: fromTm.joinedAt,
+              approvedBy: fromTm.approvedBy,
+            });
+        }
+      }
+
+      // Delete fromUser team memberships
+      await tx
+        .delete(teamMemberships)
+        .where(and(
+          eq(teamMemberships.userId, fromUserId),
+          inArray(teamMemberships.teamId, leagueTeamIds)
+        ));
+
+      // 4. Update all foreign key references with proper league scoping
+
+      // Update games (beverage duty assignments)
+      await tx
+        .update(games)
+        .set({ homeBeverageDutyUserId: toUserId })
+        .where(and(
+          eq(games.homeBeverageDutyUserId, fromUserId),
+          eq(games.leagueId, leagueId)
+        ));
+
+      await tx
+        .update(games)
+        .set({ awayBeverageDutyUserId: toUserId })
+        .where(and(
+          eq(games.awayBeverageDutyUserId, fromUserId),
+          eq(games.leagueId, leagueId)
+        ));
+
+      // Update gameRsvps with conflict resolution (unique constraint: gameId, userId, teamId)
+      const conflictingRsvps = await tx
+        .select()
+        .from(gameRsvps)
+        .innerJoin(games, eq(gameRsvps.gameId, games.id))
+        .where(and(
+          eq(games.leagueId, leagueId),
+          or(
+            eq(gameRsvps.userId, fromUserId),
+            eq(gameRsvps.userId, toUserId)
+          )
+        ));
+
+      // Group by gameId + teamId to handle conflicts
+      const rsvpConflicts = new Map<string, typeof conflictingRsvps>();
+      conflictingRsvps.forEach(rsvp => {
+        const key = `${rsvp.game_rsvps.gameId}_${rsvp.game_rsvps.teamId}`;
+        if (!rsvpConflicts.has(key)) {
+          rsvpConflicts.set(key, []);
+        }
+        rsvpConflicts.get(key)!.push(rsvp);
+      });
+
+      for (const [, rsvpsForGame] of rsvpConflicts) {
+        const fromRsvp = rsvpsForGame.find(r => r.game_rsvps.userId === fromUserId);
+        const toRsvp = rsvpsForGame.find(r => r.game_rsvps.userId === toUserId);
+        
+        if (fromRsvp && toRsvp) {
+          // Conflict: prefer non-default status or more recent timestamp
+          const preferFromRsvp = fromRsvp.game_rsvps.status !== 'no_response' && 
+                                 toRsvp.game_rsvps.status === 'no_response' ||
+                                 fromRsvp.game_rsvps.updatedAt > toRsvp.game_rsvps.updatedAt;
+          
+          if (preferFromRsvp) {
+            await tx
+              .update(gameRsvps)
+              .set({ 
+                status: fromRsvp.game_rsvps.status,
+                createdAt: fromRsvp.game_rsvps.createdAt,
+                updatedAt: fromRsvp.game_rsvps.updatedAt
+              })
+              .where(eq(gameRsvps.id, toRsvp.game_rsvps.id));
+          }
+          // Delete the fromUser RSVP (will be handled in batch delete below)
+        } else if (fromRsvp && !toRsvp) {
+          // No conflict: update fromUser RSVP to toUser
+          await tx
+            .update(gameRsvps)
+            .set({ userId: toUserId })
+            .where(eq(gameRsvps.id, fromRsvp.game_rsvps.id));
+        }
+      }
+
+      // Delete remaining fromUser RSVPs (conflicts already handled)
+      await tx
+        .delete(gameRsvps)
+        .where(and(
+          eq(gameRsvps.userId, fromUserId),
+          sql`${gameRsvps.gameId} IN (SELECT id FROM ${games} WHERE league_id = ${leagueId})`
+        ));
+
+      // Update gameScoreSubmissions
+      await tx
+        .update(gameScoreSubmissions)
+        .set({ submittedBy: toUserId })
+        .where(and(
+          eq(gameScoreSubmissions.submittedBy, fromUserId),
+          sql`${gameScoreSubmissions.gameId} IN (SELECT id FROM ${games} WHERE league_id = ${leagueId})`
+        ));
+
+      // Update substitute requests (scoped to league games)
+      await tx
+        .update(substituteRequests)
+        .set({ originalPlayerId: toUserId })
+        .where(and(
+          eq(substituteRequests.originalPlayerId, fromUserId),
+          sql`${substituteRequests.gameId} IN (SELECT id FROM ${games} WHERE league_id = ${leagueId})`
+        ));
+
+      await tx
+        .update(substituteRequests)
+        .set({ substitutePlayerId: toUserId })
+        .where(and(
+          eq(substituteRequests.substitutePlayerId, fromUserId),
+          sql`${substituteRequests.gameId} IN (SELECT id FROM ${games} WHERE league_id = ${leagueId})`
+        ));
+
+      await tx
+        .update(substituteRequests)
+        .set({ requestedBy: toUserId })
+        .where(and(
+          eq(substituteRequests.requestedBy, fromUserId),
+          sql`${substituteRequests.gameId} IN (SELECT id FROM ${games} WHERE league_id = ${leagueId})`
+        ));
+
+      // Update substitution approvals (scoped through substitute requests to league)
+      await tx
+        .update(substitutionApprovals)
+        .set({ approverId: toUserId })
+        .where(and(
+          eq(substitutionApprovals.approverId, fromUserId),
+          sql`${substitutionApprovals.substitutionRequestId} IN (
+            SELECT sr.id FROM ${substituteRequests} sr 
+            INNER JOIN ${games} g ON sr.game_id = g.id 
+            WHERE g.league_id = ${leagueId}
+          )`
+        ));
+
+      // Update messages (league scoped)
+      await tx
+        .update(messages)
+        .set({ senderId: toUserId })
+        .where(and(
+          eq(messages.senderId, fromUserId),
+          eq(messages.leagueId, leagueId)
+        ));
+
+      await tx
+        .update(messages)
+        .set({ recipientId: toUserId })
+        .where(and(
+          eq(messages.recipientId, fromUserId),
+          eq(messages.leagueId, leagueId)
+        ));
+
+      // Update announcements
+      await tx
+        .update(announcements)
+        .set({ authorId: toUserId })
+        .where(and(
+          eq(announcements.authorId, fromUserId),
+          eq(announcements.leagueId, leagueId)
+        ));
+
+      // Update announcement interactions with conflict resolution
+      // Delete conflicting reactions (unique constraint: announcementId, userId, emoji)
+      await tx
+        .delete(announcementReactions)
+        .where(and(
+          eq(announcementReactions.userId, fromUserId),
+          sql`${announcementReactions.announcementId} IN (
+            SELECT id FROM ${announcements} WHERE league_id = ${leagueId}
+          )`,
+          sql`(announcement_id, emoji) IN (
+            SELECT ar.announcement_id, ar.emoji 
+            FROM ${announcementReactions} ar 
+            INNER JOIN ${announcements} a ON ar.announcement_id = a.id
+            WHERE a.league_id = ${leagueId} AND ar.user_id = ${toUserId}
+          )`
+        ));
+
+      // Update remaining reactions
+      await tx
+        .update(announcementReactions)
+        .set({ userId: toUserId })
+        .where(and(
+          eq(announcementReactions.userId, fromUserId),
+          sql`${announcementReactions.announcementId} IN (
+            SELECT id FROM ${announcements} WHERE league_id = ${leagueId}
+          )`
+        ));
+
+      // Update announcement read status (delete conflicts, then update)
+      await tx
+        .delete(announcementReadStatus)
+        .where(and(
+          eq(announcementReadStatus.userId, fromUserId),
+          sql`${announcementReadStatus.announcementId} IN (
+            SELECT ars.announcement_id 
+            FROM ${announcementReadStatus} ars 
+            INNER JOIN ${announcements} a ON ars.announcement_id = a.id
+            WHERE a.league_id = ${leagueId} AND ars.user_id = ${toUserId}
+          )`
+        ));
+
+      await tx
+        .update(announcementReadStatus)
+        .set({ userId: toUserId })
+        .where(and(
+          eq(announcementReadStatus.userId, fromUserId),
+          sql`${announcementReadStatus.announcementId} IN (
+            SELECT id FROM ${announcements} WHERE league_id = ${leagueId}
+          )`
+        ));
+
+      // Update announcement visibility
+      await tx
+        .delete(announcementVisibility)
+        .where(and(
+          eq(announcementVisibility.userId, fromUserId),
+          sql`${announcementVisibility.announcementId} IN (
+            SELECT av.announcement_id 
+            FROM ${announcementVisibility} av 
+            INNER JOIN ${announcements} a ON av.announcement_id = a.id
+            WHERE a.league_id = ${leagueId} AND av.user_id = ${toUserId}
+          )`
+        ));
+
+      await tx
+        .update(announcementVisibility)
+        .set({ userId: toUserId })
+        .where(and(
+          eq(announcementVisibility.userId, fromUserId),
+          sql`${announcementVisibility.announcementId} IN (
+            SELECT id FROM ${announcements} WHERE league_id = ${leagueId}
+          )`
+        ));
+
+      // Update announcement poll votes with conflict resolution
+      await tx
+        .delete(announcementPollVotes)
+        .where(and(
+          eq(announcementPollVotes.userId, fromUserId),
+          sql`(poll_id, option_index) IN (
+            SELECT apv.poll_id, apv.option_index 
+            FROM ${announcementPollVotes} apv 
+            INNER JOIN ${announcementPolls} ap ON apv.poll_id = ap.id
+            INNER JOIN ${announcements} a ON ap.announcement_id = a.id
+            WHERE a.league_id = ${leagueId} AND apv.user_id = ${toUserId}
+          )`
+        ));
+
+      await tx
+        .update(announcementPollVotes)
+        .set({ userId: toUserId })
+        .where(and(
+          eq(announcementPollVotes.userId, fromUserId),
+          sql`${announcementPollVotes.pollId} IN (
+            SELECT ap.id FROM ${announcementPolls} ap 
+            INNER JOIN ${announcements} a ON ap.announcement_id = a.id
+            WHERE a.league_id = ${leagueId}
+          )`
+        ));
+
+      // Update scrimmages
+      await tx
+        .update(scrimmages)
+        .set({ creatorId: toUserId })
+        .where(and(
+          eq(scrimmages.creatorId, fromUserId),
+          eq(scrimmages.leagueId, leagueId)
+        ));
+
+      // Update scrimmage requests with conflict resolution
+      await tx
+        .delete(scrimmageRequests)
+        .where(and(
+          eq(scrimmageRequests.playerId, fromUserId),
+          sql`${scrimmageRequests.scrimmageId} IN (
+            SELECT sr.scrimmage_id 
+            FROM ${scrimmageRequests} sr 
+            INNER JOIN ${scrimmages} s ON sr.scrimmage_id = s.id
+            WHERE s.league_id = ${leagueId} AND sr.player_id = ${toUserId}
+          )`
+        ));
+
+      await tx
+        .update(scrimmageRequests)
+        .set({ playerId: toUserId })
+        .where(and(
+          eq(scrimmageRequests.playerId, fromUserId),
+          sql`${scrimmageRequests.scrimmageId} IN (
+            SELECT id FROM ${scrimmages} WHERE league_id = ${leagueId}
+          )`
+        ));
+
+      // Update team captains
+      await tx
+        .update(teams)
+        .set({ captainId: toUserId })
+        .where(and(
+          eq(teams.captainId, fromUserId),
+          eq(teams.leagueId, leagueId)
+        ));
+
+      // Update league memberships approvedBy references
+      await tx
+        .update(leagueMemberships)
+        .set({ approvedBy: toUserId })
+        .where(and(
+          eq(leagueMemberships.approvedBy, fromUserId),
+          eq(leagueMemberships.leagueId, leagueId)
+        ));
+
+      // Update team memberships approvedBy references
+      await tx
+        .update(teamMemberships)
+        .set({ approvedBy: toUserId })
+        .where(and(
+          eq(teamMemberships.approvedBy, fromUserId),
+          inArray(teamMemberships.teamId, leagueTeamIds)
+        ));
+
+      // Update import-related tables
+      await tx
+        .update(playerImports)
+        .set({ importedBy: toUserId })
+        .where(and(
+          eq(playerImports.importedBy, fromUserId),
+          eq(playerImports.leagueId, leagueId)
+        ));
+
+      await tx
+        .update(scheduleImports)
+        .set({ importedBy: toUserId })
+        .where(and(
+          eq(scheduleImports.importedBy, fromUserId),
+          eq(scheduleImports.leagueId, leagueId)
+        ));
+
+      await tx
+        .update(playerMergeRequests)
+        .set({ reviewedBy: toUserId })
+        .where(and(
+          eq(playerMergeRequests.reviewedBy, fromUserId),
+          eq(playerMergeRequests.leagueId, leagueId)
+        ));
+
+      await tx
+        .update(importedPlayers)
+        .set({ mergedWithUserId: toUserId })
+        .where(and(
+          eq(importedPlayers.mergedWithUserId, fromUserId),
+          eq(importedPlayers.leagueId, leagueId)
+        ));
+
+      // Update draft-related tables if drafts exist
+      await tx
+        .update(drafts)
+        .set({ createdBy: toUserId })
+        .where(and(
+          eq(drafts.createdBy, fromUserId),
+          eq(drafts.leagueId, leagueId)
+        ));
+
+      await tx
+        .update(draftPicks)
+        .set({ playerId: toUserId })
+        .where(and(
+          eq(draftPicks.playerId, fromUserId),
+          sql`${draftPicks.draftId} IN (SELECT id FROM ${drafts} WHERE league_id = ${leagueId})`
+        ));
+
+      // 5. Merge league membership data
+      const mergedData: Partial<LeagueMembership> = {
+        userId: toUserId,
+        // Preserve team assignment and player details from placeholder
+        assignedTeamId: fromMembership.assignedTeamId || toMembership?.assignedTeamId,
+        position: fromMembership.position || toMembership?.position,
+        skillLevel: fromMembership.skillLevel || toMembership?.skillLevel,
+        jerseyNumber: fromMembership.jerseyNumber || toMembership?.jerseyNumber,
+        notes: fromMembership.notes || toMembership?.notes,
+        // Set display names from placeholder user if preserveName is true
+        displayFirstName: preserveName ? fromMembership.displayFirstName : null,
+        displayLastName: preserveName ? fromMembership.displayLastName : null,
+        // Preserve approval status and timing
+        status: toMembership?.status || fromMembership.status,
+        requestedAt: toMembership?.requestedAt || fromMembership.requestedAt,
+        approvedAt: toMembership?.approvedAt || fromMembership.approvedAt,
+        approvedBy: toMembership?.approvedBy || fromMembership.approvedBy,
+      };
+
+      // 6. Create or update the target membership
+      let finalMembership: LeagueMembership;
+      
+      if (toMembership) {
+        // Update existing membership
+        const [updated] = await tx
+          .update(leagueMemberships)
+          .set(mergedData)
+          .where(eq(leagueMemberships.id, toMembership.id))
+          .returning();
+        finalMembership = updated;
+      } else {
+        // Create new membership for target user
+        const [created] = await tx
+          .insert(leagueMemberships)
+          .values({
+            ...mergedData,
+            leagueId: leagueId,
+            userId: toUserId,
+          } as InsertLeagueMembership)
+          .returning();
+        finalMembership = created;
+      }
+
+      // 7. Delete the source membership
+      await tx
+        .delete(leagueMemberships)
+        .where(eq(leagueMemberships.id, fromMembership.id));
+
+      return finalMembership;
+    });
   }
 }
 
