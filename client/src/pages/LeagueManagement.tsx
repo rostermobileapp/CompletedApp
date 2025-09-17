@@ -337,11 +337,19 @@ type Season = {
 };
 
 // Utility function to format names as "Last Name, First Name"
-function formatUserName(user: { firstName?: string; lastName?: string; displayName?: string }): string {
-  if (user.lastName && user.firstName) {
-    return `${user.lastName}, ${user.firstName}`;
-  } else if (user.firstName) {
-    return user.firstName;
+// Supports display names from league membership for merged players
+function formatUserName(
+  user: { firstName?: string; lastName?: string; displayName?: string }, 
+  membership?: { displayFirstName?: string; displayLastName?: string }
+): string {
+  // Use display names from membership if available (for merged players like Dale Barber)
+  const firstName = membership?.displayFirstName || user.firstName;
+  const lastName = membership?.displayLastName || user.lastName;
+  
+  if (lastName && firstName) {
+    return `${lastName}, ${firstName}`;
+  } else if (firstName) {
+    return firstName;
   } else if (user.displayName) {
     return user.displayName;
   }
@@ -598,6 +606,13 @@ export default function LeagueManagement() {
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<any[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
+  
+  // User merge modal state (for merging existing users)
+  const [showUserMergeModal, setShowUserMergeModal] = useState(false);
+  const [selectedPlayerToMerge, setSelectedPlayerToMerge] = useState<LeagueMember | null>(null);
+  const [targetUserId, setTargetUserId] = useState('');
+  const [targetUserEmail, setTargetUserEmail] = useState('');
+  const [preserveDisplayName, setPreserveDisplayName] = useState(true);
   
   // Delete confirmation state
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -1580,7 +1595,7 @@ export default function LeagueManagement() {
                   {pendingMembers.map((member: LeagueMember) => (
                     <div key={member.id} className="flex items-center justify-between p-3 bg-background rounded-lg border">
                       <div className="flex-1" data-testid={`pending-player-${member.user.id}`}>
-                        <p className="font-medium">{formatUserName(member.user)}</p>
+                        <p className="font-medium">{formatUserName(member.user, member)}</p>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -1652,7 +1667,7 @@ export default function LeagueManagement() {
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">{formatUserName(member.user)}</p>
+                          <p className="font-medium">{formatUserName(member.user, member)}</p>
                           {/* Show captain badge if user is captain of their assigned team */}
                           {member.assignedTeamId && teams.find((team: Team) => team.id === member.assignedTeamId)?.captainId === member.userId && (
                             <span className="w-4 h-4 text-warning font-bold text-sm flex items-center justify-center">C</span>
@@ -1889,7 +1904,7 @@ export default function LeagueManagement() {
                             }}
                           >
                             <div className="flex items-center gap-2">
-                              <p className="font-medium">{formatUserName(member.user)}</p>
+                              <p className="font-medium">{formatUserName(member.user, member)}</p>
                               {!selectedTeam.isFreeAgents && member.userId === selectedTeam.captainId && (
                                 <Crown className="w-4 h-4 text-warning" />
                               )}
@@ -2244,7 +2259,7 @@ export default function LeagueManagement() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-semibold">{formatUserName(selectedPlayer.user)}</h3>
+                  <h3 className="text-lg font-semibold">{formatUserName(selectedPlayer.user, selectedPlayer)}</h3>
                   <p className="text-sm text-muted-foreground">{selectedPlayer.user.email}</p>
                 </div>
                 <button
@@ -2357,6 +2372,28 @@ export default function LeagueManagement() {
                     {updatePlayerMutation.isPending ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
+
+                {/* Merge Player (Commissioner Only) */}
+                {league?.commissionerId === currentUserId && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm">Merge Player</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Merge this player with another user account (useful for linking placeholder players to real users)
+                    </p>
+                    <button
+                      onClick={() => {
+                        setSelectedPlayerToMerge(selectedPlayer);
+                        setShowUserMergeModal(true);
+                        setSelectedPlayer(null); // Close player modal
+                      }}
+                      className="w-full px-4 py-2 bg-blue-500/50 text-white rounded-lg hover:bg-blue-600/50 text-sm font-medium"
+                      data-testid={`button-merge-${selectedPlayer.user.id}`}
+                    >
+                      <Users className="w-4 h-4 inline mr-2" />
+                      Merge with Another User
+                    </button>
+                  </div>
+                )}
 
                 {/* Remove Options */}
                 <div className="space-y-2">
@@ -3488,7 +3525,7 @@ export default function LeagueManagement() {
             <div className="space-y-4">
               <div>
                 <p className="font-medium">New Player:</p>
-                <p className="text-sm text-muted-foreground">{formatUserName(selectedMember.user)}</p>
+                <p className="text-sm text-muted-foreground">{formatUserName(selectedMember.user, selectedMember)}</p>
               </div>
               
               {potentialMatches.length > 0 && (
@@ -3635,6 +3672,156 @@ export default function LeagueManagement() {
                 >
                   Close
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Merge Modal */}
+      {showUserMergeModal && selectedPlayerToMerge && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Merge Player</h3>
+              <button
+                onClick={() => {
+                  setShowUserMergeModal(false);
+                  setSelectedPlayerToMerge(null);
+                  setTargetUserId('');
+                  setTargetUserEmail('');
+                  setPreserveDisplayName(true);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <p className="font-medium">Source Player:</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatUserName(selectedPlayerToMerge.user, selectedPlayerToMerge)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedPlayerToMerge.user.email}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Target User ID</label>
+                <input
+                  type="text"
+                  value={targetUserId}
+                  onChange={(e) => setTargetUserId(e.target.value)}
+                  placeholder="e.g., 47231827"
+                  className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the user ID of the account to merge with
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Target User Email (Optional)</label>
+                <input
+                  type="email"
+                  value={targetUserEmail}
+                  onChange={(e) => setTargetUserEmail(e.target.value)}
+                  placeholder="e.g., tobinkern88@gmail.com"
+                  className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional: Enter email for verification
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={preserveDisplayName}
+                    onChange={(e) => setPreserveDisplayName(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm">Preserve display name from source player</span>
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  If checked, the source player's name will be shown on the roster
+                </p>
+              </div>
+              
+              <div className="pt-4 border-t border-border">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowUserMergeModal(false);
+                      setSelectedPlayerToMerge(null);
+                      setTargetUserId('');
+                      setTargetUserEmail('');
+                      setPreserveDisplayName(true);
+                    }}
+                    className="flex-1 bg-muted text-muted-foreground px-4 py-2 rounded-lg hover:bg-muted/80 font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!targetUserId.trim()) {
+                        toast({
+                          title: "Error",
+                          description: "Please enter a target user ID.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      
+                      try {
+                        const response = await apiRequest('POST', `/api/leagues/${leagueId}/merge-player`, {
+                          fromUserId: selectedPlayerToMerge.userId,
+                          toUserId: targetUserId.trim(),
+                          preserveName: preserveDisplayName
+                        });
+                        
+                        if (response.ok) {
+                          toast({
+                            title: "Success",
+                            description: `Player merged successfully! ${preserveDisplayName ? 'Display name preserved.' : ''}`,
+                          });
+                          
+                          // Invalidate queries to refresh the data
+                          await queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
+                          await queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+                          
+                          setShowUserMergeModal(false);
+                          setSelectedPlayerToMerge(null);
+                          setTargetUserId('');
+                          setTargetUserEmail('');
+                          setPreserveDisplayName(true);
+                        } else {
+                          const error = await response.json();
+                          toast({
+                            title: "Error",
+                            description: error.message || "Failed to merge players.",
+                            variant: "destructive",
+                          });
+                        }
+                      } catch (error) {
+                        console.error('Merge error:', error);
+                        toast({
+                          title: "Error",
+                          description: "Failed to merge players. Please try again.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    disabled={!targetUserId.trim()}
+                    className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50"
+                  >
+                    Merge Players
+                  </button>
+                </div>
               </div>
             </div>
           </div>
