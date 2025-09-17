@@ -2500,15 +2500,14 @@ export class DatabaseStorage implements IStorage {
   async getPendingSubstituteApprovalsForUser(userId: string, leagueId: string): Promise<{ captain: any[]; commissioner: any[]; total: number }> {
     const result = { captain: [], commissioner: [], total: 0 };
 
-    // Get all pending substitute requests for this league
+    // Get all pending substitute requests for this league with basic joins
     const pendingRequests = await db
-      .select()
+      .select({
+        request: substituteRequests,
+        game: games
+      })
       .from(substituteRequests)
       .innerJoin(games, eq(substituteRequests.gameId, games.id))
-      .innerJoin(teams.as('homeTeam'), eq(games.homeTeamId, teams.id))
-      .innerJoin(teams.as('awayTeam'), eq(games.awayTeamId, teams.id))
-      .leftJoin(users.as('originalPlayer'), eq(substituteRequests.originalPlayerId, users.id))
-      .leftJoin(users.as('substitutePlayer'), eq(substituteRequests.substitutePlayerId, users.id))
       .where(
         and(
           eq(games.leagueId, leagueId),
@@ -2519,14 +2518,24 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // Check each request for role-based visibility
+    // Check if user is league commissioner first
+    const league = await this.getLeague(leagueId);
+    const isCommissioner = league && league.commissionerId === userId;
+
+    // Process each request
     for (const row of pendingRequests) {
-      const request = row.substitute_requests;
-      const game = row.games;
-      const homeTeam = row.homeTeam;
-      const awayTeam = row.awayTeam;
-      const originalPlayer = row.originalPlayer;
-      const substitutePlayer = row.substitutePlayer;
+      const request = row.request;
+      const game = row.game;
+
+      // Get team information
+      const homeTeam = await this.getTeam(game.homeTeamId);
+      const awayTeam = await this.getTeam(game.awayTeamId);
+      
+      // Get player information
+      const originalPlayer = request.originalPlayerId ? await this.getUser(request.originalPlayerId) : null;
+      const substitutePlayer = request.substitutePlayerId ? await this.getUser(request.substitutePlayerId) : null;
+
+      if (!homeTeam || !awayTeam) continue;
 
       const requestSummary = {
         id: request.id,
@@ -2563,8 +2572,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Check if user is league commissioner - commissioners can see ALL pending requests for oversight
-      const league = await this.getLeague(leagueId);
-      if (league && league.commissionerId === userId) {
+      if (isCommissioner) {
         // Add to commissioner section if it's specifically pending commissioner approval
         if (request.status === 'pending_commissioner_approval') {
           result.commissioner.push(requestSummary);
