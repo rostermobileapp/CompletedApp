@@ -167,7 +167,7 @@ export default function Roster() {
       <div className="px-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold" data-testid="text-players-title">
-            Players ({teamMembers?.filter((member: any) => !member.user.email?.includes('@placeholder.roster')).length || 0})
+            Players ({Array.isArray(teamMembers) ? teamMembers.filter((member: any) => !member.user.email?.includes('@placeholder.roster')).length : 0})
           </h2>
         </div>
         
@@ -179,7 +179,7 @@ export default function Roster() {
               </div>
             ))}
           </div>
-        ) : teamMembers && teamMembers.length > 0 ? (
+        ) : Array.isArray(teamMembers) && teamMembers.length > 0 ? (
           <div className="space-y-3">
             {teamMembers
               .filter((member: any) => !member.user.email?.includes('@placeholder.roster'))
