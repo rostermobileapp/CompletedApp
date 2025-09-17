@@ -12,6 +12,7 @@ import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
@@ -48,6 +49,9 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
   leagueId: string | null;
   onNavigate: (path: string) => void;
 }) {
+  const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
+  const [comments, setComments] = useState("");
+  const { toast } = useToast();
   // Fetch pending league member approvals
   const { data: pendingMembers = [], isLoading: pendingMembersLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'pending-members'],
@@ -130,6 +134,65 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
   const totalTasks = (Array.isArray(pendingMembers) ? pendingMembers.length : 0) + 
                      (Array.isArray(gamesNeedingVerification) ? gamesNeedingVerification.length : 0) +
                      (pendingSubstituteApprovals?.total || 0);
+
+  // Process substitute approval mutation
+  const processApprovalMutation = useMutation({
+    mutationFn: async ({ requestId, approverType, status, comments }: { 
+      requestId: string; 
+      approverType: string; 
+      status: string; 
+      comments?: string;
+    }) => {
+      await apiRequest("POST", `/api/substitute-requests/${requestId}/approve`, {
+        approverType,
+        status,
+        comments
+      });
+    },
+    onSuccess: (_, { status }) => {
+      toast({
+        title: "Request Processed",
+        description: `Request ${status} successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/substitute-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/substitute-requests/pending-approvals"] });
+      setSelectedRequest(null);
+      setComments("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to process request. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleApprove = (request: any, approverType: string) => {
+    processApprovalMutation.mutate({ 
+      requestId: request.id, 
+      approverType, 
+      status: "approved", 
+      comments 
+    });
+  };
+
+  const handleDeny = (request: any, approverType: string) => {
+    if (!comments.trim()) {
+      toast({
+        title: "Comments Required",
+        description: "Please provide comments when denying a request.",
+        variant: "destructive",
+      });
+      return;
+    }
+    processApprovalMutation.mutate({ 
+      requestId: request.id, 
+      approverType, 
+      status: "denied", 
+      comments 
+    });
+  };
 
   if (!isOpen) return null;
 
@@ -229,38 +292,76 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       {pendingSubstituteApprovals.captain.map((request: any) => (
                         <div 
                           key={request.id}
-                          className="bg-white dark:bg-card border border-purple-200 dark:border-purple-800 rounded-lg p-3 flex items-center justify-between"
+                          className="bg-white dark:bg-card border border-purple-200 dark:border-purple-800 rounded-lg p-3"
                           data-testid={`pending-substitute-captain-${request.id}`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                              <Users className="w-4 h-4 text-purple-600" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-[#000000]">
-                                {request.game.homeTeam.name} vs {request.game.awayTeam.name}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
-                              </p>
-                              <p className="text-sm text-purple-600">
-                                Substitute request from opposing captain
-                              </p>
-                              {request.originalPlayer && (
-                                <p className="text-sm text-muted-foreground">
-                                  Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                                <Users className="w-4 h-4 text-purple-600" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-[#000000]">
+                                  {request.game.homeTeam.name} vs {request.game.awayTeam.name}
                                 </p>
-                              )}
+                                <p className="text-sm text-muted-foreground">
+                                  {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
+                                </p>
+                                <p className="text-sm text-purple-600">
+                                  Substitute request from opposing captain
+                                </p>
+                                {request.originalPlayer && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
+                                    {request.originalPlayer.skillLevel && ` • Skill: ${request.originalPlayer.skillLevel}`}
+                                  </p>
+                                )}
+                                {request.substitutePlayer && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Substitute: {request.substitutePlayer.firstName} {request.substitutePlayer.lastName}
+                                    {request.substitutePlayer.skillLevel && ` • Skill: ${request.substitutePlayer.skillLevel}`}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <Button 
-                            size="sm" 
-                            className="bg-purple-600 hover:bg-purple-700 text-white"
-                            onClick={() => onNavigate(`/game/${request.game.id}`)}
-                            data-testid={`button-review-substitute-${request.id}`}
-                          >
-                            Review
-                          </Button>
+                          
+                          {/* Comments Input */}
+                          <div className="mb-3">
+                            <Textarea
+                              value={selectedRequest === request.id ? comments : ""}
+                              onChange={(e) => {
+                                setSelectedRequest(request.id);
+                                setComments(e.target.value);
+                              }}
+                              placeholder="Optional comments..."
+                              className="min-h-[60px]"
+                              data-testid={`textarea-comments-${request.id}`}
+                            />
+                          </div>
+                          
+                          {/* Action Buttons */}
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleApprove(request, 'opposing_captain')}
+                              disabled={processApprovalMutation.isPending}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              data-testid={`button-approve-substitute-${request.id}`}
+                            >
+                              Approve
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleDeny(request, 'opposing_captain')}
+                              disabled={processApprovalMutation.isPending}
+                              className="border-red-300 text-red-600 hover:bg-red-50"
+                              data-testid={`button-deny-substitute-${request.id}`}
+                            >
+                              Deny
+                            </Button>
+                          </div>
                         </div>
                       ))}
                       
@@ -268,38 +369,76 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       {pendingSubstituteApprovals.commissioner.map((request: any) => (
                         <div 
                           key={request.id}
-                          className="bg-white dark:bg-card border border-purple-200 dark:border-purple-800 rounded-lg p-3 flex items-center justify-between"
+                          className="bg-white dark:bg-card border border-purple-200 dark:border-purple-800 rounded-lg p-3"
                           data-testid={`pending-substitute-commissioner-${request.id}`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                              <Shield className="w-4 h-4 text-purple-600" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-[#000000]">
-                                {request.game.homeTeam.name} vs {request.game.awayTeam.name}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
-                              </p>
-                              <p className="text-sm text-purple-600">
-                                Substitute request requires commissioner approval
-                              </p>
-                              {request.originalPlayer && (
-                                <p className="text-sm text-muted-foreground">
-                                  Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                                <Shield className="w-4 h-4 text-purple-600" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-[#000000]">
+                                  {request.game.homeTeam.name} vs {request.game.awayTeam.name}
                                 </p>
-                              )}
+                                <p className="text-sm text-muted-foreground">
+                                  {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
+                                </p>
+                                <p className="text-sm text-purple-600">
+                                  Substitute request requires commissioner approval
+                                </p>
+                                {request.originalPlayer && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
+                                    {request.originalPlayer.skillLevel && ` • Skill: ${request.originalPlayer.skillLevel}`}
+                                  </p>
+                                )}
+                                {request.substitutePlayer && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Substitute: {request.substitutePlayer.firstName} {request.substitutePlayer.lastName}
+                                    {request.substitutePlayer.skillLevel && ` • Skill: ${request.substitutePlayer.skillLevel}`}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <Button 
-                            size="sm" 
-                            className="bg-purple-600 hover:bg-purple-700 text-white"
-                            onClick={() => onNavigate(`/game/${request.game.id}`)}
-                            data-testid={`button-review-commissioner-substitute-${request.id}`}
-                          >
-                            Review
-                          </Button>
+                          
+                          {/* Comments Input */}
+                          <div className="mb-3">
+                            <Textarea
+                              value={selectedRequest === request.id ? comments : ""}
+                              onChange={(e) => {
+                                setSelectedRequest(request.id);
+                                setComments(e.target.value);
+                              }}
+                              placeholder="Optional comments..."
+                              className="min-h-[60px]"
+                              data-testid={`textarea-comments-commissioner-${request.id}`}
+                            />
+                          </div>
+                          
+                          {/* Action Buttons */}
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleApprove(request, 'commissioner')}
+                              disabled={processApprovalMutation.isPending}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              data-testid={`button-approve-commissioner-substitute-${request.id}`}
+                            >
+                              Approve
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleDeny(request, 'commissioner')}
+                              disabled={processApprovalMutation.isPending}
+                              className="border-red-300 text-red-600 hover:bg-red-50"
+                              data-testid={`button-deny-commissioner-substitute-${request.id}`}
+                            >
+                              Deny
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
