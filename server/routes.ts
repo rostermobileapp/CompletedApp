@@ -1529,33 +1529,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get pending approvals for current user
-  app.get('/api/substitute-requests/pending-approvals', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      
-      if (!userId) {
-        return res.status(401).json({ message: 'User ID not found' });
-      }
-
-      // Validate query parameters with Zod
-      const queryData = getPendingApprovalsQuerySchema.parse(req.query);
-      const { approverType } = queryData;
-
-      const pendingApprovals = await storage.getUserPendingApprovals(
-        userId,
-        approverType
-      );
-      
-      res.json(pendingApprovals);
-    } catch (error) {
-      console.error('Error fetching pending approvals:', error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: 'Invalid query parameters', errors: error.errors });
-      }
-      res.status(500).json({ message: 'Failed to fetch pending approvals' });
-    }
-  });
 
   // Update non-status fields (reason, expiry, substitute player)
   app.patch('/api/substitute-requests/:id', isAuthenticated, async (req: any, res) => {
