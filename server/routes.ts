@@ -1615,6 +1615,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get pending substitute approvals for needs attention system
+  app.get('/api/substitute-requests/pending-approvals', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId } = req.query;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      if (!leagueId) {
+        return res.status(400).json({ message: 'League ID is required' });
+      }
+
+      // Verify user has access to this league (either as member or commissioner)
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: 'User not found' });
+      }
+
+      const league = await storage.getLeague(leagueId as string);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      // Check if user is league member or commissioner
+      const leagueMembers = await storage.getLeagueMembers(leagueId as string);
+      const isMember = leagueMembers.some(m => m.userId === userId);
+      const isCommissioner = league.commissionerId === userId;
+
+      if (!isMember && !isCommissioner) {
+        return res.status(403).json({ message: 'Access denied - not a league member or commissioner' });
+      }
+
+      const pendingApprovals = await storage.getPendingSubstituteApprovalsForUser(userId, leagueId as string);
+      res.json(pendingApprovals);
+    } catch (error) {
+      console.error('Error fetching pending substitute approvals:', error);
+      res.status(500).json({ message: 'Failed to fetch pending approvals' });
+    }
+  });
+
   // Expire old substitute requests
   app.post('/api/substitute-requests/expire', isAuthenticated, async (req: any, res) => {
     try {
