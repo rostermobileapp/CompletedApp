@@ -649,8 +649,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(leagueMemberships.leagueId, leagueId),
-          eq(leagueMemberships.status, "approved"),
-          not(ilike(users.email, '%@placeholder.roster%')) // Exclude placeholder users
+          eq(leagueMemberships.status, "approved")
         )
       );
     return result.map(r => ({ ...r.league_memberships, user: r.users }));
@@ -934,8 +933,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(teamMemberships.teamId, teamId),
-          eq(teamMemberships.status, "approved"),
-          not(ilike(users.email, '%@placeholder.roster%')) // Exclude placeholder users
+          eq(teamMemberships.status, "approved")
         )
       );
 
@@ -960,8 +958,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(leagueMemberships.assignedTeamId, teamId),
-          eq(leagueMemberships.status, "approved"),
-          not(ilike(users.email, '%@placeholder.roster%')) // Exclude placeholder users
+          eq(leagueMemberships.status, "approved")
         )
       );
 
