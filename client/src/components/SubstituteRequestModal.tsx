@@ -108,7 +108,7 @@ export function SubstituteRequestModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh]" data-testid="substitute-request-modal">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" data-testid="substitute-request-modal">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
@@ -119,7 +119,7 @@ export function SubstituteRequestModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 flex flex-col flex-1 min-h-0">
           {/* Search Input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -147,7 +147,7 @@ export function SubstituteRequestModal({
               ))}
             </div>
           ) : (
-            <ScrollArea className="max-h-[55vh] pr-4">
+            <ScrollArea className="flex-1 min-h-0 pr-4" style={{ maxHeight: '400px' }}>
               <div className="space-y-2">
                 {filteredPlayers.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">

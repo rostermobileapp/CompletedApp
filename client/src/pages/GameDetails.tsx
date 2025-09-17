@@ -956,6 +956,7 @@ export default function GameDetails() {
           setShowSubstituteModal(true);
         }}
         showSubstituteButtons={isCaptain}
+        teamId={isCaptain ? captainTeamId : undefined}
       />
       
       {/* Substitute Request Modal */}

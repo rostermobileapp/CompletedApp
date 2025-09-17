@@ -19,6 +19,7 @@ interface RSVPDetailModalProps {
   onClose: () => void;
   onRequestSubstitute?: (playerId: string, playerName: string) => void;
   showSubstituteButtons?: boolean;
+  teamId?: string;
 }
 
 export function RSVPDetailModal({ 
@@ -26,12 +27,17 @@ export function RSVPDetailModal({
   isOpen, 
   onClose, 
   onRequestSubstitute,
-  showSubstituteButtons = false 
+  showSubstituteButtons = false,
+  teamId 
 }: RSVPDetailModalProps) {
   const { data: rsvpSummary, isLoading } = useQuery({
-    queryKey: [`/api/games/${gameId}/rsvp-summary`],
+    queryKey: [`/api/games/${gameId}/rsvp-summary`, teamId],
     queryFn: async () => {
-      const response = await fetch(`/api/games/${gameId}/rsvp-summary`);
+      let url = `/api/games/${gameId}/rsvp-summary`;
+      if (teamId) {
+        url += `?teamId=${teamId}`;
+      }
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Failed to fetch RSVP summary');
       }
