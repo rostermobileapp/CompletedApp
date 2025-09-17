@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { useSubscription } from '@/context/SubscriptionContext';
@@ -58,6 +59,8 @@ type LeagueMember = {
   position?: string;
   notes?: string;
   jerseyNumber?: number;
+  displayFirstName?: string; // For merged players
+  displayLastName?: string; // For merged players
   user: {
     id: string;
     firstName?: string;
@@ -671,9 +674,7 @@ export default function LeagueManagement() {
   const editMode = new URLSearchParams(window.location.search).get('edit') === 'true';
   
   // Fetch current user for commissioner checks
-  const { data: user } = useQuery({
-    queryKey: ['/api/auth/user'],
-  });
+  const { user } = useAuth();
   
   // Fetch user's leagues for selection
   const { data: userLeagues = [] } = useQuery({
