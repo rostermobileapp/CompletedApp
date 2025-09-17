@@ -2532,6 +2532,7 @@ export class DatabaseStorage implements IStorage {
 
     // Fetch skill levels for all users in this league
     const skillLevels = await this.fetchUserSkills(userIds, leagueId);
+    console.log('DEBUG: Skill levels fetched:', Array.from(skillLevels.entries()));
 
     // Process each request
     for (const row of pendingRequests) {
