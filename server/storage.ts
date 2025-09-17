@@ -706,6 +706,34 @@ export class DatabaseStorage implements IStorage {
     return membership;
   }
 
+  // Helper method to batch lookup skill levels for users in a league
+  private async fetchUserSkills(userIds: string[], leagueId: string): Promise<Map<string, string | null>> {
+    if (userIds.length === 0) {
+      return new Map();
+    }
+
+    const skillData = await db
+      .select({
+        userId: leagueMemberships.userId,
+        skillLevel: leagueMemberships.skillLevel,
+      })
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.leagueId, leagueId),
+          eq(leagueMemberships.status, "approved"),
+          inArray(leagueMemberships.userId, userIds)
+        )
+      );
+
+    const skillMap = new Map<string, string | null>();
+    skillData.forEach(skill => {
+      skillMap.set(skill.userId, skill.skillLevel);
+    });
+
+    return skillMap;
+  }
+
   async deleteLeagueMembership(membershipId: string): Promise<void> {
     // First, get the membership to find the user ID and team ID
     const [membership] = await db
