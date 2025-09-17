@@ -925,17 +925,57 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTeamMembers(teamId: string): Promise<(TeamMembership & { user: User })[]> {
-    const result = await db
+    // Get members from direct team memberships
+    const directMemberships = await db
       .select()
       .from(teamMemberships)
       .innerJoin(users, eq(teamMemberships.userId, users.id))
       .where(
         and(
           eq(teamMemberships.teamId, teamId),
-          eq(teamMemberships.status, "approved")
+          eq(teamMemberships.status, "approved"),
+          not(users.email.like('%@placeholder.roster%')) // Exclude placeholder users
         )
       );
-    return result.map(r => ({ ...r.team_memberships, user: r.users }));
+
+    // Get members from league memberships assigned to this team
+    const leagueMemberships = await db
+      .select({
+        team_memberships: {
+          id: leagueMemberships.id,
+          userId: leagueMemberships.userId,
+          teamId: leagueMemberships.assignedTeamId,
+          position: leagueMemberships.position,
+          jerseyNumber: leagueMemberships.jerseyNumber,
+          status: leagueMemberships.status,
+          joinedAt: leagueMemberships.requestedAt,
+          approvedBy: leagueMemberships.approvedBy,
+          skillLevel: leagueMemberships.skillLevel
+        },
+        users: users
+      })
+      .from(leagueMemberships)
+      .innerJoin(users, eq(leagueMemberships.userId, users.id))
+      .where(
+        and(
+          eq(leagueMemberships.assignedTeamId, teamId),
+          eq(leagueMemberships.status, "approved"),
+          not(users.email.like('%@placeholder.roster%')) // Exclude placeholder users
+        )
+      );
+
+    // Combine and deduplicate members (in case a user appears in both sources)
+    const allMembers = [
+      ...directMemberships.map(r => ({ ...r.team_memberships, user: r.users })),
+      ...leagueMemberships.map(r => ({ ...r.team_memberships, user: r.users }))
+    ];
+
+    // Remove duplicates based on userId
+    const uniqueMembers = allMembers.filter((member, index, arr) => 
+      arr.findIndex(m => m.userId === member.userId) === index
+    );
+
+    return uniqueMembers;
   }
 
   // Game operations
