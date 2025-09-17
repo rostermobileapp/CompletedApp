@@ -565,18 +565,33 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
 
       // If found, auto-assign to the team from the imported player
-      if (importedPlayer && importedPlayer.teamName) {
-        // Find the team by name in this league
-        const [team] = await tx
-          .select()
-          .from(teams)
-          .where(
-            and(
-              eq(teams.leagueId, membership.leagueId),
-              eq(teams.name, importedPlayer.teamName)
+      if (importedPlayer && (importedPlayer.teamId || importedPlayer.teamName)) {
+        let team = null;
+        
+        // First try using teamId if available (more robust)
+        if (importedPlayer.teamId) {
+          const [teamById] = await tx
+            .select()
+            .from(teams)
+            .where(eq(teams.id, importedPlayer.teamId))
+            .limit(1);
+          team = teamById;
+        }
+        
+        // Fallback to team name if teamId lookup failed or wasn't available
+        if (!team && importedPlayer.teamName) {
+          const [teamByName] = await tx
+            .select()
+            .from(teams)
+            .where(
+              and(
+                eq(teams.leagueId, membership.leagueId),
+                eq(teams.name, importedPlayer.teamName)
+              )
             )
-          )
-          .limit(1);
+            .limit(1);
+          team = teamByName;
+        }
 
         // If team exists, assign the user to it
         if (team) {
