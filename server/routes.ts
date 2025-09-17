@@ -2425,6 +2425,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Merge two user accounts in a league (e.g., placeholder with real user)
+  app.post('/api/leagues/:leagueId/merge-player', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const { fromUserId, toUserId, preserveName = true } = req.body;
+      const userId = req.user.claims.sub;
+
+      // Validate request body
+      const mergeRequestSchema = z.object({
+        fromUserId: z.string().min(1, 'From user ID is required'),
+        toUserId: z.string().min(1, 'To user ID is required'),
+        preserveName: z.boolean().optional().default(true),
+      });
+
+      const validatedData = mergeRequestSchema.parse({ fromUserId, toUserId, preserveName });
+
+      if (validatedData.fromUserId === validatedData.toUserId) {
+        return res.status(400).json({ message: 'Cannot merge user with themselves' });
+      }
+
+      // Check commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Commissioner access required' });
+      }
+
+      // Verify both users exist and are in the league
+      const [fromUser, toUser] = await Promise.all([
+        storage.getUser(validatedData.fromUserId),
+        storage.getUser(validatedData.toUserId)
+      ]);
+
+      if (!fromUser) {
+        return res.status(404).json({ message: 'Source user not found' });
+      }
+
+      if (!toUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      const [fromMembership, toMembership] = await Promise.all([
+        storage.getUserLeagueMembership(validatedData.fromUserId, leagueId),
+        storage.getUserLeagueMembership(validatedData.toUserId, leagueId)
+      ]);
+
+      if (!fromMembership) {
+        return res.status(404).json({ message: 'Source user is not a member of this league' });
+      }
+
+      // Perform the merge
+      const mergedMembership = await storage.mergeUsersInLeague(
+        leagueId,
+        validatedData.fromUserId,
+        validatedData.toUserId,
+        validatedData.preserveName
+      );
+
+      res.json({
+        message: 'Users merged successfully',
+        membership: mergedMembership,
+        preservedName: validatedData.preserveName
+      });
+
+    } catch (error) {
+      console.error('Failed to merge users:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Invalid request data', 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: 'Failed to merge users' });
+    }
+  });
+
   // Merge an imported player with a real user account
   app.post('/api/leagues/:leagueId/players/merge', isAuthenticated, async (req: any, res) => {
     try {
