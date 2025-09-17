@@ -700,11 +700,8 @@ export default function LeagueManagement() {
     enabled: !!leagueId,
   });
 
-  // Filter out placeholder users for commissioner display only
-  const commissionerDisplayMembers: LeagueMember[] = Array.isArray(members)
-    ? members.filter(m => !(m.user?.email ?? '').toLowerCase().endsWith('@placeholder.roster'))
-    : [];
-    
+  // Use all members - no filtering needed, placeholders will be merged with real users
+  const commissionerDisplayMembers: LeagueMember[] = Array.isArray(members) ? members : [];
 
   // Fetch pending members
   const { data: pendingMembers = [], refetch: refetchPending } = useQuery({
