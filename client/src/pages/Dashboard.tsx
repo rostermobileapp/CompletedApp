@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, Target, AlertCircle, Settings, UserCheck } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, Target, AlertCircle, Settings, UserCheck, Shield } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -54,6 +54,17 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
     queryFn: async () => {
       if (!leagueId) return [];
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/pending-members`);
+      return response.json();
+    },
+    enabled: !!leagueId && isOpen,
+  });
+
+  // Fetch pending substitute approvals
+  const { data: pendingSubstituteApprovals, isLoading: substituteApprovalsLoading } = useQuery({
+    queryKey: ['/api/substitute-requests/pending-approvals', leagueId],
+    queryFn: async () => {
+      if (!leagueId) return { captain: [], commissioner: [], total: 0 };
+      const response = await apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${leagueId}`);
       return response.json();
     },
     enabled: !!leagueId && isOpen,
@@ -117,7 +128,8 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
   });
 
   const totalTasks = (Array.isArray(pendingMembers) ? pendingMembers.length : 0) + 
-                     (Array.isArray(gamesNeedingVerification) ? gamesNeedingVerification.length : 0);
+                     (Array.isArray(gamesNeedingVerification) ? gamesNeedingVerification.length : 0) +
+                     (pendingSubstituteApprovals?.total || 0);
 
   if (!isOpen) return null;
 
@@ -134,7 +146,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
-          {(pendingMembersLoading || gamesLoading) ? (
+          {(pendingMembersLoading || gamesLoading || substituteApprovalsLoading) ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
@@ -192,6 +204,99 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                             onClick={() => onNavigate(`/league-management?league=${leagueId}`)}
                             data-testid={`button-review-member-${member.id}`}
+                          >
+                            Review
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pending Substitute Approvals Section */}
+              {pendingSubstituteApprovals && (pendingSubstituteApprovals.captain.length > 0 || pendingSubstituteApprovals.commissioner.length > 0) && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Users className="w-5 h-5 text-purple-600" />
+                    <h3 className="text-lg font-semibold text-purple-600">
+                      Substitute Approvals ({pendingSubstituteApprovals.total})
+                    </h3>
+                  </div>
+                  <div className="bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                    <div className="space-y-3">
+                      {/* Captain Approvals */}
+                      {pendingSubstituteApprovals.captain.map((request: any) => (
+                        <div 
+                          key={request.id}
+                          className="bg-white dark:bg-card border border-purple-200 dark:border-purple-800 rounded-lg p-3 flex items-center justify-between"
+                          data-testid={`pending-substitute-captain-${request.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                              <Users className="w-4 h-4 text-purple-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-[#000000]">
+                                {request.game.homeTeam.name} vs {request.game.awayTeam.name}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
+                              </p>
+                              <p className="text-sm text-purple-600">
+                                Substitute request from opposing captain
+                              </p>
+                              {request.originalPlayer && (
+                                <p className="text-sm text-muted-foreground">
+                                  Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                            onClick={() => onNavigate(`/game/${request.game.id}`)}
+                            data-testid={`button-review-substitute-${request.id}`}
+                          >
+                            Review
+                          </Button>
+                        </div>
+                      ))}
+                      
+                      {/* Commissioner Approvals */}
+                      {pendingSubstituteApprovals.commissioner.map((request: any) => (
+                        <div 
+                          key={request.id}
+                          className="bg-white dark:bg-card border border-purple-200 dark:border-purple-800 rounded-lg p-3 flex items-center justify-between"
+                          data-testid={`pending-substitute-commissioner-${request.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                              <Shield className="w-4 h-4 text-purple-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-[#000000]">
+                                {request.game.homeTeam.name} vs {request.game.awayTeam.name}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
+                              </p>
+                              <p className="text-sm text-purple-600">
+                                Substitute request requires commissioner approval
+                              </p>
+                              {request.originalPlayer && (
+                                <p className="text-sm text-muted-foreground">
+                                  Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                            onClick={() => onNavigate(`/game/${request.game.id}`)}
+                            data-testid={`button-review-commissioner-substitute-${request.id}`}
                           >
                             Review
                           </Button>
@@ -816,17 +921,29 @@ export default function Dashboard() {
           }
         }
         
+        // Fetch pending substitute approvals
+        let pendingSubstituteApprovals = 0;
+        try {
+          const substituteApprovalsResponse = await apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${selectedLeagueId}`);
+          const substituteData = await substituteApprovalsResponse.json();
+          pendingSubstituteApprovals = substituteData.total || 0;
+        } catch (error) {
+          // If substitute approvals endpoint fails, just continue without it
+          pendingSubstituteApprovals = 0;
+        }
+        
         const pendingMembersCount = Array.isArray(pendingMembers) ? pendingMembers.length : 0;
-        const total = pendingMembersCount + gamesNeedingVerification;
+        const total = pendingMembersCount + gamesNeedingVerification + pendingSubstituteApprovals;
         
         
         return {
           pendingMembers: pendingMembersCount,
           gamesNeedingVerification,
+          pendingSubstituteApprovals,
           total
         };
       } catch (error) {
-        return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
+        return { pendingMembers: 0, gamesNeedingVerification: 0, pendingSubstituteApprovals: 0, total: 0 };
       }
     },
     enabled: !!selectedLeagueId,
