@@ -10,7 +10,7 @@ export const setPageTransitionDirection = (direction: 'left' | 'right' | 'up' | 
 
 export function PageTransition({ children }: PageTransitionProps) {
   return (
-    <div className="absolute inset-0 w-full h-full bg-background">
+    <div className="w-full min-h-screen bg-background pb-20">
       {children}
     </div>
   );

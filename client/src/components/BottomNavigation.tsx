@@ -26,7 +26,7 @@ export function BottomNavigation() {
   const activeId = getActiveId(location);
 
   return (
-    <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-card border-t border-border" data-testid="bottom-navigation">
+    <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-card border-t border-border z-50" data-testid="bottom-navigation">
       <div className="grid grid-cols-5 py-2">
         {navItems.map(({ id, icon: Icon, label, path }) => (
           <button
