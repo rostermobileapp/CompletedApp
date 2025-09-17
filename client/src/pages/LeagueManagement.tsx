@@ -691,7 +691,7 @@ export default function LeagueManagement() {
   });
 
   // Fetch league members
-  const { data: members = [], refetch: refetchMembers } = useQuery({
+  const { data: allMembers = [], refetch: refetchMembers } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'members'],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/members`);
@@ -699,6 +699,11 @@ export default function LeagueManagement() {
     },
     enabled: !!leagueId,
   });
+
+  // Filter out placeholder users from League Management view
+  const members = allMembers.filter((member: any) => 
+    !member.user.email?.includes('@placeholder.roster')
+  );
 
   // Fetch pending members
   const { data: pendingMembers = [], refetch: refetchPending } = useQuery({
