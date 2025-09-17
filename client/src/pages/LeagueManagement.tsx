@@ -2374,7 +2374,7 @@ export default function LeagueManagement() {
                 </div>
 
                 {/* Merge Player (Commissioner Only) */}
-                {league?.commissionerId === currentUserId && (
+                {league?.commissionerId === user?.id && (
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm">Merge Player</h4>
                     <p className="text-xs text-muted-foreground">
