@@ -35,16 +35,16 @@ args = "npm run dev"
 waitForPort = 5000
 
 [agent]
-integrations = ["javascript_websocket==1.0.0", "javascript_object_storage==1.0.0", "javascript_log_in_with_replit==1.0.0", "javascript_database==1.0.0"]
+integrations = ["javascript_websocket:1.0.0", "javascript_object_storage:1.0.0", "javascript_log_in_with_replit:1.0.0", "javascript_database:1.0.0", "javascript_stripe:1.0.0"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 38081
-externalPort = 3000
+localPort = 37349
+externalPort = 3001
 
 [[ports]]
-localPort = 46535
-externalPort = 3001
+localPort = 38081
+externalPort = 3000
