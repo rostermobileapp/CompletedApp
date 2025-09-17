@@ -167,6 +167,9 @@ export const leagueMemberships = pgTable("league_memberships", {
   position: varchar("position"),
   notes: text("notes"),
   jerseyNumber: integer("jersey_number"),
+  // Player merge display name fields - when set, these override user.firstName/lastName for league display
+  displayFirstName: varchar("display_first_name"),
+  displayLastName: varchar("display_last_name"),
 });
 
 // Team memberships table
