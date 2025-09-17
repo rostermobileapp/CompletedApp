@@ -23,6 +23,9 @@ export default function Roster() {
   const { data: teamMembers, isLoading } = useQuery({
     queryKey: ['/api/teams', primaryTeam?.id, 'members'],
     enabled: !!primaryTeam?.id,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Force fresh data
   });
 
   // Team logo upload mutation
@@ -163,7 +166,7 @@ export default function Roster() {
       <div className="px-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold" data-testid="text-players-title">
-            Players ({teamMembers?.length || 0})
+            Players ({teamMembers?.filter((member: any) => !member.user.email?.includes('@placeholder.roster')).length || 0})
           </h2>
         </div>
         
@@ -177,7 +180,9 @@ export default function Roster() {
           </div>
         ) : teamMembers && teamMembers.length > 0 ? (
           <div className="space-y-3">
-            {teamMembers.map((member: any) => (
+            {teamMembers
+              .filter((member: any) => !member.user.email?.includes('@placeholder.roster'))
+              .map((member: any) => (
               <div key={member.id} className="bg-card rounded-lg border border-border p-4" data-testid={`card-player-${member.id}`}>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
