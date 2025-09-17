@@ -2496,6 +2496,85 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => ({ ...r.substitution_approvals, approver: r.users }));
   }
 
+  // Get pending substitute requests that require action from the current user for needs attention system
+  async getPendingSubstituteApprovalsForUser(userId: string, leagueId: string): Promise<{ captain: any[]; commissioner: any[]; total: number }> {
+    const result = { captain: [], commissioner: [], total: 0 };
+
+    // Get all pending substitute requests for this league
+    const pendingRequests = await db
+      .select()
+      .from(substituteRequests)
+      .innerJoin(games, eq(substituteRequests.gameId, games.id))
+      .innerJoin(teams.as('homeTeam'), eq(games.homeTeamId, teams.id))
+      .innerJoin(teams.as('awayTeam'), eq(games.awayTeamId, teams.id))
+      .leftJoin(users.as('originalPlayer'), eq(substituteRequests.originalPlayerId, users.id))
+      .leftJoin(users.as('substitutePlayer'), eq(substituteRequests.substitutePlayerId, users.id))
+      .where(
+        and(
+          eq(games.leagueId, leagueId),
+          or(
+            eq(substituteRequests.status, 'pending_opponent_approval'),
+            eq(substituteRequests.status, 'pending_commissioner_approval')
+          )
+        )
+      );
+
+    // Check each request for role-based visibility
+    for (const row of pendingRequests) {
+      const request = row.substitute_requests;
+      const game = row.games;
+      const homeTeam = row.homeTeam;
+      const awayTeam = row.awayTeam;
+      const originalPlayer = row.originalPlayer;
+      const substitutePlayer = row.substitutePlayer;
+
+      const requestSummary = {
+        id: request.id,
+        status: request.status,
+        createdAt: request.createdAt,
+        game: {
+          id: game.id,
+          scheduledAt: game.scheduledAt,
+          homeTeam: { id: homeTeam.id, name: homeTeam.name },
+          awayTeam: { id: awayTeam.id, name: awayTeam.name }
+        },
+        originalPlayer: originalPlayer ? {
+          id: originalPlayer.id,
+          firstName: originalPlayer.firstName,
+          lastName: originalPlayer.lastName
+        } : null,
+        substitutePlayer: substitutePlayer ? {
+          id: substitutePlayer.id,
+          firstName: substitutePlayer.firstName,
+          lastName: substitutePlayer.lastName
+        } : null,
+        requestingTeamId: request.requestingTeamId
+      };
+
+      // Check if user is opposing captain for requests pending captain approval
+      if (request.status === 'pending_opponent_approval') {
+        const opposingTeamId = request.requestingTeamId === game.homeTeamId ? game.awayTeamId : game.homeTeamId;
+        const opposingTeam = opposingTeamId === homeTeam.id ? homeTeam : awayTeam;
+        
+        if (opposingTeam.captainId === userId) {
+          result.captain.push(requestSummary);
+          result.total++;
+        }
+      }
+
+      // Check if user is league commissioner for requests pending commissioner approval
+      if (request.status === 'pending_commissioner_approval') {
+        const league = await this.getLeague(leagueId);
+        if (league && league.commissionerId === userId) {
+          result.commissioner.push(requestSummary);
+          result.total++;
+        }
+      }
+    }
+
+    return result;
+  }
+
   async getUserPendingApprovals(userId: string, approverType?: 'opposing_captain' | 'commissioner' | 'substitute_player'): Promise<(SubstitutionApproval & { substitutionRequest: SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User } })[]> {
     // For pending approvals, we need to find requests where:
     // 1. The request is in a status that requires this user's approval
