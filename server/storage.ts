@@ -2059,7 +2059,7 @@ export class DatabaseStorage implements IStorage {
     return rsvp;
   }
 
-  async getGameRsvpSummary(gameId: string): Promise<{ attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }> {
+  async getGameRsvpSummary(gameId: string): Promise<{ attending: (GameRsvp & { user: User & { skillLevel?: string | null } })[]; notAttending: (GameRsvp & { user: User & { skillLevel?: string | null } })[]; noResponse: (User & { skillLevel?: string | null })[] }> {
     // Get all RSVPs for this game
     const rsvps = await db
       .select()
@@ -2090,7 +2090,30 @@ export class DatabaseStorage implements IStorage {
       .filter(member => !rsvpUserIds.includes(member.userId))
       .map(member => member.user);
 
-    return { attending, notAttending, noResponse };
+    // Collect all unique user IDs and fetch skill levels
+    const allUserIds = [
+      ...attending.map(a => a.user.id),
+      ...notAttending.map(n => n.user.id),
+      ...noResponse.map(n => n.id)
+    ];
+    const uniqueUserIds = [...new Set(allUserIds)];
+    const skillMap = await this.fetchUserSkills(uniqueUserIds, game.leagueId);
+
+    // Attach skill levels to user objects
+    attending.forEach(a => {
+      (a.user as any).skillLevel = skillMap.get(a.user.id) ?? null;
+    });
+    
+    notAttending.forEach(n => {
+      (n.user as any).skillLevel = skillMap.get(n.user.id) ?? null;
+    });
+
+    const enhancedNoResponse = noResponse.map(user => ({
+      ...user,
+      skillLevel: skillMap.get(user.id) ?? null
+    }));
+
+    return { attending, notAttending, noResponse: enhancedNoResponse };
   }
 
   async getUserTeamRsvp(gameId: string, userId: string, teamId: string): Promise<GameRsvp | undefined> {
@@ -2117,7 +2140,7 @@ export class DatabaseStorage implements IStorage {
     return rsvps;
   }
 
-  async getTeamRsvpSummary(gameId: string, teamId: string): Promise<{ attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }> {
+  async getTeamRsvpSummary(gameId: string, teamId: string): Promise<{ attending: (GameRsvp & { user: User & { skillLevel?: string | null } })[]; notAttending: (GameRsvp & { user: User & { skillLevel?: string | null } })[]; noResponse: (User & { skillLevel?: string | null })[] }> {
     // Get all RSVPs for this game and team
     const rsvps = await db
       .select()
@@ -2143,7 +2166,36 @@ export class DatabaseStorage implements IStorage {
       .filter(member => !rsvpUserIds.includes(member.userId))
       .map(member => member.user);
 
-    return { attending, notAttending, noResponse };
+    // Get game to find league ID for skill level lookup
+    const game = await this.getGameById(gameId);
+    if (!game) {
+      return { attending, notAttending, noResponse };
+    }
+
+    // Collect all unique user IDs and fetch skill levels
+    const allUserIds = [
+      ...attending.map(a => a.user.id),
+      ...notAttending.map(n => n.user.id),
+      ...noResponse.map(n => n.id)
+    ];
+    const uniqueUserIds = [...new Set(allUserIds)];
+    const skillMap = await this.fetchUserSkills(uniqueUserIds, game.leagueId);
+
+    // Attach skill levels to user objects
+    attending.forEach(a => {
+      (a.user as any).skillLevel = skillMap.get(a.user.id) ?? null;
+    });
+    
+    notAttending.forEach(n => {
+      (n.user as any).skillLevel = skillMap.get(n.user.id) ?? null;
+    });
+
+    const enhancedNoResponse = noResponse.map(user => ({
+      ...user,
+      skillLevel: skillMap.get(user.id) ?? null
+    }));
+
+    return { attending, notAttending, noResponse: enhancedNoResponse };
   }
 
   async getGameRsvpSummaryByTeams(gameId: string): Promise<{ homeTeam: { teamId: string; attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }; awayTeam: { teamId: string; attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] } }> {
