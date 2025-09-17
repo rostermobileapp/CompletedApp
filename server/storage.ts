@@ -2219,7 +2219,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getAvailablePlayers(date: Date, leagueId: string): Promise<User[]> {
+  async getAvailablePlayers(date: Date, leagueId: string): Promise<(User & { skillLevel?: string | null })[]> {
     // Get all league members
     const leagueMembers = await this.getLeagueMembers(leagueId);
     
@@ -2250,10 +2250,21 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Return league members not scheduled for any game that day
-    return leagueMembers
-      .filter(member => !scheduledUserIds.has(member.userId))
-      .map(member => member.user);
+    // Filter available players
+    const availableMembers = leagueMembers
+      .filter(member => !scheduledUserIds.has(member.userId));
+    
+    const availableUsers = availableMembers.map(member => member.user);
+    
+    // Fetch skill levels for available users
+    const userIds = availableUsers.map(user => user.id);
+    const skillMap = await this.fetchUserSkills(userIds, leagueId);
+    
+    // Return users with skill level data
+    return availableUsers.map(user => ({
+      ...user,
+      skillLevel: skillMap.get(user.id) ?? null
+    }));
   }
 
   // Substitute request operations
