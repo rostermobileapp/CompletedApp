@@ -1452,6 +1452,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get pending substitute approvals - supports both league-specific (Dashboard) and user-wide (other components) requests
+  app.get('/api/substitute-requests/pending-approvals', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId, approverType } = req.query;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      // If leagueId is provided, use league-specific method (Dashboard needs attention system)
+      if (leagueId) {
+        // Verify user has access to this league (either as member or commissioner)
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(401).json({ message: 'User not found' });
+        }
+
+        const league = await storage.getLeague(leagueId as string);
+        if (!league) {
+          return res.status(404).json({ message: 'League not found' });
+        }
+
+        // Check if user is league member or commissioner
+        const leagueMembers = await storage.getLeagueMembers(leagueId as string);
+        const isMember = leagueMembers.some(m => m.userId === userId);
+        const isCommissioner = league.commissionerId === userId;
+
+        if (!isMember && !isCommissioner) {
+          return res.status(403).json({ message: 'Access denied - not a league member or commissioner' });
+        }
+
+        const pendingApprovals = await storage.getPendingSubstituteApprovalsForUser(userId, leagueId as string);
+        res.json(pendingApprovals);
+      } else {
+        // If no leagueId, use user-wide method (other components)
+        const validApproverTypes = ['opposing_captain', 'commissioner', 'substitute_player'];
+        const approverTypeParam = approverType && validApproverTypes.includes(approverType) ? approverType as any : undefined;
+        
+        const pendingApprovals = await storage.getUserPendingApprovals(userId, approverTypeParam);
+        res.json(pendingApprovals);
+      }
+    } catch (error) {
+      console.error('Error fetching pending substitute approvals:', error);
+      res.status(500).json({ message: 'Failed to fetch pending approvals' });
+    }
+  });
+
   // Get single substitute request with full details
   app.get('/api/substitute-requests/:id', isAuthenticated, async (req: any, res) => {
     try {
@@ -1588,53 +1636,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get pending substitute approvals - supports both league-specific (Dashboard) and user-wide (other components) requests
-  app.get('/api/substitute-requests/pending-approvals', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { leagueId, approverType } = req.query;
-      
-      if (!userId) {
-        return res.status(401).json({ message: 'User ID not found' });
-      }
-
-      // If leagueId is provided, use league-specific method (Dashboard needs attention system)
-      if (leagueId) {
-        // Verify user has access to this league (either as member or commissioner)
-        const user = await storage.getUser(userId);
-        if (!user) {
-          return res.status(401).json({ message: 'User not found' });
-        }
-
-        const league = await storage.getLeague(leagueId as string);
-        if (!league) {
-          return res.status(404).json({ message: 'League not found' });
-        }
-
-        // Check if user is league member or commissioner
-        const leagueMembers = await storage.getLeagueMembers(leagueId as string);
-        const isMember = leagueMembers.some(m => m.userId === userId);
-        const isCommissioner = league.commissionerId === userId;
-
-        if (!isMember && !isCommissioner) {
-          return res.status(403).json({ message: 'Access denied - not a league member or commissioner' });
-        }
-
-        const pendingApprovals = await storage.getPendingSubstituteApprovalsForUser(userId, leagueId as string);
-        res.json(pendingApprovals);
-      } else {
-        // If no leagueId, use user-wide method (other components)
-        const validApproverTypes = ['opposing_captain', 'commissioner', 'substitute_player'];
-        const approverTypeParam = approverType && validApproverTypes.includes(approverType) ? approverType as any : undefined;
-        
-        const pendingApprovals = await storage.getUserPendingApprovals(userId, approverTypeParam);
-        res.json(pendingApprovals);
-      }
-    } catch (error) {
-      console.error('Error fetching pending substitute approvals:', error);
-      res.status(500).json({ message: 'Failed to fetch pending approvals' });
-    }
-  });
 
   // Expire old substitute requests
   app.post('/api/substitute-requests/expire', isAuthenticated, async (req: any, res) => {
