@@ -181,9 +181,9 @@ export function SubstituteRequestModal({
                           <p className="font-medium">
                             {player.firstName} {player.lastName}
                           </p>
-                          {player.email && (
-                            <p className="text-sm text-muted-foreground">{player.email}</p>
-                          )}
+                          <p className="text-sm text-muted-foreground">
+                            Skill: {(player as any).skillLevel || '—'}
+                          </p>
                         </div>
                       </div>
                       

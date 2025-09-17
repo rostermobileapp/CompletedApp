@@ -59,9 +59,9 @@ export function RSVPDetailModal({
           <p className="text-sm font-medium">
             {user.firstName} {user.lastName}
           </p>
-          {user.email && (
-            <p className="text-xs text-muted-foreground">{user.email}</p>
-          )}
+          <p className="text-xs text-muted-foreground">
+            Skill: {(user as any).skillLevel || '—'}
+          </p>
         </div>
       </div>
       
