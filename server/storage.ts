@@ -644,6 +644,22 @@ export class DatabaseStorage implements IStorage {
     return membership;
   }
 
+  async updateLeagueMembershipStatus(membershipId: string, newStatus: 'pending' | 'approved' | 'rejected' | 'inactive'): Promise<LeagueMembership> {
+    const [membership] = await db
+      .update(leagueMemberships)
+      .set({
+        status: newStatus,
+        // Reset approval fields when changing to pending
+        ...(newStatus === 'pending' && {
+          approvedAt: null,
+          approvedBy: null
+        })
+      })
+      .where(eq(leagueMemberships.id, membershipId))
+      .returning();
+    return membership;
+  }
+
   async getLeagueMembers(leagueId: string): Promise<(LeagueMembership & { user: User })[]> {
     const result = await db
       .select()

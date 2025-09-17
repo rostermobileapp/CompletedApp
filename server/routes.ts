@@ -350,9 +350,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if already a member
       const existingMembership = await storage.getUserLeagueMembership(userId, leagueId);
       if (existingMembership) {
-        return res.status(400).json({ message: "Already requested or member" });
+        // If user has pending or approved status, prevent duplicate request
+        if (existingMembership.status === 'pending' || existingMembership.status === 'approved') {
+          return res.status(400).json({ message: "Already requested or member" });
+        }
+        
+        // If user was rejected or inactive, allow them to re-request by updating status to pending
+        if (existingMembership.status === 'rejected' || existingMembership.status === 'inactive') {
+          const updatedMembership = await storage.updateLeagueMembershipStatus(existingMembership.id, 'pending');
+          return res.json(updatedMembership);
+        }
       }
 
+      // Create new membership request
       const membership = await storage.requestLeagueMembership({
         userId,
         leagueId,
