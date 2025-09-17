@@ -540,16 +540,64 @@ export class DatabaseStorage implements IStorage {
   }
 
   async approveLeagueMembership(membershipId: string, approverId: string): Promise<LeagueMembership> {
-    const [membership] = await db
-      .update(leagueMemberships)
-      .set({
-        status: "approved",
-        approvedAt: new Date(),
-        approvedBy: approverId,
-      })
-      .where(eq(leagueMemberships.id, membershipId))
-      .returning();
-    return membership;
+    return await db.transaction(async (tx) => {
+      // First approve the membership
+      const [membership] = await tx
+        .update(leagueMemberships)
+        .set({
+          status: "approved",
+          approvedAt: new Date(),
+          approvedBy: approverId,
+        })
+        .where(eq(leagueMemberships.id, membershipId))
+        .returning();
+
+      // Check if this user was previously merged with an imported player in this league
+      const [importedPlayer] = await tx
+        .select()
+        .from(importedPlayers)
+        .where(
+          and(
+            eq(importedPlayers.leagueId, membership.leagueId),
+            eq(importedPlayers.mergedWithUserId, membership.userId)
+          )
+        )
+        .limit(1);
+
+      // If found, auto-assign to the team from the imported player
+      if (importedPlayer && importedPlayer.teamName) {
+        // Find the team by name in this league
+        const [team] = await tx
+          .select()
+          .from(teams)
+          .where(
+            and(
+              eq(teams.leagueId, membership.leagueId),
+              eq(teams.name, importedPlayer.teamName)
+            )
+          )
+          .limit(1);
+
+        // If team exists, assign the user to it
+        if (team) {
+          await tx
+            .update(leagueMemberships)
+            .set({ assignedTeamId: team.id })
+            .where(eq(leagueMemberships.id, membershipId));
+          
+          // Return the updated membership
+          const [updatedMembership] = await tx
+            .select()
+            .from(leagueMemberships)
+            .where(eq(leagueMemberships.id, membershipId))
+            .limit(1);
+          
+          return updatedMembership;
+        }
+      }
+
+      return membership;
+    });
   }
 
   async getUserLeagueMembership(userId: string, leagueId: string): Promise<LeagueMembership | undefined> {
@@ -748,17 +796,10 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-      // If there's a merged imported player, detach it (reverse the merge)
-      if (importedPlayer) {
-        await tx
-          .update(importedPlayers)
-          .set({
-            mergedWithUserId: null,
-            isPlaceholder: true,
-            updatedAt: new Date()
-          })
-          .where(eq(importedPlayers.id, importedPlayer.id));
-      }
+      // Note: We intentionally DO NOT unmerge the imported player when leaving
+      // This preserves the merge relationship so if the user rejoins, 
+      // they can be automatically re-assigned to their original team
+      // The imported player keeps its mergedWithUserId intact
 
       // Get all teams in this league to clean up direct team memberships
       const leagueTeams = await tx
