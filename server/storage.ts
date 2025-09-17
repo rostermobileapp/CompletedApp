@@ -2498,7 +2498,7 @@ export class DatabaseStorage implements IStorage {
 
   // Get pending substitute requests that require action from the current user for needs attention system
   async getPendingSubstituteApprovalsForUser(userId: string, leagueId: string): Promise<{ captain: any[]; commissioner: any[]; total: number }> {
-    const result = { captain: [], commissioner: [], total: 0 };
+    const result: { captain: any[]; commissioner: any[]; total: number } = { captain: [], commissioner: [], total: 0 };
 
     // Get all pending substitute requests for this league with basic joins
     const pendingRequests = await db
@@ -2521,6 +2521,17 @@ export class DatabaseStorage implements IStorage {
     // Check if user is league commissioner first
     const league = await this.getLeague(leagueId);
     const isCommissioner = league && league.commissionerId === userId;
+
+    // Get all unique user IDs from the requests to batch fetch skill levels
+    const userIds = Array.from(new Set(
+      pendingRequests.flatMap(row => [
+        row.request.originalPlayerId,
+        row.request.substitutePlayerId
+      ].filter((id): id is string => id !== null))
+    ));
+
+    // Fetch skill levels for all users in this league
+    const skillLevels = await this.fetchUserSkills(userIds, leagueId);
 
     // Process each request
     for (const row of pendingRequests) {
@@ -2550,12 +2561,14 @@ export class DatabaseStorage implements IStorage {
         originalPlayer: originalPlayer ? {
           id: originalPlayer.id,
           firstName: originalPlayer.firstName,
-          lastName: originalPlayer.lastName
+          lastName: originalPlayer.lastName,
+          skillLevel: skillLevels.get(originalPlayer.id) || null
         } : null,
         substitutePlayer: substitutePlayer ? {
           id: substitutePlayer.id,
           firstName: substitutePlayer.firstName,
-          lastName: substitutePlayer.lastName
+          lastName: substitutePlayer.lastName,
+          skillLevel: skillLevels.get(substitutePlayer.id) || null
         } : null,
         requestingTeamId: request.requestingTeamId
       };
