@@ -704,6 +704,7 @@ export default function LeagueManagement() {
   const commissionerDisplayMembers: LeagueMember[] = Array.isArray(members)
     ? members.filter(m => !(m.user?.email ?? '').toLowerCase().endsWith('@placeholder.roster'))
     : [];
+    
 
   // Fetch pending members
   const { data: pendingMembers = [], refetch: refetchPending } = useQuery({
