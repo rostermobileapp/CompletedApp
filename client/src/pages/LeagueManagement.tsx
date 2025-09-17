@@ -691,7 +691,7 @@ export default function LeagueManagement() {
   });
 
   // Fetch league members
-  const { data: allMembers = [], refetch: refetchMembers } = useQuery({
+  const { data: members = [], refetch: refetchMembers } = useQuery<LeagueMember[]>({
     queryKey: ['/api/leagues', leagueId, 'members'],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/members`);
@@ -700,10 +700,10 @@ export default function LeagueManagement() {
     enabled: !!leagueId,
   });
 
-  // Filter out placeholder users from League Management view
-  const members = allMembers.filter((member: any) => 
-    !member.user.email?.includes('@placeholder.roster')
-  );
+  // Filter out placeholder users for commissioner display only
+  const commissionerDisplayMembers: LeagueMember[] = Array.isArray(members)
+    ? members.filter(m => !(m.user?.email ?? '').toLowerCase().endsWith('@placeholder.roster'))
+    : [];
 
   // Fetch pending members
   const { data: pendingMembers = [], refetch: refetchPending } = useQuery({
@@ -1762,7 +1762,7 @@ export default function LeagueManagement() {
               {!selectedTeam ? (
                 // Teams List View
                 (() => {
-                  const freeAgents = members.filter((m: LeagueMember) => !m.assignedTeamId);
+                  const freeAgents = commissionerDisplayMembers.filter((m: LeagueMember) => !m.assignedTeamId);
                   const allTeamsToShow = [
                     // Free Agents virtual team
                     {
@@ -1780,10 +1780,10 @@ export default function LeagueManagement() {
                       {allTeamsToShow.map((team: any) => {
                         const teamMembers = team.isFreeAgents 
                           ? freeAgents 
-                          : members.filter((m: LeagueMember) => m.assignedTeamId === team.id);
+                          : commissionerDisplayMembers.filter((m: LeagueMember) => m.assignedTeamId === team.id);
                         const captain = team.isFreeAgents 
                           ? null 
-                          : members.find((m: LeagueMember) => m.userId === team.captainId);
+                          : commissionerDisplayMembers.find((m: LeagueMember) => m.userId === team.captainId);
                         
                         return (
                           <div 
@@ -1850,8 +1850,8 @@ export default function LeagueManagement() {
                 // Team Detail View - Show Players in Selected Team
                 (() => {
                   const teamMembers = selectedTeam.isFreeAgents 
-                    ? members.filter((m: LeagueMember) => !m.assignedTeamId)
-                    : members.filter((m: LeagueMember) => m.assignedTeamId === selectedTeam.id);
+                    ? commissionerDisplayMembers.filter((m: LeagueMember) => !m.assignedTeamId)
+                    : commissionerDisplayMembers.filter((m: LeagueMember) => m.assignedTeamId === selectedTeam.id);
                   
                   return teamMembers.length === 0 ? (
                     <div className="text-center py-8">
@@ -3419,7 +3419,7 @@ export default function LeagueManagement() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {(() => {
-                    const teamMembers = members.filter((m: LeagueMember) => m.assignedTeamId === teamToDelete);
+                    const teamMembers = commissionerDisplayMembers.filter((m: LeagueMember) => m.assignedTeamId === teamToDelete);
                     return `${teamMembers.length} player${teamMembers.length !== 1 ? 's' : ''}`;
                   })()}
                 </p>
@@ -3592,7 +3592,7 @@ export default function LeagueManagement() {
                 <p className="font-medium text-lg">{selectedTeamForEdit.name}</p>
                 <p className="text-sm text-muted-foreground">
                   {(() => {
-                    const teamMembers = members.filter((m: LeagueMember) => m.assignedTeamId === selectedTeamForEdit.id);
+                    const teamMembers = commissionerDisplayMembers.filter((m: LeagueMember) => m.assignedTeamId === selectedTeamForEdit.id);
                     return `${teamMembers.length} player${teamMembers.length !== 1 ? 's' : ''}`;
                   })()}
                 </p>
