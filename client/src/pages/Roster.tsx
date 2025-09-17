@@ -21,11 +21,20 @@ export default function Roster() {
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
 
   const { data: teamMembers, isLoading } = useQuery({
-    queryKey: ['/api/teams', primaryTeam?.id, 'members'],
+    queryKey: [`/api/teams/${primaryTeam?.id}/members`],
     enabled: !!primaryTeam?.id,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     staleTime: 0, // Force fresh data
+  });
+
+  // Debug logging to verify what data we're getting
+  console.log('Roster Debug Info:', {
+    primaryTeamId: primaryTeam?.id,
+    primaryTeamName: primaryTeam?.name,
+    teamMembersCount: teamMembers?.length,
+    teamMembersEmails: teamMembers?.map((m: any) => m.user.email),
+    queryKey: [`/api/teams/${primaryTeam?.id}/members`]
   });
 
   // Team logo upload mutation
