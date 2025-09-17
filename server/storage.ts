@@ -2562,10 +2562,16 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // Check if user is league commissioner for requests pending commissioner approval
-      if (request.status === 'pending_commissioner_approval') {
-        const league = await this.getLeague(leagueId);
-        if (league && league.commissionerId === userId) {
+      // Check if user is league commissioner - commissioners can see ALL pending requests for oversight
+      const league = await this.getLeague(leagueId);
+      if (league && league.commissionerId === userId) {
+        // Add to commissioner section if it's specifically pending commissioner approval
+        if (request.status === 'pending_commissioner_approval') {
+          result.commissioner.push(requestSummary);
+          result.total++;
+        }
+        // Also add to commissioner section if it's pending opponent approval (for oversight)
+        else if (request.status === 'pending_opponent_approval') {
           result.commissioner.push(requestSummary);
           result.total++;
         }
