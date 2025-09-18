@@ -1387,34 +1387,7 @@ export default function Dashboard() {
                         </div>
                       ) : null;
                     })()}
-                    {/* Claim Beverage Duty Button */}
-                    {(() => {
-                      // Show claim button only if no one has claimed beverage duty
-                      const noBeverageDutyClaimed = !(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
-                      
-                      return noBeverageDutyClaimed;
-                    })() && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
-                        onClick={() => {
-                          const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
-                          if (userTeam && primaryTeam) {
-                            claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                          }
-                        }}
-                        disabled={claimBeverageDutyMutation.isPending}
-                        data-testid={`button-claim-beverage-duty-${game.id}`}
-                      >
-                        <img 
-                          src={beverageJarUrl}
-                          alt="Claim Beverage Duty"
-                          className="h-4 w-auto"
-                          style={{ aspectRatio: '9/16' }}
-                        />
-                      </Button>
-                    )}
+                    
                   </div>
                 </div>
               </div>
