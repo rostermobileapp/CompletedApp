@@ -429,49 +429,56 @@ export default function StatsManagement() {
                           </Button>
                         </div>
 
-                        {/* Scrollable Table */}
-                        <div className="flex-1 overflow-x-auto overflow-y-auto border rounded-lg">
-                          <Table data-testid="table-game-stats">
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead 
-                                  className="cursor-pointer select-none w-32" 
-                                  onClick={() => handleSort('name')}
-                                  data-testid="header-player-name"
-                                >
-                                  Player {getSortIcon('name')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16" 
-                                  onClick={() => handleSort('gamesPlayed')}
-                                  data-testid="header-games-played"
-                                >
-                                  GP {getSortIcon('gamesPlayed')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16" 
-                                  onClick={() => handleSort('goals')}
-                                  data-testid="header-goals"
-                                >
-                                  G {getSortIcon('goals')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16" 
-                                  onClick={() => handleSort('assists')}
-                                  data-testid="header-assists"
-                                >
-                                  A {getSortIcon('assists')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16" 
-                                  onClick={() => handleSort('penaltyMinutes')}
-                                  data-testid="header-penalty-minutes"
-                                >
-                                  PIM {getSortIcon('penaltyMinutes')}
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                        {/* Table with Fixed Header */}
+                        <div className="flex-1 border rounded-lg bg-background">
+                          {/* Fixed Header */}
+                          <div className="border-b bg-muted/30">
+                            <table className="w-full" data-testid="table-game-stats">
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead 
+                                    className="cursor-pointer select-none w-32" 
+                                    onClick={() => handleSort('name')}
+                                    data-testid="header-player-name"
+                                  >
+                                    Player {getSortIcon('name')}
+                                  </TableHead>
+                                  <TableHead 
+                                    className="cursor-pointer select-none text-center w-16" 
+                                    onClick={() => handleSort('gamesPlayed')}
+                                    data-testid="header-games-played"
+                                  >
+                                    GP {getSortIcon('gamesPlayed')}
+                                  </TableHead>
+                                  <TableHead 
+                                    className="cursor-pointer select-none text-center w-16" 
+                                    onClick={() => handleSort('goals')}
+                                    data-testid="header-goals"
+                                  >
+                                    G {getSortIcon('goals')}
+                                  </TableHead>
+                                  <TableHead 
+                                    className="cursor-pointer select-none text-center w-16" 
+                                    onClick={() => handleSort('assists')}
+                                    data-testid="header-assists"
+                                  >
+                                    A {getSortIcon('assists')}
+                                  </TableHead>
+                                  <TableHead 
+                                    className="cursor-pointer select-none text-center w-16" 
+                                    onClick={() => handleSort('penaltyMinutes')}
+                                    data-testid="header-penalty-minutes"
+                                  >
+                                    PIM {getSortIcon('penaltyMinutes')}
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                            </table>
+                          </div>
+                          {/* Scrollable Body */}
+                          <div className="overflow-x-auto overflow-y-auto" style={{height: 'calc(100% - 49px)'}}>
+                            <table className="w-full">
+                              <TableBody>
                               {getSortedPlayers(gameParticipants).map((player: Player, index: number) => (
                                 <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
                                   <TableCell className="font-medium w-32" data-testid={`cell-name-${player.id}`}>
@@ -602,8 +609,9 @@ export default function StatsManagement() {
                                   </TableCell>
                                 </TableRow>
                               ))}
-                            </TableBody>
-                          </Table>
+                              </TableBody>
+                            </table>
+                          </div>
                         </div>
                         
                         <Button 
@@ -646,49 +654,56 @@ export default function StatsManagement() {
                           </Button>
                         </div>
 
-                        {/* Scrollable Table */}
-                        <div className="flex-1 overflow-x-auto overflow-y-auto border rounded-lg">
-                          <Table data-testid="table-player-stats">
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead 
-                                  className="cursor-pointer select-none w-32" 
-                                  onClick={() => handleSort('name')}
-                                  data-testid="header-player-name"
-                                >
-                                  Player {getSortIcon('name')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16" 
-                                  onClick={() => handleSort('gamesPlayed')}
-                                  data-testid="header-games-played"
-                                >
-                                  GP {getSortIcon('gamesPlayed')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16" 
-                                  onClick={() => handleSort('goals')}
-                                  data-testid="header-goals"
-                                >
-                                  G {getSortIcon('goals')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16" 
-                                  onClick={() => handleSort('assists')}
-                                  data-testid="header-assists"
-                                >
-                                  A {getSortIcon('assists')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16" 
-                                  onClick={() => handleSort('penaltyMinutes')}
-                                  data-testid="header-penalty-minutes"
-                                >
-                                  PIM {getSortIcon('penaltyMinutes')}
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                        {/* Table with Fixed Header */}
+                        <div className="flex-1 border rounded-lg bg-background">
+                          {/* Fixed Header */}
+                          <div className="border-b bg-muted/30">
+                            <table className="w-full" data-testid="table-player-stats">
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead 
+                                    className="cursor-pointer select-none w-32" 
+                                    onClick={() => handleSort('name')}
+                                    data-testid="header-player-name"
+                                  >
+                                    Player {getSortIcon('name')}
+                                  </TableHead>
+                                  <TableHead 
+                                    className="cursor-pointer select-none text-center w-16" 
+                                    onClick={() => handleSort('gamesPlayed')}
+                                    data-testid="header-games-played"
+                                  >
+                                    GP {getSortIcon('gamesPlayed')}
+                                  </TableHead>
+                                  <TableHead 
+                                    className="cursor-pointer select-none text-center w-16" 
+                                    onClick={() => handleSort('goals')}
+                                    data-testid="header-goals"
+                                  >
+                                    G {getSortIcon('goals')}
+                                  </TableHead>
+                                  <TableHead 
+                                    className="cursor-pointer select-none text-center w-16" 
+                                    onClick={() => handleSort('assists')}
+                                    data-testid="header-assists"
+                                  >
+                                    A {getSortIcon('assists')}
+                                  </TableHead>
+                                  <TableHead 
+                                    className="cursor-pointer select-none text-center w-16" 
+                                    onClick={() => handleSort('penaltyMinutes')}
+                                    data-testid="header-penalty-minutes"
+                                  >
+                                    PIM {getSortIcon('penaltyMinutes')}
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                            </table>
+                          </div>
+                          {/* Scrollable Body */}
+                          <div className="overflow-x-auto overflow-y-auto" style={{height: 'calc(100% - 49px)'}}>
+                            <table className="w-full">
+                              <TableBody>
                               {getSortedPlayers(players).map((player: Player, index: number) => (
                                 <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
                                   <TableCell className="font-medium w-32 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-name-${player.id}`}>
@@ -819,8 +834,9 @@ export default function StatsManagement() {
                                   </TableCell>
                                 </TableRow>
                               ))}
-                            </TableBody>
-                          </Table>
+                              </TableBody>
+                            </table>
+                          </div>
                         </div>
                       </div>
                     )}
