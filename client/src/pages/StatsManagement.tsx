@@ -476,7 +476,7 @@ export default function StatsManagement() {
                         </div>
 
                         {/* Fixed Header */}
-                        <div ref={gameTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-hidden">
+                        <div ref={gameTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-auto pointer-events-none">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -704,7 +704,7 @@ export default function StatsManagement() {
                         </div>
 
                         {/* Fixed Header */}
-                        <div ref={playerTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-hidden">
+                        <div ref={playerTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-auto pointer-events-none">
                           <Table>
                             <TableHeader>
                               <TableRow>
