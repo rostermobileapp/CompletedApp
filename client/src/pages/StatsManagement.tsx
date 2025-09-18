@@ -429,10 +429,10 @@ export default function StatsManagement() {
                           </Button>
                         </div>
 
-                        {/* Scrollable Table with Sticky Header */}
-                        <div className="flex-1 relative overflow-auto border rounded-lg">
-                          <Table data-testid="table-game-stats" className="border-separate border-spacing-0">
-                            <TableHeader className="sticky top-0 z-20 bg-background">
+                        {/* Fixed Header */}
+                        <div className="border rounded-t-lg bg-background">
+                          <Table>
+                            <TableHeader>
                               <TableRow>
                                 <TableHead 
                                   className="cursor-pointer select-none w-32 bg-background"
@@ -476,6 +476,12 @@ export default function StatsManagement() {
                                 </TableHead>
                               </TableRow>
                             </TableHeader>
+                          </Table>
+                        </div>
+                        
+                        {/* Scrollable Table Body */}
+                        <div className="flex-1 overflow-auto border-l border-r border-b rounded-b-lg">
+                          <Table data-testid="table-game-stats">
                             <TableBody>
                               {getSortedPlayers(gameParticipants).map((player: Player, index: number) => (
                                 <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
