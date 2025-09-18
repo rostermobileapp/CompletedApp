@@ -242,9 +242,21 @@ export default function StatsManagement() {
       setIndividualStats({ goals: '', assists: '', penaltyMinutes: '', gamesPlayed: '' });
     },
     onError: (error: any) => {
+      console.error('Error saving player:', error);
+      let errorMessage = 'Failed to update statistics.';
+      
+      // Handle different error types
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update statistics.',
+        description: errorMessage,
         variant: 'destructive',
       });
     },
