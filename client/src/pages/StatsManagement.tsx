@@ -93,18 +93,21 @@ export default function StatsManagement() {
   // Initialize player stats when game participants are loaded
   useEffect(() => {
     if (Array.isArray(gameParticipants) && gameParticipants.length > 0) {
-      const initialStats: Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }> = {};
-      gameParticipants.forEach((player: Player) => {
-        initialStats[player.id] = {
-          goals: '',
-          assists: '',
-          penaltyMinutes: '',
-          gamesPlayed: '1' // Default to 1 game played
-        };
+      setPlayerGameStats(prev => {
+        const newStats = { ...prev };
+        gameParticipants.forEach((player: Player) => {
+          // Only initialize if this player doesn't already have stats
+          if (!newStats[player.id]) {
+            newStats[player.id] = {
+              goals: '0',
+              assists: '0',
+              penaltyMinutes: '0',
+              gamesPlayed: '1' // Default to 1 game played
+            };
+          }
+        });
+        return newStats;
       });
-      setPlayerGameStats(initialStats);
-    } else {
-      setPlayerGameStats({});
     }
   }, [gameParticipants]);
 
