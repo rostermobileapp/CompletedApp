@@ -439,84 +439,106 @@ export default function StatsManagement() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <User className="w-5 h-5" />
-                      Update Individual Player Stats
+                      Update Player Stats by Individual
                     </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Update stats for all league players individually. Changes are added to existing totals.
+                    </p>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Player</Label>
-                      <Select value={selectedPlayer} onValueChange={setSelectedPlayer} data-testid="select-player">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a player" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(players) && players.map((player: Player) => (
-                            <SelectItem key={player.id} value={player.id}>
-                              {player.firstName} {player.lastName}
-                              {player.teamName && ` (${player.teamName})`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {selectedPlayer && (
+                  <CardContent>
+                    {selectedLeague && Array.isArray(players) && players.length > 0 && (
                       <div className="space-y-4">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="space-y-2">
-                            <Label>Goals</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              value={individualStats.goals}
-                              onChange={(e) => setIndividualStats(prev => ({ ...prev, goals: e.target.value }))}
-                              data-testid="input-individual-goals"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Assists</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              value={individualStats.assists}
-                              onChange={(e) => setIndividualStats(prev => ({ ...prev, assists: e.target.value }))}
-                              data-testid="input-individual-assists"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Penalty Minutes</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              value={individualStats.penaltyMinutes}
-                              onChange={(e) => setIndividualStats(prev => ({ ...prev, penaltyMinutes: e.target.value }))}
-                              data-testid="input-individual-penalty"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Games Played</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              value={individualStats.gamesPlayed}
-                              onChange={(e) => setIndividualStats(prev => ({ ...prev, gamesPlayed: e.target.value }))}
-                              data-testid="input-individual-games"
-                            />
-                          </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {players.map((player: Player) => (
+                            <div key={player.id} className="border rounded-lg p-4 bg-card">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <User className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <h4 className="font-medium" data-testid={`text-player-name-${player.id}`}>
+                                    {player.firstName} {player.lastName}
+                                  </h4>
+                                  {player.teamName && (
+                                    <p className="text-sm text-muted-foreground" data-testid={`text-team-${player.id}`}>
+                                      {player.teamName}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Goals</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    value={playerGameStats[player.id]?.goals || ''}
+                                    onChange={(e) => updatePlayerGameStat(player.id, 'goals', e.target.value)}
+                                    data-testid={`input-goals-${player.id}`}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Assists</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    value={playerGameStats[player.id]?.assists || ''}
+                                    onChange={(e) => updatePlayerGameStat(player.id, 'assists', e.target.value)}
+                                    data-testid={`input-assists-${player.id}`}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Penalty Min</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    value={playerGameStats[player.id]?.penaltyMinutes || ''}
+                                    onChange={(e) => updatePlayerGameStat(player.id, 'penaltyMinutes', e.target.value)}
+                                    data-testid={`input-penalty-${player.id}`}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Games Played</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    value={playerGameStats[player.id]?.gamesPlayed || ''}
+                                    onChange={(e) => updatePlayerGameStat(player.id, 'gamesPlayed', e.target.value)}
+                                    data-testid={`input-games-${player.id}`}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                         
                         <Button 
-                          onClick={handlePlayerStatsUpdate} 
+                          onClick={handleGameStatsUpdate} 
                           disabled={updateStatsMutation.isPending}
                           className="w-full"
                           data-testid="button-update-player-stats"
                         >
-                          {updateStatsMutation.isPending ? 'Updating...' : 'Update Player Stats'}
+                          {updateStatsMutation.isPending ? 'Updating...' : 'Update All Player Stats'}
                         </Button>
+                      </div>
+                    )}
+
+                    {selectedLeague && Array.isArray(players) && players.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground" data-testid="text-no-players">
+                        <AlertCircle className="w-12 h-12 mx-auto mb-4" />
+                        <p>No players found in this league.</p>
+                        <p className="text-sm">Players need to join teams in this league.</p>
+                      </div>
+                    )}
+
+                    {!selectedLeague && (
+                      <div className="text-center py-8 text-muted-foreground" data-testid="text-select-league">
+                        <Users className="w-12 h-12 mx-auto mb-4" />
+                        <p>Select a league to see all players.</p>
                       </div>
                     )}
                   </CardContent>
