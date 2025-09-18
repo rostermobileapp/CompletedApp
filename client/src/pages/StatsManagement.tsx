@@ -515,7 +515,7 @@ export default function StatsManagement() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center w-16" data-testid={`cell-goals-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-goals-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -543,7 +543,7 @@ export default function StatsManagement() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center w-16" data-testid={`cell-assists-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-assists-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -572,7 +572,7 @@ export default function StatsManagement() {
                                     </div>
                                   </TableCell>
 
-                                  <TableCell className="text-center w-16" data-testid={`cell-penalty-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-penalty-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -633,7 +633,7 @@ export default function StatsManagement() {
                 <Card>
                   <CardContent className="p-6 pt-[0px] pb-[0px] pl-[0px] pr-[0px] text-[14px]">
                     {selectedLeague && Array.isArray(players) && players.length > 0 && (
-                      <div className="flex flex-col" style={{height: 'calc(100vh - 280px)'}}>
+                      <div className="flex flex-col" style={{height: 'calc(100vh - 200px)'}}>
                         {/* Fixed Update Button at Top */}
                         <div className="flex-shrink-0 mb-4">
                           <Button 
@@ -691,7 +691,7 @@ export default function StatsManagement() {
                             <TableBody>
                               {getSortedPlayers(players).map((player: Player, index: number) => (
                                 <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
-                                  <TableCell className="font-medium w-32" data-testid={`cell-name-${player.id}`}>
+                                  <TableCell className="font-medium w-32 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-name-${player.id}`}>
                                     <div className="flex items-center gap-3">
                                       <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
                                         {index + 1}
@@ -704,7 +704,7 @@ export default function StatsManagement() {
                                       </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center w-16" data-testid={`cell-gamesplayed-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px] text-[14px]" data-testid={`cell-gamesplayed-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -732,7 +732,7 @@ export default function StatsManagement() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center w-16" data-testid={`cell-goals-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-goals-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -760,7 +760,7 @@ export default function StatsManagement() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center w-16" data-testid={`cell-assists-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-assists-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -789,7 +789,7 @@ export default function StatsManagement() {
                                     </div>
                                   </TableCell>
 
-                                  <TableCell className="text-center w-16" data-testid={`cell-penalty-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-penalty-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
