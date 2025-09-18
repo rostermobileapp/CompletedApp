@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Trophy, Target, Clock, Medal, TrendingUp, Filter } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Clock, Medal, TrendingUp, Filter, Settings } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import {
 
 export default function Stats() {
   const { user } = useAuth();
+  const { hasAccess } = useSubscription();
   const [, navigate] = useLocation();
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [sortField, setSortField] = useState<string>('points');
@@ -144,18 +146,36 @@ export default function Stats() {
     <div className="min-h-screen flex flex-col pb-24" data-testid="stats-page">
       {/* Header */}
       <div className="p-6 pt-12">
-        <div className="flex items-center gap-4 mb-6">
-          <button 
-            onClick={() => {
-              setPageTransitionDirection('down');
-              navigate('/');
-            }}
-            className="text-muted-foreground"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Player Stats</h1>
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate('/');
+              }}
+              className="text-muted-foreground"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Player Stats</h1>
+          </div>
+          
+          {/* Commissioner Update Button */}
+          {hasAccess('commissioner') && (
+            <Button 
+              onClick={() => {
+                setPageTransitionDirection('up');
+                navigate('/stats-management');
+              }}
+              size="sm"
+              data-testid="button-update-stats"
+              className="flex items-center gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              Update Stats
+            </Button>
+          )}
         </div>
       </div>
 

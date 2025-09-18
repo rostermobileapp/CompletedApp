@@ -3424,25 +3424,89 @@ export class DatabaseStorage implements IStorage {
 
   // Player stats operations
   async getPlayerStats(leagueId: string, seasonId?: string): Promise<(PlayerStats & { user: User })[]> {
-    let conditions = [eq(playerStats.leagueId, leagueId)];
+    // Build conditions for stats table join
+    let statsConditions = [eq(playerStats.leagueId, leagueId)];
     
     // Consistent season handling: undefined means non-seasonal stats (null seasonId)
     if (seasonId) {
-      conditions.push(eq(playerStats.seasonId, seasonId));
+      statsConditions.push(eq(playerStats.seasonId, seasonId));
     } else {
-      conditions.push(isNull(playerStats.seasonId));
+      statsConditions.push(isNull(playerStats.seasonId));
     }
     
+    // Get all approved league members and LEFT JOIN with their stats
     const result = await db
-      .select()
-      .from(playerStats)
-      .innerJoin(users, eq(playerStats.userId, users.id))
-      .where(and(...conditions))
-      .orderBy(desc(sql`${playerStats.goals} + ${playerStats.assists}`)); // Order by points (goals + assists)
+      .select({
+        // User info
+        userId: users.id,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+        userProfileImageUrl: users.profileImageUrl,
+        userAge: users.age,
+        userPhoneNumber: users.phoneNumber,
+        userCity: users.city,
+        userSubscriptionTier: users.subscriptionTier,
+        userStripeCustomerId: users.stripeCustomerId,
+        userStripeSubscriptionId: users.stripeSubscriptionId,
+        userPrimarySport: users.primarySport,
+        userCreatedAt: users.createdAt,
+        userUpdatedAt: users.updatedAt,
+        
+        // Stats info (will be null if player has no stats)
+        statsId: playerStats.id,
+        statsLeagueId: playerStats.leagueId,
+        statsSeasonId: playerStats.seasonId,
+        statsUserId: playerStats.userId,
+        statsGamesPlayed: playerStats.gamesPlayed,
+        statsGoals: playerStats.goals,
+        statsAssists: playerStats.assists,
+        statsPenaltyMinutes: playerStats.penaltyMinutes,
+        statsCreatedAt: playerStats.createdAt,
+        statsUpdatedAt: playerStats.updatedAt,
+      })
+      .from(leagueMemberships)
+      .innerJoin(users, eq(leagueMemberships.userId, users.id))
+      .leftJoin(playerStats, and(
+        eq(playerStats.userId, users.id),
+        ...statsConditions
+      ))
+      .where(
+        and(
+          eq(leagueMemberships.leagueId, leagueId),
+          eq(leagueMemberships.status, "approved")
+        )
+      )
+      .orderBy(desc(sql`COALESCE(${playerStats.goals}, 0) + COALESCE(${playerStats.assists}, 0)`)); // Order by points (goals + assists)
     
     return result.map(r => ({
-      ...r.player_stats,
-      user: r.users
+      // If player has stats, use them; otherwise use default zero values
+      id: r.statsId || `${r.userId}-${leagueId}-${seasonId || 'null'}`,
+      leagueId: leagueId,
+      seasonId: seasonId || null,
+      userId: r.userId,
+      gamesPlayed: r.statsGamesPlayed || 0,
+      goals: r.statsGoals || 0,
+      assists: r.statsAssists || 0,
+      penaltyMinutes: r.statsPenaltyMinutes || 0,
+      createdAt: r.statsCreatedAt || new Date(),
+      updatedAt: r.statsUpdatedAt || new Date(),
+      user: {
+        id: r.userId,
+        email: r.userEmail,
+        firstName: r.userFirstName,
+        lastName: r.userLastName,
+        profileImageUrl: r.userProfileImageUrl,
+        age: r.userAge,
+        phoneNumber: r.userPhoneNumber,
+        city: r.userCity,
+        subscriptionTier: r.userSubscriptionTier,
+        stripeCustomerId: r.userStripeCustomerId,
+        stripeSubscriptionId: r.userStripeSubscriptionId,
+        primarySport: r.userPrimarySport,
+        createdAt: r.userCreatedAt,
+        updatedAt: r.userUpdatedAt,
+      }
     }));
   }
 
