@@ -1051,6 +1051,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get game participants (all players from home and away teams)
+  app.get('/api/games/:gameId/participants', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const userId = req.user.claims.sub;
+      
+      // Get game details first
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Verify user has access to this game's league
+      const userMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
+      if (!userMembership || userMembership.status !== 'approved') {
+        return res.status(403).json({ message: 'Access denied - not an approved league member' });
+      }
+      
+      // Get members from both home and away teams
+      const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
+      const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+      
+      // Combine all participants and format for stats management
+      const participants = [...homeTeamMembers, ...awayTeamMembers].map(member => ({
+        id: member.user.id,
+        firstName: member.user.firstName,
+        lastName: member.user.lastName,
+        email: member.user.email,
+        teamName: member.teamMembership.teamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name
+      }));
+
+      res.json(participants);
+    } catch (error) {
+      console.error('Error fetching game participants:', error);
+      res.status(500).json({ message: 'Failed to fetch game participants' });
+    }
+  });
+
   // Release beverage duty
   app.post('/api/games/:gameId/release-beverage-duty', isAuthenticated, async (req: any, res) => {
     try {
