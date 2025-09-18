@@ -235,7 +235,7 @@ export interface IStorage {
   getPlayerStatsByUser(userId: string, leagueId: string, seasonId?: string): Promise<PlayerStats | undefined>;
   createPlayerStats(stats: InsertPlayerStats): Promise<PlayerStats>;
   updatePlayerStats(userId: string, leagueId: string, seasonId?: string, updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>>): Promise<PlayerStats>;
-  bulkUpdatePlayerStats(leagueId: string, seasonId?: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[]): Promise<void>;
+  bulkUpdatePlayerStats(leagueId: string, seasonId?: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[], mode?: 'increment' | 'set'): Promise<void>;
   
   // Player merge operations
   mergeUsersInLeague(leagueId: string, fromUserId: string, toUserId: string, preserveName?: boolean): Promise<LeagueMembership>;
@@ -3520,7 +3520,7 @@ export class DatabaseStorage implements IStorage {
     return updatedStats;
   }
 
-  async bulkUpdatePlayerStats(leagueId: string, seasonId?: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[]): Promise<void> {
+  async bulkUpdatePlayerStats(leagueId: string, seasonId?: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[], mode: 'increment' | 'set' = 'set'): Promise<void> {
     await db.transaction(async (tx) => {
       for (const { userId, updates } of statsUpdates) {
         let conditions = [
@@ -3536,12 +3536,22 @@ export class DatabaseStorage implements IStorage {
         }
         
         // Try to update existing record first
+        let updateData: any = { updatedAt: new Date() };
+        
+        if (mode === 'increment') {
+          // For increment mode, add to existing values
+          if (updates.goals !== undefined) updateData.goals = sql`${playerStats.goals} + ${updates.goals}`;
+          if (updates.assists !== undefined) updateData.assists = sql`${playerStats.assists} + ${updates.assists}`;
+          if (updates.penaltyMinutes !== undefined) updateData.penaltyMinutes = sql`${playerStats.penaltyMinutes} + ${updates.penaltyMinutes}`;
+          if (updates.gamesPlayed !== undefined) updateData.gamesPlayed = sql`${playerStats.gamesPlayed} + ${updates.gamesPlayed}`;
+        } else {
+          // For set mode, replace values directly
+          updateData = { ...updates, updatedAt: new Date() };
+        }
+        
         const result = await tx
           .update(playerStats)
-          .set({
-            ...updates,
-            updatedAt: new Date(),
-          })
+          .set(updateData)
           .where(and(...conditions))
           .returning();
         

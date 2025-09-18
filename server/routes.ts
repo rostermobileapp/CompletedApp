@@ -3990,7 +3990,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             assists: true,
             penaltyMinutes: true,
           }).partial()
-        }))
+        })),
+        mode: z.enum(['increment', 'set']).optional().default('set')
       });
       
       const validatedData = bulkUpdateSchema.parse(req.body);
@@ -4011,7 +4012,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates: update.stats
       }));
       
-      await storage.bulkUpdatePlayerStats(leagueId, seasonId, statsUpdates);
+      await storage.bulkUpdatePlayerStats(leagueId, seasonId, statsUpdates, validatedData.mode);
       
       res.json({ message: 'Player stats updated successfully', updatedCount: statsUpdates.length });
     } catch (error) {
