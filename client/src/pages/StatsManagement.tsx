@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { SubscriptionGate } from '@/components/SubscriptionGate';
@@ -57,6 +57,10 @@ export default function StatsManagement() {
   // Sorting state
   const [sortField, setSortField] = useState<string>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Refs for scroll synchronization
+  const gameTableHeaderRef = useRef<HTMLDivElement>(null);
+  const gameTableBodyRef = useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
 
@@ -129,6 +133,26 @@ export default function StatsManagement() {
       });
     }
   }, [currentPlayerStats]);
+
+  // Scroll synchronization for game table
+  useEffect(() => {
+    const headerEl = gameTableHeaderRef.current;
+    const bodyEl = gameTableBodyRef.current;
+    
+    if (!headerEl || !bodyEl) return;
+    
+    const syncScroll = (source: HTMLElement, target: HTMLElement) => (e: Event) => {
+      target.scrollLeft = source.scrollLeft;
+    };
+    
+    const handleBodyScroll = syncScroll(bodyEl, headerEl);
+    
+    bodyEl.addEventListener('scroll', handleBodyScroll);
+    
+    return () => {
+      bodyEl.removeEventListener('scroll', handleBodyScroll);
+    };
+  }, [selectedGame, gameParticipants]);
 
   // Update stats mutation
   const updateStatsMutation = useMutation({
@@ -430,7 +454,7 @@ export default function StatsManagement() {
                         </div>
 
                         {/* Fixed Header */}
-                        <div className="border rounded-t-lg bg-background">
+                        <div ref={gameTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-auto">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -480,7 +504,7 @@ export default function StatsManagement() {
                         </div>
                         
                         {/* Scrollable Table Body */}
-                        <div className="flex-1 overflow-auto border-l border-r border-b rounded-b-lg">
+                        <div ref={gameTableBodyRef} className="flex-1 overflow-auto border-l border-r border-b rounded-b-lg">
                           <Table data-testid="table-game-stats">
                             <TableBody>
                               {getSortedPlayers(gameParticipants).map((player: Player, index: number) => (
