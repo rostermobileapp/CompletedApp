@@ -390,7 +390,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                   </p>
                                 )}
                                 {request.substitutePlayer && (
-                                  <p className="text-sm text-muted-foreground">
+                                  <p className="text-sm text-[#ffffff] font-bold">
                                     Substitute: {request.substitutePlayer.firstName} {request.substitutePlayer.lastName}
                                     {request.substitutePlayer.skillLevel && ` • Skill: ${request.substitutePlayer.skillLevel}`}
                                   </p>
