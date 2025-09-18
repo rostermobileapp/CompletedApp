@@ -287,13 +287,6 @@ export default function StatsManagement() {
       } else if (sortField === 'assists') {
         aVal = parseInt(playerGameStats[a.id]?.assists || '0') || 0;
         bVal = parseInt(playerGameStats[b.id]?.assists || '0') || 0;
-      } else if (sortField === 'points') {
-        const aGoals = parseInt(playerGameStats[a.id]?.goals || '0') || 0;
-        const aAssists = parseInt(playerGameStats[a.id]?.assists || '0') || 0;
-        const bGoals = parseInt(playerGameStats[b.id]?.goals || '0') || 0;
-        const bAssists = parseInt(playerGameStats[b.id]?.assists || '0') || 0;
-        aVal = aGoals + aAssists;
-        bVal = bGoals + bAssists;
       } else if (sortField === 'penaltyMinutes') {
         aVal = parseInt(playerGameStats[a.id]?.penaltyMinutes || '0') || 0;
         bVal = parseInt(playerGameStats[b.id]?.penaltyMinutes || '0') || 0;
@@ -442,42 +435,35 @@ export default function StatsManagement() {
                             <TableHeader>
                               <TableRow>
                                 <TableHead 
-                                  className="cursor-pointer select-none" 
+                                  className="cursor-pointer select-none w-32" 
                                   onClick={() => handleSort('name')}
                                   data-testid="header-player-name"
                                 >
                                   Player {getSortIcon('name')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center" 
+                                  className="cursor-pointer select-none text-center w-16" 
                                   onClick={() => handleSort('gamesPlayed')}
                                   data-testid="header-games-played"
                                 >
                                   GP {getSortIcon('gamesPlayed')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center" 
+                                  className="cursor-pointer select-none text-center w-16" 
                                   onClick={() => handleSort('goals')}
                                   data-testid="header-goals"
                                 >
                                   G {getSortIcon('goals')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center" 
+                                  className="cursor-pointer select-none text-center w-16" 
                                   onClick={() => handleSort('assists')}
                                   data-testid="header-assists"
                                 >
                                   A {getSortIcon('assists')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center" 
-                                  onClick={() => handleSort('points')}
-                                  data-testid="header-points"
-                                >
-                                  PTS {getSortIcon('points')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center" 
+                                  className="cursor-pointer select-none text-center w-16" 
                                   onClick={() => handleSort('penaltyMinutes')}
                                   data-testid="header-penalty-minutes"
                                 >
@@ -488,7 +474,7 @@ export default function StatsManagement() {
                             <TableBody>
                               {getSortedPlayers(gameParticipants).map((player: Player, index: number) => (
                                 <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
-                                  <TableCell className="font-medium" data-testid={`cell-name-${player.id}`}>
+                                  <TableCell className="font-medium w-32" data-testid={`cell-name-${player.id}`}>
                                     <div className="flex items-center gap-3">
                                       <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
                                         {index + 1}
@@ -501,7 +487,7 @@ export default function StatsManagement() {
                                       </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center" data-testid={`cell-gamesplayed-${player.id}`}>
+                                  <TableCell className="text-center w-16" data-testid={`cell-gamesplayed-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -529,7 +515,7 @@ export default function StatsManagement() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center" data-testid={`cell-goals-${player.id}`}>
+                                  <TableCell className="text-center w-16" data-testid={`cell-goals-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -557,7 +543,7 @@ export default function StatsManagement() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center" data-testid={`cell-assists-${player.id}`}>
+                                  <TableCell className="text-center w-16" data-testid={`cell-assists-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -585,10 +571,8 @@ export default function StatsManagement() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center text-blue-400 font-medium" data-testid={`cell-points-${player.id}`}>
-                                    {(parseInt(playerGameStats[player.id]?.goals || '0') || 0) + (parseInt(playerGameStats[player.id]?.assists || '0') || 0)}
-                                  </TableCell>
-                                  <TableCell className="text-center" data-testid={`cell-penalty-${player.id}`}>
+
+                                  <TableCell className="text-center w-16" data-testid={`cell-penalty-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -668,42 +652,35 @@ export default function StatsManagement() {
                             <TableHeader>
                               <TableRow>
                                 <TableHead 
-                                  className="cursor-pointer select-none" 
+                                  className="cursor-pointer select-none w-32" 
                                   onClick={() => handleSort('name')}
                                   data-testid="header-player-name"
                                 >
                                   Player {getSortIcon('name')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center" 
+                                  className="cursor-pointer select-none text-center w-16" 
                                   onClick={() => handleSort('gamesPlayed')}
                                   data-testid="header-games-played"
                                 >
                                   GP {getSortIcon('gamesPlayed')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center" 
+                                  className="cursor-pointer select-none text-center w-16" 
                                   onClick={() => handleSort('goals')}
                                   data-testid="header-goals"
                                 >
                                   G {getSortIcon('goals')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center" 
+                                  className="cursor-pointer select-none text-center w-16" 
                                   onClick={() => handleSort('assists')}
                                   data-testid="header-assists"
                                 >
                                   A {getSortIcon('assists')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center" 
-                                  onClick={() => handleSort('points')}
-                                  data-testid="header-points"
-                                >
-                                  PTS {getSortIcon('points')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center" 
+                                  className="cursor-pointer select-none text-center w-16" 
                                   onClick={() => handleSort('penaltyMinutes')}
                                   data-testid="header-penalty-minutes"
                                 >
@@ -714,7 +691,7 @@ export default function StatsManagement() {
                             <TableBody>
                               {getSortedPlayers(players).map((player: Player, index: number) => (
                                 <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
-                                  <TableCell className="font-medium" data-testid={`cell-name-${player.id}`}>
+                                  <TableCell className="font-medium w-32" data-testid={`cell-name-${player.id}`}>
                                     <div className="flex items-center gap-3">
                                       <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
                                         {index + 1}
@@ -727,7 +704,7 @@ export default function StatsManagement() {
                                       </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center" data-testid={`cell-gamesplayed-${player.id}`}>
+                                  <TableCell className="text-center w-16" data-testid={`cell-gamesplayed-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -755,7 +732,7 @@ export default function StatsManagement() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center" data-testid={`cell-goals-${player.id}`}>
+                                  <TableCell className="text-center w-16" data-testid={`cell-goals-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -783,7 +760,7 @@ export default function StatsManagement() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center" data-testid={`cell-assists-${player.id}`}>
+                                  <TableCell className="text-center w-16" data-testid={`cell-assists-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
@@ -811,10 +788,8 @@ export default function StatsManagement() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center text-blue-400 font-medium" data-testid={`cell-points-${player.id}`}>
-                                    {(parseInt(playerGameStats[player.id]?.goals || '0') || 0) + (parseInt(playerGameStats[player.id]?.assists || '0') || 0)}
-                                  </TableCell>
-                                  <TableCell className="text-center" data-testid={`cell-penalty-${player.id}`}>
+
+                                  <TableCell className="text-center w-16" data-testid={`cell-penalty-${player.id}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
