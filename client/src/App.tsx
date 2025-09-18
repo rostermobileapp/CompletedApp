@@ -26,6 +26,7 @@ import Calendar from "@/pages/Calendar";
 import GameDetails from "@/pages/GameDetails";
 import Announcements from "@/pages/Announcements";
 import SubstituteConfirmations from "@/pages/SubstituteConfirmations";
+import Stats from "@/pages/Stats";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -72,6 +73,7 @@ function Router() {
             <Route path="/scrimmage/:id" component={GameDetails} />
             <Route path="/announcements" component={Announcements} />
             <Route path="/substitute-confirmations" component={SubstituteConfirmations} />
+            <Route path="/stats" component={Stats} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>
