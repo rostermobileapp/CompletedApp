@@ -138,41 +138,77 @@ export default function StatsManagement() {
 
   // Scroll synchronization for game table
   useEffect(() => {
-    const headerEl = gameTableHeaderRef.current;
-    const bodyEl = gameTableBodyRef.current;
+    let scrollHandler: ((e: Event) => void) | null = null;
+    let timeoutId: NodeJS.Timeout;
     
-    if (!headerEl || !bodyEl) return;
-    
-    const syncScroll = (source: HTMLElement, target: HTMLElement) => (e: Event) => {
-      target.scrollLeft = source.scrollLeft;
+    const setupScrollSync = () => {
+      const headerEl = gameTableHeaderRef.current;
+      const bodyEl = gameTableBodyRef.current;
+      
+      if (!headerEl || !bodyEl) {
+        // Try again after a short delay
+        timeoutId = setTimeout(setupScrollSync, 100);
+        return;
+      }
+      
+      console.log('Setting up game table scroll sync');
+      
+      const syncScroll = (source: HTMLElement, target: HTMLElement) => (e: Event) => {
+        console.log('Syncing scroll:', source.scrollLeft);
+        target.scrollLeft = source.scrollLeft;
+      };
+      
+      scrollHandler = syncScroll(bodyEl, headerEl);
+      bodyEl.addEventListener('scroll', scrollHandler);
+      console.log('Game table scroll listener added');
     };
     
-    const handleBodyScroll = syncScroll(bodyEl, headerEl);
-    
-    bodyEl.addEventListener('scroll', handleBodyScroll);
+    setupScrollSync();
     
     return () => {
-      bodyEl.removeEventListener('scroll', handleBodyScroll);
+      if (timeoutId) clearTimeout(timeoutId);
+      if (scrollHandler && gameTableBodyRef.current) {
+        gameTableBodyRef.current.removeEventListener('scroll', scrollHandler);
+        console.log('Game table scroll listener removed');
+      }
     };
   }, [selectedGame, gameParticipants]);
 
   // Scroll synchronization for player table
   useEffect(() => {
-    const headerEl = playerTableHeaderRef.current;
-    const bodyEl = playerTableBodyRef.current;
+    let scrollHandler: ((e: Event) => void) | null = null;
+    let timeoutId: NodeJS.Timeout;
     
-    if (!headerEl || !bodyEl) return;
-    
-    const syncScroll = (source: HTMLElement, target: HTMLElement) => (e: Event) => {
-      target.scrollLeft = source.scrollLeft;
+    const setupScrollSync = () => {
+      const headerEl = playerTableHeaderRef.current;
+      const bodyEl = playerTableBodyRef.current;
+      
+      if (!headerEl || !bodyEl) {
+        // Try again after a short delay
+        timeoutId = setTimeout(setupScrollSync, 100);
+        return;
+      }
+      
+      console.log('Setting up player table scroll sync');
+      
+      const syncScroll = (source: HTMLElement, target: HTMLElement) => (e: Event) => {
+        console.log('Syncing player scroll:', source.scrollLeft);
+        target.scrollLeft = source.scrollLeft;
+      };
+      
+      scrollHandler = syncScroll(bodyEl, headerEl);
+      bodyEl.addEventListener('scroll', scrollHandler);
+      console.log('Player table scroll listener added');
     };
     
-    const handleBodyScroll = syncScroll(bodyEl, headerEl);
-    
-    bodyEl.addEventListener('scroll', handleBodyScroll);
+    setupScrollSync();
     
     return () => {
-      bodyEl.removeEventListener('scroll', handleBodyScroll);
+      if (timeoutId) clearTimeout(timeoutId);
+      if (scrollHandler && playerTableBodyRef.current) {
+        playerTableBodyRef.current.removeEventListener('scroll', scrollHandler);
+        console.log('Player table scroll listener removed');
+      }
     };
   }, [selectedLeague, players]);
 
@@ -477,7 +513,7 @@ export default function StatsManagement() {
 
                         {/* Fixed Header */}
                         <div ref={gameTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-auto pointer-events-none">
-                          <Table>
+                          <Table style={{minWidth: '800px'}}>
                             <TableHeader>
                               <TableRow>
                                 <TableHead 
@@ -527,7 +563,7 @@ export default function StatsManagement() {
                         
                         {/* Scrollable Table Body */}
                         <div ref={gameTableBodyRef} className="flex-1 overflow-auto border-l border-r border-b rounded-b-lg">
-                          <Table data-testid="table-game-stats">
+                          <Table data-testid="table-game-stats" style={{minWidth: '800px'}}>
                             <TableBody>
                               {getSortedPlayers(gameParticipants).map((player: Player, index: number) => (
                                 <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
@@ -705,7 +741,7 @@ export default function StatsManagement() {
 
                         {/* Fixed Header */}
                         <div ref={playerTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-auto pointer-events-none">
-                          <Table>
+                          <Table style={{minWidth: '600px'}}>
                             <TableHeader>
                               <TableRow>
                                 <TableHead 
@@ -755,7 +791,7 @@ export default function StatsManagement() {
                         
                         {/* Scrollable Table Body */}
                         <div ref={playerTableBodyRef} className="flex-1 overflow-auto border-l border-r border-b rounded-b-lg">
-                          <Table data-testid="table-player-stats">
+                          <Table data-testid="table-player-stats" style={{minWidth: '600px'}}>
                             <TableBody>
                               {getSortedPlayers(players).map((player: Player, index: number) => (
                                 <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
