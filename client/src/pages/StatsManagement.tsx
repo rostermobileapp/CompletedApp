@@ -79,21 +79,10 @@ export default function StatsManagement() {
   });
 
   // Get players for selected league
-  const { data: players = [], error: playersError, isLoading: playersLoading } = useQuery({
+  const { data: players = [] } = useQuery({
     queryKey: [`/api/leagues/${selectedLeague}/players`],
     enabled: !!selectedLeague,
   });
-
-  // Debug logging to see what we're getting
-  useEffect(() => {
-    if (players && players.length > 0) {
-      console.log('Players loaded:', players);
-      console.log('First player structure:', players[0]);
-    }
-    if (playersError) {
-      console.error('Players error:', playersError);
-    }
-  }, [players, playersError]);
 
   // Get game participants for selected game
   const { data: gameParticipants = [] } = useQuery({
