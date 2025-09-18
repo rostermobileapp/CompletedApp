@@ -25,6 +25,7 @@ import {
   playerMergeRequests,
   scheduleImports,
   importedSchedules,
+  playerStats,
   type User,
   type UpsertUser,
   type League,
@@ -49,6 +50,8 @@ import {
   type InsertSubstitutionApproval,
   type Message,
   type InsertMessage,
+  type PlayerStats,
+  type InsertPlayerStats,
   type Announcement,
   type InsertAnnouncement,
   type AnnouncementAttachment,
@@ -226,6 +229,13 @@ export interface IStorage {
   updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date): Promise<ScrimmageRequest>;
   deleteScrimmageRequest(requestId: string): Promise<void>;
   getScrimmageRequestsByPlayer(playerId: string): Promise<(ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[]>;
+  
+  // Player stats operations
+  getPlayerStats(leagueId: string, seasonId?: string): Promise<(PlayerStats & { user: User })[]>;
+  getPlayerStatsByUser(userId: string, leagueId: string, seasonId?: string): Promise<PlayerStats | undefined>;
+  createPlayerStats(stats: InsertPlayerStats): Promise<PlayerStats>;
+  updatePlayerStats(userId: string, leagueId: string, seasonId?: string, updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>>): Promise<PlayerStats>;
+  bulkUpdatePlayerStats(leagueId: string, seasonId?: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[]): Promise<void>;
   
   // Player merge operations
   mergeUsersInLeague(leagueId: string, fromUserId: string, toUserId: string, preserveName?: boolean): Promise<LeagueMembership>;
@@ -3410,6 +3420,148 @@ export class DatabaseStorage implements IStorage {
         creator: r.users
       }
     }));
+  }
+
+  // Player stats operations
+  async getPlayerStats(leagueId: string, seasonId?: string): Promise<(PlayerStats & { user: User })[]> {
+    let conditions = [eq(playerStats.leagueId, leagueId)];
+    
+    // Consistent season handling: undefined means non-seasonal stats (null seasonId)
+    if (seasonId) {
+      conditions.push(eq(playerStats.seasonId, seasonId));
+    } else {
+      conditions.push(isNull(playerStats.seasonId));
+    }
+    
+    const result = await db
+      .select()
+      .from(playerStats)
+      .innerJoin(users, eq(playerStats.userId, users.id))
+      .where(and(...conditions))
+      .orderBy(desc(sql`${playerStats.goals} + ${playerStats.assists}`)); // Order by points (goals + assists)
+    
+    return result.map(r => ({
+      ...r.player_stats,
+      user: r.users
+    }));
+  }
+
+  async getPlayerStatsByUser(userId: string, leagueId: string, seasonId?: string): Promise<PlayerStats | undefined> {
+    let conditions = [
+      eq(playerStats.userId, userId),
+      eq(playerStats.leagueId, leagueId)
+    ];
+    
+    // Consistent season handling: undefined means non-seasonal stats (null seasonId)
+    if (seasonId) {
+      conditions.push(eq(playerStats.seasonId, seasonId));
+    } else {
+      conditions.push(isNull(playerStats.seasonId));
+    }
+    
+    const [stats] = await db
+      .select()
+      .from(playerStats)
+      .where(and(...conditions));
+    
+    return stats;
+  }
+
+  async createPlayerStats(stats: InsertPlayerStats): Promise<PlayerStats> {
+    const [newStats] = await db
+      .insert(playerStats)
+      .values(stats)
+      .returning();
+    
+    return newStats;
+  }
+
+  async updatePlayerStats(userId: string, leagueId: string, seasonId?: string, updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>>): Promise<PlayerStats> {
+    let conditions = [
+      eq(playerStats.userId, userId),
+      eq(playerStats.leagueId, leagueId)
+    ];
+    
+    // Consistent season handling
+    if (seasonId) {
+      conditions.push(eq(playerStats.seasonId, seasonId));
+    } else {
+      conditions.push(isNull(playerStats.seasonId));
+    }
+    
+    // First try to update existing record
+    const [updatedStats] = await db
+      .update(playerStats)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(and(...conditions))
+      .returning();
+    
+    if (!updatedStats) {
+      // If no record was updated, create a new one (UPSERT behavior)
+      const [newStats] = await db
+        .insert(playerStats)
+        .values({
+          userId,
+          leagueId,
+          seasonId: seasonId || null,
+          gamesPlayed: 0,
+          goals: 0,
+          assists: 0,
+          penaltyMinutes: 0,
+          ...updates,
+        })
+        .returning();
+      return newStats;
+    }
+    
+    return updatedStats;
+  }
+
+  async bulkUpdatePlayerStats(leagueId: string, seasonId?: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[]): Promise<void> {
+    await db.transaction(async (tx) => {
+      for (const { userId, updates } of statsUpdates) {
+        let conditions = [
+          eq(playerStats.userId, userId),
+          eq(playerStats.leagueId, leagueId)
+        ];
+        
+        // Consistent season handling
+        if (seasonId) {
+          conditions.push(eq(playerStats.seasonId, seasonId));
+        } else {
+          conditions.push(isNull(playerStats.seasonId));
+        }
+        
+        // Try to update existing record first
+        const result = await tx
+          .update(playerStats)
+          .set({
+            ...updates,
+            updatedAt: new Date(),
+          })
+          .where(and(...conditions))
+          .returning();
+        
+        // If no record was updated, create a new one (UPSERT behavior)
+        if (result.length === 0) {
+          await tx
+            .insert(playerStats)
+            .values({
+              userId,
+              leagueId,
+              seasonId: seasonId || null,
+              gamesPlayed: 0,
+              goals: 0,
+              assists: 0,
+              penaltyMinutes: 0,
+              ...updates,
+            });
+        }
+      }
+    });
   }
 
   // Player merge operations
