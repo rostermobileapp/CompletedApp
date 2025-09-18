@@ -429,7 +429,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                               variant="outline"
                               onClick={() => handleDeny(request, 'commissioner')}
                               disabled={processApprovalMutation.isPending}
-                              className="border-red-300 text-red-600 hover:bg-red-50"
+                              className="border-red-300 hover:bg-red-50 text-[#ffffff] bg-[#de0000]"
                               data-testid={`button-deny-commissioner-substitute-${request.id}`}
                             >
                               Deny
