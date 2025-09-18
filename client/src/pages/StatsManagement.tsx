@@ -430,13 +430,13 @@ export default function StatsManagement() {
                         </div>
 
                         {/* Scrollable Table with Sticky Header */}
-                        <div className="flex-1 overflow-auto border rounded-lg">
-                          <Table data-testid="table-game-stats">
-                            <TableHeader>
+                        <div className="flex-1 relative overflow-auto border rounded-lg">
+                          <Table data-testid="table-game-stats" className="border-separate border-spacing-0">
+                            <TableHeader className="sticky top-0 z-20 bg-background">
                               <TableRow>
                                 <TableHead 
                                   className="cursor-pointer select-none w-32 bg-background"
-                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
+ 
                                   onClick={() => handleSort('name')}
                                   data-testid="header-player-name"
                                 >
@@ -444,7 +444,7 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
-                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
+ 
                                   onClick={() => handleSort('gamesPlayed')}
                                   data-testid="header-games-played"
                                 >
@@ -452,7 +452,7 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
-                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
+ 
                                   onClick={() => handleSort('goals')}
                                   data-testid="header-goals"
                                 >
@@ -460,7 +460,7 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
-                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
+ 
                                   onClick={() => handleSort('assists')}
                                   data-testid="header-assists"
                                 >
@@ -468,7 +468,7 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
-                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
+ 
                                   onClick={() => handleSort('penaltyMinutes')}
                                   data-testid="header-penalty-minutes"
                                 >
@@ -652,13 +652,13 @@ export default function StatsManagement() {
                         </div>
 
                         {/* Scrollable Table with Sticky Header */}
-                        <div className="flex-1 overflow-auto border rounded-lg">
-                          <Table data-testid="table-player-stats">
-                            <TableHeader>
+                        <div className="flex-1 relative overflow-auto border rounded-lg">
+                          <Table data-testid="table-player-stats" className="border-separate border-spacing-0">
+                            <TableHeader className="sticky top-0 z-20 bg-background">
                               <TableRow>
                                 <TableHead 
                                   className="cursor-pointer select-none w-32 bg-background"
-                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
+ 
                                   onClick={() => handleSort('name')}
                                   data-testid="header-player-name"
                                 >
@@ -666,7 +666,7 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
-                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
+ 
                                   onClick={() => handleSort('gamesPlayed')}
                                   data-testid="header-games-played"
                                 >
@@ -674,7 +674,7 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
-                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
+ 
                                   onClick={() => handleSort('goals')}
                                   data-testid="header-goals"
                                 >
@@ -682,7 +682,7 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
-                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
+ 
                                   onClick={() => handleSort('assists')}
                                   data-testid="header-assists"
                                 >
@@ -690,7 +690,7 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
-                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
+ 
                                   onClick={() => handleSort('penaltyMinutes')}
                                   data-testid="header-penalty-minutes"
                                 >
