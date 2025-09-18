@@ -379,7 +379,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                 <p className="font-medium text-[#000000]">
                                   {request.game.homeTeam.name} vs {request.game.awayTeam.name}
                                 </p>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-sm text-[#ffffff]">
                                   {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
                                 </p>
                                 <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] text-[#de0000] bg-[#ffffff00] text-[16px] font-extrabold text-left pl-[0px] pr-[0px]">Substitution requires approval</p>
