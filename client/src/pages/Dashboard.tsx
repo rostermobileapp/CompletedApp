@@ -353,10 +353,9 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                             </Button>
                             <Button 
                               size="sm" 
-                              variant="outline"
                               onClick={() => handleDeny(request, 'opposing_captain')}
                               disabled={processApprovalMutation.isPending}
-                              className="border-red-300 text-red-600 hover:bg-red-50"
+                              className="bg-red-600 hover:bg-red-700 text-white"
                               data-testid={`button-deny-substitute-${request.id}`}
                             >
                               Deny
@@ -426,10 +425,9 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                             </Button>
                             <Button 
                               size="sm" 
-                              variant="outline"
                               onClick={() => handleDeny(request, 'commissioner')}
                               disabled={processApprovalMutation.isPending}
-                              className="border-red-300 hover:bg-red-50 text-[#ffffff] bg-[#de0000]"
+                              className="bg-red-600 hover:bg-red-700 text-white"
                               data-testid={`button-deny-commissioner-substitute-${request.id}`}
                             >
                               Deny
