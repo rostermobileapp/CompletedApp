@@ -369,7 +369,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       {pendingSubstituteApprovals.commissioner.map((request: any) => (
                         <div 
                           key={request.id}
-                          className="bg-white dark:bg-card border border-purple-200 dark:border-purple-800 rounded-lg p-3"
+                          className="dark:bg-card border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-[#ffffff] bg-[#000000]"
                           data-testid={`pending-substitute-commissioner-${request.id}`}
                         >
                           <div className="flex items-center justify-between mb-2">
