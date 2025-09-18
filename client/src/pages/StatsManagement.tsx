@@ -658,8 +658,21 @@ export default function StatsManagement() {
                   </CardHeader>
                   <CardContent>
                     {selectedLeague && Array.isArray(players) && players.length > 0 && (
-                      <div className="space-y-4">
-                        <div className="overflow-x-auto">
+                      <div className="flex flex-col h-96">
+                        {/* Fixed Update Button at Top */}
+                        <div className="flex-shrink-0 mb-4">
+                          <Button 
+                            onClick={handlePlayerStatsUpdate} 
+                            disabled={updateStatsMutation.isPending}
+                            className="w-full bg-primary hover:bg-primary/90"
+                            data-testid="button-update-all-player-stats"
+                          >
+                            {updateStatsMutation.isPending ? 'Updating...' : 'Update All Player Stats'}
+                          </Button>
+                        </div>
+
+                        {/* Scrollable Table */}
+                        <div className="flex-1 overflow-x-auto overflow-y-auto border rounded-lg">
                           <Table data-testid="table-player-stats">
                             <TableHeader>
                               <TableRow>
