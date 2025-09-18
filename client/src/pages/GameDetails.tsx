@@ -567,8 +567,8 @@ export default function GameDetails() {
         {/* Substitute Requests Dashboard for Commissioners */}
         {isCommissioner && (
           <div className="bg-card rounded-xl border border-border p-6">
-            <h3 className="text-lg font-semibold mb-4">Substitute Requests</h3>
-            <SubstituteRequestsDashboard />
+            <h3 className="text-lg font-semibold mb-4">Substitute Requests for This Game</h3>
+            <SubstituteRequestsDashboard gameId={game.id} />
           </div>
         )}
 

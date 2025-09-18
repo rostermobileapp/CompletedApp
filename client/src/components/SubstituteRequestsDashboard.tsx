@@ -14,9 +14,10 @@ import { format } from "date-fns";
 
 interface SubstituteRequestsDashboardProps {
   className?: string;
+  gameId?: string; // Optional prop to filter requests by specific game
 }
 
-export function SubstituteRequestsDashboard({ className }: SubstituteRequestsDashboardProps) {
+export function SubstituteRequestsDashboard({ className, gameId }: SubstituteRequestsDashboardProps) {
   const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const { toast } = useToast();
@@ -24,13 +25,20 @@ export function SubstituteRequestsDashboard({ className }: SubstituteRequestsDas
 
   // Fetch substitute requests
   const { data: requests = [], isLoading } = useQuery({
-    queryKey: ["/api/substitute-requests"],
+    queryKey: ["/api/substitute-requests", gameId],
     queryFn: async () => {
       const response = await fetch("/api/substitute-requests");
       if (!response.ok) {
         throw new Error('Failed to fetch substitute requests');
       }
-      return response.json();
+      const allRequests = await response.json();
+      
+      // Filter by gameId if provided
+      if (gameId) {
+        return allRequests.filter((request: any) => request.gameId === gameId);
+      }
+      
+      return allRequests;
     },
   });
 
