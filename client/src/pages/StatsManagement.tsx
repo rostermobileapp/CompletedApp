@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { ArrowLeft, Users, User, Trophy, Target, AlertCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Users, User, Trophy, Target, AlertCircle, Clock, Plus, Minus } from 'lucide-react';
 import { Link } from 'wouter';
 import { format } from 'date-fns';
 
@@ -238,6 +238,19 @@ export default function StatsManagement() {
         [field]: value
       }
     }));
+  };
+
+  // Increment/Decrement functions
+  const incrementStat = (userId: string, field: string) => {
+    const currentValue = parseInt(playerGameStats[userId]?.[field] || '0') || 0;
+    const newValue = Math.max(0, currentValue + 1).toString();
+    updatePlayerGameStat(userId, field, newValue);
+  };
+
+  const decrementStat = (userId: string, field: string) => {
+    const currentValue = parseInt(playerGameStats[userId]?.[field] || '0') || 0;
+    const newValue = Math.max(0, currentValue - 1).toString();
+    updatePlayerGameStat(userId, field, newValue);
   };
 
   // Sorting functions
@@ -471,51 +484,119 @@ export default function StatsManagement() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-center" data-testid={`cell-gamesplayed-${player.id}`}>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      placeholder="1"
-                                      className="w-16 h-8 text-center"
-                                      value={playerGameStats[player.id]?.gamesPlayed || '1'}
-                                      onChange={(e) => updatePlayerGameStat(player.id, 'gamesPlayed', e.target.value)}
-                                      data-testid={`input-games-${player.id}`}
-                                    />
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                        onClick={() => decrementStat(player.id, 'gamesPlayed')}
+                                        data-testid={`button-minus-games-${player.id}`}
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </Button>
+                                      <div 
+                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                        data-testid={`display-games-${player.id}`}
+                                      >
+                                        {parseInt(playerGameStats[player.id]?.gamesPlayed || '1') || 1}
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                        onClick={() => incrementStat(player.id, 'gamesPlayed')}
+                                        data-testid={`button-plus-games-${player.id}`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                   <TableCell className="text-center" data-testid={`cell-goals-${player.id}`}>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      placeholder="0"
-                                      className="w-16 h-8 text-center"
-                                      value={playerGameStats[player.id]?.goals || ''}
-                                      onChange={(e) => updatePlayerGameStat(player.id, 'goals', e.target.value)}
-                                      data-testid={`input-goals-${player.id}`}
-                                    />
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                        onClick={() => decrementStat(player.id, 'goals')}
+                                        data-testid={`button-minus-goals-${player.id}`}
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </Button>
+                                      <div 
+                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                        data-testid={`display-goals-${player.id}`}
+                                      >
+                                        {parseInt(playerGameStats[player.id]?.goals || '0') || 0}
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                        onClick={() => incrementStat(player.id, 'goals')}
+                                        data-testid={`button-plus-goals-${player.id}`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                   <TableCell className="text-center" data-testid={`cell-assists-${player.id}`}>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      placeholder="0"
-                                      className="w-16 h-8 text-center"
-                                      value={playerGameStats[player.id]?.assists || ''}
-                                      onChange={(e) => updatePlayerGameStat(player.id, 'assists', e.target.value)}
-                                      data-testid={`input-assists-${player.id}`}
-                                    />
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                        onClick={() => decrementStat(player.id, 'assists')}
+                                        data-testid={`button-minus-assists-${player.id}`}
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </Button>
+                                      <div 
+                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                        data-testid={`display-assists-${player.id}`}
+                                      >
+                                        {parseInt(playerGameStats[player.id]?.assists || '0') || 0}
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                        onClick={() => incrementStat(player.id, 'assists')}
+                                        data-testid={`button-plus-assists-${player.id}`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                   <TableCell className="text-center text-blue-400 font-medium" data-testid={`cell-points-${player.id}`}>
                                     {(parseInt(playerGameStats[player.id]?.goals || '0') || 0) + (parseInt(playerGameStats[player.id]?.assists || '0') || 0)}
                                   </TableCell>
                                   <TableCell className="text-center" data-testid={`cell-penalty-${player.id}`}>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      placeholder="0"
-                                      className="w-16 h-8 text-center"
-                                      value={playerGameStats[player.id]?.penaltyMinutes || ''}
-                                      onChange={(e) => updatePlayerGameStat(player.id, 'penaltyMinutes', e.target.value)}
-                                      data-testid={`input-penalty-${player.id}`}
-                                    />
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                        onClick={() => decrementStat(player.id, 'penaltyMinutes')}
+                                        data-testid={`button-minus-penalty-${player.id}`}
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </Button>
+                                      <div 
+                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                        data-testid={`display-penalty-${player.id}`}
+                                      >
+                                        {parseInt(playerGameStats[player.id]?.penaltyMinutes || '0') || 0}
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                        onClick={() => incrementStat(player.id, 'penaltyMinutes')}
+                                        data-testid={`button-plus-penalty-${player.id}`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -625,51 +706,119 @@ export default function StatsManagement() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-center" data-testid={`cell-gamesplayed-${player.id}`}>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      placeholder="0"
-                                      className="w-16 h-8 text-center"
-                                      value={playerGameStats[player.id]?.gamesPlayed || ''}
-                                      onChange={(e) => updatePlayerGameStat(player.id, 'gamesPlayed', e.target.value)}
-                                      data-testid={`input-games-${player.id}`}
-                                    />
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                        onClick={() => decrementStat(player.id, 'gamesPlayed')}
+                                        data-testid={`button-minus-games-${player.id}`}
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </Button>
+                                      <div 
+                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                        data-testid={`display-games-${player.id}`}
+                                      >
+                                        {parseInt(playerGameStats[player.id]?.gamesPlayed || '0') || 0}
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                        onClick={() => incrementStat(player.id, 'gamesPlayed')}
+                                        data-testid={`button-plus-games-${player.id}`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                   <TableCell className="text-center" data-testid={`cell-goals-${player.id}`}>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      placeholder="0"
-                                      className="w-16 h-8 text-center"
-                                      value={playerGameStats[player.id]?.goals || ''}
-                                      onChange={(e) => updatePlayerGameStat(player.id, 'goals', e.target.value)}
-                                      data-testid={`input-goals-${player.id}`}
-                                    />
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                        onClick={() => decrementStat(player.id, 'goals')}
+                                        data-testid={`button-minus-goals-${player.id}`}
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </Button>
+                                      <div 
+                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                        data-testid={`display-goals-${player.id}`}
+                                      >
+                                        {parseInt(playerGameStats[player.id]?.goals || '0') || 0}
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                        onClick={() => incrementStat(player.id, 'goals')}
+                                        data-testid={`button-plus-goals-${player.id}`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                   <TableCell className="text-center" data-testid={`cell-assists-${player.id}`}>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      placeholder="0"
-                                      className="w-16 h-8 text-center"
-                                      value={playerGameStats[player.id]?.assists || ''}
-                                      onChange={(e) => updatePlayerGameStat(player.id, 'assists', e.target.value)}
-                                      data-testid={`input-assists-${player.id}`}
-                                    />
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                        onClick={() => decrementStat(player.id, 'assists')}
+                                        data-testid={`button-minus-assists-${player.id}`}
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </Button>
+                                      <div 
+                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                        data-testid={`display-assists-${player.id}`}
+                                      >
+                                        {parseInt(playerGameStats[player.id]?.assists || '0') || 0}
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                        onClick={() => incrementStat(player.id, 'assists')}
+                                        data-testid={`button-plus-assists-${player.id}`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                   <TableCell className="text-center text-blue-400 font-medium" data-testid={`cell-points-${player.id}`}>
                                     {(parseInt(playerGameStats[player.id]?.goals || '0') || 0) + (parseInt(playerGameStats[player.id]?.assists || '0') || 0)}
                                   </TableCell>
                                   <TableCell className="text-center" data-testid={`cell-penalty-${player.id}`}>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      placeholder="0"
-                                      className="w-16 h-8 text-center"
-                                      value={playerGameStats[player.id]?.penaltyMinutes || ''}
-                                      onChange={(e) => updatePlayerGameStat(player.id, 'penaltyMinutes', e.target.value)}
-                                      data-testid={`input-penalty-${player.id}`}
-                                    />
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                        onClick={() => decrementStat(player.id, 'penaltyMinutes')}
+                                        data-testid={`button-minus-penalty-${player.id}`}
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </Button>
+                                      <div 
+                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                        data-testid={`display-penalty-${player.id}`}
+                                      >
+                                        {parseInt(playerGameStats[player.id]?.penaltyMinutes || '0') || 0}
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                        onClick={() => incrementStat(player.id, 'penaltyMinutes')}
+                                        data-testid={`button-plus-penalty-${player.id}`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
