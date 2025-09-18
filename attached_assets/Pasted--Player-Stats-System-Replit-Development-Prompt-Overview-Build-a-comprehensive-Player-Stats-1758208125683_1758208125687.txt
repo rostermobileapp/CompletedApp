@@ -1,0 +1,116 @@
+# Player Stats System - Replit Development Prompt
+
+## Overview
+Build a comprehensive Player Stats tracking system for a hockey league management application. The system should track player performance metrics and provide different input methods for commissioners.
+
+## Core Features Required
+
+### 1. Stats Display Screen
+**Access**: Click "Stats" card on home page → Opens new stats screen
+
+**Player Stats Tracked (Left to Right Order)**:
+- Player Name
+- Games Played (GP)
+- Goals (G) 
+- Assists (A)
+- Total Points (Pts) - Calculated as Goals + Assists
+- Penalty Minutes (PIM)
+
+**Features**:
+- Display all players in a table/list format
+- Filter functionality by metric
+- Responsive design for mobile and desktop
+- Sort capabilities by any stat column
+
+### 2. Commissioner Stats Update System
+**Access**: Commissioner tier only
+- "Update Player Stats" button/option at top of stats page
+- Opens new screen exclusive to commissioners
+- Two input methods available
+
+#### Method 1: Input Stats by Game
+**Interface Requirements**:
+- Game selection dropdown/picker
+- Player list showing only league players (exclude substitutes)
+- Simple checkbox for game attendance tracking
+- Interactive stat columns for each metric (GP, G, A, PIM)
+- Click to increment stat by +1
+- Click and hold to reset stat to 0
+- Real-time visual feedback for interactions
+- Submit button to save all changes
+
+**Functionality**:
+- Only count stats for players who attended the game
+- Substitute players excluded from display and calculations
+- Intuitive click/hold interface
+- Validation before submission
+
+#### Method 2: Input Stats by Player
+**Interface Requirements**:
+- Display complete league player roster
+- Individual stat entry fields for each player
+- Same click/hold functionality as Method 1
+- Batch editing capabilities
+- Submit button to save all changes
+
+**Functionality**:
+- Show all league players regardless of game attendance
+- Allow editing of any stat for any player
+- Maintain same interaction patterns as Method 1
+
+### 3. Technical Requirements
+
+#### Data Management
+- Automatic calculation of Total Points (Goals + Assists)
+- Data persistence between sessions
+- Proper state management for real-time updates
+- Input validation and error handling
+
+#### User Interface
+- Clean, intuitive design matching existing app theme
+- Mobile-responsive layout
+- Loading states and success/error feedback
+- Confirmation dialogs for destructive actions (resets)
+- Access control - Commissioner features only visible to appropriate users
+
+#### User Experience
+- Smooth transitions between screens
+- Quick stat entry workflow
+- Clear visual indicators for interactive elements
+- Undo functionality consideration
+- Bulk operations support
+
+### 4. Implementation Considerations
+
+#### Security & Access Control
+- Validate commissioner permissions on backend
+- Secure API endpoints for stat updates
+- Session management for user roles
+
+#### Performance
+- Efficient data loading for large player lists
+- Optimized re-rendering for stat updates
+- Lazy loading for better performance
+
+#### Data Integrity
+- Prevent negative stat values
+- Proper data validation before submission
+- Backup/recovery considerations
+- Audit trail for stat changes
+
+## User Flow Summary
+
+1. **View Stats**: Home → Stats Card → Stats Display Screen
+2. **Update Stats (Commissioner)**: Stats Screen → "Update Player Stats" → Method Selection → Input Interface → Submit → Return to Stats Screen with Updated Totals
+3. **Filter/Sort**: Use filter controls on stats display to view by specific metrics
+
+## Deliverables Expected
+- Responsive stats display component
+- Commissioner-only stats update interface
+- Two distinct input method implementations
+- Proper data validation and persistence
+- Clean, intuitive user interface
+- Mobile-friendly design
+- Role-based access control implementation
+
+Build this as a modern web application with smooth interactions, proper error handling, and a professional appearance that fits within the existing league management system.
