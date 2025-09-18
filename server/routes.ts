@@ -452,6 +452,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get league players for stats management
+  app.get('/api/leagues/:leagueId/players', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+      
+      // Verify user has access to this league
+      const userMembership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!userMembership || userMembership.status !== 'approved') {
+        return res.status(403).json({ message: 'Access denied - not an approved league member' });
+      }
+      
+      // Get all league members and format them for stats management
+      const members = await storage.getLeagueMembers(leagueId);
+      const players = members.map(member => ({
+        id: member.user.id,
+        firstName: member.user.firstName,
+        lastName: member.user.lastName,
+        email: member.user.email,
+        teamName: member.assignedTeamId ? null : null // Will be populated if we have team info
+      }));
+      
+      res.json(players);
+    } catch (error) {
+      console.error('Error fetching league players:', error);
+      res.status(500).json({ message: 'Failed to fetch league players' });
+    }
+  });
+
   // League members for scrimmage creation - accessible by Player Plus+ users who are members of the league
   app.get("/api/leagues/:id/members-for-scrimmage", isAuthenticated, async (req: any, res) => {
     try {
