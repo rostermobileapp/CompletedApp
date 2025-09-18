@@ -298,13 +298,11 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
           </div>
         )}
 
-        {/* Empty State */}
+        {/* Empty State - Compact */}
         {requests.length === 0 && (
-          <div className="text-center py-12">
-            <Users className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-lg font-medium text-muted-foreground mb-2">No Substitute Requests</h3>
+          <div className="text-center py-2">
             <p className="text-sm text-muted-foreground">
-              Substitute requests from team captains will appear here for your review.
+              No substitute requests for this game
             </p>
           </div>
         )}
