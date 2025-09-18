@@ -647,15 +647,6 @@ export default function StatsManagement() {
               {/* By Player Tab */}
               <TabsContent value="by-player" className="space-y-4">
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <User className="w-5 h-5" />
-                      Update Player Stats by Individual
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Update stats for all league players individually. Changes are added to existing totals.
-                    </p>
-                  </CardHeader>
                   <CardContent>
                     {selectedLeague && Array.isArray(players) && players.length > 0 && (
                       <div className="flex flex-col h-96">
