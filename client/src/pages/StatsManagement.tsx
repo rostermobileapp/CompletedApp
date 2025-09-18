@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -52,6 +53,11 @@ export default function StatsManagement() {
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [playerGameStats, setPlayerGameStats] = useState<Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>>({});
   const [individualStats, setIndividualStats] = useState({ goals: '', assists: '', penaltyMinutes: '', gamesPlayed: '' });
+  
+  // Sorting state
+  const [sortField, setSortField] = useState<string>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
   const { toast } = useToast();
 
   // Get user's commissioner leagues
@@ -234,6 +240,58 @@ export default function StatsManagement() {
     }));
   };
 
+  // Sorting functions
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortField(field);
+      setSortOrder(field === 'name' ? 'asc' : 'desc');
+    }
+  };
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) return null;
+    return sortOrder === 'desc' ? '↓' : '↑';
+  };
+
+  // Sort players for table display
+  const getSortedPlayers = (playersList: Player[]) => {
+    return [...playersList].sort((a, b) => {
+      let aVal: any, bVal: any;
+      
+      if (sortField === 'name') {
+        aVal = `${a.firstName} ${a.lastName}`.toLowerCase();
+        bVal = `${b.firstName} ${b.lastName}`.toLowerCase();
+      } else if (sortField === 'goals') {
+        aVal = parseInt(playerGameStats[a.id]?.goals || '0') || 0;
+        bVal = parseInt(playerGameStats[b.id]?.goals || '0') || 0;
+      } else if (sortField === 'assists') {
+        aVal = parseInt(playerGameStats[a.id]?.assists || '0') || 0;
+        bVal = parseInt(playerGameStats[b.id]?.assists || '0') || 0;
+      } else if (sortField === 'points') {
+        const aGoals = parseInt(playerGameStats[a.id]?.goals || '0') || 0;
+        const aAssists = parseInt(playerGameStats[a.id]?.assists || '0') || 0;
+        const bGoals = parseInt(playerGameStats[b.id]?.goals || '0') || 0;
+        const bAssists = parseInt(playerGameStats[b.id]?.assists || '0') || 0;
+        aVal = aGoals + aAssists;
+        bVal = bGoals + bAssists;
+      } else if (sortField === 'penaltyMinutes') {
+        aVal = parseInt(playerGameStats[a.id]?.penaltyMinutes || '0') || 0;
+        bVal = parseInt(playerGameStats[b.id]?.penaltyMinutes || '0') || 0;
+      } else if (sortField === 'gamesPlayed') {
+        aVal = parseInt(playerGameStats[a.id]?.gamesPlayed || '0') || 0;
+        bVal = parseInt(playerGameStats[b.id]?.gamesPlayed || '0') || 0;
+      }
+
+      if (sortOrder === 'desc') {
+        return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
+      } else {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      }
+    });
+  };
+
   return (
     <SubscriptionGate requiredTier="commissioner">
       <div className="min-h-screen bg-background pb-20">
@@ -348,67 +406,121 @@ export default function StatsManagement() {
 
                     {selectedGame && Array.isArray(gameParticipants) && gameParticipants.length > 0 && (
                       <div className="space-y-4">
-                        <h3 className="font-medium" data-testid="text-game-participants">Game Participants</h3>
-                        <div className="space-y-3">
-                          {gameParticipants.map((player: Player) => (
-                            <div key={player.id} className="border border-border rounded-lg p-3" data-testid={`player-stats-${player.id}`}>
-                              <div className="flex items-center justify-between mb-3">
-                                <div>
-                                  <p className="font-medium">{player.firstName} {player.lastName}</p>
-                                  {player.teamName && (
-                                    <p className="text-sm text-muted-foreground">{player.teamName}</p>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Goals</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    value={playerGameStats[player.id]?.goals || ''}
-                                    onChange={(e) => updatePlayerGameStat(player.id, 'goals', e.target.value)}
-                                    data-testid={`input-goals-${player.id}`}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Assists</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    value={playerGameStats[player.id]?.assists || ''}
-                                    onChange={(e) => updatePlayerGameStat(player.id, 'assists', e.target.value)}
-                                    data-testid={`input-assists-${player.id}`}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Penalty Min</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    value={playerGameStats[player.id]?.penaltyMinutes || ''}
-                                    onChange={(e) => updatePlayerGameStat(player.id, 'penaltyMinutes', e.target.value)}
-                                    data-testid={`input-penalty-${player.id}`}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Games Played</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="1"
-                                    value={playerGameStats[player.id]?.gamesPlayed || '1'}
-                                    onChange={(e) => updatePlayerGameStat(player.id, 'gamesPlayed', e.target.value)}
-                                    data-testid={`input-games-${player.id}`}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                        <div className="overflow-x-auto">
+                          <Table data-testid="table-game-stats">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead 
+                                  className="cursor-pointer select-none" 
+                                  onClick={() => handleSort('name')}
+                                  data-testid="header-player-name"
+                                >
+                                  Player {getSortIcon('name')}
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer select-none text-center" 
+                                  onClick={() => handleSort('gamesPlayed')}
+                                  data-testid="header-games-played"
+                                >
+                                  GP {getSortIcon('gamesPlayed')}
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer select-none text-center" 
+                                  onClick={() => handleSort('goals')}
+                                  data-testid="header-goals"
+                                >
+                                  G {getSortIcon('goals')}
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer select-none text-center" 
+                                  onClick={() => handleSort('assists')}
+                                  data-testid="header-assists"
+                                >
+                                  A {getSortIcon('assists')}
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer select-none text-center" 
+                                  onClick={() => handleSort('points')}
+                                  data-testid="header-points"
+                                >
+                                  PTS {getSortIcon('points')}
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer select-none text-center" 
+                                  onClick={() => handleSort('penaltyMinutes')}
+                                  data-testid="header-penalty-minutes"
+                                >
+                                  PIM {getSortIcon('penaltyMinutes')}
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {getSortedPlayers(gameParticipants).map((player: Player, index: number) => (
+                                <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
+                                  <TableCell className="font-medium" data-testid={`cell-name-${player.id}`}>
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
+                                        {index + 1}
+                                      </div>
+                                      <div>
+                                        <div className="font-medium">{player.firstName} {player.lastName}</div>
+                                        {player.teamName && (
+                                          <div className="text-sm text-muted-foreground">{player.teamName}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center" data-testid={`cell-gamesplayed-${player.id}`}>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="1"
+                                      className="w-16 h-8 text-center"
+                                      value={playerGameStats[player.id]?.gamesPlayed || '1'}
+                                      onChange={(e) => updatePlayerGameStat(player.id, 'gamesPlayed', e.target.value)}
+                                      data-testid={`input-games-${player.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center" data-testid={`cell-goals-${player.id}`}>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="0"
+                                      className="w-16 h-8 text-center"
+                                      value={playerGameStats[player.id]?.goals || ''}
+                                      onChange={(e) => updatePlayerGameStat(player.id, 'goals', e.target.value)}
+                                      data-testid={`input-goals-${player.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center" data-testid={`cell-assists-${player.id}`}>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="0"
+                                      className="w-16 h-8 text-center"
+                                      value={playerGameStats[player.id]?.assists || ''}
+                                      onChange={(e) => updatePlayerGameStat(player.id, 'assists', e.target.value)}
+                                      data-testid={`input-assists-${player.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center text-blue-400 font-medium" data-testid={`cell-points-${player.id}`}>
+                                    {(parseInt(playerGameStats[player.id]?.goals || '0') || 0) + (parseInt(playerGameStats[player.id]?.assists || '0') || 0)}
+                                  </TableCell>
+                                  <TableCell className="text-center" data-testid={`cell-penalty-${player.id}`}>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="0"
+                                      className="w-16 h-8 text-center"
+                                      value={playerGameStats[player.id]?.penaltyMinutes || ''}
+                                      onChange={(e) => updatePlayerGameStat(player.id, 'penaltyMinutes', e.target.value)}
+                                      data-testid={`input-penalty-${player.id}`}
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
                         </div>
                         
                         <Button 
@@ -448,72 +560,121 @@ export default function StatsManagement() {
                   <CardContent>
                     {selectedLeague && Array.isArray(players) && players.length > 0 && (
                       <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {players.map((player: Player) => (
-                            <div key={player.id} className="border rounded-lg p-4 bg-card">
-                              <div className="flex items-center gap-3 mb-3">
-                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <User className="w-5 h-5" />
-                                </div>
-                                <div>
-                                  <h4 className="font-medium" data-testid={`text-player-name-${player.id}`}>
-                                    {player.firstName} {player.lastName}
-                                  </h4>
-                                  {player.teamName && (
-                                    <p className="text-sm text-muted-foreground" data-testid={`text-team-${player.id}`}>
-                                      {player.teamName}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Goals</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    value={playerGameStats[player.id]?.goals || ''}
-                                    onChange={(e) => updatePlayerGameStat(player.id, 'goals', e.target.value)}
-                                    data-testid={`input-goals-${player.id}`}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Assists</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    value={playerGameStats[player.id]?.assists || ''}
-                                    onChange={(e) => updatePlayerGameStat(player.id, 'assists', e.target.value)}
-                                    data-testid={`input-assists-${player.id}`}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Penalty Min</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    value={playerGameStats[player.id]?.penaltyMinutes || ''}
-                                    onChange={(e) => updatePlayerGameStat(player.id, 'penaltyMinutes', e.target.value)}
-                                    data-testid={`input-penalty-${player.id}`}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Games Played</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    value={playerGameStats[player.id]?.gamesPlayed || ''}
-                                    onChange={(e) => updatePlayerGameStat(player.id, 'gamesPlayed', e.target.value)}
-                                    data-testid={`input-games-${player.id}`}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                        <div className="overflow-x-auto">
+                          <Table data-testid="table-player-stats">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead 
+                                  className="cursor-pointer select-none" 
+                                  onClick={() => handleSort('name')}
+                                  data-testid="header-player-name"
+                                >
+                                  Player {getSortIcon('name')}
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer select-none text-center" 
+                                  onClick={() => handleSort('gamesPlayed')}
+                                  data-testid="header-games-played"
+                                >
+                                  GP {getSortIcon('gamesPlayed')}
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer select-none text-center" 
+                                  onClick={() => handleSort('goals')}
+                                  data-testid="header-goals"
+                                >
+                                  G {getSortIcon('goals')}
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer select-none text-center" 
+                                  onClick={() => handleSort('assists')}
+                                  data-testid="header-assists"
+                                >
+                                  A {getSortIcon('assists')}
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer select-none text-center" 
+                                  onClick={() => handleSort('points')}
+                                  data-testid="header-points"
+                                >
+                                  PTS {getSortIcon('points')}
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer select-none text-center" 
+                                  onClick={() => handleSort('penaltyMinutes')}
+                                  data-testid="header-penalty-minutes"
+                                >
+                                  PIM {getSortIcon('penaltyMinutes')}
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {getSortedPlayers(players).map((player: Player, index: number) => (
+                                <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
+                                  <TableCell className="font-medium" data-testid={`cell-name-${player.id}`}>
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
+                                        {index + 1}
+                                      </div>
+                                      <div>
+                                        <div className="font-medium">{player.firstName} {player.lastName}</div>
+                                        {player.teamName && (
+                                          <div className="text-sm text-muted-foreground">{player.teamName}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center" data-testid={`cell-gamesplayed-${player.id}`}>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="0"
+                                      className="w-16 h-8 text-center"
+                                      value={playerGameStats[player.id]?.gamesPlayed || ''}
+                                      onChange={(e) => updatePlayerGameStat(player.id, 'gamesPlayed', e.target.value)}
+                                      data-testid={`input-games-${player.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center" data-testid={`cell-goals-${player.id}`}>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="0"
+                                      className="w-16 h-8 text-center"
+                                      value={playerGameStats[player.id]?.goals || ''}
+                                      onChange={(e) => updatePlayerGameStat(player.id, 'goals', e.target.value)}
+                                      data-testid={`input-goals-${player.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center" data-testid={`cell-assists-${player.id}`}>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="0"
+                                      className="w-16 h-8 text-center"
+                                      value={playerGameStats[player.id]?.assists || ''}
+                                      onChange={(e) => updatePlayerGameStat(player.id, 'assists', e.target.value)}
+                                      data-testid={`input-assists-${player.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center text-blue-400 font-medium" data-testid={`cell-points-${player.id}`}>
+                                    {(parseInt(playerGameStats[player.id]?.goals || '0') || 0) + (parseInt(playerGameStats[player.id]?.assists || '0') || 0)}
+                                  </TableCell>
+                                  <TableCell className="text-center" data-testid={`cell-penalty-${player.id}`}>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="0"
+                                      className="w-16 h-8 text-center"
+                                      value={playerGameStats[player.id]?.penaltyMinutes || ''}
+                                      onChange={(e) => updatePlayerGameStat(player.id, 'penaltyMinutes', e.target.value)}
+                                      data-testid={`input-penalty-${player.id}`}
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
                         </div>
                         
                         <Button 
