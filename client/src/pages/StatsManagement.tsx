@@ -79,10 +79,21 @@ export default function StatsManagement() {
   });
 
   // Get players for selected league
-  const { data: players = [] } = useQuery({
+  const { data: players = [], error: playersError, isLoading: playersLoading } = useQuery({
     queryKey: [`/api/leagues/${selectedLeague}/players`],
     enabled: !!selectedLeague,
   });
+
+  // Debug logging to see what we're getting
+  useEffect(() => {
+    if (players && players.length > 0) {
+      console.log('Players loaded:', players);
+      console.log('First player structure:', players[0]);
+    }
+    if (playersError) {
+      console.error('Players error:', playersError);
+    }
+  }, [players, playersError]);
 
   // Get game participants for selected game
   const { data: gameParticipants = [] } = useQuery({
@@ -231,23 +242,17 @@ export default function StatsManagement() {
   };
 
   const updatePlayerGameStat = (userId: string, field: string, value: string) => {
-    console.log('updatePlayerGameStat called:', { userId, field, value });
-    setPlayerGameStats(prev => {
-      const updated = {
-        ...prev,
-        [userId]: {
-          ...prev[userId],
-          [field]: value
-        }
-      };
-      console.log('Updated stats:', updated);
-      return updated;
-    });
+    setPlayerGameStats(prev => ({
+      ...prev,
+      [userId]: {
+        ...prev[userId],
+        [field]: value
+      }
+    }));
   };
 
   // Increment/Decrement functions
   const incrementStat = (userId: string, field: string) => {
-    alert(`Increment clicked: ${userId} ${field}`);
     const currentStats = playerGameStats[userId] || { goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '0' };
     const currentValue = parseInt(currentStats[field as keyof typeof currentStats] || '0') || 0;
     const newValue = Math.max(0, currentValue + 1).toString();
@@ -255,7 +260,6 @@ export default function StatsManagement() {
   };
 
   const decrementStat = (userId: string, field: string) => {
-    alert(`Decrement clicked: ${userId} ${field}`);
     const currentStats = playerGameStats[userId] || { goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '0' };
     const currentValue = parseInt(currentStats[field as keyof typeof currentStats] || '0') || 0;
     const newValue = Math.max(0, currentValue - 1).toString();
