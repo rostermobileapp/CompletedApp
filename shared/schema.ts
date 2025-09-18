@@ -538,6 +538,24 @@ export const importedSchedules = pgTable("imported_schedules", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Player stats table
+export const playerStats = pgTable("player_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  seasonId: varchar("season_id").references(() => seasons.id),
+  gamesPlayed: integer("games_played").default(0).notNull(),
+  goals: integer("goals").default(0).notNull(),
+  assists: integer("assists").default(0).notNull(),
+  penaltyMinutes: integer("penalty_minutes").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_player_league_season_stats").on(table.userId, table.leagueId, table.seasonId),
+  index("idx_player_stats_league_id").on(table.leagueId),
+  index("idx_player_stats_user_id").on(table.userId),
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   leagueMemberships: many(leagueMemberships),
@@ -546,6 +564,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   receivedMessages: many(messages, { relationName: "recipient" }),
   commissionsLeagues: many(leagues),
   captainedTeams: many(teams),
+  playerStats: many(playerStats),
 }));
 
 export const leaguesRelations = relations(leagues, ({ one, many }) => ({
@@ -558,6 +577,22 @@ export const leaguesRelations = relations(leagues, ({ one, many }) => ({
   memberships: many(leagueMemberships),
   games: many(games),
   messages: many(messages),
+  playerStats: many(playerStats),
+}));
+
+export const playerStatsRelations = relations(playerStats, ({ one }) => ({
+  user: one(users, {
+    fields: [playerStats.userId],
+    references: [users.id],
+  }),
+  league: one(leagues, {
+    fields: [playerStats.leagueId],
+    references: [leagues.id],
+  }),
+  season: one(seasons, {
+    fields: [playerStats.seasonId],
+    references: [seasons.id],
+  }),
 }));
 
 export const seasonsRelations = relations(seasons, ({ one, many }) => ({
@@ -567,6 +602,7 @@ export const seasonsRelations = relations(seasons, ({ one, many }) => ({
   }),
   teams: many(teams),
   games: many(games),
+  playerStats: many(playerStats),
 }));
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
@@ -927,6 +963,12 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
   createdAt: true,
 });
 
+export const insertPlayerStatsSchema = createInsertSchema(playerStats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertDraftSchema = createInsertSchema(drafts).omit({
   id: true,
   currentRound: true,
@@ -1165,6 +1207,8 @@ export type GameScoreSubmission = typeof gameScoreSubmissions.$inferSelect;
 export type InsertGameScoreSubmission = z.infer<typeof insertGameScoreSubmissionSchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type PlayerStats = typeof playerStats.$inferSelect;
+export type InsertPlayerStats = z.infer<typeof insertPlayerStatsSchema>;
 export type Draft = typeof drafts.$inferSelect;
 export type InsertDraft = z.infer<typeof insertDraftSchema>;
 export type DraftPick = typeof draftPicks.$inferSelect;
