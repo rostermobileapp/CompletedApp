@@ -1079,7 +1079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: member.user.firstName,
         lastName: member.user.lastName,
         email: member.user.email,
-        teamName: member.teamMembership.teamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name
+        teamName: member.teamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name
       }));
 
       res.json(participants);
