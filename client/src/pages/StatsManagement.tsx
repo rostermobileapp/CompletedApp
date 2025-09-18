@@ -432,38 +432,43 @@ export default function StatsManagement() {
                         {/* Scrollable Table with Sticky Header */}
                         <div className="flex-1 overflow-auto border rounded-lg">
                           <Table data-testid="table-game-stats">
-                            <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableHeader>
                               <TableRow>
                                 <TableHead 
-                                  className="cursor-pointer select-none w-32 bg-background" 
+                                  className="cursor-pointer select-none w-32 bg-background"
+                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
                                   onClick={() => handleSort('name')}
                                   data-testid="header-player-name"
                                 >
                                   Player {getSortIcon('name')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background" 
+                                  className="cursor-pointer select-none text-center w-16 bg-background"
+                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
                                   onClick={() => handleSort('gamesPlayed')}
                                   data-testid="header-games-played"
                                 >
                                   GP {getSortIcon('gamesPlayed')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background" 
+                                  className="cursor-pointer select-none text-center w-16 bg-background"
+                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
                                   onClick={() => handleSort('goals')}
                                   data-testid="header-goals"
                                 >
                                   G {getSortIcon('goals')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background" 
+                                  className="cursor-pointer select-none text-center w-16 bg-background"
+                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
                                   onClick={() => handleSort('assists')}
                                   data-testid="header-assists"
                                 >
                                   A {getSortIcon('assists')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background" 
+                                  className="cursor-pointer select-none text-center w-16 bg-background"
+                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
                                   onClick={() => handleSort('penaltyMinutes')}
                                   data-testid="header-penalty-minutes"
                                 >
@@ -649,38 +654,43 @@ export default function StatsManagement() {
                         {/* Scrollable Table with Sticky Header */}
                         <div className="flex-1 overflow-auto border rounded-lg">
                           <Table data-testid="table-player-stats">
-                            <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableHeader>
                               <TableRow>
                                 <TableHead 
-                                  className="cursor-pointer select-none w-32 bg-background" 
+                                  className="cursor-pointer select-none w-32 bg-background"
+                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
                                   onClick={() => handleSort('name')}
                                   data-testid="header-player-name"
                                 >
                                   Player {getSortIcon('name')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background" 
+                                  className="cursor-pointer select-none text-center w-16 bg-background"
+                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
                                   onClick={() => handleSort('gamesPlayed')}
                                   data-testid="header-games-played"
                                 >
                                   GP {getSortIcon('gamesPlayed')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background" 
+                                  className="cursor-pointer select-none text-center w-16 bg-background"
+                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
                                   onClick={() => handleSort('goals')}
                                   data-testid="header-goals"
                                 >
                                   G {getSortIcon('goals')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background" 
+                                  className="cursor-pointer select-none text-center w-16 bg-background"
+                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
                                   onClick={() => handleSort('assists')}
                                   data-testid="header-assists"
                                 >
                                   A {getSortIcon('assists')}
                                 </TableHead>
                                 <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background" 
+                                  className="cursor-pointer select-none text-center w-16 bg-background"
+                                  style={{position: 'sticky', top: 0, backgroundColor: 'hsl(var(--background))', zIndex: 20}} 
                                   onClick={() => handleSort('penaltyMinutes')}
                                   data-testid="header-penalty-minutes"
                                 >
