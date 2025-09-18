@@ -45,7 +45,7 @@ export default function Stats() {
 
   // Fetch player stats for the league
   const { data: playerStats, isLoading } = useQuery({
-    queryKey: [`/api/leagues/${leagueId}/stats${selectedSeason ? `?seasonId=${selectedSeason}` : ''}`],
+    queryKey: [`/api/leagues/${leagueId}/stats${selectedSeason && selectedSeason !== 'all' ? `?seasonId=${selectedSeason}` : ''}`],
     enabled: !!leagueId,
   });
 
@@ -176,7 +176,7 @@ export default function Stats() {
                   <SelectValue placeholder="All Seasons" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Seasons</SelectItem>
+                  <SelectItem value="all">All Seasons</SelectItem>
                   {Array.isArray(seasons) ? seasons.map((season: any) => (
                     <SelectItem key={season.id} value={String(season.id)}>
                       {season.name}
