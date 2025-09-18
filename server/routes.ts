@@ -33,6 +33,7 @@ import {
   approveSubstituteRequestSchema,
   getPendingApprovalsQuerySchema,
   updateSubstituteRequestSchema,
+  insertPlayerStatsSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import Stripe from "stripe";
@@ -3837,6 +3838,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting scrimmage:', error);
       res.status(500).json({ message: 'Failed to cancel scrimmage' });
+    }
+  });
+
+  // Player Stats Routes
+  
+  // Get player stats for a league (with optional season filter)
+  app.get('/api/leagues/:leagueId/stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const seasonId = Array.isArray(req.query.seasonId) ? req.query.seasonId[0] : req.query.seasonId;
+      const userId = req.user.claims.sub;
+      
+      // Verify user is a member of this league
+      const userMembership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!userMembership || userMembership.status !== 'approved') {
+        return res.status(403).json({ message: "Access denied - not an approved league member" });
+      }
+      
+      // Validate season ownership if seasonId is provided
+      if (seasonId) {
+        const season = await storage.getSeason(seasonId);
+        if (!season || season.leagueId !== leagueId) {
+          return res.status(400).json({ message: "Season not found or does not belong to this league" });
+        }
+      }
+      
+      const stats = await storage.getPlayerStats(leagueId, seasonId);
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching player stats:', error);
+      res.status(500).json({ message: 'Failed to fetch player stats' });
+    }
+  });
+  
+  // Get individual player's stats
+  app.get('/api/leagues/:leagueId/stats/players/:playerId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId, playerId } = req.params;
+      const seasonId = Array.isArray(req.query.seasonId) ? req.query.seasonId[0] : req.query.seasonId;
+      const userId = req.user.claims.sub;
+      
+      // Verify user is a member of this league
+      const userMembership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!userMembership || userMembership.status !== 'approved') {
+        return res.status(403).json({ message: "Access denied - not an approved league member" });
+      }
+      
+      // Validate season ownership if seasonId is provided
+      if (seasonId) {
+        const season = await storage.getSeason(seasonId);
+        if (!season || season.leagueId !== leagueId) {
+          return res.status(400).json({ message: "Season not found or does not belong to this league" });
+        }
+      }
+      
+      const stats = await storage.getPlayerStatsByUser(playerId, leagueId, seasonId);
+      if (!stats) {
+        return res.status(404).json({ message: "Player stats not found" });
+      }
+      
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching individual player stats:', error);
+      res.status(500).json({ message: 'Failed to fetch player stats' });
+    }
+  });
+  
+  // Create or update player stats (Commissioner only)
+  app.post('/api/leagues/:leagueId/stats/players/:playerId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId, playerId } = req.params;
+      const seasonId = Array.isArray(req.query.seasonId) ? req.query.seasonId[0] : req.query.seasonId;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(leagueId);
+      
+      // Verify user is commissioner of this league
+      if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
+        return res.status(403).json({ message: "Access denied - commissioner access required" });
+      }
+      
+      // Validate season ownership if seasonId is provided
+      if (seasonId) {
+        const season = await storage.getSeason(seasonId);
+        if (!season || season.leagueId !== leagueId) {
+          return res.status(400).json({ message: "Season not found or does not belong to this league" });
+        }
+      }
+      
+      // Validate target player is in league
+      const playerMembership = await storage.getUserLeagueMembership(playerId, leagueId);
+      if (!playerMembership || playerMembership.status !== 'approved') {
+        return res.status(404).json({ message: "Player not found in this league" });
+      }
+      
+      // Validate request body - only allow stat fields with proper coercion
+      const validatedData = insertPlayerStatsSchema.pick({
+        gamesPlayed: true,
+        goals: true,
+        assists: true,
+        penaltyMinutes: true,
+      }).parse(req.body);
+      
+      const updatedStats = await storage.updatePlayerStats(
+        playerId, 
+        leagueId, 
+        seasonId, 
+        validatedData
+      );
+      
+      res.json(updatedStats);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error('Error updating player stats:', error);
+      res.status(500).json({ message: 'Failed to update player stats' });
+    }
+  });
+  
+  // Bulk update player stats (Commissioner only) - useful for "by game" updates
+  app.post('/api/leagues/:leagueId/stats/bulk', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const seasonId = Array.isArray(req.query.seasonId) ? req.query.seasonId[0] : req.query.seasonId;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(leagueId);
+      
+      // Verify user is commissioner of this league
+      if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
+        return res.status(403).json({ message: "Access denied - commissioner access required" });
+      }
+      
+      // Validate season ownership if seasonId is provided
+      if (seasonId) {
+        const season = await storage.getSeason(seasonId);
+        if (!season || season.leagueId !== leagueId) {
+          return res.status(400).json({ message: "Season not found or does not belong to this league" });
+        }
+      }
+      
+      // Validate request body structure with proper coercion
+      const bulkUpdateSchema = z.object({
+        updates: z.array(z.object({
+          userId: z.string(),
+          stats: insertPlayerStatsSchema.pick({
+            gamesPlayed: true,
+            goals: true,
+            assists: true,
+            penaltyMinutes: true,
+          }).partial()
+        }))
+      });
+      
+      const validatedData = bulkUpdateSchema.parse(req.body);
+      
+      // Verify all target players are in the league
+      for (const update of validatedData.updates) {
+        const playerMembership = await storage.getUserLeagueMembership(update.userId, leagueId);
+        if (!playerMembership || playerMembership.status !== 'approved') {
+          return res.status(400).json({ 
+            message: `Player ${update.userId} not found in this league` 
+          });
+        }
+      }
+      
+      // Transform to storage format
+      const statsUpdates = validatedData.updates.map(update => ({
+        userId: update.userId,
+        updates: update.stats
+      }));
+      
+      await storage.bulkUpdatePlayerStats(leagueId, seasonId, statsUpdates);
+      
+      res.json({ message: 'Player stats updated successfully', updatedCount: statsUpdates.length });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error('Error bulk updating player stats:', error);
+      res.status(500).json({ message: 'Failed to update player stats' });
     }
   });
 
