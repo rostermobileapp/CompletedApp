@@ -647,7 +647,7 @@ export default function StatsManagement() {
               {/* By Player Tab */}
               <TabsContent value="by-player" className="space-y-4">
                 <Card>
-                  <CardContent>
+                  <CardContent className="p-6 pt-[0px] pb-[0px] pl-[0px] pr-[0px] text-[14px]"></CardContent>
                     {selectedLeague && Array.isArray(players) && players.length > 0 && (
                       <div className="flex flex-col" style={{height: 'calc(100vh - 280px)'}}>
                         {/* Fixed Update Button at Top */}
