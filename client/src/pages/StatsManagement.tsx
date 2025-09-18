@@ -416,7 +416,7 @@ export default function StatsManagement() {
                     </div>
 
                     {selectedGame && Array.isArray(gameParticipants) && gameParticipants.length > 0 && (
-                      <div className="flex flex-col h-96">
+                      <div className="flex flex-col" style={{height: 'calc(100vh - 200px)'}}>
                         {/* Fixed Update Button at Top */}
                         <div className="flex-shrink-0 mb-4">
                           <Button 
