@@ -231,17 +231,23 @@ export default function StatsManagement() {
   };
 
   const updatePlayerGameStat = (userId: string, field: string, value: string) => {
-    setPlayerGameStats(prev => ({
-      ...prev,
-      [userId]: {
-        ...prev[userId],
-        [field]: value
-      }
-    }));
+    console.log('updatePlayerGameStat called:', { userId, field, value });
+    setPlayerGameStats(prev => {
+      const updated = {
+        ...prev,
+        [userId]: {
+          ...prev[userId],
+          [field]: value
+        }
+      };
+      console.log('Updated stats:', updated);
+      return updated;
+    });
   };
 
   // Increment/Decrement functions
   const incrementStat = (userId: string, field: string) => {
+    alert(`Increment clicked: ${userId} ${field}`);
     const currentStats = playerGameStats[userId] || { goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '0' };
     const currentValue = parseInt(currentStats[field as keyof typeof currentStats] || '0') || 0;
     const newValue = Math.max(0, currentValue + 1).toString();
@@ -249,6 +255,7 @@ export default function StatsManagement() {
   };
 
   const decrementStat = (userId: string, field: string) => {
+    alert(`Decrement clicked: ${userId} ${field}`);
     const currentStats = playerGameStats[userId] || { goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '0' };
     const currentValue = parseInt(currentStats[field as keyof typeof currentStats] || '0') || 0;
     const newValue = Math.max(0, currentValue - 1).toString();
