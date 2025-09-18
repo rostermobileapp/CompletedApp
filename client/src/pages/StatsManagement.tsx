@@ -242,13 +242,15 @@ export default function StatsManagement() {
 
   // Increment/Decrement functions
   const incrementStat = (userId: string, field: string) => {
-    const currentValue = parseInt(playerGameStats[userId]?.[field] || '0') || 0;
+    const currentStats = playerGameStats[userId] || { goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '0' };
+    const currentValue = parseInt(currentStats[field as keyof typeof currentStats] || '0') || 0;
     const newValue = Math.max(0, currentValue + 1).toString();
     updatePlayerGameStat(userId, field, newValue);
   };
 
   const decrementStat = (userId: string, field: string) => {
-    const currentValue = parseInt(playerGameStats[userId]?.[field] || '0') || 0;
+    const currentStats = playerGameStats[userId] || { goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '0' };
+    const currentValue = parseInt(currentStats[field as keyof typeof currentStats] || '0') || 0;
     const newValue = Math.max(0, currentValue - 1).toString();
     updatePlayerGameStat(userId, field, newValue);
   };
