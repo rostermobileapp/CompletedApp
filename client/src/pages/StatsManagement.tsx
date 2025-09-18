@@ -423,13 +423,13 @@ export default function StatsManagement() {
                     </div>
 
                     {selectedGame && Array.isArray(gameParticipants) && gameParticipants.length > 0 && (
-                      <div className="space-y-4">
-                        {/* Fixed Update Button */}
-                        <div className="sticky top-0 z-10 bg-background border-b pb-4">
+                      <div className="flex flex-col h-96">
+                        {/* Fixed Update Button at Top */}
+                        <div className="flex-shrink-0 mb-4">
                           <Button 
                             onClick={handleGameStatsUpdate} 
                             disabled={updateStatsMutation.isPending}
-                            className="w-full"
+                            className="w-full bg-primary hover:bg-primary/90"
                             data-testid="button-update-player-stats"
                           >
                             {updateStatsMutation.isPending ? 'Updating...' : 'Update All Player Stats'}
@@ -437,7 +437,7 @@ export default function StatsManagement() {
                         </div>
 
                         {/* Scrollable Table */}
-                        <div className="overflow-x-auto max-h-96 overflow-y-auto border rounded-lg">
+                        <div className="flex-1 overflow-x-auto overflow-y-auto border rounded-lg">
                           <Table data-testid="table-game-stats">
                             <TableHeader>
                               <TableRow>
