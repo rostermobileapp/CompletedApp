@@ -61,6 +61,8 @@ export default function StatsManagement() {
   // Refs for scroll synchronization
   const gameTableHeaderRef = useRef<HTMLDivElement>(null);
   const gameTableBodyRef = useRef<HTMLDivElement>(null);
+  const playerTableHeaderRef = useRef<HTMLDivElement>(null);
+  const playerTableBodyRef = useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
 
@@ -153,6 +155,26 @@ export default function StatsManagement() {
       bodyEl.removeEventListener('scroll', handleBodyScroll);
     };
   }, [selectedGame, gameParticipants]);
+
+  // Scroll synchronization for player table
+  useEffect(() => {
+    const headerEl = playerTableHeaderRef.current;
+    const bodyEl = playerTableBodyRef.current;
+    
+    if (!headerEl || !bodyEl) return;
+    
+    const syncScroll = (source: HTMLElement, target: HTMLElement) => (e: Event) => {
+      target.scrollLeft = source.scrollLeft;
+    };
+    
+    const handleBodyScroll = syncScroll(bodyEl, headerEl);
+    
+    bodyEl.addEventListener('scroll', handleBodyScroll);
+    
+    return () => {
+      bodyEl.removeEventListener('scroll', handleBodyScroll);
+    };
+  }, [selectedLeague, players]);
 
   // Update stats mutation
   const updateStatsMutation = useMutation({
@@ -681,10 +703,10 @@ export default function StatsManagement() {
                           </Button>
                         </div>
 
-                        {/* Scrollable Table with Sticky Header */}
-                        <div className="flex-1 relative overflow-auto border rounded-lg">
-                          <Table data-testid="table-player-stats" className="border-separate border-spacing-0">
-                            <TableHeader className="sticky top-0 z-20 bg-background">
+                        {/* Fixed Header */}
+                        <div ref={playerTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-auto">
+                          <Table>
+                            <TableHeader>
                               <TableRow>
                                 <TableHead 
                                   className="cursor-pointer select-none w-32 bg-background"
@@ -728,6 +750,12 @@ export default function StatsManagement() {
                                 </TableHead>
                               </TableRow>
                             </TableHeader>
+                          </Table>
+                        </div>
+                        
+                        {/* Scrollable Table Body */}
+                        <div ref={playerTableBodyRef} className="flex-1 overflow-auto border-l border-r border-b rounded-b-lg">
+                          <Table data-testid="table-player-stats">
                             <TableBody>
                               {getSortedPlayers(players).map((player: Player, index: number) => (
                                 <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
