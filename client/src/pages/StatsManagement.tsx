@@ -337,7 +337,7 @@ export default function StatsManagement() {
                 League & Season Selection
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-6 space-y-4 pt-[2px] pb-[2px]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>League</Label>
@@ -649,7 +649,7 @@ export default function StatsManagement() {
                 <Card>
                   <CardContent>
                     {selectedLeague && Array.isArray(players) && players.length > 0 && (
-                      <div className="flex flex-col h-96">
+                      <div className="flex flex-col" style={{height: 'calc(100vh - 280px)'}}>
                         {/* Fixed Update Button at Top */}
                         <div className="flex-shrink-0 mb-4">
                           <Button 
