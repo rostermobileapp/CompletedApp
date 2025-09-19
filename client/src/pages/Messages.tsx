@@ -1,10 +1,11 @@
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -60,6 +61,19 @@ interface ConversationParticipant {
   };
 }
 
+interface Contact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  profileImageUrl?: string;
+  displayFirstName?: string;
+  displayLastName?: string;
+  position?: string;
+  jerseyNumber?: number;
+  skillLevel?: string;
+}
+
 export default function Messages() {
   const { hasAccess, tier } = useSubscription();
   const { user } = useAuth();
@@ -71,11 +85,26 @@ export default function Messages() {
   const [isTyping, setIsTyping] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [showContactDiscovery, setShowContactDiscovery] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Fetch user's leagues for contact discovery
+  const { data: userLeagues = [] } = useQuery({
+    queryKey: ['/api/user/leagues'],
+    enabled: hasAccess('player_plus')
+  });
+
+  // Fetch contacts for selected league
+  const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
+    queryKey: ['/api/leagues', selectedLeague, 'contacts'],
+    enabled: !!selectedLeague && hasAccess('player_plus')
+  });
 
   // Fetch conversations
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
@@ -87,6 +116,30 @@ export default function Messages() {
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ['/api/conversations', selectedConversation, 'messages'],
     enabled: !!selectedConversation && hasAccess('player_plus')
+  });
+
+  // Create new conversation mutation
+  const createConversationMutation = useMutation({
+    mutationFn: async (data: { otherUserId: string; leagueId: string }) => {
+      const response = await apiRequest('POST', '/api/conversations/direct', data);
+      return response.json();
+    },
+    onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+      setSelectedConversation(conversation.id);
+      setShowContactDiscovery(false);
+      toast({
+        title: 'Conversation started',
+        description: 'You can now send messages'
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to start conversation',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
+    }
   });
 
   // Send message mutation
@@ -441,15 +494,145 @@ export default function Messages() {
     );
   }
 
+  // Helper functions for contact discovery
+  const filteredContacts = contacts.filter(contact => {
+    if (!searchQuery) return true;
+    const fullName = `${contact.firstName} ${contact.lastName}`.toLowerCase();
+    const displayName = `${contact.displayFirstName || contact.firstName} ${contact.displayLastName || contact.lastName}`.toLowerCase();
+    return fullName.includes(searchQuery.toLowerCase()) || 
+           displayName.includes(searchQuery.toLowerCase()) ||
+           contact.email.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const handleStartConversation = (contact: Contact) => {
+    if (!selectedLeague) return;
+    createConversationMutation.mutate({
+      otherUserId: contact.id,
+      leagueId: selectedLeague
+    });
+  };
+
+  const getContactDisplayName = (contact: Contact) => {
+    return `${contact.displayFirstName || contact.firstName} ${contact.displayLastName || contact.lastName}`;
+  };
+
   return (
-    <div className="min-h-screen flex flex-col pb-24" data-testid="messages-page">
+    <>
+      {/* Contact Discovery Dialog */}
+      <Dialog open={showContactDiscovery} onOpenChange={setShowContactDiscovery}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Start New Conversation</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* League Selection */}
+            {userLeagues.length > 1 && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">Select League</label>
+                <select 
+                  value={selectedLeague || ''} 
+                  onChange={(e) => setSelectedLeague(e.target.value)}
+                  className="w-full p-2 border border-border rounded-md bg-background"
+                  data-testid="select-league"
+                >
+                  <option value="">Choose a league...</option>
+                  {userLeagues.map((league: any) => (
+                    <option key={league.id} value={league.id}>{league.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
+            {/* Search Contacts */}
+            {selectedLeague && (
+              <>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search contacts..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search-contacts"
+                  />
+                </div>
+                
+                {/* Contacts List */}
+                <div className="max-h-64 overflow-y-auto space-y-2">
+                  {contactsLoading ? (
+                    <div className="space-y-2" data-testid="contacts-loading">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="flex items-center gap-3 p-3 border rounded-lg animate-pulse">
+                          <div className="w-8 h-8 bg-muted rounded-full"></div>
+                          <div className="flex-1">
+                            <div className="h-4 bg-muted rounded w-2/3 mb-1"></div>
+                            <div className="h-3 bg-muted rounded w-1/2"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : filteredContacts.length > 0 ? (
+                    <div className="space-y-2" data-testid="contacts-list">
+                      {filteredContacts.map((contact) => (
+                        <div 
+                          key={contact.id}
+                          className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
+                          onClick={() => handleStartConversation(contact)}
+                          data-testid={`contact-${contact.id}`}
+                        >
+                          <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                            <span className="text-xs font-semibold">
+                              {getInitials(getContactDisplayName(contact))}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-sm" data-testid={`text-contact-name-${contact.id}`}>
+                              {getContactDisplayName(contact)}
+                            </p>
+                            {contact.position && (
+                              <p className="text-xs text-muted-foreground" data-testid={`text-contact-position-${contact.id}`}>
+                                {contact.position}
+                                {contact.jerseyNumber && ` #${contact.jerseyNumber}`}
+                              </p>
+                            )}
+                          </div>
+                          <UserPlus className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6" data-testid="no-contacts-found">
+                      <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        {searchQuery ? 'No contacts found' : 'No contacts available'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <div className="min-h-screen flex flex-col pb-24" data-testid="messages-page">
       {!selectedConversation ? (
         <>
           {/* Conversations List Header */}
           <div className="p-6 pt-12">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold" data-testid="text-page-title">Messages</h1>
-              <button className="text-primary" data-testid="button-new-message">
+              <button 
+                className="text-primary" 
+                data-testid="button-new-message"
+                onClick={() => {
+                  setShowContactDiscovery(true);
+                  if (userLeagues.length === 1) {
+                    setSelectedLeague(userLeagues[0].id);
+                  }
+                }}
+              >
                 <Edit className="w-5 h-5" />
               </button>
             </div>

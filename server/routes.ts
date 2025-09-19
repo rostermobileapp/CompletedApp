@@ -4181,6 +4181,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Messaging API routes
   
+  // Get league members for contact discovery (messaging)
+  app.get('/api/leagues/:id/contacts', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      // Check if user is a member of this league
+      const userMembership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!userMembership || userMembership.status !== 'approved') {
+        return res.status(403).json({ message: "Access denied - not a league member" });
+      }
+      
+      // Check if user has Player Plus subscription for messaging
+      const user = await storage.getUser(userId);
+      if (!user || user.subscriptionTier === 'free') {
+        return res.status(403).json({ message: "Player Plus subscription required for messaging" });
+      }
+      
+      // Get all league members except the current user
+      const allMembers = await storage.getLeagueMembers(leagueId);
+      const contacts = allMembers
+        .filter(member => member.userId !== userId)
+        .map(member => ({
+          id: member.user.id,
+          firstName: member.user.firstName,
+          lastName: member.user.lastName,
+          email: member.user.email,
+          profileImageUrl: member.user.profileImageUrl,
+          displayFirstName: member.displayFirstName,
+          displayLastName: member.displayLastName,
+          position: member.position,
+          jerseyNumber: member.jerseyNumber,
+          skillLevel: member.skillLevel
+        }));
+      
+      res.json(contacts);
+    } catch (error) {
+      console.error("Error fetching league contacts:", error);
+      res.status(500).json({ message: "Failed to fetch contacts" });
+    }
+  });
+
   // Get user's conversations
   app.get('/api/conversations', isAuthenticated, async (req: any, res) => {
     try {
