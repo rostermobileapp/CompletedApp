@@ -333,7 +333,7 @@ export default function Stats() {
                           <span className="text-sm text-muted-foreground">Wins</span>
                         </div>
                       </div>
-                      <span className="text-sm font-medium truncate">{`${leaders?.mostWins?.user?.firstName || ''} ${leaders?.mostWins?.user?.lastName || ''}`.trim() || 'N/A'}</span>
+                      <span className="text-sm font-medium truncate">{leaders?.mostWins?.user?.lastName || 'N/A'}</span>
                     </Card>
 
                     {/* Best GAA */}
@@ -345,7 +345,7 @@ export default function Stats() {
                           <span className="text-sm text-muted-foreground">GAA</span>
                         </div>
                       </div>
-                      <span className="text-sm font-medium truncate">{`${leaders?.bestGAA?.user?.firstName || ''} ${leaders?.bestGAA?.user?.lastName || ''}`.trim() || 'N/A'}</span>
+                      <span className="text-sm font-medium truncate">{leaders?.bestGAA?.user?.lastName || 'N/A'}</span>
                     </Card>
 
                     {/* Most Games */}
@@ -357,7 +357,7 @@ export default function Stats() {
                           <span className="text-sm text-muted-foreground">Games</span>
                         </div>
                       </div>
-                      <span className="text-sm font-medium truncate">{`${leaders?.mostGames?.user?.firstName || ''} ${leaders?.mostGames?.user?.lastName || ''}`.trim() || 'N/A'}</span>
+                      <span className="text-sm font-medium truncate">{leaders?.mostGames?.user?.lastName || 'N/A'}</span>
                     </Card>
 
                     {/* Fewest Losses */}
@@ -369,7 +369,7 @@ export default function Stats() {
                           <span className="text-sm text-muted-foreground">Losses</span>
                         </div>
                       </div>
-                      <span className="text-sm font-medium truncate">{`${leaders?.fewestLosses?.user?.firstName || ''} ${leaders?.fewestLosses?.user?.lastName || ''}`.trim() || 'N/A'}</span>
+                      <span className="text-sm font-medium truncate">{leaders?.fewestLosses?.user?.lastName || 'N/A'}</span>
                     </Card>
                   </>
                 );
@@ -391,7 +391,7 @@ export default function Stats() {
                           <span className="text-sm text-muted-foreground">Points</span>
                         </div>
                       </div>
-                      <span className="text-sm font-medium truncate">{`${leaders?.topScorer?.user?.firstName || ''} ${leaders?.topScorer?.user?.lastName || ''}`.trim() || 'N/A'}</span>
+                      <span className="text-sm font-medium truncate">{leaders?.topScorer?.user?.lastName || 'N/A'}</span>
                     </Card>
 
                     {/* Most Goals */}
@@ -403,7 +403,7 @@ export default function Stats() {
                           <span className="text-sm text-muted-foreground">Goals</span>
                         </div>
                       </div>
-                      <span className="text-sm font-medium truncate">{`${leaders?.topGoalScorer?.user?.firstName || ''} ${leaders?.topGoalScorer?.user?.lastName || ''}`.trim() || 'N/A'}</span>
+                      <span className="text-sm font-medium truncate">{leaders?.topGoalScorer?.user?.lastName || 'N/A'}</span>
                     </Card>
 
                     {/* Most Assists */}
@@ -415,7 +415,7 @@ export default function Stats() {
                           <span className="text-sm text-muted-foreground">Assists</span>
                         </div>
                       </div>
-                      <span className="text-sm font-medium truncate">{`${leaders?.topAssistProvider?.user?.firstName || ''} ${leaders?.topAssistProvider?.user?.lastName || ''}`.trim() || 'N/A'}</span>
+                      <span className="text-sm font-medium truncate">{leaders?.topAssistProvider?.user?.lastName || 'N/A'}</span>
                     </Card>
 
                     {/* Most Penalty Minutes */}
@@ -427,7 +427,7 @@ export default function Stats() {
                           <span className="text-sm text-muted-foreground">PIM</span>
                         </div>
                       </div>
-                      <span className="text-sm font-medium truncate">{`${leaders?.mostPenaltyMinutes?.user?.firstName || ''} ${leaders?.mostPenaltyMinutes?.user?.lastName || ''}`.trim() || 'N/A'}</span>
+                      <span className="text-sm font-medium truncate">{leaders?.mostPenaltyMinutes?.user?.lastName || 'N/A'}</span>
                     </Card>
                   </>
                 );
