@@ -31,7 +31,7 @@ export default function Stats() {
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [sortField, setSortField] = useState<string>('points');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [playerType, setPlayerType] = useState<'all' | 'goalies' | 'non-goalies'>('all');
+  const [playerType, setPlayerType] = useState<'goalies' | 'non-goalies'>('non-goalies');
 
   // Set default sort field based on player type
   useEffect(() => {
@@ -67,7 +67,7 @@ export default function Stats() {
       if (selectedSeason && selectedSeason !== 'all') {
         params.append('seasonId', selectedSeason);
       }
-      if (playerType && playerType !== 'all') {
+      if (playerType) {
         params.append('playerType', playerType);
       }
       const query = params.toString();
@@ -294,19 +294,17 @@ export default function Stats() {
               </Select>
             </div>
 
-            {/* Player Type Filter */}
+            {/* Player Type Toggle */}
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-2 block">Player Type</label>
-              <Select value={playerType} onValueChange={(value) => setPlayerType(value as 'all' | 'goalies' | 'non-goalies')} data-testid="select-player-type">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Players</SelectItem>
-                  <SelectItem value="goalies">Goalies</SelectItem>
-                  <SelectItem value="non-goalies">Non-Goalies</SelectItem>
-                </SelectContent>
-              </Select>
+              <Button 
+                variant="outline" 
+                onClick={() => setPlayerType(playerType === 'goalies' ? 'non-goalies' : 'goalies')}
+                className="w-full justify-start"
+                data-testid="button-toggle-player-type"
+              >
+                {playerType === 'goalies' ? 'Switch to Skaters' : 'Switch to Goalies'}
+              </Button>
             </div>
 
             {/* Sort Field */}
