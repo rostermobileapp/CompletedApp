@@ -307,37 +307,7 @@ export default function Stats() {
               </Button>
             </div>
 
-            {/* Sort Field */}
-            <div>
-              <label className="text-sm font-medium text-muted-foreground mb-2 block">Sort By</label>
-              <Select value={sortField} onValueChange={setSortField} data-testid="select-sort-field">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {playerType === 'goalies' ? (
-                    <>
-                      <SelectItem value="wins">Wins</SelectItem>
-                      <SelectItem value="losses">Losses</SelectItem>
-                      <SelectItem value="ties">Ties</SelectItem>
-                      <SelectItem value="shootoutLosses">Shootout Losses</SelectItem>
-                      <SelectItem value="goalsAgainstAverage">Goals Against Average</SelectItem>
-                      <SelectItem value="gamesPlayed">Games Played</SelectItem>
-                      <SelectItem value="name">Player Name</SelectItem>
-                    </>
-                  ) : (
-                    <>
-                      <SelectItem value="points">Points</SelectItem>
-                      <SelectItem value="goals">Goals</SelectItem>
-                      <SelectItem value="assists">Assists</SelectItem>
-                      <SelectItem value="gamesPlayed">Games Played</SelectItem>
-                      <SelectItem value="penaltyMinutes">Penalty Minutes</SelectItem>
-                      <SelectItem value="name">Player Name</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+            
           </div>
         </Card>
       </div>
