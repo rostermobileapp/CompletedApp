@@ -4242,6 +4242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const readReceipts = await messagingService.getMessageReadReceipts(message.id);
           return {
             ...message,
+            sentAt: message.createdAt, // Map createdAt to sentAt for frontend compatibility
             attachments,
             readReceipts
           };

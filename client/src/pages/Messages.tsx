@@ -446,11 +446,17 @@ export default function Messages() {
   }, []);
 
   const formatMessageTime = (timestamp: string) => {
-    return format(new Date(timestamp), 'h:mm a');
+    if (!timestamp) return 'Unknown';
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    return format(date, 'h:mm a');
   };
 
   const formatConversationTime = (timestamp: string) => {
+    if (!timestamp) return 'Unknown';
     const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
     
