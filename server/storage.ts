@@ -3645,6 +3645,160 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  // Goalie stats operations
+  async getGoalieStats(leagueId: string, seasonId?: string): Promise<Array<{
+    userId: string;
+    gamesPlayed: number;
+    wins: number;
+    losses: number;
+    ties: number;
+    shootoutLosses: number;
+    goalsAgainst: number;
+    goalsAgainstAverage: number;
+    user: User;
+    teamId?: string;
+  }>> {
+    // Build season conditions
+    let gameSeasonConditions = [];
+    if (seasonId) {
+      gameSeasonConditions.push(eq(games.seasonId, seasonId));
+    } else {
+      gameSeasonConditions.push(isNull(games.seasonId));
+    }
+
+    // Get individual goalie stats from gameGoalies table with game result information
+    const goalieGameStats = await db
+      .select({
+        userId: gameGoalies.goalieUserId,
+        teamId: gameGoalies.teamId,
+        gameId: gameGoalies.gameId,
+        goalsAgainst: gameGoalies.goalsAgainst,
+        minutesPlayed: gameGoalies.minutesPlayed,
+        homeTeamId: games.homeTeamId,
+        awayTeamId: games.awayTeamId,
+        homeScore: games.homeScore,
+        awayScore: games.awayScore,
+        resultType: games.resultType,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+        userProfileImageUrl: users.profileImageUrl,
+        userAge: users.age,
+        userPhoneNumber: users.phoneNumber,
+        userCity: users.city,
+        userSubscriptionTier: users.subscriptionTier,
+        userStripeCustomerId: users.stripeCustomerId,
+        userStripeSubscriptionId: users.stripeSubscriptionId,
+        userPrimarySport: users.primarySport,
+        userCreatedAt: users.createdAt,
+        userUpdatedAt: users.updatedAt,
+      })
+      .from(gameGoalies)
+      .innerJoin(games, eq(gameGoalies.gameId, games.id))
+      .innerJoin(users, eq(gameGoalies.goalieUserId, users.id))
+      .where(
+        and(
+          eq(games.leagueId, leagueId),
+          eq(games.isCompleted, true),
+          ...gameSeasonConditions
+        )
+      );
+
+    // Group stats by goalie userId
+    const goalieStatsMap = new Map<string, {
+      userId: string;
+      gamesPlayed: number;
+      wins: number;
+      losses: number;
+      ties: number;
+      shootoutLosses: number;
+      goalsAgainst: number;
+      totalMinutes: number;
+      teamId?: string;
+      user: User;
+    }>();
+
+    goalieGameStats.forEach(gameStat => {
+      const goalieId = gameStat.userId;
+      
+      if (!goalieStatsMap.has(goalieId)) {
+        goalieStatsMap.set(goalieId, {
+          userId: goalieId,
+          gamesPlayed: 0,
+          wins: 0,
+          losses: 0,
+          ties: 0,
+          shootoutLosses: 0,
+          goalsAgainst: 0,
+          totalMinutes: 0,
+          teamId: gameStat.teamId,
+          user: {
+            id: goalieId,
+            email: gameStat.userEmail,
+            firstName: gameStat.userFirstName,
+            lastName: gameStat.userLastName,
+            profileImageUrl: gameStat.userProfileImageUrl,
+            age: gameStat.userAge,
+            phoneNumber: gameStat.userPhoneNumber,
+            city: gameStat.userCity,
+            subscriptionTier: gameStat.userSubscriptionTier,
+            stripeCustomerId: gameStat.userStripeCustomerId,
+            stripeSubscriptionId: gameStat.userStripeSubscriptionId,
+            primarySport: gameStat.userPrimarySport,
+            createdAt: gameStat.userCreatedAt,
+            updatedAt: gameStat.userUpdatedAt,
+          }
+        });
+      }
+
+      const goalieStats = goalieStatsMap.get(goalieId)!;
+      
+      // Update games played and minutes
+      goalieStats.gamesPlayed++;
+      goalieStats.goalsAgainst += gameStat.goalsAgainst || 0;
+      goalieStats.totalMinutes += gameStat.minutesPlayed || 0;
+      
+      // Determine game result for this goalie's team
+      const isHomeTeam = gameStat.homeTeamId === gameStat.teamId;
+      const teamScore = isHomeTeam ? (gameStat.homeScore || 0) : (gameStat.awayScore || 0);
+      const opponentScore = isHomeTeam ? (gameStat.awayScore || 0) : (gameStat.homeScore || 0);
+      
+      if (teamScore > opponentScore) {
+        goalieStats.wins++;
+      } else if (teamScore < opponentScore) {
+        if (gameStat.resultType === 'shootout') {
+          goalieStats.shootoutLosses++;
+        } else {
+          goalieStats.losses++;
+        }
+      } else {
+        goalieStats.ties++;
+      }
+    });
+
+    // Convert to final format with proper GAA calculation
+    const finalStats = Array.from(goalieStatsMap.values()).map(stats => ({
+      userId: stats.userId,
+      gamesPlayed: stats.gamesPlayed,
+      wins: stats.wins,
+      losses: stats.losses,
+      ties: stats.ties,
+      shootoutLosses: stats.shootoutLosses,
+      goalsAgainst: stats.goalsAgainst,
+      // GAA = (goals against * 60) / minutes played (standard hockey GAA calculation)
+      goalsAgainstAverage: stats.totalMinutes > 0 ? 
+        parseFloat(((stats.goalsAgainst * 60) / stats.totalMinutes).toFixed(2)) : 0.00,
+      teamId: stats.teamId,
+      user: stats.user
+    }));
+
+    // Sort by wins (descending), then by goals against average (ascending)
+    return finalStats.sort((a, b) => {
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return a.goalsAgainstAverage - b.goalsAgainstAverage;
+    });
+  }
+
   // Player merge operations
   async mergeUsersInLeague(leagueId: string, fromUserId: string, toUserId: string, preserveName = true): Promise<LeagueMembership> {
     return await db.transaction(async (tx) => {

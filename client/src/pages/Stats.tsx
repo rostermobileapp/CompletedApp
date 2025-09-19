@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { PlayerStatsUnion, GoalieStats, SkaterStats } from '@shared/schema';
 
 export default function Stats() {
   const { user } = useAuth();
@@ -31,6 +32,15 @@ export default function Stats() {
   const [sortField, setSortField] = useState<string>('points');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [playerType, setPlayerType] = useState<'all' | 'goalies' | 'non-goalies'>('all');
+
+  // Set default sort field based on player type
+  useEffect(() => {
+    if (playerType === 'goalies') {
+      setSortField('wins');
+    } else {
+      setSortField('points');
+    }
+  }, [playerType]);
 
   // Get league ID from URL parameter if provided, otherwise use user's primary league
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
@@ -69,22 +79,61 @@ export default function Stats() {
   // Ensure playerStats is an array
   const statsArray = Array.isArray(playerStats) ? playerStats : [];
 
-  // Sort the stats
-  const sortedStats = statsArray.length > 0 ? [...statsArray].sort((a, b) => {
+  // Sort the stats based on player type
+  const sortedStats = statsArray.length > 0 ? [...statsArray].sort((a: PlayerStatsUnion, b: PlayerStatsUnion) => {
     let aVal, bVal;
     
-    switch (sortField) {
-      case 'points':
-        aVal = (a.goals || 0) + (a.assists || 0);
-        bVal = (b.goals || 0) + (b.assists || 0);
-        break;
-      case 'name':
-        aVal = `${a.user.firstName || ''} ${a.user.lastName || ''}`.trim();
-        bVal = `${b.user.firstName || ''} ${b.user.lastName || ''}`.trim();
-        break;
-      default:
-        aVal = a[sortField] || 0;
-        bVal = b[sortField] || 0;
+    if (playerType === 'goalies' && a.type === 'goalie' && b.type === 'goalie') {
+      // Handle goalie stats sorting
+      switch (sortField) {
+        case 'wins':
+          aVal = a.wins || 0;
+          bVal = b.wins || 0;
+          break;
+        case 'losses':
+          aVal = a.losses || 0;
+          bVal = b.losses || 0;
+          break;
+        case 'goalsAgainstAverage':
+        case 'gaa':
+          aVal = a.goalsAgainstAverage || 0;
+          bVal = b.goalsAgainstAverage || 0;
+          break;
+        case 'name':
+          aVal = `${a.user?.firstName || ''} ${a.user?.lastName || ''}`.trim();
+          bVal = `${b.user?.firstName || ''} ${b.user?.lastName || ''}`.trim();
+          break;
+        default:
+          aVal = a.gamesPlayed || 0;
+          bVal = b.gamesPlayed || 0;
+      }
+    } else if (a.type === 'skater' && b.type === 'skater') {
+      // Handle skater stats sorting
+      switch (sortField) {
+        case 'points':
+          aVal = a.points || 0;
+          bVal = b.points || 0;
+          break;
+        case 'goals':
+          aVal = a.goals || 0;
+          bVal = b.goals || 0;
+          break;
+        case 'assists':
+          aVal = a.assists || 0;
+          bVal = b.assists || 0;
+          break;
+        case 'name':
+          aVal = `${a.user?.firstName || ''} ${a.user?.lastName || ''}`.trim();
+          bVal = `${b.user?.firstName || ''} ${b.user?.lastName || ''}`.trim();
+          break;
+        default:
+          aVal = a.gamesPlayed || 0;
+          bVal = b.gamesPlayed || 0;
+      }
+    } else {
+      // Fallback for mixed types or unknown types
+      aVal = 0;
+      bVal = 0;
     }
     
     if (sortOrder === 'desc') {
@@ -94,35 +143,59 @@ export default function Stats() {
     }
   }) : [];
 
-  // Calculate leaders independently of current sort
-  const getTopScorer = () => {
+  // Calculate leaders based on player type
+  const getLeaders = () => {
     if (statsArray.length === 0) return null;
-    return statsArray.reduce((top, current) => {
-      const topPoints = (top.goals || 0) + (top.assists || 0);
-      const currentPoints = (current.goals || 0) + (current.assists || 0);
-      return currentPoints > topPoints ? current : top;
-    });
-  };
+    
+    if (playerType === 'goalies') {
+      // Goalie leaders
+      const goalieStats = statsArray.filter((stat): stat is GoalieStats => stat.type === 'goalie');
+      if (goalieStats.length === 0) return null;
 
-  const getTopGoalScorer = () => {
-    if (statsArray.length === 0) return null;
-    return statsArray.reduce((top, current) => {
-      return (current.goals || 0) > (top.goals || 0) ? current : top;
-    });
-  };
+      const mostWins = goalieStats.reduce((top, current) => {
+        return (current.wins || 0) > (top.wins || 0) ? current : top;
+      });
+      
+      const bestGAA = goalieStats.reduce((top, current) => {
+        const topGAA = top.goalsAgainstAverage || 999;
+        const currentGAA = current.goalsAgainstAverage || 999;
+        return (currentGAA < topGAA && current.gamesPlayed > 0) ? current : top;
+      });
+      
+      const mostGames = goalieStats.reduce((top, current) => {
+        return (current.gamesPlayed || 0) > (top.gamesPlayed || 0) ? current : top;
+      });
+      
+      const fewestLosses = goalieStats.reduce((top, current) => {
+        return (current.losses || 0) < (top.losses || 0) ? current : top;
+      });
+      
+      return { mostWins, bestGAA, mostGames, fewestLosses };
+    } else {
+      // Skater leaders
+      const skaterStats = statsArray.filter((stat): stat is SkaterStats => stat.type === 'skater');
+      if (skaterStats.length === 0) return null;
 
-  const getTopAssistProvider = () => {
-    if (statsArray.length === 0) return null;
-    return statsArray.reduce((top, current) => {
-      return (current.assists || 0) > (top.assists || 0) ? current : top;
-    });
-  };
-
-  const getMostActivePlayer = () => {
-    if (statsArray.length === 0) return null;
-    return statsArray.reduce((top, current) => {
-      return (current.gamesPlayed || 0) > (top.gamesPlayed || 0) ? current : top;
-    });
+      const topScorer = skaterStats.reduce((top, current) => {
+        const topPoints = top.points || 0;
+        const currentPoints = current.points || 0;
+        return currentPoints > topPoints ? current : top;
+      });
+      
+      const topGoalScorer = skaterStats.reduce((top, current) => {
+        return (current.goals || 0) > (top.goals || 0) ? current : top;
+      });
+      
+      const topAssistProvider = skaterStats.reduce((top, current) => {
+        return (current.assists || 0) > (top.assists || 0) ? current : top;
+      });
+      
+      const mostActivePlayer = skaterStats.reduce((top, current) => {
+        return (current.gamesPlayed || 0) > (top.gamesPlayed || 0) ? current : top;
+      });
+      
+      return { topScorer, topGoalScorer, topAssistProvider, mostActivePlayer };
+    }
   };
 
   const handleSort = (field: string) => {
@@ -244,12 +317,26 @@ export default function Stats() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="points">Points</SelectItem>
-                  <SelectItem value="goals">Goals</SelectItem>
-                  <SelectItem value="assists">Assists</SelectItem>
-                  <SelectItem value="gamesPlayed">Games Played</SelectItem>
-                  <SelectItem value="penaltyMinutes">Penalty Minutes</SelectItem>
-                  <SelectItem value="name">Player Name</SelectItem>
+                  {playerType === 'goalies' ? (
+                    <>
+                      <SelectItem value="wins">Wins</SelectItem>
+                      <SelectItem value="losses">Losses</SelectItem>
+                      <SelectItem value="ties">Ties</SelectItem>
+                      <SelectItem value="shootoutLosses">Shootout Losses</SelectItem>
+                      <SelectItem value="goalsAgainstAverage">Goals Against Average</SelectItem>
+                      <SelectItem value="gamesPlayed">Games Played</SelectItem>
+                      <SelectItem value="name">Player Name</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="points">Points</SelectItem>
+                      <SelectItem value="goals">Goals</SelectItem>
+                      <SelectItem value="assists">Assists</SelectItem>
+                      <SelectItem value="gamesPlayed">Games Played</SelectItem>
+                      <SelectItem value="penaltyMinutes">Penalty Minutes</SelectItem>
+                      <SelectItem value="name">Player Name</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -261,42 +348,89 @@ export default function Stats() {
       {statsArray.length > 0 && (
         <div className="px-6 mb-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Top Scorer */}
-            <Card className="p-4 text-center" data-testid="card-top-scorer">
-              <Target className="w-8 h-8 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold">
-                {(() => {
-                  const topScorer = getTopScorer();
-                  return topScorer ? (topScorer.goals || 0) + (topScorer.assists || 0) : 0;
-                })()}
-              </p>
-              <p className="text-xs text-muted-foreground">Top Points</p>
-              <p className="text-xs font-medium mt-1">{getTopScorer()?.user.firstName || 'N/A'}</p>
-            </Card>
+            {playerType === 'goalies' ? (
+              // Goalie overview cards
+              (() => {
+                const leaders = getLeaders();
+                return (
+                  <>
+                    {/* Most Wins */}
+                    <Card className="p-4 text-center" data-testid="card-most-wins">
+                      <Trophy className="w-8 h-8 text-primary mx-auto mb-2" />
+                      <p className="text-2xl font-bold">{leaders?.mostWins?.wins || 0}</p>
+                      <p className="text-xs text-muted-foreground">Most Wins</p>
+                      <p className="text-xs font-medium mt-1">{leaders?.mostWins?.user?.firstName || 'N/A'}</p>
+                    </Card>
 
-            {/* Most Goals */}
-            <Card className="p-4 text-center" data-testid="card-most-goals">
-              <Medal className="w-8 h-8 text-success mx-auto mb-2" />
-              <p className="text-2xl font-bold">{getTopGoalScorer()?.goals || 0}</p>
-              <p className="text-xs text-muted-foreground">Most Goals</p>
-              <p className="text-xs font-medium mt-1">{getTopGoalScorer()?.user.firstName || 'N/A'}</p>
-            </Card>
+                    {/* Best GAA */}
+                    <Card className="p-4 text-center" data-testid="card-best-gaa">
+                      <Target className="w-8 h-8 text-success mx-auto mb-2" />
+                      <p className="text-2xl font-bold">{leaders?.bestGAA?.goalsAgainstAverage?.toFixed(2) || '0.00'}</p>
+                      <p className="text-xs text-muted-foreground">Best GAA</p>
+                      <p className="text-xs font-medium mt-1">{leaders?.bestGAA?.user?.firstName || 'N/A'}</p>
+                    </Card>
 
-            {/* Most Assists */}
-            <Card className="p-4 text-center" data-testid="card-most-assists">
-              <TrendingUp className="w-8 h-8 text-info mx-auto mb-2" />
-              <p className="text-2xl font-bold">{getTopAssistProvider()?.assists || 0}</p>
-              <p className="text-xs text-muted-foreground">Most Assists</p>
-              <p className="text-xs font-medium mt-1">{getTopAssistProvider()?.user.firstName || 'N/A'}</p>
-            </Card>
+                    {/* Most Games */}
+                    <Card className="p-4 text-center" data-testid="card-most-games-goalie">
+                      <Clock className="w-8 h-8 text-info mx-auto mb-2" />
+                      <p className="text-2xl font-bold">{leaders?.mostGames?.gamesPlayed || 0}</p>
+                      <p className="text-xs text-muted-foreground">Most Games</p>
+                      <p className="text-xs font-medium mt-1">{leaders?.mostGames?.user?.firstName || 'N/A'}</p>
+                    </Card>
 
-            {/* Most Games */}
-            <Card className="p-4 text-center" data-testid="card-most-games">
-              <Clock className="w-8 h-8 text-warning mx-auto mb-2" />
-              <p className="text-2xl font-bold">{getMostActivePlayer()?.gamesPlayed || 0}</p>
-              <p className="text-xs text-muted-foreground">Most Games</p>
-              <p className="text-xs font-medium mt-1">{getMostActivePlayer()?.user.firstName || 'N/A'}</p>
-            </Card>
+                    {/* Fewest Losses */}
+                    <Card className="p-4 text-center" data-testid="card-fewest-losses">
+                      <Medal className="w-8 h-8 text-warning mx-auto mb-2" />
+                      <p className="text-2xl font-bold">{leaders?.fewestLosses?.losses || 0}</p>
+                      <p className="text-xs text-muted-foreground">Fewest Losses</p>
+                      <p className="text-xs font-medium mt-1">{leaders?.fewestLosses?.user?.firstName || 'N/A'}</p>
+                    </Card>
+                  </>
+                );
+              })()
+            ) : (
+              // Skater overview cards
+              (() => {
+                const leaders = getLeaders();
+                return (
+                  <>
+                    {/* Top Scorer */}
+                    <Card className="p-4 text-center" data-testid="card-top-scorer">
+                      <Target className="w-8 h-8 text-primary mx-auto mb-2" />
+                      <p className="text-2xl font-bold">
+                        {leaders?.topScorer ? (leaders.topScorer.goals || 0) + (leaders.topScorer.assists || 0) : 0}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Top Points</p>
+                      <p className="text-xs font-medium mt-1">{leaders?.topScorer?.user?.firstName || 'N/A'}</p>
+                    </Card>
+
+                    {/* Most Goals */}
+                    <Card className="p-4 text-center" data-testid="card-most-goals">
+                      <Medal className="w-8 h-8 text-success mx-auto mb-2" />
+                      <p className="text-2xl font-bold">{leaders?.topGoalScorer?.goals || 0}</p>
+                      <p className="text-xs text-muted-foreground">Most Goals</p>
+                      <p className="text-xs font-medium mt-1">{leaders?.topGoalScorer?.user?.firstName || 'N/A'}</p>
+                    </Card>
+
+                    {/* Most Assists */}
+                    <Card className="p-4 text-center" data-testid="card-most-assists">
+                      <TrendingUp className="w-8 h-8 text-info mx-auto mb-2" />
+                      <p className="text-2xl font-bold">{leaders?.topAssistProvider?.assists || 0}</p>
+                      <p className="text-xs text-muted-foreground">Most Assists</p>
+                      <p className="text-xs font-medium mt-1">{leaders?.topAssistProvider?.user?.firstName || 'N/A'}</p>
+                    </Card>
+
+                    {/* Most Games */}
+                    <Card className="p-4 text-center" data-testid="card-most-games">
+                      <Clock className="w-8 h-8 text-warning mx-auto mb-2" />
+                      <p className="text-2xl font-bold">{leaders?.mostActivePlayer?.gamesPlayed || 0}</p>
+                      <p className="text-xs text-muted-foreground">Most Games</p>
+                      <p className="text-xs font-medium mt-1">{leaders?.mostActivePlayer?.user?.firstName || 'N/A'}</p>
+                    </Card>
+                  </>
+                );
+              })()
+            )}
           </div>
         </div>
       )}
@@ -344,34 +478,78 @@ export default function Stats() {
                     >
                       GP {getSortIcon('gamesPlayed')}
                     </TableHead>
-                    <TableHead 
-                      className="cursor-pointer select-none text-center" 
-                      onClick={() => handleSort('goals')}
-                      data-testid="header-goals"
-                    >
-                      G {getSortIcon('goals')}
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer select-none text-center" 
-                      onClick={() => handleSort('assists')}
-                      data-testid="header-assists"
-                    >
-                      A {getSortIcon('assists')}
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer select-none text-center" 
-                      onClick={() => handleSort('points')}
-                      data-testid="header-points"
-                    >
-                      PTS {getSortIcon('points')}
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer select-none text-center" 
-                      onClick={() => handleSort('penaltyMinutes')}
-                      data-testid="header-penalty-minutes"
-                    >
-                      PIM {getSortIcon('penaltyMinutes')}
-                    </TableHead>
+                    {playerType === 'goalies' ? (
+                      // Goalie table headers
+                      <>
+                        <TableHead 
+                          className="cursor-pointer select-none text-center" 
+                          onClick={() => handleSort('wins')}
+                          data-testid="header-wins"
+                        >
+                          W {getSortIcon('wins')}
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer select-none text-center" 
+                          onClick={() => handleSort('losses')}
+                          data-testid="header-losses"
+                        >
+                          L {getSortIcon('losses')}
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer select-none text-center" 
+                          onClick={() => handleSort('ties')}
+                          data-testid="header-ties"
+                        >
+                          T {getSortIcon('ties')}
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer select-none text-center" 
+                          onClick={() => handleSort('shootoutLosses')}
+                          data-testid="header-shootout-losses"
+                        >
+                          SOL {getSortIcon('shootoutLosses')}
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer select-none text-center" 
+                          onClick={() => handleSort('goalsAgainstAverage')}
+                          data-testid="header-gaa"
+                        >
+                          GAA {getSortIcon('goalsAgainstAverage')}
+                        </TableHead>
+                      </>
+                    ) : (
+                      // Skater table headers
+                      <>
+                        <TableHead 
+                          className="cursor-pointer select-none text-center" 
+                          onClick={() => handleSort('goals')}
+                          data-testid="header-goals"
+                        >
+                          G {getSortIcon('goals')}
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer select-none text-center" 
+                          onClick={() => handleSort('assists')}
+                          data-testid="header-assists"
+                        >
+                          A {getSortIcon('assists')}
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer select-none text-center" 
+                          onClick={() => handleSort('points')}
+                          data-testid="header-points"
+                        >
+                          PTS {getSortIcon('points')}
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer select-none text-center" 
+                          onClick={() => handleSort('penaltyMinutes')}
+                          data-testid="header-penalty-minutes"
+                        >
+                          PIM {getSortIcon('penaltyMinutes')}
+                        </TableHead>
+                      </>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -395,18 +573,42 @@ export default function Stats() {
                       <TableCell className="text-center" data-testid={`cell-gp-${stat.userId}`}>
                         {stat.gamesPlayed || 0}
                       </TableCell>
-                      <TableCell className="text-center font-semibold" data-testid={`cell-goals-${stat.userId}`}>
-                        {stat.goals || 0}
-                      </TableCell>
-                      <TableCell className="text-center font-semibold" data-testid={`cell-assists-${stat.userId}`}>
-                        {stat.assists || 0}
-                      </TableCell>
-                      <TableCell className="text-center font-bold text-primary" data-testid={`cell-points-${stat.userId}`}>
-                        {(stat.goals || 0) + (stat.assists || 0)}
-                      </TableCell>
-                      <TableCell className="text-center text-warning font-medium" data-testid={`cell-pim-${stat.userId}`}>
-                        {stat.penaltyMinutes || 0}
-                      </TableCell>
+                      {playerType === 'goalies' ? (
+                        // Goalie table cells
+                        <>
+                          <TableCell className="text-center font-semibold" data-testid={`cell-wins-${stat.userId}`}>
+                            {stat.wins || 0}
+                          </TableCell>
+                          <TableCell className="text-center font-semibold" data-testid={`cell-losses-${stat.userId}`}>
+                            {stat.losses || 0}
+                          </TableCell>
+                          <TableCell className="text-center font-semibold" data-testid={`cell-ties-${stat.userId}`}>
+                            {stat.ties || 0}
+                          </TableCell>
+                          <TableCell className="text-center font-semibold" data-testid={`cell-sol-${stat.userId}`}>
+                            {stat.shootoutLosses || 0}
+                          </TableCell>
+                          <TableCell className="text-center font-bold text-primary" data-testid={`cell-gaa-${stat.userId}`}>
+                            {stat.goalsAgainstAverage?.toFixed(2) || '0.00'}
+                          </TableCell>
+                        </>
+                      ) : (
+                        // Skater table cells
+                        <>
+                          <TableCell className="text-center font-semibold" data-testid={`cell-goals-${stat.userId}`}>
+                            {stat.goals || 0}
+                          </TableCell>
+                          <TableCell className="text-center font-semibold" data-testid={`cell-assists-${stat.userId}`}>
+                            {stat.assists || 0}
+                          </TableCell>
+                          <TableCell className="text-center font-bold text-primary" data-testid={`cell-points-${stat.userId}`}>
+                            {(stat.goals || 0) + (stat.assists || 0)}
+                          </TableCell>
+                          <TableCell className="text-center text-warning font-medium" data-testid={`cell-pim-${stat.userId}`}>
+                            {stat.penaltyMinutes || 0}
+                          </TableCell>
+                        </>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

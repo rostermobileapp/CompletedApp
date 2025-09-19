@@ -85,6 +85,13 @@ export const scrimmageRequestStatusEnum = pgEnum("scrimmage_request_status", [
   "dismissed"
 ]);
 
+// Game result type enum
+export const gameResultTypeEnum = pgEnum("game_result_type", [
+  "regulation",
+  "overtime", 
+  "shootout"
+]);
+
 // Users table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -206,6 +213,7 @@ export const games = pgTable("games", {
   homeBeverageDutyClaimedAt: timestamp("home_beverage_duty_claimed_at"),
   awayBeverageDutyUserId: varchar("away_beverage_duty_user_id").references(() => users.id),
   awayBeverageDutyClaimedAt: timestamp("away_beverage_duty_claimed_at"),
+  resultType: gameResultTypeEnum("result_type").default("regulation"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -220,6 +228,23 @@ export const gameScoreSubmissions = pgTable("game_score_submissions", {
   isCommissionerOverride: boolean("is_commissioner_override").default(false).notNull(),
   submittedAt: timestamp("submitted_at").defaultNow().notNull(),
 });
+
+// Game goalies table - tracks goalie of record for each team in each game
+export const gameGoalies = pgTable("game_goalies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: varchar("game_id").references(() => games.id).notNull(),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  goalieUserId: varchar("goalie_user_id").references(() => users.id).notNull(),
+  isStarter: boolean("is_starter").default(true).notNull(),
+  goalsAgainst: integer("goals_against").default(0).notNull(),
+  minutesPlayed: integer("minutes_played").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_game_team_goalie").on(table.gameId, table.teamId),
+  index("idx_game_goalies_game_id").on(table.gameId),
+  index("idx_game_goalies_team_id").on(table.teamId),
+  index("idx_game_goalies_user_id").on(table.goalieUserId),
+]);
 
 // Game RSVPs table
 export const gameRsvps = pgTable("game_rsvps", {
@@ -960,6 +985,11 @@ export const insertGameScoreSubmissionSchema = createInsertSchema(gameScoreSubmi
   submittedAt: true,
 });
 
+export const insertGameGoalieSchema = createInsertSchema(gameGoalies).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertMessageSchema = createInsertSchema(messages).omit({
   id: true,
   createdAt: true,
@@ -1207,6 +1237,8 @@ export type Game = typeof games.$inferSelect;
 export type InsertGame = z.infer<typeof insertGameSchema>;
 export type GameScoreSubmission = typeof gameScoreSubmissions.$inferSelect;
 export type InsertGameScoreSubmission = z.infer<typeof insertGameScoreSubmissionSchema>;
+export type GameGoalie = typeof gameGoalies.$inferSelect;
+export type InsertGameGoalie = z.infer<typeof insertGameGoalieSchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type PlayerStats = typeof playerStats.$inferSelect;
@@ -1217,6 +1249,38 @@ export type DraftPick = typeof draftPicks.$inferSelect;
 export type InsertDraftPick = z.infer<typeof insertDraftPickSchema>;
 export type PlayerImport = typeof playerImports.$inferSelect;
 export type InsertPlayerImport = z.infer<typeof insertPlayerImportSchema>;
+
+// Discriminated union types for player statistics
+export type GoalieStats = {
+  type: 'goalie';
+  userId: string;
+  teamId?: string;
+  gamesPlayed: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  shootoutLosses: number;
+  goalsAgainst: number;
+  goalsAgainstAverage: number;
+  user: User;
+};
+
+export type SkaterStats = {
+  type: 'skater';
+  id?: string;
+  leagueId?: string;
+  seasonId?: string;
+  userId: string;
+  gamesPlayed: number;
+  goals: number;
+  assists: number;
+  penaltyMinutes: number;
+  points: number;
+  isGoalie?: boolean;
+  user: User;
+};
+
+export type PlayerStatsUnion = GoalieStats | SkaterStats;
 export type ImportedPlayer = typeof importedPlayers.$inferSelect;
 export type InsertImportedPlayer = z.infer<typeof insertImportedPlayerSchema>;
 export type PlayerMergeRequest = typeof playerMergeRequests.$inferSelect;

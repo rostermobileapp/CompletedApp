@@ -3933,8 +3933,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const stats = await storage.getPlayerStats(leagueId, seasonId, playerType as 'goalies' | 'non-goalies' | undefined);
-      res.json(stats);
+      if (playerType === 'goalies') {
+        // Get goalie statistics with discriminated union type
+        const goalieStats = await storage.getGoalieStats(leagueId, seasonId);
+        const response = goalieStats.map(stat => ({
+          type: 'goalie' as const,
+          userId: stat.userId,
+          teamId: stat.teamId,
+          gamesPlayed: stat.gamesPlayed,
+          wins: stat.wins,
+          losses: stat.losses,
+          ties: stat.ties,
+          shootoutLosses: stat.shootoutLosses,
+          goalsAgainst: stat.goalsAgainst,
+          goalsAgainstAverage: stat.goalsAgainstAverage,
+          user: stat.user
+        }));
+        res.json(response);
+      } else {
+        // Get regular player statistics with discriminated union type
+        const playerStats = await storage.getPlayerStats(leagueId, seasonId, playerType as 'non-goalies' | undefined);
+        const response = playerStats.map(stat => ({
+          type: 'skater' as const,
+          id: stat.id,
+          leagueId: stat.leagueId,
+          seasonId: stat.seasonId,
+          userId: stat.userId,
+          gamesPlayed: stat.gamesPlayed,
+          goals: stat.goals,
+          assists: stat.assists,
+          penaltyMinutes: stat.penaltyMinutes,
+          points: stat.goals + stat.assists,
+          isGoalie: stat.isGoalie,
+          user: stat.user
+        }));
+        res.json(response);
+      }
     } catch (error) {
       console.error('Error fetching player stats:', error);
       res.status(500).json({ message: 'Failed to fetch player stats' });
