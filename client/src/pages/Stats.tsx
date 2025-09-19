@@ -266,7 +266,6 @@ export default function Stats() {
           )}
         </div>
       </div>
-
       {/* Filters */}
       <div className="px-6 mb-6">
         <Card className="p-4 pt-[0px] pb-[0px]" data-testid="card-filters">
@@ -311,14 +310,13 @@ export default function Stats() {
           </div>
         </Card>
       </div>
-
       {/* Stats Overview Cards */}
       {statsArray.length > 0 && (
-        <div className="px-6 mb-6">
+        <div className="px-6 pl-[0px] pr-[0px] mt-[0px] mb-[0px]">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {playerType === 'goalies' ? (
               // Goalie overview cards
-              (() => {
+              ((() => {
                 const leaders = getLeaders();
                 return (
                   <>
@@ -355,10 +353,10 @@ export default function Stats() {
                     </Card>
                   </>
                 );
-              })()
+              })())
             ) : (
               // Skater overview cards
-              (() => {
+              ((() => {
                 const leaders = getLeaders();
                 return (
                   <>
@@ -397,12 +395,11 @@ export default function Stats() {
                     </Card>
                   </>
                 );
-              })()
+              })())
             )}
           </div>
         </div>
       )}
-
       {/* Stats Table */}
       <div className="px-6">
         <Card data-testid="card-stats-table">
@@ -448,7 +445,7 @@ export default function Stats() {
                     </TableHead>
                     {playerType === 'goalies' ? (
                       // Goalie table headers
-                      <>
+                      (<>
                         <TableHead 
                           className="cursor-pointer select-none text-center" 
                           onClick={() => handleSort('wins')}
@@ -484,10 +481,10 @@ export default function Stats() {
                         >
                           GAA {getSortIcon('goalsAgainstAverage')}
                         </TableHead>
-                      </>
+                      </>)
                     ) : (
                       // Skater table headers
-                      <>
+                      (<>
                         <TableHead 
                           className="cursor-pointer select-none text-center" 
                           onClick={() => handleSort('goals')}
@@ -516,7 +513,7 @@ export default function Stats() {
                         >
                           PIM {getSortIcon('penaltyMinutes')}
                         </TableHead>
-                      </>
+                      </>)
                     )}
                   </TableRow>
                 </TableHeader>
@@ -543,7 +540,7 @@ export default function Stats() {
                       </TableCell>
                       {playerType === 'goalies' ? (
                         // Goalie table cells
-                        <>
+                        (<>
                           <TableCell className="text-center font-semibold" data-testid={`cell-wins-${stat.userId}`}>
                             {stat.wins || 0}
                           </TableCell>
@@ -559,10 +556,10 @@ export default function Stats() {
                           <TableCell className="text-center font-bold text-primary" data-testid={`cell-gaa-${stat.userId}`}>
                             {stat.goalsAgainstAverage?.toFixed(2) || '0.00'}
                           </TableCell>
-                        </>
+                        </>)
                       ) : (
                         // Skater table cells
-                        <>
+                        (<>
                           <TableCell className="text-center font-semibold" data-testid={`cell-goals-${stat.userId}`}>
                             {stat.goals || 0}
                           </TableCell>
@@ -575,7 +572,7 @@ export default function Stats() {
                           <TableCell className="text-center text-warning font-medium" data-testid={`cell-pim-${stat.userId}`}>
                             {stat.penaltyMinutes || 0}
                           </TableCell>
-                        </>
+                        </>)
                       )}
                     </TableRow>
                   ))}
