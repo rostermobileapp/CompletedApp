@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
+import { League } from '@shared/schema';
 
 interface Message {
   id: string;
@@ -95,7 +96,7 @@ export default function Messages() {
   const { toast } = useToast();
 
   // Fetch user's leagues for contact discovery
-  const { data: userLeagues = [] } = useQuery({
+  const { data: userLeagues = [] } = useQuery<League[]>({
     queryKey: ['/api/user/leagues'],
     enabled: hasAccess('player_plus')
   });
@@ -537,7 +538,7 @@ export default function Messages() {
                   data-testid="select-league"
                 >
                   <option value="">Choose a league...</option>
-                  {userLeagues.map((league: any) => (
+                  {userLeagues.map((league) => (
                     <option key={league.id} value={league.id}>{league.name}</option>
                   ))}
                 </select>
@@ -896,5 +897,6 @@ export default function Messages() {
         </>
       )}
     </div>
+    </>
   );
 }
