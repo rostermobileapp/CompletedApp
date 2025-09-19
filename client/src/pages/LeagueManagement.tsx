@@ -675,6 +675,7 @@ export default function LeagueManagement() {
   // Get league ID and edit mode from URL params
   const leagueId = new URLSearchParams(window.location.search).get('league') || '';
   const editMode = new URLSearchParams(window.location.search).get('edit') === 'true';
+  const editMemberId = new URLSearchParams(window.location.search).get('editMember') || '';
   
   // Fetch current user for commissioner checks
   const { user } = useAuth();
@@ -862,6 +863,31 @@ export default function LeagueManagement() {
       setSelectedSeasonId(activeSeason?.id || seasons[0].id);
     }
   }, [seasons, selectedSeasonId]);
+
+  // Auto-open player edit modal when editMember parameter is provided
+  React.useEffect(() => {
+    if (editMemberId && members.length > 0 && teams.length > 0 && !selectedPlayer) {
+      const memberToEdit = members.find((member: LeagueMember) => member.id === editMemberId);
+      if (memberToEdit) {
+        const assignedTeam = teams.find((team: Team) => team.id === memberToEdit.assignedTeamId);
+        setSelectedPlayer(memberToEdit);
+        setPlayerEditForm({
+          assignedTeamId: memberToEdit.assignedTeamId || '',
+          position: memberToEdit.position || '',
+          skillLevel: memberToEdit.skillLevel || '',
+          skillRating: memberToEdit.skillRating || 1,
+          jerseyNumber: memberToEdit.jerseyNumber?.toString() || '',
+          notes: memberToEdit.notes || '',
+          isCaptain: assignedTeam?.captainId === memberToEdit.userId,
+          isGoalie: memberToEdit.isGoalie || false
+        });
+        // Clear the editMember parameter from URL after opening modal
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('editMember');
+        window.history.replaceState({}, '', newUrl.toString());
+      }
+    }
+  }, [editMemberId, members, teams, selectedPlayer]);
 
   // Mutations for member management
   const approveMutation = useMutation({
@@ -2295,7 +2321,35 @@ export default function LeagueManagement() {
                   </select>
                 </div>
 
-                {/* Captain assignment is now handled at team level - see Teams tab */}
+                {/* Captain Status */}
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="captain-checkbox"
+                    checked={playerEditForm.isCaptain}
+                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, isCaptain: e.target.checked }))}
+                    className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
+                    data-testid="checkbox-captain"
+                  />
+                  <label htmlFor="captain-checkbox" className="text-sm font-medium">
+                    Captain
+                  </label>
+                </div>
+
+                {/* Goalie Status */}
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="goalie-checkbox"
+                    checked={playerEditForm.isGoalie}
+                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, isGoalie: e.target.checked }))}
+                    className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
+                    data-testid="checkbox-goalie"
+                  />
+                  <label htmlFor="goalie-checkbox" className="text-sm font-medium">
+                    Goalie
+                  </label>
+                </div>
 
                 {/* Position */}
                 <div>
@@ -2368,8 +2422,27 @@ export default function LeagueManagement() {
                         position: playerEditForm.position,
                         skillRating: playerEditForm.skillRating,
                         jerseyNumber: playerEditForm.jerseyNumber ? parseInt(playerEditForm.jerseyNumber) : null,
-                        notes: playerEditForm.notes
+                        notes: playerEditForm.notes,
+                        isGoalie: playerEditForm.isGoalie
                       };
+                      
+                      // Handle captain assignment separately (this affects the team's captainId)
+                      if (playerEditForm.isCaptain && playerEditForm.assignedTeamId) {
+                        // Set this player as captain of their assigned team
+                        setTeamCaptainMutation.mutate({
+                          teamId: playerEditForm.assignedTeamId,
+                          captainId: selectedPlayer.userId
+                        });
+                      } else if (!playerEditForm.isCaptain && playerEditForm.assignedTeamId) {
+                        // Remove captain status if unchecked and this player was the captain
+                        const assignedTeam = teams.find((team: Team) => team.id === playerEditForm.assignedTeamId);
+                        if (assignedTeam?.captainId === selectedPlayer.userId) {
+                          setTeamCaptainMutation.mutate({
+                            teamId: playerEditForm.assignedTeamId,
+                            captainId: null
+                          });
+                        }
+                      }
                       updatePlayerMutation.mutate({
                         memberId: selectedPlayer.id,
                         updates

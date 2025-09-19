@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Trophy, Users, Upload } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Upload, Edit } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { useToast } from '@/hooks/use-toast';
@@ -209,7 +209,7 @@ export default function Roster() {
                       {member.jerseyNumber ? ` • #${member.jerseyNumber}` : ''}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex items-center gap-2">
                     <span 
                       className={`tier-badge text-xs px-2 py-1 rounded-full font-semibold ${
                         primaryTeam.captainId === member.userId 
@@ -220,6 +220,19 @@ export default function Roster() {
                     >
                       {primaryTeam.captainId === member.userId ? 'CAPTAIN' : 'PLAYER'}
                     </span>
+                    {/* Only show edit button if user is team captain */}
+                    {isTeamCaptain && (
+                      <button
+                        onClick={() => {
+                          navigate(`/league-management?league=${primaryTeam.leagueId}&edit=true&editMember=${member.id}`);
+                        }}
+                        className="p-1 hover:bg-muted rounded-md transition-colors"
+                        title="Edit Player"
+                        data-testid={`button-edit-player-${member.id}`}
+                      >
+                        <Edit className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
