@@ -4129,6 +4129,251 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Messaging API routes
+  
+  // Get user's conversations
+  app.get('/api/conversations', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId } = req.query;
+      
+      const conversations = await messagingService.getUserConversations(userId, leagueId);
+      res.json(conversations);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      res.status(500).json({ message: 'Failed to fetch conversations' });
+    }
+  });
+
+  // Get conversation details with participants
+  app.get('/api/conversations/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      // Verify user is participant
+      const isParticipant = await messagingService.isUserInConversation(userId, id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const conversation = await messagingService.getConversation(id);
+      if (!conversation) {
+        return res.status(404).json({ message: 'Conversation not found' });
+      }
+      
+      const participants = await messagingService.getConversationParticipants(id);
+      
+      res.json({
+        ...conversation,
+        participants
+      });
+    } catch (error) {
+      console.error('Error fetching conversation details:', error);
+      res.status(500).json({ message: 'Failed to fetch conversation details' });
+    }
+  });
+
+  // Create a new direct conversation
+  app.post('/api/conversations/direct', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requestSchema = z.object({
+        otherUserId: z.string().min(1),
+        leagueId: z.string().min(1)
+      });
+      
+      const { otherUserId, leagueId } = requestSchema.parse(req.body);
+      
+      // Check if conversation already exists
+      const existingConversation = await messagingService.findDirectConversation(userId, otherUserId, leagueId);
+      if (existingConversation) {
+        const participants = await messagingService.getConversationParticipants(existingConversation.id);
+        return res.json({
+          ...existingConversation,
+          participants
+        });
+      }
+      
+      // Create new conversation
+      const conversation = await messagingService.createDirectConversation(userId, otherUserId, leagueId);
+      const participants = await messagingService.getConversationParticipants(conversation.id);
+      
+      res.status(201).json({
+        ...conversation,
+        participants
+      });
+    } catch (error) {
+      console.error('Error creating direct conversation:', error);
+      res.status(500).json({ message: 'Failed to create conversation' });
+    }
+  });
+
+  // Get conversation messages
+  app.get('/api/conversations/:id/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const querySchema = z.object({
+        limit: z.coerce.number().min(1).max(100).default(50),
+        before: z.string().optional()
+      });
+      
+      const { limit, before } = querySchema.parse(req.query);
+      
+      // Verify user is participant
+      const isParticipant = await messagingService.isUserInConversation(userId, id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const messages = await messagingService.getConversationMessages(id, limit);
+      
+      // Get attachments and read receipts for each message
+      const messagesWithDetails = await Promise.all(
+        messages.map(async (message) => {
+          const attachments = await messagingService.getMessageAttachments(message.id);
+          const readReceipts = await messagingService.getMessageReadReceipts(message.id);
+          return {
+            ...message,
+            attachments,
+            readReceipts
+          };
+        })
+      );
+      
+      res.json(messagesWithDetails);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      res.status(500).json({ message: 'Failed to fetch messages' });
+    }
+  });
+
+  // Send a new message
+  app.post('/api/conversations/:id/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: conversationId } = req.params;
+      const requestSchema = z.object({
+        content: z.string().min(1).max(10000),
+        messageType: z.enum(['text', 'image', 'gif', 'file']).default('text'),
+        replyToId: z.string().optional(),
+        attachments: z.array(z.object({
+          fileName: z.string(),
+          fileUrl: z.string().url(),
+          fileType: z.string(),
+          fileSize: z.number().min(0)
+        })).optional()
+      });
+      
+      const { content, messageType, replyToId, attachments } = requestSchema.parse(req.body);
+      
+      // Verify user is participant
+      const isParticipant = await messagingService.isUserInConversation(userId, conversationId);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      // Create message
+      const message = await messagingService.createMessage({
+        conversationId,
+        senderId: userId,
+        content,
+        messageType,
+        replyToId
+      });
+      
+      // Add attachments if any
+      let messageAttachments = [];
+      if (attachments && attachments.length > 0) {
+        for (const attachment of attachments) {
+          const messageAttachment = await messagingService.createMessageAttachment({
+            messageId: message.id,
+            fileName: attachment.fileName,
+            fileUrl: attachment.fileUrl,
+            fileType: attachment.fileType,
+            fileSize: attachment.fileSize
+          });
+          messageAttachments.push(messageAttachment);
+        }
+      }
+      
+      res.status(201).json({
+        ...message,
+        attachments: messageAttachments,
+        readReceipts: []
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      res.status(500).json({ message: 'Failed to send message' });
+    }
+  });
+
+  // Mark message as read
+  app.post('/api/messages/:id/read', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: messageId } = req.params;
+      
+      // Get message to verify access
+      const message = await messagingService.getMessage(messageId);
+      if (!message) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+      
+      // Verify user is participant in conversation
+      const isParticipant = await messagingService.isUserInConversation(userId, message.conversationId);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const readReceipt = await messagingService.markMessageAsRead(messageId, userId);
+      res.json(readReceipt);
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+      res.status(500).json({ message: 'Failed to mark message as read' });
+    }
+  });
+
+  // Get user's online status
+  app.get('/api/users/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id: targetUserId } = req.params;
+      
+      const status = await messagingService.getUserOnlineStatus(targetUserId);
+      res.json(status || { userId: targetUserId, status: 'offline', lastSeenAt: null });
+    } catch (error) {
+      console.error('Error fetching user status:', error);
+      res.status(500).json({ message: 'Failed to fetch user status' });
+    }
+  });
+
+  // Get conversation typing indicators
+  app.get('/api/conversations/:id/typing', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      // Verify user is participant
+      const isParticipant = await messagingService.isUserInConversation(userId, id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const typingIndicators = await messagingService.getTypingIndicators(id);
+      // Filter out expired indicators (older than 5 seconds)
+      const now = new Date();
+      const activeIndicators = typingIndicators.filter(indicator => 
+        indicator.expiresAt && indicator.expiresAt > now
+      );
+      
+      res.json(activeIndicators);
+    } catch (error) {
+      console.error('Error fetching typing indicators:', error);
+      res.status(500).json({ message: 'Failed to fetch typing indicators' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time messaging
