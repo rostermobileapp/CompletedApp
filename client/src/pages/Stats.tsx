@@ -357,7 +357,7 @@ export default function Stats() {
                       <Trophy className="w-8 h-8 text-primary mx-auto mb-2" />
                       <p className="text-2xl font-bold">{leaders?.mostWins?.wins || 0}</p>
                       <p className="text-xs text-muted-foreground">Most Wins</p>
-                      <p className="text-xs font-medium mt-1">{leaders?.mostWins?.user?.firstName || 'N/A'}</p>
+                      <p className="text-xs font-medium mt-1">{`${leaders?.mostWins?.user?.firstName || ''} ${leaders?.mostWins?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Best GAA */}
@@ -365,7 +365,7 @@ export default function Stats() {
                       <Target className="w-8 h-8 text-success mx-auto mb-2" />
                       <p className="text-2xl font-bold">{leaders?.bestGAA?.goalsAgainstAverage?.toFixed(2) || '0.00'}</p>
                       <p className="text-xs text-muted-foreground">Best GAA</p>
-                      <p className="text-xs font-medium mt-1">{leaders?.bestGAA?.user?.firstName || 'N/A'}</p>
+                      <p className="text-xs font-medium mt-1">{`${leaders?.bestGAA?.user?.firstName || ''} ${leaders?.bestGAA?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Most Games */}
@@ -373,7 +373,7 @@ export default function Stats() {
                       <Clock className="w-8 h-8 text-info mx-auto mb-2" />
                       <p className="text-2xl font-bold">{leaders?.mostGames?.gamesPlayed || 0}</p>
                       <p className="text-xs text-muted-foreground">Most Games</p>
-                      <p className="text-xs font-medium mt-1">{leaders?.mostGames?.user?.firstName || 'N/A'}</p>
+                      <p className="text-xs font-medium mt-1">{`${leaders?.mostGames?.user?.firstName || ''} ${leaders?.mostGames?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Fewest Losses */}
@@ -381,7 +381,7 @@ export default function Stats() {
                       <Medal className="w-8 h-8 text-warning mx-auto mb-2" />
                       <p className="text-2xl font-bold">{leaders?.fewestLosses?.losses || 0}</p>
                       <p className="text-xs text-muted-foreground">Fewest Losses</p>
-                      <p className="text-xs font-medium mt-1">{leaders?.fewestLosses?.user?.firstName || 'N/A'}</p>
+                      <p className="text-xs font-medium mt-1">{`${leaders?.fewestLosses?.user?.firstName || ''} ${leaders?.fewestLosses?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
                   </>
                 );
@@ -399,7 +399,7 @@ export default function Stats() {
                         {leaders?.topScorer ? (leaders.topScorer.goals || 0) + (leaders.topScorer.assists || 0) : 0}
                       </p>
                       <p className="text-xs text-muted-foreground">Top Points</p>
-                      <p className="text-xs font-medium mt-1">{leaders?.topScorer?.user?.firstName || 'N/A'}</p>
+                      <p className="text-xs font-medium mt-1">{`${leaders?.topScorer?.user?.firstName || ''} ${leaders?.topScorer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Most Goals */}
@@ -407,7 +407,7 @@ export default function Stats() {
                       <Medal className="w-8 h-8 text-success mx-auto mb-2" />
                       <p className="text-2xl font-bold">{leaders?.topGoalScorer?.goals || 0}</p>
                       <p className="text-xs text-muted-foreground">Most Goals</p>
-                      <p className="text-xs font-medium mt-1">{leaders?.topGoalScorer?.user?.firstName || 'N/A'}</p>
+                      <p className="text-xs font-medium mt-1">{`${leaders?.topGoalScorer?.user?.firstName || ''} ${leaders?.topGoalScorer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Most Assists */}
@@ -415,7 +415,7 @@ export default function Stats() {
                       <TrendingUp className="w-8 h-8 text-info mx-auto mb-2" />
                       <p className="text-2xl font-bold">{leaders?.topAssistProvider?.assists || 0}</p>
                       <p className="text-xs text-muted-foreground">Most Assists</p>
-                      <p className="text-xs font-medium mt-1">{leaders?.topAssistProvider?.user?.firstName || 'N/A'}</p>
+                      <p className="text-xs font-medium mt-1">{`${leaders?.topAssistProvider?.user?.firstName || ''} ${leaders?.topAssistProvider?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Most Games */}
@@ -423,7 +423,7 @@ export default function Stats() {
                       <Clock className="w-8 h-8 text-warning mx-auto mb-2" />
                       <p className="text-2xl font-bold">{leaders?.mostActivePlayer?.gamesPlayed || 0}</p>
                       <p className="text-xs text-muted-foreground">Most Games</p>
-                      <p className="text-xs font-medium mt-1">{leaders?.mostActivePlayer?.user?.firstName || 'N/A'}</p>
+                      <p className="text-xs font-medium mt-1">{`${leaders?.mostActivePlayer?.user?.firstName || ''} ${leaders?.mostActivePlayer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
                   </>
                 );
