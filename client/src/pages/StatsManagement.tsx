@@ -309,9 +309,6 @@ export default function StatsManagement() {
                   Back to Commissioner Dashboard
                 </Button>
               </Link>
-              <div>
-                
-              </div>
             </div>
           </div>
 
