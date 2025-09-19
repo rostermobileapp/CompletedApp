@@ -311,7 +311,6 @@ export default function StatsManagement() {
               </Link>
               <div>
                 
-                <p className="text-muted-foreground">Update player statistics for your leagues</p>
               </div>
             </div>
           </div>
