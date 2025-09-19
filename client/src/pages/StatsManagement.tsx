@@ -94,7 +94,7 @@ export default function StatsManagement() {
 
   // Get game participants for selected game
   const { data: gameParticipants = [] } = useQuery({
-    queryKey: [`/api/leagues/${selectedLeague}/games/${selectedGame}/participants`],
+    queryKey: [`/api/games/${selectedGame}/participants`],
     enabled: !!selectedGame,
   });
 
