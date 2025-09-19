@@ -263,19 +263,7 @@ export default function StatsManagement() {
   });
 
   const handleGameStatsUpdate = () => {
-    console.log('handleGameStatsUpdate called with:', {
-      selectedGame,
-      selectedLeague,
-      selectedSeason,
-      playerGameStats
-    });
-    
     if (!selectedGame || !selectedLeague || !selectedSeason) {
-      console.log('Validation failed:', {
-        selectedGame: !!selectedGame,
-        selectedLeague: !!selectedLeague,
-        selectedSeason: !!selectedSeason
-      });
       toast({
         title: 'Error',
         description: 'Please select a league, season, and game.',
@@ -313,19 +301,7 @@ export default function StatsManagement() {
   };
 
   const handlePlayerStatsUpdate = () => {
-    console.log('handlePlayerStatsUpdate called with:', {
-      selectedPlayer,
-      selectedLeague,
-      selectedSeason,
-      individualStats
-    });
-    
     if (!selectedPlayer || !selectedLeague || !selectedSeason) {
-      console.log('Player stats validation failed:', {
-        selectedPlayer: !!selectedPlayer,
-        selectedLeague: !!selectedLeague,
-        selectedSeason: !!selectedSeason
-      });
       toast({
         title: 'Error',
         description: 'Please select a league, season, and player.',
@@ -760,6 +736,92 @@ export default function StatsManagement() {
               {/* By Player Tab */}
               <TabsContent value="by-player" className="space-y-4">
                 <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="w-5 h-5" />
+                      Update Individual Player Stats
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Player</Label>
+                      <Select value={selectedPlayer} onValueChange={setSelectedPlayer} data-testid="select-player">
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a player" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.isArray(players) && players.map((player: Player) => (
+                            <SelectItem key={player.id} value={player.id}>
+                              {player.firstName} {player.lastName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {selectedPlayer && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label>Games Played</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={individualStats.gamesPlayed}
+                            onChange={(e) => setIndividualStats(prev => ({ ...prev, gamesPlayed: e.target.value }))}
+                            data-testid="input-games-played"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Goals</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={individualStats.goals}
+                            onChange={(e) => setIndividualStats(prev => ({ ...prev, goals: e.target.value }))}
+                            data-testid="input-goals"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Assists</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={individualStats.assists}
+                            onChange={(e) => setIndividualStats(prev => ({ ...prev, assists: e.target.value }))}
+                            data-testid="input-assists"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Penalty Minutes</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={individualStats.penaltyMinutes}
+                            onChange={(e) => setIndividualStats(prev => ({ ...prev, penaltyMinutes: e.target.value }))}
+                            data-testid="input-penalty-minutes"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedPlayer && (
+                      <Button 
+                        onClick={handlePlayerStatsUpdate} 
+                        disabled={updateStatsMutation.isPending}
+                        className="w-full bg-primary hover:bg-primary/90"
+                        data-testid="button-update-player-stats"
+                      >
+                        {updateStatsMutation.isPending ? 'Updating...' : 'Update Player Stats'}
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                {/* Player Stats Table for Reference */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>All Player Stats (Reference)</CardTitle>
+                  </CardHeader>
                   <CardContent className="p-6 pt-[0px] pb-[0px] pl-[0px] pr-[0px] text-[14px]">
                     {selectedLeague && Array.isArray(players) && players.length > 0 && (
                       <div className="flex flex-col" style={{height: 'calc(100vh - 200px)'}}>
