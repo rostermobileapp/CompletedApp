@@ -301,6 +301,13 @@ export default function StatsManagement() {
   };
 
   const handlePlayerStatsUpdate = () => {
+    console.log('handlePlayerStatsUpdate called:', {
+      selectedPlayer,
+      selectedLeague, 
+      selectedSeason,
+      individualStats
+    });
+    
     if (!selectedPlayer || !selectedLeague || !selectedSeason) {
       toast({
         title: 'Error',
@@ -310,21 +317,50 @@ export default function StatsManagement() {
       return;
     }
 
-    const statsUpdate: PlayerStats[] = [{
-      userId: selectedPlayer,
-      leagueId: selectedLeague,
-      seasonId: selectedSeason,
+    const statsData = {
       goals: parseInt(individualStats.goals) || 0,
       assists: parseInt(individualStats.assists) || 0,
       penaltyMinutes: parseInt(individualStats.penaltyMinutes) || 0,
       gamesPlayed: parseInt(individualStats.gamesPlayed) || 0,
-    }];
+    };
 
-    updateStatsMutation.mutate({ 
-      statsData: statsUpdate, 
-      mode: 'set', 
-      seasonId: selectedSeason 
-    });
+    // Use individual player API endpoint instead of bulk
+    const url = selectedSeason ? 
+      `/api/leagues/${selectedLeague}/stats/players/${selectedPlayer}?seasonId=${selectedSeason}` : 
+      `/api/leagues/${selectedLeague}/stats/players/${selectedPlayer}`;
+    
+    apiRequest('POST', url, statsData)
+      .then(() => {
+        toast({
+          title: 'Success',
+          description: 'Player statistics updated successfully.',
+        });
+        queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/stats`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/stats/players`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/stats/players/${selectedPlayer}`] });
+        // Reset form
+        setIndividualStats({ goals: '', assists: '', penaltyMinutes: '', gamesPlayed: '' });
+        setSelectedPlayer('');
+      })
+      .catch((error: any) => {
+        console.error('Error saving player:', error);
+        let errorMessage = 'Failed to update statistics.';
+        
+        // Handle different error types
+        if (error?.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      });
   };
 
   const updatePlayerGameStat = (userId: string, field: string, value: string) => {
