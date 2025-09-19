@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Trophy, Target, Clock, Medal, TrendingUp, Filter, Settings } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Clock, Medal, TrendingUp, Filter, Settings, Apple, Hand } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -194,7 +194,11 @@ export default function Stats() {
         return (current.gamesPlayed || 0) > (top.gamesPlayed || 0) ? current : top;
       });
       
-      return { topScorer, topGoalScorer, topAssistProvider, mostActivePlayer };
+      const mostPenaltyMinutes = skaterStats.reduce((top, current) => {
+        return (current.penaltyMinutes || 0) > (top.penaltyMinutes || 0) ? current : top;
+      });
+      
+      return { topScorer, topGoalScorer, topAssistProvider, mostActivePlayer, mostPenaltyMinutes };
     }
   };
 
@@ -361,9 +365,9 @@ export default function Stats() {
                 return (
                   <>
                     {/* Top Scorer */}
-                    <Card className="p-4 text-center" data-testid="card-top-scorer">
-                      <Target className="w-8 h-8 text-primary mx-auto mb-2" />
-                      <p className="text-2xl font-bold">
+                    <Card className="p-2 text-center aspect-square flex flex-col justify-center" data-testid="card-top-scorer">
+                      <TrendingUp className="w-6 h-6 text-primary mx-auto mb-1" />
+                      <p className="text-xl font-bold">
                         {leaders?.topScorer ? (leaders.topScorer.goals || 0) + (leaders.topScorer.assists || 0) : 0}
                       </p>
                       <p className="text-xs text-muted-foreground">Top Points</p>
@@ -371,27 +375,27 @@ export default function Stats() {
                     </Card>
 
                     {/* Most Goals */}
-                    <Card className="p-4 text-center" data-testid="card-most-goals">
-                      <Medal className="w-8 h-8 text-success mx-auto mb-2" />
-                      <p className="text-2xl font-bold">{leaders?.topGoalScorer?.goals || 0}</p>
+                    <Card className="p-2 text-center aspect-square flex flex-col justify-center" data-testid="card-most-goals">
+                      <Target className="w-6 h-6 text-success mx-auto mb-1" />
+                      <p className="text-xl font-bold">{leaders?.topGoalScorer?.goals || 0}</p>
                       <p className="text-xs text-muted-foreground">Most Goals</p>
                       <p className="text-xs font-medium mt-1">{`${leaders?.topGoalScorer?.user?.firstName || ''} ${leaders?.topGoalScorer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Most Assists */}
-                    <Card className="p-4 text-center" data-testid="card-most-assists">
-                      <TrendingUp className="w-8 h-8 text-info mx-auto mb-2" />
-                      <p className="text-2xl font-bold">{leaders?.topAssistProvider?.assists || 0}</p>
+                    <Card className="p-2 text-center aspect-square flex flex-col justify-center" data-testid="card-most-assists">
+                      <Apple className="w-6 h-6 text-info mx-auto mb-1" />
+                      <p className="text-xl font-bold">{leaders?.topAssistProvider?.assists || 0}</p>
                       <p className="text-xs text-muted-foreground">Most Assists</p>
                       <p className="text-xs font-medium mt-1">{`${leaders?.topAssistProvider?.user?.firstName || ''} ${leaders?.topAssistProvider?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
-                    {/* Most Games */}
-                    <Card className="p-4 text-center" data-testid="card-most-games">
-                      <Clock className="w-8 h-8 text-warning mx-auto mb-2" />
-                      <p className="text-2xl font-bold">{leaders?.mostActivePlayer?.gamesPlayed || 0}</p>
-                      <p className="text-xs text-muted-foreground">Most Games</p>
-                      <p className="text-xs font-medium mt-1">{`${leaders?.mostActivePlayer?.user?.firstName || ''} ${leaders?.mostActivePlayer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    {/* Most Penalty Minutes */}
+                    <Card className="p-2 text-center aspect-square flex flex-col justify-center" data-testid="card-most-penalty-minutes">
+                      <Hand className="w-6 h-6 text-warning mx-auto mb-1" />
+                      <p className="text-xl font-bold">{leaders?.mostPenaltyMinutes?.penaltyMinutes || 0}</p>
+                      <p className="text-xs text-muted-foreground">Most Penalty Minutes</p>
+                      <p className="text-xs font-medium mt-1">{`${leaders?.mostPenaltyMinutes?.user?.firstName || ''} ${leaders?.mostPenaltyMinutes?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
                   </>
                 );
