@@ -26,12 +26,6 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// Subscription tiers enum
-export const subscriptionTierEnum = pgEnum("subscription_tier", [
-  "free",
-  "player_plus",
-  "commissioner"
-]);
 
 // Sports enum
 export const sportEnum = pgEnum("sport", [
@@ -102,9 +96,6 @@ export const users = pgTable("users", {
   age: integer("age"),
   phoneNumber: varchar("phone_number"),
   city: varchar("city"),
-  subscriptionTier: subscriptionTierEnum("subscription_tier").default("free").notNull(),
-  stripeCustomerId: varchar("stripe_customer_id"),
-  stripeSubscriptionId: varchar("stripe_subscription_id"),
   primarySport: sportEnum("primary_sport"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

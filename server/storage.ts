@@ -105,8 +105,6 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber'>>): Promise<User>;
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
-  updateUserSubscription(id: string, tier: string): Promise<User>;
-  updateUserStripeInfo(id: string, customerId: string, subscriptionId: string): Promise<User>;
   
   // League operations
   createLeague(league: InsertLeague): Promise<League>;
@@ -283,30 +281,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserSubscription(id: string, tier: string): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({ 
-        subscriptionTier: tier as any,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, id))
-      .returning();
-    return user;
-  }
 
-  async updateUserStripeInfo(id: string, customerId: string, subscriptionId: string): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({
-        stripeCustomerId: customerId,
-        stripeSubscriptionId: subscriptionId,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, id))
-      .returning();
-    return user;
-  }
 
   async updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber'>>): Promise<User> {
     const [user] = await db

@@ -227,8 +227,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       const leagues = await storage.getLeaguesByCommissioner(userId);
@@ -245,8 +245,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       
       // Check if user has commissioner tier
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner tier required to create leagues" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       const leagueData = insertLeagueSchema.parse({
@@ -282,8 +282,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const leagueId = req.params.id;
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       // Verify that the user owns the league
@@ -319,8 +319,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const leagueId = req.params.id;
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       // Verify that the user owns the league
@@ -354,8 +354,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const leagueId = req.params.leagueId;
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       // Verify that the user owns the league
@@ -463,8 +463,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(leagueId);
       
       // Check if user is the commissioner of this league
-      if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!league || !user) {
+        return res.status(404).json({ message: "League or user not found" });
       }
       
       const updates = req.body;
@@ -485,8 +485,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(leagueId);
       
       // Check if user is the commissioner of this league
-      if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!league || !user) {
+        return res.status(404).json({ message: "League or user not found" });
       }
       
       const members = await storage.getLeagueMembers(leagueId);
@@ -535,8 +535,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(leagueId);
       
       // Check if user has Player Plus+ access and is a member of this league
-      if (!league || !user || !['player_plus', 'commissioner'].includes(user.subscriptionTier)) {
-        return res.status(403).json({ message: "Player Plus+ access required" });
+      if (!league || !user) {
+        return res.status(404).json({ message: "League or user not found" });
       }
       
       // Check if user is a member of this league
@@ -561,8 +561,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(leagueId);
       
       // Check if user is the commissioner of this league
-      if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!league || !user) {
+        return res.status(404).json({ message: "League or user not found" });
       }
       
       const pendingMembers = await storage.getPendingLeagueMembers(leagueId);
@@ -579,8 +579,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       const membership = await storage.approveLeagueMembership(membershipId, userId);
@@ -597,8 +597,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       const membership = await storage.rejectLeagueMembership(membershipId, userId);
@@ -616,8 +616,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       // Validate skill level - can be text, number, or null
@@ -637,8 +637,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       await storage.deleteLeagueMembership(membershipId);
@@ -846,8 +846,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       const gameData = insertGameSchema.parse(req.body);
@@ -865,8 +865,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const gameId = req.params.gameId;
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
 
       // Verify that the game exists and the user has permission to edit it
@@ -896,8 +896,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const gameId = req.params.gameId;
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
 
       // Verify that the game exists
@@ -1068,8 +1068,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const teamId = req.params.teamId;
       
-      if (!user || user.subscriptionTier !== 'commissioner') {
-        return res.status(403).json({ message: "Commissioner access required" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
 
       // Verify that the team exists
@@ -1825,27 +1825,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  // Change subscription tier (free for testing)
-  app.post('/api/change-tier', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { tier } = req.body;
-
-      if (!tier || !['free', 'player_plus', 'commissioner'].includes(tier)) {
-        return res.status(400).json({ message: 'Invalid tier specified' });
-      }
-
-      await storage.updateUserSubscription(userId, tier);
-      
-      res.json({ 
-        message: 'Subscription tier updated successfully',
-        tier: tier 
-      });
-    } catch (error: any) {
-      console.error("Error updating subscription tier:", error);
-      return res.status(500).json({ message: "Failed to update subscription tier" });
-    }
-  });
 
   // Configure multer for file uploads
   const upload = multer({ 
@@ -3214,9 +3193,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check Player Plus+ subscription - strict validation
-      if (!['player_plus', 'commissioner'].includes(user.subscriptionTier)) {
-        return res.status(403).json({ message: "Player Plus or Commissioner subscription required to create scrimmages" });
-      }
 
       // Validate input data with proper schema
       let scrimmageData;
@@ -4133,8 +4109,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user has Player Plus subscription for messaging
       const user = await storage.getUser(userId);
-      if (!user || user.subscriptionTier === 'free') {
-        return res.status(403).json({ message: "Player Plus subscription required for messaging" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
       
       // Get all league members except the current user
