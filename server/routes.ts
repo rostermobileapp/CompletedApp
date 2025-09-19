@@ -44,12 +44,15 @@ import Papa from "papaparse";
 import * as fs from 'fs';
 import * as path from 'path';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+// Make Stripe optional for development and testing
+const STRIPE_ENABLED = !!process.env.STRIPE_SECRET_KEY && process.env.STRIPE_ENABLED !== 'false';
+let stripe: Stripe | null = null;
+
+if (STRIPE_ENABLED) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2025-08-27.basil",
+  });
 }
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-08-27.basil",
-});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -1831,61 +1834,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe subscription routes
-  app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
-    let user = await storage.getUser(userId);
+  // Stripe subscription routes (only if Stripe is enabled)
+  if (STRIPE_ENABLED && stripe) {
+    app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
+      const userId = req.user.claims.sub;
+      let user = await storage.getUser(userId);
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (user.stripeSubscriptionId) {
-      const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-      res.json({
-        subscriptionId: subscription.id,
-        clientSecret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
-      });
-      return;
-    }
-    
-    if (!user.email) {
-      return res.status(400).json({ message: 'Email required for subscription' });
-    }
-
-    try {
-      let customer;
-      if (user.stripeCustomerId) {
-        customer = await stripe.customers.retrieve(user.stripeCustomerId);
-      } else {
-        customer = await stripe.customers.create({
-          email: user.email,
-          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        });
-        user = await storage.updateUserStripeInfo(user.id, customer.id, '');
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
 
-      const subscription = await stripe.subscriptions.create({
-        customer: customer.id,
-        items: [{
-          price: process.env.STRIPE_PRICE_ID || 'price_1234567890', // Placeholder price ID
-        }],
-        payment_behavior: 'default_incomplete',
-        expand: ['latest_invoice.payment_intent'],
-      });
+      if (user.stripeSubscriptionId) {
+        const subscription = await stripe!.subscriptions.retrieve(user.stripeSubscriptionId);
+        res.json({
+          subscriptionId: subscription.id,
+          clientSecret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
+        });
+        return;
+      }
+      
+      if (!user.email) {
+        return res.status(400).json({ message: 'Email required for subscription' });
+      }
 
-      await storage.updateUserStripeInfo(user.id, customer.id, subscription.id);
-      await storage.updateUserSubscription(user.id, 'player_plus');
-  
-      res.json({
-        subscriptionId: subscription.id,
-        clientSecret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
-      });
-    } catch (error: any) {
-      console.error("Error creating subscription:", error);
-      return res.status(400).json({ error: { message: error.message } });
-    }
-  });
+      try {
+        let customer;
+        if (user.stripeCustomerId) {
+          customer = await stripe!.customers.retrieve(user.stripeCustomerId);
+        } else {
+          customer = await stripe!.customers.create({
+            email: user.email,
+            name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+          });
+          user = await storage.updateUserStripeInfo(user.id, customer.id, '');
+        }
+
+        const subscription = await stripe!.subscriptions.create({
+          customer: customer.id,
+          items: [{
+            price: process.env.STRIPE_PRICE_ID || 'price_1234567890', // Placeholder price ID
+          }],
+          payment_behavior: 'default_incomplete',
+          expand: ['latest_invoice.payment_intent'],
+        });
+
+        await storage.updateUserStripeInfo(user.id, customer.id, subscription.id);
+        await storage.updateUserSubscription(user.id, 'player_plus');
+    
+        res.json({
+          subscriptionId: subscription.id,
+          clientSecret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
+        });
+      } catch (error: any) {
+        console.error("Error creating subscription:", error);
+        return res.status(400).json({ error: { message: error.message } });
+      }
+    });
+  }
 
   // Change subscription tier (free for testing)
   app.post('/api/change-tier', isAuthenticated, async (req: any, res) => {
