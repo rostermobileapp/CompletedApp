@@ -1123,7 +1123,7 @@ export default function LeagueManagement() {
 
   // Game update mutation
   const updateGameMutation = useMutation({
-    mutationFn: async ({ gameId, data }: { gameId: string; data: EditGameForm }) => {
+    mutationFn: async ({ gameId, data, originalScheduledAt }: { gameId: string; data: EditGameForm; originalScheduledAt: string }) => {
       // Combine date and time into a single datetime using local date components
       const [year, month, day] = data.gameDate.split('-');
       const [hours, minutes] = data.gameTime.split(':');
@@ -1135,13 +1135,38 @@ export default function LeagueManagement() {
         parseInt(minutes)
       );
       
-      const response = await apiRequest('PATCH', `/api/games/${gameId}`, {
+      // Check if the scheduledAt has actually changed using consistent local components
+      let shouldUpdateScheduledAt = false;
+      if (originalScheduledAt) {
+        const originalDate = new Date(originalScheduledAt);
+        
+        // Use consistent local components for comparison
+        const originalY = originalDate.getFullYear();
+        const originalM = String(originalDate.getMonth() + 1).padStart(2, '0');
+        const originalD = String(originalDate.getDate()).padStart(2, '0');
+        const originalHH = String(originalDate.getHours()).padStart(2, '0');
+        const originalMM = String(originalDate.getMinutes()).padStart(2, '0');
+        
+        const originalFormattedDate = `${originalY}-${originalM}-${originalD}`;
+        const originalFormattedTime = `${originalHH}:${originalMM}`;
+        
+        // Only update scheduledAt if date or time has changed
+        shouldUpdateScheduledAt = data.gameDate !== originalFormattedDate || data.gameTime !== originalFormattedTime;
+      }
+      
+      // Build update payload - only include scheduledAt if it changed
+      const updatePayload: any = {
         homeTeamId: data.homeTeamId,
         awayTeamId: data.awayTeamId,
-        scheduledAt: combinedDateTime.toISOString(),
         venue: data.venue,
         lockerRoom: data.lockerRoom,
-      });
+      };
+      
+      if (shouldUpdateScheduledAt) {
+        updatePayload.scheduledAt = combinedDateTime.toISOString();
+      }
+      
+      const response = await apiRequest('PATCH', `/api/games/${gameId}`, updatePayload);
       return response.json();
     },
     onSuccess: () => {
@@ -2839,7 +2864,11 @@ export default function LeagueManagement() {
 
               <form
                 onSubmit={editGameForm.handleSubmit((data) => {
-                  updateGameMutation.mutate({ gameId: selectedGame.id, data });
+                  updateGameMutation.mutate({ 
+                    gameId: selectedGame.id, 
+                    data,
+                    originalScheduledAt: selectedGame.scheduledAt
+                  });
                 })}
                 className="space-y-4"
               >
