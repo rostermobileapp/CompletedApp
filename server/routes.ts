@@ -1802,7 +1802,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teams/:id/messages", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (!user || user.subscriptionTier === "free") {
+      // Allow messaging in development mode
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      if (!user || (!isDevelopment && user.subscriptionTier === "free")) {
         return res.status(403).json({ message: "Upgrade to Player Plus required" });
       }
 
@@ -1817,7 +1819,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/teams/:id/messages", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (!user || user.subscriptionTier === "free") {
+      // Allow messaging in development mode
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      if (!user || (!isDevelopment && user.subscriptionTier === "free")) {
         return res.status(403).json({ message: "Upgrade to Player Plus required" });
       }
 
