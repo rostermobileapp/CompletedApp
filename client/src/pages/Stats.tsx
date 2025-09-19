@@ -294,7 +294,7 @@ export default function Stats() {
 
             {/* Player Type Toggle */}
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-muted-foreground">Type:</label>
+              <label className="text-sm font-medium text-[#3c83f6]">Type:</label>
               <Button 
                 variant="outline" 
                 onClick={() => setPlayerType(playerType === 'goalies' ? 'non-goalies' : 'goalies')}
