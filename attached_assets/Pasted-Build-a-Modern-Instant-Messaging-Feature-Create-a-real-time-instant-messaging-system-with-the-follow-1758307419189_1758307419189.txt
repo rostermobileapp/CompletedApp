@@ -1,0 +1,73 @@
+Build a Modern Instant Messaging Feature
+Create a real-time instant messaging system with the following specifications:
+Core Features
+User Communication Options
+
+Direct Messages: Allow users to message other individual players within the league
+Team Group Chats: Enable users to start group conversations with their assigned team members
+Contact Discovery: Provide a way to browse and select other league players to message
+
+Real-time Status Indicators
+
+Typing Indicators: Show when someone is actively typing in a conversation
+Read Receipts: Display read status for messages (sent, delivered, read)
+Online Status: Show user availability (online, away, offline)
+
+Message Features
+
+Real-time Messaging: Instant message delivery and updates
+Message History: Persistent chat history storage
+Message Timestamps: Show when messages were sent
+Unread Message Counters: Badge counts for unread messages
+
+Technical Requirements
+Frontend Components
+
+Clean, modern chat interface with message bubbles
+Responsive design that works on mobile and desktop
+Real-time updates without page refreshes
+Smooth scrolling chat windows
+User-friendly contact/team selection interface
+
+Backend Functionality
+
+WebSocket connections for real-time communication
+User authentication and authorization
+Message persistence in database
+Typing status broadcasting
+Read receipt tracking
+Team membership validation
+
+Database Schema
+Design tables for:
+
+Users and their league/team associations
+Conversations (direct and group)
+Messages with timestamps and status
+Read receipts and typing indicators
+Team rosters for group chat creation
+
+User Experience Flow
+
+Message Initiation: User can select "New Message" and choose between individual players or team chat
+Contact Selection: Browse league players or select team members for group chat
+Active Messaging: Real-time chat with typing indicators and message status
+Chat Management: View conversation list with unread counts and last message previews
+
+Styling Requirements
+
+Modern, clean UI similar to popular messaging apps
+Consistent with existing app design
+Mobile-responsive layout
+Smooth animations for new messages and status updates
+Clear visual hierarchy for different message types
+
+Additional Considerations
+
+Handle multiple simultaneous conversations
+Optimize for performance with large message histories
+Include basic moderation features if needed
+Ensure secure message transmission
+Handle offline/online state transitions gracefully
+
+Please implement this as a complete, functional messaging system with proper error handling, loading states, and a polished user interface.

@@ -1,0 +1,85 @@
+# Build a Modern Instant Messaging Feature
+
+Create a real-time instant messaging system with the following specifications:
+
+## Core Features
+
+### User Communication Options
+- **Direct Messages**: Allow users to message other individual players within the league
+- **Team Group Chats**: Enable users to start group conversations with their assigned team members
+- **Contact Discovery**: Provide a way to browse and select other league players to message
+
+### Real-time Status Indicators
+- **Typing Indicators**: Show when someone is actively typing in a conversation
+- **Read Receipts**: Display read status for messages (sent, delivered, read)
+- **Online Status**: Show user availability (online, away, offline)
+
+### Message Features
+- **Real-time Messaging**: Instant message delivery and updates
+- **Message History**: Persistent chat history storage
+- **Message Timestamps**: Show when messages were sent
+- **Unread Message Counters**: Badge counts for unread messages
+- **Media Sharing**: Support for sending pictures and GIFs
+- **File Upload**: Image upload functionality with preview before sending
+- **Media Display**: Proper rendering and display of images and GIFs in chat bubbles
+
+## Technical Requirements
+
+### Frontend Components
+- Clean, modern chat interface with message bubbles
+- Responsive design that works on mobile and desktop
+- Real-time updates without page refreshes
+- Smooth scrolling chat windows
+- User-friendly contact/team selection interface
+- **Media upload interface**: Camera/gallery access and file selection
+- **Image/GIF preview**: Show media thumbnails in chat
+- **Media viewer**: Click to expand images/GIFs for full-screen viewing
+
+### Backend Functionality
+- WebSocket connections for real-time communication
+- User authentication and authorization
+- Message persistence in database
+- Typing status broadcasting
+- Read receipt tracking
+- Team membership validation
+- **Duplicate conversation detection**: Check for existing conversations before creating new ones
+- **File upload handling**: Secure image and GIF upload with validation
+- **Media storage**: Efficient storage and retrieval of uploaded media files
+- **File type validation**: Ensure only allowed image formats and GIFs are accepted
+
+### Database Schema
+Design tables for:
+- Users and their league/team associations
+- Conversations (direct and group)
+- Messages with timestamps and status
+- Read receipts and typing indicators
+- Team rosters for group chat creation
+- **Media attachments**: Store file paths, types, and metadata for images/GIFs
+
+## User Experience Flow
+
+1. **Message Initiation**: User can select "New Message" and choose between individual players or team chat
+2. **Contact Selection**: Browse league players or select team members for group chat
+3. **Duplicate Chat Prevention**: If user attempts to start a chat with a player they already have an active conversation with, show a notification/alert and redirect them to the existing chat instead of creating a duplicate
+4. **Active Messaging**: Real-time chat with typing indicators and message status
+5. **Chat Management**: View conversation list with unread counts and last message previews
+
+## Styling Requirements
+- Modern, clean UI similar to popular messaging apps
+- Consistent with existing app design
+- Mobile-responsive layout
+- Smooth animations for new messages and status updates
+- Clear visual hierarchy for different message types
+
+## Additional Considerations
+- Handle multiple simultaneous conversations
+- Optimize for performance with large message histories
+- Include basic moderation features if needed
+- Ensure secure message transmission
+- Handle offline/online state transitions gracefully
+- **Media optimization**: Compress images for faster loading while maintaining quality
+- **File size limits**: Set appropriate limits for uploaded media files
+- **Loading indicators**: Show upload progress for media files
+- **Error handling**: Graceful handling of failed media uploads
+
+Please implement this as a complete, functional messaging system with proper error handling, loading states, and a polished user interface.
