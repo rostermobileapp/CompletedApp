@@ -1,13 +1,13 @@
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
-import { useQuery, useMutation, queryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 
 interface Message {
   id: string;
@@ -68,13 +68,13 @@ export default function Messages() {
   const { toast } = useToast();
 
   // Fetch conversations
-  const { data: conversations = [], isLoading: conversationsLoading } = useQuery({
+  const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
     queryKey: ['/api/conversations'],
     enabled: hasAccess('player_plus')
   });
 
   // Fetch messages for selected conversation
-  const { data: messages = [], isLoading: messagesLoading } = useQuery({
+  const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ['/api/conversations', selectedConversation, 'messages'],
     enabled: !!selectedConversation && hasAccess('player_plus')
   });
@@ -82,10 +82,8 @@ export default function Messages() {
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (messageData: { content: string; messageType?: string }) => {
-      return apiRequest(`/api/conversations/${selectedConversation}/messages`, {
-        method: 'POST',
-        body: JSON.stringify(messageData)
-      });
+      const response = await apiRequest('POST', `/api/conversations/${selectedConversation}/messages`, messageData);
+      return response.json();
     },
     onSuccess: () => {
       setNewMessage('');
