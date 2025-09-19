@@ -325,35 +325,51 @@ export default function Stats() {
                 return (
                   <>
                     {/* Most Wins */}
-                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-most-wins">
-                      <Trophy className="w-6 h-6 text-primary mx-auto mb-2" />
-                      <p className="text-xl font-bold leading-tight">{leaders?.mostWins?.wins || 0}</p>
-                      <p className="text-xs text-muted-foreground mb-2">Most Wins</p>
-                      <p className="text-xs font-medium truncate">{`${leaders?.mostWins?.user?.firstName || ''} ${leaders?.mostWins?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-wins">
+                      <div className="flex items-center gap-3">
+                        <Trophy className="w-5 h-5 text-primary" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold">{leaders?.mostWins?.wins || 0}</span>
+                          <span className="text-sm text-muted-foreground">Wins</span>
+                        </div>
+                      </div>
+                      <span className="text-sm font-medium truncate">{`${leaders?.mostWins?.user?.firstName || ''} ${leaders?.mostWins?.user?.lastName || ''}`.trim() || 'N/A'}</span>
                     </Card>
 
                     {/* Best GAA */}
-                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-best-gaa">
-                      <Target className="w-6 h-6 text-success mx-auto mb-2" />
-                      <p className="text-xl font-bold leading-tight">{leaders?.bestGAA?.goalsAgainstAverage?.toFixed(2) || '0.00'}</p>
-                      <p className="text-xs text-muted-foreground mb-2">Best GAA</p>
-                      <p className="text-xs font-medium truncate">{`${leaders?.bestGAA?.user?.firstName || ''} ${leaders?.bestGAA?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-best-gaa">
+                      <div className="flex items-center gap-3">
+                        <Target className="w-5 h-5 text-success" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold">{leaders?.bestGAA?.goalsAgainstAverage?.toFixed(2) || '0.00'}</span>
+                          <span className="text-sm text-muted-foreground">GAA</span>
+                        </div>
+                      </div>
+                      <span className="text-sm font-medium truncate">{`${leaders?.bestGAA?.user?.firstName || ''} ${leaders?.bestGAA?.user?.lastName || ''}`.trim() || 'N/A'}</span>
                     </Card>
 
                     {/* Most Games */}
-                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-most-games-goalie">
-                      <Clock className="w-6 h-6 text-info mx-auto mb-2" />
-                      <p className="text-xl font-bold leading-tight">{leaders?.mostGames?.gamesPlayed || 0}</p>
-                      <p className="text-xs text-muted-foreground mb-2">Most Games</p>
-                      <p className="text-xs font-medium truncate">{`${leaders?.mostGames?.user?.firstName || ''} ${leaders?.mostGames?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-games-goalie">
+                      <div className="flex items-center gap-3">
+                        <Clock className="w-5 h-5 text-info" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold">{leaders?.mostGames?.gamesPlayed || 0}</span>
+                          <span className="text-sm text-muted-foreground">Games</span>
+                        </div>
+                      </div>
+                      <span className="text-sm font-medium truncate">{`${leaders?.mostGames?.user?.firstName || ''} ${leaders?.mostGames?.user?.lastName || ''}`.trim() || 'N/A'}</span>
                     </Card>
 
                     {/* Fewest Losses */}
-                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-fewest-losses">
-                      <Medal className="w-6 h-6 text-warning mx-auto mb-2" />
-                      <p className="text-xl font-bold leading-tight">{leaders?.fewestLosses?.losses || 0}</p>
-                      <p className="text-xs text-muted-foreground mb-2">Fewest Losses</p>
-                      <p className="text-xs font-medium truncate">{`${leaders?.fewestLosses?.user?.firstName || ''} ${leaders?.fewestLosses?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-fewest-losses">
+                      <div className="flex items-center gap-3">
+                        <Medal className="w-5 h-5 text-warning" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold">{leaders?.fewestLosses?.losses || 0}</span>
+                          <span className="text-sm text-muted-foreground">Losses</span>
+                        </div>
+                      </div>
+                      <span className="text-sm font-medium truncate">{`${leaders?.fewestLosses?.user?.firstName || ''} ${leaders?.fewestLosses?.user?.lastName || ''}`.trim() || 'N/A'}</span>
                     </Card>
                   </>
                 );
@@ -365,37 +381,53 @@ export default function Stats() {
                 return (
                   <>
                     {/* Top Scorer */}
-                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-top-scorer">
-                      <TrendingUp className="w-6 h-6 text-primary mx-auto mb-2" />
-                      <p className="text-xl font-bold leading-tight">
-                        {leaders?.topScorer ? (leaders.topScorer.goals || 0) + (leaders.topScorer.assists || 0) : 0}
-                      </p>
-                      <p className="text-xs text-muted-foreground mb-2">Points</p>
-                      <p className="text-xs font-medium truncate">{`${leaders?.topScorer?.user?.firstName || ''} ${leaders?.topScorer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-top-scorer">
+                      <div className="flex items-center gap-3">
+                        <TrendingUp className="w-5 h-5 text-primary" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold">
+                            {leaders?.topScorer ? (leaders.topScorer.goals || 0) + (leaders.topScorer.assists || 0) : 0}
+                          </span>
+                          <span className="text-sm text-muted-foreground">Points</span>
+                        </div>
+                      </div>
+                      <span className="text-sm font-medium truncate">{`${leaders?.topScorer?.user?.firstName || ''} ${leaders?.topScorer?.user?.lastName || ''}`.trim() || 'N/A'}</span>
                     </Card>
 
                     {/* Most Goals */}
-                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-most-goals">
-                      <Target className="w-6 h-6 text-success mx-auto mb-2" />
-                      <p className="text-xl font-bold leading-tight">{leaders?.topGoalScorer?.goals || 0}</p>
-                      <p className="text-xs text-muted-foreground mb-2">Goals</p>
-                      <p className="text-xs font-medium truncate">{`${leaders?.topGoalScorer?.user?.firstName || ''} ${leaders?.topGoalScorer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-goals">
+                      <div className="flex items-center gap-3">
+                        <Target className="w-5 h-5 text-success" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold">{leaders?.topGoalScorer?.goals || 0}</span>
+                          <span className="text-sm text-muted-foreground">Goals</span>
+                        </div>
+                      </div>
+                      <span className="text-sm font-medium truncate">{`${leaders?.topGoalScorer?.user?.firstName || ''} ${leaders?.topGoalScorer?.user?.lastName || ''}`.trim() || 'N/A'}</span>
                     </Card>
 
                     {/* Most Assists */}
-                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-most-assists">
-                      <Apple className="w-6 h-6 text-info mx-auto mb-2" />
-                      <p className="text-xl font-bold leading-tight">{leaders?.topAssistProvider?.assists || 0}</p>
-                      <p className="text-xs text-muted-foreground mb-2">Assists</p>
-                      <p className="text-xs font-medium truncate">{`${leaders?.topAssistProvider?.user?.firstName || ''} ${leaders?.topAssistProvider?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-assists">
+                      <div className="flex items-center gap-3">
+                        <Apple className="w-5 h-5 text-info" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold">{leaders?.topAssistProvider?.assists || 0}</span>
+                          <span className="text-sm text-muted-foreground">Assists</span>
+                        </div>
+                      </div>
+                      <span className="text-sm font-medium truncate">{`${leaders?.topAssistProvider?.user?.firstName || ''} ${leaders?.topAssistProvider?.user?.lastName || ''}`.trim() || 'N/A'}</span>
                     </Card>
 
                     {/* Most Penalty Minutes */}
-                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-most-penalty-minutes">
-                      <Hand className="w-6 h-6 text-warning mx-auto mb-2" />
-                      <p className="text-xl font-bold leading-tight">{leaders?.mostPenaltyMinutes?.penaltyMinutes || 0}</p>
-                      <p className="text-xs text-muted-foreground mb-2">Penalty Minutes</p>
-                      <p className="text-xs font-medium truncate">{`${leaders?.mostPenaltyMinutes?.user?.firstName || ''} ${leaders?.mostPenaltyMinutes?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-penalty-minutes">
+                      <div className="flex items-center gap-3">
+                        <Hand className="w-5 h-5 text-warning" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold">{leaders?.mostPenaltyMinutes?.penaltyMinutes || 0}</span>
+                          <span className="text-sm text-muted-foreground">PIM</span>
+                        </div>
+                      </div>
+                      <span className="text-sm font-medium truncate">{`${leaders?.mostPenaltyMinutes?.user?.firstName || ''} ${leaders?.mostPenaltyMinutes?.user?.lastName || ''}`.trim() || 'N/A'}</span>
                     </Card>
                   </>
                 );
