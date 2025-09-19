@@ -59,8 +59,8 @@ type LeagueMember = {
   position?: string;
   notes?: string;
   jerseyNumber?: number;
-  displayFirstName?: string; // For merged players
-  displayLastName?: string; // For merged players
+  displayFirstName?: string; // For merged players - overrides user.firstName for league display
+  displayLastName?: string; // For merged players - overrides user.lastName for league display
   isGoalie?: boolean; // Added for goalie status
   user: {
     id: string;
@@ -669,7 +669,9 @@ export default function LeagueManagement() {
     jerseyNumber: '',
     notes: '',
     isCaptain: false,
-    isGoalie: false
+    isGoalie: false,
+    displayFirstName: '',
+    displayLastName: ''
   });
 
   // Get league ID and edit mode from URL params
@@ -879,7 +881,9 @@ export default function LeagueManagement() {
           jerseyNumber: memberToEdit.jerseyNumber?.toString() || '',
           notes: memberToEdit.notes || '',
           isCaptain: assignedTeam?.captainId === memberToEdit.userId,
-          isGoalie: memberToEdit.isGoalie || false
+          isGoalie: memberToEdit.isGoalie || false,
+          displayFirstName: memberToEdit.displayFirstName || memberToEdit.user.firstName || '',
+          displayLastName: memberToEdit.displayLastName || memberToEdit.user.lastName || ''
         });
         // Clear the editMember parameter from URL after opening modal
         const newUrl = new URL(window.location.href);
@@ -1693,7 +1697,9 @@ export default function LeagueManagement() {
                           jerseyNumber: member.jerseyNumber?.toString() || '',
                           notes: member.notes || '',
                           isCaptain: assignedTeam?.captainId === member.userId,
-                          isGoalie: member.isGoalie || false
+                          isGoalie: member.isGoalie || false,
+                          displayFirstName: member.displayFirstName || member.user.firstName || '',
+                          displayLastName: member.displayLastName || member.user.lastName || ''
                         });
                       }}
                       data-testid={`member-${member.user.id}`}
@@ -1934,7 +1940,9 @@ export default function LeagueManagement() {
                                 jerseyNumber: member.jerseyNumber?.toString() || '',
                                 notes: member.notes || '',
                                 isCaptain: assignedTeam?.captainId === member.userId,
-                                isGoalie: member.isGoalie || false
+                                isGoalie: member.isGoalie || false,
+                                displayFirstName: member.displayFirstName || member.user.firstName || '',
+                                displayLastName: member.displayLastName || member.user.lastName || ''
                               });
                             }}
                           >
@@ -2321,6 +2329,32 @@ export default function LeagueManagement() {
                   </select>
                 </div>
 
+                {/* Player Name Fields */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">First Name</label>
+                    <input
+                      type="text"
+                      value={playerEditForm.displayFirstName}
+                      onChange={(e) => setPlayerEditForm(prev => ({ ...prev, displayFirstName: e.target.value }))}
+                      className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Enter first name"
+                      data-testid="input-first-name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Last Name</label>
+                    <input
+                      type="text"
+                      value={playerEditForm.displayLastName}
+                      onChange={(e) => setPlayerEditForm(prev => ({ ...prev, displayLastName: e.target.value }))}
+                      className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Enter last name"
+                      data-testid="input-last-name"
+                    />
+                  </div>
+                </div>
+
                 {/* Captain Status */}
                 <div className="flex items-center space-x-3">
                   <input
@@ -2423,7 +2457,9 @@ export default function LeagueManagement() {
                         skillRating: playerEditForm.skillRating,
                         jerseyNumber: playerEditForm.jerseyNumber ? parseInt(playerEditForm.jerseyNumber) : null,
                         notes: playerEditForm.notes,
-                        isGoalie: playerEditForm.isGoalie
+                        isGoalie: playerEditForm.isGoalie,
+                        displayFirstName: playerEditForm.displayFirstName?.trim() || null,
+                        displayLastName: playerEditForm.displayLastName?.trim() || null
                       };
                       
                       // Handle captain assignment separately (this affects the team's captainId)
