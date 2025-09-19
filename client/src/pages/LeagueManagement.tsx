@@ -61,6 +61,7 @@ type LeagueMember = {
   jerseyNumber?: number;
   displayFirstName?: string; // For merged players
   displayLastName?: string; // For merged players
+  isGoalie?: boolean; // Added for goalie status
   user: {
     id: string;
     firstName?: string;
@@ -666,7 +667,9 @@ export default function LeagueManagement() {
     skillLevel: '',
     skillRating: 1,
     jerseyNumber: '',
-    notes: ''
+    notes: '',
+    isCaptain: false,
+    isGoalie: false
   });
 
   // Get league ID and edit mode from URL params
@@ -1655,13 +1658,16 @@ export default function LeagueManagement() {
                       className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-card cursor-pointer transition-colors"
                       onClick={() => {
                         setSelectedPlayer(member);
+                        const assignedTeam = teams.find((team: Team) => team.id === member.assignedTeamId);
                         setPlayerEditForm({
                           assignedTeamId: member.assignedTeamId || '',
                           position: member.position || '',
                           skillLevel: member.skillLevel || '',
                           skillRating: member.skillRating || 1,
                           jerseyNumber: member.jerseyNumber?.toString() || '',
-                          notes: member.notes || ''
+                          notes: member.notes || '',
+                          isCaptain: assignedTeam?.captainId === member.userId,
+                          isGoalie: member.isGoalie || false
                         });
                       }}
                       data-testid={`member-${member.user.id}`}
@@ -1893,14 +1899,16 @@ export default function LeagueManagement() {
                             className="flex-1 cursor-pointer"
                             onClick={() => {
                               setSelectedPlayer(member);
+                              const assignedTeam = teams.find((team: Team) => team.id === member.assignedTeamId);
                               setPlayerEditForm({
                                 assignedTeamId: member.assignedTeamId || '',
-                                // Captain status is now determined by team.captainId, not membership
                                 position: member.position || '',
                                 skillLevel: member.skillLevel || '',
                                 skillRating: member.skillRating || 1,
                                 jerseyNumber: member.jerseyNumber?.toString() || '',
-                                notes: member.notes || ''
+                                notes: member.notes || '',
+                                isCaptain: assignedTeam?.captainId === member.userId,
+                                isGoalie: member.isGoalie || false
                               });
                             }}
                           >
