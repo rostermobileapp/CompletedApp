@@ -142,9 +142,9 @@ export default function StatsManagement() {
 
   // Stats update mutation
   const updateStatsMutation = useMutation({
-    mutationFn: async ({ statsData, mode, seasonId }: { statsData: PlayerStats[], mode: 'increment' | 'set', seasonId: string }) => {
+    mutationFn: async ({ updates, mode, seasonId }: { updates: Array<{userId: string, stats: {goals: number, assists: number, penaltyMinutes: number, gamesPlayed: number}}>, mode: 'increment' | 'set', seasonId: string }) => {
       return apiRequest('POST', `/api/leagues/${selectedLeague}/stats/bulk`, {
-        updates: statsData,
+        updates,
         mode,
         seasonId
       });
@@ -190,18 +190,18 @@ export default function StatsManagement() {
     }
 
     // Include all participants - each should get at least Games Played incremented
-    const statsUpdates: PlayerStats[] = Object.entries(playerGameStats)
+    const updates = Object.entries(playerGameStats)
       .map(([userId, stats]) => ({
         userId,
-        leagueId: selectedLeague,
-        seasonId: selectedSeason,
-        goals: parseInt(stats.goals) || 0,
-        assists: parseInt(stats.assists) || 0,
-        penaltyMinutes: parseInt(stats.penaltyMinutes) || 0,
-        gamesPlayed: parseInt(stats.gamesPlayed) || 1, // Ensure every participant gets GP+1
+        stats: {
+          goals: parseInt(stats.goals) || 0,
+          assists: parseInt(stats.assists) || 0,
+          penaltyMinutes: parseInt(stats.penaltyMinutes) || 0,
+          gamesPlayed: parseInt(stats.gamesPlayed) || 1, // Ensure every participant gets GP+1
+        }
       }));
 
-    if (statsUpdates.length === 0) {
+    if (updates.length === 0) {
       toast({
         title: 'Error',
         description: 'Please enter statistics for at least one player.',
@@ -211,7 +211,7 @@ export default function StatsManagement() {
     }
 
     updateStatsMutation.mutate({ 
-      statsData: statsUpdates, 
+      updates, 
       mode: 'increment', 
       seasonId: selectedSeason 
     });
