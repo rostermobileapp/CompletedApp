@@ -107,7 +107,7 @@ export default function Messages() {
   // Fetch contacts for selected league
   const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
     queryKey: ['/api/leagues', selectedLeague, 'contacts'],
-    enabled: !!selectedLeague && hasAccess('player_plus')
+    enabled: !!selectedLeague // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
   // Fetch conversations
@@ -119,7 +119,7 @@ export default function Messages() {
   // Fetch messages for selected conversation
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ['/api/conversations', selectedConversation, 'messages'],
-    enabled: !!selectedConversation && hasAccess('player_plus')
+    enabled: !!selectedConversation // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
   // Create new conversation mutation
@@ -168,7 +168,7 @@ export default function Messages() {
 
   // Persistent WebSocket connection for real-time updates
   useEffect(() => {
-    if (!hasAccess('player_plus')) return;
+    // 🚨 FREE ACCESS - WEBSOCKET ENABLED FOR EVERYONE! 🚨
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${location.host}/ws`;
@@ -234,7 +234,7 @@ export default function Messages() {
     return () => {
       websocket.close();
     };
-  }, [hasAccess]);
+  }, [currentUserId, selectedConversation]); // 🚨 FIXED DEPENDENCIES
   
   // Reset conversation-scoped state when conversation changes
   useEffect(() => {
