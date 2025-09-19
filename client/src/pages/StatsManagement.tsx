@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { ArrowLeft, Users, User, Trophy, Target, AlertCircle, Clock, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Users, Trophy, Target, AlertCircle, Clock, Plus, Minus } from 'lucide-react';
 import { Link } from 'wouter';
 import { format } from 'date-fns';
 
@@ -50,9 +50,7 @@ export default function StatsManagement() {
   const [selectedLeague, setSelectedLeague] = useState<string>('');
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [selectedGame, setSelectedGame] = useState<string>('');
-  const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [playerGameStats, setPlayerGameStats] = useState<Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>>({});
-  const [individualStats, setIndividualStats] = useState({ goals: '', assists: '', penaltyMinutes: '', gamesPlayed: '' });
   
   // Sorting state
   const [sortField, setSortField] = useState<string>('name');
@@ -61,8 +59,6 @@ export default function StatsManagement() {
   // Refs for scroll synchronization
   const gameTableHeaderRef = useRef<HTMLDivElement>(null);
   const gameTableBodyRef = useRef<HTMLDivElement>(null);
-  const playerTableHeaderRef = useRef<HTMLDivElement>(null);
-  const playerTableBodyRef = useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
 
@@ -78,157 +74,74 @@ export default function StatsManagement() {
     enabled: !!selectedLeague,
   });
 
-  // Get games for selected league and season
-  const { data: games = [] } = useQuery({
-    queryKey: [`/api/leagues/${selectedLeague}/games${selectedSeason ? `?seasonId=${selectedSeason}` : ''}`],
-    enabled: !!selectedLeague && !!selectedSeason,
-  });
-
   // Get players for selected league
   const { data: players = [] } = useQuery({
     queryKey: [`/api/leagues/${selectedLeague}/players`],
     enabled: !!selectedLeague,
   });
 
+  // Get games for selected league
+  const { data: games = [] } = useQuery({
+    queryKey: [`/api/leagues/${selectedLeague}/games`],
+    enabled: !!selectedLeague,
+  });
+
   // Get game participants for selected game
   const { data: gameParticipants = [] } = useQuery({
-    queryKey: [`/api/games/${selectedGame}/participants`],
+    queryKey: [`/api/leagues/${selectedLeague}/games/${selectedGame}/participants`],
     enabled: !!selectedGame,
   });
 
-  // Initialize player stats when game participants are loaded
+  // Initialize player stats when game participants change
   useEffect(() => {
     if (Array.isArray(gameParticipants) && gameParticipants.length > 0) {
-      setPlayerGameStats(prev => {
-        const newStats = { ...prev };
-        gameParticipants.forEach((player: Player) => {
-          // Only initialize if this player doesn't already have stats
-          if (!newStats[player.id]) {
-            newStats[player.id] = {
-              goals: '0',
-              assists: '0',
-              penaltyMinutes: '0',
-              gamesPlayed: '1' // Default to 1 game played
-            };
-          }
-        });
-        return newStats;
+      const initialStats: Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }> = {};
+      
+      gameParticipants.forEach((participant: any) => {
+        initialStats[participant.userId] = {
+          goals: '0',
+          assists: '0', 
+          penaltyMinutes: '0',
+          gamesPlayed: '1'
+        };
       });
+      
+      setPlayerGameStats(initialStats);
     }
   }, [gameParticipants]);
 
-  // Get current player stats for individual editing
-  const { data: currentPlayerStats } = useQuery({
-    queryKey: [`/api/leagues/${selectedLeague}/stats/players/${selectedPlayer}${selectedSeason ? `?seasonId=${selectedSeason}` : ''}`],
-    enabled: !!selectedLeague && !!selectedPlayer && !!selectedSeason,
-  });
-
-  // Initialize individual stats when player changes
+  // Scroll synchronization
   useEffect(() => {
-    if (currentPlayerStats) {
-      const stats = currentPlayerStats as any;
-      setIndividualStats({
-        goals: String(stats.goals || 0),
-        assists: String(stats.assists || 0),
-        penaltyMinutes: String(stats.penaltyMinutes || 0),
-        gamesPlayed: String(stats.gamesPlayed || 0),
-      });
-    }
-  }, [currentPlayerStats]);
+    const syncScrolls = () => {
+      const gameHeader = gameTableHeaderRef.current;
+      const gameBody = gameTableBodyRef.current;
 
-  // Scroll synchronization for game table
-  useEffect(() => {
-    let scrollHandler: ((e: Event) => void) | null = null;
-    let timeoutId: NodeJS.Timeout;
-    
-    const setupScrollSync = () => {
-      const headerEl = gameTableHeaderRef.current;
-      const bodyEl = gameTableBodyRef.current;
-      
-      if (!headerEl || !bodyEl) {
-        // Try again after a short delay
-        timeoutId = setTimeout(setupScrollSync, 100);
-        return;
-      }
-      
-      console.log('Setting up game table scroll sync');
-      
-      const syncScroll = (source: HTMLElement, target: HTMLElement) => (e: Event) => {
-        console.log('Syncing scroll:', source.scrollLeft);
-        target.scrollLeft = source.scrollLeft;
+      const handleGameScroll = () => {
+        if (gameHeader && gameBody) {
+          gameHeader.scrollLeft = gameBody.scrollLeft;
+        }
       };
-      
-      scrollHandler = syncScroll(bodyEl, headerEl);
-      bodyEl.addEventListener('scroll', scrollHandler);
-      console.log('Game table scroll listener added');
-    };
-    
-    setupScrollSync();
-    
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      if (scrollHandler && gameTableBodyRef.current) {
-        gameTableBodyRef.current.removeEventListener('scroll', scrollHandler);
-        console.log('Game table scroll listener removed');
-      }
-    };
-  }, [selectedGame, gameParticipants]);
 
-  // Scroll synchronization for player table
-  useEffect(() => {
-    let scrollHandler: ((e: Event) => void) | null = null;
-    let timeoutId: NodeJS.Timeout;
-    
-    const setupScrollSync = () => {
-      const headerEl = playerTableHeaderRef.current;
-      const bodyEl = playerTableBodyRef.current;
-      
-      if (!headerEl || !bodyEl) {
-        // Try again after a short delay
-        timeoutId = setTimeout(setupScrollSync, 100);
-        return;
-      }
-      
-      console.log('Setting up player table scroll sync');
-      
-      const syncScroll = (source: HTMLElement, target: HTMLElement) => (e: Event) => {
-        console.log('Syncing player scroll:', source.scrollLeft);
-        target.scrollLeft = source.scrollLeft;
-      };
-      
-      scrollHandler = syncScroll(bodyEl, headerEl);
-      bodyEl.addEventListener('scroll', scrollHandler);
-      console.log('Player table scroll listener added');
-    };
-    
-    setupScrollSync();
-    
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      if (scrollHandler && playerTableBodyRef.current) {
-        playerTableBodyRef.current.removeEventListener('scroll', scrollHandler);
-        console.log('Player table scroll listener removed');
+      if (gameBody) {
+        gameBody.addEventListener('scroll', handleGameScroll);
+        console.log('Setting up player table scroll sync');
+        return () => {
+          gameBody.removeEventListener('scroll', handleGameScroll);
+        };
       }
     };
-  }, [selectedLeague, players]);
 
-  // Update stats mutation
+    syncScrolls();
+  }, [gameParticipants]);
+
+  // Stats update mutation
   const updateStatsMutation = useMutation({
-    mutationFn: async ({ statsData, mode, seasonId }: { statsData: PlayerStats[]; mode: 'increment' | 'set'; seasonId: string }) => {
-      const bulkPayload = {
-        updates: statsData.map(stat => ({
-          userId: stat.userId,
-          stats: {
-            goals: stat.goals,
-            assists: stat.assists,
-            penaltyMinutes: stat.penaltyMinutes,
-            gamesPlayed: stat.gamesPlayed,
-          }
-        })),
-        mode
-      };
-      const url = seasonId ? `/api/leagues/${selectedLeague}/stats/bulk?seasonId=${seasonId}` : `/api/leagues/${selectedLeague}/stats/bulk`;
-      await apiRequest('POST', url, bulkPayload);
+    mutationFn: async ({ statsData, mode, seasonId }: { statsData: PlayerStats[], mode: 'increment' | 'set', seasonId: string }) => {
+      return apiRequest('POST', `/api/leagues/${selectedLeague}/stats/bulk`, {
+        updates: statsData,
+        mode,
+        seasonId
+      });
     },
     onSuccess: () => {
       toast({
@@ -236,13 +149,11 @@ export default function StatsManagement() {
         description: 'Player statistics updated successfully.',
       });
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/stats`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/stats/players`] });
-      // Reset forms
+      // Reset form
       setPlayerGameStats({});
-      setIndividualStats({ goals: '', assists: '', penaltyMinutes: '', gamesPlayed: '' });
     },
     onError: (error: any) => {
-      console.error('Error saving player:', error);
+      console.error('Error saving stats:', error);
       let errorMessage = 'Failed to update statistics.';
       
       // Handle different error types
@@ -298,69 +209,6 @@ export default function StatsManagement() {
       mode: 'increment', 
       seasonId: selectedSeason 
     });
-  };
-
-  const handlePlayerStatsUpdate = () => {
-    console.log('handlePlayerStatsUpdate called:', {
-      selectedPlayer,
-      selectedLeague, 
-      selectedSeason,
-      individualStats
-    });
-    
-    if (!selectedPlayer || !selectedLeague || !selectedSeason) {
-      toast({
-        title: 'Error',
-        description: 'Please select a league, season, and player.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const statsData = {
-      goals: parseInt(individualStats.goals) || 0,
-      assists: parseInt(individualStats.assists) || 0,
-      penaltyMinutes: parseInt(individualStats.penaltyMinutes) || 0,
-      gamesPlayed: parseInt(individualStats.gamesPlayed) || 0,
-    };
-
-    // Use individual player API endpoint instead of bulk
-    const url = selectedSeason ? 
-      `/api/leagues/${selectedLeague}/stats/players/${selectedPlayer}?seasonId=${selectedSeason}` : 
-      `/api/leagues/${selectedLeague}/stats/players/${selectedPlayer}`;
-    
-    apiRequest('POST', url, statsData)
-      .then(() => {
-        toast({
-          title: 'Success',
-          description: 'Player statistics updated successfully.',
-        });
-        queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/stats`] });
-        queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/stats/players`] });
-        queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/stats/players/${selectedPlayer}`] });
-        // Reset form
-        setIndividualStats({ goals: '', assists: '', penaltyMinutes: '', gamesPlayed: '' });
-        setSelectedPlayer('');
-      })
-      .catch((error: any) => {
-        console.error('Error saving player:', error);
-        let errorMessage = 'Failed to update statistics.';
-        
-        // Handle different error types
-        if (error?.message) {
-          errorMessage = error.message;
-        } else if (typeof error === 'string') {
-          errorMessage = error;
-        } else if (error?.response?.data?.message) {
-          errorMessage = error.response.data.message;
-        }
-        
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          variant: 'destructive',
-        });
-      });
   };
 
   const updatePlayerGameStat = (userId: string, field: string, value: string) => {
@@ -433,34 +281,53 @@ export default function StatsManagement() {
     });
   };
 
+  // Filtered games for current season
+  const filteredGames = useMemo(() => {
+    if (!selectedSeason || !Array.isArray(games)) return [];
+    return games.filter((game: Game) => {
+      // Find season for this game
+      const gameSeason = Array.isArray(seasons) ? seasons.find((s: any) => {
+        const gameDate = new Date(game.scheduledAt);
+        const seasonStart = new Date(s.startDate);
+        const seasonEnd = new Date(s.endDate);
+        return gameDate >= seasonStart && gameDate <= seasonEnd;
+      }) : null;
+      return gameSeason?.id === selectedSeason;
+    });
+  }, [games, seasons, selectedSeason]);
+
   return (
     <SubscriptionGate requiredTier="commissioner">
-      <div className="min-h-screen bg-background pb-20">
-        {/* Header */}
-        <div className="sticky top-0 z-10 bg-background border-b border-border">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              <Link href="/stats">
-                <Button variant="ghost" size="sm" data-testid="button-back-stats">
-                  <ArrowLeft className="w-4 h-4" />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/commissioner">
+                <Button variant="ghost" size="sm" data-testid="button-back">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Commissioner Dashboard
                 </Button>
               </Link>
-              <h1 className="text-xl font-bold" data-testid="text-page-title">Manage Stats</h1>
+              <div>
+                <h1 className="text-3xl font-bold flex items-center gap-3" data-testid="heading-stats-management">
+                  <Target className="w-8 h-8 text-primary" />
+                  Statistics Management
+                </h1>
+                <p className="text-muted-foreground">Update player statistics for your leagues</p>
+              </div>
             </div>
-            <Trophy className="w-6 h-6 text-primary" />
           </div>
-        </div>
 
-        <div className="p-4 space-y-4">
           {/* League and Season Selection */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Target className="w-5 h-5" />
+                <Trophy className="w-5 h-5" />
                 League & Season Selection
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6 space-y-4 pt-[2px] pb-[2px]">
+            <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>League</Label>
@@ -469,9 +336,7 @@ export default function StatsManagement() {
                       <SelectValue placeholder="Select a league" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Array.isArray(commissionerLeagues) && (commissionerLeagues as any[])
-                        .filter((league: any) => league?.id) // Filter out leagues without ID
-                        .map((league: any) => (
+                      {Array.isArray(commissionerLeagues) && commissionerLeagues.map((league: any) => (
                         <SelectItem key={league.id} value={league.id}>
                           {league.name}
                         </SelectItem>
@@ -479,10 +344,9 @@ export default function StatsManagement() {
                     </SelectContent>
                   </Select>
                 </div>
-                
                 <div className="space-y-2">
                   <Label>Season</Label>
-                  <Select value={selectedSeason} onValueChange={setSelectedSeason} disabled={!selectedLeague} data-testid="select-season">
+                  <Select value={selectedSeason} onValueChange={setSelectedSeason} data-testid="select-season">
                     <SelectTrigger>
                       <SelectValue placeholder="Select a season" />
                     </SelectTrigger>
@@ -501,15 +365,11 @@ export default function StatsManagement() {
 
           {/* Stats Management Tabs */}
           {selectedLeague && selectedSeason && (
-            <Tabs defaultValue="by-game" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+            <Tabs defaultValue="by-game" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-1">
                 <TabsTrigger value="by-game" className="flex items-center gap-2" data-testid="tab-by-game">
                   <Users className="w-4 h-4" />
                   By Game
-                </TabsTrigger>
-                <TabsTrigger value="by-player" className="flex items-center gap-2" data-testid="tab-by-player">
-                  <User className="w-4 h-4" />
-                  By Player
                 </TabsTrigger>
               </TabsList>
 
@@ -518,8 +378,8 @@ export default function StatsManagement() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Users className="w-5 h-5" />
-                      Update Stats by Game
+                      <Clock className="w-5 h-5" />
+                      Select Game
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -530,15 +390,10 @@ export default function StatsManagement() {
                           <SelectValue placeholder="Select a game" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.isArray(games) && games.map((game: Game) => (
+                          {Array.isArray(filteredGames) && filteredGames.map((game: Game) => (
                             <SelectItem key={game.id} value={game.id}>
-                              <div className="flex items-center gap-2">
-                                {game.isScrimmage && <Clock className="w-3 h-3" />}
-                                {game.homeTeam.name} vs {game.awayTeam.name} - {format(new Date(game.scheduledAt), 'MMM d, yyyy')}
-                                {game.homeScore !== null && game.awayScore !== null && 
-                                  ` (${game.homeScore}-${game.awayScore})`
-                                }
-                              </div>
+                              {game.homeTeam.name} vs {game.awayTeam.name} - {format(new Date(game.scheduledAt), 'MMM d, yyyy h:mm a')}
+                              {game.isScrimmage && ' (Scrimmage)'}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -546,35 +401,25 @@ export default function StatsManagement() {
                     </div>
 
                     {selectedGame && Array.isArray(gameParticipants) && gameParticipants.length > 0 && (
-                      <div className="flex flex-col" style={{height: 'calc(100vh - 200px)'}}>
-                        {/* Fixed Update Button at Top */}
-                        <div className="flex-shrink-0 mb-4">
-                          <Button 
-                            onClick={handleGameStatsUpdate} 
-                            disabled={updateStatsMutation.isPending}
-                            className="w-full bg-primary hover:bg-primary/90"
-                            data-testid="button-update-player-stats"
-                          >
-                            {updateStatsMutation.isPending ? 'Updating...' : 'Update All Player Stats'}
-                          </Button>
+                      <div className="space-y-4">
+                        <div className="text-sm text-muted-foreground" data-testid="text-participants-count">
+                          {gameParticipants.length} players found for this game
                         </div>
-
+                        
                         {/* Fixed Header */}
                         <div ref={gameTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-auto pointer-events-none">
-                          <Table style={{minWidth: '800px'}}>
+                          <Table style={{minWidth: '600px'}}>
                             <TableHeader>
                               <TableRow>
                                 <TableHead 
                                   className="cursor-pointer select-none w-32 bg-background"
- 
                                   onClick={() => handleSort('name')}
-                                  data-testid="header-player-name"
+                                  data-testid="header-name"
                                 >
                                   Player {getSortIcon('name')}
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
- 
                                   onClick={() => handleSort('gamesPlayed')}
                                   data-testid="header-games-played"
                                 >
@@ -582,7 +427,6 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
- 
                                   onClick={() => handleSort('goals')}
                                   data-testid="header-goals"
                                 >
@@ -590,7 +434,6 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
- 
                                   onClick={() => handleSort('assists')}
                                   data-testid="header-assists"
                                 >
@@ -598,7 +441,6 @@ export default function StatsManagement() {
                                 </TableHead>
                                 <TableHead 
                                   className="cursor-pointer select-none text-center w-16 bg-background"
- 
                                   onClick={() => handleSort('penaltyMinutes')}
                                   data-testid="header-penalty-minutes"
                                 >
@@ -610,132 +452,131 @@ export default function StatsManagement() {
                         </div>
                         
                         {/* Scrollable Table Body */}
-                        <div ref={gameTableBodyRef} className="flex-1 overflow-auto border-l border-r border-b rounded-b-lg">
-                          <Table data-testid="table-game-stats" style={{minWidth: '800px'}}>
+                        <div ref={gameTableBodyRef} className="max-h-96 overflow-auto border-l border-r border-b rounded-b-lg">
+                          <Table data-testid="table-game-stats" style={{minWidth: '600px'}}>
                             <TableBody>
-                              {getSortedPlayers(gameParticipants).map((player: Player, index: number) => (
-                                <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
-                                  <TableCell className="font-medium w-32" data-testid={`cell-name-${player.id}`}>
+                              {getSortedPlayers(gameParticipants).map((participant: any, index: number) => (
+                                <TableRow key={participant.userId} data-testid={`row-participant-${participant.userId}`}>
+                                  <TableCell className="font-medium w-32 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-name-${participant.userId}`}>
                                     <div className="flex items-center gap-3">
                                       <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
                                         {index + 1}
                                       </div>
                                       <div>
-                                        <div className="font-medium">{player.firstName} {player.lastName}</div>
-                                        {player.teamName && (
-                                          <div className="text-sm text-muted-foreground">{player.teamName}</div>
+                                        <div className="font-medium">{participant.firstName} {participant.lastName}</div>
+                                        {participant.teamName && (
+                                          <div className="text-sm text-muted-foreground">{participant.teamName}</div>
                                         )}
                                       </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center w-16" data-testid={`cell-gamesplayed-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px] text-[14px]" data-testid={`cell-gamesplayed-${participant.userId}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(player.id, 'gamesPlayed')}
-                                        data-testid={`button-minus-games-${player.id}`}
+                                        onClick={() => decrementStat(participant.userId, 'gamesPlayed')}
+                                        data-testid={`button-minus-games-${participant.userId}`}
                                       >
                                         <Minus className="w-3 h-3" />
                                       </Button>
                                       <div 
                                         className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-games-${player.id}`}
+                                        data-testid={`display-games-${participant.userId}`}
                                       >
-                                        {parseInt(playerGameStats[player.id]?.gamesPlayed || '1') || 1}
+                                        {parseInt(playerGameStats[participant.userId]?.gamesPlayed || '0') || 0}
                                       </div>
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(player.id, 'gamesPlayed')}
-                                        data-testid={`button-plus-games-${player.id}`}
+                                        onClick={() => incrementStat(participant.userId, 'gamesPlayed')}
+                                        data-testid={`button-plus-games-${participant.userId}`}
                                       >
                                         <Plus className="w-3 h-3" />
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-goals-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-goals-${participant.userId}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(player.id, 'goals')}
-                                        data-testid={`button-minus-goals-${player.id}`}
+                                        onClick={() => decrementStat(participant.userId, 'goals')}
+                                        data-testid={`button-minus-goals-${participant.userId}`}
                                       >
                                         <Minus className="w-3 h-3" />
                                       </Button>
                                       <div 
                                         className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-goals-${player.id}`}
+                                        data-testid={`display-goals-${participant.userId}`}
                                       >
-                                        {parseInt(playerGameStats[player.id]?.goals || '0') || 0}
+                                        {parseInt(playerGameStats[participant.userId]?.goals || '0') || 0}
                                       </div>
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(player.id, 'goals')}
-                                        data-testid={`button-plus-goals-${player.id}`}
+                                        onClick={() => incrementStat(participant.userId, 'goals')}
+                                        data-testid={`button-plus-goals-${participant.userId}`}
                                       >
                                         <Plus className="w-3 h-3" />
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-assists-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-assists-${participant.userId}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(player.id, 'assists')}
-                                        data-testid={`button-minus-assists-${player.id}`}
+                                        onClick={() => decrementStat(participant.userId, 'assists')}
+                                        data-testid={`button-minus-assists-${participant.userId}`}
                                       >
                                         <Minus className="w-3 h-3" />
                                       </Button>
                                       <div 
                                         className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-assists-${player.id}`}
+                                        data-testid={`display-assists-${participant.userId}`}
                                       >
-                                        {parseInt(playerGameStats[player.id]?.assists || '0') || 0}
+                                        {parseInt(playerGameStats[participant.userId]?.assists || '0') || 0}
                                       </div>
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(player.id, 'assists')}
-                                        data-testid={`button-plus-assists-${player.id}`}
+                                        onClick={() => incrementStat(participant.userId, 'assists')}
+                                        data-testid={`button-plus-assists-${participant.userId}`}
                                       >
                                         <Plus className="w-3 h-3" />
                                       </Button>
                                     </div>
                                   </TableCell>
-
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-penalty-${player.id}`}>
+                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-penalty-${participant.userId}`}>
                                     <div className="flex items-center justify-center gap-1">
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(player.id, 'penaltyMinutes')}
-                                        data-testid={`button-minus-penalty-${player.id}`}
+                                        onClick={() => decrementStat(participant.userId, 'penaltyMinutes')}
+                                        data-testid={`button-minus-penalty-${participant.userId}`}
                                       >
                                         <Minus className="w-3 h-3" />
                                       </Button>
                                       <div 
                                         className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-penalty-${player.id}`}
+                                        data-testid={`display-penalty-${participant.userId}`}
                                       >
-                                        {parseInt(playerGameStats[player.id]?.penaltyMinutes || '0') || 0}
+                                        {parseInt(playerGameStats[participant.userId]?.penaltyMinutes || '0') || 0}
                                       </div>
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(player.id, 'penaltyMinutes')}
-                                        data-testid={`button-plus-penalty-${player.id}`}
+                                        onClick={() => incrementStat(participant.userId, 'penaltyMinutes')}
+                                        data-testid={`button-plus-penalty-${participant.userId}`}
                                       >
                                         <Plus className="w-3 h-3" />
                                       </Button>
@@ -763,318 +604,6 @@ export default function StatsManagement() {
                         <AlertCircle className="w-12 h-12 mx-auto mb-4" />
                         <p>No participants found for this game.</p>
                         <p className="text-sm">Players need to be assigned to teams in this game.</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* By Player Tab */}
-              <TabsContent value="by-player" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <User className="w-5 h-5" />
-                      Update Individual Player Stats
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Player</Label>
-                      <Select value={selectedPlayer} onValueChange={setSelectedPlayer} data-testid="select-player">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a player" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(players) && players.map((player: Player) => (
-                            <SelectItem key={player.id} value={player.id}>
-                              {player.firstName} {player.lastName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {selectedPlayer && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                          <Label>Games Played</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={individualStats.gamesPlayed}
-                            onChange={(e) => setIndividualStats(prev => ({ ...prev, gamesPlayed: e.target.value }))}
-                            data-testid="input-games-played"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Goals</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={individualStats.goals}
-                            onChange={(e) => setIndividualStats(prev => ({ ...prev, goals: e.target.value }))}
-                            data-testid="input-goals"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Assists</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={individualStats.assists}
-                            onChange={(e) => setIndividualStats(prev => ({ ...prev, assists: e.target.value }))}
-                            data-testid="input-assists"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Penalty Minutes</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={individualStats.penaltyMinutes}
-                            onChange={(e) => setIndividualStats(prev => ({ ...prev, penaltyMinutes: e.target.value }))}
-                            data-testid="input-penalty-minutes"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedPlayer && (
-                      <Button 
-                        onClick={handlePlayerStatsUpdate} 
-                        disabled={updateStatsMutation.isPending}
-                        className="w-full bg-primary hover:bg-primary/90"
-                        data-testid="button-update-player-stats"
-                      >
-                        {updateStatsMutation.isPending ? 'Updating...' : 'Update Player Stats'}
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-                
-                {/* Player Stats Table for Reference */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>All Player Stats (Reference)</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6 pt-[0px] pb-[0px] pl-[0px] pr-[0px] text-[14px]">
-                    {selectedLeague && Array.isArray(players) && players.length > 0 && (
-                      <div className="flex flex-col" style={{height: 'calc(100vh - 200px)'}}>
-                        {/* Fixed Update Button at Top */}
-                        <div className="flex-shrink-0 mb-4">
-                          <Button 
-                            onClick={handlePlayerStatsUpdate} 
-                            disabled={updateStatsMutation.isPending}
-                            className="w-full bg-primary hover:bg-primary/90"
-                            data-testid="button-update-all-player-stats"
-                          >
-                            {updateStatsMutation.isPending ? 'Updating...' : 'Update All Player Stats'}
-                          </Button>
-                        </div>
-
-                        {/* Fixed Header */}
-                        <div ref={playerTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-auto pointer-events-none">
-                          <Table style={{minWidth: '600px'}}>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead 
-                                  className="cursor-pointer select-none w-32 bg-background"
- 
-                                  onClick={() => handleSort('name')}
-                                  data-testid="header-player-name"
-                                >
-                                  Player {getSortIcon('name')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background"
- 
-                                  onClick={() => handleSort('gamesPlayed')}
-                                  data-testid="header-games-played"
-                                >
-                                  GP {getSortIcon('gamesPlayed')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background"
- 
-                                  onClick={() => handleSort('goals')}
-                                  data-testid="header-goals"
-                                >
-                                  G {getSortIcon('goals')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background"
- 
-                                  onClick={() => handleSort('assists')}
-                                  data-testid="header-assists"
-                                >
-                                  A {getSortIcon('assists')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background"
- 
-                                  onClick={() => handleSort('penaltyMinutes')}
-                                  data-testid="header-penalty-minutes"
-                                >
-                                  PIM {getSortIcon('penaltyMinutes')}
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                          </Table>
-                        </div>
-                        
-                        {/* Scrollable Table Body */}
-                        <div ref={playerTableBodyRef} className="flex-1 overflow-auto border-l border-r border-b rounded-b-lg">
-                          <Table data-testid="table-player-stats" style={{minWidth: '600px'}}>
-                            <TableBody>
-                              {getSortedPlayers(players).map((player: Player, index: number) => (
-                                <TableRow key={player.id} data-testid={`row-player-${player.id}`}>
-                                  <TableCell className="font-medium w-32 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-name-${player.id}`}>
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
-                                        {index + 1}
-                                      </div>
-                                      <div>
-                                        <div className="font-medium">{player.firstName} {player.lastName}</div>
-                                        {player.teamName && (
-                                          <div className="text-sm text-muted-foreground">{player.teamName}</div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px] text-[14px]" data-testid={`cell-gamesplayed-${player.id}`}>
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(player.id, 'gamesPlayed')}
-                                        data-testid={`button-minus-games-${player.id}`}
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </Button>
-                                      <div 
-                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-games-${player.id}`}
-                                      >
-                                        {parseInt(playerGameStats[player.id]?.gamesPlayed || '0') || 0}
-                                      </div>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(player.id, 'gamesPlayed')}
-                                        data-testid={`button-plus-games-${player.id}`}
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-goals-${player.id}`}>
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(player.id, 'goals')}
-                                        data-testid={`button-minus-goals-${player.id}`}
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </Button>
-                                      <div 
-                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-goals-${player.id}`}
-                                      >
-                                        {parseInt(playerGameStats[player.id]?.goals || '0') || 0}
-                                      </div>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(player.id, 'goals')}
-                                        data-testid={`button-plus-goals-${player.id}`}
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-assists-${player.id}`}>
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(player.id, 'assists')}
-                                        data-testid={`button-minus-assists-${player.id}`}
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </Button>
-                                      <div 
-                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-assists-${player.id}`}
-                                      >
-                                        {parseInt(playerGameStats[player.id]?.assists || '0') || 0}
-                                      </div>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(player.id, 'assists')}
-                                        data-testid={`button-plus-assists-${player.id}`}
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-penalty-${player.id}`}>
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(player.id, 'penaltyMinutes')}
-                                        data-testid={`button-minus-penalty-${player.id}`}
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </Button>
-                                      <div 
-                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-penalty-${player.id}`}
-                                      >
-                                        {parseInt(playerGameStats[player.id]?.penaltyMinutes || '0') || 0}
-                                      </div>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(player.id, 'penaltyMinutes')}
-                                        data-testid={`button-plus-penalty-${player.id}`}
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedLeague && Array.isArray(players) && players.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground" data-testid="text-no-players">
-                        <AlertCircle className="w-12 h-12 mx-auto mb-4" />
-                        <p>No players found in this league.</p>
-                        <p className="text-sm">Players need to join teams in this league.</p>
-                      </div>
-                    )}
-
-                    {!selectedLeague && (
-                      <div className="text-center py-8 text-muted-foreground" data-testid="text-select-league">
-                        <Users className="w-12 h-12 mx-auto mb-4" />
-                        <p>Select a league to see all players.</p>
                       </div>
                     )}
                   </CardContent>
