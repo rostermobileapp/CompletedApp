@@ -115,6 +115,16 @@ export class MessagingService {
       .where(eq(messageAttachments.messageId, messageId));
   }
 
+  // Get message attachment by file path (for authorization checks)
+  async getMessageAttachmentByPath(filePath: string): Promise<MessageAttachment | undefined> {
+    const [attachment] = await db
+      .select()
+      .from(messageAttachments)
+      .where(eq(messageAttachments.url, filePath))
+      .limit(1);
+    return attachment;
+  }
+
   // Read receipt operations
   async markMessageAsRead(messageId: string, userId: string): Promise<MessageReadReceipt> {
     // Check if read receipt already exists

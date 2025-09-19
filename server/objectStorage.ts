@@ -295,6 +295,30 @@ export class ObjectStorageService {
     });
   }
 
+  // Gets the upload URL for message attachment upload
+  async getMessageAttachmentUploadURL(): Promise<string> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    if (!privateObjectDir) {
+      throw new Error(
+        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
+          "tool and set PRIVATE_OBJECT_DIR env var."
+      );
+    }
+
+    const objectId = randomUUID();
+    const fullPath = `${privateObjectDir}/message-attachments/${objectId}`;
+
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+
+    // Sign URL for PUT method with TTL
+    return signObjectURL({
+      bucketName,
+      objectName,
+      method: "PUT",
+      ttlSec: 900,
+    });
+  }
+
   normalizeAnnouncementMediaPath(
     rawPath: string,
   ): string {
@@ -335,6 +359,58 @@ export class ObjectStorageService {
     announcementMediaDir += "announcement-media/";
     
     const objectPath = `${announcementMediaDir}${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(objectPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    
+    const [exists] = await file.exists();
+    if (!exists) {
+      throw new ObjectNotFoundError();
+    }
+    
+    return file;
+  }
+
+  normalizeMessageAttachmentPath(
+    rawPath: string,
+  ): string {
+    if (!rawPath.startsWith("https://storage.googleapis.com/")) {
+      return rawPath;
+    }
+  
+    // Extract the path from the URL by removing query parameters and domain
+    const url = new URL(rawPath);
+    const rawObjectPath = url.pathname;
+  
+    let messageAttachmentDir = this.getPrivateObjectDir();
+    if (!messageAttachmentDir.endsWith("/")) {
+      messageAttachmentDir = `${messageAttachmentDir}/`;
+    }
+    messageAttachmentDir += "message-attachments/";
+  
+    if (!rawObjectPath.startsWith(messageAttachmentDir)) {
+      return rawObjectPath;
+    }
+  
+    // Extract the entity ID from the path
+    const entityId = rawObjectPath.slice(messageAttachmentDir.length);
+    return `/message-attachments/${entityId}`;
+  }
+
+  // Get message attachment file for serving
+  async getMessageAttachmentFile(messageAttachmentPath: string): Promise<File> {
+    if (!messageAttachmentPath.startsWith("/message-attachments/")) {
+      throw new ObjectNotFoundError();
+    }
+
+    const entityId = messageAttachmentPath.slice("/message-attachments/".length);
+    let messageAttachmentDir = this.getPrivateObjectDir();
+    if (!messageAttachmentDir.endsWith("/")) {
+      messageAttachmentDir = `${messageAttachmentDir}/`;
+    }
+    messageAttachmentDir += "message-attachments/";
+    
+    const objectPath = `${messageAttachmentDir}${entityId}`;
     const { bucketName, objectName } = parseObjectPath(objectPath);
     const bucket = objectStorageClient.bucket(bucketName);
     const file = bucket.file(objectName);

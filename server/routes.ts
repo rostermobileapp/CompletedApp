@@ -164,6 +164,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Message attachment upload URL
+  app.post("/api/message-attachments/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getMessageAttachmentUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting message attachment upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  // Serve message attachments (authenticated and authorized)
+  app.get("/message-attachments/:objectPath(*)", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const fullPath = `/message-attachments/${req.params.objectPath}`;
+      
+      // Find the message attachment to verify access
+      const attachment = await messagingService.getMessageAttachmentByPath(fullPath);
+      if (!attachment) {
+        return res.sendStatus(404);
+      }
+      
+      // Get the message to check conversation access
+      const message = await messagingService.getMessage(attachment.messageId);
+      if (!message) {
+        return res.sendStatus(404);
+      }
+      
+      // Verify user is participant in the conversation
+      const isParticipant = await messagingService.isUserInConversation(userId, message.conversationId);
+      if (!isParticipant) {
+        return res.sendStatus(403);
+      }
+      
+      const objectFile = await objectStorageService.getMessageAttachmentFile(fullPath);
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving message attachment:", error);
+      if ((error as Error).name === 'ObjectNotFoundError') {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
   // League routes
   app.get("/api/leagues", async (req, res) => {
     try {
@@ -4286,13 +4336,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add attachments if any
       let messageAttachments = [];
       if (attachments && attachments.length > 0) {
+        const { ObjectStorageService } = await import('./objectStorage');
+        const objectStorageService = new ObjectStorageService();
+        
         for (const attachment of attachments) {
+          // Validate file size (10MB limit)
+          if (attachment.fileSize > 10 * 1024 * 1024) {
+            return res.status(400).json({ message: 'File size exceeds 10MB limit' });
+          }
+          
+          // Normalize the file URL to use app route
+          const normalizedUrl = objectStorageService.normalizeMessageAttachmentPath(attachment.fileUrl);
+          
+          // Determine attachment type from MIME type
+          let attachmentType = 'file';
+          if (attachment.fileType.startsWith('image/')) {
+            attachmentType = attachment.fileType === 'image/gif' ? 'gif' : 'image';
+          }
+          
           const messageAttachment = await messagingService.createMessageAttachment({
             messageId: message.id,
-            fileName: attachment.fileName,
-            fileUrl: attachment.fileUrl,
-            fileType: attachment.fileType,
-            fileSize: attachment.fileSize
+            type: attachmentType,
+            url: normalizedUrl,
+            filename: attachment.fileName,
+            fileSize: attachment.fileSize,
+            mimeType: attachment.fileType
           });
           messageAttachments.push(messageAttachment);
         }

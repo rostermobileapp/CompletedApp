@@ -1,7 +1,7 @@
 import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,9 +69,12 @@ export default function Messages() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Fetch conversations
@@ -88,7 +91,7 @@ export default function Messages() {
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async (messageData: { content: string; messageType?: string }) => {
+    mutationFn: async (messageData: { content: string; messageType?: string; attachments?: any[] }) => {
       const response = await apiRequest('POST', `/api/conversations/${selectedConversation}/messages`, messageData);
       return response.json();
     },
@@ -250,13 +253,38 @@ export default function Messages() {
     }
   };
   
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !selectedConversation) return;
+  const handleSendMessage = async () => {
+    if ((!newMessage.trim() && selectedFiles.length === 0) || !selectedConversation) return;
     
     // Stop typing indicator when sending message
     handleTypingStop();
     
-    sendMessageMutation.mutate({ content: newMessage.trim() });
+    let attachments = [];
+    
+    // Upload files if any are selected
+    if (selectedFiles.length > 0) {
+      setIsUploadingFiles(true);
+      try {
+        attachments = await uploadFiles(selectedFiles);
+      } catch (error) {
+        toast({
+          title: 'Failed to upload files',
+          description: 'Please try again',
+          variant: 'destructive'
+        });
+        setIsUploadingFiles(false);
+        return;
+      }
+      setIsUploadingFiles(false);
+    }
+    
+    sendMessageMutation.mutate({ 
+      content: newMessage.trim() || ' ', // Ensure content is not empty
+      attachments 
+    });
+    
+    // Clear selected files after sending
+    setSelectedFiles([]);
   };
   
   // Mark message as read when viewing conversation
@@ -277,6 +305,79 @@ export default function Messages() {
       }
     }
   }, [messages, selectedConversation]);
+  
+  // File upload functions
+  const uploadFiles = async (files: File[]): Promise<any[]> => {
+    const uploadPromises = files.map(async (file) => {
+      try {
+        // Get upload URL
+        const uploadUrlResponse = await apiRequest('POST', '/api/message-attachments/upload');
+        const { uploadURL } = await uploadUrlResponse.json();
+        
+        // Upload file to object storage
+        const uploadResponse = await fetch(uploadURL, {
+          method: 'PUT',
+          body: file,
+          headers: {
+            'Content-Type': file.type
+          }
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload file');
+        }
+        
+        // Extract file path from upload URL
+        const fileUrl = uploadURL.split('?')[0]; // Remove query parameters
+        
+        return {
+          fileName: file.name,
+          fileUrl,
+          fileType: file.type,
+          fileSize: file.size
+        };
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        throw error;
+      }
+    });
+    
+    return Promise.all(uploadPromises);
+  };
+  
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const validFiles = files.filter(file => {
+      // Limit file size to 10MB
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: `${file.name} is larger than 10MB`,
+          variant: 'destructive'
+        });
+        return false;
+      }
+      return true;
+    });
+    
+    setSelectedFiles(prev => [...prev, ...validFiles]);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+  
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const getFileIcon = (fileType: string) => {
+    if (fileType.startsWith('image/')) {
+      return <Image className="w-4 h-4" />;
+    }
+    return <File className="w-4 h-4" />;
+  };
   
   // Cleanup typing timeout on unmount
   useEffect(() => {
@@ -489,6 +590,30 @@ export default function Messages() {
                     <p className="text-sm" data-testid={`text-message-content-${message.id}`}>
                       {message.content}
                     </p>
+                    {message.attachments && message.attachments.length > 0 && (
+                      <div className="mt-2 space-y-2" data-testid={`message-attachments-${message.id}`}>
+                        {message.attachments.map((attachment: any, index: number) => (
+                          <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded border">
+                            {getFileIcon(attachment.mimeType || '')}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{attachment.filename}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {attachment.fileSize ? (attachment.fileSize / 1024).toFixed(1) + ' KB' : 'Unknown size'}
+                              </p>
+                            </div>
+                            <a 
+                              href={attachment.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline text-sm"
+                              data-testid={`attachment-link-${index}`}
+                            >
+                              Download
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
@@ -515,7 +640,38 @@ export default function Messages() {
           
           {/* Message Input */}
           <div className="p-4 border-t border-border" data-testid="message-input-container">
+            {/* File previews */}
+            {selectedFiles.length > 0 && (
+              <div className="mb-3 space-y-2" data-testid="selected-files">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded border">
+                    {getFileIcon(file.type)}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => removeFile(index)}
+                      className="p-1 hover:bg-accent rounded"
+                      data-testid={`remove-file-${index}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
             <div className="flex items-center gap-2">
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 hover:bg-accent rounded transition-colors"
+                data-testid="button-attach-file"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
               <Input
                 placeholder="Type a message..."
                 value={newMessage}
@@ -532,11 +688,26 @@ export default function Messages() {
               />
               <Button 
                 onClick={handleSendMessage}
-                disabled={!newMessage.trim() || sendMessageMutation.isPending}
+                disabled={(!newMessage.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending || isUploadingFiles}
                 data-testid="button-send-message"
               >
-                <Send className="w-4 h-4" />
+                {isUploadingFiles ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </Button>
+              
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+                accept="*/*"
+                data-testid="file-input"
+              />
             </div>
           </div>
         </>
