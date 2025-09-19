@@ -8,6 +8,7 @@ import {
   games,
   gameScoreSubmissions,
   gameRsvps,
+  gameGoalies,
   substituteRequests,
   substitutionApprovals,
   messages,
