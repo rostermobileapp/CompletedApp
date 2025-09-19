@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { messagingService } from "./messagingService";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { db } from "./db";
 import { leagueMemberships, importedPlayers, teams, announcementPolls } from "@shared/schema";
@@ -4128,5 +4130,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+
+  // WebSocket server for real-time messaging
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+
+  // Store active connections by user ID
+  const activeConnections = new Map<string, WebSocket>();
+
+  wss.on('connection', async (ws: WebSocket, req) => {
+    let userId: string | null = null;
+    
+    ws.on('message', async (message: Buffer) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        switch (data.type) {
+          case 'authenticate':
+            // Authenticate user and store connection
+            userId = data.userId;
+            if (userId) {
+              activeConnections.set(userId, ws);
+              
+              // Update user online status
+              await messagingService.updateUserOnlineStatus(userId, true);
+              
+              // Broadcast to contacts that user is online
+              broadcastOnlineStatus(userId, true);
+              
+              ws.send(JSON.stringify({ type: 'authenticated', userId }));
+            }
+            break;
+
+          case 'join_conversation':
+            if (!userId) return;
+            
+            // Verify user is participant in conversation
+            const conversation = await messagingService.getConversation(data.conversationId);
+            const isParticipant = await messagingService.isUserInConversation(userId, data.conversationId);
+            
+            if (conversation && isParticipant) {
+              // Join conversation room (store conversation ID on connection)
+              (ws as any).conversationId = data.conversationId;
+              ws.send(JSON.stringify({ 
+                type: 'joined_conversation', 
+                conversationId: data.conversationId 
+              }));
+            }
+            break;
+
+          case 'send_message':
+            if (!userId) return;
+            
+            const { conversationId, content, messageType = 'text', replyToId, attachments } = data;
+            
+            // Create message in database
+            const message = await messagingService.createMessage({
+              conversationId,
+              senderId: userId,
+              content,
+              messageType,
+              replyToId
+            });
+
+            // Add attachments if any
+            if (attachments && attachments.length > 0) {
+              for (const attachment of attachments) {
+                await messagingService.createMessageAttachment({
+                  messageId: message.id,
+                  fileName: attachment.fileName,
+                  fileUrl: attachment.fileUrl,
+                  fileType: attachment.fileType,
+                  fileSize: attachment.fileSize
+                });
+              }
+            }
+
+            // Broadcast message to all participants
+            const participants = await messagingService.getConversationParticipants(conversationId);
+            broadcastToParticipants(participants, {
+              type: 'new_message',
+              message: {
+                ...message,
+                attachments: attachments || []
+              }
+            });
+            break;
+
+          case 'typing_start':
+            if (!userId) return;
+            
+            await messagingService.setTypingIndicator(data.conversationId, userId, true);
+            
+            // Broadcast typing indicator to other participants
+            const typingParticipants = await messagingService.getConversationParticipants(data.conversationId);
+            broadcastToParticipants(
+              typingParticipants.filter(p => p.userId !== userId),
+              {
+                type: 'typing_indicator',
+                conversationId: data.conversationId,
+                userId,
+                isTyping: true
+              }
+            );
+            break;
+
+          case 'typing_stop':
+            if (!userId) return;
+            
+            await messagingService.setTypingIndicator(data.conversationId, userId, false);
+            
+            // Broadcast typing stopped to other participants
+            const stoppedTypingParticipants = await messagingService.getConversationParticipants(data.conversationId);
+            broadcastToParticipants(
+              stoppedTypingParticipants.filter(p => p.userId !== userId),
+              {
+                type: 'typing_indicator',
+                conversationId: data.conversationId,
+                userId,
+                isTyping: false
+              }
+            );
+            break;
+
+          case 'mark_read':
+            if (!userId) return;
+            
+            // Create read receipt
+            await messagingService.markMessageAsRead(data.messageId, userId);
+            
+            // Broadcast read receipt to message sender
+            const readMessage = await messagingService.getMessage(data.messageId);
+            if (readMessage) {
+              const senderConnection = activeConnections.get(readMessage.senderId);
+              if (senderConnection && senderConnection.readyState === WebSocket.OPEN) {
+                senderConnection.send(JSON.stringify({
+                  type: 'message_read',
+                  messageId: data.messageId,
+                  readBy: userId,
+                  readAt: new Date().toISOString()
+                }));
+              }
+            }
+            break;
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+        ws.send(JSON.stringify({ 
+          type: 'error', 
+          message: 'Failed to process message' 
+        }));
+      }
+    });
+
+    ws.on('close', async () => {
+      if (userId) {
+        // Remove connection
+        activeConnections.delete(userId);
+        
+        // Update user offline status
+        await messagingService.updateUserOnlineStatus(userId, false);
+        
+        // Clear any typing indicators
+        await messagingService.clearUserTypingIndicators(userId);
+        
+        // Broadcast to contacts that user is offline
+        broadcastOnlineStatus(userId, false);
+      }
+    });
+  });
+
+  // Helper function to broadcast online status to user contacts
+  function broadcastOnlineStatus(userId: string, isOnline: boolean) {
+    // This would need to get user's contacts and broadcast to them
+    // For now, we'll implement a simple version
+    const statusMessage = {
+      type: 'user_status',
+      userId,
+      isOnline,
+      lastSeen: new Date().toISOString()
+    };
+
+    for (const [contactId, connection] of activeConnections) {
+      if (contactId !== userId && connection.readyState === WebSocket.OPEN) {
+        connection.send(JSON.stringify(statusMessage));
+      }
+    }
+  }
+
+  // Helper function to broadcast to conversation participants
+  function broadcastToParticipants(participants: Array<{userId: string}>, message: any) {
+    participants.forEach(participant => {
+      const connection = activeConnections.get(participant.userId);
+      if (connection && connection.readyState === WebSocket.OPEN) {
+        connection.send(JSON.stringify(message));
+      }
+    });
+  }
+
   return httpServer;
 }
