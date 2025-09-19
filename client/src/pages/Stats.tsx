@@ -269,7 +269,7 @@ export default function Stats() {
 
       {/* Filters */}
       <div className="px-6 mb-6">
-        <Card className="p-4" data-testid="card-filters">
+        <Card className="p-4 pt-[0px] pb-[0px]" data-testid="card-filters">
           <div className="flex items-center gap-2 mb-4">
             <Filter className="w-5 h-5 text-muted-foreground" />
             <h2 className="font-semibold">Filters</h2>
