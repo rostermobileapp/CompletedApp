@@ -317,7 +317,7 @@ export default function Stats() {
       {/* Stats Overview Cards */}
       {statsArray.length > 0 && (
         <div className="px-6 pl-[0px] pr-[0px] mt-[0px] mb-[0px]">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pl-[12px] pr-[12px] pt-[2px] pb-[2px]">
             {playerType === 'goalies' ? (
               // Goalie overview cards
               ((() => {
