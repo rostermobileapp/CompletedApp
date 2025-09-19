@@ -1105,6 +1105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Combine all participants and format for stats management
       const participants = [...homeTeamMembers, ...awayTeamMembers].map(member => ({
         id: member.user.id,
+        userId: member.user.id,
         firstName: member.user.firstName,
         lastName: member.user.lastName,
         email: member.user.email,
