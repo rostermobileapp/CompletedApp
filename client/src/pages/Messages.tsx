@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Message {
   id: string;
@@ -61,10 +62,16 @@ interface ConversationParticipant {
 
 export default function Messages() {
   const { hasAccess, tier } = useSubscription();
+  const { user } = useAuth();
+  const currentUserId = (user as any)?.id;
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
-  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
 
   // Fetch conversations
@@ -99,7 +106,7 @@ export default function Messages() {
     }
   });
 
-  // WebSocket connection for real-time updates
+  // Persistent WebSocket connection for real-time updates
   useEffect(() => {
     if (!hasAccess('player_plus')) return;
 
@@ -110,41 +117,175 @@ export default function Messages() {
     
     websocket.onopen = () => {
       console.log('Connected to messaging WebSocket');
-      setWs(websocket);
+      wsRef.current = websocket;
     };
     
     websocket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       
       // Handle different message types
-      if (data.type === 'message') {
-        // Refresh conversations and messages
-        queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
-        if (data.conversationId === selectedConversation) {
-          queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
-        }
+      switch (data.type) {
+        case 'message':
+          // Refresh conversations and messages
+          queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+          if (data.conversationId === selectedConversation) {
+            queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
+          }
+          break;
+          
+        case 'typing_start':
+          if (data.conversationId === selectedConversation && data.userId !== currentUserId) {
+            setTypingUsers(prev => Array.from(new Set([...prev, data.userId])));
+          }
+          break;
+          
+        case 'typing_stop':
+          if (data.conversationId === selectedConversation) {
+            setTypingUsers(prev => prev.filter(userId => userId !== data.userId));
+          }
+          break;
+          
+        case 'user_online':
+          if (data.conversationId === selectedConversation) {
+            setOnlineUsers(prev => Array.from(new Set([...prev, data.userId])));
+          }
+          break;
+          
+        case 'user_offline':
+          if (data.conversationId === selectedConversation) {
+            setOnlineUsers(prev => prev.filter(userId => userId !== data.userId));
+          }
+          break;
+          
+        case 'read_receipt':
+          // Refresh messages to show updated read receipts
+          if (data.conversationId === selectedConversation) {
+            queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
+          }
+          break;
       }
     };
     
     websocket.onclose = () => {
       console.log('Disconnected from messaging WebSocket');
-      setWs(null);
+      wsRef.current = null;
     };
     
     return () => {
       websocket.close();
     };
-  }, [hasAccess, selectedConversation]);
+  }, [hasAccess]);
+  
+  // Reset conversation-scoped state when conversation changes
+  useEffect(() => {
+    setTypingUsers([]);
+    setOnlineUsers([]);
+    
+    // Clear any pending typing timeout for previous conversation
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+      setIsTyping(false);
+    }
+  }, [selectedConversation]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Typing indicator functions
+  const handleTypingStart = () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !selectedConversation || isTyping) return;
+    
+    setIsTyping(true);
+    wsRef.current.send(JSON.stringify({
+      type: 'typing_start',
+      conversationId: selectedConversation
+    }));
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Set timeout to stop typing indicator
+    typingTimeoutRef.current = setTimeout(() => {
+      handleTypingStop();
+    }, 3000);
+  };
+  
+  const handleTypingStop = () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !selectedConversation || !isTyping) return;
+    
+    setIsTyping(false);
+    wsRef.current.send(JSON.stringify({
+      type: 'typing_stop',
+      conversationId: selectedConversation
+    }));
+    
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+    
+    // Start typing indicator when user starts typing
+    if (e.target.value.trim() && !isTyping) {
+      handleTypingStart();
+    }
+    
+    // Reset typing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    if (e.target.value.trim()) {
+      typingTimeoutRef.current = setTimeout(() => {
+        handleTypingStop();
+      }, 3000);
+    }
+  };
+  
   const handleSendMessage = () => {
     if (!newMessage.trim() || !selectedConversation) return;
+    
+    // Stop typing indicator when sending message
+    handleTypingStop();
+    
     sendMessageMutation.mutate({ content: newMessage.trim() });
   };
+  
+  // Mark message as read when viewing conversation
+  const markMessageAsRead = async (messageId: string) => {
+    try {
+      await apiRequest('POST', `/api/messages/${messageId}/read`);
+    } catch (error) {
+      console.error('Failed to mark message as read:', error);
+    }
+  };
+  
+  // Mark messages as read when conversation is opened
+  useEffect(() => {
+    if (messages.length > 0 && selectedConversation && currentUserId) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.senderId !== currentUserId) {
+        markMessageAsRead(lastMessage.id);
+      }
+    }
+  }, [messages, selectedConversation]);
+  
+  // Cleanup typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const formatMessageTime = (timestamp: string) => {
     return format(new Date(timestamp), 'h:mm a');
@@ -170,7 +311,7 @@ export default function Messages() {
     }
     
     // For direct messages, find the other participant
-    const otherParticipant = conversation.participants.find(p => p.user?.id !== 'current-user-id');
+    const otherParticipant = conversation.participants.find(p => p.user?.id !== currentUserId);
     return otherParticipant?.user?.displayName || 'Unknown User';
   };
 
@@ -295,7 +436,9 @@ export default function Messages() {
               </div>
               <div className="flex-1">
                 <h2 className="font-semibold" data-testid="text-chat-title">Team Chat</h2>
-                <p className="text-xs text-muted-foreground" data-testid="text-chat-status">5 members</p>
+                <p className="text-xs text-muted-foreground" data-testid="text-chat-status">
+                  {onlineUsers.length > 0 ? `${onlineUsers.length} online` : 'Team members'}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <button className="p-2 hover:bg-accent rounded-lg transition-colors" data-testid="button-voice-call">
@@ -337,6 +480,11 @@ export default function Messages() {
                       <span className="text-xs text-muted-foreground" data-testid={`text-message-time-${message.id}`}>
                         {formatMessageTime(message.sentAt)}
                       </span>
+                      {message.readReceipts.length > 0 && (
+                        <span className="text-xs text-muted-foreground" data-testid={`text-read-status-${message.id}`}>
+                          ✓ Read
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm" data-testid={`text-message-content-${message.id}`}>
                       {message.content}
@@ -344,6 +492,23 @@ export default function Messages() {
                   </div>
                 </div>
               ))
+            )}
+            
+            {/* Typing indicators */}
+            {typingUsers.length > 0 && (
+              <div className="flex gap-3 opacity-75" data-testid="typing-indicators">
+                <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                  <span className="text-muted-foreground text-xs font-semibold">...</span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground italic" data-testid="text-typing-status">
+                    {typingUsers.length === 1 
+                      ? 'Someone is typing...' 
+                      : `${typingUsers.length} people are typing...`
+                    }
+                  </p>
+                </div>
+              </div>
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -354,8 +519,14 @@ export default function Messages() {
               <Input
                 placeholder="Type a message..."
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                onBlur={handleTypingStop}
                 className="flex-1"
                 data-testid="input-message"
               />
