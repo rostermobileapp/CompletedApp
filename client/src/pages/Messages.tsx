@@ -178,6 +178,14 @@ export default function Messages() {
     websocket.onopen = () => {
       console.log('Connected to messaging WebSocket');
       wsRef.current = websocket;
+      
+      // Authenticate with the server so it knows which user this connection belongs to
+      if (currentUserId) {
+        websocket.send(JSON.stringify({
+          type: 'authenticate',
+          userId: currentUserId
+        }));
+      }
     };
     
     websocket.onmessage = (event) => {
