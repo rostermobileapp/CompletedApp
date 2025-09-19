@@ -512,10 +512,6 @@ export default function Messages() {
           </DialogHeader>
           
           <div className="space-y-4">
-            {/* Debug info */}
-            <div className="text-xs text-muted-foreground">
-              Debug: {userLeagues.length} leagues, selectedLeague: {selectedLeague || 'none'}, loading: {userLeaguesLoading ? 'yes' : 'no'}
-            </div>
             
             {/* Fallback content if no leagues but user is authenticated */}
             {userLeagues.length === 0 && !userLeaguesLoading && (
