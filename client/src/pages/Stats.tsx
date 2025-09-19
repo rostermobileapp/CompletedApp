@@ -30,6 +30,7 @@ export default function Stats() {
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [sortField, setSortField] = useState<string>('points');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [playerType, setPlayerType] = useState<'all' | 'goalies' | 'non-goalies'>('all');
 
   // Get league ID from URL parameter if provided, otherwise use user's primary league
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
@@ -50,7 +51,18 @@ export default function Stats() {
 
   // Fetch player stats for the league
   const { data: playerStats, isLoading } = useQuery({
-    queryKey: [`/api/leagues/${leagueId}/stats${selectedSeason && selectedSeason !== 'all' ? `?seasonId=${selectedSeason}` : ''}`],
+    queryKey: ['/api/leagues', leagueId, 'stats', { seasonId: selectedSeason, playerType }],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (selectedSeason && selectedSeason !== 'all') {
+        params.append('seasonId', selectedSeason);
+      }
+      if (playerType && playerType !== 'all') {
+        params.append('playerType', playerType);
+      }
+      const query = params.toString();
+      return fetch(`/api/leagues/${leagueId}/stats${query ? `?${query}` : ''}`).then(res => res.json());
+    },
     enabled: !!leagueId,
   });
 
@@ -190,7 +202,7 @@ export default function Stats() {
             <h2 className="font-semibold">Filters</h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Season Filter */}
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-2 block">Season</label>
@@ -205,6 +217,21 @@ export default function Stats() {
                       {season.name}
                     </SelectItem>
                   )) : []}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Player Type Filter */}
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">Player Type</label>
+              <Select value={playerType} onValueChange={(value) => setPlayerType(value as 'all' | 'goalies' | 'non-goalies')} data-testid="select-player-type">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Players</SelectItem>
+                  <SelectItem value="goalies">Goalies</SelectItem>
+                  <SelectItem value="non-goalies">Non-Goalies</SelectItem>
                 </SelectContent>
               </Select>
             </div>

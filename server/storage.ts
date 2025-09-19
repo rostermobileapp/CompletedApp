@@ -3423,7 +3423,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Player stats operations
-  async getPlayerStats(leagueId: string, seasonId?: string): Promise<(PlayerStats & { user: User })[]> {
+  async getPlayerStats(leagueId: string, seasonId?: string, playerType?: 'goalies' | 'non-goalies'): Promise<(PlayerStats & { user: User; isGoalie: boolean })[]> {
     // Build conditions for stats table join
     let statsConditions = [eq(playerStats.leagueId, leagueId)];
     
@@ -3453,6 +3453,9 @@ export class DatabaseStorage implements IStorage {
         userCreatedAt: users.createdAt,
         userUpdatedAt: users.updatedAt,
         
+        // Membership info
+        membershipIsGoalie: leagueMemberships.isGoalie,
+        
         // Stats info (will be null if player has no stats)
         statsId: playerStats.id,
         statsLeagueId: playerStats.leagueId,
@@ -3474,7 +3477,10 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(leagueMemberships.leagueId, leagueId),
-          eq(leagueMemberships.status, "approved")
+          eq(leagueMemberships.status, "approved"),
+          // Filter by player type if specified
+          ...(playerType === 'goalies' ? [eq(leagueMemberships.isGoalie, true)] : []),
+          ...(playerType === 'non-goalies' ? [eq(leagueMemberships.isGoalie, false)] : [])
         )
       )
       .orderBy(desc(sql`COALESCE(${playerStats.goals}, 0) + COALESCE(${playerStats.assists}, 0)`)); // Order by points (goals + assists)
@@ -3491,6 +3497,7 @@ export class DatabaseStorage implements IStorage {
       penaltyMinutes: r.statsPenaltyMinutes || 0,
       createdAt: r.statsCreatedAt || new Date(),
       updatedAt: r.statsUpdatedAt || new Date(),
+      isGoalie: r.membershipIsGoalie || false,
       user: {
         id: r.userId,
         email: r.userEmail,

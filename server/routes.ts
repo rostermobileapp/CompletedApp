@@ -3916,6 +3916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = req.params.leagueId;
       const seasonId = Array.isArray(req.query.seasonId) ? req.query.seasonId[0] : req.query.seasonId;
+      const playerType = Array.isArray(req.query.playerType) ? req.query.playerType[0] : req.query.playerType;
       const userId = req.user.claims.sub;
       
       // Verify user is a member of this league
@@ -3932,7 +3933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const stats = await storage.getPlayerStats(leagueId, seasonId);
+      const stats = await storage.getPlayerStats(leagueId, seasonId, playerType as 'goalies' | 'non-goalies' | undefined);
       res.json(stats);
     } catch (error) {
       console.error('Error fetching player stats:', error);
