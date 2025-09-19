@@ -1,0 +1,68 @@
+# 🔍 FIND THE HIDDEN STRIPE CODE
+
+The app is testing successfully until it hits hidden Stripe code. We need to find and eliminate the EXACT code that's triggering the API key request.
+
+## STEP 1: FIND THE EXACT SOURCE
+Run these commands to locate the hidden Stripe references:
+
+```bash
+# Search for the exact strings being requested
+grep -r "TESTING_VITE_STRIPE_PUBLIC_KEY" .
+grep -r "TESTING_STRIPE_SECRET_KEY" .
+grep -r "Please provide API keys for the testing Stripe environment" .
+
+# Search for any remaining Stripe references
+grep -ri "stripe" . --exclude-dir=node_modules
+grep -ri "subscription" . --exclude-dir=node_modules
+```
+
+## STEP 2: COMMON HIDING PLACES TO CHECK
+- **Environment configuration files**
+- **Build/bundler configuration** (vite.config.js, webpack.config.js)
+- **Package.json scripts** that might reference Stripe
+- **Docker or deployment files**
+- **Hidden .env files** (.env.production, .env.test, .env.development)
+- **Database seed files** or migration scripts
+- **Test files** that might import Stripe
+
+## STEP 3: NUCLEAR ELIMINATION OPTIONS
+
+### Option A: Set Fake Environment Variables
+Create a `.env` file with fake values:
+```
+TESTING_VITE_STRIPE_PUBLIC_KEY=pk_fake_12345678901234567890123456
+TESTING_STRIPE_SECRET_KEY=sk_fake_12345678901234567890123456789012345678901234567890123456789012
+```
+
+### Option B: Hardcode Bypass in Code
+Find where these variables are used and replace with:
+```javascript
+// STRIPE BYPASSED - FAKE KEYS FOR TESTING
+const stripePublicKey = process.env.TESTING_VITE_STRIPE_PUBLIC_KEY || "pk_fake_bypass";
+const stripeSecretKey = process.env.TESTING_STRIPE_SECRET_KEY || "sk_fake_bypass";
+
+// Or completely bypass Stripe initialization
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Stripe bypassed in development');
+  // Skip all Stripe setup
+} else {
+  // Original Stripe code here
+}
+```
+
+### Option C: Mock Stripe Module
+Create a fake Stripe module that returns success for everything:
+```javascript
+// Create src/utils/mockStripe.js
+export default {
+  elements: () => ({ create: () => ({}), mount: () => {}, unmount: () => {} }),
+  createPaymentMethod: () => Promise.resolve({ id: 'pm_fake', status: 'succeeded' }),
+  confirmPayment: () => Promise.resolve({ status: 'succeeded' }),
+  // Mock any other Stripe methods needed
+};
+```
+
+## STEP 4: IMMEDIATE ACTION
+**Show me the EXACT output** of the grep commands above so we can see where this Stripe code is hiding and eliminate it permanently.
+
+**The goal is to make the app run completely without any Stripe interaction whatsoever.**

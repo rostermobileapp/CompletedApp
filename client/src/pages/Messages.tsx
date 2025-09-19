@@ -99,7 +99,7 @@ export default function Messages() {
   const { toast } = useToast();
 
   // Fetch user's leagues for contact discovery
-  const { data: userLeagues = [] } = useQuery<League[]>({
+  const { data: userLeagues = [], isLoading: userLeaguesLoading } = useQuery<League[]>({
     queryKey: ['/api/user/leagues'],
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
@@ -512,6 +512,21 @@ export default function Messages() {
           </DialogHeader>
           
           <div className="space-y-4">
+            {/* Debug info */}
+            <div className="text-xs text-muted-foreground">
+              Debug: {userLeagues.length} leagues, selectedLeague: {selectedLeague || 'none'}, loading: {userLeaguesLoading ? 'yes' : 'no'}
+            </div>
+            
+            {/* Fallback content if no leagues but user is authenticated */}
+            {userLeagues.length === 0 && !userLeaguesLoading && (
+              <div className="p-4 bg-muted rounded-md text-center">
+                <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  No leagues found. You need to join a league to send messages.
+                </p>
+              </div>
+            )}
+            
             {/* League Selection */}
             {userLeagues.length > 1 && (
               <div>
@@ -530,8 +545,16 @@ export default function Messages() {
               </div>
             )}
             
+            {/* Always show league info if single league */}
+            {userLeagues.length === 1 && (
+              <div className="p-3 bg-muted rounded-md">
+                <div className="text-sm font-medium">League: {userLeagues[0]?.name}</div>
+                <div className="text-xs text-muted-foreground">Auto-selected</div>
+              </div>
+            )}
+            
             {/* Search Contacts */}
-            {selectedLeague && (
+            {(selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
               <>
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
