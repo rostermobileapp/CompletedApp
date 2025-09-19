@@ -469,6 +469,9 @@ export default function Messages() {
     }
     
     // For direct messages, find the other participant
+    if (!conversation.participants) {
+      return 'Loading...';
+    }
     const otherParticipant = conversation.participants.find(p => p.user?.id !== currentUserId);
     return otherParticipant?.user?.displayName || 'Unknown User';
   };
