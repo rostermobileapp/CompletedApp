@@ -325,35 +325,35 @@ export default function Stats() {
                 return (
                   <>
                     {/* Most Wins */}
-                    <Card className="p-4 text-center" data-testid="card-most-wins">
-                      <Trophy className="w-8 h-8 text-primary mx-auto mb-2" />
-                      <p className="text-2xl font-bold">{leaders?.mostWins?.wins || 0}</p>
-                      <p className="text-xs text-muted-foreground">Most Wins</p>
-                      <p className="text-xs font-medium mt-1">{`${leaders?.mostWins?.user?.firstName || ''} ${leaders?.mostWins?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-most-wins">
+                      <Trophy className="w-6 h-6 text-primary mx-auto mb-2" />
+                      <p className="text-xl font-bold leading-tight">{leaders?.mostWins?.wins || 0}</p>
+                      <p className="text-xs text-muted-foreground mb-2">Most Wins</p>
+                      <p className="text-xs font-medium truncate">{`${leaders?.mostWins?.user?.firstName || ''} ${leaders?.mostWins?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Best GAA */}
-                    <Card className="p-4 text-center" data-testid="card-best-gaa">
-                      <Target className="w-8 h-8 text-success mx-auto mb-2" />
-                      <p className="text-2xl font-bold">{leaders?.bestGAA?.goalsAgainstAverage?.toFixed(2) || '0.00'}</p>
-                      <p className="text-xs text-muted-foreground">Best GAA</p>
-                      <p className="text-xs font-medium mt-1">{`${leaders?.bestGAA?.user?.firstName || ''} ${leaders?.bestGAA?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-best-gaa">
+                      <Target className="w-6 h-6 text-success mx-auto mb-2" />
+                      <p className="text-xl font-bold leading-tight">{leaders?.bestGAA?.goalsAgainstAverage?.toFixed(2) || '0.00'}</p>
+                      <p className="text-xs text-muted-foreground mb-2">Best GAA</p>
+                      <p className="text-xs font-medium truncate">{`${leaders?.bestGAA?.user?.firstName || ''} ${leaders?.bestGAA?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Most Games */}
-                    <Card className="p-4 text-center" data-testid="card-most-games-goalie">
-                      <Clock className="w-8 h-8 text-info mx-auto mb-2" />
-                      <p className="text-2xl font-bold">{leaders?.mostGames?.gamesPlayed || 0}</p>
-                      <p className="text-xs text-muted-foreground">Most Games</p>
-                      <p className="text-xs font-medium mt-1">{`${leaders?.mostGames?.user?.firstName || ''} ${leaders?.mostGames?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-most-games-goalie">
+                      <Clock className="w-6 h-6 text-info mx-auto mb-2" />
+                      <p className="text-xl font-bold leading-tight">{leaders?.mostGames?.gamesPlayed || 0}</p>
+                      <p className="text-xs text-muted-foreground mb-2">Most Games</p>
+                      <p className="text-xs font-medium truncate">{`${leaders?.mostGames?.user?.firstName || ''} ${leaders?.mostGames?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Fewest Losses */}
-                    <Card className="p-4 text-center" data-testid="card-fewest-losses">
-                      <Medal className="w-8 h-8 text-warning mx-auto mb-2" />
-                      <p className="text-2xl font-bold">{leaders?.fewestLosses?.losses || 0}</p>
-                      <p className="text-xs text-muted-foreground">Fewest Losses</p>
-                      <p className="text-xs font-medium mt-1">{`${leaders?.fewestLosses?.user?.firstName || ''} ${leaders?.fewestLosses?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-fewest-losses">
+                      <Medal className="w-6 h-6 text-warning mx-auto mb-2" />
+                      <p className="text-xl font-bold leading-tight">{leaders?.fewestLosses?.losses || 0}</p>
+                      <p className="text-xs text-muted-foreground mb-2">Fewest Losses</p>
+                      <p className="text-xs font-medium truncate">{`${leaders?.fewestLosses?.user?.firstName || ''} ${leaders?.fewestLosses?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
                   </>
                 );
@@ -365,7 +365,7 @@ export default function Stats() {
                 return (
                   <>
                     {/* Top Scorer */}
-                    <Card className="p-3 text-center h-25 w-25 flex flex-col justify-center" data-testid="card-top-scorer">
+                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-top-scorer">
                       <TrendingUp className="w-6 h-6 text-primary mx-auto mb-2" />
                       <p className="text-xl font-bold leading-tight">
                         {leaders?.topScorer ? (leaders.topScorer.goals || 0) + (leaders.topScorer.assists || 0) : 0}
@@ -375,7 +375,7 @@ export default function Stats() {
                     </Card>
 
                     {/* Most Goals */}
-                    <Card className="p-3 text-center h-25 w-25 flex flex-col justify-center" data-testid="card-most-goals">
+                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-most-goals">
                       <Target className="w-6 h-6 text-success mx-auto mb-2" />
                       <p className="text-xl font-bold leading-tight">{leaders?.topGoalScorer?.goals || 0}</p>
                       <p className="text-xs text-muted-foreground mb-2">Goals</p>
@@ -383,7 +383,7 @@ export default function Stats() {
                     </Card>
 
                     {/* Most Assists */}
-                    <Card className="p-3 text-center h-25 w-25 flex flex-col justify-center" data-testid="card-most-assists">
+                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-most-assists">
                       <Apple className="w-6 h-6 text-info mx-auto mb-2" />
                       <p className="text-xl font-bold leading-tight">{leaders?.topAssistProvider?.assists || 0}</p>
                       <p className="text-xs text-muted-foreground mb-2">Assists</p>
@@ -391,7 +391,7 @@ export default function Stats() {
                     </Card>
 
                     {/* Most Penalty Minutes */}
-                    <Card className="p-3 text-center h-25 w-25 flex flex-col justify-center" data-testid="card-most-penalty-minutes">
+                    <Card className="p-3 text-center aspect-square flex flex-col justify-center" data-testid="card-most-penalty-minutes">
                       <Hand className="w-6 h-6 text-warning mx-auto mb-2" />
                       <p className="text-xl font-bold leading-tight">{leaders?.mostPenaltyMinutes?.penaltyMinutes || 0}</p>
                       <p className="text-xs text-muted-foreground mb-2">Penalty Minutes</p>
