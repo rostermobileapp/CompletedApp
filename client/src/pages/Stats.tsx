@@ -430,7 +430,7 @@ export default function Stats() {
         </div>
       )}
       {/* Stats Table */}
-      <div className="px-6">
+      <div className="px-6 pl-[5px] pr-[5px]">
         <Card data-testid="card-stats-table">
           <div className="p-4 border-b">
             <h2 className="text-lg font-semibold" data-testid="text-stats-title">
