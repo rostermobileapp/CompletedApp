@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Trophy, Target, Clock, Medal, TrendingUp, Filter, Settings, Apple, Hand, Whistle } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Clock, Medal, TrendingUp, Filter, Settings, Apple, Hand, Flag } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -421,7 +421,7 @@ export default function Stats() {
                     {/* Most Penalty Minutes */}
                     <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-penalty-minutes">
                       <div className="flex items-center gap-3">
-                        <Whistle className="w-5 h-5 text-red-500" />
+                        <Flag className="w-5 h-5 text-red-500" />
                         <div className="flex items-center gap-2">
                           <span className="text-lg font-bold">{leaders?.mostPenaltyMinutes?.penaltyMinutes || 0}</span>
                           <span className="text-sm text-muted-foreground">PIM</span>
