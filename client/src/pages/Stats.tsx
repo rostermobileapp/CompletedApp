@@ -271,20 +271,15 @@ export default function Stats() {
         </div>
       </div>
       {/* Filters */}
-      <div className="px-6 mb-6">
-        <Card className="p-4 pt-[0px] pb-[0px]" data-testid="card-filters">
-          <div className="flex items-center gap-2 mb-4">
-            <Filter className="w-5 h-5 text-muted-foreground" />
-            <h2 className="font-semibold">Filters</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="px-6 mb-3">
+        <Card className="p-2" data-testid="card-filters">
+          <div className="flex items-center gap-4">
             {/* Season Filter */}
-            <div>
-              <label className="text-sm font-medium text-muted-foreground mb-2 block">Season</label>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-muted-foreground">Season:</label>
               <Select value={selectedSeason} onValueChange={setSelectedSeason} data-testid="select-season">
-                <SelectTrigger>
-                  <SelectValue placeholder="All Seasons" />
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Seasons</SelectItem>
@@ -298,19 +293,17 @@ export default function Stats() {
             </div>
 
             {/* Player Type Toggle */}
-            <div>
-              <label className="text-sm font-medium text-muted-foreground mb-2 block">Player Type</label>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-muted-foreground">Type:</label>
               <Button 
                 variant="outline" 
                 onClick={() => setPlayerType(playerType === 'goalies' ? 'non-goalies' : 'goalies')}
-                className="w-full justify-start"
+                className="justify-start"
                 data-testid="button-toggle-player-type"
               >
                 {playerType === 'goalies' ? 'Switch to Skaters' : 'Switch to Goalies'}
               </Button>
             </div>
-
-            
           </div>
         </Card>
       </div>
