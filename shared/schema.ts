@@ -306,17 +306,127 @@ export const substitutionApprovals = pgTable("substitution_approvals", {
 ]);
 
 
-// Messages table
+// Conversation type enum
+export const conversationTypeEnum = pgEnum("conversation_type", [
+  "direct",
+  "team_group"
+]);
+
+// Message status enum
+export const messageStatusEnum = pgEnum("message_status", [
+  "sent",
+  "delivered", 
+  "read"
+]);
+
+// User online status enum
+export const onlineStatusEnum = pgEnum("online_status", [
+  "online",
+  "away",
+  "offline"
+]);
+
+// Conversations table
+export const conversations = pgTable("conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: conversationTypeEnum("type").notNull(),
+  title: varchar("title"), // For group chats, null for direct messages
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(), // All conversations are within a league context
+  teamId: varchar("team_id").references(() => teams.id), // For team group chats
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  lastMessageAt: timestamp("last_message_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_conversations_league_id").on(table.leagueId),
+  index("idx_conversations_team_id").on(table.teamId),
+  index("idx_conversations_last_message").on(table.lastMessageAt),
+]);
+
+// Conversation participants table
+export const conversationParticipants = pgTable("conversation_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  leftAt: timestamp("left_at"), // For when users leave group chats
+  lastReadAt: timestamp("last_read_at"), // For read receipts
+}, (table) => [
+  unique("unique_conversation_user").on(table.conversationId, table.userId),
+  index("idx_conversation_participants_conversation").on(table.conversationId),
+  index("idx_conversation_participants_user").on(table.userId),
+]);
+
+// Enhanced messages table
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
   senderId: varchar("sender_id").references(() => users.id).notNull(),
-  recipientId: varchar("recipient_id").references(() => users.id),
-  teamId: varchar("team_id").references(() => teams.id),
-  leagueId: varchar("league_id").references(() => leagues.id),
-  content: text("content").notNull(),
-  messageType: varchar("message_type").default("text").notNull(), // text, image, gif
+  content: text("content"),
+  messageType: varchar("message_type").default("text").notNull(), // text, image, gif, file
+  status: messageStatusEnum("status").default("sent").notNull(),
+  editedAt: timestamp("edited_at"), // For message editing
+  replyToId: varchar("reply_to_id"), // For threaded replies - self reference added later
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_messages_conversation").on(table.conversationId),
+  index("idx_messages_sender").on(table.senderId),
+  index("idx_messages_created_at").on(table.createdAt),
+]);
+
+// Message attachments table
+export const messageAttachments = pgTable("message_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").references(() => messages.id).notNull(),
+  type: varchar("type").notNull(), // 'image', 'gif', 'file'
+  url: varchar("url").notNull(),
+  filename: varchar("filename"),
+  fileSize: integer("file_size"),
+  mimeType: varchar("mime_type"),
+  thumbnailUrl: varchar("thumbnail_url"), // For image/video previews
+  width: integer("width"), // For images/videos
+  height: integer("height"), // For images/videos
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_message_attachments_message").on(table.messageId),
+]);
+
+// Message read receipts table
+export const messageReadReceipts = pgTable("message_read_receipts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").references(() => messages.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  readAt: timestamp("read_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_message_user_read").on(table.messageId, table.userId),
+  index("idx_message_read_receipts_message").on(table.messageId),
+  index("idx_message_read_receipts_user").on(table.userId),
+]);
+
+// Typing indicators table (for real-time typing status)
+export const typingIndicators = pgTable("typing_indicators", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(), // Auto-expire after 5 seconds
+}, (table) => [
+  unique("unique_conversation_user_typing").on(table.conversationId, table.userId),
+  index("idx_typing_indicators_conversation").on(table.conversationId),
+  index("idx_typing_indicators_expires").on(table.expiresAt),
+]);
+
+// User online status table
+export const userOnlineStatus = pgTable("user_online_status", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  status: onlineStatusEnum("status").default("offline").notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_user_online_status_user").on(table.userId),
+]);
 
 // Announcements table
 export const announcements = pgTable("announcements", {
@@ -704,24 +814,90 @@ export const gamesRelations = relations(games, ({ one, many }) => ({
   substituteRequests: many(substituteRequests),
 }));
 
-export const messagesRelations = relations(messages, ({ one }) => ({
+// Messaging relations
+export const conversationsRelations = relations(conversations, ({ one, many }) => ({
+  league: one(leagues, {
+    fields: [conversations.leagueId],
+    references: [leagues.id],
+  }),
+  team: one(teams, {
+    fields: [conversations.teamId],
+    references: [teams.id],
+  }),
+  createdBy: one(users, {
+    fields: [conversations.createdBy],
+    references: [users.id],
+  }),
+  participants: many(conversationParticipants),
+  messages: many(messages),
+  typingIndicators: many(typingIndicators),
+}));
+
+export const conversationParticipantsRelations = relations(conversationParticipants, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [conversationParticipants.conversationId],
+    references: [conversations.id],
+  }),
+  user: one(users, {
+    fields: [conversationParticipants.userId],
+    references: [users.id],
+  }),
+}));
+
+export const messagesRelations = relations(messages, ({ one, many }) => ({
+  conversation: one(conversations, {
+    fields: [messages.conversationId],
+    references: [conversations.id],
+  }),
   sender: one(users, {
     fields: [messages.senderId],
     references: [users.id],
-    relationName: "sender",
   }),
-  recipient: one(users, {
-    fields: [messages.recipientId],
+  attachments: many(messageAttachments),
+  readReceipts: many(messageReadReceipts),
+  replyTo: one(messages, {
+    fields: [messages.replyToId],
+    references: [messages.id],
+    relationName: "replyTo",
+  }),
+  replies: many(messages, {
+    relationName: "replyTo",
+  }),
+}));
+
+export const messageAttachmentsRelations = relations(messageAttachments, ({ one }) => ({
+  message: one(messages, {
+    fields: [messageAttachments.messageId],
+    references: [messages.id],
+  }),
+}));
+
+export const messageReadReceiptsRelations = relations(messageReadReceipts, ({ one }) => ({
+  message: one(messages, {
+    fields: [messageReadReceipts.messageId],
+    references: [messages.id],
+  }),
+  user: one(users, {
+    fields: [messageReadReceipts.userId],
     references: [users.id],
-    relationName: "recipient",
   }),
-  team: one(teams, {
-    fields: [messages.teamId],
-    references: [teams.id],
+}));
+
+export const typingIndicatorsRelations = relations(typingIndicators, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [typingIndicators.conversationId],
+    references: [conversations.id],
   }),
-  league: one(leagues, {
-    fields: [messages.leagueId],
-    references: [leagues.id],
+  user: one(users, {
+    fields: [typingIndicators.userId],
+    references: [users.id],
+  }),
+}));
+
+export const userOnlineStatusRelations = relations(userOnlineStatus, ({ one }) => ({
+  user: one(users, {
+    fields: [userOnlineStatus.userId],
+    references: [users.id],
   }),
 }));
 
@@ -990,9 +1166,43 @@ export const insertGameGoalieSchema = createInsertSchema(gameGoalies).omit({
   createdAt: true,
 });
 
+// Messaging schemas
+export const insertConversationSchema = createInsertSchema(conversations).omit({
+  id: true,
+  lastMessageAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertConversationParticipantSchema = createInsertSchema(conversationParticipants).omit({
+  id: true,
+  joinedAt: true,
+});
+
 export const insertMessageSchema = createInsertSchema(messages).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+});
+
+export const insertMessageAttachmentSchema = createInsertSchema(messageAttachments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMessageReadReceiptSchema = createInsertSchema(messageReadReceipts).omit({
+  id: true,
+  readAt: true,
+});
+
+export const insertTypingIndicatorSchema = createInsertSchema(typingIndicators).omit({
+  id: true,
+  startedAt: true,
+});
+
+export const insertUserOnlineStatusSchema = createInsertSchema(userOnlineStatus).omit({
+  id: true,
+  updatedAt: true,
 });
 
 export const insertPlayerStatsSchema = createInsertSchema(playerStats).omit({
@@ -1239,8 +1449,21 @@ export type GameScoreSubmission = typeof gameScoreSubmissions.$inferSelect;
 export type InsertGameScoreSubmission = z.infer<typeof insertGameScoreSubmissionSchema>;
 export type GameGoalie = typeof gameGoalies.$inferSelect;
 export type InsertGameGoalie = z.infer<typeof insertGameGoalieSchema>;
+// Messaging types
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type ConversationParticipant = typeof conversationParticipants.$inferSelect;
+export type InsertConversationParticipant = z.infer<typeof insertConversationParticipantSchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type MessageAttachment = typeof messageAttachments.$inferSelect;
+export type InsertMessageAttachment = z.infer<typeof insertMessageAttachmentSchema>;
+export type MessageReadReceipt = typeof messageReadReceipts.$inferSelect;
+export type InsertMessageReadReceipt = z.infer<typeof insertMessageReadReceiptSchema>;
+export type TypingIndicator = typeof typingIndicators.$inferSelect;
+export type InsertTypingIndicator = z.infer<typeof insertTypingIndicatorSchema>;
+export type UserOnlineStatus = typeof userOnlineStatus.$inferSelect;
+export type InsertUserOnlineStatus = z.infer<typeof insertUserOnlineStatusSchema>;
 export type PlayerStats = typeof playerStats.$inferSelect;
 export type InsertPlayerStats = z.infer<typeof insertPlayerStatsSchema>;
 export type Draft = typeof drafts.$inferSelect;
