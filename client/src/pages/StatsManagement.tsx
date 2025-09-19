@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { ArrowLeft, Users, Trophy, Target, AlertCircle, Clock, Plus, Minus } from 'lucide-react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
 
 interface Player {
@@ -47,7 +47,13 @@ interface PlayerStats {
 
 export default function StatsManagement() {
   const { user } = useAuth();
-  const [selectedLeague, setSelectedLeague] = useState<string>('');
+  const [location, navigate] = useLocation();
+  
+  // Get league ID from URL parameter if provided
+  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  const urlLeagueId = urlParams.get('league');
+  
+  const [selectedLeague, setSelectedLeague] = useState<string>(urlLeagueId || '');
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [selectedGame, setSelectedGame] = useState<string>('');
   const [playerGameStats, setPlayerGameStats] = useState<Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>>({});

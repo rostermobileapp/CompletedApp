@@ -1210,7 +1210,7 @@ export default function Dashboard() {
           <div 
             className="bg-card rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors" 
             data-testid="card-stats"
-            onClick={() => navigate('/stats')}
+            onClick={() => navigate(selectedLeagueId ? `/stats?league=${selectedLeagueId}` : '/stats')}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <BarChart3 className="w-8 h-8 text-purple-500 mb-3" />

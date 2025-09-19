@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/context/SubscriptionContext';
@@ -26,18 +26,21 @@ import {
 export default function Stats() {
   const { user } = useAuth();
   const { hasAccess } = useSubscription();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [sortField, setSortField] = useState<string>('points');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Get user's primary league (for now, using first league they're in)
+  // Get league ID from URL parameter if provided, otherwise use user's primary league
+  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  const urlLeagueId = urlParams.get('league');
+
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
   });
 
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
-  const leagueId = primaryTeam?.leagueId;
+  const leagueId = urlLeagueId || primaryTeam?.leagueId;
 
   // Fetch league seasons for filtering
   const { data: seasons } = useQuery({
@@ -166,7 +169,7 @@ export default function Stats() {
             <Button 
               onClick={() => {
                 setPageTransitionDirection('up');
-                navigate('/stats-management');
+                navigate(leagueId ? `/stats-management?league=${leagueId}` : '/stats-management');
               }}
               size="sm"
               data-testid="button-update-stats"
