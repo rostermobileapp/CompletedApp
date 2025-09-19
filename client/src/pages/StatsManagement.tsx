@@ -313,7 +313,19 @@ export default function StatsManagement() {
   };
 
   const handlePlayerStatsUpdate = () => {
+    console.log('handlePlayerStatsUpdate called with:', {
+      selectedPlayer,
+      selectedLeague,
+      selectedSeason,
+      individualStats
+    });
+    
     if (!selectedPlayer || !selectedLeague || !selectedSeason) {
+      console.log('Player stats validation failed:', {
+        selectedPlayer: !!selectedPlayer,
+        selectedLeague: !!selectedLeague,
+        selectedSeason: !!selectedSeason
+      });
       toast({
         title: 'Error',
         description: 'Please select a league, season, and player.',
