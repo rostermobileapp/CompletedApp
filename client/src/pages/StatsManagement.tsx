@@ -310,10 +310,7 @@ export default function StatsManagement() {
                 </Button>
               </Link>
               <div>
-                <h1 className="text-3xl font-bold flex items-center gap-3" data-testid="heading-stats-management">
-                  <Target className="w-8 h-8 text-primary" />
-                  Statistics Management
-                </h1>
+                
                 <p className="text-muted-foreground">Update player statistics for your leagues</p>
               </div>
             </div>
