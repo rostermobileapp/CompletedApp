@@ -365,53 +365,37 @@ export default function Stats() {
                 return (
                   <>
                     {/* Top Scorer */}
-                    <Card className="p-1.5 text-center h-16 w-16 flex flex-col justify-center" data-testid="card-top-scorer">
-                      <div className="flex items-center justify-center gap-1">
-                        <TrendingUp className="w-3 h-3 text-primary" />
-                        <div className="flex flex-col items-center">
-                          <p className="text-sm font-bold leading-none">
-                            {leaders?.topScorer ? (leaders.topScorer.goals || 0) + (leaders.topScorer.assists || 0) : 0}
-                          </p>
-                          <p className="text-xs text-muted-foreground leading-none">PTS</p>
-                        </div>
-                      </div>
-                      <p className="text-xs font-medium mt-0.5 truncate">{`${leaders?.topScorer?.user?.firstName || ''} ${leaders?.topScorer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 text-center h-25 w-25 flex flex-col justify-center" data-testid="card-top-scorer">
+                      <TrendingUp className="w-6 h-6 text-primary mx-auto mb-2" />
+                      <p className="text-xl font-bold leading-tight">
+                        {leaders?.topScorer ? (leaders.topScorer.goals || 0) + (leaders.topScorer.assists || 0) : 0}
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-2">Points</p>
+                      <p className="text-xs font-medium truncate">{`${leaders?.topScorer?.user?.firstName || ''} ${leaders?.topScorer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Most Goals */}
-                    <Card className="p-1.5 text-center h-16 w-16 flex flex-col justify-center" data-testid="card-most-goals">
-                      <div className="flex items-center justify-center gap-1">
-                        <Target className="w-3 h-3 text-success" />
-                        <div className="flex flex-col items-center">
-                          <p className="text-sm font-bold leading-none">{leaders?.topGoalScorer?.goals || 0}</p>
-                          <p className="text-xs text-muted-foreground leading-none">G</p>
-                        </div>
-                      </div>
-                      <p className="text-xs font-medium mt-0.5 truncate">{`${leaders?.topGoalScorer?.user?.firstName || ''} ${leaders?.topGoalScorer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 text-center h-25 w-25 flex flex-col justify-center" data-testid="card-most-goals">
+                      <Target className="w-6 h-6 text-success mx-auto mb-2" />
+                      <p className="text-xl font-bold leading-tight">{leaders?.topGoalScorer?.goals || 0}</p>
+                      <p className="text-xs text-muted-foreground mb-2">Goals</p>
+                      <p className="text-xs font-medium truncate">{`${leaders?.topGoalScorer?.user?.firstName || ''} ${leaders?.topGoalScorer?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Most Assists */}
-                    <Card className="p-1.5 text-center h-16 w-16 flex flex-col justify-center" data-testid="card-most-assists">
-                      <div className="flex items-center justify-center gap-1">
-                        <Apple className="w-3 h-3 text-info" />
-                        <div className="flex flex-col items-center">
-                          <p className="text-sm font-bold leading-none">{leaders?.topAssistProvider?.assists || 0}</p>
-                          <p className="text-xs text-muted-foreground leading-none">A</p>
-                        </div>
-                      </div>
-                      <p className="text-xs font-medium mt-0.5 truncate">{`${leaders?.topAssistProvider?.user?.firstName || ''} ${leaders?.topAssistProvider?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 text-center h-25 w-25 flex flex-col justify-center" data-testid="card-most-assists">
+                      <Apple className="w-6 h-6 text-info mx-auto mb-2" />
+                      <p className="text-xl font-bold leading-tight">{leaders?.topAssistProvider?.assists || 0}</p>
+                      <p className="text-xs text-muted-foreground mb-2">Assists</p>
+                      <p className="text-xs font-medium truncate">{`${leaders?.topAssistProvider?.user?.firstName || ''} ${leaders?.topAssistProvider?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
 
                     {/* Most Penalty Minutes */}
-                    <Card className="p-1.5 text-center h-16 w-16 flex flex-col justify-center" data-testid="card-most-penalty-minutes">
-                      <div className="flex items-center justify-center gap-1">
-                        <Hand className="w-3 h-3 text-warning" />
-                        <div className="flex flex-col items-center">
-                          <p className="text-sm font-bold leading-none">{leaders?.mostPenaltyMinutes?.penaltyMinutes || 0}</p>
-                          <p className="text-xs text-muted-foreground leading-none">PIM</p>
-                        </div>
-                      </div>
-                      <p className="text-xs font-medium mt-0.5 truncate">{`${leaders?.mostPenaltyMinutes?.user?.firstName || ''} ${leaders?.mostPenaltyMinutes?.user?.lastName || ''}`.trim() || 'N/A'}</p>
+                    <Card className="p-3 text-center h-25 w-25 flex flex-col justify-center" data-testid="card-most-penalty-minutes">
+                      <Hand className="w-6 h-6 text-warning mx-auto mb-2" />
+                      <p className="text-xl font-bold leading-tight">{leaders?.mostPenaltyMinutes?.penaltyMinutes || 0}</p>
+                      <p className="text-xs text-muted-foreground mb-2">Penalty Minutes</p>
+                      <p className="text-xs font-medium truncate">{`${leaders?.mostPenaltyMinutes?.user?.firstName || ''} ${leaders?.mostPenaltyMinutes?.user?.lastName || ''}`.trim() || 'N/A'}</p>
                     </Card>
                   </>
                 );
