@@ -276,7 +276,7 @@ export default function Stats() {
           <div className="flex items-center gap-4">
             {/* Season Filter */}
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-muted-foreground">Season:</label>
+              <label className="text-sm font-medium text-[#3c83f6]">Season:</label>
               <Select value={selectedSeason} onValueChange={setSelectedSeason} data-testid="select-season">
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="All" />
