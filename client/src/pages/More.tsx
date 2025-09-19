@@ -1,12 +1,15 @@
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Users, BarChart3, UserPlus, Crown, Settings, Bell, Moon, Shield, LogOut, Plus, Calendar, CheckCircle } from 'lucide-react';
-import { useSubscription } from '@/context/SubscriptionContext';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { apiRequest } from '@/lib/queryClient';
 
 export default function More() {
   const [, navigate] = useLocation();
-  const { hasAccess, tier } = useSubscription();
+  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
+  const hasAccess = () => true; // All features unlocked!
+  const tier = 'commissioner'; // Everyone is commissioner now!
 
   const teamFeatures = [
     {

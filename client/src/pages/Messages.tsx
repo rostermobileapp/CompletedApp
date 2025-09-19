@@ -1,5 +1,6 @@
-import { SubscriptionGate } from '@/components/SubscriptionGate';
-import { useSubscription } from '@/context/SubscriptionContext';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
+// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
@@ -76,7 +77,9 @@ interface Contact {
 }
 
 export default function Messages() {
-  const { hasAccess, tier } = useSubscription();
+  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
+  const hasAccess = () => true; // All features unlocked!
+  const tier = 'commissioner'; // Everyone is commissioner now!
   const { user } = useAuth();
   const currentUserId = (user as any)?.id;
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
@@ -98,7 +101,7 @@ export default function Messages() {
   // Fetch user's leagues for contact discovery
   const { data: userLeagues = [] } = useQuery<League[]>({
     queryKey: ['/api/user/leagues'],
-    enabled: hasAccess('player_plus')
+    enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
   // Fetch contacts for selected league
@@ -110,7 +113,7 @@ export default function Messages() {
   // Fetch conversations
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
     queryKey: ['/api/conversations'],
-    enabled: hasAccess('player_plus')
+    enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
   // Fetch messages for selected conversation
@@ -474,26 +477,8 @@ export default function Messages() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
-  if (!hasAccess('player_plus')) {
-    return (
-      <div className="min-h-screen flex flex-col pb-24" data-testid="messages-page">
-        <div className="p-6 pt-12">
-          <h1 className="text-2xl font-bold mb-6" data-testid="text-page-title">Messages</h1>
-        </div>
-        <div className="px-6 mb-6">
-          <SubscriptionGate requiredTier="player_plus">
-            <div className="text-center py-8">
-              <MessageCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Team Messages</h3>
-              <p className="text-muted-foreground">
-                Upgrade to Player Plus to access team messaging
-              </p>
-            </div>
-          </SubscriptionGate>
-        </div>
-      </div>
-    );
-  }
+  // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
+  // All users now have free access to messaging features
 
   // Helper functions for contact discovery
   const filteredContacts = contacts.filter(contact => {

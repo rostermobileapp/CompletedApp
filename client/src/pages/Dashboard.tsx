@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { SubscriptionGate } from '@/components/SubscriptionGate';
-import { useSubscription } from '@/context/SubscriptionContext';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
+// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useLocation, Link } from 'wouter';
 import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, Target, AlertCircle, Settings, UserCheck, Shield } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -831,7 +832,8 @@ function CaptainToDo({ leagueId, userTeams, onNavigate, onOpenScoreModal }: {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { tier } = useSubscription();
+  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
+  const tier = 'commissioner'; // Everyone is commissioner now!
   const [, navigate] = useLocation();
   const { toast } = useToast();
   

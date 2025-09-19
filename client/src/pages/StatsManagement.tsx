@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { SubscriptionGate } from '@/components/SubscriptionGate';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -302,8 +303,9 @@ export default function StatsManagement() {
     });
   }, [games, seasons, selectedSeason]);
 
+  // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
   return (
-    <SubscriptionGate requiredTier="commissioner">
+    // <SubscriptionGate requiredTier="commissioner"> // DELETED - ALL ACCESS GRANTED
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
@@ -612,6 +614,5 @@ export default function StatsManagement() {
           )}
         </div>
       </div>
-    </SubscriptionGate>
-  );
+    );
 }

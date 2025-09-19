@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Plus, Users, Trophy, Calendar } from 'lucide-react';
-import { useSubscription } from '@/context/SubscriptionContext';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 
 type League = {
   id: string;
@@ -15,7 +16,8 @@ type League = {
 
 export default function LeagueList() {
   const [, navigate] = useLocation();
-  const { hasAccess } = useSubscription();
+  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
+  const hasAccess = () => true; // All features unlocked!
 
   const { data: leagues, isLoading } = useQuery<League[]>({
     queryKey: ['/api/leagues/commissioner'],

@@ -16,7 +16,6 @@ import Messages from "@/pages/Messages";
 import More from "@/pages/More";
 import Profile from "@/pages/Profile";
 import Roster from "@/pages/Roster";
-import Subscription from "@/pages/Subscription";
 import CreateLeague from "@/pages/CreateLeague";
 import CreateScrimmage from "@/pages/CreateScrimmage";
 import ScrimmageManagement from "@/pages/ScrimmageManagement";
@@ -63,7 +62,6 @@ function Router() {
             <Route path="/more" component={More} />
             <Route path="/profile" component={Profile} />
             <Route path="/roster" component={Roster} />
-            <Route path="/subscription" component={Subscription} />
             <Route path="/create-league" component={CreateLeague} />
             <Route path="/create-scrimmage" component={CreateScrimmage} />
             <Route path="/scrimmage-management" component={ScrimmageManagement} />

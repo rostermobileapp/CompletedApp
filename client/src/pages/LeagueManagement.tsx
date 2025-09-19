@@ -9,8 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { useSubscription } from '@/context/SubscriptionContext';
-import { SubscriptionGate } from '@/components/SubscriptionGate';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
+// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import {
@@ -573,7 +574,8 @@ export default function LeagueManagement() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { hasAccess } = useSubscription();
+  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
+  const hasAccess = () => true; // All features unlocked!
   const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('games');
   const [gamesViewMode, setGamesViewMode] = useState<'calendar' | 'list'>('calendar');
   const [showCreateTeam, setShowCreateTeam] = useState(false);
@@ -1337,25 +1339,8 @@ export default function LeagueManagement() {
     },
   });
 
-  if (!hasAccess('commissioner')) {
-    return (
-      <SubscriptionGate requiredTier="commissioner">
-        <div className="min-h-screen flex flex-col items-center justify-center px-6">
-          <Crown className="w-16 h-16 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-bold mb-2">Commissioner Access Required</h2>
-          <p className="text-muted-foreground text-center mb-6">
-            You need Commissioner tier access to manage leagues.
-          </p>
-          <button 
-            onClick={() => navigate('/subscription')}
-            className="bg-warning text-black px-6 py-3 rounded-lg font-semibold"
-          >
-            Upgrade to Commissioner
-          </button>
-        </div>
-      </SubscriptionGate>
-    );
-  }
+  // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
+  // All users now have commissioner access to manage leagues
 
   if (!leagueId) {
     return (

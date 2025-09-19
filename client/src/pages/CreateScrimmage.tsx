@@ -9,8 +9,9 @@ import { ArrowLeft, Calendar, Crown, MapPin, Users, Search } from 'lucide-react'
 import { useLocation } from 'wouter';
 import { createScrimmageRequestSchema } from '@shared/schema';
 import { z } from 'zod';
-import { useSubscription } from '@/context/SubscriptionContext';
-import { SubscriptionGate } from '@/components/SubscriptionGate';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
+// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,7 +40,8 @@ export default function CreateScrimmage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { hasAccess } = useSubscription();
+  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
+  const hasAccess = () => true; // All features unlocked!
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
@@ -158,26 +160,8 @@ export default function CreateScrimmage() {
     form.trigger('selectedMemberIds');
   };
 
-  if (!hasAccess('player_plus')) {
-    return (
-      <SubscriptionGate requiredTier="player_plus">
-        <div className="min-h-screen flex flex-col items-center justify-center px-6">
-          <Calendar className="w-16 h-16 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-bold mb-2">Player Plus+ Access Required</h2>
-          <p className="text-muted-foreground text-center mb-6">
-            You need Player Plus+ access to schedule scrimmages and organize games.
-          </p>
-          <button 
-            onClick={() => navigate('/subscription')}
-            className="bg-primary text-primary-foreground px-6 py-3 rounded-lg font-semibold"
-            data-testid="button-upgrade"
-          >
-            Upgrade to Player Plus+
-          </button>
-        </div>
-      </SubscriptionGate>
-    );
-  }
+  // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
+  // All users now have free access to scrimmage creation
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="create-scrimmage-page">

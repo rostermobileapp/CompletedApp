@@ -23,9 +23,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const tier: SubscriptionTier = (user && typeof user === 'object' && 'subscriptionTier' in user && typeof user.subscriptionTier === 'string') ? user.subscriptionTier as SubscriptionTier : 'free';
   
   const hasAccess = (requiredTier: SubscriptionTier): boolean => {
-    // Allow bypassing subscription gate for testing/development
-    const bypass = import.meta.env.VITE_DISABLE_SUBSCRIPTION_GATE === 'true' || import.meta.env.MODE === 'development';
-    return bypass ? true : tierHierarchy[tier] >= tierHierarchy[requiredTier];
+    // 🚨 STRIPE REMOVED - ALL FEATURES ARE FREE IN BETA! 🚨
+    return true; // Everyone gets full access to everything
   };
 
   return (

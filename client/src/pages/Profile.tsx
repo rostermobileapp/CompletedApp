@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useSubscription } from '@/context/SubscriptionContext';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useLocation } from 'wouter';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -25,7 +26,8 @@ type ProfileForm = z.infer<typeof profileSchema>;
 
 export default function Profile() {
   const { user } = useAuth();
-  const { tier } = useSubscription();
+  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
+  const tier = 'commissioner'; // Everyone is commissioner now!
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();

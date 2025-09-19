@@ -13,8 +13,9 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Scrimmage, ScrimmageRequest, User } from '@shared/schema';
-import { SubscriptionGate } from '@/components/SubscriptionGate';
-import { useSubscription } from '@/context/SubscriptionContext';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
+// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 
 // Extended types with relationships for UI
 type ScrimmageWithCreatorAndCount = Scrimmage & {
@@ -32,7 +33,8 @@ export default function ScrimmageManagement() {
   const queryClient = useQueryClient();
   const [selectedScrimmage, setSelectedScrimmage] = useState<string | null>(null);
   const [viewRosterScrimmage, setViewRosterScrimmage] = useState<string | null>(null);
-  const { hasAccess } = useSubscription();
+  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
+  const hasAccess = () => true; // All features unlocked!
 
   const handleBack = () => {
     setPageTransitionDirection('down');
@@ -142,15 +144,8 @@ export default function ScrimmageManagement() {
   const getApprovedRequests = (requests: ScrimmageRequestWithPlayer[]) => 
     requests.filter(r => r.status === 'approved');
 
-  // Check access control
-  if (!hasAccess('player_plus')) {
-    return (
-      <SubscriptionGate 
-        requiredTier="player_plus"
-        onUpgrade={() => navigate('/subscription')}
-      />
-    );
-  }
+  // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
+  // All users now have player_plus access to manage scrimmages
 
   // Show error states
   if (scrimmagesError) {

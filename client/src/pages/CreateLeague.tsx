@@ -9,8 +9,9 @@ import { ArrowLeft, Crown, MapPin, Calendar } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { insertLeagueSchema } from '@shared/schema';
 import type { z } from 'zod';
-import { useSubscription } from '@/context/SubscriptionContext';
-import { SubscriptionGate } from '@/components/SubscriptionGate';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
+// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 
 // Create a form schema that includes the new fields, making most fields optional
 const createLeagueSchema = insertLeagueSchema.extend({
@@ -32,7 +33,9 @@ export default function CreateLeague() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { hasAccess, tier } = useSubscription();
+  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
+  const hasAccess = () => true; // All features unlocked!
+  const tier = 'commissioner'; // Everyone is commissioner now!
   
   const form = useForm<CreateLeagueForm>({
     resolver: zodResolver(createLeagueSchema),
@@ -74,25 +77,8 @@ export default function CreateLeague() {
     createLeagueMutation.mutate(data);
   };
 
-  if (!hasAccess('commissioner')) {
-    return (
-      <SubscriptionGate requiredTier="commissioner">
-        <div className="min-h-screen flex flex-col items-center justify-center px-6">
-          <Crown className="w-16 h-16 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-bold mb-2">Commissioner Access Required</h2>
-          <p className="text-muted-foreground text-center mb-6">
-            You need Commissioner tier access to create leagues and manage teams.
-          </p>
-          <button 
-            onClick={() => navigate('/subscription')}
-            className="bg-warning text-black px-6 py-3 rounded-lg font-semibold"
-          >
-            Upgrade to Commissioner
-          </button>
-        </div>
-      </SubscriptionGate>
-    );
-  }
+  // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
+  // All users now have commissioner access to create leagues
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="create-league-page">

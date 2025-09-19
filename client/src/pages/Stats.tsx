@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { useSubscription } from '@/context/SubscriptionContext';
+// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
+// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Trophy, Target, Clock, Medal, TrendingUp, Filter, Settings, Apple, Hand, Flag } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -26,7 +27,8 @@ import { PlayerStatsUnion, GoalieStats, SkaterStats } from '@shared/schema';
 
 export default function Stats() {
   const { user } = useAuth();
-  const { hasAccess } = useSubscription();
+  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
+  const hasAccess = () => true; // All features unlocked!
   const [location, navigate] = useLocation();
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [sortField, setSortField] = useState<string>('points');

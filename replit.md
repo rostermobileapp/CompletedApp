@@ -1,6 +1,6 @@
 # Overview
 
-Rosters is a comprehensive sports team management platform that provides league and team organization, game scheduling, messaging, and subscription-based features. The application targets sports teams and leagues across multiple sports including hockey, basketball, soccer, baseball, and more. It offers tiered subscription plans (Free, Player Plus, Commissioner) that unlock progressively advanced features for team coordination and league management.
+Rosters is a comprehensive sports team management platform that provides league and team organization, game scheduling, and messaging features. The application targets sports teams and leagues across multiple sports including hockey, basketball, soccer, baseball, and more. All features are completely free and accessible to all users in this beta environment.
 
 # User Preferences
 
