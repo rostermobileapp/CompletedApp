@@ -6,6 +6,7 @@ import {
   messageReadReceipts,
   typingIndicators,
   userOnlineStatus,
+  users,
   type Conversation,
   type InsertConversation,
   type ConversationParticipant,
@@ -44,10 +45,27 @@ export class MessagingService {
   }
 
   async getConversationParticipants(conversationId: string): Promise<ConversationParticipant[]> {
-    return await db
-      .select()
+    const result = await db
+      .select({
+        // Get participant fields
+        id: conversationParticipants.id,
+        conversationId: conversationParticipants.conversationId, 
+        userId: conversationParticipants.userId,
+        joinedAt: conversationParticipants.joinedAt,
+        // Get user fields and create user object
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          displayName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
+        }
+      })
       .from(conversationParticipants)
+      .innerJoin(users, eq(conversationParticipants.userId, users.id))
       .where(eq(conversationParticipants.conversationId, conversationId));
+    
+    return result as ConversationParticipant[];
   }
 
   async isUserInConversation(userId: string, conversationId: string): Promise<boolean> {
