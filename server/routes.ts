@@ -4144,7 +4144,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { leagueId } = req.query;
       
       const conversations = await messagingService.getUserConversations(userId, leagueId);
-      res.json(conversations);
+      
+      // Get participants for each conversation so frontend can display names
+      const conversationsWithParticipants = await Promise.all(
+        conversations.map(async (conversation) => {
+          const participants = await messagingService.getConversationParticipants(conversation.id);
+          return {
+            ...conversation,
+            participants
+          };
+        })
+      );
+      
+      res.json(conversationsWithParticipants);
     } catch (error) {
       console.error('Error fetching conversations:', error);
       res.status(500).json({ message: 'Failed to fetch conversations' });
