@@ -134,7 +134,7 @@ export default function Messages() {
       setShowContactDiscovery(false);
       toast({
         title: 'Conversation started',
-        description: 'You can now send messages'
+        description: 'Conversation started successfully'
       });
     },
     onError: (error) => {
@@ -535,7 +535,7 @@ export default function Messages() {
               <div className="p-4 bg-muted rounded-md text-center">
                 <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  No leagues found. You need to join a league to send messages.
+                  No leagues found. Join a league to send messages.
                 </p>
               </div>
             )}
@@ -851,7 +851,7 @@ export default function Messages() {
                     {isCurrentUser && (
                       <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center order-2">
                         <span className="text-primary-foreground text-xs font-semibold">
-                          You
+                          {user?.firstName?.charAt(0) || 'M'}
                         </span>
                       </div>
                     )}
