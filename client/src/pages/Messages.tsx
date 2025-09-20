@@ -775,53 +775,80 @@ export default function Messages() {
                 ))}
               </div>
             ) : (
-              messages.map((message: Message) => (
-                <div key={message.id} className="flex gap-3" data-testid={`message-${message.id}`}>
-                  <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
-                    <span className="text-accent-foreground text-xs font-semibold">U</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-sm" data-testid={`text-message-sender-${message.id}`}>User</span>
-                      <span className="text-xs text-muted-foreground" data-testid={`text-message-time-${message.id}`}>
-                        {formatMessageTime(message.sentAt)}
-                      </span>
-                      {message.readReceipts.length > 0 && (
-                        <span className="text-xs text-muted-foreground" data-testid={`text-read-status-${message.id}`}>
-                          ✓ Read
+              messages.map((message: Message) => {
+                const isCurrentUser = message.senderId === currentUserId;
+                
+                return (
+                  <div 
+                    key={message.id} 
+                    className={`flex gap-3 ${isCurrentUser ? 'justify-end' : 'justify-start'}`} 
+                    data-testid={`message-${message.id}`}
+                  >
+                    {!isCurrentUser && (
+                      <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
+                        <span className="text-accent-foreground text-xs font-semibold">
+                          {message.sender?.firstName?.charAt(0) || 'U'}
                         </span>
-                      )}
-                    </div>
-                    <p className="text-sm" data-testid={`text-message-content-${message.id}`}>
-                      {message.content}
-                    </p>
-                    {message.attachments && message.attachments.length > 0 && (
-                      <div className="mt-2 space-y-2" data-testid={`message-attachments-${message.id}`}>
-                        {message.attachments.map((attachment: any, index: number) => (
-                          <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded border">
-                            {getFileIcon(attachment.mimeType || '')}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{attachment.filename}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {attachment.fileSize ? (attachment.fileSize / 1024).toFixed(1) + ' KB' : 'Unknown size'}
-                              </p>
-                            </div>
-                            <a 
-                              href={attachment.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-primary hover:underline text-sm"
-                              data-testid={`attachment-link-${index}`}
-                            >
-                              Download
-                            </a>
+                      </div>
+                    )}
+                    <div className={`max-w-[70%] ${isCurrentUser ? 'order-1' : 'order-2'}`}>
+                      <div className={`rounded-lg p-3 ${
+                        isCurrentUser 
+                          ? 'bg-primary text-primary-foreground ml-auto' 
+                          : 'bg-muted'
+                      }`}>
+                        <div className={`flex items-center gap-2 mb-1 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                          <span className="font-semibold text-xs" data-testid={`text-message-sender-${message.id}`}>
+                            {isCurrentUser ? 'You' : (message.sender?.firstName || 'User')}
+                          </span>
+                          <span className="text-xs opacity-70" data-testid={`text-message-time-${message.id}`}>
+                            {formatMessageTime(message.sentAt)}
+                          </span>
+                          {isCurrentUser && message.readReceipts.length > 0 && (
+                            <span className="text-xs opacity-70" data-testid={`text-read-status-${message.id}`}>
+                              ✓ Read
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm" data-testid={`text-message-content-${message.id}`}>
+                          {message.content}
+                        </p>
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="mt-2 space-y-2" data-testid={`message-attachments-${message.id}`}>
+                            {message.attachments.map((attachment: any, index: number) => (
+                              <div key={index} className="flex items-center gap-2 p-2 bg-background/20 rounded border">
+                                {getFileIcon(attachment.mimeType || '')}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{attachment.filename}</p>
+                                  <p className="text-xs opacity-70">
+                                    {attachment.fileSize ? (attachment.fileSize / 1024).toFixed(1) + ' KB' : 'Unknown size'}
+                                  </p>
+                                </div>
+                                <a 
+                                  href={attachment.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline text-sm"
+                                  data-testid={`attachment-link-${index}`}
+                                >
+                                  Download
+                                </a>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
+                      </div>
+                    </div>
+                    {isCurrentUser && (
+                      <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center order-2">
+                        <span className="text-primary-foreground text-xs font-semibold">
+                          You
+                        </span>
                       </div>
                     )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
             
             {/* Typing indicators */}

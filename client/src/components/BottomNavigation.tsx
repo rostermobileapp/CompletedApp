@@ -22,7 +22,7 @@ export function BottomNavigation() {
     staleTime: 5000, // Consider data stale after 5 seconds
   });
   
-  const unreadCount = unreadData?.count ?? 0;
+  const unreadCount = (unreadData as { count: number } | undefined)?.count ?? 0;
 
   const getActiveId = (pathname: string) => {
     if (pathname === '/') return 'home';
