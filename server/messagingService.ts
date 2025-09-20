@@ -23,7 +23,7 @@ import {
   type InsertUserOnlineStatus,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 
 export class MessagingService {
   // Conversation operations
@@ -369,7 +369,7 @@ export class MessagingService {
       )
       .where(
         and(
-          sql`${messages.conversationId} = ANY(${conversationIds})`,
+          inArray(messages.conversationId, conversationIds),
           sql`${messages.senderId} != ${userId}`, // Don't count user's own messages
           sql`${messageReadReceipts.id} IS NULL` // Messages without read receipts
         )
