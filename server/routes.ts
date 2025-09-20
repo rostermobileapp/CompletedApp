@@ -4425,6 +4425,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get unread message count for current user
+  app.get('/api/messages/unread-count', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const unreadCount = await messagingService.getUnreadMessageCount(userId);
+      res.json({ count: unreadCount });
+    } catch (error) {
+      console.error('Error fetching unread message count:', error);
+      res.status(500).json({ message: 'Failed to fetch unread message count' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time messaging

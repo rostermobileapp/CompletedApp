@@ -65,7 +65,7 @@ export class MessagingService {
       .innerJoin(users, eq(conversationParticipants.userId, users.id))
       .where(eq(conversationParticipants.conversationId, conversationId));
     
-    return result as ConversationParticipant[];
+    return result as any[] as ConversationParticipant[];
   }
 
   async isUserInConversation(userId: string, conversationId: string): Promise<boolean> {
@@ -335,6 +335,47 @@ export class MessagingService {
       .orderBy(desc(conversations.updatedAt));
 
     return result.map(row => row.conversations);
+  }
+
+  async getUnreadMessageCount(userId: string): Promise<number> {
+    // Get all conversations the user is part of
+    const userConversations = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .innerJoin(
+        conversationParticipants,
+        eq(conversations.id, conversationParticipants.conversationId)
+      )
+      .where(eq(conversationParticipants.userId, userId));
+
+    if (userConversations.length === 0) {
+      return 0;
+    }
+
+    const conversationIds = userConversations.map(c => c.id);
+
+    // Count messages in user's conversations that they haven't read
+    const [result] = await db
+      .select({ 
+        count: sql<number>`count(*)::int` 
+      })
+      .from(messages)
+      .leftJoin(
+        messageReadReceipts,
+        and(
+          eq(messages.id, messageReadReceipts.messageId),
+          eq(messageReadReceipts.userId, userId)
+        )
+      )
+      .where(
+        and(
+          sql`${messages.conversationId} = ANY(${conversationIds})`,
+          sql`${messages.senderId} != ${userId}`, // Don't count user's own messages
+          sql`${messageReadReceipts.id} IS NULL` // Messages without read receipts
+        )
+      );
+
+    return result?.count ?? 0;
   }
 }
 

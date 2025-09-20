@@ -1,5 +1,6 @@
 import { Users, MessageCircle, MoreHorizontal, User } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
@@ -13,6 +14,15 @@ const navItems = [
 
 export function BottomNavigation() {
   const [location, navigate] = useLocation();
+  
+  // Fetch unread message count
+  const { data: unreadData } = useQuery({
+    queryKey: ['/api/messages/unread-count'],
+    refetchInterval: 10000, // Poll every 10 seconds
+    staleTime: 5000, // Consider data stale after 5 seconds
+  });
+  
+  const unreadCount = unreadData?.count ?? 0;
 
   const getActiveId = (pathname: string) => {
     if (pathname === '/') return 'home';
@@ -46,7 +56,14 @@ export function BottomNavigation() {
                 style={{ width: '30px', height: '30px' }}
               />
             ) : Icon && (
-              <Icon className="w-5 h-5 mb-1" />
+              <div className="relative">
+                <Icon className="w-5 h-5 mb-1" />
+                {id === 'messages' && unreadCount > 0 && (
+                  <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid="message-badge">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </div>
+                )}
+              </div>
             )}
             <span className="text-xs">{label}</span>
           </button>
