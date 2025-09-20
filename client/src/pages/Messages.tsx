@@ -761,7 +761,7 @@ export default function Messages() {
           </div>
           
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4" data-testid="messages-container">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20" data-testid="messages-container">
             {messagesLoading ? (
               <div className="space-y-4" data-testid="messages-loading">
                 {[1, 2, 3].map(i => (
@@ -878,82 +878,84 @@ export default function Messages() {
             )}
             <div ref={messagesEndRef} />
           </div>
-          
-          {/* Message Input */}
-          <div className="p-4 border-t border-border" data-testid="message-input-container">
-            {/* File previews */}
-            {selectedFiles.length > 0 && (
-              <div className="mb-3 space-y-2" data-testid="selected-files">
-                {selectedFiles.map((file, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded border">
-                    {getFileIcon(file.type)}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(file.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                    <button 
-                      onClick={() => removeFile(index)}
-                      className="p-1 hover:bg-accent rounded"
-                      data-testid={`remove-file-${index}`}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2 hover:bg-accent rounded transition-colors"
-                data-testid="button-attach-file"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
-              <Input
-                placeholder="Type a message..."
-                value={newMessage}
-                onChange={handleInputChange}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                onBlur={handleTypingStop}
-                className="flex-1"
-                data-testid="input-message"
-              />
-              <Button 
-                onClick={handleSendMessage}
-                disabled={(!newMessage.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending || isUploadingFiles}
-                data-testid="button-send-message"
-              >
-                {isUploadingFiles ? (
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-              </Button>
-              
-              {/* Hidden file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileSelect}
-                className="hidden"
-                accept="*/*"
-                data-testid="file-input"
-              />
-            </div>
-          </div>
         </>
       )}
     </div>
+    
+    {/* Fixed Message Input - only show when conversation is selected */}
+    {selectedConversation && (
+      <div className="fixed bottom-20 left-0 right-0 bg-background border-t border-border p-4 z-40" data-testid="message-input-container">
+        {/* File previews */}
+        {selectedFiles.length > 0 && (
+          <div className="mb-3 space-y-2" data-testid="selected-files">
+            {selectedFiles.map((file, index) => (
+              <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded border">
+                {getFileIcon(file.type)}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(file.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                <button 
+                  onClick={() => removeFile(index)}
+                  className="p-1 hover:bg-accent rounded"
+                  data-testid={`remove-file-${index}`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 hover:bg-accent rounded transition-colors"
+            data-testid="button-attach-file"
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
+          <Input
+            placeholder="Type a message..."
+            value={newMessage}
+            onChange={handleInputChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            onBlur={handleTypingStop}
+            className="flex-1"
+            data-testid="input-message"
+          />
+          <Button 
+            onClick={handleSendMessage}
+            disabled={(!newMessage.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending || isUploadingFiles}
+            data-testid="button-send-message"
+          >
+            {isUploadingFiles ? (
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </Button>
+          
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+            accept="*/*"
+            data-testid="file-input"
+          />
+        </div>
+      </div>
+    )}
     </>
   );
 }
