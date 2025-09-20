@@ -787,7 +787,7 @@ export default function Messages() {
                     {!isCurrentUser && (
                       <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
                         <span className="text-accent-foreground text-xs font-semibold">
-                          U
+                          {message.sender?.firstName?.charAt(0) || 'U'}
                         </span>
                       </div>
                     )}
@@ -797,19 +797,28 @@ export default function Messages() {
                           ? 'bg-primary text-primary-foreground ml-auto' 
                           : 'bg-muted'
                       }`}>
-                        <div className={`flex items-center gap-2 mb-1 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
-                          <span className="font-semibold text-xs" data-testid={`text-message-sender-${message.id}`}>
-                            {isCurrentUser ? 'You' : 'User'}
-                          </span>
-                          <span className="text-xs opacity-70" data-testid={`text-message-time-${message.id}`}>
-                            {formatMessageTime(message.sentAt)}
-                          </span>
-                          {isCurrentUser && message.readReceipts.length > 0 && (
-                            <span className="text-xs opacity-70" data-testid={`text-read-status-${message.id}`}>
-                              ✓ Read
+                        {!isCurrentUser && (
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-xs" data-testid={`text-message-sender-${message.id}`}>
+                              {message.sender?.firstName || 'Unknown User'}{message.sender?.lastName ? ` ${message.sender.lastName}` : ''}
                             </span>
-                          )}
-                        </div>
+                            <span className="text-xs opacity-70" data-testid={`text-message-time-${message.id}`}>
+                              {formatMessageTime(message.sentAt)}
+                            </span>
+                          </div>
+                        )}
+                        {isCurrentUser && (
+                          <div className="flex items-center gap-2 mb-1 justify-end">
+                            <span className="text-xs opacity-70" data-testid={`text-message-time-${message.id}`}>
+                              {formatMessageTime(message.sentAt)}
+                            </span>
+                            {message.readReceipts.length > 0 && (
+                              <span className="text-xs opacity-70" data-testid={`text-read-status-${message.id}`}>
+                                ✓ Read
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <p className="text-sm" data-testid={`text-message-content-${message.id}`}>
                           {message.content}
                         </p>

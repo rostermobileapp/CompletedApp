@@ -108,13 +108,33 @@ export class MessagingService {
     return message;
   }
 
-  async getConversationMessages(conversationId: string, limit: number = 50): Promise<Message[]> {
-    return await db
-      .select()
+  async getConversationMessages(conversationId: string, limit: number = 50): Promise<any[]> {
+    const result = await db
+      .select({
+        id: messages.id,
+        conversationId: messages.conversationId,
+        senderId: messages.senderId,
+        content: messages.content,
+        messageType: messages.messageType,
+        status: messages.status,
+        sentAt: messages.createdAt,
+        editedAt: messages.editedAt,
+        replyToId: messages.replyToId,
+        createdAt: messages.createdAt,
+        updatedAt: messages.updatedAt,
+        sender: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        }
+      })
       .from(messages)
+      .innerJoin(users, eq(messages.senderId, users.id))
       .where(eq(messages.conversationId, conversationId))
       .orderBy(messages.createdAt)
       .limit(limit);
+    
+    return result;
   }
 
   // Message attachment operations
