@@ -4323,8 +4323,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Broadcast message to all participants via WebSocket
+      const participants = await messagingService.getConversationParticipants(conversationId);
+      broadcastToParticipants(participants, {
+        type: 'message',
+        conversationId,
+        message: {
+          ...message,
+          sentAt: message.createdAt, // Map for frontend compatibility
+          attachments: messageAttachments,
+          readReceipts: []
+        }
+      });
+
       res.status(201).json({
         ...message,
+        sentAt: message.createdAt, // Map for frontend compatibility
         attachments: messageAttachments,
         readReceipts: []
       });
