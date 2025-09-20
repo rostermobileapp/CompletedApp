@@ -775,7 +775,7 @@ export default function Messages() {
                 ))}
               </div>
             ) : (
-              messages.map((message: Message) => {
+              messages.map((message: any) => {
                 const isCurrentUser = message.senderId === currentUserId;
                 
                 return (
