@@ -787,7 +787,7 @@ export default function Messages() {
                     {!isCurrentUser && (
                       <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
                         <span className="text-accent-foreground text-xs font-semibold">
-                          {message.sender?.firstName?.charAt(0) || 'U'}
+                          U
                         </span>
                       </div>
                     )}
@@ -799,7 +799,7 @@ export default function Messages() {
                       }`}>
                         <div className={`flex items-center gap-2 mb-1 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
                           <span className="font-semibold text-xs" data-testid={`text-message-sender-${message.id}`}>
-                            {isCurrentUser ? 'You' : (message.sender?.firstName || 'User')}
+                            {isCurrentUser ? 'You' : 'User'}
                           </span>
                           <span className="text-xs opacity-70" data-testid={`text-message-time-${message.id}`}>
                             {formatMessageTime(message.sentAt)}
