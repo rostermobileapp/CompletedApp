@@ -397,6 +397,134 @@ export class MessagingService {
 
     return result?.count ?? 0;
   }
+
+  // Group conversation operations
+  async createTeamGroupChat(teamId: string, leagueId: string, createdBy: string): Promise<Conversation> {
+    // Check if team group chat already exists
+    const [existingChat] = await db
+      .select()
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.type, "team_group"),
+          eq(conversations.teamId, teamId)
+        )
+      )
+      .limit(1);
+
+    if (existingChat) {
+      return existingChat;
+    }
+
+    // Get team name for the conversation title
+    const [team] = await db
+      .select({ name: sql<string>`teams.name` })
+      .from(sql`teams`)
+      .where(sql`teams.id = ${teamId}`)
+      .limit(1);
+
+    const teamName = team?.name || 'Team';
+
+    // Create team group conversation
+    const conversation = await this.createConversation({
+      type: "team_group",
+      title: `${teamName} Team Chat`,
+      leagueId,
+      teamId,
+      createdBy,
+    });
+
+    // Add all team members to the conversation
+    const teamMembers = await db
+      .select({ userId: sql<string>`team_memberships.user_id` })
+      .from(sql`team_memberships`)
+      .where(sql`team_memberships.team_id = ${teamId} AND team_memberships.status = 'active'`);
+
+    // Add all team members as participants
+    const participantPromises = teamMembers.map(member => 
+      this.addParticipantToConversation({
+        conversationId: conversation.id,
+        userId: member.userId,
+      })
+    );
+
+    await Promise.all(participantPromises);
+
+    return conversation;
+  }
+
+  async createCustomGroupChat(
+    title: string, 
+    leagueId: string, 
+    createdBy: string, 
+    participantIds: string[]
+  ): Promise<Conversation> {
+    // Create custom group conversation
+    const conversation = await this.createConversation({
+      type: "custom_group",
+      title,
+      leagueId,
+      createdBy,
+    });
+
+    // Add creator as participant
+    await this.addParticipantToConversation({
+      conversationId: conversation.id,
+      userId: createdBy,
+    });
+
+    // Add all specified participants
+    const participantPromises = participantIds
+      .filter(id => id !== createdBy) // Don't duplicate creator
+      .map(userId => 
+        this.addParticipantToConversation({
+          conversationId: conversation.id,
+          userId,
+        })
+      );
+
+    await Promise.all(participantPromises);
+
+    return conversation;
+  }
+
+  async addUserToGroupConversation(conversationId: string, userId: string): Promise<ConversationParticipant> {
+    // Check if conversation is a group conversation
+    const conversation = await this.getConversation(conversationId);
+    if (!conversation || conversation.type === "direct") {
+      throw new Error("Can only add users to group conversations");
+    }
+
+    // Check if user is already in conversation
+    const existingParticipant = await this.isUserInConversation(userId, conversationId);
+    if (existingParticipant) {
+      throw new Error("User is already in this conversation");
+    }
+
+    return this.addParticipantToConversation({
+      conversationId,
+      userId,
+    });
+  }
+
+  async removeUserFromGroupConversation(conversationId: string, userId: string): Promise<void> {
+    // Check if conversation is a group conversation
+    const conversation = await this.getConversation(conversationId);
+    if (!conversation || conversation.type === "direct") {
+      throw new Error("Can only remove users from group conversations");
+    }
+
+    // Update participant to mark as left
+    await db
+      .update(conversationParticipants)
+      .set({ leftAt: new Date() })
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, conversationId),
+          eq(conversationParticipants.userId, userId)
+        )
+      );
+  }
 }
 
 export const messagingService = new MessagingService();
