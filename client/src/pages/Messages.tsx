@@ -43,9 +43,11 @@ interface ReadReceipt {
 
 interface Conversation {
   id: string;
-  name?: string;
-  type: 'direct' | 'team';
+  title?: string;
+  type: 'direct' | 'team_group' | 'custom_group';
   leagueId: string;
+  teamId?: string;
+  createdBy: string;
   createdAt: string;
   participants: ConversationParticipant[];
   lastMessage?: Message;
@@ -92,6 +94,10 @@ export default function Messages() {
   const [showContactDiscovery, setShowContactDiscovery] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
+  const [conversationType, setConversationType] = useState<'direct' | 'team_group' | 'custom_group'>('direct');
+  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const [groupTitle, setGroupTitle] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -110,6 +116,12 @@ export default function Messages() {
     enabled: !!selectedLeague // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
+  // Fetch user teams for team group chat option
+  const { data: userTeams = [] } = useQuery<any[]>({
+    queryKey: ['/api/user/teams'],
+    enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
+  });
+
   // Fetch conversations
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
     queryKey: ['/api/conversations'],
@@ -122,6 +134,15 @@ export default function Messages() {
     enabled: !!selectedConversation // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
+  // Reset dialog function
+  const resetDialog = () => {
+    setConversationType('direct');
+    setSelectedTeam(null);
+    setSelectedContacts([]);
+    setGroupTitle('');
+    setSearchQuery('');
+  };
+
   // Create new conversation mutation
   const createConversationMutation = useMutation({
     mutationFn: async (data: { otherUserId: string; leagueId: string }) => {
@@ -132,6 +153,7 @@ export default function Messages() {
       queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
       setSelectedConversation(conversation.id);
       setShowContactDiscovery(false);
+      resetDialog();
       toast({
         title: 'Conversation started',
         description: 'Conversation started successfully'
@@ -140,6 +162,56 @@ export default function Messages() {
     onError: (error) => {
       toast({
         title: 'Failed to start conversation',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Create team group conversation mutation
+  const createTeamGroupMutation = useMutation({
+    mutationFn: async (data: { teamId: string; leagueId: string }) => {
+      const response = await apiRequest('POST', '/api/conversations/team-group', data);
+      return response.json();
+    },
+    onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+      setSelectedConversation(conversation.id);
+      setShowContactDiscovery(false);
+      resetDialog();
+      toast({
+        title: 'Team chat created',
+        description: 'Team group chat created successfully'
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to create team chat',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Create custom group conversation mutation
+  const createCustomGroupMutation = useMutation({
+    mutationFn: async (data: { title: string; leagueId: string; participantIds: string[] }) => {
+      const response = await apiRequest('POST', '/api/conversations/custom-group', data);
+      return response.json();
+    },
+    onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+      setSelectedConversation(conversation.id);
+      setShowContactDiscovery(false);
+      resetDialog();
+      toast({
+        title: 'Group chat created',
+        description: 'Custom group chat created successfully'
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to create group chat',
         description: 'Please try again',
         variant: 'destructive'
       });
@@ -478,8 +550,8 @@ export default function Messages() {
   };
 
   const getParticipantName = (conversation: Conversation) => {
-    if (conversation.type === 'team') {
-      return conversation.name || 'Team Chat';
+    if (conversation.type === 'team_group' || conversation.type === 'custom_group') {
+      return conversation.title || 'Group Chat';
     }
     
     // For direct messages, find the other participant
@@ -513,6 +585,31 @@ export default function Messages() {
       otherUserId: contact.id,
       leagueId: selectedLeague
     });
+  };
+
+  const handleCreateTeamGroup = () => {
+    if (!selectedTeam || !selectedLeague) return;
+    createTeamGroupMutation.mutate({
+      teamId: selectedTeam,
+      leagueId: selectedLeague
+    });
+  };
+
+  const handleCreateCustomGroup = () => {
+    if (!groupTitle.trim() || selectedContacts.length === 0 || !selectedLeague) return;
+    createCustomGroupMutation.mutate({
+      title: groupTitle,
+      leagueId: selectedLeague,
+      participantIds: selectedContacts
+    });
+  };
+
+  const toggleContactSelection = (contactId: string) => {
+    setSelectedContacts(prev => 
+      prev.includes(contactId) 
+        ? prev.filter(id => id !== contactId)
+        : [...prev, contactId]
+    );
   };
 
   const getContactDisplayName = (contact: Contact) => {
@@ -565,9 +662,94 @@ export default function Messages() {
                 <div className="text-xs text-muted-foreground">Auto-selected</div>
               </div>
             )}
-            
-            {/* Search Contacts */}
+
+            {/* Conversation Type Selection */}
             {(selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">Conversation Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConversationType('direct')}
+                    className={`p-3 border rounded-lg text-center transition-colors ${
+                      conversationType === 'direct' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
+                    }`}
+                    data-testid="button-direct-message"
+                  >
+                    <MessageCircle className="w-4 h-4 mx-auto mb-1" />
+                    <div className="text-xs">Direct</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConversationType('team_group')}
+                    className={`p-3 border rounded-lg text-center transition-colors ${
+                      conversationType === 'team_group' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
+                    }`}
+                    data-testid="button-team-group"
+                  >
+                    <Users className="w-4 h-4 mx-auto mb-1" />
+                    <div className="text-xs">Team</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConversationType('custom_group')}
+                    className={`p-3 border rounded-lg text-center transition-colors ${
+                      conversationType === 'custom_group' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
+                    }`}
+                    data-testid="button-custom-group"
+                  >
+                    <UserPlus className="w-4 h-4 mx-auto mb-1" />
+                    <div className="text-xs">Group</div>
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Team Selection for Team Group Chat */}
+            {conversationType === 'team_group' && (selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">Select Team</label>
+                <select 
+                  value={selectedTeam || ''} 
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="w-full p-2 border border-border rounded-md bg-background"
+                  data-testid="select-team"
+                >
+                  <option value="">Choose a team...</option>
+                  {userTeams
+                    .filter(team => team.leagueId === (selectedLeague || userLeagues[0]?.id))
+                    .map((team) => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                </select>
+                {selectedTeam && (
+                  <Button
+                    onClick={handleCreateTeamGroup}
+                    disabled={createTeamGroupMutation.isPending}
+                    className="w-full mt-3"
+                    data-testid="button-create-team-chat"
+                  >
+                    {createTeamGroupMutation.isPending ? 'Creating...' : 'Create Team Chat'}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Group Title for Custom Group Chat */}
+            {conversationType === 'custom_group' && (selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">Group Name</label>
+                <Input
+                  placeholder="Enter group name..."
+                  value={groupTitle}
+                  onChange={(e) => setGroupTitle(e.target.value)}
+                  data-testid="input-group-title"
+                />
+              </div>
+            )}
+
+            {/* Search Contacts */}
+            {(conversationType === 'direct' || conversationType === 'custom_group') && (selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
               <>
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
@@ -599,8 +781,18 @@ export default function Messages() {
                       {filteredContacts.map((contact) => (
                         <div 
                           key={contact.id}
-                          className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
-                          onClick={() => handleStartConversation(contact)}
+                          className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                            conversationType === 'custom_group' && selectedContacts.includes(contact.id)
+                              ? 'bg-primary/10 border-primary'
+                              : 'hover:bg-accent/50'
+                          }`}
+                          onClick={() => {
+                            if (conversationType === 'direct') {
+                              handleStartConversation(contact);
+                            } else if (conversationType === 'custom_group') {
+                              toggleContactSelection(contact.id);
+                            }
+                          }}
                           data-testid={`contact-${contact.id}`}
                         >
                           <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
@@ -619,7 +811,17 @@ export default function Messages() {
                               </p>
                             )}
                           </div>
-                          <UserPlus className="w-4 h-4 text-muted-foreground" />
+                          {conversationType === 'direct' ? (
+                            <UserPlus className="w-4 h-4 text-muted-foreground" />
+                          ) : conversationType === 'custom_group' ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedContacts.includes(contact.id)}
+                              onChange={() => {}}
+                              className="w-4 h-4"
+                              data-testid={`checkbox-contact-${contact.id}`}
+                            />
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -632,6 +834,18 @@ export default function Messages() {
                     </div>
                   )}
                 </div>
+
+                {/* Create Custom Group Button */}
+                {conversationType === 'custom_group' && selectedContacts.length > 0 && groupTitle.trim() && (
+                  <Button
+                    onClick={handleCreateCustomGroup}
+                    disabled={createCustomGroupMutation.isPending}
+                    className="w-full"
+                    data-testid="button-create-custom-group"
+                  >
+                    {createCustomGroupMutation.isPending ? 'Creating...' : `Create Group (${selectedContacts.length} members)`}
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -687,7 +901,7 @@ export default function Messages() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-                        {conversation.type === 'team' ? (
+                        {conversation.type === 'team_group' || conversation.type === 'custom_group' ? (
                           <Users className="w-5 h-5 text-muted-foreground" />
                         ) : (
                           <span className="text-muted-foreground text-sm font-semibold">
