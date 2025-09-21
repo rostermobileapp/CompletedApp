@@ -4227,6 +4227,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create a team group conversation
+  app.post('/api/conversations/team-group', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requestSchema = z.object({
+        teamId: z.string().min(1),
+        leagueId: z.string().min(1)
+      });
+      
+      const { teamId, leagueId } = requestSchema.parse(req.body);
+      
+      // Check if team group conversation already exists
+      const conversation = await messagingService.createTeamGroupChat(teamId, leagueId, userId);
+      const participants = await messagingService.getConversationParticipants(conversation.id);
+      
+      res.status(201).json({
+        ...conversation,
+        participants
+      });
+    } catch (error) {
+      console.error('Error creating team group conversation:', error);
+      res.status(500).json({ message: 'Failed to create team group conversation' });
+    }
+  });
+
+  // Create a custom group conversation
+  app.post('/api/conversations/custom-group', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requestSchema = z.object({
+        title: z.string().min(1).max(100),
+        leagueId: z.string().min(1),
+        participantIds: z.array(z.string().min(1)).min(1).max(20)
+      });
+      
+      const { title, leagueId, participantIds } = requestSchema.parse(req.body);
+      
+      // Create custom group conversation
+      const conversation = await messagingService.createCustomGroupChat(title, leagueId, userId, participantIds);
+      const participants = await messagingService.getConversationParticipants(conversation.id);
+      
+      res.status(201).json({
+        ...conversation,
+        participants
+      });
+    } catch (error) {
+      console.error('Error creating custom group conversation:', error);
+      res.status(500).json({ message: 'Failed to create custom group conversation' });
+    }
+  });
+
+  // Add user to group conversation
+  app.post('/api/conversations/:id/participants', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const requestSchema = z.object({
+        userId: z.string().min(1)
+      });
+      
+      const { userId: targetUserId } = requestSchema.parse(req.body);
+      
+      // Verify user has permission to add participants (participant in conversation)
+      const isParticipant = await messagingService.isUserInConversation(userId, id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const participant = await messagingService.addUserToGroupConversation(id, targetUserId);
+      res.status(201).json(participant);
+    } catch (error) {
+      console.error('Error adding user to conversation:', error);
+      res.status(500).json({ message: 'Failed to add user to conversation' });
+    }
+  });
+
+  // Remove user from group conversation
+  app.delete('/api/conversations/:id/participants/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const { id, userId } = req.params;
+      
+      // Only allow removing yourself or if you're the conversation creator
+      const conversation = await messagingService.getConversation(id);
+      if (!conversation) {
+        return res.status(404).json({ message: 'Conversation not found' });
+      }
+      
+      if (currentUserId !== userId && conversation.createdBy !== currentUserId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      await messagingService.removeUserFromGroupConversation(id, userId);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error removing user from conversation:', error);
+      res.status(500).json({ message: 'Failed to remove user from conversation' });
+    }
+  });
+
   // Get conversation messages
   app.get('/api/conversations/:id/messages', isAuthenticated, async (req: any, res) => {
     try {
