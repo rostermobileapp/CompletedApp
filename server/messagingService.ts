@@ -7,6 +7,8 @@ import {
   typingIndicators,
   userOnlineStatus,
   users,
+  teamMemberships,
+  teams,
   type Conversation,
   type InsertConversation,
   type ConversationParticipant,
@@ -400,6 +402,41 @@ export class MessagingService {
 
   // Group conversation operations
   async createTeamGroupChat(teamId: string, leagueId: string, createdBy: string): Promise<Conversation> {
+    // Get all approved team members first (needed for both existing and new chats)
+    const teamMembers = await db
+      .select({ userId: teamMemberships.userId })
+      .from(teamMemberships)
+      .where(and(
+        eq(teamMemberships.teamId, teamId),
+        eq(teamMemberships.status, 'approved')
+      ));
+
+    console.log(`[DEBUG] Team group chat: Found ${teamMembers.length} team members for team ${teamId}:`, teamMembers.map(m => m.userId));
+
+    // Helper function to ensure participants are added (idempotent with conflict resolution)
+    const ensureParticipants = async (conversationId: string) => {
+      if (teamMembers.length === 0) {
+        console.log(`[DEBUG] No team members to add for conversation ${conversationId}`);
+        return;
+      }
+      
+      try {
+        console.log(`[DEBUG] Adding ${teamMembers.length} participants to conversation ${conversationId}`);
+        await db.insert(conversationParticipants)
+          .values(teamMembers.map(member => ({
+            conversationId,
+            userId: member.userId,
+          })))
+          .onConflictDoNothing({
+            target: [conversationParticipants.conversationId, conversationParticipants.userId]
+          });
+        console.log(`[DEBUG] Successfully added participants to conversation ${conversationId}`);
+      } catch (error) {
+        console.error(`[DEBUG] Failed to add participants to conversation ${conversationId}:`, error);
+        throw error;
+      }
+    };
+
     // Check if team group chat already exists
     const [existingChat] = await db
       .select()
@@ -413,14 +450,29 @@ export class MessagingService {
       .limit(1);
 
     if (existingChat) {
+      console.log(`[DEBUG] Found existing team group conversation ${existingChat.id}, checking participants`);
+      
+      // Check if existing conversation has participants
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(conversationParticipants)
+        .where(eq(conversationParticipants.conversationId, existingChat.id));
+      
+      console.log(`[DEBUG] Existing conversation ${existingChat.id} has ${count} participants`);
+      
+      if (count === 0) {
+        console.log(`[DEBUG] Repairing existing conversation ${existingChat.id} by adding missing participants`);
+        await ensureParticipants(existingChat.id);
+      }
+      
       return existingChat;
     }
 
     // Get team name for the conversation title
     const [team] = await db
-      .select({ name: sql<string>`teams.name` })
-      .from(sql`teams`)
-      .where(sql`teams.id = ${teamId}`)
+      .select({ name: teams.name })
+      .from(teams)
+      .where(eq(teams.id, teamId))
       .limit(1);
 
     const teamName = team?.name || 'Team';
@@ -434,21 +486,10 @@ export class MessagingService {
       createdBy,
     });
 
-    // Add all team members to the conversation
-    const teamMembers = await db
-      .select({ userId: sql<string>`team_memberships.user_id` })
-      .from(sql`team_memberships`)
-      .where(sql`team_memberships.team_id = ${teamId} AND team_memberships.status = 'active'`);
+    console.log(`[DEBUG] Created new team group conversation ${conversation.id}, adding participants`);
 
-    // Add all team members as participants
-    const participantPromises = teamMembers.map(member => 
-      this.addParticipantToConversation({
-        conversationId: conversation.id,
-        userId: member.userId,
-      })
-    );
-
-    await Promise.all(participantPromises);
+    // Add all team members as participants using bulk insert
+    await ensureParticipants(conversation.id);
 
     return conversation;
   }
