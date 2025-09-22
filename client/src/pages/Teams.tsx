@@ -350,7 +350,7 @@ export default function Teams() {
                 {/* Team Standings */}
                 <Card>
                   <CardHeader className="flex flex-col space-y-1.5 p-6 pt-[5px] pb-[5px]">
-                    <CardTitle className="text-2xl font-semibold leading-none tracking-tight text-center pt-[5px] pb-[5px]">League Standing</CardTitle>
+                    <CardTitle className="text-2xl font-semibold leading-none tracking-tight text-center">League Standing</CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 pt-[5px] pb-[5px]">
                     {teamStanding ? (
