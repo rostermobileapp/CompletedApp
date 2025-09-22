@@ -566,6 +566,150 @@ export class MessagingService {
         )
       );
   }
+
+  // Enhanced permission checks and captain-only chat functionality
+  async isUserCaptain(userId: string, leagueId: string): Promise<boolean> {
+    const [captain] = await db
+      .select()
+      .from(teams)
+      .where(and(
+        eq(teams.captainId, userId),
+        eq(teams.leagueId, leagueId)
+      ))
+      .limit(1);
+    return !!captain;
+  }
+
+  async canUserManageConversation(userId: string, conversationId: string): Promise<boolean> {
+    const conversation = await this.getConversation(conversationId);
+    if (!conversation) return false;
+
+    // Creator can always manage
+    if (conversation.createdBy === userId) return true;
+
+    // For team group chats, team captain can manage
+    if (conversation.type === "team_group" && conversation.teamId) {
+      const team = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, conversation.teamId))
+        .limit(1);
+      
+      if (team[0] && team[0].captainId === userId) return true;
+    }
+
+    // For captain-only chats, any captain in the league can manage
+    if (conversation.type === "captain_only") {
+      return await this.isUserCaptain(userId, conversation.leagueId);
+    }
+
+    return false;
+  }
+
+  async createCaptainOnlyChat(leagueId: string, createdBy: string): Promise<Conversation> {
+    // Check if captain-only chat already exists for this league
+    const [existingChat] = await db
+      .select()
+      .from(conversations)
+      .where(and(
+        eq(conversations.type, "captain_only"),
+        eq(conversations.leagueId, leagueId)
+      ))
+      .limit(1);
+
+    if (existingChat) {
+      return existingChat;
+    }
+
+    // Create captain-only conversation
+    const conversation = await this.createConversation({
+      type: "captain_only",
+      title: "Captains Only",
+      leagueId,
+      createdBy,
+    });
+
+    // Add all captains from this league as participants
+    const captains = await db
+      .select({
+        captainId: teams.captainId
+      })
+      .from(teams)
+      .where(eq(teams.leagueId, leagueId))
+      .groupBy(teams.captainId);
+
+    const participantPromises = captains
+      .filter(captain => captain.captainId) // Filter out null captain IDs
+      .map(captain => 
+        this.addParticipantToConversation({
+          conversationId: conversation.id,
+          userId: captain.captainId!,
+        })
+      );
+
+    await Promise.all(participantPromises);
+
+    return conversation;
+  }
+
+  async deleteConversation(conversationId: string): Promise<void> {
+    // Delete all related data in correct order
+    await db.delete(messageReadReceipts)
+      .where(sql`message_id IN (SELECT id FROM messages WHERE conversation_id = ${conversationId})`);
+    
+    await db.delete(messageAttachments)
+      .where(sql`message_id IN (SELECT id FROM messages WHERE conversation_id = ${conversationId})`);
+    
+    await db.delete(messages)
+      .where(eq(messages.conversationId, conversationId));
+    
+    await db.delete(typingIndicators)
+      .where(eq(typingIndicators.conversationId, conversationId));
+    
+    await db.delete(conversationParticipants)
+      .where(eq(conversationParticipants.conversationId, conversationId));
+    
+    await db.delete(conversations)
+      .where(eq(conversations.id, conversationId));
+  }
+
+  async getConversationMemberCount(conversationId: string): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(conversationParticipants)
+      .where(and(
+        eq(conversationParticipants.conversationId, conversationId),
+        sql`left_at IS NULL`
+      ));
+    
+    return result?.count || 0;
+  }
+
+  async getConversationMembersWithStatus(conversationId: string): Promise<any[]> {
+    const result = await db
+      .select({
+        userId: conversationParticipants.userId,
+        joinedAt: conversationParticipants.joinedAt,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          displayName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
+        },
+        onlineStatus: userOnlineStatus.status,
+        lastSeenAt: userOnlineStatus.lastSeenAt
+      })
+      .from(conversationParticipants)
+      .innerJoin(users, eq(conversationParticipants.userId, users.id))
+      .leftJoin(userOnlineStatus, eq(users.id, userOnlineStatus.userId))
+      .where(and(
+        eq(conversationParticipants.conversationId, conversationId),
+        sql`conversation_participants.left_at IS NULL`
+      ));
+    
+    return result;
+  }
 }
 
 export const messagingService = new MessagingService();

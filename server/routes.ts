@@ -4309,13 +4309,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUserId = req.user.claims.sub;
       const { id, userId } = req.params;
       
-      // Only allow removing yourself or if you're the conversation creator
+      // Enhanced permission check - allow removal if user can manage conversation
       const conversation = await messagingService.getConversation(id);
       if (!conversation) {
         return res.status(404).json({ message: 'Conversation not found' });
       }
       
-      if (currentUserId !== userId && conversation.createdBy !== currentUserId) {
+      const canManage = await messagingService.canUserManageConversation(currentUserId, id);
+      if (currentUserId !== userId && !canManage) {
         return res.status(403).json({ message: 'Access denied' });
       }
       
@@ -4324,6 +4325,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error removing user from conversation:', error);
       res.status(500).json({ message: 'Failed to remove user from conversation' });
+    }
+  });
+
+  // Create captain-only chat
+  app.post('/api/conversations/captain-only', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requestSchema = z.object({
+        leagueId: z.string().min(1)
+      });
+      
+      const { leagueId } = requestSchema.parse(req.body);
+      
+      // Verify user is a captain in this league
+      const isCaptain = await messagingService.isUserCaptain(userId, leagueId);
+      if (!isCaptain) {
+        return res.status(403).json({ message: 'Only team captains can create captain-only chats' });
+      }
+      
+      const conversation = await messagingService.createCaptainOnlyChat(leagueId, userId);
+      const participants = await messagingService.getConversationParticipants(conversation.id);
+      
+      res.status(201).json({
+        ...conversation,
+        participants
+      });
+    } catch (error) {
+      console.error('Error creating captain-only conversation:', error);
+      res.status(500).json({ message: 'Failed to create captain-only conversation' });
+    }
+  });
+
+  // Delete conversation
+  app.delete('/api/conversations/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      // Check if conversation exists
+      const conversation = await messagingService.getConversation(id);
+      if (!conversation) {
+        return res.status(404).json({ message: 'Conversation not found' });
+      }
+      
+      // Captain-only chats cannot be deleted
+      if (conversation.type === 'captain_only') {
+        return res.status(403).json({ message: 'Captain-only chats cannot be deleted' });
+      }
+      
+      // Check permissions
+      const canManage = await messagingService.canUserManageConversation(userId, id);
+      if (!canManage) {
+        return res.status(403).json({ message: 'Only conversation creators and team captains can delete conversations' });
+      }
+      
+      await messagingService.deleteConversation(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      res.status(500).json({ message: 'Failed to delete conversation' });
+    }
+  });
+
+  // Get conversation members with status
+  app.get('/api/conversations/:id/members', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      // Verify user is participant
+      const isParticipant = await messagingService.isUserInConversation(userId, id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const members = await messagingService.getConversationMembersWithStatus(id);
+      const memberCount = await messagingService.getConversationMemberCount(id);
+      
+      res.json({
+        members,
+        count: memberCount
+      });
+    } catch (error) {
+      console.error('Error fetching conversation members:', error);
+      res.status(500).json({ message: 'Failed to fetch conversation members' });
     }
   });
 

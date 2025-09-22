@@ -301,7 +301,8 @@ export const substitutionApprovals = pgTable("substitution_approvals", {
 export const conversationTypeEnum = pgEnum("conversation_type", [
   "direct",
   "team_group",
-  "custom_group"
+  "custom_group",
+  "captain_only"
 ]);
 
 // Message status enum
