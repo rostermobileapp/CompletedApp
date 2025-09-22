@@ -240,12 +240,12 @@ export default function Teams() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center">
+                      <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${team.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
                         {team.logoUrl ? (
                           <img 
                             src={team.logoUrl} 
                             alt={`${team.name} logo`}
-                            className="w-full h-full rounded-lg object-cover"
+                            className="w-full h-full rounded-lg object-contain"
                             data-testid={`img-team-logo-${team.id}`}
                           />
                         ) : (
