@@ -1059,47 +1059,131 @@ export default function StatsManagement() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                               <div className="space-y-2">
                                 <Label htmlFor="player-goals">Goals</Label>
-                                <Input
-                                  id="player-goals"
-                                  type="number"
-                                  value={individualPlayerStats.goals}
-                                  onChange={(e) => updateIndividualPlayerStat('goals', e.target.value)}
-                                  min="0"
-                                  data-testid="input-player-goals"
-                                />
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => decrementIndividualPlayerStat('goals')}
+                                    className="h-9 w-9 p-0"
+                                    data-testid="button-decrease-player-goals"
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    id="player-goals"
+                                    type="number"
+                                    value={individualPlayerStats.goals}
+                                    onChange={(e) => updateIndividualPlayerStat('goals', e.target.value)}
+                                    min="0"
+                                    className="text-center"
+                                    data-testid="input-player-goals"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => incrementIndividualPlayerStat('goals')}
+                                    className="h-9 w-9 p-0"
+                                    data-testid="button-increase-player-goals"
+                                  >
+                                    +
+                                  </Button>
+                                </div>
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="player-assists">Assists</Label>
-                                <Input
-                                  id="player-assists"
-                                  type="number"
-                                  value={individualPlayerStats.assists}
-                                  onChange={(e) => updateIndividualPlayerStat('assists', e.target.value)}
-                                  min="0"
-                                  data-testid="input-player-assists"
-                                />
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => decrementIndividualPlayerStat('assists')}
+                                    className="h-9 w-9 p-0"
+                                    data-testid="button-decrease-player-assists"
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    id="player-assists"
+                                    type="number"
+                                    value={individualPlayerStats.assists}
+                                    onChange={(e) => updateIndividualPlayerStat('assists', e.target.value)}
+                                    min="0"
+                                    className="text-center"
+                                    data-testid="input-player-assists"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => incrementIndividualPlayerStat('assists')}
+                                    className="h-9 w-9 p-0"
+                                    data-testid="button-increase-player-assists"
+                                  >
+                                    +
+                                  </Button>
+                                </div>
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="player-penalty">Penalty Minutes</Label>
-                                <Input
-                                  id="player-penalty"
-                                  type="number"
-                                  value={individualPlayerStats.penaltyMinutes}
-                                  onChange={(e) => updateIndividualPlayerStat('penaltyMinutes', e.target.value)}
-                                  min="0"
-                                  data-testid="input-player-penalty"
-                                />
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => decrementIndividualPlayerStat('penaltyMinutes')}
+                                    className="h-9 w-9 p-0"
+                                    data-testid="button-decrease-player-penalty"
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    id="player-penalty"
+                                    type="number"
+                                    value={individualPlayerStats.penaltyMinutes}
+                                    onChange={(e) => updateIndividualPlayerStat('penaltyMinutes', e.target.value)}
+                                    min="0"
+                                    className="text-center"
+                                    data-testid="input-player-penalty"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => incrementIndividualPlayerStat('penaltyMinutes')}
+                                    className="h-9 w-9 p-0"
+                                    data-testid="button-increase-player-penalty"
+                                  >
+                                    +
+                                  </Button>
+                                </div>
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor="player-games">Games Played</Label>
-                                <Input
-                                  id="player-games"
-                                  type="number"
-                                  value={individualPlayerStats.gamesPlayed}
-                                  onChange={(e) => updateIndividualPlayerStat('gamesPlayed', e.target.value)}
-                                  min="0"
-                                  data-testid="input-player-games"
-                                />
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => decrementIndividualPlayerStat('gamesPlayed')}
+                                    className="h-9 w-9 p-0"
+                                    data-testid="button-decrease-player-games"
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    id="player-games"
+                                    type="number"
+                                    value={individualPlayerStats.gamesPlayed}
+                                    onChange={(e) => updateIndividualPlayerStat('gamesPlayed', e.target.value)}
+                                    min="0"
+                                    className="text-center"
+                                    data-testid="input-player-games"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => incrementIndividualPlayerStat('gamesPlayed')}
+                                    className="h-9 w-9 p-0"
+                                    data-testid="button-increase-player-games"
+                                  >
+                                    +
+                                  </Button>
+                                </div>
                               </div>
                             </div>
 
