@@ -2,7 +2,7 @@
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { League } from '@shared/schema';
+import { EnhancedMediaUploader } from '@/components/EnhancedMediaUploader';
+import { MediaGallery } from '@/components/MediaGallery';
 
 interface Message {
   id: string;
@@ -103,6 +105,11 @@ export default function Messages() {
   const wsRef = useRef<WebSocket | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  // Media gallery state
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryItems, setGalleryItems] = useState<any[]>([]);
+  const [galleryIndex, setGalleryIndex] = useState(0);
 
   // Fetch user's leagues for contact discovery
   const { data: userLeagues = [], isLoading: userLeaguesLoading } = useQuery<League[]>({
@@ -514,6 +521,91 @@ export default function Messages() {
       return <Image className="w-4 h-4" />;
     }
     return <File className="w-4 h-4" />;
+  };
+
+  // Media gallery functions
+  const openMediaGallery = (attachments: any[], startIndex: number = 0) => {
+    const galleryItems = attachments.map((attachment, index) => ({
+      id: `${attachment.messageId || 'unknown'}-${index}`,
+      url: attachment.url,
+      filename: attachment.filename || 'Unknown file',
+      fileSize: attachment.fileSize,
+      mimeType: attachment.mimeType,
+      thumbnailUrl: attachment.thumbnailUrl
+    }));
+    
+    setGalleryItems(galleryItems);
+    setGalleryIndex(startIndex);
+    setGalleryOpen(true);
+  };
+
+  const handleEnhancedMediaUpload = async (mediaFiles: any[]) => {
+    if (!selectedConversation || !currentUserId) return;
+
+    setIsUploadingFiles(true);
+    
+    try {
+      for (const mediaFile of mediaFiles) {
+        // Get upload URL
+        const response = await apiRequest('/api/message-attachments/upload', {
+          method: 'POST'
+        });
+        const { uploadURL } = response;
+
+        // Upload file (use compressed version if available)
+        const fileToUpload = mediaFile.compressed || mediaFile.file;
+        await fetch(uploadURL, {
+          method: 'PUT',
+          body: fileToUpload,
+          headers: {
+            'Content-Type': fileToUpload.type,
+          },
+        });
+
+        // Extract filename from upload URL
+        const urlParts = uploadURL.split('/');
+        const filename = urlParts[urlParts.length - 1].split('?')[0];
+
+        // Send message with attachment
+        const messageData = {
+          content: `📎 ${mediaFile.file.name}`,
+          messageType: mediaFile.type === 'image' ? 'image' : 
+                      mediaFile.type === 'video' ? 'video' : 'file',
+          attachments: [{
+            type: mediaFile.type,
+            url: `/message-attachments/${filename}`,
+            filename: mediaFile.file.name,
+            fileSize: fileToUpload.size,
+            mimeType: fileToUpload.type
+          }]
+        };
+
+        // Send via WebSocket if connected, otherwise use HTTP
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: 'send_message',
+            conversationId: selectedConversation,
+            ...messageData
+          }));
+        } else {
+          await sendMessageMutation.mutateAsync(messageData);
+        }
+      }
+
+      toast({
+        title: 'Media sent',
+        description: `Successfully sent ${mediaFiles.length} file(s)`,
+      });
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      toast({
+        title: 'Upload failed',
+        description: 'Failed to upload media files',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsUploadingFiles(false);
+    }
   };
   
   // Cleanup typing timeout on unmount
@@ -1032,26 +1124,79 @@ export default function Messages() {
                         </p>
                         {message.attachments && message.attachments.length > 0 && (
                           <div className="mt-2 space-y-2" data-testid={`message-attachments-${message.id}`}>
-                            {message.attachments.map((attachment: any, index: number) => (
-                              <div key={index} className="flex items-center gap-2 p-2 bg-background/20 rounded border">
-                                {getFileIcon(attachment.mimeType || '')}
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{attachment.filename}</p>
-                                  <p className="text-xs opacity-70">
-                                    {attachment.fileSize ? (attachment.fileSize / 1024).toFixed(1) + ' KB' : 'Unknown size'}
-                                  </p>
+                            {message.attachments.map((attachment: any, index: number) => {
+                              const isImage = attachment.mimeType?.startsWith('image/');
+                              const isVideo = attachment.mimeType?.startsWith('video/');
+                              
+                              return (
+                                <div key={index} className={isImage || isVideo ? "mt-2" : "flex items-center gap-2 p-2 bg-background/20 rounded border"}>
+                                  {isImage && (
+                                    <div 
+                                      className="relative cursor-pointer rounded-lg overflow-hidden max-w-xs border"
+                                      onClick={() => openMediaGallery(message.attachments, index)}
+                                      data-testid={`image-preview-${index}`}
+                                    >
+                                      <img
+                                        src={attachment.url}
+                                        alt={attachment.filename}
+                                        className="w-full h-auto max-h-48 object-cover hover:opacity-90 transition-opacity"
+                                      />
+                                      <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
+                                        <div className="opacity-0 hover:opacity-100 transition-opacity bg-black/50 rounded-full p-2">
+                                          <Search className="w-4 h-4 text-white" />
+                                        </div>
+                                      </div>
+                                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                                        <p className="text-xs text-white truncate">{attachment.filename}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {isVideo && (
+                                    <div 
+                                      className="relative cursor-pointer rounded-lg overflow-hidden max-w-xs border"
+                                      onClick={() => openMediaGallery(message.attachments, index)}
+                                      data-testid={`video-preview-${index}`}
+                                    >
+                                      <video
+                                        src={attachment.url}
+                                        className="w-full h-auto max-h-48 object-cover"
+                                        poster={attachment.thumbnailUrl}
+                                      />
+                                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                        <div className="bg-black/50 rounded-full p-3">
+                                          <Video className="w-6 h-6 text-white" />
+                                        </div>
+                                      </div>
+                                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                                        <p className="text-xs text-white truncate">{attachment.filename}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {!isImage && !isVideo && (
+                                    <>
+                                      {getFileIcon(attachment.mimeType || '')}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">{attachment.filename}</p>
+                                        <p className="text-xs opacity-70">
+                                          {attachment.fileSize ? (attachment.fileSize / 1024).toFixed(1) + ' KB' : 'Unknown size'}
+                                        </p>
+                                      </div>
+                                      <a 
+                                        href={attachment.url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline text-sm"
+                                        data-testid={`attachment-link-${index}`}
+                                      >
+                                        Download
+                                      </a>
+                                    </>
+                                  )}
                                 </div>
-                                <a 
-                                  href={attachment.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-primary hover:underline text-sm"
-                                  data-testid={`attachment-link-${index}`}
-                                >
-                                  Download
-                                </a>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -1111,12 +1256,21 @@ export default function Messages() {
         )}
         
         <div className="flex items-center gap-2">
+          <EnhancedMediaUploader
+            maxFiles={5}
+            maxFileSize={50 * 1024 * 1024} // 50MB
+            onFilesSelected={handleEnhancedMediaUpload}
+            className="p-2 hover:bg-accent rounded transition-colors bg-transparent border-none shadow-none"
+          >
+            <Paperclip className="w-4 h-4" />
+          </EnhancedMediaUploader>
           <button 
             onClick={() => fileInputRef.current?.click()}
             className="p-2 hover:bg-accent rounded transition-colors"
-            data-testid="button-attach-file"
+            data-testid="button-attach-file-basic"
+            title="Basic file upload"
           >
-            <Paperclip className="w-4 h-4" />
+            <File className="w-4 h-4" />
           </button>
           <Input
             placeholder="Type a message..."
@@ -1157,6 +1311,15 @@ export default function Messages() {
         </div>
       </div>
     )}
+
+      {/* Media Gallery */}
+      <MediaGallery
+        items={galleryItems}
+        currentIndex={galleryIndex}
+        isOpen={galleryOpen}
+        onClose={() => setGalleryOpen(false)}
+        onIndexChange={setGalleryIndex}
+      />
     </>
   );
 }
