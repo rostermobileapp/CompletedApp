@@ -1201,9 +1201,7 @@ export default function Messages() {
                                           <Search className="w-4 h-4 text-white" />
                                         </div>
                                       </div>
-                                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                                        <p className="text-xs text-white truncate">{attachment.filename}</p>
-                                      </div>
+
                                     </div>
                                   )}
                                   
@@ -1223,9 +1221,7 @@ export default function Messages() {
                                           <Video className="w-6 h-6 text-white" />
                                         </div>
                                       </div>
-                                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                                        <p className="text-xs text-white truncate">{attachment.filename}</p>
-                                      </div>
+
                                     </div>
                                   )}
                                   

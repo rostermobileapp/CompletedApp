@@ -245,7 +245,6 @@ export function MediaGallery({
           {!isImage && !isVideo && (
             <div className="text-center text-white">
               <div className="text-6xl mb-4">📄</div>
-              <p className="text-lg mb-2">{currentItem.filename}</p>
               <p className="text-sm text-white/75 mb-4">
                 {currentItem.fileSize && `${(currentItem.fileSize / 1024).toFixed(1)} KB`}
               </p>
