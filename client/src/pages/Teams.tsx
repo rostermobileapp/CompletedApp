@@ -23,6 +23,10 @@ export default function Teams() {
     enabled: !!isAuthenticated,
   });
 
+  // Define current team early so it can be used in subsequent queries
+  const primaryTeam = (userTeams as any[])[0];
+  const currentTeam = selectedTeam ? (userTeams as any[]).find((t: any) => t.id === selectedTeam) : primaryTeam;
+
   // Get selected team members
   const { data: teamMembers = [] } = useQuery({
     queryKey: ['/api/teams', currentTeam?.id, 'members'],
@@ -147,8 +151,6 @@ export default function Teams() {
     );
   }
 
-  const primaryTeam = (userTeams as any[])[0];
-  const currentTeam = selectedTeam ? (userTeams as any[]).find((t: any) => t.id === selectedTeam) : primaryTeam;
   const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
   const isCommissioner = (user as any)?.subscriptionTier === 'commissioner';
   const canUploadLogo = isTeamCaptain || isCommissioner;
