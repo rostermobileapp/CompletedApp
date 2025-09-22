@@ -4623,6 +4623,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== GIPHY API ROUTES =====
+  
+  // Import Giphy service
+  const { giphyService } = await import('./giphyService');
+
+  // Search GIFs
+  app.get('/api/giphy/search', isAuthenticated, async (req: any, res) => {
+    try {
+      const { q: query, limit = 25, offset = 0 } = req.query;
+      
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ message: 'Search query is required' });
+      }
+
+      const result = await giphyService.searchGifs(query, {
+        limit: parseInt(limit as string) || 25,
+        offset: parseInt(offset as string) || 0
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error searching GIFs:', error);
+      res.status(500).json({ message: 'Failed to search GIFs' });
+    }
+  });
+
+  // Get trending GIFs
+  app.get('/api/giphy/trending', isAuthenticated, async (req: any, res) => {
+    try {
+      const { limit = 25, offset = 0 } = req.query;
+
+      const result = await giphyService.getTrendingGifs({
+        limit: parseInt(limit as string) || 25,
+        offset: parseInt(offset as string) || 0
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error getting trending GIFs:', error);
+      res.status(500).json({ message: 'Failed to get trending GIFs' });
+    }
+  });
+
+  // Get category GIFs
+  app.get('/api/giphy/category/:category', isAuthenticated, async (req: any, res) => {
+    try {
+      const { category } = req.params;
+      const { limit = 25, offset = 0 } = req.query;
+
+      const result = await giphyService.getCategoryGifs(category, {
+        limit: parseInt(limit as string) || 25,
+        offset: parseInt(offset as string) || 0
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error getting category GIFs:', error);
+      res.status(500).json({ message: 'Failed to get category GIFs' });
+    }
+  });
+
+  // Get GIF by ID
+  app.get('/api/giphy/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      const gif = await giphyService.getGifById(id);
+      if (!gif) {
+        return res.status(404).json({ message: 'GIF not found' });
+      }
+
+      res.json(gif);
+    } catch (error) {
+      console.error('Error getting GIF by ID:', error);
+      res.status(500).json({ message: 'Failed to get GIF' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time messaging
