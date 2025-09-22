@@ -99,17 +99,32 @@ export default function Teams() {
   });
 
   const handleGetTeamLogoUploadParameters = async () => {
-    const response = await apiRequest('POST', '/api/team-logos/upload');
-    return {
-      method: 'PUT' as const,
-      url: (response as any).uploadURL,
-    };
+    try {
+      const response = await apiRequest('POST', '/api/team-logos/upload');
+      console.log('Upload URL response:', response);
+      return {
+        method: 'PUT' as const,
+        url: (response as any).uploadURL,
+      };
+    } catch (error) {
+      console.error('Failed to get upload URL:', error);
+      throw error;
+    }
   };
 
-  const handleTeamLogoUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful && result.successful[0] && currentTeam) {
+  const createTeamLogoUploadComplete = (teamId: string) => (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    console.log('Upload complete result:', result);
+    if (result.successful && result.successful[0]) {
       const uploadURL = result.successful[0].uploadURL as string;
-      updateTeamLogoMutation.mutate({ teamId: currentTeam.id, logoUrl: uploadURL });
+      console.log('Updating team logo with URL:', uploadURL);
+      updateTeamLogoMutation.mutate({ teamId, logoUrl: uploadURL });
+    } else {
+      console.error('Upload failed or no successful uploads:', result);
+      toast({
+        title: "Error",
+        description: "Failed to upload team logo. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -250,7 +265,7 @@ export default function Teams() {
                           maxNumberOfFiles={1}
                           maxFileSize={10485760}
                           onGetUploadParameters={handleGetTeamLogoUploadParameters}
-                          onComplete={handleTeamLogoUploadComplete}
+                          onComplete={createTeamLogoUploadComplete(team.id)}
                           buttonClassName="h-9"
                         >
                           <div className="flex items-center gap-2">
