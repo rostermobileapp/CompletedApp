@@ -101,10 +101,11 @@ export default function Teams() {
   const handleGetTeamLogoUploadParameters = async () => {
     try {
       const response = await apiRequest('POST', '/api/team-logos/upload');
-      console.log('Upload URL response:', response);
+      const data = await response.json();
+      console.log('Upload URL response:', data);
       return {
         method: 'PUT' as const,
-        url: (response as any).uploadURL,
+        url: data.uploadURL,
       };
     } catch (error) {
       console.error('Failed to get upload URL:', error);
