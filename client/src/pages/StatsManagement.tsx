@@ -238,7 +238,23 @@ export default function StatsManagement() {
         title: 'Success',
         description: 'Player statistics updated successfully.',
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/stats`] });
+      // Invalidate all stats-related queries for this league
+      queryClient.invalidateQueries({ 
+        queryKey: [`/api/leagues/${selectedLeague}/stats`] 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/leagues', selectedLeague, 'stats'] 
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const queryKey = query.queryKey;
+          return Array.isArray(queryKey) && 
+                 queryKey.length >= 3 &&
+                 queryKey[0] === '/api/leagues' && 
+                 queryKey[1] === selectedLeague && 
+                 queryKey[2] === 'stats';
+        }
+      });
       // Reset form
       setPlayerGameStats({});
     },
