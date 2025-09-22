@@ -57,7 +57,9 @@ export default function StatsManagement() {
   const [selectedLeague, setSelectedLeague] = useState<string>(urlLeagueId || '');
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [selectedGame, setSelectedGame] = useState<string>('');
+  const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [playerGameStats, setPlayerGameStats] = useState<Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>>({});
+  const [individualPlayerStats, setIndividualPlayerStats] = useState<{ goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>({ goals: '', assists: '', penaltyMinutes: '', gamesPlayed: '' });
   
   // Sorting state
   const [sortField, setSortField] = useState<string>('name');
@@ -99,6 +101,12 @@ export default function StatsManagement() {
     enabled: !!selectedGame,
   });
 
+  // Get individual player stats for selected player
+  const { data: currentPlayerStats } = useQuery({
+    queryKey: [`/api/leagues/${selectedLeague}/stats/player/${selectedPlayer}`, selectedSeason],
+    enabled: !!selectedLeague && !!selectedPlayer && !!selectedSeason,
+  });
+
   // Initialize player stats when game participants change
   useEffect(() => {
     if (Array.isArray(gameParticipants) && gameParticipants.length > 0) {
@@ -116,6 +124,20 @@ export default function StatsManagement() {
       setPlayerGameStats(initialStats);
     }
   }, [gameParticipants]);
+
+  // Initialize individual player stats when current player stats change
+  useEffect(() => {
+    if (currentPlayerStats) {
+      setIndividualPlayerStats({
+        goals: currentPlayerStats.goals?.toString() || '0',
+        assists: currentPlayerStats.assists?.toString() || '0',
+        penaltyMinutes: currentPlayerStats.penaltyMinutes?.toString() || '0',
+        gamesPlayed: currentPlayerStats.gamesPlayed?.toString() || '0'
+      });
+    } else {
+      setIndividualPlayerStats({ goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '0' });
+    }
+  }, [currentPlayerStats]);
 
   // Scroll synchronization
   useEffect(() => {
@@ -218,6 +240,33 @@ export default function StatsManagement() {
     });
   };
 
+  const handlePlayerStatsUpdate = () => {
+    if (!selectedPlayer || !selectedLeague || !selectedSeason) {
+      toast({
+        title: 'Error',
+        description: 'Please select a league, season, and player.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const updates = [{
+      userId: selectedPlayer,
+      stats: {
+        goals: parseInt(individualPlayerStats.goals) || 0,
+        assists: parseInt(individualPlayerStats.assists) || 0,
+        penaltyMinutes: parseInt(individualPlayerStats.penaltyMinutes) || 0,
+        gamesPlayed: parseInt(individualPlayerStats.gamesPlayed) || 0,
+      }
+    }];
+
+    updateStatsMutation.mutate({ 
+      updates, 
+      mode: 'set', // Use 'set' mode for absolute values
+      seasonId: selectedSeason 
+    });
+  };
+
   const updatePlayerGameStat = (userId: string, field: string, value: string) => {
     setPlayerGameStats(prev => ({
       ...prev,
@@ -225,6 +274,13 @@ export default function StatsManagement() {
         ...prev[userId],
         [field]: value
       }
+    }));
+  };
+
+  const updateIndividualPlayerStat = (field: string, value: string) => {
+    setIndividualPlayerStats(prev => ({
+      ...prev,
+      [field]: value
     }));
   };
 
@@ -367,10 +423,14 @@ export default function StatsManagement() {
           {/* Stats Management Tabs */}
           {selectedLeague && selectedSeason && (
             <Tabs defaultValue="by-game" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-1">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="by-game" className="flex items-center gap-2" data-testid="tab-by-game">
                   <Users className="w-4 h-4" />
                   By Game
+                </TabsTrigger>
+                <TabsTrigger value="by-player" className="flex items-center gap-2" data-testid="tab-by-player">
+                  <Target className="w-4 h-4" />
+                  By Player
                 </TabsTrigger>
               </TabsList>
 
@@ -605,6 +665,131 @@ export default function StatsManagement() {
                         <AlertCircle className="w-12 h-12 mx-auto mb-4" />
                         <p>No participants found for this game.</p>
                         <p className="text-sm">Players need to be assigned to teams in this game.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* By Player Tab */}
+              <TabsContent value="by-player" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="w-5 h-5" />
+                      Select Player
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Player</Label>
+                      <Select value={selectedPlayer} onValueChange={setSelectedPlayer} data-testid="select-player">
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a player" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.isArray(players) && players.map((player: Player) => (
+                            <SelectItem key={player.id} value={player.id}>
+                              {player.firstName} {player.lastName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {selectedPlayer && (
+                      <div className="space-y-4">
+                        <div className="text-sm text-muted-foreground" data-testid="text-selected-player">
+                          Editing stats for: {players.find((p: Player) => p.id === selectedPlayer)?.firstName} {players.find((p: Player) => p.id === selectedPlayer)?.lastName}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="player-goals">Goals</Label>
+                            <Input
+                              id="player-goals"
+                              type="number"
+                              value={individualPlayerStats.goals}
+                              onChange={(e) => updateIndividualPlayerStat('goals', e.target.value)}
+                              min="0"
+                              data-testid="input-player-goals"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="player-assists">Assists</Label>
+                            <Input
+                              id="player-assists"
+                              type="number"
+                              value={individualPlayerStats.assists}
+                              onChange={(e) => updateIndividualPlayerStat('assists', e.target.value)}
+                              min="0"
+                              data-testid="input-player-assists"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="player-penalty">Penalty Minutes</Label>
+                            <Input
+                              id="player-penalty"
+                              type="number"
+                              value={individualPlayerStats.penaltyMinutes}
+                              onChange={(e) => updateIndividualPlayerStat('penaltyMinutes', e.target.value)}
+                              min="0"
+                              data-testid="input-player-penalty"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="player-games">Games Played</Label>
+                            <Input
+                              id="player-games"
+                              type="number"
+                              value={individualPlayerStats.gamesPlayed}
+                              onChange={(e) => updateIndividualPlayerStat('gamesPlayed', e.target.value)}
+                              min="0"
+                              data-testid="input-player-games"
+                            />
+                          </div>
+                        </div>
+
+                        {currentPlayerStats && (
+                          <div className="bg-muted/50 p-4 rounded-lg">
+                            <h4 className="font-medium mb-2">Current Season Stats</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Goals:</span>
+                                <span className="ml-2 font-medium" data-testid="display-current-goals">{currentPlayerStats.goals || 0}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Assists:</span>
+                                <span className="ml-2 font-medium" data-testid="display-current-assists">{currentPlayerStats.assists || 0}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">PIM:</span>
+                                <span className="ml-2 font-medium" data-testid="display-current-penalty">{currentPlayerStats.penaltyMinutes || 0}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">GP:</span>
+                                <span className="ml-2 font-medium" data-testid="display-current-games">{currentPlayerStats.gamesPlayed || 0}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <Button 
+                          onClick={handlePlayerStatsUpdate} 
+                          disabled={updateStatsMutation.isPending}
+                          className="w-full"
+                          data-testid="button-update-player-stats"
+                        >
+                          {updateStatsMutation.isPending ? 'Updating...' : 'Update Player Stats'}
+                        </Button>
+                      </div>
+                    )}
+
+                    {selectedPlayer && !currentPlayerStats && (
+                      <div className="text-center py-8 text-muted-foreground" data-testid="text-no-stats">
+                        <AlertCircle className="w-12 h-12 mx-auto mb-4" />
+                        <p>No stats found for this player in the selected season.</p>
+                        <p className="text-sm">Enter initial stats to create a record.</p>
                       </div>
                     )}
                   </CardContent>
