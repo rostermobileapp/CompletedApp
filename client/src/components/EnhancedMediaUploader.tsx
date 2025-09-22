@@ -172,19 +172,6 @@ export function EnhancedMediaUploader({
 
   return (
     <>
-      <Button
-        onClick={() => setIsOpen(true)}
-        className={cn("", className)}
-        data-testid="button-enhanced-media-upload"
-      >
-        {children || (
-          <>
-            <Upload className="w-4 h-4 mr-2" />
-            Upload Media
-          </>
-        )}
-      </Button>
-
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="media-upload-dialog">
           <DialogHeader>

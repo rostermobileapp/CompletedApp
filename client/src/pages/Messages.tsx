@@ -1333,14 +1333,6 @@ export default function Messages() {
         )}
         
         <div className="flex items-center gap-2">
-          <EnhancedMediaUploader
-            maxFiles={5}
-            maxFileSize={50 * 1024 * 1024} // 50MB
-            onFilesSelected={handleEnhancedMediaUpload}
-            className="p-2 hover:bg-accent rounded transition-colors bg-transparent border-none shadow-none"
-          >
-            <Paperclip className="w-4 h-4" />
-          </EnhancedMediaUploader>
           <button 
             onClick={() => fileInputRef.current?.click()}
             className="p-2 hover:bg-accent rounded transition-colors"
