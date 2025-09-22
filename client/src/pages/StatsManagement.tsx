@@ -888,15 +888,17 @@ export default function StatsManagement() {
                           <TableHeader className="sticky top-0 bg-background z-10">
                             <TableRow>
                               <TableHead className="w-48">Player</TableHead>
+                              <TableHead className="text-center w-20">GP</TableHead>
                               <TableHead className="text-center w-20">Goals</TableHead>
                               <TableHead className="text-center w-20">Assists</TableHead>
+                              <TableHead className="text-center w-20">Points</TableHead>
                               <TableHead className="text-center w-20">PIM</TableHead>
-                              <TableHead className="text-center w-20">GP</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
                               <TableRow key={player.id} data-testid={`row-bulk-player-${player.id}`}>
+                                {/* Player Name */}
                                 <TableCell className="font-medium">
                                   <div>
                                     <div className="font-medium">{player.firstName} {player.lastName}</div>
@@ -905,6 +907,38 @@ export default function StatsManagement() {
                                     )}
                                   </div>
                                 </TableCell>
+                                {/* Games Played */}
+                                <TableCell className="text-center">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => decrementBulkPlayerStat(player.id, 'gamesPlayed')}
+                                      className="h-8 w-8 p-0"
+                                      data-testid={`button-decrease-bulk-games-${player.id}`}
+                                    >
+                                      -
+                                    </Button>
+                                    <Input
+                                      type="number"
+                                      value={bulkPlayerStats[player.id]?.gamesPlayed || '1'}
+                                      onChange={(e) => updateBulkPlayerStat(player.id, 'gamesPlayed', e.target.value)}
+                                      min="1"
+                                      className="w-12 text-center p-1"
+                                      data-testid={`input-bulk-games-${player.id}`}
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => incrementBulkPlayerStat(player.id, 'gamesPlayed')}
+                                      className="h-8 w-8 p-0"
+                                      data-testid={`button-increase-bulk-games-${player.id}`}
+                                    >
+                                      +
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                                {/* Goals */}
                                 <TableCell className="text-center">
                                   <div className="flex items-center justify-center space-x-1">
                                     <Button
@@ -935,6 +969,7 @@ export default function StatsManagement() {
                                     </Button>
                                   </div>
                                 </TableCell>
+                                {/* Assists */}
                                 <TableCell className="text-center">
                                   <div className="flex items-center justify-center space-x-1">
                                     <Button
@@ -965,6 +1000,13 @@ export default function StatsManagement() {
                                     </Button>
                                   </div>
                                 </TableCell>
+                                {/* Points (calculated) */}
+                                <TableCell className="text-center font-bold text-primary">
+                                  <div className="text-lg" data-testid={`display-bulk-points-${player.id}`}>
+                                    {(parseInt(bulkPlayerStats[player.id]?.goals || '0') + parseInt(bulkPlayerStats[player.id]?.assists || '0'))}
+                                  </div>
+                                </TableCell>
+                                {/* Penalty Minutes */}
                                 <TableCell className="text-center">
                                   <div className="flex items-center justify-center space-x-1">
                                     <Button
@@ -990,36 +1032,6 @@ export default function StatsManagement() {
                                       onClick={() => incrementBulkPlayerStat(player.id, 'penaltyMinutes')}
                                       className="h-8 w-8 p-0"
                                       data-testid={`button-increase-bulk-penalty-${player.id}`}
-                                    >
-                                      +
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center space-x-1">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => decrementBulkPlayerStat(player.id, 'gamesPlayed')}
-                                      className="h-8 w-8 p-0"
-                                      data-testid={`button-decrease-bulk-games-${player.id}`}
-                                    >
-                                      -
-                                    </Button>
-                                    <Input
-                                      type="number"
-                                      value={bulkPlayerStats[player.id]?.gamesPlayed || '0'}
-                                      onChange={(e) => updateBulkPlayerStat(player.id, 'gamesPlayed', e.target.value)}
-                                      min="0"
-                                      className="w-12 text-center p-1"
-                                      data-testid={`input-bulk-games-${player.id}`}
-                                    />
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => incrementBulkPlayerStat(player.id, 'gamesPlayed')}
-                                      className="h-8 w-8 p-0"
-                                      data-testid={`button-increase-bulk-games-${player.id}`}
                                     >
                                       +
                                     </Button>
