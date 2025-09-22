@@ -1273,7 +1273,7 @@ export default function Messages() {
             data-testid="button-attach-file-basic"
             title="Basic file upload"
           >
-            <File className="w-4 h-4" />
+            <Paperclip className="w-4 h-4" />
           </button>
           <Input
             placeholder="Type a message..."
