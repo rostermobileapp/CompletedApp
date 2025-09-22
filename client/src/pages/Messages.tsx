@@ -998,13 +998,7 @@ export default function Messages() {
                     className={`flex gap-3 ${isCurrentUser ? 'justify-end' : 'justify-start'}`} 
                     data-testid={`message-${message.id}`}
                   >
-                    {!isCurrentUser && (
-                      <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
-                        <span className="text-accent-foreground text-xs font-semibold">
-                          {message.sender?.firstName?.charAt(0) || 'U'}
-                        </span>
-                      </div>
-                    )}
+                    
                     <div className={`max-w-[70%] ${isCurrentUser ? 'order-1' : 'order-2'}`}>
                       <div className={`rounded-lg p-3 ${
                         isCurrentUser 
