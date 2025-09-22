@@ -25,8 +25,8 @@ export default function Teams() {
 
   // Get selected team members
   const { data: teamMembers = [] } = useQuery({
-    queryKey: ['/api/teams', selectedTeam, 'members'],
-    enabled: !!selectedTeam,
+    queryKey: ['/api/teams', currentTeam?.id, 'members'],
+    enabled: !!currentTeam?.id,
   }) as { data: any[] };
 
   // Get upcoming games for beverage duty
@@ -167,7 +167,7 @@ export default function Teams() {
         return isMember && stat.type === 'skater'; // Only skaters for these stats
       });
     },
-    enabled: !!currentTeam?.leagueId && teamMembers.length > 0,
+    enabled: !!currentTeam?.leagueId && Array.isArray(teamMembers),
   });
 
   // Fetch league standings
@@ -405,7 +405,7 @@ export default function Teams() {
                               <span className="text-sm text-muted-foreground">Points</span>
                             </div>
                           </div>
-                          <span className="text-sm font-medium truncate">{teamLeaders.topScorer?.user?.lastName || 'N/A'}</span>
+                          <span className="text-sm font-medium truncate" data-testid="text-points-leader-name">{teamLeaders.topScorer?.user?.lastName || 'N/A'}</span>
                         </Card>
 
                         {/* Goals Leader */}
@@ -417,7 +417,7 @@ export default function Teams() {
                               <span className="text-sm text-muted-foreground">Goals</span>
                             </div>
                           </div>
-                          <span className="text-sm font-medium truncate">{teamLeaders.topGoalScorer?.user?.lastName || 'N/A'}</span>
+                          <span className="text-sm font-medium truncate" data-testid="text-goals-leader-name">{teamLeaders.topGoalScorer?.user?.lastName || 'N/A'}</span>
                         </Card>
 
                         {/* Assists Leader */}
@@ -429,7 +429,7 @@ export default function Teams() {
                               <span className="text-sm text-muted-foreground">Assists</span>
                             </div>
                           </div>
-                          <span className="text-sm font-medium truncate">{teamLeaders.topAssistProvider?.user?.lastName || 'N/A'}</span>
+                          <span className="text-sm font-medium truncate" data-testid="text-assists-leader-name">{teamLeaders.topAssistProvider?.user?.lastName || 'N/A'}</span>
                         </Card>
 
                         {/* Penalty Minutes Leader */}
@@ -441,7 +441,7 @@ export default function Teams() {
                               <span className="text-sm text-muted-foreground">PIM</span>
                             </div>
                           </div>
-                          <span className="text-sm font-medium truncate">{teamLeaders.mostPenaltyMinutes?.user?.lastName || 'N/A'}</span>
+                          <span className="text-sm font-medium truncate" data-testid="text-penalty-leader-name">{teamLeaders.mostPenaltyMinutes?.user?.lastName || 'N/A'}</span>
                         </Card>
                       </>
                     ) : (
