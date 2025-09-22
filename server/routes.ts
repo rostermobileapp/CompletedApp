@@ -4357,6 +4357,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Leave conversation (remove yourself from participants)
+  app.post('/api/conversations/:id/leave', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      // Check if conversation exists
+      const conversation = await messagingService.getConversation(id);
+      if (!conversation) {
+        return res.status(404).json({ message: 'Conversation not found' });
+      }
+      
+      // Check if user is actually in the conversation
+      const isParticipant = await messagingService.isUserInConversation(userId, id);
+      if (!isParticipant) {
+        return res.status(400).json({ message: 'You are not a participant in this conversation' });
+      }
+      
+      // Users cannot leave direct messages or captain-only chats
+      if (conversation.type === 'direct' || conversation.type === 'captain_only') {
+        return res.status(400).json({ message: 'You cannot leave this type of conversation' });
+      }
+      
+      // Remove user from conversation
+      await messagingService.removeUserFromGroupConversation(id, userId);
+      res.status(200).json({ message: 'Successfully left conversation' });
+    } catch (error) {
+      console.error('Error leaving conversation:', error);
+      res.status(500).json({ message: 'Failed to leave conversation' });
+    }
+  });
+
   // Delete conversation
   app.delete('/api/conversations/:id', isAuthenticated, async (req: any, res) => {
     try {

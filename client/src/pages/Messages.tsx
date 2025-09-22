@@ -2,7 +2,7 @@
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -276,6 +276,32 @@ export default function Messages() {
     }
   });
 
+  const leaveConversationMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      const response = await apiRequest('POST', `/api/conversations/${conversationId}/leave`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+      // If we left the currently selected conversation, go back to list
+      if (selectedConversation) {
+        setSelectedConversation(null);
+      }
+      toast({
+        title: "Success",
+        description: "Left conversation successfully.",
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error leaving conversation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to leave conversation. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent conversation selection when clicking delete
     
@@ -283,6 +309,31 @@ export default function Messages() {
     if (window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
       deleteConversationMutation.mutate(conversationId);
     }
+  };
+
+  const handleLeaveConversation = async (conversationId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent conversation selection when clicking leave
+    
+    // Ask for confirmation before leaving
+    if (window.confirm('Are you sure you want to leave this conversation?')) {
+      leaveConversationMutation.mutate(conversationId);
+    }
+  };
+
+  // Check if user can manage (delete) a conversation
+  const canUserManageConversation = (conversation: any): boolean => {
+    if (!currentUserId) return false;
+    
+    // User created the conversation
+    if (conversation.createdBy === currentUserId) return true;
+    
+    // For team group chats, check if user is team captain
+    if (conversation.type === 'team_group' && conversation.teamId) {
+      // We'd need team captain info, but for now we'll try deletion and handle error
+      return false; // Conservative approach - will show Leave instead of Delete
+    }
+    
+    return false;
   };
 
   // Persistent WebSocket connection for real-time updates
@@ -1071,15 +1122,29 @@ export default function Messages() {
                         
                       </div>
                       
-                      {/* Delete conversation button */}
-                      <button
-                        onClick={(e) => handleDeleteConversation(conversation.id, e)}
-                        className="p-2 hover:bg-destructive/20 rounded-lg transition-colors"
-                        title="Delete conversation"
-                        data-testid={`button-delete-conversation-${conversation.id}`}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </button>
+                      {/* Conditional Delete/Leave conversation button */}
+                      {canUserManageConversation(conversation) ? (
+                        <button
+                          onClick={(e) => handleDeleteConversation(conversation.id, e)}
+                          className="p-2 hover:bg-destructive/20 rounded-lg transition-colors"
+                          title="Delete conversation"
+                          data-testid={`button-delete-conversation-${conversation.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </button>
+                      ) : (
+                        // Show Leave button for conversations user can't delete
+                        conversation.type !== 'direct' && conversation.type !== 'captain_only' && (
+                          <button
+                            onClick={(e) => handleLeaveConversation(conversation.id, e)}
+                            className="p-2 hover:bg-orange-500/20 rounded-lg transition-colors"
+                            title="Leave conversation"
+                            data-testid={`button-leave-conversation-${conversation.id}`}
+                          >
+                            <LogOut className="w-4 h-4 text-orange-600" />
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
                 ))}
