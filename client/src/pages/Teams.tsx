@@ -162,14 +162,25 @@ export default function Teams() {
       if (!currentTeam?.leagueId) return [];
       const response = await apiRequest('GET', `/api/leagues/${currentTeam.leagueId}/stats`);
       const allStats = await response.json();
-      // Filter stats for current team players
-      return allStats.filter((stat: any) => {
-        // Check if this player is on the current team
-        const isMember = teamMembers?.some((member: any) => member.id === stat.userId);
-        return isMember && stat.type === 'skater'; // Only skaters for these stats
+      
+      // Filter stats for current team players - more flexible matching
+      const filteredStats = allStats.filter((stat: any) => {
+        if (stat.type !== 'skater') return false; // Only skaters for these stats
+        
+        // Check multiple possible member ID fields for matching
+        const isMember = teamMembers?.some((member: any) => 
+          member.id === stat.userId || 
+          member.userId === stat.userId ||
+          member.id === stat.id ||
+          member.user?.id === stat.userId
+        );
+        
+        return isMember;
       });
+      
+      return filteredStats;
     },
-    enabled: !!currentTeam?.leagueId && Array.isArray(teamMembers),
+    enabled: !!currentTeam?.leagueId,
   });
 
   // Fetch league standings
@@ -180,23 +191,29 @@ export default function Teams() {
 
   // Calculate team leaders
   const getTeamLeaders = () => {
-    if (!teamStats || teamStats.length === 0) return null;
+    if (!teamStats || teamStats.length === 0) {
+      return null;
+    }
 
-    const topGoalScorer = teamStats.reduce((top: any, current: any) => {
+    // Ensure we have at least one stat entry for reduce to work
+    const stats = Array.isArray(teamStats) ? teamStats : [];
+    if (stats.length === 0) return null;
+
+    const topGoalScorer = stats.reduce((top: any, current: any) => {
       return (current.goals || 0) > (top.goals || 0) ? current : top;
     });
     
-    const topAssistProvider = teamStats.reduce((top: any, current: any) => {
+    const topAssistProvider = stats.reduce((top: any, current: any) => {
       return (current.assists || 0) > (top.assists || 0) ? current : top;
     });
     
-    const topScorer = teamStats.reduce((top: any, current: any) => {
+    const topScorer = stats.reduce((top: any, current: any) => {
       const topPoints = top.points || 0;
       const currentPoints = current.points || 0;
       return currentPoints > topPoints ? current : top;
     });
     
-    const mostPenaltyMinutes = teamStats.reduce((top: any, current: any) => {
+    const mostPenaltyMinutes = stats.reduce((top: any, current: any) => {
       return (current.penaltyMinutes || 0) > (top.penaltyMinutes || 0) ? current : top;
     });
 
@@ -448,7 +465,11 @@ export default function Teams() {
                       </>
                     ) : (
                       <div className="col-span-full text-center text-muted-foreground py-8">
-                        No stats available for this team yet.
+                        <div>Debug Info:</div>
+                        <div>Current Team: {currentTeam?.name || 'None'}</div>
+                        <div>Team Members: {Array.isArray(teamMembers) ? teamMembers.length : 'Not array'}</div>
+                        <div>Team Stats: {Array.isArray(teamStats) ? teamStats.length : 'Not array'}</div>
+                        <div>Team Leaders: {teamLeaders ? 'Available' : 'Null'}</div>
                       </div>
                     )}
                   </div>
