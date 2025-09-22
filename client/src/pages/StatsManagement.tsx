@@ -118,7 +118,7 @@ export default function StatsManagement() {
 
   // Get all players' stats for the season (for bulk mode)
   const { data: allPlayerStats = [] } = useQuery<Array<PlayerStatsResponse & { userId: string; firstName: string; lastName: string }>>({
-    queryKey: [`/api/leagues/${selectedLeague}/stats/season/${selectedSeason}`],
+    queryKey: [`/api/leagues/${selectedLeague}/stats?seasonId=${selectedSeason}`],
     enabled: !!selectedLeague && !!selectedSeason,
   });
 
