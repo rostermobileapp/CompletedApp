@@ -1133,17 +1133,15 @@ export default function Messages() {
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </button>
                       ) : (
-                        // Show Leave button for conversations user can't delete
-                        conversation.type !== 'direct' && conversation.type !== 'captain_only' && (
-                          <button
-                            onClick={(e) => handleLeaveConversation(conversation.id, e)}
-                            className="p-2 hover:bg-orange-500/20 rounded-lg transition-colors"
-                            title="Leave conversation"
-                            data-testid={`button-leave-conversation-${conversation.id}`}
-                          >
-                            <LogOut className="w-4 h-4 text-orange-600" />
-                          </button>
-                        )
+                        // Show Leave button for conversations user can't delete (now includes direct and captain chats)
+                        <button
+                          onClick={(e) => handleLeaveConversation(conversation.id, e)}
+                          className="p-2 hover:bg-orange-500/20 rounded-lg transition-colors"
+                          title="Leave conversation"
+                          data-testid={`button-leave-conversation-${conversation.id}`}
+                        >
+                          <LogOut className="w-4 h-4 text-orange-600" />
+                        </button>
                       )}
                     </div>
                   </div>

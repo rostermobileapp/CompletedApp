@@ -344,10 +344,14 @@ export const conversationParticipants = pgTable("conversation_participants", {
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   leftAt: timestamp("left_at"), // For when users leave group chats
   lastReadAt: timestamp("last_read_at"), // For read receipts
+  hiddenAt: timestamp("hidden_at"), // When conversation is hidden from user's view (SMS-style leave)
+  historyClearedAt: timestamp("history_cleared_at"), // When message history is cleared for user
 }, (table) => [
   unique("unique_conversation_user").on(table.conversationId, table.userId),
   index("idx_conversation_participants_conversation").on(table.conversationId),
   index("idx_conversation_participants_user").on(table.userId),
+  index("idx_conversation_participants_hidden").on(table.hiddenAt),
+  index("idx_conversation_participants_history").on(table.historyClearedAt),
 ]);
 
 // Enhanced messages table

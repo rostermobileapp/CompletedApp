@@ -4357,7 +4357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Leave conversation (remove yourself from participants)
+  // Leave conversation (SMS-style for direct/captain, group removal for others)
   app.post('/api/conversations/:id/leave', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -4375,14 +4375,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'You are not a participant in this conversation' });
       }
       
-      // Users cannot leave direct messages or captain-only chats
+      // Handle different conversation types
       if (conversation.type === 'direct' || conversation.type === 'captain_only') {
-        return res.status(400).json({ message: 'You cannot leave this type of conversation' });
+        // SMS-style leave: hide conversation and clear history from user's view only
+        await messagingService.leaveConversationSMSStyle(id, userId);
+        res.status(200).json({ message: 'Successfully left conversation' });
+      } else {
+        // Group conversations: remove user from participants entirely  
+        await messagingService.removeUserFromGroupConversation(id, userId);
+        res.status(200).json({ message: 'Successfully left conversation' });
       }
-      
-      // Remove user from conversation
-      await messagingService.removeUserFromGroupConversation(id, userId);
-      res.status(200).json({ message: 'Successfully left conversation' });
     } catch (error) {
       console.error('Error leaving conversation:', error);
       res.status(500).json({ message: 'Failed to leave conversation' });
@@ -4463,7 +4465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
       
-      const messages = await messagingService.getConversationMessages(id, limit);
+      const messages = await messagingService.getConversationMessagesForUser(id, userId, limit);
       
       // Get attachments and read receipts for each message
       const messagesWithDetails = await Promise.all(

@@ -94,11 +94,47 @@ export class MessagingService {
 
   // Message operations
   async createMessage(data: InsertMessage): Promise<Message> {
-    const [message] = await db
-      .insert(messages)
-      .values(data)
-      .returning();
-    return message;
+    return await db.transaction(async (tx) => {
+      // Insert the message
+      const [message] = await tx
+        .insert(messages)
+        .values(data)
+        .returning();
+
+      // Update conversation's last message timestamp
+      await tx
+        .update(conversations)
+        .set({ 
+          lastMessageAt: new Date(),
+          updatedAt: new Date() 
+        })
+        .where(eq(conversations.id, data.conversationId));
+
+      // Resurface hidden conversations for all participants (except sender gets special handling)
+      await tx
+        .update(conversationParticipants)
+        .set({ hiddenAt: null })
+        .where(eq(conversationParticipants.conversationId, data.conversationId));
+
+      return message;
+    });
+  }
+
+  // SMS-style leave conversation - hide it from user's view and clear history
+  async leaveConversationSMSStyle(conversationId: string, userId: string): Promise<void> {
+    const now = new Date();
+    await db
+      .update(conversationParticipants)
+      .set({ 
+        hiddenAt: now,
+        historyClearedAt: now 
+      })
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, conversationId),
+          eq(conversationParticipants.userId, userId)
+        )
+      );
   }
 
   async getMessage(id: string): Promise<Message | undefined> {
@@ -133,6 +169,68 @@ export class MessagingService {
       .from(messages)
       .innerJoin(users, eq(messages.senderId, users.id))
       .where(eq(messages.conversationId, conversationId))
+      .orderBy(messages.createdAt)
+      .limit(limit);
+    
+    return result;
+  }
+
+  // User-aware version that respects history clearing and hiding
+  async getConversationMessagesForUser(conversationId: string, userId: string, limit: number = 50): Promise<any[]> {
+    // Get user's participant info to check for hiddenAt and historyClearedAt
+    const [participant] = await db
+      .select({
+        hiddenAt: conversationParticipants.hiddenAt,
+        historyClearedAt: conversationParticipants.historyClearedAt
+      })
+      .from(conversationParticipants)
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, conversationId),
+          eq(conversationParticipants.userId, userId)
+        )
+      )
+      .limit(1);
+
+    if (!participant) {
+      return []; // User not in conversation
+    }
+
+    // Build where conditions based on user's history
+    const whereConditions = [eq(messages.conversationId, conversationId)];
+    
+    // If user cleared history, only show messages after that time
+    if (participant.historyClearedAt) {
+      whereConditions.push(sql`${messages.createdAt} > ${participant.historyClearedAt}`);
+    }
+    
+    // If conversation was hidden but resurfaced, only show messages after hiddenAt
+    if (participant.hiddenAt) {
+      whereConditions.push(sql`${messages.createdAt} > ${participant.hiddenAt}`);
+    }
+
+    const result = await db
+      .select({
+        id: messages.id,
+        conversationId: messages.conversationId,
+        senderId: messages.senderId,
+        content: messages.content,
+        messageType: messages.messageType,
+        status: messages.status,
+        sentAt: messages.createdAt,
+        editedAt: messages.editedAt,
+        replyToId: messages.replyToId,
+        createdAt: messages.createdAt,
+        updatedAt: messages.updatedAt,
+        sender: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        }
+      })
+      .from(messages)
+      .innerJoin(users, eq(messages.senderId, users.id))
+      .where(and(...whereConditions))
       .orderBy(messages.createdAt)
       .limit(limit);
     
@@ -351,7 +449,9 @@ export class MessagingService {
       .where(
         and(
           eq(conversationParticipants.userId, userId),
-          leagueId ? eq(conversations.leagueId, leagueId) : sql`true`
+          leagueId ? eq(conversations.leagueId, leagueId) : sql`true`,
+          // Only show conversations that are not hidden OR have new messages after hiddenAt
+          sql`(${conversationParticipants.hiddenAt} IS NULL OR ${conversations.lastMessageAt} > ${conversationParticipants.hiddenAt})`
         )
       )
       .orderBy(desc(conversations.updatedAt));
