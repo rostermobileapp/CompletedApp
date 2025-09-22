@@ -46,7 +46,7 @@ interface ReadReceipt {
 interface Conversation {
   id: string;
   title?: string;
-  type: 'direct' | 'team_group' | 'custom_group';
+  type: 'direct' | 'team_group' | 'custom_group' | 'captain_only';
   leagueId: string;
   teamId?: string;
   createdBy: string;
@@ -992,25 +992,80 @@ export default function Messages() {
                     onClick={() => setSelectedConversation(conversation.id)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                      {/* Enhanced Avatar Display */}
+                      <div className="relative">
                         {conversation.type === 'team_group' || conversation.type === 'custom_group' ? (
-                          <Users className="w-5 h-5 text-muted-foreground" />
+                          // Group chat avatar with member count
+                          <div className="relative">
+                            <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                              <Users className="w-5 h-5 text-muted-foreground" />
+                            </div>
+                            {/* Member count badge */}
+                            <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid={`badge-member-count-${conversation.id}`}>
+                              {conversation.participants?.length || 0}
+                            </div>
+                          </div>
                         ) : (
-                          <span className="text-muted-foreground text-sm font-semibold">
-                            {getInitials(getParticipantName(conversation))}
-                          </span>
+                          // Direct message avatar
+                          <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                            <span className="text-muted-foreground text-sm font-semibold">
+                              {getInitials(getParticipantName(conversation))}
+                            </span>
+                          </div>
                         )}
                       </div>
+                      
                       <div className="flex-1">
-                        <h3 className="font-semibold" data-testid={`text-conversation-name-${conversation.id}`}>
-                          {getParticipantName(conversation)}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold" data-testid={`text-conversation-name-${conversation.id}`}>
+                            {getParticipantName(conversation)}
+                          </h3>
+                          {/* Group chat type indicator */}
+                          {conversation.type === 'team_group' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" data-testid={`badge-type-team-${conversation.id}`}>
+                              Team
+                            </span>
+                          )}
+                          {conversation.type === 'captain_only' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" data-testid={`badge-type-captain-${conversation.id}`}>
+                              Captain
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Enhanced last message display */}
                         {conversation.lastMessage && (
                           <p className="text-sm text-muted-foreground truncate" data-testid={`text-last-message-${conversation.id}`}>
                             {conversation.lastMessage.content}
                           </p>
                         )}
+                        
+                        {/* Group chat participant preview */}
+                        {(conversation.type === 'team_group' || conversation.type === 'custom_group') && conversation.participants && conversation.participants.length > 0 && (
+                          <div className="flex items-center gap-1 mt-1" data-testid={`conversation-participants-${conversation.id}`}>
+                            <div className="flex -space-x-1">
+                              {conversation.participants.slice(0, 3).map((participant, idx) => (
+                                <div 
+                                  key={participant.id}
+                                  className="w-4 h-4 bg-accent rounded-full flex items-center justify-center text-xs font-medium border border-background"
+                                  title={participant.user?.displayName || 'Unknown'}
+                                >
+                                  {participant.user?.displayName ? getInitials(participant.user.displayName) : '?'}
+                                </div>
+                              ))}
+                              {conversation.participants.length > 3 && (
+                                <div className="w-4 h-4 bg-muted rounded-full flex items-center justify-center text-xs font-medium border border-background">
+                                  +{conversation.participants.length - 3}
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground ml-1">
+                              {conversation.participants.length} member{conversation.participants.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        )}
                       </div>
+                      
                       <div className="text-right">
                         {conversation.lastMessage && (
                           <p className="text-xs text-muted-foreground" data-testid={`text-conversation-time-${conversation.id}`}>
