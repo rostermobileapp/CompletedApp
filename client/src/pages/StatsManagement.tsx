@@ -532,731 +532,731 @@ export default function StatsManagement() {
   // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
   return (
     // <SubscriptionGate requiredTier="commissioner"> // DELETED - ALL ACCESS GRANTED
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/commissioner">
-                <Button variant="ghost" size="sm" data-testid="button-back">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Commissioner Dashboard
-                </Button>
-              </Link>
-            </div>
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/commissioner">
+              <Button variant="ghost" size="sm" data-testid="button-back">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Commissioner Dashboard
+              </Button>
+            </Link>
           </div>
+        </div>
 
-          {/* League and Season Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="w-5 h-5" />
-                League & Season Selection
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>League</Label>
-                  <Select value={selectedLeague} onValueChange={setSelectedLeague} data-testid="select-league">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a league" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.isArray(commissionerLeagues) && commissionerLeagues.map((league: any) => (
-                        <SelectItem key={league.id} value={league.id}>
-                          {league.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Season</Label>
-                  <Select value={selectedSeason} onValueChange={setSelectedSeason} data-testid="select-season">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a season" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.isArray(seasons) && seasons.map((season: any) => (
-                        <SelectItem key={season.id} value={season.id}>
-                          {season.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+        {/* League and Season Selection */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5" />
+              League & Season Selection
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>League</Label>
+                <Select value={selectedLeague} onValueChange={setSelectedLeague} data-testid="select-league">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a league" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.isArray(commissionerLeagues) && commissionerLeagues.map((league: any) => (
+                      <SelectItem key={league.id} value={league.id}>
+                        {league.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </CardContent>
-          </Card>
+              <div className="space-y-2">
+                <Label>Season</Label>
+                <Select value={selectedSeason} onValueChange={setSelectedSeason} data-testid="select-season">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a season" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.isArray(seasons) && seasons.map((season: any) => (
+                      <SelectItem key={season.id} value={season.id}>
+                        {season.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Stats Management Tabs */}
-          {selectedLeague && selectedSeason && (
-            <Tabs defaultValue="by-game" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="by-game" className="flex items-center gap-2" data-testid="tab-by-game">
-                  <Users className="w-4 h-4" />
-                  By Game
-                </TabsTrigger>
-                <TabsTrigger value="by-player" className="flex items-center gap-2" data-testid="tab-by-player">
-                  <Target className="w-4 h-4" />
-                  By Player
-                </TabsTrigger>
-              </TabsList>
+        {/* Stats Management Tabs */}
+        {selectedLeague && selectedSeason && (
+          <Tabs defaultValue="by-game" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="by-game" className="flex items-center gap-2" data-testid="tab-by-game">
+                <Users className="w-4 h-4" />
+                By Game
+              </TabsTrigger>
+              <TabsTrigger value="by-player" className="flex items-center gap-2" data-testid="tab-by-player">
+                <Target className="w-4 h-4" />
+                By Player
+              </TabsTrigger>
+            </TabsList>
 
-              {/* By Game Tab */}
-              <TabsContent value="by-game" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="w-5 h-5" />
-                      Select Game
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Game</Label>
-                      <Select value={selectedGame} onValueChange={setSelectedGame} data-testid="select-game">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a game" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(filteredGames) && filteredGames.map((game: Game) => (
-                            <SelectItem key={game.id} value={game.id}>
-                              {game.homeTeam.name} vs {game.awayTeam.name} - {format(new Date(game.scheduledAt), 'MMM d, yyyy h:mm a')}
-                              {game.isScrimmage && ' (Scrimmage)'}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+            {/* By Game Tab */}
+            <TabsContent value="by-game" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Select Game
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Game</Label>
+                    <Select value={selectedGame} onValueChange={setSelectedGame} data-testid="select-game">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a game" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.isArray(filteredGames) && filteredGames.map((game: Game) => (
+                          <SelectItem key={game.id} value={game.id}>
+                            {game.homeTeam.name} vs {game.awayTeam.name} - {format(new Date(game.scheduledAt), 'MMM d, yyyy h:mm a')}
+                            {game.isScrimmage && ' (Scrimmage)'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    {selectedGame && Array.isArray(gameParticipants) && gameParticipants.length > 0 && (
-                      <div className="space-y-4">
-                        <div className="text-sm text-muted-foreground" data-testid="text-participants-count">
-                          {gameParticipants.length} players found for this game
-                        </div>
-                        
-                        {/* Fixed Header */}
-                        <div ref={gameTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-auto pointer-events-none">
-                          <Table style={{minWidth: '600px'}}>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead 
-                                  className="cursor-pointer select-none w-32 bg-background"
-                                  onClick={() => handleSort('name')}
-                                  data-testid="header-name"
-                                >
-                                  Player {getSortIcon('name')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background"
-                                  onClick={() => handleSort('gamesPlayed')}
-                                  data-testid="header-games-played"
-                                >
-                                  GP {getSortIcon('gamesPlayed')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background"
-                                  onClick={() => handleSort('goals')}
-                                  data-testid="header-goals"
-                                >
-                                  G {getSortIcon('goals')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background"
-                                  onClick={() => handleSort('assists')}
-                                  data-testid="header-assists"
-                                >
-                                  A {getSortIcon('assists')}
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer select-none text-center w-16 bg-background"
-                                  onClick={() => handleSort('penaltyMinutes')}
-                                  data-testid="header-penalty-minutes"
-                                >
-                                  PIM {getSortIcon('penaltyMinutes')}
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                          </Table>
-                        </div>
-                        
-                        {/* Scrollable Table Body */}
-                        <div ref={gameTableBodyRef} className="max-h-96 overflow-auto border-l border-r border-b rounded-b-lg">
-                          <Table data-testid="table-game-stats" style={{minWidth: '600px'}}>
-                            <TableBody>
-                              {getSortedPlayers(gameParticipants).map((participant: any, index: number) => (
-                                <TableRow key={participant.userId} data-testid={`row-participant-${participant.userId}`}>
-                                  <TableCell className="font-medium w-32 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-name-${participant.userId}`}>
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
-                                        {index + 1}
-                                      </div>
-                                      <div>
-                                        <div className="font-medium">{participant.firstName} {participant.lastName}</div>
-                                        {participant.teamName && (
-                                          <div className="text-sm text-muted-foreground">{participant.teamName}</div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px] text-[14px]" data-testid={`cell-gamesplayed-${participant.userId}`}>
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(participant.userId, 'gamesPlayed')}
-                                        data-testid={`button-minus-games-${participant.userId}`}
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </Button>
-                                      <div 
-                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-games-${participant.userId}`}
-                                      >
-                                        {parseInt(playerGameStats[participant.userId]?.gamesPlayed || '0') || 0}
-                                      </div>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(participant.userId, 'gamesPlayed')}
-                                        data-testid={`button-plus-games-${participant.userId}`}
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-goals-${participant.userId}`}>
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(participant.userId, 'goals')}
-                                        data-testid={`button-minus-goals-${participant.userId}`}
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </Button>
-                                      <div 
-                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-goals-${participant.userId}`}
-                                      >
-                                        {parseInt(playerGameStats[participant.userId]?.goals || '0') || 0}
-                                      </div>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(participant.userId, 'goals')}
-                                        data-testid={`button-plus-goals-${participant.userId}`}
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-assists-${participant.userId}`}>
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(participant.userId, 'assists')}
-                                        data-testid={`button-minus-assists-${participant.userId}`}
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </Button>
-                                      <div 
-                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-assists-${participant.userId}`}
-                                      >
-                                        {parseInt(playerGameStats[participant.userId]?.assists || '0') || 0}
-                                      </div>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(participant.userId, 'assists')}
-                                        data-testid={`button-plus-assists-${participant.userId}`}
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-penalty-${participant.userId}`}>
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
-                                        onClick={() => decrementStat(participant.userId, 'penaltyMinutes')}
-                                        data-testid={`button-minus-penalty-${participant.userId}`}
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </Button>
-                                      <div 
-                                        className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
-                                        data-testid={`display-penalty-${participant.userId}`}
-                                      >
-                                        {parseInt(playerGameStats[participant.userId]?.penaltyMinutes || '0') || 0}
-                                      </div>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
-                                        onClick={() => incrementStat(participant.userId, 'penaltyMinutes')}
-                                        data-testid={`button-plus-penalty-${participant.userId}`}
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                        
-                        <Button 
-                          onClick={handleGameStatsUpdate} 
-                          disabled={updateStatsMutation.isPending}
-                          className="w-full"
-                          data-testid="button-update-game-stats"
-                        >
-                          {updateStatsMutation.isPending ? 'Updating...' : 'Update Game Stats'}
-                        </Button>
+                  {selectedGame && Array.isArray(gameParticipants) && gameParticipants.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="text-sm text-muted-foreground" data-testid="text-participants-count">
+                        {gameParticipants.length} players found for this game
                       </div>
-                    )}
-
-                    {selectedGame && Array.isArray(gameParticipants) && gameParticipants.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground" data-testid="text-no-participants">
-                        <AlertCircle className="w-12 h-12 mx-auto mb-4" />
-                        <p>No participants found for this game.</p>
-                        <p className="text-sm">Players need to be assigned to teams in this game.</p>
+                      
+                      {/* Fixed Header */}
+                      <div ref={gameTableHeaderRef} className="border rounded-t-lg bg-background overflow-x-auto pointer-events-none">
+                        <Table style={{minWidth: '600px'}}>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead 
+                                className="cursor-pointer select-none w-32 bg-background"
+                                onClick={() => handleSort('name')}
+                                data-testid="header-name"
+                              >
+                                Player {getSortIcon('name')}
+                              </TableHead>
+                              <TableHead 
+                                className="cursor-pointer select-none text-center w-16 bg-background"
+                                onClick={() => handleSort('gamesPlayed')}
+                                data-testid="header-games-played"
+                              >
+                                GP {getSortIcon('gamesPlayed')}
+                              </TableHead>
+                              <TableHead 
+                                className="cursor-pointer select-none text-center w-16 bg-background"
+                                onClick={() => handleSort('goals')}
+                                data-testid="header-goals"
+                              >
+                                G {getSortIcon('goals')}
+                              </TableHead>
+                              <TableHead 
+                                className="cursor-pointer select-none text-center w-16 bg-background"
+                                onClick={() => handleSort('assists')}
+                                data-testid="header-assists"
+                              >
+                                A {getSortIcon('assists')}
+                              </TableHead>
+                              <TableHead 
+                                className="cursor-pointer select-none text-center w-16 bg-background"
+                                onClick={() => handleSort('penaltyMinutes')}
+                                data-testid="header-penalty-minutes"
+                              >
+                                PIM {getSortIcon('penaltyMinutes')}
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                        </Table>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* By Player Tab */}
-              <TabsContent value="by-player" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Target className="w-5 h-5" />
-                      Player Stats Management
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Mode Selection */}
-                    <div className="flex items-center space-x-4">
-                      <Label>Update Mode:</Label>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant={updateMode === 'bulk' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setUpdateMode('bulk')}
-                          data-testid="button-bulk-mode"
-                        >
-                          <Users className="w-4 h-4 mr-2" />
-                          Bulk Update
-                        </Button>
-                        <Button
-                          variant={updateMode === 'single' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setUpdateMode('single')}
-                          data-testid="button-single-mode"
-                        >
-                          <Target className="w-4 h-4 mr-2" />
-                          Single Player
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Bulk Update Mode */}
-                    {updateMode === 'bulk' && Array.isArray(players) && players.length > 0 && (
-                      <div className="space-y-4">
-                        <div className="text-sm text-muted-foreground" data-testid="text-bulk-players">
-                          {players.length} players found - Edit stats for multiple players simultaneously
-                        </div>
-                        
-                        <div className="max-h-96 overflow-auto border rounded-lg">
-                          <Table data-testid="table-bulk-stats">
-                            <TableHeader className="sticky top-0 bg-background z-10">
-                              <TableRow>
-                                <TableHead className="w-48">Player</TableHead>
-                                <TableHead className="text-center w-20">Goals</TableHead>
-                                <TableHead className="text-center w-20">Assists</TableHead>
-                                <TableHead className="text-center w-20">PIM</TableHead>
-                                <TableHead className="text-center w-20">GP</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
-                                <TableRow key={player.id} data-testid={`row-bulk-player-${player.id}`}>
-                                  <TableCell className="font-medium">
+                      
+                      {/* Scrollable Table Body */}
+                      <div ref={gameTableBodyRef} className="max-h-96 overflow-auto border-l border-r border-b rounded-b-lg">
+                        <Table data-testid="table-game-stats" style={{minWidth: '600px'}}>
+                          <TableBody>
+                            {getSortedPlayers(gameParticipants).map((participant: any, index: number) => (
+                              <TableRow key={participant.userId} data-testid={`row-participant-${participant.userId}`}>
+                                <TableCell className="font-medium w-32 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-name-${participant.userId}`}>
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
+                                      {index + 1}
+                                    </div>
                                     <div>
-                                      <div className="font-medium">{player.firstName} {player.lastName}</div>
-                                      {player.teamName && (
-                                        <div className="text-sm text-muted-foreground">{player.teamName}</div>
+                                      <div className="font-medium">{participant.firstName} {participant.lastName}</div>
+                                      {participant.teamName && (
+                                        <div className="text-sm text-muted-foreground">{participant.teamName}</div>
                                       )}
                                     </div>
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    <div className="flex items-center justify-center space-x-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => decrementBulkPlayerStat(player.id, 'goals')}
-                                        className="h-8 w-8 p-0"
-                                        data-testid={`button-decrease-bulk-goals-${player.id}`}
-                                      >
-                                        -
-                                      </Button>
-                                      <Input
-                                        type="number"
-                                        value={bulkPlayerStats[player.id]?.goals || '0'}
-                                        onChange={(e) => updateBulkPlayerStat(player.id, 'goals', e.target.value)}
-                                        min="0"
-                                        className="w-12 text-center p-1"
-                                        data-testid={`input-bulk-goals-${player.id}`}
-                                      />
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => incrementBulkPlayerStat(player.id, 'goals')}
-                                        className="h-8 w-8 p-0"
-                                        data-testid={`button-increase-bulk-goals-${player.id}`}
-                                      >
-                                        +
-                                      </Button>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px] text-[14px]" data-testid={`cell-gamesplayed-${participant.userId}`}>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                      onClick={() => decrementStat(participant.userId, 'gamesPlayed')}
+                                      data-testid={`button-minus-games-${participant.userId}`}
+                                    >
+                                      <Minus className="w-3 h-3" />
+                                    </Button>
+                                    <div 
+                                      className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                      data-testid={`display-games-${participant.userId}`}
+                                    >
+                                      {parseInt(playerGameStats[participant.userId]?.gamesPlayed || '0') || 0}
                                     </div>
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    <div className="flex items-center justify-center space-x-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => decrementBulkPlayerStat(player.id, 'assists')}
-                                        className="h-8 w-8 p-0"
-                                        data-testid={`button-decrease-bulk-assists-${player.id}`}
-                                      >
-                                        -
-                                      </Button>
-                                      <Input
-                                        type="number"
-                                        value={bulkPlayerStats[player.id]?.assists || '0'}
-                                        onChange={(e) => updateBulkPlayerStat(player.id, 'assists', e.target.value)}
-                                        min="0"
-                                        className="w-12 text-center p-1"
-                                        data-testid={`input-bulk-assists-${player.id}`}
-                                      />
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => incrementBulkPlayerStat(player.id, 'assists')}
-                                        className="h-8 w-8 p-0"
-                                        data-testid={`button-increase-bulk-assists-${player.id}`}
-                                      >
-                                        +
-                                      </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                      onClick={() => incrementStat(participant.userId, 'gamesPlayed')}
+                                      data-testid={`button-plus-games-${participant.userId}`}
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-goals-${participant.userId}`}>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                      onClick={() => decrementStat(participant.userId, 'goals')}
+                                      data-testid={`button-minus-goals-${participant.userId}`}
+                                    >
+                                      <Minus className="w-3 h-3" />
+                                    </Button>
+                                    <div 
+                                      className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                      data-testid={`display-goals-${participant.userId}`}
+                                    >
+                                      {parseInt(playerGameStats[participant.userId]?.goals || '0') || 0}
                                     </div>
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    <div className="flex items-center justify-center space-x-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => decrementBulkPlayerStat(player.id, 'penaltyMinutes')}
-                                        className="h-8 w-8 p-0"
-                                        data-testid={`button-decrease-bulk-penalty-${player.id}`}
-                                      >
-                                        -
-                                      </Button>
-                                      <Input
-                                        type="number"
-                                        value={bulkPlayerStats[player.id]?.penaltyMinutes || '0'}
-                                        onChange={(e) => updateBulkPlayerStat(player.id, 'penaltyMinutes', e.target.value)}
-                                        min="0"
-                                        className="w-12 text-center p-1"
-                                        data-testid={`input-bulk-penalty-${player.id}`}
-                                      />
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => incrementBulkPlayerStat(player.id, 'penaltyMinutes')}
-                                        className="h-8 w-8 p-0"
-                                        data-testid={`button-increase-bulk-penalty-${player.id}`}
-                                      >
-                                        +
-                                      </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                      onClick={() => incrementStat(participant.userId, 'goals')}
+                                      data-testid={`button-plus-goals-${participant.userId}`}
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-assists-${participant.userId}`}>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                      onClick={() => decrementStat(participant.userId, 'assists')}
+                                      data-testid={`button-minus-assists-${participant.userId}`}
+                                    >
+                                      <Minus className="w-3 h-3" />
+                                    </Button>
+                                    <div 
+                                      className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                      data-testid={`display-assists-${participant.userId}`}
+                                    >
+                                      {parseInt(playerGameStats[participant.userId]?.assists || '0') || 0}
                                     </div>
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    <div className="flex items-center justify-center space-x-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => decrementBulkPlayerStat(player.id, 'gamesPlayed')}
-                                        className="h-8 w-8 p-0"
-                                        data-testid={`button-decrease-bulk-games-${player.id}`}
-                                      >
-                                        -
-                                      </Button>
-                                      <Input
-                                        type="number"
-                                        value={bulkPlayerStats[player.id]?.gamesPlayed || '0'}
-                                        onChange={(e) => updateBulkPlayerStat(player.id, 'gamesPlayed', e.target.value)}
-                                        min="0"
-                                        className="w-12 text-center p-1"
-                                        data-testid={`input-bulk-games-${player.id}`}
-                                      />
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => incrementBulkPlayerStat(player.id, 'gamesPlayed')}
-                                        className="h-8 w-8 p-0"
-                                        data-testid={`button-increase-bulk-games-${player.id}`}
-                                      >
-                                        +
-                                      </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                      onClick={() => incrementStat(participant.userId, 'assists')}
+                                      data-testid={`button-plus-assists-${participant.userId}`}
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-penalty-${participant.userId}`}>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                      onClick={() => decrementStat(participant.userId, 'penaltyMinutes')}
+                                      data-testid={`button-minus-penalty-${participant.userId}`}
+                                    >
+                                      <Minus className="w-3 h-3" />
+                                    </Button>
+                                    <div 
+                                      className="w-10 h-6 bg-muted rounded border flex items-center justify-center text-sm font-medium"
+                                      data-testid={`display-penalty-${participant.userId}`}
+                                    >
+                                      {parseInt(playerGameStats[participant.userId]?.penaltyMinutes || '0') || 0}
                                     </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                        
-                        <Button 
-                          onClick={handleBulkStatsUpdate} 
-                          disabled={updateStatsMutation.isPending}
-                          className="w-full"
-                          data-testid="button-update-bulk-stats"
-                        >
-                          {updateStatsMutation.isPending ? 'Updating...' : 'Update All Player Stats'}
-                        </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                                      onClick={() => incrementStat(participant.userId, 'penaltyMinutes')}
+                                      data-testid={`button-plus-penalty-${participant.userId}`}
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
                       </div>
-                    )}
+                      
+                      <Button 
+                        onClick={handleGameStatsUpdate} 
+                        disabled={updateStatsMutation.isPending}
+                        className="w-full"
+                        data-testid="button-update-game-stats"
+                      >
+                        {updateStatsMutation.isPending ? 'Updating...' : 'Update Game Stats'}
+                      </Button>
+                    </div>
+                  )}
 
-                    {/* Single Player Mode */}
-                    {updateMode === 'single' && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label>Player</Label>
-                          <Select value={selectedPlayer} onValueChange={setSelectedPlayer} data-testid="select-player">
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a player" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.isArray(players) && getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
-                                <SelectItem key={player.id} value={player.id}>
-                                  {player.firstName} {player.lastName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                  {selectedGame && Array.isArray(gameParticipants) && gameParticipants.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground" data-testid="text-no-participants">
+                      <AlertCircle className="w-12 h-12 mx-auto mb-4" />
+                      <p>No participants found for this game.</p>
+                      <p className="text-sm">Players need to be assigned to teams in this game.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                        {selectedPlayer && (
-                          <div className="space-y-4">
-                            <div className="text-sm text-muted-foreground" data-testid="text-selected-player">
-                              Editing stats for: {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.firstName} {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.lastName}
-                            </div>
-                            
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="player-goals">Goals</Label>
-                                <div className="flex items-center space-x-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => decrementIndividualPlayerStat('goals')}
-                                    className="h-9 w-9 p-0"
-                                    data-testid="button-decrease-player-goals"
-                                  >
-                                    -
-                                  </Button>
-                                  <Input
-                                    id="player-goals"
-                                    type="number"
-                                    value={individualPlayerStats.goals}
-                                    onChange={(e) => updateIndividualPlayerStat('goals', e.target.value)}
-                                    min="0"
-                                    className="text-center"
-                                    data-testid="input-player-goals"
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => incrementIndividualPlayerStat('goals')}
-                                    className="h-9 w-9 p-0"
-                                    data-testid="button-increase-player-goals"
-                                  >
-                                    +
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="player-assists">Assists</Label>
-                                <div className="flex items-center space-x-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => decrementIndividualPlayerStat('assists')}
-                                    className="h-9 w-9 p-0"
-                                    data-testid="button-decrease-player-assists"
-                                  >
-                                    -
-                                  </Button>
-                                  <Input
-                                    id="player-assists"
-                                    type="number"
-                                    value={individualPlayerStats.assists}
-                                    onChange={(e) => updateIndividualPlayerStat('assists', e.target.value)}
-                                    min="0"
-                                    className="text-center"
-                                    data-testid="input-player-assists"
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => incrementIndividualPlayerStat('assists')}
-                                    className="h-9 w-9 p-0"
-                                    data-testid="button-increase-player-assists"
-                                  >
-                                    +
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="player-penalty">Penalty Minutes</Label>
-                                <div className="flex items-center space-x-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => decrementIndividualPlayerStat('penaltyMinutes')}
-                                    className="h-9 w-9 p-0"
-                                    data-testid="button-decrease-player-penalty"
-                                  >
-                                    -
-                                  </Button>
-                                  <Input
-                                    id="player-penalty"
-                                    type="number"
-                                    value={individualPlayerStats.penaltyMinutes}
-                                    onChange={(e) => updateIndividualPlayerStat('penaltyMinutes', e.target.value)}
-                                    min="0"
-                                    className="text-center"
-                                    data-testid="input-player-penalty"
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => incrementIndividualPlayerStat('penaltyMinutes')}
-                                    className="h-9 w-9 p-0"
-                                    data-testid="button-increase-player-penalty"
-                                  >
-                                    +
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="player-games">Games Played</Label>
-                                <div className="flex items-center space-x-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => decrementIndividualPlayerStat('gamesPlayed')}
-                                    className="h-9 w-9 p-0"
-                                    data-testid="button-decrease-player-games"
-                                  >
-                                    -
-                                  </Button>
-                                  <Input
-                                    id="player-games"
-                                    type="number"
-                                    value={individualPlayerStats.gamesPlayed}
-                                    onChange={(e) => updateIndividualPlayerStat('gamesPlayed', e.target.value)}
-                                    min="0"
-                                    className="text-center"
-                                    data-testid="input-player-games"
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => incrementIndividualPlayerStat('gamesPlayed')}
-                                    className="h-9 w-9 p-0"
-                                    data-testid="button-increase-player-games"
-                                  >
-                                    +
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
+            {/* By Player Tab */}
+            <TabsContent value="by-player" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="w-5 h-5" />
+                    Player Stats Management
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Mode Selection */}
+                  <div className="flex items-center space-x-4">
+                    <Label>Update Mode:</Label>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant={updateMode === 'bulk' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setUpdateMode('bulk')}
+                        data-testid="button-bulk-mode"
+                      >
+                        <Users className="w-4 h-4 mr-2" />
+                        Bulk Update
+                      </Button>
+                      <Button
+                        variant={updateMode === 'single' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setUpdateMode('single')}
+                        data-testid="button-single-mode"
+                      >
+                        <Target className="w-4 h-4 mr-2" />
+                        Single Player
+                      </Button>
+                    </div>
+                  </div>
 
-                            {currentPlayerStats && (
-                              <div className="bg-muted/50 p-4 rounded-lg">
-                                <h4 className="font-medium mb-2">Current Season Stats</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  {/* Bulk Update Mode */}
+                  {updateMode === 'bulk' && Array.isArray(players) && players.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="text-sm text-muted-foreground" data-testid="text-bulk-players">
+                        {players.length} players found - Edit stats for multiple players simultaneously
+                      </div>
+                      
+                      <div className="max-h-96 overflow-auto border rounded-lg mt-[2px] mb-[2px]">
+                        <Table data-testid="table-bulk-stats">
+                          <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                              <TableHead className="w-48">Player</TableHead>
+                              <TableHead className="text-center w-20">Goals</TableHead>
+                              <TableHead className="text-center w-20">Assists</TableHead>
+                              <TableHead className="text-center w-20">PIM</TableHead>
+                              <TableHead className="text-center w-20">GP</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
+                              <TableRow key={player.id} data-testid={`row-bulk-player-${player.id}`}>
+                                <TableCell className="font-medium">
                                   <div>
-                                    <span className="text-muted-foreground">Goals:</span>
-                                    <span className="ml-2 font-medium" data-testid="display-current-goals">{currentPlayerStats.goals || 0}</span>
+                                    <div className="font-medium">{player.firstName} {player.lastName}</div>
+                                    {player.teamName && (
+                                      <div className="text-sm text-muted-foreground">{player.teamName}</div>
+                                    )}
                                   </div>
-                                  <div>
-                                    <span className="text-muted-foreground">Assists:</span>
-                                    <span className="ml-2 font-medium" data-testid="display-current-assists">{currentPlayerStats.assists || 0}</span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => decrementBulkPlayerStat(player.id, 'goals')}
+                                      className="h-8 w-8 p-0"
+                                      data-testid={`button-decrease-bulk-goals-${player.id}`}
+                                    >
+                                      -
+                                    </Button>
+                                    <Input
+                                      type="number"
+                                      value={bulkPlayerStats[player.id]?.goals || '0'}
+                                      onChange={(e) => updateBulkPlayerStat(player.id, 'goals', e.target.value)}
+                                      min="0"
+                                      className="w-12 text-center p-1"
+                                      data-testid={`input-bulk-goals-${player.id}`}
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => incrementBulkPlayerStat(player.id, 'goals')}
+                                      className="h-8 w-8 p-0"
+                                      data-testid={`button-increase-bulk-goals-${player.id}`}
+                                    >
+                                      +
+                                    </Button>
                                   </div>
-                                  <div>
-                                    <span className="text-muted-foreground">PIM:</span>
-                                    <span className="ml-2 font-medium" data-testid="display-current-penalty">{currentPlayerStats.penaltyMinutes || 0}</span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => decrementBulkPlayerStat(player.id, 'assists')}
+                                      className="h-8 w-8 p-0"
+                                      data-testid={`button-decrease-bulk-assists-${player.id}`}
+                                    >
+                                      -
+                                    </Button>
+                                    <Input
+                                      type="number"
+                                      value={bulkPlayerStats[player.id]?.assists || '0'}
+                                      onChange={(e) => updateBulkPlayerStat(player.id, 'assists', e.target.value)}
+                                      min="0"
+                                      className="w-12 text-center p-1"
+                                      data-testid={`input-bulk-assists-${player.id}`}
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => incrementBulkPlayerStat(player.id, 'assists')}
+                                      className="h-8 w-8 p-0"
+                                      data-testid={`button-increase-bulk-assists-${player.id}`}
+                                    >
+                                      +
+                                    </Button>
                                   </div>
-                                  <div>
-                                    <span className="text-muted-foreground">GP:</span>
-                                    <span className="ml-2 font-medium" data-testid="display-current-games">{currentPlayerStats.gamesPlayed || 0}</span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => decrementBulkPlayerStat(player.id, 'penaltyMinutes')}
+                                      className="h-8 w-8 p-0"
+                                      data-testid={`button-decrease-bulk-penalty-${player.id}`}
+                                    >
+                                      -
+                                    </Button>
+                                    <Input
+                                      type="number"
+                                      value={bulkPlayerStats[player.id]?.penaltyMinutes || '0'}
+                                      onChange={(e) => updateBulkPlayerStat(player.id, 'penaltyMinutes', e.target.value)}
+                                      min="0"
+                                      className="w-12 text-center p-1"
+                                      data-testid={`input-bulk-penalty-${player.id}`}
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => incrementBulkPlayerStat(player.id, 'penaltyMinutes')}
+                                      className="h-8 w-8 p-0"
+                                      data-testid={`button-increase-bulk-penalty-${player.id}`}
+                                    >
+                                      +
+                                    </Button>
                                   </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            <Button 
-                              onClick={handlePlayerStatsUpdate} 
-                              disabled={updateStatsMutation.isPending}
-                              className="w-full"
-                              data-testid="button-update-player-stats"
-                            >
-                              {updateStatsMutation.isPending ? 'Updating...' : 'Update Player Stats'}
-                            </Button>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => decrementBulkPlayerStat(player.id, 'gamesPlayed')}
+                                      className="h-8 w-8 p-0"
+                                      data-testid={`button-decrease-bulk-games-${player.id}`}
+                                    >
+                                      -
+                                    </Button>
+                                    <Input
+                                      type="number"
+                                      value={bulkPlayerStats[player.id]?.gamesPlayed || '0'}
+                                      onChange={(e) => updateBulkPlayerStat(player.id, 'gamesPlayed', e.target.value)}
+                                      min="0"
+                                      className="w-12 text-center p-1"
+                                      data-testid={`input-bulk-games-${player.id}`}
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => incrementBulkPlayerStat(player.id, 'gamesPlayed')}
+                                      className="h-8 w-8 p-0"
+                                      data-testid={`button-increase-bulk-games-${player.id}`}
+                                    >
+                                      +
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      
+                      <Button 
+                        onClick={handleBulkStatsUpdate} 
+                        disabled={updateStatsMutation.isPending}
+                        className="w-full"
+                        data-testid="button-update-bulk-stats"
+                      >
+                        {updateStatsMutation.isPending ? 'Updating...' : 'Update All Player Stats'}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Single Player Mode */}
+                  {updateMode === 'single' && (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Player</Label>
+                        <Select value={selectedPlayer} onValueChange={setSelectedPlayer} data-testid="select-player">
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a player" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.isArray(players) && getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
+                              <SelectItem key={player.id} value={player.id}>
+                                {player.firstName} {player.lastName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {selectedPlayer && (
+                        <div className="space-y-4">
+                          <div className="text-sm text-muted-foreground" data-testid="text-selected-player">
+                            Editing stats for: {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.firstName} {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.lastName}
                           </div>
-                        )}
-
-                        {selectedPlayer && !currentPlayerStats && (
-                          <div className="text-center py-8 text-muted-foreground" data-testid="text-no-stats">
-                            <AlertCircle className="w-12 h-12 mx-auto mb-4" />
-                            <p>No stats found for this player in the selected season.</p>
-                            <p className="text-sm">Enter initial stats to create a record.</p>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="player-goals">Goals</Label>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => decrementIndividualPlayerStat('goals')}
+                                  className="h-9 w-9 p-0"
+                                  data-testid="button-decrease-player-goals"
+                                >
+                                  -
+                                </Button>
+                                <Input
+                                  id="player-goals"
+                                  type="number"
+                                  value={individualPlayerStats.goals}
+                                  onChange={(e) => updateIndividualPlayerStat('goals', e.target.value)}
+                                  min="0"
+                                  className="text-center"
+                                  data-testid="input-player-goals"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => incrementIndividualPlayerStat('goals')}
+                                  className="h-9 w-9 p-0"
+                                  data-testid="button-increase-player-goals"
+                                >
+                                  +
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="player-assists">Assists</Label>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => decrementIndividualPlayerStat('assists')}
+                                  className="h-9 w-9 p-0"
+                                  data-testid="button-decrease-player-assists"
+                                >
+                                  -
+                                </Button>
+                                <Input
+                                  id="player-assists"
+                                  type="number"
+                                  value={individualPlayerStats.assists}
+                                  onChange={(e) => updateIndividualPlayerStat('assists', e.target.value)}
+                                  min="0"
+                                  className="text-center"
+                                  data-testid="input-player-assists"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => incrementIndividualPlayerStat('assists')}
+                                  className="h-9 w-9 p-0"
+                                  data-testid="button-increase-player-assists"
+                                >
+                                  +
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="player-penalty">Penalty Minutes</Label>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => decrementIndividualPlayerStat('penaltyMinutes')}
+                                  className="h-9 w-9 p-0"
+                                  data-testid="button-decrease-player-penalty"
+                                >
+                                  -
+                                </Button>
+                                <Input
+                                  id="player-penalty"
+                                  type="number"
+                                  value={individualPlayerStats.penaltyMinutes}
+                                  onChange={(e) => updateIndividualPlayerStat('penaltyMinutes', e.target.value)}
+                                  min="0"
+                                  className="text-center"
+                                  data-testid="input-player-penalty"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => incrementIndividualPlayerStat('penaltyMinutes')}
+                                  className="h-9 w-9 p-0"
+                                  data-testid="button-increase-player-penalty"
+                                >
+                                  +
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="player-games">Games Played</Label>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => decrementIndividualPlayerStat('gamesPlayed')}
+                                  className="h-9 w-9 p-0"
+                                  data-testid="button-decrease-player-games"
+                                >
+                                  -
+                                </Button>
+                                <Input
+                                  id="player-games"
+                                  type="number"
+                                  value={individualPlayerStats.gamesPlayed}
+                                  onChange={(e) => updateIndividualPlayerStat('gamesPlayed', e.target.value)}
+                                  min="0"
+                                  className="text-center"
+                                  data-testid="input-player-games"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => incrementIndividualPlayerStat('gamesPlayed')}
+                                  className="h-9 w-9 p-0"
+                                  data-testid="button-increase-player-games"
+                                >
+                                  +
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    )}
 
-                    {/* No Players Message */}
-                    {(!players || players.length === 0) && (
-                      <div className="text-center py-8 text-muted-foreground" data-testid="text-no-players">
-                        <AlertCircle className="w-12 h-12 mx-auto mb-4" />
-                        <p>No players found in this league.</p>
-                        <p className="text-sm">Players need to be added to the league first.</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          )}
-        </div>
+                          {currentPlayerStats && (
+                            <div className="bg-muted/50 p-4 rounded-lg">
+                              <h4 className="font-medium mb-2">Current Season Stats</h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground">Goals:</span>
+                                  <span className="ml-2 font-medium" data-testid="display-current-goals">{currentPlayerStats.goals || 0}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Assists:</span>
+                                  <span className="ml-2 font-medium" data-testid="display-current-assists">{currentPlayerStats.assists || 0}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">PIM:</span>
+                                  <span className="ml-2 font-medium" data-testid="display-current-penalty">{currentPlayerStats.penaltyMinutes || 0}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">GP:</span>
+                                  <span className="ml-2 font-medium" data-testid="display-current-games">{currentPlayerStats.gamesPlayed || 0}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <Button 
+                            onClick={handlePlayerStatsUpdate} 
+                            disabled={updateStatsMutation.isPending}
+                            className="w-full"
+                            data-testid="button-update-player-stats"
+                          >
+                            {updateStatsMutation.isPending ? 'Updating...' : 'Update Player Stats'}
+                          </Button>
+                        </div>
+                      )}
+
+                      {selectedPlayer && !currentPlayerStats && (
+                        <div className="text-center py-8 text-muted-foreground" data-testid="text-no-stats">
+                          <AlertCircle className="w-12 h-12 mx-auto mb-4" />
+                          <p>No stats found for this player in the selected season.</p>
+                          <p className="text-sm">Enter initial stats to create a record.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* No Players Message */}
+                  {(!players || players.length === 0) && (
+                    <div className="text-center py-8 text-muted-foreground" data-testid="text-no-players">
+                      <AlertCircle className="w-12 h-12 mx-auto mb-4" />
+                      <p>No players found in this league.</p>
+                      <p className="text-sm">Players need to be added to the league first.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
-    );
+    </div>
+  );
 }
