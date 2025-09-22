@@ -1062,9 +1062,6 @@ export default function Messages() {
                         )}
                       </div>
                     </div>
-                    {isCurrentUser && (
-                      
-                    )}
                   </div>
                 );
               })
