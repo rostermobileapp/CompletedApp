@@ -392,7 +392,7 @@ export default function Teams() {
                 </Card>
 
                 {/* Team Leaders */}
-                <Card>
+                <Card className="rounded-lg border bg-card text-card-foreground shadow-sm mt-[5px] mb-[5px] text-center">
                   <CardHeader>
                     <CardTitle>Team Leaders</CardTitle>
                   </CardHeader>
