@@ -29,24 +29,6 @@ export default function Teams() {
     enabled: !!selectedTeam,
   });
 
-
-  // Fetch team stats for leaders
-  const { data: teamStats = [] } = useQuery({
-    queryKey: ['/api/leagues', currentTeam?.leagueId, 'stats', 'team', currentTeam?.id],
-    queryFn: async () => {
-      if (!currentTeam?.leagueId) return [];
-      const response = await apiRequest('GET', `/api/leagues/${currentTeam.leagueId}/stats`);
-      const allStats = await response.json();
-      // Filter stats for current team players
-      return allStats.filter((stat: any) => {
-        // Check if this player is on the current team
-        const isMember = (teamMembers as any[])?.some((member: any) => member.id === stat.userId);
-        return isMember && stat.type === 'skater'; // Only skaters for these stats
-      });
-    },
-    enabled: !!currentTeam?.leagueId && teamMembers.length > 0,
-  });
-
   // Get upcoming games for beverage duty
   const { data: upcomingGames = [] } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
@@ -170,6 +152,23 @@ export default function Teams() {
   const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
   const isCommissioner = (user as any)?.subscriptionTier === 'commissioner';
   const canUploadLogo = isTeamCaptain || isCommissioner;
+
+  // Fetch team stats for leaders
+  const { data: teamStats = [] } = useQuery({
+    queryKey: ['/api/leagues', currentTeam?.leagueId, 'stats', 'team', currentTeam?.id],
+    queryFn: async () => {
+      if (!currentTeam?.leagueId) return [];
+      const response = await apiRequest('GET', `/api/leagues/${currentTeam.leagueId}/stats`);
+      const allStats = await response.json();
+      // Filter stats for current team players
+      return allStats.filter((stat: any) => {
+        // Check if this player is on the current team
+        const isMember = (teamMembers as any[])?.some((member: any) => member.id === stat.userId);
+        return isMember && stat.type === 'skater'; // Only skaters for these stats
+      });
+    },
+    enabled: !!currentTeam?.leagueId && teamMembers.length > 0,
+  });
 
   // Calculate team leaders
   const getTeamLeaders = () => {
