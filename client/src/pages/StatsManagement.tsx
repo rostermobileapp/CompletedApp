@@ -338,10 +338,11 @@ export default function StatsManagement() {
 
     const updates = Object.entries(bulkPlayerStats)
       .filter(([_, stats]) => 
-        parseInt(stats.goals) > 0 || 
-        parseInt(stats.assists) > 0 || 
-        parseInt(stats.penaltyMinutes) > 0 || 
-        parseInt(stats.gamesPlayed) > 0
+        // Include any player with entered values (not empty strings)
+        stats.goals !== '' || 
+        stats.assists !== '' || 
+        stats.penaltyMinutes !== '' || 
+        stats.gamesPlayed !== ''
       )
       .map(([userId, stats]) => ({
         userId,
@@ -349,7 +350,7 @@ export default function StatsManagement() {
           goals: parseInt(stats.goals) || 0,
           assists: parseInt(stats.assists) || 0,
           penaltyMinutes: parseInt(stats.penaltyMinutes) || 0,
-          gamesPlayed: parseInt(stats.gamesPlayed) || 0,
+          gamesPlayed: parseInt(stats.gamesPlayed) || 1, // Keep min 1 for gamesPlayed
         }
       }));
 
@@ -373,20 +374,25 @@ export default function StatsManagement() {
     setBulkPlayerStats(prev => ({
       ...prev,
       [userId]: {
+        goals: '0',
+        assists: '0',
+        penaltyMinutes: '0',
+        gamesPlayed: '1',
         ...prev[userId],
-        [field as keyof typeof prev[userId]]: value
+        [field]: value
       }
     }));
   };
 
   const incrementBulkPlayerStat = (userId: string, field: string) => {
     setBulkPlayerStats(prev => {
-      const currentValue = parseInt(prev[userId]?.[field as keyof typeof prev[userId]] || '0');
+      const currentStats = prev[userId] || { goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '1' };
+      const currentValue = parseInt(currentStats[field as keyof typeof currentStats] || (field === 'gamesPlayed' ? '1' : '0'));
       return {
         ...prev,
         [userId]: {
-          ...prev[userId],
-          [field as keyof typeof prev[userId]]: String(currentValue + 1)
+          ...currentStats,
+          [field]: String(currentValue + 1)
         }
       };
     });
@@ -394,13 +400,16 @@ export default function StatsManagement() {
 
   const decrementBulkPlayerStat = (userId: string, field: string) => {
     setBulkPlayerStats(prev => {
-      const currentValue = parseInt(prev[userId]?.[field as keyof typeof prev[userId]] || '0');
-      const newValue = Math.max(0, currentValue - 1); // Don't go below 0
+      const currentStats = prev[userId] || { goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '1' };
+      const currentValue = parseInt(currentStats[field as keyof typeof currentStats] || (field === 'gamesPlayed' ? '1' : '0'));
+      // Don't let gamesPlayed go below 1, other stats can go to 0
+      const minValue = field === 'gamesPlayed' ? 1 : 0;
+      const newValue = Math.max(minValue, currentValue - 1);
       return {
         ...prev,
         [userId]: {
-          ...prev[userId],
-          [field as keyof typeof prev[userId]]: String(newValue)
+          ...currentStats,
+          [field]: String(newValue)
         }
       };
     });
@@ -415,7 +424,7 @@ export default function StatsManagement() {
 
   const incrementIndividualPlayerStat = (field: string) => {
     setIndividualPlayerStats(prev => {
-      const currentValue = parseInt(prev[field as keyof typeof prev] || '0');
+      const currentValue = parseInt(prev[field as keyof typeof prev] || (field === 'gamesPlayed' ? '1' : '0'));
       return {
         ...prev,
         [field as keyof typeof prev]: String(currentValue + 1)
@@ -425,8 +434,10 @@ export default function StatsManagement() {
 
   const decrementIndividualPlayerStat = (field: string) => {
     setIndividualPlayerStats(prev => {
-      const currentValue = parseInt(prev[field as keyof typeof prev] || '0');
-      const newValue = Math.max(0, currentValue - 1); // Don't go below 0
+      const currentValue = parseInt(prev[field as keyof typeof prev] || (field === 'gamesPlayed' ? '1' : '0'));
+      // Don't let gamesPlayed go below 1, other stats can go to 0
+      const minValue = field === 'gamesPlayed' ? 1 : 0;
+      const newValue = Math.max(minValue, currentValue - 1);
       return {
         ...prev,
         [field as keyof typeof prev]: String(newValue)
