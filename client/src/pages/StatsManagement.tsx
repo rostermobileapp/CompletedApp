@@ -188,6 +188,14 @@ export default function StatsManagement() {
     }
   }, [allPlayerStats, players, selectedSeason]);
 
+  // Auto-select first season when seasons are loaded
+  useEffect(() => {
+    if (Array.isArray(seasons) && seasons.length > 0 && !selectedSeason) {
+      const activeSeason = seasons.find((s: any) => s.isActive);
+      setSelectedSeason(activeSeason?.id || seasons[0].id);
+    }
+  }, [seasons, selectedSeason]);
+
   // Scroll synchronization
   useEffect(() => {
     const syncScrolls = () => {
