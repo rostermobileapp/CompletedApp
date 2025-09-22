@@ -2,7 +2,7 @@
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { League } from '@shared/schema';
 
 import { MediaGallery } from '@/components/MediaGallery';
+import GifSearchModal from '@/components/GifSearchModal';
 
 interface Message {
   id: string;
@@ -110,6 +111,9 @@ export default function Messages() {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryItems, setGalleryItems] = useState<any[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  
+  // GIF search modal state
+  const [gifModalOpen, setGifModalOpen] = useState(false);
 
   // Fetch user's leagues for contact discovery
   const { data: userLeagues = [], isLoading: userLeaguesLoading } = useQuery<League[]>({
@@ -465,6 +469,34 @@ export default function Messages() {
     
     // Clear selected files after sending
     setSelectedFiles([]);
+  };
+
+  // Handle GIF selection from modal
+  const handleGifSelect = (gif: any) => {
+    if (!selectedConversation) return;
+    
+    // Create GIF attachment data
+    const gifAttachment = {
+      fileName: `${gif.title || 'gif'}.gif`,
+      fileUrl: gif.images.original.url,
+      fileType: 'image/gif',
+      fileSize: 0, // We don't have size info from Giphy
+      thumbnailUrl: gif.images.fixed_height.url,
+      width: parseInt(gif.images.original.width) || 0,
+      height: parseInt(gif.images.original.height) || 0
+    };
+    
+    // Send GIF as message
+    sendMessageMutation.mutate({ 
+      content: gif.title || 'GIF',
+      messageType: 'gif',
+      attachments: [gifAttachment] 
+    });
+    
+    toast({
+      title: 'GIF sent!',
+      description: 'Your GIF has been sent to the conversation'
+    });
   };
   
   // Mark message as read when viewing conversation
@@ -1157,10 +1189,35 @@ export default function Messages() {
                             {message.attachments.map((attachment: any, index: number) => {
                               const isImage = attachment.mimeType?.startsWith('image/');
                               const isVideo = attachment.mimeType?.startsWith('video/');
+                              const isGif = attachment.mimeType === 'image/gif' || message.messageType === 'gif';
                               
                               return (
-                                <div key={index} className={isImage || isVideo ? "mt-2" : "flex items-center gap-2 p-2 bg-background/20 rounded border"}>
-                                  {isImage && (
+                                <div key={index} className={isImage || isVideo || isGif ? "mt-2" : "flex items-center gap-2 p-2 bg-background/20 rounded border"}>
+                                  {isGif && (
+                                    <div 
+                                      className="relative cursor-pointer rounded-lg overflow-hidden max-w-xs border"
+                                      onClick={() => openMediaGallery(message.attachments, index)}
+                                      data-testid={`gif-preview-${index}`}
+                                    >
+                                      <img
+                                        src={attachment.url}
+                                        alt={attachment.filename || 'GIF'}
+                                        className="w-full h-auto max-h-64 object-contain hover:opacity-90 transition-opacity rounded"
+                                        loading="lazy"
+                                      />
+                                      <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
+                                        <div className="opacity-0 hover:opacity-100 transition-opacity bg-black/50 rounded-full p-2">
+                                          <Search className="w-4 h-4 text-white" />
+                                        </div>
+                                      </div>
+                                      {/* GIF indicator */}
+                                      <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                                        GIF
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {isImage && !isGif && (
                                     <div 
                                       className="relative cursor-pointer rounded-lg overflow-hidden max-w-xs border"
                                       onClick={() => openMediaGallery(message.attachments, index)}
@@ -1286,9 +1343,17 @@ export default function Messages() {
             onClick={() => fileInputRef.current?.click()}
             className="p-2 hover:bg-accent rounded transition-colors"
             data-testid="button-attach-file-basic"
-            title="Basic file upload"
+            title="Attach file"
           >
             <Paperclip className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => setGifModalOpen(true)}
+            className="p-2 hover:bg-accent rounded transition-colors"
+            data-testid="button-gif-search"
+            title="Send GIF"
+          >
+            <Smile className="w-4 h-4" />
           </button>
           <Input
             placeholder="Type a message..."
@@ -1337,6 +1402,13 @@ export default function Messages() {
         isOpen={galleryOpen}
         onClose={() => setGalleryOpen(false)}
         onIndexChange={setGalleryIndex}
+      />
+
+      {/* GIF Search Modal */}
+      <GifSearchModal
+        open={gifModalOpen}
+        onOpenChange={setGifModalOpen}
+        onSelectGif={handleGifSelect}
       />
     </>
   );
