@@ -44,14 +44,6 @@ export default function Stats() {
     }
   }, [playerType]);
 
-  // Auto-select current season when seasons are loaded
-  useEffect(() => {
-    if (Array.isArray(seasons) && seasons.length > 0 && !selectedSeason) {
-      const activeSeason = seasons.find((s: any) => s.isActive);
-      setSelectedSeason(activeSeason?.id || seasons[0].id);
-    }
-  }, [seasons, selectedSeason]);
-
   // Get league ID from URL parameter if provided, otherwise use user's primary league
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const urlLeagueId = urlParams.get('league');
@@ -68,6 +60,14 @@ export default function Stats() {
     queryKey: [`/api/leagues/${leagueId}/seasons`],
     enabled: !!leagueId,
   });
+
+  // Auto-select current season when seasons are loaded
+  useEffect(() => {
+    if (Array.isArray(seasons) && seasons.length > 0 && !selectedSeason) {
+      const activeSeason = seasons.find((s: any) => s.isActive);
+      setSelectedSeason(activeSeason?.id || seasons[0].id);
+    }
+  }, [seasons, selectedSeason]);
 
   // Fetch player stats for the league
   const { data: playerStats, isLoading } = useQuery({
