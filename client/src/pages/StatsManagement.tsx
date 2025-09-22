@@ -67,6 +67,8 @@ export default function StatsManagement() {
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [playerGameStats, setPlayerGameStats] = useState<Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>>({});
   const [individualPlayerStats, setIndividualPlayerStats] = useState<{ goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>({ goals: '', assists: '', penaltyMinutes: '', gamesPlayed: '' });
+  const [bulkPlayerStats, setBulkPlayerStats] = useState<Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>>({});
+  const [updateMode, setUpdateMode] = useState<'single' | 'bulk'>('bulk');
   
   // Sorting state
   const [sortField, setSortField] = useState<string>('name');
@@ -114,6 +116,12 @@ export default function StatsManagement() {
     enabled: !!selectedLeague && !!selectedPlayer && !!selectedSeason,
   });
 
+  // Get all players' stats for the season (for bulk mode)
+  const { data: allPlayerStats = [] } = useQuery<Array<PlayerStatsResponse & { userId: string; firstName: string; lastName: string }>>({
+    queryKey: [`/api/leagues/${selectedLeague}/stats/season/${selectedSeason}`],
+    enabled: !!selectedLeague && !!selectedSeason,
+  });
+
   // Initialize player stats when game participants change
   useEffect(() => {
     if (Array.isArray(gameParticipants) && gameParticipants.length > 0) {
@@ -145,6 +153,40 @@ export default function StatsManagement() {
       setIndividualPlayerStats({ goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '0' });
     }
   }, [currentPlayerStats]);
+
+  // Initialize bulk player stats when all player stats change
+  useEffect(() => {
+    if (Array.isArray(allPlayerStats) && allPlayerStats.length > 0) {
+      const initialBulkStats: Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }> = {};
+      
+      allPlayerStats.forEach((playerStat: any) => {
+        initialBulkStats[playerStat.userId] = {
+          goals: playerStat.goals?.toString() || '0',
+          assists: playerStat.assists?.toString() || '0',
+          penaltyMinutes: playerStat.penaltyMinutes?.toString() || '0',
+          gamesPlayed: playerStat.gamesPlayed?.toString() || '0'
+        };
+      });
+      
+      setBulkPlayerStats(initialBulkStats);
+    } else {
+      // Initialize with players from the league if no stats exist yet
+      if (Array.isArray(players) && players.length > 0) {
+        const initialBulkStats: Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }> = {};
+        
+        (players as Player[]).forEach((player: Player) => {
+          initialBulkStats[player.id] = {
+            goals: '0',
+            assists: '0',
+            penaltyMinutes: '0',
+            gamesPlayed: '0'
+          };
+        });
+        
+        setBulkPlayerStats(initialBulkStats);
+      }
+    }
+  }, [allPlayerStats, players]);
 
   // Scroll synchronization
   useEffect(() => {
@@ -284,6 +326,59 @@ export default function StatsManagement() {
     }));
   };
 
+  const handleBulkStatsUpdate = () => {
+    if (!selectedLeague || !selectedSeason) {
+      toast({
+        title: 'Error',
+        description: 'Please select a league and season.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const updates = Object.entries(bulkPlayerStats)
+      .filter(([_, stats]) => 
+        parseInt(stats.goals) > 0 || 
+        parseInt(stats.assists) > 0 || 
+        parseInt(stats.penaltyMinutes) > 0 || 
+        parseInt(stats.gamesPlayed) > 0
+      )
+      .map(([userId, stats]) => ({
+        userId,
+        stats: {
+          goals: parseInt(stats.goals) || 0,
+          assists: parseInt(stats.assists) || 0,
+          penaltyMinutes: parseInt(stats.penaltyMinutes) || 0,
+          gamesPlayed: parseInt(stats.gamesPlayed) || 0,
+        }
+      }));
+
+    if (updates.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'Please enter statistics for at least one player.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    updateStatsMutation.mutate({ 
+      updates, 
+      mode: 'set', // Use 'set' mode for absolute values
+      seasonId: selectedSeason 
+    });
+  };
+
+  const updateBulkPlayerStat = (userId: string, field: string, value: string) => {
+    setBulkPlayerStats(prev => ({
+      ...prev,
+      [userId]: {
+        ...prev[userId],
+        [field]: value
+      }
+    }));
+  };
+
   const updateIndividualPlayerStat = (field: string, value: string) => {
     setIndividualPlayerStats(prev => ({
       ...prev,
@@ -348,6 +443,15 @@ export default function StatsManagement() {
       } else {
         return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
       }
+    });
+  };
+
+  // Sort players alphabetically by name
+  const getSortedPlayersAlphabetically = (playersList: Player[]) => {
+    return [...playersList].sort((a, b) => {
+      const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
+      const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
+      return nameA.localeCompare(nameB);
     });
   };
 
@@ -684,119 +788,244 @@ export default function StatsManagement() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Target className="w-5 h-5" />
-                      Select Player
+                      Player Stats Management
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Player</Label>
-                      <Select value={selectedPlayer} onValueChange={setSelectedPlayer} data-testid="select-player">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a player" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(players) && (players as Player[]).map((player: Player) => (
-                            <SelectItem key={player.id} value={player.id}>
-                              {player.firstName} {player.lastName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    {/* Mode Selection */}
+                    <div className="flex items-center space-x-4">
+                      <Label>Update Mode:</Label>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant={updateMode === 'bulk' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setUpdateMode('bulk')}
+                          data-testid="button-bulk-mode"
+                        >
+                          <Users className="w-4 h-4 mr-2" />
+                          Bulk Update
+                        </Button>
+                        <Button
+                          variant={updateMode === 'single' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setUpdateMode('single')}
+                          data-testid="button-single-mode"
+                        >
+                          <Target className="w-4 h-4 mr-2" />
+                          Single Player
+                        </Button>
+                      </div>
                     </div>
 
-                    {selectedPlayer && (
+                    {/* Bulk Update Mode */}
+                    {updateMode === 'bulk' && Array.isArray(players) && players.length > 0 && (
                       <div className="space-y-4">
-                        <div className="text-sm text-muted-foreground" data-testid="text-selected-player">
-                          Editing stats for: {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.firstName} {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.lastName}
+                        <div className="text-sm text-muted-foreground" data-testid="text-bulk-players">
+                          {players.length} players found - Edit stats for multiple players simultaneously
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="player-goals">Goals</Label>
-                            <Input
-                              id="player-goals"
-                              type="number"
-                              value={individualPlayerStats.goals}
-                              onChange={(e) => updateIndividualPlayerStat('goals', e.target.value)}
-                              min="0"
-                              data-testid="input-player-goals"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="player-assists">Assists</Label>
-                            <Input
-                              id="player-assists"
-                              type="number"
-                              value={individualPlayerStats.assists}
-                              onChange={(e) => updateIndividualPlayerStat('assists', e.target.value)}
-                              min="0"
-                              data-testid="input-player-assists"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="player-penalty">Penalty Minutes</Label>
-                            <Input
-                              id="player-penalty"
-                              type="number"
-                              value={individualPlayerStats.penaltyMinutes}
-                              onChange={(e) => updateIndividualPlayerStat('penaltyMinutes', e.target.value)}
-                              min="0"
-                              data-testid="input-player-penalty"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="player-games">Games Played</Label>
-                            <Input
-                              id="player-games"
-                              type="number"
-                              value={individualPlayerStats.gamesPlayed}
-                              onChange={(e) => updateIndividualPlayerStat('gamesPlayed', e.target.value)}
-                              min="0"
-                              data-testid="input-player-games"
-                            />
-                          </div>
+                        <div className="max-h-96 overflow-auto border rounded-lg">
+                          <Table data-testid="table-bulk-stats">
+                            <TableHeader className="sticky top-0 bg-background z-10">
+                              <TableRow>
+                                <TableHead className="w-48">Player</TableHead>
+                                <TableHead className="text-center w-20">Goals</TableHead>
+                                <TableHead className="text-center w-20">Assists</TableHead>
+                                <TableHead className="text-center w-20">PIM</TableHead>
+                                <TableHead className="text-center w-20">GP</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
+                                <TableRow key={player.id} data-testid={`row-bulk-player-${player.id}`}>
+                                  <TableCell className="font-medium">
+                                    <div>
+                                      <div className="font-medium">{player.firstName} {player.lastName}</div>
+                                      {player.teamName && (
+                                        <div className="text-sm text-muted-foreground">{player.teamName}</div>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Input
+                                      type="number"
+                                      value={bulkPlayerStats[player.id]?.goals || ''}
+                                      onChange={(e) => updateBulkPlayerStat(player.id, 'goals', e.target.value)}
+                                      min="0"
+                                      className="w-16 text-center"
+                                      data-testid={`input-bulk-goals-${player.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Input
+                                      type="number"
+                                      value={bulkPlayerStats[player.id]?.assists || ''}
+                                      onChange={(e) => updateBulkPlayerStat(player.id, 'assists', e.target.value)}
+                                      min="0"
+                                      className="w-16 text-center"
+                                      data-testid={`input-bulk-assists-${player.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Input
+                                      type="number"
+                                      value={bulkPlayerStats[player.id]?.penaltyMinutes || ''}
+                                      onChange={(e) => updateBulkPlayerStat(player.id, 'penaltyMinutes', e.target.value)}
+                                      min="0"
+                                      className="w-16 text-center"
+                                      data-testid={`input-bulk-penalty-${player.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Input
+                                      type="number"
+                                      value={bulkPlayerStats[player.id]?.gamesPlayed || ''}
+                                      onChange={(e) => updateBulkPlayerStat(player.id, 'gamesPlayed', e.target.value)}
+                                      min="0"
+                                      className="w-16 text-center"
+                                      data-testid={`input-bulk-games-${player.id}`}
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
                         </div>
-
-                        {currentPlayerStats && (
-                          <div className="bg-muted/50 p-4 rounded-lg">
-                            <h4 className="font-medium mb-2">Current Season Stats</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Goals:</span>
-                                <span className="ml-2 font-medium" data-testid="display-current-goals">{currentPlayerStats.goals || 0}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Assists:</span>
-                                <span className="ml-2 font-medium" data-testid="display-current-assists">{currentPlayerStats.assists || 0}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">PIM:</span>
-                                <span className="ml-2 font-medium" data-testid="display-current-penalty">{currentPlayerStats.penaltyMinutes || 0}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">GP:</span>
-                                <span className="ml-2 font-medium" data-testid="display-current-games">{currentPlayerStats.gamesPlayed || 0}</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
                         
                         <Button 
-                          onClick={handlePlayerStatsUpdate} 
+                          onClick={handleBulkStatsUpdate} 
                           disabled={updateStatsMutation.isPending}
                           className="w-full"
-                          data-testid="button-update-player-stats"
+                          data-testid="button-update-bulk-stats"
                         >
-                          {updateStatsMutation.isPending ? 'Updating...' : 'Update Player Stats'}
+                          {updateStatsMutation.isPending ? 'Updating...' : 'Update All Player Stats'}
                         </Button>
                       </div>
                     )}
 
-                    {selectedPlayer && !currentPlayerStats && (
-                      <div className="text-center py-8 text-muted-foreground" data-testid="text-no-stats">
+                    {/* Single Player Mode */}
+                    {updateMode === 'single' && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Player</Label>
+                          <Select value={selectedPlayer} onValueChange={setSelectedPlayer} data-testid="select-player">
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a player" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.isArray(players) && getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
+                                <SelectItem key={player.id} value={player.id}>
+                                  {player.firstName} {player.lastName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {selectedPlayer && (
+                          <div className="space-y-4">
+                            <div className="text-sm text-muted-foreground" data-testid="text-selected-player">
+                              Editing stats for: {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.firstName} {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.lastName}
+                            </div>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="player-goals">Goals</Label>
+                                <Input
+                                  id="player-goals"
+                                  type="number"
+                                  value={individualPlayerStats.goals}
+                                  onChange={(e) => updateIndividualPlayerStat('goals', e.target.value)}
+                                  min="0"
+                                  data-testid="input-player-goals"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="player-assists">Assists</Label>
+                                <Input
+                                  id="player-assists"
+                                  type="number"
+                                  value={individualPlayerStats.assists}
+                                  onChange={(e) => updateIndividualPlayerStat('assists', e.target.value)}
+                                  min="0"
+                                  data-testid="input-player-assists"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="player-penalty">Penalty Minutes</Label>
+                                <Input
+                                  id="player-penalty"
+                                  type="number"
+                                  value={individualPlayerStats.penaltyMinutes}
+                                  onChange={(e) => updateIndividualPlayerStat('penaltyMinutes', e.target.value)}
+                                  min="0"
+                                  data-testid="input-player-penalty"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="player-games">Games Played</Label>
+                                <Input
+                                  id="player-games"
+                                  type="number"
+                                  value={individualPlayerStats.gamesPlayed}
+                                  onChange={(e) => updateIndividualPlayerStat('gamesPlayed', e.target.value)}
+                                  min="0"
+                                  data-testid="input-player-games"
+                                />
+                              </div>
+                            </div>
+
+                            {currentPlayerStats && (
+                              <div className="bg-muted/50 p-4 rounded-lg">
+                                <h4 className="font-medium mb-2">Current Season Stats</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-muted-foreground">Goals:</span>
+                                    <span className="ml-2 font-medium" data-testid="display-current-goals">{currentPlayerStats.goals || 0}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Assists:</span>
+                                    <span className="ml-2 font-medium" data-testid="display-current-assists">{currentPlayerStats.assists || 0}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">PIM:</span>
+                                    <span className="ml-2 font-medium" data-testid="display-current-penalty">{currentPlayerStats.penaltyMinutes || 0}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">GP:</span>
+                                    <span className="ml-2 font-medium" data-testid="display-current-games">{currentPlayerStats.gamesPlayed || 0}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <Button 
+                              onClick={handlePlayerStatsUpdate} 
+                              disabled={updateStatsMutation.isPending}
+                              className="w-full"
+                              data-testid="button-update-player-stats"
+                            >
+                              {updateStatsMutation.isPending ? 'Updating...' : 'Update Player Stats'}
+                            </Button>
+                          </div>
+                        )}
+
+                        {selectedPlayer && !currentPlayerStats && (
+                          <div className="text-center py-8 text-muted-foreground" data-testid="text-no-stats">
+                            <AlertCircle className="w-12 h-12 mx-auto mb-4" />
+                            <p>No stats found for this player in the selected season.</p>
+                            <p className="text-sm">Enter initial stats to create a record.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* No Players Message */}
+                    {(!players || players.length === 0) && (
+                      <div className="text-center py-8 text-muted-foreground" data-testid="text-no-players">
                         <AlertCircle className="w-12 h-12 mx-auto mb-4" />
-                        <p>No stats found for this player in the selected season.</p>
-                        <p className="text-sm">Enter initial stats to create a record.</p>
+                        <p>No players found in this league.</p>
+                        <p className="text-sm">Players need to be added to the league first.</p>
                       </div>
                     )}
                   </CardContent>
