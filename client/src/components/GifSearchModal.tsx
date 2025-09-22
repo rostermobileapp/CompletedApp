@@ -111,7 +111,7 @@ export default function GifSearchModal({ open, onOpenChange, onSelectGif }: GifS
   // Determine which endpoint to use
   const getQueryKey = () => {
     if (debouncedSearch) {
-      return ['/api/giphy/search', { q: debouncedSearch }];
+      return [`/api/giphy/search?q=${encodeURIComponent(debouncedSearch)}`];
     }
     const category = CATEGORIES.find(c => c.id === selectedCategory);
     return [category?.endpoint || '/api/giphy/trending'];
