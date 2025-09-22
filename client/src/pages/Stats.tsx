@@ -132,6 +132,10 @@ export default function Stats() {
           aVal = a.assists || 0;
           bVal = b.assists || 0;
           break;
+        case 'penaltyMinutes':
+          aVal = a.penaltyMinutes || 0;
+          bVal = b.penaltyMinutes || 0;
+          break;
         case 'name':
           aVal = `${a.user?.firstName || ''} ${a.user?.lastName || ''}`.trim();
           bVal = `${b.user?.firstName || ''} ${b.user?.lastName || ''}`.trim();
