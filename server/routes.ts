@@ -4357,6 +4357,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Ensure captain chat membership is up-to-date for a league
+  app.post('/api/leagues/:id/captain-chat/sync', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: leagueId } = req.params;
+      
+      // Verify user is a captain in this league
+      const isCaptain = await messagingService.isUserCaptain(userId, leagueId);
+      if (!isCaptain) {
+        return res.status(403).json({ message: 'Only team captains can manage captain chats' });
+      }
+      
+      // Sync captain chat membership
+      await messagingService.ensureCaptainChatMembership(leagueId);
+      
+      res.status(200).json({ message: 'Captain chat membership synced successfully' });
+    } catch (error) {
+      console.error('Error syncing captain chat membership:', error);
+      res.status(500).json({ message: 'Failed to sync captain chat membership' });
+    }
+  });
+
   // Leave conversation (SMS-style for direct/captain, group removal for others)
   app.post('/api/conversations/:id/leave', isAuthenticated, async (req: any, res) => {
     try {

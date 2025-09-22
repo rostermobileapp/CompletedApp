@@ -25,7 +25,7 @@ import {
   type InsertUserOnlineStatus,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
 
 export class MessagingService {
   // Conversation operations
@@ -750,6 +750,84 @@ export class MessagingService {
     await Promise.all(participantPromises);
 
     return conversation;
+  }
+
+  // Automatically sync captain chat membership to reflect current captain status
+  async ensureCaptainChatMembership(leagueId: string): Promise<void> {
+    // Get or create captain-only chat for this league
+    const [existingChat] = await db
+      .select()
+      .from(conversations)
+      .where(and(
+        eq(conversations.type, "captain_only"),
+        eq(conversations.leagueId, leagueId)
+      ))
+      .limit(1);
+
+    let captainChat: Conversation;
+    if (existingChat) {
+      captainChat = existingChat;
+    } else {
+      // Create captain chat if it doesn't exist
+      // Use system user or first available captain as creator
+      const captains = await db
+        .select({ captainId: teams.captainId })
+        .from(teams)
+        .where(eq(teams.leagueId, leagueId))
+        .groupBy(teams.captainId);
+
+      const firstCaptain = captains.find(c => c.captainId);
+      if (!firstCaptain?.captainId) {
+        // No captains yet, skip creating chat
+        return;
+      }
+
+      captainChat = await this.createCaptainOnlyChat(leagueId, firstCaptain.captainId);
+      return; // createCaptainOnlyChat already adds all captains
+    }
+
+    // Get current captains in the league
+    const currentCaptains = await db
+      .select({ captainId: teams.captainId })
+      .from(teams)
+      .where(eq(teams.leagueId, leagueId))
+      .groupBy(teams.captainId);
+
+    const currentCaptainIds = currentCaptains
+      .filter(captain => captain.captainId)
+      .map(captain => captain.captainId!);
+
+    // Get current participants in the captain chat
+    const currentParticipants = await db
+      .select()
+      .from(conversationParticipants)
+      .where(and(
+        eq(conversationParticipants.conversationId, captainChat.id),
+        isNull(conversationParticipants.leftAt)
+      ));
+
+    const participantUserIds = currentParticipants.map(p => p.userId);
+
+    // Add new captains to the chat
+    const captainsToAdd = currentCaptainIds.filter(captainId => 
+      !participantUserIds.includes(captainId)
+    );
+
+    for (const captainId of captainsToAdd) {
+      await this.addParticipantToConversation({
+        conversationId: captainChat.id,
+        userId: captainId,
+      });
+    }
+
+    // Remove users who are no longer captains
+    const participantsToRemove = participantUserIds.filter(userId => 
+      !currentCaptainIds.includes(userId)
+    );
+
+    for (const userId of participantsToRemove) {
+      await this.removeUserFromGroupConversation(captainChat.id, userId);
+    }
   }
 
   async deleteConversation(conversationId: string): Promise<void> {

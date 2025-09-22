@@ -477,6 +477,14 @@ export class DatabaseStorage implements IStorage {
       .set({ captainId })
       .where(eq(teams.id, teamId))
       .returning();
+    
+    // Update captain chat membership for this league
+    if (team.leagueId) {
+      const { MessagingService } = await import('./messagingService');
+      const messagingService = new MessagingService();
+      await messagingService.ensureCaptainChatMembership(team.leagueId);
+    }
+    
     return team;
   }
 
