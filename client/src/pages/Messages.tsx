@@ -547,10 +547,9 @@ export default function Messages() {
     try {
       for (const mediaFile of mediaFiles) {
         // Get upload URL
-        const response: any = await apiRequest('/api/message-attachments/upload', {
-          method: 'POST'
-        });
-        const { uploadURL } = response;
+        const response = await apiRequest('POST', '/api/message-attachments/upload');
+        const responseData = await response.json();
+        const { uploadURL } = responseData;
 
         // Upload file (use compressed version if available)
         const fileToUpload = mediaFile.compressed || mediaFile.file;
@@ -1116,7 +1115,7 @@ export default function Messages() {
       ) : (
         <>
           {/* Chat Header */}
-          <div className="p-4 pt-12 border-b border-border" data-testid="chat-header">
+          <div className="sticky top-0 z-50 p-4 pt-12 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" data-testid="chat-header">
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => setSelectedConversation(null)}
