@@ -4031,7 +4031,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/leagues/:leagueId/stats/bulk', isAuthenticated, async (req: any, res) => {
     try {
       const leagueId = req.params.leagueId;
-      const seasonId = Array.isArray(req.query.seasonId) ? req.query.seasonId[0] : req.query.seasonId;
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       const league = await storage.getLeague(leagueId);
@@ -4039,14 +4038,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify user is commissioner of this league
       if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
         return res.status(403).json({ message: "Access denied - commissioner access required" });
-      }
-      
-      // Validate season ownership if seasonId is provided
-      if (seasonId) {
-        const season = await storage.getSeason(seasonId);
-        if (!season || season.leagueId !== leagueId) {
-          return res.status(400).json({ message: "Season not found or does not belong to this league" });
-        }
       }
       
       // Validate request body structure with proper coercion
@@ -4060,10 +4051,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             penaltyMinutes: true,
           }).partial()
         })),
-        mode: z.enum(['increment', 'set']).optional().default('set')
+        mode: z.enum(['increment', 'set']).optional().default('set'),
+        seasonId: z.string().min(1, "Season ID is required for all stats updates")
       });
       
       const validatedData = bulkUpdateSchema.parse(req.body);
+      const seasonId = validatedData.seasonId;
+      
+      // Validate season ownership if seasonId is provided
+      if (seasonId) {
+        const season = await storage.getSeason(seasonId);
+        if (!season || season.leagueId !== leagueId) {
+          return res.status(400).json({ message: "Season not found or does not belong to this league" });
+        }
+      }
       
       // Verify all target players are in the league
       for (const update of validatedData.updates) {
