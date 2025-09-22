@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { League } from '@shared/schema';
-import { EnhancedMediaUploader } from '@/components/EnhancedMediaUploader';
+
 import { MediaGallery } from '@/components/MediaGallery';
 
 interface Message {
@@ -539,73 +539,7 @@ export default function Messages() {
     setGalleryOpen(true);
   };
 
-  const handleEnhancedMediaUpload = async (mediaFiles: any[]) => {
-    if (!selectedConversation || !currentUserId) return;
-
-    setIsUploadingFiles(true);
-    
-    try {
-      for (const mediaFile of mediaFiles) {
-        // Get upload URL
-        const response = await apiRequest('POST', '/api/message-attachments/upload');
-        const responseData = await response.json();
-        const { uploadURL } = responseData;
-
-        // Upload file (use compressed version if available)
-        const fileToUpload = mediaFile.compressed || mediaFile.file;
-        await fetch(uploadURL, {
-          method: 'PUT',
-          body: fileToUpload,
-          headers: {
-            'Content-Type': fileToUpload.type,
-          },
-        });
-
-        // Extract filename from upload URL
-        const urlParts = uploadURL.split('/');
-        const filename = urlParts[urlParts.length - 1].split('?')[0];
-
-        // Send message with attachment
-        const messageData = {
-          content: `📎 ${mediaFile.file.name}`,
-          messageType: mediaFile.type === 'image' ? 'image' : 
-                      mediaFile.type === 'video' ? 'video' : 'file',
-          attachments: [{
-            type: mediaFile.type,
-            url: `/message-attachments/${filename}`,
-            filename: mediaFile.file.name,
-            fileSize: fileToUpload.size,
-            mimeType: fileToUpload.type
-          }]
-        };
-
-        // Send via WebSocket if connected, otherwise use HTTP
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({
-            type: 'send_message',
-            conversationId: selectedConversation,
-            ...messageData
-          }));
-        } else {
-          await sendMessageMutation.mutateAsync(messageData);
-        }
-      }
-
-      toast({
-        title: 'Media sent',
-        description: `Successfully sent ${mediaFiles.length} file(s)`,
-      });
-    } catch (error) {
-      console.error('Error uploading media:', error);
-      toast({
-        title: 'Upload failed',
-        description: 'Failed to upload media files',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsUploadingFiles(false);
-    }
-  };
+  
   
   // Cleanup typing timeout on unmount
   useEffect(() => {
