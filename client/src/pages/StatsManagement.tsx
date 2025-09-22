@@ -156,40 +156,37 @@ export default function StatsManagement() {
 
   // Initialize bulk player stats when all player stats change
   useEffect(() => {
-    setBulkPlayerStats(prev => {
-      const newStats = { ...prev };
+    if (Array.isArray(allPlayerStats) && allPlayerStats.length > 0) {
+      const initialBulkStats: Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }> = {};
       
-      if (Array.isArray(allPlayerStats) && allPlayerStats.length > 0) {
-        // Only update players that don't already have user input
-        allPlayerStats.forEach((playerStat: any) => {
-          if (!newStats[playerStat.userId]) {
-            newStats[playerStat.userId] = {
-              goals: playerStat.goals?.toString() || '0',
-              assists: playerStat.assists?.toString() || '0',
-              penaltyMinutes: playerStat.penaltyMinutes?.toString() || '0',
-              gamesPlayed: playerStat.gamesPlayed?.toString() || '1'
-            };
-          }
+      allPlayerStats.forEach((playerStat: any) => {
+        initialBulkStats[playerStat.userId] = {
+          goals: playerStat.goals?.toString() || '0',
+          assists: playerStat.assists?.toString() || '0',
+          penaltyMinutes: playerStat.penaltyMinutes?.toString() || '0',
+          gamesPlayed: playerStat.gamesPlayed?.toString() || '1'
+        };
+      });
+      
+      setBulkPlayerStats(initialBulkStats);
+    } else {
+      // Initialize with players from the league if no stats exist yet
+      if (Array.isArray(players) && players.length > 0) {
+        const initialBulkStats: Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }> = {};
+        
+        (players as Player[]).forEach((player: Player) => {
+          initialBulkStats[player.id] = {
+            goals: '0',
+            assists: '0',
+            penaltyMinutes: '0',
+            gamesPlayed: '1'
+          };
         });
-      } else {
-        // Initialize with players from the league if no stats exist yet
-        if (Array.isArray(players) && players.length > 0) {
-          (players as Player[]).forEach((player: Player) => {
-            if (!newStats[player.id]) {
-              newStats[player.id] = {
-                goals: '0',
-                assists: '0',
-                penaltyMinutes: '0',
-                gamesPlayed: '1'
-              };
-            }
-          });
-        }
+        
+        setBulkPlayerStats(initialBulkStats);
       }
-      
-      return newStats;
-    });
-  }, [allPlayerStats, players]);
+    }
+  }, [allPlayerStats, players, selectedSeason]);
 
   // Scroll synchronization
   useEffect(() => {
