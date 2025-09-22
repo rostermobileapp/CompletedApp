@@ -1063,11 +1063,7 @@ export default function Messages() {
                       </div>
                     </div>
                     {isCurrentUser && (
-                      <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center order-2">
-                        <span className="text-primary-foreground text-xs font-semibold">
-                          {user?.firstName?.charAt(0) || 'M'}
-                        </span>
-                      </div>
+                      
                     )}
                   </div>
                 );
