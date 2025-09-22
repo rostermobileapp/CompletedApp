@@ -135,16 +135,7 @@ export function MediaGallery({
       >
         {/* Header Controls */}
         <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between">
-          <div className="flex items-center gap-2 bg-black/75 rounded-lg p-2">
-            <span className="text-white text-sm">
-              {currentIndex + 1} of {items.length}
-            </span>
-            {currentItem.filename && (
-              <span className="text-white/75 text-sm max-w-48 truncate">
-                {currentItem.filename}
-              </span>
-            )}
-          </div>
+          
 
           <div className="flex items-center gap-2">
             {/* Image Controls */}
