@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trophy, Users, Star, Upload, Coffee, Target, Award } from 'lucide-react';
+import { Trophy, Users, Star, Upload, Coffee, Target, Award, TrendingUp, Apple, Flag } from 'lucide-react';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -27,7 +27,7 @@ export default function Teams() {
   const { data: teamMembers = [] } = useQuery({
     queryKey: ['/api/teams', selectedTeam, 'members'],
     enabled: !!selectedTeam,
-  });
+  }) as { data: any[] };
 
   // Get upcoming games for beverage duty
   const { data: upcomingGames = [] } = useQuery({
@@ -163,7 +163,7 @@ export default function Teams() {
       // Filter stats for current team players
       return allStats.filter((stat: any) => {
         // Check if this player is on the current team
-        const isMember = (teamMembers as any[])?.some((member: any) => member.id === stat.userId);
+        const isMember = teamMembers?.some((member: any) => member.id === stat.userId);
         return isMember && stat.type === 'skater'; // Only skaters for these stats
       });
     },
@@ -174,27 +174,27 @@ export default function Teams() {
   const { data: leagueStandings = [] } = useQuery({
     queryKey: ['/api/leagues', currentTeam?.leagueId, 'standings'],
     enabled: !!currentTeam?.leagueId,
-  });
+  }) as { data: any[] };
 
   // Calculate team leaders
   const getTeamLeaders = () => {
     if (!teamStats || teamStats.length === 0) return null;
 
-    const topGoalScorer = teamStats.reduce((top, current) => {
+    const topGoalScorer = teamStats.reduce((top: any, current: any) => {
       return (current.goals || 0) > (top.goals || 0) ? current : top;
     });
     
-    const topAssistProvider = teamStats.reduce((top, current) => {
+    const topAssistProvider = teamStats.reduce((top: any, current: any) => {
       return (current.assists || 0) > (top.assists || 0) ? current : top;
     });
     
-    const topScorer = teamStats.reduce((top, current) => {
+    const topScorer = teamStats.reduce((top: any, current: any) => {
       const topPoints = top.points || 0;
       const currentPoints = current.points || 0;
       return currentPoints > topPoints ? current : top;
     });
     
-    const mostPenaltyMinutes = teamStats.reduce((top, current) => {
+    const mostPenaltyMinutes = teamStats.reduce((top: any, current: any) => {
       return (current.penaltyMinutes || 0) > (top.penaltyMinutes || 0) ? current : top;
     });
 
@@ -205,7 +205,7 @@ export default function Teams() {
 
   // Get current team's standing
   const getCurrentTeamStanding = () => {
-    if (!currentTeam || !leagueStandings || leagueStandings.length === 0) return null;
+    if (!currentTeam || !Array.isArray(leagueStandings) || leagueStandings.length === 0) return null;
     
     const standingIndex = leagueStandings.findIndex((standing: any) => standing.teamId === currentTeam.id);
     if (standingIndex === -1) return null;
@@ -392,84 +392,65 @@ export default function Teams() {
                 </Card>
 
                 {/* Team Leaders */}
-                <Card className="rounded-lg border bg-card text-card-foreground shadow-sm mt-[5px] mb-[5px] text-center">
-                  <CardHeader>
-                    <CardTitle className="text-2xl font-semibold leading-none tracking-tight text-center">Team Leaders</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                <div className="px-0 pl-[0px] pr-[0px] mt-[0px] mb-[0px]">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pl-[0px] pr-[0px] pt-[2px] pb-[2px]">
                     {teamLeaders ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <>
+                        {/* Points Leader */}
+                        <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-team-points-leader">
+                          <div className="flex items-center gap-3">
+                            <TrendingUp className="w-5 h-5 text-primary" />
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold">{teamLeaders.topScorer?.points || 0}</span>
+                              <span className="text-sm text-muted-foreground">Points</span>
+                            </div>
+                          </div>
+                          <span className="text-sm font-medium truncate">{teamLeaders.topScorer?.user?.lastName || 'N/A'}</span>
+                        </Card>
+
                         {/* Goals Leader */}
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                          <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
-                            <Target className="w-5 h-5 text-green-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-muted-foreground">Goals Leader</div>
-                            <div className="font-semibold">
-                              {teamLeaders.topGoalScorer.user?.firstName} {teamLeaders.topGoalScorer.user?.lastName}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {teamLeaders.topGoalScorer.goals || 0} goals
+                        <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-team-goals-leader">
+                          <div className="flex items-center gap-3">
+                            <Target className="w-5 h-5 text-success" />
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold">{teamLeaders.topGoalScorer?.goals || 0}</span>
+                              <span className="text-sm text-muted-foreground">Goals</span>
                             </div>
                           </div>
-                        </div>
+                          <span className="text-sm font-medium truncate">{teamLeaders.topGoalScorer?.user?.lastName || 'N/A'}</span>
+                        </Card>
 
                         {/* Assists Leader */}
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                          <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-                            <Users className="w-5 h-5 text-blue-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-muted-foreground">Assists Leader</div>
-                            <div className="font-semibold">
-                              {teamLeaders.topAssistProvider.user?.firstName} {teamLeaders.topAssistProvider.user?.lastName}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {teamLeaders.topAssistProvider.assists || 0} assists
+                        <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-team-assists-leader">
+                          <div className="flex items-center gap-3">
+                            <Apple className="w-5 h-5 text-info" />
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold">{teamLeaders.topAssistProvider?.assists || 0}</span>
+                              <span className="text-sm text-muted-foreground">Assists</span>
                             </div>
                           </div>
-                        </div>
-
-                        {/* Points Leader */}
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                          <div className="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center">
-                            <Star className="w-5 h-5 text-yellow-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-muted-foreground">Points Leader</div>
-                            <div className="font-semibold">
-                              {teamLeaders.topScorer.user?.firstName} {teamLeaders.topScorer.user?.lastName}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {teamLeaders.topScorer.points || 0} points
-                            </div>
-                          </div>
-                        </div>
+                          <span className="text-sm font-medium truncate">{teamLeaders.topAssistProvider?.user?.lastName || 'N/A'}</span>
+                        </Card>
 
                         {/* Penalty Minutes Leader */}
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                          <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
-                            <Award className="w-5 h-5 text-red-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-muted-foreground">Penalty Minutes Leader</div>
-                            <div className="font-semibold">
-                              {teamLeaders.mostPenaltyMinutes.user?.firstName} {teamLeaders.mostPenaltyMinutes.user?.lastName}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {teamLeaders.mostPenaltyMinutes.penaltyMinutes || 0} PIM
+                        <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-team-penalty-leader">
+                          <div className="flex items-center gap-3">
+                            <Flag className="w-5 h-5 text-red-500" />
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold">{teamLeaders.mostPenaltyMinutes?.penaltyMinutes || 0}</span>
+                              <span className="text-sm text-muted-foreground">PIM</span>
                             </div>
                           </div>
-                        </div>
-                      </div>
+                          <span className="text-sm font-medium truncate">{teamLeaders.mostPenaltyMinutes?.user?.lastName || 'N/A'}</span>
+                        </Card>
+                      </>
                     ) : (
-                      <div className="text-center text-muted-foreground py-8">
+                      <div className="col-span-full text-center text-muted-foreground py-8">
                         No stats available for this team yet.
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
                 
               </TabsContent>
