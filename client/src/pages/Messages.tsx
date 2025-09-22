@@ -1181,9 +1181,11 @@ export default function Messages() {
                             )}
                           </div>
                         )}
-                        <p className="text-sm" data-testid={`text-message-content-${message.id}`}>
-                          {message.content}
-                        </p>
+                        {message.messageType !== 'gif' && (
+                          <p className="text-sm" data-testid={`text-message-content-${message.id}`}>
+                            {message.content}
+                          </p>
+                        )}
                         {message.attachments && message.attachments.length > 0 && (
                           <div className="mt-2 space-y-2" data-testid={`message-attachments-${message.id}`}>
                             {message.attachments.map((attachment: any, index: number) => {
