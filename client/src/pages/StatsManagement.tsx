@@ -117,8 +117,12 @@ export default function StatsManagement() {
   });
 
   // Get all players' stats for the season (for bulk mode)
+  const statsUrl = selectedSeason 
+    ? `/api/leagues/${selectedLeague}/stats?seasonId=${selectedSeason}`
+    : `/api/leagues/${selectedLeague}/stats`;
+  
   const { data: allPlayerStats = [] } = useQuery<Array<PlayerStatsResponse & { userId: string; firstName: string; lastName: string }>>({
-    queryKey: [`/api/leagues/${selectedLeague}/stats?seasonId=${selectedSeason}`],
+    queryKey: [statsUrl],
     enabled: !!selectedLeague && !!selectedSeason,
   });
 
