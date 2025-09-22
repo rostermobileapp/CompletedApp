@@ -394,7 +394,7 @@ export default function Teams() {
                 {/* Team Leaders */}
                 <Card className="rounded-lg border bg-card text-card-foreground shadow-sm mt-[5px] mb-[5px] text-center">
                   <CardHeader>
-                    <CardTitle>Team Leaders</CardTitle>
+                    <CardTitle className="text-2xl font-semibold leading-none tracking-tight text-center">Team Leaders</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {teamLeaders ? (
