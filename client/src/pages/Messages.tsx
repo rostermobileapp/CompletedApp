@@ -1036,32 +1036,7 @@ export default function Messages() {
                           </p>
                         )}
                         
-                        {/* Group chat participant preview */}
-                        {(conversation.type === 'team_group' || conversation.type === 'custom_group') && conversation.participants && conversation.participants.length > 0 && (
-                          <div className="flex items-center gap-1 mt-1" data-testid={`conversation-participants-${conversation.id}`}>
-                            <div className="flex -space-x-1">
-                              {conversation.participants.slice(0, 3).map((participant, idx) => (
-                                idx === 1 ? null : (
-                                  <div 
-                                    key={participant.id}
-                                    className="w-4 h-4 bg-accent rounded-full flex items-center justify-center text-xs font-medium border border-background"
-                                    title={participant.user?.displayName || 'Unknown'}
-                                  >
-                                    {participant.user?.displayName ? getInitials(participant.user.displayName) : '?'}
-                                  </div>
-                                )
-                              ))}
-                              {conversation.participants.length > 3 && (
-                                <div className="w-4 h-4 bg-muted rounded-full flex items-center justify-center text-xs font-medium border border-background">
-                                  +{conversation.participants.length - 3}
-                                </div>
-                              )}
-                            </div>
-                            <span className="text-xs text-muted-foreground ml-1">
-                              {conversation.participants.length} member{conversation.participants.length !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                        )}
+                        
                       </div>
                       
                       {/* Delete conversation button */}
