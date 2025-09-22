@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trophy, Users, Star, Upload, Coffee } from 'lucide-react';
+import { Trophy, Users, Star, Upload, Coffee, Target, Award } from 'lucide-react';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -27,6 +27,24 @@ export default function Teams() {
   const { data: teamMembers = [] } = useQuery({
     queryKey: ['/api/teams', selectedTeam, 'members'],
     enabled: !!selectedTeam,
+  });
+
+
+  // Fetch team stats for leaders
+  const { data: teamStats = [] } = useQuery({
+    queryKey: ['/api/leagues', currentTeam?.leagueId, 'stats', 'team', currentTeam?.id],
+    queryFn: async () => {
+      if (!currentTeam?.leagueId) return [];
+      const response = await apiRequest('GET', `/api/leagues/${currentTeam.leagueId}/stats`);
+      const allStats = await response.json();
+      // Filter stats for current team players
+      return allStats.filter((stat: any) => {
+        // Check if this player is on the current team
+        const isMember = (teamMembers as any[])?.some((member: any) => member.id === stat.userId);
+        return isMember && stat.type === 'skater'; // Only skaters for these stats
+      });
+    },
+    enabled: !!currentTeam?.leagueId && teamMembers.length > 0,
   });
 
   // Get upcoming games for beverage duty
@@ -102,7 +120,6 @@ export default function Teams() {
     try {
       const response = await apiRequest('POST', '/api/team-logos/upload');
       const data = await response.json();
-      console.log('Upload URL response:', data);
       return {
         method: 'PUT' as const,
         url: data.uploadURL,
@@ -114,13 +131,10 @@ export default function Teams() {
   };
 
   const createTeamLogoUploadComplete = (teamId: string) => (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    console.log('Upload complete result:', result);
     if (result.successful && result.successful[0]) {
       const uploadURL = result.successful[0].uploadURL as string;
-      console.log('Updating team logo with URL:', uploadURL);
       updateTeamLogoMutation.mutate({ teamId, logoUrl: uploadURL });
     } else {
-      console.error('Upload failed or no successful uploads:', result);
       toast({
         title: "Error",
         description: "Failed to upload team logo. Please try again.",
@@ -156,6 +170,33 @@ export default function Teams() {
   const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
   const isCommissioner = (user as any)?.subscriptionTier === 'commissioner';
   const canUploadLogo = isTeamCaptain || isCommissioner;
+
+  // Calculate team leaders
+  const getTeamLeaders = () => {
+    if (!teamStats || teamStats.length === 0) return null;
+
+    const topGoalScorer = teamStats.reduce((top, current) => {
+      return (current.goals || 0) > (top.goals || 0) ? current : top;
+    });
+    
+    const topAssistProvider = teamStats.reduce((top, current) => {
+      return (current.assists || 0) > (top.assists || 0) ? current : top;
+    });
+    
+    const topScorer = teamStats.reduce((top, current) => {
+      const topPoints = top.points || 0;
+      const currentPoints = current.points || 0;
+      return currentPoints > topPoints ? current : top;
+    });
+    
+    const mostPenaltyMinutes = teamStats.reduce((top, current) => {
+      return (current.penaltyMinutes || 0) > (top.penaltyMinutes || 0) ? current : top;
+    });
+
+    return { topGoalScorer, topAssistProvider, topScorer, mostPenaltyMinutes };
+  };
+
+  const teamLeaders = getTeamLeaders();
 
   // Filter games for current team only
   const teamGames = (upcomingGames as any[]).filter((game: any) => 
@@ -311,39 +352,83 @@ export default function Teams() {
                   </CardContent>
                 </Card>
 
-                {/* Teammates */}
+                {/* Team Leaders */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Teammates</CardTitle>
+                    <CardTitle>Team Leaders</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      {(teamMembers as any[]).map((member: any) => (
-                        <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                          <Avatar>
-                            <AvatarImage src={member.profileImageUrl || undefined} />
-                            <AvatarFallback>
-                              {member.firstName?.[0]}{member.lastName?.[0]}
-                            </AvatarFallback>
-                          </Avatar>
+                    {teamLeaders ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Goals Leader */}
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                          <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+                            <Target className="w-5 h-5 text-green-600" />
+                          </div>
                           <div className="flex-1">
-                            <div className="font-medium">
-                              {member.firstName} {member.lastName}
-                              {member.id === team.captainId && (
-                                <Badge variant="secondary" className="ml-2">
-                                  <span className="w-3 h-3 mr-1 text-xs font-bold">C</span>
-                                  Captain
-                                </Badge>
-                              )}
+                            <div className="text-sm font-medium text-muted-foreground">Goals Leader</div>
+                            <div className="font-semibold">
+                              {teamLeaders.topGoalScorer.user?.firstName} {teamLeaders.topGoalScorer.user?.lastName}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {member.city && `${member.city} • `}
-                              {member.age && `Age ${member.age}`}
+                              {teamLeaders.topGoalScorer.goals || 0} goals
                             </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
+
+                        {/* Assists Leader */}
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                          <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                            <Users className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-muted-foreground">Assists Leader</div>
+                            <div className="font-semibold">
+                              {teamLeaders.topAssistProvider.user?.firstName} {teamLeaders.topAssistProvider.user?.lastName}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {teamLeaders.topAssistProvider.assists || 0} assists
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Points Leader */}
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                          <div className="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                            <Star className="w-5 h-5 text-yellow-600" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-muted-foreground">Points Leader</div>
+                            <div className="font-semibold">
+                              {teamLeaders.topScorer.user?.firstName} {teamLeaders.topScorer.user?.lastName}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {teamLeaders.topScorer.points || 0} points
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Penalty Minutes Leader */}
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                          <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                            <Award className="w-5 h-5 text-red-600" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-muted-foreground">Penalty Minutes Leader</div>
+                            <div className="font-semibold">
+                              {teamLeaders.mostPenaltyMinutes.user?.firstName} {teamLeaders.mostPenaltyMinutes.user?.lastName}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {teamLeaders.mostPenaltyMinutes.penaltyMinutes || 0} PIM
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">
+                        No stats available for this team yet.
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
