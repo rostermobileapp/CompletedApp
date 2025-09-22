@@ -1100,11 +1100,6 @@ export default function Messages() {
                             {getParticipantName(conversation)}
                           </h3>
                           {/* Group chat type indicator */}
-                          {conversation.type === 'team_group' && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" data-testid={`badge-type-team-${conversation.id}`}>
-                              Team
-                            </span>
-                          )}
                           {conversation.type === 'captain_only' && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" data-testid={`badge-type-captain-${conversation.id}`}>
                               Captain
