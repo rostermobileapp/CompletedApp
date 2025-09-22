@@ -46,6 +46,13 @@ interface PlayerStats {
   mode?: 'increment' | 'set'; // Distinguish between incremental vs absolute updates
 }
 
+interface PlayerStatsResponse {
+  goals: number;
+  assists: number;
+  penaltyMinutes: number;
+  gamesPlayed: number;
+}
+
 export default function StatsManagement() {
   const { user } = useAuth();
   const [location, navigate] = useLocation();
@@ -84,7 +91,7 @@ export default function StatsManagement() {
   });
 
   // Get players for selected league
-  const { data: players = [] } = useQuery({
+  const { data: players = [] } = useQuery<Player[]>({
     queryKey: [`/api/leagues/${selectedLeague}/players`],
     enabled: !!selectedLeague,
   });
@@ -102,7 +109,7 @@ export default function StatsManagement() {
   });
 
   // Get individual player stats for selected player
-  const { data: currentPlayerStats } = useQuery({
+  const { data: currentPlayerStats } = useQuery<PlayerStatsResponse>({
     queryKey: [`/api/leagues/${selectedLeague}/stats/player/${selectedPlayer}`, selectedSeason],
     enabled: !!selectedLeague && !!selectedPlayer && !!selectedSeason,
   });
@@ -688,7 +695,7 @@ export default function StatsManagement() {
                           <SelectValue placeholder="Select a player" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.isArray(players) && players.map((player: Player) => (
+                          {Array.isArray(players) && (players as Player[]).map((player: Player) => (
                             <SelectItem key={player.id} value={player.id}>
                               {player.firstName} {player.lastName}
                             </SelectItem>
@@ -700,7 +707,7 @@ export default function StatsManagement() {
                     {selectedPlayer && (
                       <div className="space-y-4">
                         <div className="text-sm text-muted-foreground" data-testid="text-selected-player">
-                          Editing stats for: {players.find((p: Player) => p.id === selectedPlayer)?.firstName} {players.find((p: Player) => p.id === selectedPlayer)?.lastName}
+                          Editing stats for: {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.firstName} {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.lastName}
                         </div>
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
