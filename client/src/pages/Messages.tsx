@@ -1065,7 +1065,7 @@ export default function Messages() {
                       {/* Delete conversation button */}
                       <button
                         onClick={(e) => handleDeleteConversation(conversation.id, e)}
-                        className="p-2 hover:bg-destructive/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-2 hover:bg-destructive/20 rounded-lg transition-colors"
                         title="Delete conversation"
                         data-testid={`button-delete-conversation-${conversation.id}`}
                       >
