@@ -983,7 +983,7 @@ export default function Messages() {
                 {conversations.map((conversation: Conversation) => (
                   <div 
                     key={conversation.id}
-                    className="bg-card rounded-lg border border-border p-4 cursor-pointer hover:bg-accent/50 transition-colors" 
+                    className="bg-card rounded-lg border border-border p-4 cursor-pointer hover:bg-accent/50 transition-colors group" 
                     data-testid={`card-conversation-${conversation.id}`}
                     onClick={() => setSelectedConversation(conversation.id)}
                   >
@@ -1062,6 +1062,15 @@ export default function Messages() {
                         )}
                       </div>
                       
+                      {/* Delete conversation button */}
+                      <button
+                        onClick={(e) => handleDeleteConversation(conversation.id, e)}
+                        className="p-2 hover:bg-destructive/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete conversation"
+                        data-testid={`button-delete-conversation-${conversation.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </button>
                     </div>
                   </div>
                 ))}
