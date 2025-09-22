@@ -352,7 +352,7 @@ export default function Teams() {
                   <CardHeader>
                     <CardTitle className="text-2xl font-semibold leading-none tracking-tight text-center pt-[5px] pb-[5px]">League Standing</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-6 pt-[5px] pb-[5px]">
                     {teamStanding ? (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="text-center">
