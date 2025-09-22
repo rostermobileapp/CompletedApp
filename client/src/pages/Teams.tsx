@@ -170,6 +170,12 @@ export default function Teams() {
     enabled: !!currentTeam?.leagueId && teamMembers.length > 0,
   });
 
+  // Fetch league standings
+  const { data: leagueStandings = [] } = useQuery({
+    queryKey: ['/api/leagues', currentTeam?.leagueId, 'standings'],
+    enabled: !!currentTeam?.leagueId,
+  });
+
   // Calculate team leaders
   const getTeamLeaders = () => {
     if (!teamStats || teamStats.length === 0) return null;
@@ -196,6 +202,28 @@ export default function Teams() {
   };
 
   const teamLeaders = getTeamLeaders();
+
+  // Get current team's standing
+  const getCurrentTeamStanding = () => {
+    if (!currentTeam || !leagueStandings || leagueStandings.length === 0) return null;
+    
+    const standingIndex = leagueStandings.findIndex((standing: any) => standing.teamId === currentTeam.id);
+    if (standingIndex === -1) return null;
+    
+    const teamStanding = leagueStandings[standingIndex];
+    const position = standingIndex + 1; // 1-based position
+    const totalTeams = leagueStandings.length;
+    const goalDifferential = teamStanding.goalsFor - teamStanding.goalsAgainst;
+    
+    return {
+      ...teamStanding,
+      position,
+      totalTeams,
+      goalDifferential
+    };
+  };
+
+  const teamStanding = getCurrentTeamStanding();
 
   // Filter games for current team only
   const teamGames = (upcomingGames as any[]).filter((game: any) => 
@@ -319,35 +347,47 @@ export default function Teams() {
                   </CardHeader>
                 </Card>
 
-                {/* Team Stats */}
+                {/* Team Standings */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Team Stats</CardTitle>
+                    <CardTitle>League Standing</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600/50">{team.wins}</div>
-                        <div className="text-sm text-muted-foreground">Wins</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600/50">{team.losses}</div>
-                        <div className="text-sm text-muted-foreground">Losses</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-yellow-600/50">{team.ties}</div>
-                        <div className="text-sm text-muted-foreground">Ties</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold">
-                          {team.wins + team.losses + team.ties > 0 
-                            ? ((team.wins + team.ties * 0.5) / (team.wins + team.losses + team.ties) * 100).toFixed(1)
-                            : '0.0'
-                          }%
+                    {teamStanding ? (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-primary">
+                            {teamStanding.position}
+                            {teamStanding.position === 1 ? 'st' : 
+                             teamStanding.position === 2 ? 'nd' : 
+                             teamStanding.position === 3 ? 'rd' : 'th'}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            of {teamStanding.totalTeams}
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">Win Rate</div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">{teamStanding.points}</div>
+                          <div className="text-sm text-muted-foreground">Points</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold">
+                            {teamStanding.wins}-{teamStanding.losses}-{teamStanding.ties}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Record</div>
+                        </div>
+                        <div className="text-center">
+                          <div className={`text-2xl font-bold ${teamStanding.goalDifferential >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {teamStanding.goalDifferential >= 0 ? '+' : ''}{teamStanding.goalDifferential}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Goal Diff</div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">
+                        No standings available yet.
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
