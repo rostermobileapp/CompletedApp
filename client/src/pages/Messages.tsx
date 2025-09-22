@@ -245,6 +245,42 @@ export default function Messages() {
     }
   });
 
+  // Delete conversation mutation
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      const response = await apiRequest('DELETE', `/api/conversations/${conversationId}`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+      // If we deleted the currently selected conversation, go back to list
+      if (selectedConversation) {
+        setSelectedConversation(null);
+      }
+      toast({
+        title: "Success",
+        description: "Conversation deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error deleting conversation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete conversation. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent conversation selection when clicking delete
+    
+    // Ask for confirmation before deleting
+    if (window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+      deleteConversationMutation.mutate(conversationId);
+    }
+  };
+
   // Persistent WebSocket connection for real-time updates
   useEffect(() => {
     // 🚨 FREE ACCESS - WEBSOCKET ENABLED FOR EVERYONE! 🚨
@@ -1026,13 +1062,6 @@ export default function Messages() {
                         )}
                       </div>
                       
-                      <div className="text-right">
-                        {conversation.lastMessage && (
-                          <p className="text-xs text-muted-foreground" data-testid={`text-conversation-time-${conversation.id}`}>
-                            {formatConversationTime(conversation.lastMessage.sentAt)}
-                          </p>
-                        )}
-                      </div>
                     </div>
                   </div>
                 ))}
