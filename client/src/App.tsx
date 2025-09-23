@@ -3,7 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SubscriptionProvider } from "@/context/SubscriptionContext";
+import { PermissionProvider } from "@/context/SubscriptionContext";
 import { BottomNavigation } from "@/components/BottomNavigation";
 import { PageTransition } from "@/components/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
@@ -51,7 +51,7 @@ function Router() {
   }
 
   return (
-    <SubscriptionProvider>
+    <PermissionProvider>
       <div className="relative min-h-screen w-full">
         <PageTransition>
           <Switch>
@@ -79,7 +79,7 @@ function Router() {
         </PageTransition>
         <BottomNavigation />
       </div>
-    </SubscriptionProvider>
+    </PermissionProvider>
   );
 }
 
