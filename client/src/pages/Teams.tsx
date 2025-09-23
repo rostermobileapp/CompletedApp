@@ -408,7 +408,7 @@ export default function Teams() {
                             <TrendingUp className="w-5 h-5 text-primary" />
                             <div className="flex items-center gap-2">
                               <span className="text-lg font-bold">{teamLeaders.topScorer?.points || 0}</span>
-                              <span className="text-sm text-muted-foreground">Points</span>
+                              <span className="text-sm text-muted-foreground">Pts</span>
                             </div>
                           </div>
                           <span className="text-sm font-medium truncate" data-testid="text-points-leader-name">{teamLeaders.topScorer?.user?.lastName || 'N/A'}</span>
