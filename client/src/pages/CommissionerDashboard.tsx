@@ -1,13 +1,8 @@
-import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/context/SubscriptionContext';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Users, Shield, Crown, Star } from 'lucide-react';
+import { Shield, Crown, Star, Users } from 'lucide-react';
 import type { User } from '@shared/schema';
 import type { UserRole, SpecialPermission } from '@/context/SubscriptionContext';
 
@@ -24,83 +19,14 @@ const roleDisplayNames = {
   commissioner: 'Commissioner'
 };
 
-const roleColors = {
-  free_tier: 'bg-gray-500',
-  player_pro: 'bg-blue-500',
-  secondary_commissioner: 'bg-purple-500',
-  commissioner: 'bg-gold-500'
-};
-
 export function CommissionerDashboard() {
-  const { toast } = useToast();
-  const { canManageUsers, canManageLeague, user, role, specialPermissions, isPrimaryCommissioner } = usePermissions();
-  const [activeTab, setActiveTab] = useState('all-users');
-
-  // Get all users - only for admins/primary commissioners
-  const { data: allUsers = [], isLoading: usersLoading } = useQuery<UserWithPermissions[]>({
-    queryKey: ['/api/admin/users'],
-    enabled: canManageUsers(),
-  });
+  const { canManageLeague, user, role, specialPermissions, isPrimaryCommissioner } = usePermissions();
 
   // Get current user's leagues for league-specific management
   const { data: userLeagues = [] } = useQuery<any[]>({
     queryKey: ['/api/user/leagues'],
   });
 
-  // Update user permissions mutation
-  const updatePermissionsMutation = useMutation({
-    mutationFn: async ({ userId, role, specialPermissions, isPrimaryCommissioner }: {
-      userId: string;
-      role: string;
-      specialPermissions?: string[];
-      isPrimaryCommissioner?: boolean;
-    }) => {
-      const response = await fetch(`/api/admin/users/${userId}/permissions`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ role, specialPermissions, isPrimaryCommissioner })
-      });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
-      toast({
-        title: 'Success',
-        description: 'User permissions updated successfully',
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to update user permissions',
-        variant: 'destructive',
-      });
-    }
-  });
-
-  const handleRoleUpdate = (userId: string, role: string, specialPermissions?: string[], isPrimaryCommissioner?: boolean) => {
-    updatePermissionsMutation.mutate({ userId, role, specialPermissions, isPrimaryCommissioner });
-  };
-
-  const handleMakeAdmin = (user: UserWithPermissions) => {
-    const currentSpecialPermissions = user.specialPermissions || [];
-    const newSpecialPermissions = currentSpecialPermissions.includes('admin') 
-      ? currentSpecialPermissions.filter(p => p !== 'admin')
-      : [...currentSpecialPermissions, 'admin'];
-    
-    handleRoleUpdate(user.id, user.role, newSpecialPermissions as string[], user.isPrimaryCommissioner);
-  };
-
-
-  const handleMakeSecondaryCommissioner = (user: UserWithPermissions) => {
-    const newRole = user.role === 'secondary_commissioner' ? 'free_tier' : 'secondary_commissioner';
-    handleRoleUpdate(user.id, newRole, user.specialPermissions as string[], user.isPrimaryCommissioner);
-  };
 
   const getRoleIcon = (user: UserWithPermissions) => {
     if (user.isPrimaryCommissioner) return <Crown className="h-4 w-4 text-yellow-500" />;
@@ -109,7 +35,7 @@ export function CommissionerDashboard() {
     return <Users className="h-4 w-4 text-gray-500" />;
   };
 
-  if (!canManageUsers() && !canManageLeague()) {
+  if (!canManageLeague()) {
     return (
       <div className="container mx-auto p-6">
         <Card>
@@ -143,109 +69,24 @@ export function CommissionerDashboard() {
         </Badge>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          {canManageUsers() && (
-            <TabsTrigger value="all-users" data-testid="tab-all-users">All Users</TabsTrigger>
-          )}
-          {canManageLeague() && (
-            <TabsTrigger value="league-users" data-testid="tab-league-users">League Management</TabsTrigger>
-          )}
-        </TabsList>
-
-        {canManageUsers() && (
-          <TabsContent value="all-users" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  System Users ({allUsers.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {usersLoading ? (
-                  <div className="text-center py-8">Loading users...</div>
-                ) : (
-                  <div className="space-y-4">
-                    {allUsers.map((user) => (
-                      <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center space-x-4">
-                          {getRoleIcon(user)}
-                          <div>
-                            <p className="font-medium" data-testid={`user-name-${user.id}`}>
-                              {user.firstName} {user.lastName}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-4">
-                          <div className="flex flex-wrap gap-2">
-                            <Badge className={roleColors[user.role]} data-testid={`user-role-${user.id}`}>
-                              {roleDisplayNames[user.role]}
-                            </Badge>
-                            {user.isPrimaryCommissioner && (
-                              <Badge variant="outline" className="border-yellow-500 text-yellow-700">
-                                Primary
-                              </Badge>
-                            )}
-                            {user.specialPermissions?.map(permission => (
-                              <Badge key={permission} variant="outline" className="border-green-500 text-green-700">
-                                {permission}
-                              </Badge>
-                            ))}
-                          </div>
-                          
-                          <div className="flex items-center space-x-2">
-                            <Button 
-                              size="sm"
-                              onClick={() => handleMakeAdmin(user)}
-                              variant="outline"
-                              data-testid={`button-toggle-admin-${user.id}`}
-                            >
-                              {user.specialPermissions?.includes('admin') ? 'Remove Admin' : 'Make Admin'}
-                            </Button>
-                            <Button 
-                              size="sm"
-                              onClick={() => handleMakeSecondaryCommissioner(user)}
-                              variant="outline"
-                              data-testid={`button-toggle-secondary-commissioner-${user.id}`}
-                            >
-                              {user.role === 'secondary_commissioner' ? 'Remove Secondary Commissioner' : 'Make Secondary Commissioner'}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-
-        {canManageLeague() && (
-          <TabsContent value="league-users" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>League-Specific User Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  Manage users within your leagues. This section will show league memberships and allow you to manage roles within specific leagues.
-                </p>
-                <div className="mt-4 grid gap-4">
-                  {userLeagues.map((league: any) => (
-                    <Card key={league.id} className="p-4">
-                      <h3 className="font-semibold" data-testid={`league-name-${league.id}`}>{league.name}</h3>
-                      <p className="text-sm text-gray-600">League members management coming soon...</p>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-      </Tabs>
+      <Card>
+        <CardHeader>
+          <CardTitle>League-Specific User Management</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-600">
+            Manage users within your leagues. This section will show league memberships and allow you to manage roles within specific leagues.
+          </p>
+          <div className="mt-4 grid gap-4">
+            {userLeagues.map((league: any) => (
+              <Card key={league.id} className="p-4">
+                <h3 className="font-semibold" data-testid={`league-name-${league.id}`}>{league.name}</h3>
+                <p className="text-sm text-gray-600">League members management coming soon...</p>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
