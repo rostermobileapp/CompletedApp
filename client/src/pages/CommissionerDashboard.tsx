@@ -2,13 +2,6 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -41,7 +34,6 @@ const roleColors = {
 export function CommissionerDashboard() {
   const { toast } = useToast();
   const { canManageUsers, canManageLeague, user, role, specialPermissions, isPrimaryCommissioner } = usePermissions();
-  const [selectedUserData, setSelectedUserData] = useState<{[userId: string]: {role: UserRole}}>({});
   const [activeTab, setActiveTab] = useState('all-users');
 
   // Get all users - only for admins/primary commissioners
@@ -81,7 +73,6 @@ export function CommissionerDashboard() {
         title: 'Success',
         description: 'User permissions updated successfully',
       });
-      setSelectedUserData({});
     },
     onError: (error: any) => {
       toast({
@@ -105,21 +96,10 @@ export function CommissionerDashboard() {
     handleRoleUpdate(user.id, user.role, newSpecialPermissions as string[], user.isPrimaryCommissioner);
   };
 
-  const handleMakePrimary = (user: UserWithPermissions) => {
-    handleRoleUpdate(user.id, user.role, user.specialPermissions as string[], !user.isPrimaryCommissioner);
-  };
 
-  const handleRoleChange = (userId: string, newRole: UserRole) => {
-    const user = allUsers.find(u => u.id === userId);
-    if (!user) return;
-    
-    handleRoleUpdate(userId, newRole, user.specialPermissions as string[], user.isPrimaryCommissioner);
-    
-    // Clear selection after update
-    setSelectedUserData(prev => {
-      const { [userId]: removed, ...rest } = prev;
-      return rest;
-    });
+  const handleMakeSecondaryCommissioner = (user: UserWithPermissions) => {
+    const newRole = user.role === 'secondary_commissioner' ? 'free_tier' : 'secondary_commissioner';
+    handleRoleUpdate(user.id, newRole, user.specialPermissions as string[], user.isPrimaryCommissioner);
   };
 
   const getRoleIcon = (user: UserWithPermissions) => {
@@ -219,55 +199,22 @@ export function CommissionerDashboard() {
                           </div>
                           
                           <div className="flex items-center space-x-2">
-                            <Select
-                              value={selectedUserData[user.id]?.role || ''}
-                              onValueChange={(value) => {
-                                setSelectedUserData(prev => ({
-                                  ...prev,
-                                  [user.id]: { role: value as UserRole }
-                                }));
-                              }}
-                              data-testid={`select-user-${user.id}`}
+                            <Button 
+                              size="sm"
+                              onClick={() => handleMakeAdmin(user)}
+                              variant="outline"
+                              data-testid={`button-toggle-admin-${user.id}`}
                             >
-                              <SelectTrigger className="w-40">
-                                <SelectValue placeholder="Change Role" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="free_tier">Free Tier</SelectItem>
-                                <SelectItem value="player_pro">Player Pro</SelectItem>
-                                <SelectItem value="secondary_commissioner">Secondary Commissioner</SelectItem>
-                                <SelectItem value="commissioner">Commissioner</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            
-                            {selectedUserData[user.id] && (
-                              <Button 
-                                size="sm"
-                                onClick={() => handleRoleChange(user.id, selectedUserData[user.id].role)}
-                                data-testid={`button-update-role-${user.id}`}
-                              >
-                                Update Role
-                              </Button>
-                            )}
-                            
-                            <div className="flex space-x-2">
-                              <Button 
-                                size="sm"
-                                onClick={() => handleMakeAdmin(user)}
-                                variant="outline"
-                                data-testid={`button-toggle-admin-${user.id}`}
-                              >
-                                {user.specialPermissions?.includes('admin') ? 'Remove Admin' : 'Make Admin'}
-                              </Button>
-                              <Button 
-                                size="sm"
-                                onClick={() => handleMakePrimary(user)}
-                                variant="outline"
-                                data-testid={`button-toggle-primary-${user.id}`}
-                              >
-                                {user.isPrimaryCommissioner ? 'Remove Primary' : 'Make Primary'}
-                              </Button>
-                            </div>
+                              {user.specialPermissions?.includes('admin') ? 'Remove Admin' : 'Make Admin'}
+                            </Button>
+                            <Button 
+                              size="sm"
+                              onClick={() => handleMakeSecondaryCommissioner(user)}
+                              variant="outline"
+                              data-testid={`button-toggle-secondary-commissioner-${user.id}`}
+                            >
+                              {user.role === 'secondary_commissioner' ? 'Remove Secondary Commissioner' : 'Make Secondary Commissioner'}
+                            </Button>
                           </div>
                         </div>
                       </div>

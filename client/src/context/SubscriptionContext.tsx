@@ -57,7 +57,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
 
   // Complex permission checks for specific actions
   const canManageUsers = (): boolean => {
-    return isPrimaryCommissioner || hasSpecialPermission('admin');
+    return isPrimaryCommissioner || hasSpecialPermission('admin') || hasRole('commissioner');
   };
 
   const canManageLeague = (leagueId?: string): boolean => {

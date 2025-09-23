@@ -95,8 +95,8 @@ export default function More() {
     {
       icon: Shield,
       label: 'Commissioner Dashboard',
-      locked: !canManageUsers() && !canManageLeague(),
-      requiredTier: 'ADMIN',
+      locked: !canManageUsers() && !canManageLeague() && !hasRole('commissioner'),
+      requiredTier: 'COMMISSIONER',
       action: () => {
         setPageTransitionDirection('up');
         navigate('/commissioner-dashboard');
