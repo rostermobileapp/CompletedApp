@@ -205,10 +205,10 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
     };
 
     return (
-      <div className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-700 rounded-lg p-4 pt-[2px] pb-[2px]">
-        <div className="flex items-start justify-between mb-3">
+      <div className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-700 rounded-lg p-3 pt-[1px] pb-[1px]">
+        <div className="flex items-start justify-between mb-2">
           <div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            <h3 className="text-base font-medium text-gray-900 dark:text-white">
               {game.homeTeam?.name} vs {game.awayTeam?.name}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300">
@@ -219,8 +219,8 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
         </div>
         {/* Show existing submissions if any */}
         {game.submissions && game.submissions.length > 0 && (
-          <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Current Submissions:</h4>
+          <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">Current Submissions:</h4>
             {game.submissions.map((sub: any, index: number) => (
               <div key={index} className="text-sm text-gray-700 dark:text-gray-300">
                 Submission {index + 1}: {game.homeTeam?.name} {sub.homeScore} - {sub.awayScore} {game.awayTeam?.name}
@@ -230,9 +230,9 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
           </div>
         )}
         {/* Score submission form */}
-        <div className="grid grid-cols-3 gap-3 items-center">
+        <div className="grid grid-cols-3 gap-2 items-center">
           <div className="text-center">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">
               {game.homeTeam?.name}
             </label>
             <Input
@@ -251,7 +251,7 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
           </div>
           
           <div className="text-center">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">
               {game.awayTeam?.name}
             </label>
             <Input
@@ -268,7 +268,7 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
         <Button
           onClick={handleSubmitScore}
           disabled={submitScoreMutation.isPending || !homeScore || !awayScore}
-          className="w-full mt-3"
+          className="w-full mt-2"
           data-testid={`button-submit-score-${game.id}`}
         >
           {submitScoreMutation.isPending ? "Submitting..." : "Submit Final Score"}
