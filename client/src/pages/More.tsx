@@ -1,15 +1,18 @@
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Users, BarChart3, UserPlus, Crown, Settings, Bell, Moon, Shield, LogOut, Plus, Calendar, CheckCircle } from 'lucide-react';
-// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
-// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
+import { usePermissions } from '@/context/SubscriptionContext';
 import { apiRequest } from '@/lib/queryClient';
 
 export default function More() {
   const [, navigate] = useLocation();
-  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
-  const hasAccess = () => true; // All features unlocked!
-  const tier = 'commissioner'; // Everyone is commissioner now!
+  const { 
+    canManageUsers, 
+    canManageLeague, 
+    canAccessPremiumFeatures, 
+    hasRole,
+    role 
+  } = usePermissions();
 
   const teamFeatures = [
     {
@@ -25,15 +28,15 @@ export default function More() {
     {
       icon: BarChart3,
       label: 'Team Stats',
-      locked: !hasAccess('player_plus'),
-      requiredTier: 'PLUS',
+      locked: !canAccessPremiumFeatures(),
+      requiredTier: 'PRO',
       action: () => {/* TODO: Navigate to stats */},
     },
     {
       icon: UserPlus,
       label: 'Find Subs',
-      locked: !hasAccess('player_plus'),
-      requiredTier: 'PLUS',
+      locked: !canAccessPremiumFeatures(),
+      requiredTier: 'PRO',
       action: () => {/* TODO: Navigate to subs */},
     },
     {
@@ -52,7 +55,7 @@ export default function More() {
     {
       icon: Plus,
       label: 'Create League',
-      locked: !hasAccess('commissioner'),
+      locked: !canManageLeague(),
       requiredTier: 'COMMISSIONER',
       action: () => {
         setPageTransitionDirection('up');
@@ -62,8 +65,8 @@ export default function More() {
     {
       icon: Calendar,
       label: 'Schedule Scrimmage',
-      locked: !hasAccess('player_plus'),
-      requiredTier: 'PLUS',
+      locked: !canAccessPremiumFeatures(),
+      requiredTier: 'PRO',
       action: () => {
         setPageTransitionDirection('up');
         navigate('/create-scrimmage');
@@ -72,8 +75,8 @@ export default function More() {
     {
       icon: Settings,
       label: 'Manage Scrimmages',
-      locked: !hasAccess('player_plus'),
-      requiredTier: 'PLUS',
+      locked: !canAccessPremiumFeatures(),
+      requiredTier: 'PRO',
       action: () => {
         setPageTransitionDirection('up');
         navigate('/scrimmage-management');
@@ -82,11 +85,21 @@ export default function More() {
     {
       icon: Crown,
       label: 'League Management',
-      locked: !hasAccess('commissioner'),
+      locked: !hasRole('secondary_commissioner'),
       requiredTier: 'COMMISSIONER',
       action: () => {
         setPageTransitionDirection('up');
         navigate('/league-list');
+      },
+    },
+    {
+      icon: Shield,
+      label: 'Commissioner Dashboard',
+      locked: !canManageUsers() && !canManageLeague(),
+      requiredTier: 'ADMIN',
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/commissioner-dashboard');
       },
     },
   ];
@@ -101,7 +114,7 @@ export default function More() {
         setPageTransitionDirection('up');
         navigate('/subscription');
       },
-      highlight: tier === 'free',
+      highlight: role === 'free_tier',
     },
     {
       icon: Settings,

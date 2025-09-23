@@ -5100,6 +5100,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User Management API Routes - Admin Only
+  
+  // Get all users (for admin user management)
+  app.get('/api/admin/users', isAuthenticated, loadUserPermissions, requireUserManagement, async (req: any, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error('Error fetching all users:', error);
+      res.status(500).json({ message: 'Failed to fetch users' });
+    }
+  });
+  
+  // Update user role and permissions
+  app.patch('/api/admin/users/:userId/permissions', isAuthenticated, loadUserPermissions, requireUserManagement, async (req: any, res) => {
+    try {
+      const targetUserId = req.params.userId;
+      const updatedById = req.user.claims.sub;
+      const { role, specialPermissions, isPrimaryCommissioner } = req.body;
+      
+      // Validate input
+      if (!role) {
+        return res.status(400).json({ message: 'Role is required' });
+      }
+      
+      const permissionData: any = { role };
+      if (specialPermissions !== undefined) permissionData.specialPermissions = specialPermissions;
+      if (isPrimaryCommissioner !== undefined) permissionData.isPrimaryCommissioner = isPrimaryCommissioner;
+      
+      const updatedUser = await storage.updateUserPermissions(targetUserId, permissionData, updatedById);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error('Error updating user permissions:', error);
+      res.status(500).json({ message: 'Failed to update user permissions' });
+    }
+  });
+  
+  // Get users by league (for league-specific user management)
+  app.get('/api/leagues/:leagueId/users', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+      const userPermissions = (req as any).userPermissions;
+      
+      // Check if user can manage this league (commissioner of this league, or admin/primary commissioner)
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+      
+      const canManageLeague = league.commissionerId === userId || 
+                             userPermissions.specialPermissions?.includes('admin') ||
+                             userPermissions.isPrimaryCommissioner;
+                             
+      if (!canManageLeague) {
+        return res.status(403).json({ message: 'Access denied - insufficient permissions' });
+      }
+      
+      const leagueUsers = await storage.getLeagueUsers(leagueId);
+      res.json(leagueUsers);
+    } catch (error) {
+      console.error('Error fetching league users:', error);
+      res.status(500).json({ message: 'Failed to fetch league users' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time messaging
