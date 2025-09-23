@@ -157,9 +157,9 @@ export default function Teams() {
 
   // Fetch team stats for leaders
   const { data: teamStats = [] } = useQuery({
-    queryKey: ['/api/leagues', currentTeam?.leagueId, 'stats', 'team', currentTeam?.id],
+    queryKey: ['/api/leagues', currentTeam?.leagueId, 'stats', 'team', currentTeam?.id, 'members', teamMembers?.length],
     queryFn: async () => {
-      if (!currentTeam?.leagueId) return [];
+      if (!currentTeam?.leagueId || !teamMembers || teamMembers.length === 0) return [];
       const response = await apiRequest('GET', `/api/leagues/${currentTeam.leagueId}/stats`);
       const allStats = await response.json();
       
@@ -168,36 +168,18 @@ export default function Teams() {
         String(member.userId ?? member.user?.id)
       ));
       
-      // Debug logging
-      console.log('=== TEAM STATS DEBUG ===');
-      console.log('Team Members:', teamMembers?.slice(0, 2)); // First 2 members
-      console.log('Member User IDs:', Array.from(memberUserIds).slice(0, 5)); // First 5 IDs
-      console.log('All Stats (first 2):', allStats?.slice(0, 2));
-      console.log('All Stats count:', allStats?.length);
-      
       // Filter stats for current team players using proper user ID matching
       const filteredStats = allStats.filter((stat: any) => {
         if (stat.type !== 'skater') return false; // Only skaters for these stats
         
         // Match user IDs properly
         const statUserId = String(stat.userId ?? stat.user?.id);
-        const isMatch = memberUserIds.has(statUserId);
-        
-        // Debug a few entries
-        if (allStats.indexOf(stat) < 3) {
-          console.log(`Stat ${allStats.indexOf(stat)}: userId=${stat.userId}, user.id=${stat.user?.id}, statUserId="${statUserId}", isMatch=${isMatch}`);
-        }
-        
-        return isMatch;
+        return memberUserIds.has(statUserId);
       });
-      
-      console.log('Filtered Stats count:', filteredStats.length);
-      console.log('Filtered Stats (first 2):', filteredStats.slice(0, 2));
-      console.log('=== END DEBUG ===');
       
       return filteredStats;
     },
-    enabled: !!currentTeam?.leagueId,
+    enabled: !!currentTeam?.leagueId && !!teamMembers && teamMembers.length > 0,
   });
 
   // Fetch league standings

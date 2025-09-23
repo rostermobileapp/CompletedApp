@@ -1,0 +1,90 @@
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+10The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+10The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-edd9d204c79d3563.js:34 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+Rosters:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+Rosters:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+Rosters:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-edd9d204c79d3563.js:34 [LaunchDarkly] LaunchDarkly client initialized
+main.MWM1NDgwZmE2MQ.js:1 Deprecated API for given entry type.
+(anonymous) @ main.MWM1NDgwZmE2MQ.js:1Understand this warning
+Rosters:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+framework-c1f6fa9e0be3ac9e.js:1 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this error
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'battery'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'layout-animations'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'navigation-override'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'oversized-images'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'publickey-credentials'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'speaker-selection'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'unoptimized-images'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'unsized-media'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Unrecognized feature: 'pointer-lock'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+framework-c1f6fa9e0be3ac9e.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-c1f6fa9e0be3ac9e.js:1Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar1v%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+Network.js:227 WebSocket connection to 'wss://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/?token=1FaT5CFDVlXQ' failed: 
+t @ Network.js:227Understand this error
+Network.js:227 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=1FaT5CFDVlXQ' is invalid.
+    at new t (Network.js:227:18)
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)Understand this error
+Console.js:61 === TEAM STATS DEBUG ===
+Console.js:61 Team Members: Array(0)
+Console.js:61 Member User IDs: Array(0)
+Console.js:61 All Stats (first 2): Array(2)
+Console.js:61 All Stats count: 99
+Console.js:61 Stat 0: userId=placeholder_1757363176783_wonajuv0k, user.id=placeholder_1757363176783_wonajuv0k, statUserId="placeholder_1757363176783_wonajuv0k", isMatch=false
+Console.js:61 Stat 1: userId=placeholder_1757363176926_4xxeik718, user.id=placeholder_1757363176926_4xxeik718, statUserId="placeholder_1757363176926_4xxeik718", isMatch=false
+Console.js:61 Stat 2: userId=placeholder_1757363176970_27wyef2xb, user.id=placeholder_1757363176970_27wyef2xb, statUserId="placeholder_1757363176970_27wyef2xb", isMatch=false
+Console.js:61 Filtered Stats count: 0
+Console.js:61 Filtered Stats (first 2): Array(0)
+Console.js:61 === END DEBUG ===
