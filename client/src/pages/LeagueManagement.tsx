@@ -206,16 +206,13 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
 
     return (
       <div className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-700 rounded-lg p-3 pt-[1px] pb-[1px]">
-        <div className="flex items-start justify-between mb-2">
-          <div>
-            <h3 className="text-base font-medium text-gray-900 dark:text-white">
-              {game.homeTeam?.name} vs {game.awayTeam?.name}
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              {format(new Date(game.scheduledAt), 'MMM d, yyyy • h:mm a')}
-            </p>
-            
-          </div>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-base font-medium text-gray-900 dark:text-white">
+            {game.homeTeam?.name} vs {game.awayTeam?.name}
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            {format(new Date(game.scheduledAt), 'MMM d, yyyy • h:mm a')}
+          </p>
         </div>
         {/* Show existing submissions if any */}
         {game.submissions && game.submissions.length > 0 && (
