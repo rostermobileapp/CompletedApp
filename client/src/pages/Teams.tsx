@@ -16,6 +16,7 @@ import type { UploadResult } from '@uppy/core';
 
 export default function Teams() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const { hasRole } = usePermissions();
   const { toast } = useToast();
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
 
@@ -154,7 +155,6 @@ export default function Teams() {
   }
 
   const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
-  const { hasRole } = usePermissions();
   const isCommissioner = hasRole('secondary_commissioner');
   const canUploadLogo = isTeamCaptain || isCommissioner;
 

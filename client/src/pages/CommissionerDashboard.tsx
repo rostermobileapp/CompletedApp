@@ -37,7 +37,7 @@ const roleColors = {
 
 export function CommissionerDashboard() {
   const { toast } = useToast();
-  const { canManageLeague, user, role, specialPermissions, isPrimaryCommissioner } = usePermissions();
+  const { canManageLeague, canManageLeagueSpecific, user, role, specialPermissions, isPrimaryCommissioner } = usePermissions();
   const [expandedLeagues, setExpandedLeagues] = useState<Set<string>>(new Set());
 
   // Get current user's leagues for league-specific management
@@ -120,7 +120,12 @@ export function CommissionerDashboard() {
     return <Users className="h-4 w-4 text-gray-500" />;
   };
 
-  if (!canManageLeague()) {
+  // Check if user has global permissions or league-specific management permissions
+  const hasGlobalAccess = canManageLeague();
+  const hasLeagueSpecificAccess = userLeagues.some((league: any) => canManageLeagueSpecific(league.id));
+  const hasAccess = hasGlobalAccess || hasLeagueSpecificAccess;
+
+  if (!hasAccess) {
     return (
       <div className="container mx-auto p-6">
         <Card>

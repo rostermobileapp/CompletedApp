@@ -75,7 +75,7 @@ function Router() {
             <Route path="/substitute-confirmations" component={SubstituteConfirmations} />
             <Route path="/stats" component={Stats} />
             <Route path="/stats-management" component={StatsManagement} />
-            <Route path="/commissioner-dashboard" component={CommissionerDashboard} />
+            <Route path="/commissioner" component={CommissionerDashboard} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>

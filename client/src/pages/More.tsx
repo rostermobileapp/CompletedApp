@@ -99,7 +99,7 @@ export default function More() {
       requiredTier: 'COMMISSIONER',
       action: () => {
         setPageTransitionDirection('up');
-        navigate('/commissioner-dashboard');
+        navigate('/commissioner');
       },
     },
   ];

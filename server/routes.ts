@@ -5142,7 +5142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
-      const userPermissions = (req as any).userPermissions;
+      const userPermissions = (req as any).userWithPermissions;
       
       // Check if user can manage this league (commissioner of this league, or admin/primary commissioner)
       const league = await storage.getLeague(leagueId);
