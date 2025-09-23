@@ -36,8 +36,13 @@ import {
   getPendingApprovalsQuerySchema,
   updateSubstituteRequestSchema,
   insertPlayerStatsSchema,
+  insertLineCombinationSchema,
+  insertLineCombinationAssignmentSchema,
+  createLineCombinationRequestSchema,
+  createLineCombinationAssignmentRequestSchema,
+  updateLineCombinationRequestSchema,
 } from "@shared/schema";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import multer from "multer";
 import Papa from "papaparse";
 import * as fs from 'fs';
@@ -838,6 +843,342 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching team record:", error);
       res.status(500).json({ message: "Failed to fetch team record" });
+    }
+  });
+
+  // Line combinations routes
+  app.get("/api/teams/:teamId/line-combinations", isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const { gameId } = req.query;
+      
+      // Check if user has access to this team's line combinations (team member or captain)
+      const userId = req.user.claims.sub;
+      const teamMembers = await storage.getTeamMembers(teamId);
+      const isTeamMember = teamMembers.some(member => member.user.id === userId);
+      const team = await storage.getTeam(teamId);
+      const isTeamCaptain = team?.captainId === userId;
+      
+      if (!isTeamMember && !isTeamCaptain) {
+        return res.status(403).json({ message: "Access denied. You must be a team member or captain." });
+      }
+      
+      const lineCombinations = await storage.getTeamLineCombinations(teamId, gameId as string);
+      res.json(lineCombinations);
+    } catch (error) {
+      console.error("Error fetching line combinations:", error);
+      res.status(500).json({ message: "Failed to fetch line combinations" });
+    }
+  });
+
+  app.post("/api/teams/:teamId/line-combinations", isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Check if user is team captain
+      const team = await storage.getTeam(teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: "Only team captains can create line combinations" });
+      }
+      
+      const lineCombinationData = createLineCombinationRequestSchema.parse(req.body);
+      
+      // Validate gameId belongs to this team if provided
+      if (lineCombinationData.gameId) {
+        const game = await storage.getGameById(lineCombinationData.gameId);
+        if (!game || (game.homeTeamId !== teamId && game.awayTeamId !== teamId)) {
+          return res.status(400).json({ message: "Game does not involve this team" });
+        }
+      }
+      
+      const lineCombination = await storage.createLineCombination({
+        ...lineCombinationData,
+        teamId,
+      });
+      res.json(lineCombination);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating line combination:", error);
+      res.status(500).json({ message: "Failed to create line combination" });
+    }
+  });
+
+  app.get("/api/line-combinations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const lineCombination = await storage.getLineCombination(id);
+      if (!lineCombination) {
+        return res.status(404).json({ message: "Line combination not found" });
+      }
+      
+      // Check if user has access to this line combination (team member or captain)
+      const teamMembers = await storage.getTeamMembers(lineCombination.teamId);
+      const isTeamMember = teamMembers.some(member => member.user.id === userId);
+      const team = await storage.getTeam(lineCombination.teamId);
+      const isTeamCaptain = team?.captainId === userId;
+      
+      if (!isTeamMember && !isTeamCaptain) {
+        return res.status(403).json({ message: "Access denied. You must be a team member or captain." });
+      }
+      
+      res.json(lineCombination);
+    } catch (error) {
+      console.error("Error fetching line combination:", error);
+      res.status(500).json({ message: "Failed to fetch line combination" });
+    }
+  });
+
+  app.patch("/api/line-combinations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const lineCombination = await storage.getLineCombination(id);
+      if (!lineCombination) {
+        return res.status(404).json({ message: "Line combination not found" });
+      }
+      
+      // Check if user is team captain
+      const team = await storage.getTeam(lineCombination.teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: "Only team captains can update line combinations" });
+      }
+      
+      const updates = updateLineCombinationRequestSchema.parse(req.body);
+      
+      // Validate gameId belongs to this team if provided
+      if (updates.gameId) {
+        const game = await storage.getGameById(updates.gameId);
+        if (!game || (game.homeTeamId !== lineCombination.teamId && game.awayTeamId !== lineCombination.teamId)) {
+          return res.status(400).json({ message: "Game does not involve this team" });
+        }
+      }
+      
+      const updatedLineCombination = await storage.updateLineCombination(id, updates);
+      res.json(updatedLineCombination);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error updating line combination:", error);
+      res.status(500).json({ message: "Failed to update line combination" });
+    }
+  });
+
+  app.delete("/api/line-combinations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const lineCombination = await storage.getLineCombination(id);
+      if (!lineCombination) {
+        return res.status(404).json({ message: "Line combination not found" });
+      }
+      
+      // Check if user is team captain
+      const team = await storage.getTeam(lineCombination.teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: "Only team captains can delete line combinations" });
+      }
+      
+      await storage.deleteLineCombination(id);
+      res.json({ message: "Line combination deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting line combination:", error);
+      res.status(500).json({ message: "Failed to delete line combination" });
+    }
+  });
+
+  // Line combination assignment routes
+  app.post("/api/line-combinations/:lineId/assignments", isAuthenticated, async (req: any, res) => {
+    try {
+      const { lineId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const lineCombination = await storage.getLineCombination(lineId);
+      if (!lineCombination) {
+        return res.status(404).json({ message: "Line combination not found" });
+      }
+      
+      // Check if user is team captain
+      const team = await storage.getTeam(lineCombination.teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: "Only team captains can assign players to line combinations" });
+      }
+      
+      const assignmentData = createLineCombinationAssignmentRequestSchema.parse(req.body);
+      
+      // Validate that the player is a member of this team
+      const teamMembers = await storage.getTeamMembers(lineCombination.teamId);
+      const isPlayerTeamMember = teamMembers.some(member => member.user.id === assignmentData.playerId);
+      if (!isPlayerTeamMember) {
+        return res.status(400).json({ message: "Player must be a member of this team" });
+      }
+      
+      const assignment = await storage.createLineCombinationAssignment({
+        ...assignmentData,
+        lineCombinationId: lineId,
+      });
+      res.json(assignment);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating line assignment:", error);
+      res.status(500).json({ message: "Failed to create line assignment" });
+    }
+  });
+
+  app.patch("/api/line-assignments/:assignmentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { assignmentId } = req.params;
+      const { playerId } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Get the assignment to find the line combination
+      const assignments = await storage.getLineCombinationAssignments("");
+      const assignment = assignments.find(a => a.id === assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: "Line assignment not found" });
+      }
+      
+      const lineCombination = await storage.getLineCombination(assignment.lineCombinationId);
+      if (!lineCombination) {
+        return res.status(404).json({ message: "Line combination not found" });
+      }
+      
+      // Check if user is team captain
+      const team = await storage.getTeam(lineCombination.teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: "Only team captains can update line assignments" });
+      }
+      
+      const updatedAssignment = await storage.updateLineCombinationAssignment(assignmentId, playerId);
+      res.json(updatedAssignment);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error updating line assignment:", error);
+      res.status(500).json({ message: "Failed to update line assignment" });
+    }
+  });
+
+  // Update assignment position (for drag & drop)
+  app.patch("/api/line-assignments/:assignmentId/position", isAuthenticated, async (req: any, res) => {
+    try {
+      const { assignmentId } = req.params;
+      const { position } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!position) {
+        return res.status(400).json({ message: "Position is required" });
+      }
+      
+      // Get the assignment to find the line combination
+      const assignments = await storage.getLineCombinationAssignments("");
+      const assignment = assignments.find(a => a.id === assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: "Line assignment not found" });
+      }
+      
+      const lineCombination = await storage.getLineCombination(assignment.lineCombinationId);
+      if (!lineCombination) {
+        return res.status(404).json({ message: "Line combination not found" });
+      }
+      
+      // Check if user is team captain
+      const team = await storage.getTeam(lineCombination.teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: "Only team captains can update line assignments" });
+      }
+      
+      const updatedAssignment = await storage.updateLineCombinationAssignmentPosition(assignmentId, position);
+      res.json(updatedAssignment);
+    } catch (error) {
+      console.error("Error updating line assignment position:", error);
+      res.status(500).json({ message: "Failed to update line assignment position" });
+    }
+  });
+
+  // Bulk update assignments (for efficient drag & drop reordering)
+  app.patch("/api/line-combinations/:lineId/assignments/bulk", isAuthenticated, async (req: any, res) => {
+    try {
+      const { lineId } = req.params;
+      const { updates } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!Array.isArray(updates)) {
+        return res.status(400).json({ message: "Updates must be an array" });
+      }
+      
+      const lineCombination = await storage.getLineCombination(lineId);
+      if (!lineCombination) {
+        return res.status(404).json({ message: "Line combination not found" });
+      }
+      
+      // Check if user is team captain
+      const team = await storage.getTeam(lineCombination.teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: "Only team captains can update line assignments" });
+      }
+      
+      // Validate all player IDs if provided
+      if (updates.some((u: any) => u.playerId)) {
+        const teamMembers = await storage.getTeamMembers(lineCombination.teamId);
+        const teamMemberIds = new Set(teamMembers.map(member => member.user.id));
+        
+        for (const update of updates) {
+          if (update.playerId && !teamMemberIds.has(update.playerId)) {
+            return res.status(400).json({ message: `Player ${update.playerId} is not a member of this team` });
+          }
+        }
+      }
+      
+      const updatedAssignments = await storage.bulkUpdateLineCombinationAssignments(updates);
+      res.json(updatedAssignments);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error bulk updating line assignments:", error);
+      res.status(500).json({ message: "Failed to bulk update line assignments" });
+    }
+  });
+
+  app.delete("/api/line-assignments/:assignmentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { assignmentId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Get the assignment to find the line combination  
+      const assignments = await storage.getLineCombinationAssignments("");
+      const assignment = assignments.find(a => a.id === assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: "Line assignment not found" });
+      }
+      
+      const lineCombination = await storage.getLineCombination(assignment.lineCombinationId);
+      if (!lineCombination) {
+        return res.status(404).json({ message: "Line combination not found" });
+      }
+      
+      // Check if user is team captain
+      const team = await storage.getTeam(lineCombination.teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: "Only team captains can delete line assignments" });
+      }
+      
+      await storage.deleteLineCombinationAssignment(assignmentId);
+      res.json({ message: "Line assignment deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting line assignment:", error);
+      res.status(500).json({ message: "Failed to delete line assignment" });
     }
   });
 

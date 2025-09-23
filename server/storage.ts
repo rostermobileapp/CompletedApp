@@ -27,6 +27,8 @@ import {
   scheduleImports,
   importedSchedules,
   playerStats,
+  lineCombinations,
+  lineCombinationAssignments,
   // New messaging tables
   conversations,
   conversationParticipants,
@@ -95,6 +97,12 @@ import {
   type ScheduleImport,
   type InsertScheduleImport,
   type ImportedSchedule,
+  type LineCombination,
+  type InsertLineCombination,
+  type LineCombinationAssignment,
+  type InsertLineCombinationAssignment,
+  type LineCombinationWithAssignments,
+  type LineAssignmentWithPlayer,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, not } from "drizzle-orm";
@@ -182,6 +190,22 @@ export interface IStorage {
   getUserPendingApprovals(userId: string, approverType?: 'opposing_captain' | 'commissioner' | 'substitute_player'): Promise<(SubstitutionApproval & { substitutionRequest: SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User } })[]>;
   processApproval(requestId: string, approverId: string, approverType: 'opposing_captain' | 'commissioner' | 'substitute_player', status: 'approved' | 'denied', comments?: string): Promise<{ approval: SubstitutionApproval; updatedRequest: SubstituteRequest }>;
   
+  
+  // Line combinations operations
+  createLineCombination(lineCombination: InsertLineCombination): Promise<LineCombination>;
+  getTeamLineCombinations(teamId: string, gameId?: string): Promise<LineCombinationWithAssignments[]>;
+  getLineCombination(id: string): Promise<LineCombinationWithAssignments | undefined>;
+  updateLineCombination(id: string, updates: Partial<LineCombination>): Promise<LineCombination>;
+  deleteLineCombination(id: string): Promise<void>;
+  
+  // Line combination assignment operations
+  createLineCombinationAssignment(assignment: InsertLineCombinationAssignment): Promise<LineCombinationAssignment>;
+  updateLineCombinationAssignment(id: string, playerId: string): Promise<LineCombinationAssignment>;
+  updateLineCombinationAssignmentPosition(id: string, position: string): Promise<LineCombinationAssignment>;
+  bulkUpdateLineCombinationAssignments(updates: { id: string; playerId?: string; position?: string }[]): Promise<LineCombinationAssignment[]>;
+  deleteLineCombinationAssignment(id: string): Promise<void>;
+  deleteLineCombinationAssignmentsByLine(lineCombinationId: string): Promise<void>;
+  getLineCombinationAssignments(lineCombinationId: string): Promise<LineAssignmentWithPlayer[]>;
   
   // Message operations
   sendMessage(message: InsertMessage): Promise<Message>;
@@ -4289,6 +4313,186 @@ export class DatabaseStorage implements IStorage {
 
       return finalMembership;
     });
+  }
+
+  // Line combinations operations
+  async createLineCombination(lineCombination: InsertLineCombination): Promise<LineCombination> {
+    const [newLineCombination] = await db
+      .insert(lineCombinations)
+      .values(lineCombination)
+      .returning();
+    return newLineCombination;
+  }
+
+  async getTeamLineCombinations(teamId: string, gameId?: string): Promise<LineCombinationWithAssignments[]> {
+    const whereCondition = gameId 
+      ? and(eq(lineCombinations.teamId, teamId), eq(lineCombinations.gameId, gameId))
+      : and(eq(lineCombinations.teamId, teamId), isNull(lineCombinations.gameId));
+
+    const result = await db
+      .select({
+        lineCombination: lineCombinations,
+        assignment: lineCombinationAssignments,
+        user: users,
+      })
+      .from(lineCombinations)
+      .leftJoin(lineCombinationAssignments, eq(lineCombinations.id, lineCombinationAssignments.lineCombinationId))
+      .leftJoin(users, eq(lineCombinationAssignments.playerId, users.id))
+      .where(whereCondition)
+      .orderBy(
+        asc(lineCombinations.lineType),
+        asc(lineCombinations.lineNumber),
+        asc(lineCombinationAssignments.position)
+      );
+
+    // Group by line combination and structure the result
+    const lineCombinationsMap = new Map<string, LineCombinationWithAssignments>();
+    
+    for (const row of result) {
+      const lineId = row.lineCombination.id;
+      
+      if (!lineCombinationsMap.has(lineId)) {
+        lineCombinationsMap.set(lineId, {
+          ...row.lineCombination,
+          assignments: [],
+        });
+      }
+      
+      if (row.assignment && row.user) {
+        lineCombinationsMap.get(lineId)!.assignments.push({
+          ...row.assignment,
+          player: row.user,
+        });
+      }
+    }
+    
+    return Array.from(lineCombinationsMap.values());
+  }
+
+  async getLineCombination(id: string): Promise<LineCombinationWithAssignments | undefined> {
+    const result = await db
+      .select({
+        lineCombination: lineCombinations,
+        assignment: lineCombinationAssignments,
+        user: users,
+      })
+      .from(lineCombinations)
+      .leftJoin(lineCombinationAssignments, eq(lineCombinations.id, lineCombinationAssignments.lineCombinationId))
+      .leftJoin(users, eq(lineCombinationAssignments.playerId, users.id))
+      .where(eq(lineCombinations.id, id))
+      .orderBy(asc(lineCombinationAssignments.position));
+
+    if (result.length === 0) return undefined;
+
+    const lineWithAssignments: LineCombinationWithAssignments = {
+      ...result[0].lineCombination,
+      assignments: result
+        .filter(row => row.assignment && row.user)
+        .map(row => ({
+          ...row.assignment!,
+          player: row.user!,
+        })),
+    };
+
+    return lineWithAssignments;
+  }
+
+  async updateLineCombination(id: string, updates: Partial<LineCombination>): Promise<LineCombination> {
+    const [lineCombination] = await db
+      .update(lineCombinations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(lineCombinations.id, id))
+      .returning();
+    return lineCombination;
+  }
+
+  async deleteLineCombination(id: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Delete all assignments for this line combination first
+      await tx
+        .delete(lineCombinationAssignments)
+        .where(eq(lineCombinationAssignments.lineCombinationId, id));
+      
+      // Delete the line combination
+      await tx
+        .delete(lineCombinations)
+        .where(eq(lineCombinations.id, id));
+    });
+  }
+
+  // Line combination assignment operations
+  async createLineCombinationAssignment(assignment: InsertLineCombinationAssignment): Promise<LineCombinationAssignment> {
+    const [newAssignment] = await db
+      .insert(lineCombinationAssignments)
+      .values(assignment)
+      .returning();
+    return newAssignment;
+  }
+
+  async updateLineCombinationAssignment(id: string, playerId: string): Promise<LineCombinationAssignment> {
+    const [assignment] = await db
+      .update(lineCombinationAssignments)
+      .set({ playerId, updatedAt: new Date() })
+      .where(eq(lineCombinationAssignments.id, id))
+      .returning();
+    return assignment;
+  }
+
+  async updateLineCombinationAssignmentPosition(id: string, position: string): Promise<LineCombinationAssignment> {
+    const [assignment] = await db
+      .update(lineCombinationAssignments)
+      .set({ position: position as any, updatedAt: new Date() })
+      .where(eq(lineCombinationAssignments.id, id))
+      .returning();
+    return assignment;
+  }
+
+  async bulkUpdateLineCombinationAssignments(updates: { id: string; playerId?: string; position?: string }[]): Promise<LineCombinationAssignment[]> {
+    return await db.transaction(async (tx) => {
+      const results = [];
+      for (const update of updates) {
+        const setData: any = { updatedAt: new Date() };
+        if (update.playerId) setData.playerId = update.playerId;
+        if (update.position) setData.position = update.position;
+        
+        const [assignment] = await tx
+          .update(lineCombinationAssignments)
+          .set(setData)
+          .where(eq(lineCombinationAssignments.id, update.id))
+          .returning();
+        results.push(assignment);
+      }
+      return results;
+    });
+  }
+
+  async deleteLineCombinationAssignment(id: string): Promise<void> {
+    await db
+      .delete(lineCombinationAssignments)
+      .where(eq(lineCombinationAssignments.id, id));
+  }
+
+  async deleteLineCombinationAssignmentsByLine(lineCombinationId: string): Promise<void> {
+    await db
+      .delete(lineCombinationAssignments)
+      .where(eq(lineCombinationAssignments.lineCombinationId, lineCombinationId));
+  }
+
+  async getLineCombinationAssignments(lineCombinationId: string): Promise<LineAssignmentWithPlayer[]> {
+    const result = await db
+      .select({
+        assignment: lineCombinationAssignments,
+        user: users,
+      })
+      .from(lineCombinationAssignments)
+      .innerJoin(users, eq(lineCombinationAssignments.playerId, users.id))
+      .where(eq(lineCombinationAssignments.lineCombinationId, lineCombinationId))
+      .orderBy(asc(lineCombinationAssignments.position));
+
+    return result.map(row => ({
+      ...row.assignment,
+      player: row.user,
+    }));
   }
 }
 
