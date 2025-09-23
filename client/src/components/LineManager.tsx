@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Plus, Trash2, Users, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -264,14 +263,8 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
             onDragStart={(e) => handleDragStart(e, undefined, assignment)}
             data-testid={`player-${player.id}-in-${position}`}
           >
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={player.profileImageUrl} alt={`${player.firstName} ${player.lastName}`} />
-              <AvatarFallback className="text-xs">
-                {player.firstName?.[0]}{player.lastName?.[0]}
-              </AvatarFallback>
-            </Avatar>
-            <div className="text-xs text-center font-medium truncate max-w-full">
-              {player.firstName} {player.lastName}
+            <div className="text-sm text-center font-medium truncate max-w-full">
+              {player.lastName}
             </div>
             {isTeamCaptain && (
               <Button
@@ -363,14 +356,8 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
                     onDragStart={(e) => !isAssigned && handleDragStart(e, member)}
                     data-testid={`player-${member.user?.id || member.userId}`}
                   >
-                    <Avatar className="w-6 h-6">
-                      <AvatarImage src={member.user?.profileImageUrl} alt={`${member.user?.firstName} ${member.user?.lastName}`} />
-                      <AvatarFallback className="text-xs">
-                        {member.user?.firstName?.[0]}{member.user?.lastName?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
                     <span className="text-sm font-medium">
-                      {member.user?.firstName} {member.user?.lastName}
+                      {member.user?.lastName}
                     </span>
                     {isAssigned && (
                       <Badge variant="secondary" className="text-xs">Assigned</Badge>
