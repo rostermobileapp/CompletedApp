@@ -1171,17 +1171,7 @@ export default function Messages() {
                   {onlineUsers.length > 0 ? `${onlineUsers.length} online` : 'Team members'}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <button className="p-2 hover:bg-accent rounded-lg transition-colors" data-testid="button-voice-call">
-                  <Phone className="w-5 h-5" />
-                </button>
-                <button className="p-2 hover:bg-accent rounded-lg transition-colors" data-testid="button-video-call">
-                  <Video className="w-5 h-5" />
-                </button>
-                <button className="p-2 hover:bg-accent rounded-lg transition-colors" data-testid="button-chat-info">
-                  <Info className="w-5 h-5" />
-                </button>
-              </div>
+              
             </div>
           </div>
           
