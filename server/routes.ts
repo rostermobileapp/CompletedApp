@@ -1157,8 +1157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       
       // Get the assignment to find the line combination  
-      const assignments = await storage.getLineCombinationAssignments("");
-      const assignment = assignments.find(a => a.id === assignmentId);
+      const assignment = await storage.getLineCombinationAssignment(assignmentId);
       if (!assignment) {
         return res.status(404).json({ message: "Line assignment not found" });
       }

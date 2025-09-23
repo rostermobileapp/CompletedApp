@@ -400,7 +400,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
             )}
             
             {forwardLines.map((line: LineCombination) => (
-              <Card key={line.id} className="p-4">
+              <Card key={line.id} className="p-4 pt-[2px] pb-[2px]">
                 <div className="flex items-center justify-between mb-3">
                   <h5 className="font-medium" data-testid={`text-line-name-${line.id}`}>{line.name}</h5>
                   {isTeamCaptain && (
@@ -456,7 +456,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
             )}
             
             {defenseLines.map((line: LineCombination) => (
-              <Card key={line.id} className="p-4">
+              <Card key={line.id} className="p-4 pt-[2px] pb-[2px]">
                 <div className="flex items-center justify-between mb-3">
                   <h5 className="font-medium" data-testid={`text-line-name-${line.id}`}>{line.name}</h5>
                   {isTeamCaptain && (

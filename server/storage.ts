@@ -206,6 +206,7 @@ export interface IStorage {
   deleteLineCombinationAssignment(id: string): Promise<void>;
   deleteLineCombinationAssignmentsByLine(lineCombinationId: string): Promise<void>;
   getLineCombinationAssignments(lineCombinationId: string): Promise<LineAssignmentWithPlayer[]>;
+  getLineCombinationAssignment(id: string): Promise<LineAssignmentWithPlayer | undefined>;
   
   // Message operations
   sendMessage(message: InsertMessage): Promise<Message>;
@@ -4494,6 +4495,24 @@ export class DatabaseStorage implements IStorage {
       ...row.assignment,
       player: row.user,
     }));
+  }
+
+  async getLineCombinationAssignment(id: string): Promise<LineAssignmentWithPlayer | undefined> {
+    const [result] = await db
+      .select({
+        assignment: lineCombinationAssignments,
+        user: users,
+      })
+      .from(lineCombinationAssignments)
+      .innerJoin(users, eq(lineCombinationAssignments.playerId, users.id))
+      .where(eq(lineCombinationAssignments.id, id));
+
+    if (!result) return undefined;
+    
+    return {
+      ...result.assignment,
+      player: result.user,
+    };
   }
 }
 
