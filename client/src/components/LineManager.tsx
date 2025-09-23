@@ -60,7 +60,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
 
   // Create line combination mutation
   const createLineCombinationMutation = useMutation({
-    mutationFn: async (data: { name: string; lineType: 'forward' | 'defense'; gameId?: string }) => {
+    mutationFn: async (data: { name: string; lineType: 'forward' | 'defense'; lineNumber: number; gameId?: string }) => {
       const payload = selectedGame === 'default' ? { ...data, gameId: undefined } : { ...data, gameId: selectedGame };
       return apiRequest('POST', `/api/teams/${teamId}/line-combinations`, payload);
     },
@@ -143,16 +143,20 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
     const forwardLines = lineCombinations.filter((line: LineCombination) => line.lineType === 'forward');
     const defenseLines = lineCombinations.filter((line: LineCombination) => line.lineType === 'defense');
     
-    let lineName;
+    let lineName: string;
+    let lineNumber: number;
     if (lineType === 'forward') {
-      lineName = `Forward Line ${forwardLines.length + 1}`;
+      lineNumber = forwardLines.length + 1;
+      lineName = `Forward Line ${lineNumber}`;
     } else {
-      lineName = `Defense Line ${defenseLines.length + 1}`;
+      lineNumber = defenseLines.length + 1;
+      lineName = `Defense Line ${lineNumber}`;
     }
 
     createLineCombinationMutation.mutate({
       name: lineName,
       lineType,
+      lineNumber,
       gameId: selectedGame === 'default' ? undefined : selectedGame,
     });
   };
