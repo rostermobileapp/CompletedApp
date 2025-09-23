@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
 import type { User } from '@shared/schema';
 
 export type UserRole = 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier';
@@ -10,6 +11,7 @@ interface PermissionContextType {
   role: UserRole;
   specialPermissions: SpecialPermission[];
   isPrimaryCommissioner: boolean;
+  // Global permission checks (backward compatibility)
   hasRole: (requiredRole: UserRole) => boolean;
   hasAnyRole: (roles: UserRole[]) => boolean;
   hasSpecialPermission: (permission: SpecialPermission) => boolean;
@@ -17,6 +19,13 @@ interface PermissionContextType {
   canManageLeague: (leagueId?: string) => boolean;
   canEditStats: () => boolean;
   canAccessPremiumFeatures: () => boolean;
+  // League-specific permission checks
+  hasLeagueRole: (leagueId: string, requiredRole: UserRole) => boolean;
+  hasAnyLeagueRole: (leagueId: string, roles: UserRole[]) => boolean;
+  hasLeagueSpecialPermission: (leagueId: string, permission: SpecialPermission) => boolean;
+  canManageLeagueSpecific: (leagueId: string) => boolean;
+  canEditLeagueStats: (leagueId: string) => boolean;
+  getUserLeagueMembership: (leagueId: string) => any | null;
   isLoading: boolean;
 }
 
@@ -32,6 +41,12 @@ const roleHierarchy: Record<UserRole, number> = {
 
 export function PermissionProvider({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
+  
+  // Fetch user's league memberships with permissions
+  const { data: leagueMemberships = [], isLoading: isMembershipsLoading } = useQuery<any[]>({
+    queryKey: ['/api/user/league-memberships'],
+    enabled: !!user,
+  });
   
   const role: UserRole = user?.role || 'free_tier';
   const specialPermissions: SpecialPermission[] = user?.specialPermissions || [];
@@ -78,6 +93,64 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     return hasRole('player_pro');
   };
 
+  // League-specific permission functions
+  const getUserLeagueMembership = (leagueId: string) => {
+    return leagueMemberships.find((membership: any) => membership.leagueId === leagueId) || null;
+  };
+
+  const hasLeagueRole = (leagueId: string, requiredRole: UserRole): boolean => {
+    if (!user) return false;
+    
+    // Primary commissioner has all permissions globally
+    if (isPrimaryCommissioner) return true;
+    
+    const membership = getUserLeagueMembership(leagueId);
+    if (!membership) return false;
+    
+    const leagueRole: UserRole = membership.leagueRole || 'free_tier';
+    return roleHierarchy[leagueRole] >= roleHierarchy[requiredRole];
+  };
+
+  const hasAnyLeagueRole = (leagueId: string, roles: UserRole[]): boolean => {
+    if (!user) return false;
+    return roles.some(r => hasLeagueRole(leagueId, r));
+  };
+
+  const hasLeagueSpecialPermission = (leagueId: string, permission: SpecialPermission): boolean => {
+    if (!user) return false;
+    
+    // Primary commissioner has all permissions globally
+    if (isPrimaryCommissioner) return true;
+    
+    const membership = getUserLeagueMembership(leagueId);
+    if (!membership) return false;
+    
+    const leagueSpecialPermissions = membership.leagueSpecialPermissions || [];
+    return leagueSpecialPermissions.includes(permission);
+  };
+
+  const canManageLeagueSpecific = (leagueId: string): boolean => {
+    // Primary commissioner can manage any league
+    if (isPrimaryCommissioner) return true;
+    // Global admin can manage any league
+    if (hasSpecialPermission('admin')) return true;
+    // Check league-specific admin permission
+    if (hasLeagueSpecialPermission(leagueId, 'admin')) return true;
+    // Check league-specific commissioner role
+    return hasLeagueRole(leagueId, 'secondary_commissioner');
+  };
+
+  const canEditLeagueStats = (leagueId: string): boolean => {
+    // Primary commissioner can edit stats anywhere
+    if (isPrimaryCommissioner) return true;
+    // Global stat manager can edit stats anywhere
+    if (hasSpecialPermission('stat_manager')) return true;
+    // Check league-specific stat manager permission
+    if (hasLeagueSpecialPermission(leagueId, 'stat_manager')) return true;
+    // Check league-specific commissioner role
+    return hasLeagueRole(leagueId, 'commissioner');
+  };
+
   return (
     <PermissionContext.Provider value={{
       user: user || null,
@@ -91,7 +164,13 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
       canManageLeague,
       canEditStats,
       canAccessPremiumFeatures,
-      isLoading
+      hasLeagueRole,
+      hasAnyLeagueRole,
+      hasLeagueSpecialPermission,
+      canManageLeagueSpecific,
+      canEditLeagueStats,
+      getUserLeagueMembership,
+      isLoading: isLoading || isMembershipsLoading
     }}>
       {children}
     </PermissionContext.Provider>

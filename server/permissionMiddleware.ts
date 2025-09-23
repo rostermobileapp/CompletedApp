@@ -251,3 +251,135 @@ export function canEditStats(user: UserWithPermissions): boolean {
 export function canAccessPremiumFeatures(user: UserWithPermissions): boolean {
   return hasRole(user, 'player_pro');
 }
+
+/**
+ * League-specific permission checking functions
+ */
+
+export async function hasLeagueRole(user: UserWithPermissions, leagueId: string, requiredRole: UserRole): Promise<boolean> {
+  // Primary commissioner has all permissions globally
+  if (user.isPrimaryCommissioner) return true;
+  
+  try {
+    const membership = await storage.getUserLeagueMembership(user.id, leagueId);
+    if (!membership) return false;
+    
+    const leagueRole = membership.leagueRole || 'free_tier';
+    return roleHierarchy[leagueRole] >= roleHierarchy[requiredRole];
+  } catch (error) {
+    console.error('Error checking league role:', error);
+    return false;
+  }
+}
+
+export async function hasLeagueSpecialPermission(user: UserWithPermissions, leagueId: string, permission: SpecialPermission): Promise<boolean> {
+  // Primary commissioner has all permissions globally  
+  if (user.isPrimaryCommissioner) return true;
+  
+  try {
+    const membership = await storage.getUserLeagueMembership(user.id, leagueId);
+    if (!membership) return false;
+    
+    const leagueSpecialPermissions = membership.leagueSpecialPermissions || [];
+    return leagueSpecialPermissions.includes(permission);
+  } catch (error) {
+    console.error('Error checking league special permission:', error);
+    return false;
+  }
+}
+
+export async function canManageLeagueSpecific(user: UserWithPermissions, leagueId: string): Promise<boolean> {
+  // Primary commissioner can manage any league
+  if (user.isPrimaryCommissioner) return true;
+  // Global admin can manage any league
+  if (hasSpecialPermission(user, 'admin')) return true;
+  // Check league-specific admin permission
+  if (await hasLeagueSpecialPermission(user, leagueId, 'admin')) return true;
+  // Check league-specific commissioner role
+  return await hasLeagueRole(user, leagueId, 'secondary_commissioner');
+}
+
+export async function canEditLeagueStats(user: UserWithPermissions, leagueId: string): Promise<boolean> {
+  // Primary commissioner can edit stats anywhere
+  if (user.isPrimaryCommissioner) return true;
+  // Global stat manager can edit stats anywhere
+  if (hasSpecialPermission(user, 'stat_manager')) return true;
+  // Check league-specific stat manager permission
+  if (await hasLeagueSpecialPermission(user, leagueId, 'stat_manager')) return true;
+  // Check league-specific commissioner role
+  return await hasLeagueRole(user, leagueId, 'commissioner');
+}
+
+/**
+ * League-specific middleware functions
+ */
+
+export function requireLeagueRole(requiredRole: UserRole): RequestHandler {
+  return async (req, res, next) => {
+    const user = req.userWithPermissions;
+    if (!user) {
+      return res.status(401).json({ message: "User permissions not loaded" });
+    }
+
+    const leagueId = req.params.leagueId || req.params.id;
+    if (!leagueId) {
+      return res.status(400).json({ message: "League ID required for this operation" });
+    }
+
+    if (await hasLeagueRole(user, leagueId, requiredRole)) {
+      return next();
+    }
+
+    res.status(403).json({ 
+      message: `Access denied. Required league role: ${requiredRole} or higher` 
+    });
+  };
+}
+
+export function requireLeagueSpecialPermission(permission: SpecialPermission): RequestHandler {
+  return async (req, res, next) => {
+    const user = req.userWithPermissions;
+    if (!user) {
+      return res.status(401).json({ message: "User permissions not loaded" });
+    }
+
+    const leagueId = req.params.leagueId || req.params.id;
+    if (!leagueId) {
+      return res.status(400).json({ message: "League ID required for this operation" });
+    }
+
+    // Check global permission first
+    if (hasSpecialPermission(user, permission)) {
+      return next();
+    }
+
+    // Check league-specific permission
+    if (await hasLeagueSpecialPermission(user, leagueId, permission)) {
+      return next();
+    }
+
+    res.status(403).json({ 
+      message: `Access denied. Required league permission: ${permission}` 
+    });
+  };
+}
+
+export const requireLeagueManagementSpecific: RequestHandler = async (req, res, next) => {
+  const user = req.userWithPermissions;
+  if (!user) {
+    return res.status(401).json({ message: "User permissions not loaded" });
+  }
+
+  const leagueId = req.params.leagueId || req.params.id;
+  if (!leagueId) {
+    return res.status(400).json({ message: "League ID required for this operation" });
+  }
+
+  if (await canManageLeagueSpecific(user, leagueId)) {
+    return next();
+  }
+
+  res.status(403).json({ 
+    message: "Access denied. League management requires league-specific commissioner or admin permissions" 
+  });
+};
