@@ -441,7 +441,6 @@ export default function Teams() {
                             <Flag className="w-5 h-5 text-red-500" />
                             <div className="flex items-center gap-2">
                               <span className="text-lg font-bold">{teamLeaders.mostPenaltyMinutes?.penaltyMinutes || 0}</span>
-                              <span className="text-sm text-muted-foreground">PIM</span>
                             </div>
                           </div>
                           <span className="text-sm font-medium truncate" data-testid="text-penalty-leader-name">{teamLeaders.mostPenaltyMinutes?.user?.lastName || 'N/A'}</span>
