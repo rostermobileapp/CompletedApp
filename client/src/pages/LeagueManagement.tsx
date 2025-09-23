@@ -205,7 +205,7 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
     };
 
     return (
-      <div className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-700 rounded-lg p-4">
+      <div className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-700 rounded-lg p-4 pt-[2px] pb-[2px]">
         <div className="flex items-start justify-between mb-3">
           <div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
@@ -220,7 +220,6 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
             </div>
           </div>
         </div>
-
         {/* Show existing submissions if any */}
         {game.submissions && game.submissions.length > 0 && (
           <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -233,7 +232,6 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
             ))}
           </div>
         )}
-
         {/* Score submission form */}
         <div className="grid grid-cols-3 gap-3 items-center">
           <div className="text-center">
@@ -270,7 +268,6 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
             />
           </div>
         </div>
-        
         <Button
           onClick={handleSubmitScore}
           disabled={submitScoreMutation.isPending || !homeScore || !awayScore}
@@ -1542,7 +1539,6 @@ export default function LeagueManagement() {
           </button>
         </div>
       </div>
-
       {/* Tab Content */}
       <div className="px-6 flex-1">
         {/* Player Management Tab */}
@@ -1820,7 +1816,7 @@ export default function LeagueManagement() {
               {/* Teams List or Team Detail */}
               {!selectedTeam ? (
                 // Teams List View
-                (() => {
+                ((() => {
                   const freeAgents = commissionerDisplayMembers.filter((m: LeagueMember) => !m.assignedTeamId);
                   const allTeamsToShow = [
                     // Free Agents virtual team
@@ -1904,10 +1900,10 @@ export default function LeagueManagement() {
                       })}
                     </div>
                   );
-                })()
+                })())
               ) : (
                 // Team Detail View - Show Players in Selected Team
-                (() => {
+                ((() => {
                   const teamMembers = selectedTeam.isFreeAgents 
                     ? commissionerDisplayMembers.filter((m: LeagueMember) => !m.assignedTeamId)
                     : commissionerDisplayMembers.filter((m: LeagueMember) => m.assignedTeamId === selectedTeam.id);
@@ -2016,7 +2012,7 @@ export default function LeagueManagement() {
                       ))}
                     </div>
                   );
-                })()
+                })())
               )}
             </div>
           </div>
@@ -2301,7 +2297,6 @@ export default function LeagueManagement() {
           </div>
         )}
       </div>
-
       {/* Player Detail Modal */}
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -2561,7 +2556,6 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-
       {/* Edit League Modal */}
       {showEditLeague && league && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -2725,7 +2719,6 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-
       {/* Create Season Modal */}
       {showCreateSeason && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -2824,7 +2817,6 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-
       {/* Edit Game Modal */}
       {showEditGame && selectedGame && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -3497,7 +3489,6 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-
       {/* Delete Game Confirmation Modal */}
       {showDeleteConfirmation && selectedGame && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -3558,7 +3549,6 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-
       {/* Delete Team Confirmation Modal */}
       {showDeleteTeamConfirmation && teamToDelete && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -3631,7 +3621,6 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-
       {/* Merge Approval Modal */}
       {showMergeModal && selectedMember && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -3733,7 +3722,6 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-
       {/* Edit Team Modal */}
       {showEditTeam && selectedTeamForEdit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -3806,7 +3794,6 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-
       {/* User Merge Modal */}
       {showUserMergeModal && selectedPlayerToMerge && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
