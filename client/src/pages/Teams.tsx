@@ -419,7 +419,6 @@ export default function Teams() {
                             <Target className="w-5 h-5 text-success" />
                             <div className="flex items-center gap-2">
                               <span className="text-lg font-bold">{teamLeaders.topGoalScorer?.goals || 0}</span>
-                              <span className="text-sm text-muted-foreground">Goals</span>
                             </div>
                           </div>
                           <span className="text-sm font-medium truncate" data-testid="text-goals-leader-name">{teamLeaders.topGoalScorer?.user?.lastName || 'N/A'}</span>
