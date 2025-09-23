@@ -114,12 +114,19 @@ export interface IStorage {
   updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber'>>): Promise<User>;
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
   
-  // Permission management operations
+  // Permission management operations (global - deprecated, use league-specific instead)
   getAllUsers(): Promise<User[]>;
   getUsersByRole(role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User[]>;
   updateUserPermissions(userId: string, updates: { role?: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'; specialPermissions?: ('admin' | 'stat_manager')[]; isPrimaryCommissioner?: boolean; }): Promise<User>;
   addSpecialPermission(userId: string, permission: 'admin' | 'stat_manager'): Promise<User>;
   removeSpecialPermission(userId: string, permission: 'admin' | 'stat_manager'): Promise<User>;
+  
+  // League-specific permission management operations
+  getLeagueUsersWithPermissions(leagueId: string): Promise<(LeagueMembership & { user: User })[]>;
+  updateLeagueUserPermissions(userId: string, leagueId: string, updates: { leagueRole?: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'; leagueSpecialPermissions?: ('admin' | 'stat_manager')[]; }): Promise<LeagueMembership>;
+  addLeagueSpecialPermission(userId: string, leagueId: string, permission: 'admin' | 'stat_manager'): Promise<LeagueMembership>;
+  removeLeagueSpecialPermission(userId: string, leagueId: string, permission: 'admin' | 'stat_manager'): Promise<LeagueMembership>;
+  getUserLeaguePermissions(userId: string, leagueId: string): Promise<{ leagueRole: string; leagueSpecialPermissions: string[] } | null>;
   
   // League operations
   createLeague(league: InsertLeague): Promise<League>;
@@ -428,6 +435,144 @@ export class DatabaseStorage implements IStorage {
       }
       return user;
     });
+  }
+
+  // League-specific permission management operations
+  async getLeagueUsersWithPermissions(leagueId: string): Promise<(LeagueMembership & { user: User })[]> {
+    const result = await db
+      .select()
+      .from(leagueMemberships)
+      .innerJoin(users, eq(leagueMemberships.userId, users.id))
+      .where(
+        and(
+          eq(leagueMemberships.leagueId, leagueId),
+          eq(leagueMemberships.status, "approved")
+        )
+      )
+      .orderBy(users.lastName, users.firstName);
+    
+    return result.map(r => ({
+      ...r.league_memberships,
+      user: r.users
+    }));
+  }
+
+  async updateLeagueUserPermissions(
+    userId: string, 
+    leagueId: string, 
+    updates: { 
+      leagueRole?: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'; 
+      leagueSpecialPermissions?: ('admin' | 'stat_manager')[]; 
+    }
+  ): Promise<LeagueMembership> {
+    const [membership] = await db
+      .update(leagueMemberships)
+      .set(updates)
+      .where(
+        and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.leagueId, leagueId)
+        )
+      )
+      .returning();
+    
+    if (!membership) {
+      throw new Error(`League membership not found for user ${userId} in league ${leagueId}`);
+    }
+    return membership;
+  }
+
+  async addLeagueSpecialPermission(userId: string, leagueId: string, permission: 'admin' | 'stat_manager'): Promise<LeagueMembership> {
+    return await db.transaction(async (tx) => {
+      const [membership] = await tx
+        .select()
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.leagueId, leagueId)
+          )
+        );
+      
+      if (!membership) throw new Error('League membership not found');
+      
+      const currentPermissions = membership.leagueSpecialPermissions || [];
+      if (!currentPermissions.includes(permission)) {
+        const updatedPermissions = [...currentPermissions, permission];
+        const [updatedMembership] = await tx
+          .update(leagueMemberships)
+          .set({
+            leagueSpecialPermissions: updatedPermissions,
+          })
+          .where(
+            and(
+              eq(leagueMemberships.userId, userId),
+              eq(leagueMemberships.leagueId, leagueId)
+            )
+          )
+          .returning();
+        return updatedMembership;
+      }
+      return membership;
+    });
+  }
+
+  async removeLeagueSpecialPermission(userId: string, leagueId: string, permission: 'admin' | 'stat_manager'): Promise<LeagueMembership> {
+    return await db.transaction(async (tx) => {
+      const [membership] = await tx
+        .select()
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.leagueId, leagueId)
+          )
+        );
+      
+      if (!membership) throw new Error('League membership not found');
+      
+      const currentPermissions = membership.leagueSpecialPermissions || [];
+      const updatedPermissions = currentPermissions.filter(p => p !== permission);
+      if (updatedPermissions.length !== currentPermissions.length) {
+        const [updatedMembership] = await tx
+          .update(leagueMemberships)
+          .set({
+            leagueSpecialPermissions: updatedPermissions,
+          })
+          .where(
+            and(
+              eq(leagueMemberships.userId, userId),
+              eq(leagueMemberships.leagueId, leagueId)
+            )
+          )
+          .returning();
+        return updatedMembership;
+      }
+      return membership;
+    });
+  }
+
+  async getUserLeaguePermissions(userId: string, leagueId: string): Promise<{ leagueRole: string; leagueSpecialPermissions: string[] } | null> {
+    const [membership] = await db
+      .select({
+        leagueRole: leagueMemberships.leagueRole,
+        leagueSpecialPermissions: leagueMemberships.leagueSpecialPermissions
+      })
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.leagueId, leagueId),
+          eq(leagueMemberships.status, "approved")
+        )
+      );
+    
+    if (!membership) return null;
+    
+    return {
+      leagueRole: membership.leagueRole || 'free_tier',
+      leagueSpecialPermissions: membership.leagueSpecialPermissions || []
+    };
   }
 
   // League operations
