@@ -116,6 +116,8 @@ export default function Messages() {
   
   // Group members modal state
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [selectedUserToAdd, setSelectedUserToAdd] = useState<string | null>(null);
 
   // Fetch user's leagues for contact discovery
   const { data: userLeagues = [], isLoading: userLeaguesLoading } = useQuery<League[]>({
@@ -128,6 +130,7 @@ export default function Messages() {
     queryKey: ['/api/leagues', selectedLeague, 'contacts'],
     enabled: !!selectedLeague // 🚨 FREE ACCESS - NO GATES! 🚨
   });
+
 
   // Fetch user teams for team group chat option
   const { data: userTeams = [] } = useQuery<any[]>({
@@ -300,6 +303,34 @@ export default function Messages() {
         title: "Error",
         description: "Failed to leave conversation. Please try again.",
         variant: "destructive",
+      });
+    }
+  });
+
+  // Add user to conversation mutation
+  const addUserToConversationMutation = useMutation({
+    mutationFn: async ({ conversationId, userId }: { conversationId: string; userId: string }) => {
+      const response = await apiRequest('POST', `/api/conversations/${conversationId}/participants`, { userId });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+      if (selectedConversation) {
+        queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
+      }
+      toast({
+        title: "User added",
+        description: "User has been added to the conversation."
+      });
+      setShowAddUserModal(false);
+      setSelectedUserToAdd(null);
+    },
+    onError: (error) => {
+      console.error('Error adding user to conversation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add user to conversation. Please try again.",
+        variant: "destructive"
       });
     }
   });
@@ -710,6 +741,31 @@ export default function Messages() {
 
   // Get the current conversation to display proper chat title
   const currentConversation = conversations.find(c => c.id === selectedConversation);
+
+  // Fetch available contacts that can be added to the current conversation
+  const { data: availableContacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/leagues', currentConversation?.leagueId, 'contacts'],
+    enabled: !!currentConversation?.leagueId && showAddUserModal // 🚨 FREE ACCESS - NO GATES! 🚨
+  });
+
+  // Get users that can be added to the conversation (not already participants)
+  const getAvailableUsersToAdd = () => {
+    if (!currentConversation?.participants || !availableContacts) return [];
+    
+    const participantUserIds = new Set(currentConversation.participants.map(p => p.userId));
+    return availableContacts.filter(contact => !participantUserIds.has(contact.id));
+  };
+
+  // Handle adding user to conversation
+  const handleAddUserToConversation = () => {
+    if (!selectedConversation || !selectedUserToAdd) return;
+    
+    addUserToConversationMutation.mutate({
+      conversationId: selectedConversation,
+      userId: selectedUserToAdd
+    });
+  };
+
   const getChatTitle = () => {
     if (!currentConversation) return 'Chat';
     
@@ -1472,13 +1528,27 @@ export default function Messages() {
       <Dialog open={showMembersModal} onOpenChange={setShowMembersModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Group Members
-              {currentConversation?.participants && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  ({currentConversation.participants.length})
-                </span>
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Group Members
+                {currentConversation?.participants && (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    ({currentConversation.participants.length})
+                  </span>
+                )}
+              </div>
+              {currentConversation?.type !== 'direct' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddUserModal(true)}
+                  className="ml-auto"
+                  data-testid="button-add-user"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Add User
+                </Button>
               )}
             </DialogTitle>
           </DialogHeader>
@@ -1513,6 +1583,90 @@ export default function Messages() {
               <div className="text-center py-8 text-muted-foreground">
                 <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>No members found</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add User Modal */}
+      <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5" />
+              Add User to Group
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {getAvailableUsersToAdd().length > 0 ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Select a user to add to this group conversation:
+                </p>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {getAvailableUsersToAdd().map((contact) => (
+                    <div
+                      key={contact.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                        selectedUserToAdd === contact.id
+                          ? 'bg-primary/10 border-2 border-primary'
+                          : 'hover:bg-accent/50 border-2 border-transparent'
+                      }`}
+                      onClick={() => setSelectedUserToAdd(contact.id)}
+                      data-testid={`add-user-option-${contact.id}`}
+                    >
+                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-medium text-primary">
+                          {contact.firstName?.charAt(0)?.toUpperCase() || contact.displayFirstName?.charAt(0)?.toUpperCase() || '?'}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate" data-testid={`add-user-name-${contact.id}`}>
+                          {contact.displayFirstName || contact.firstName} {contact.displayLastName || contact.lastName}
+                        </p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {contact.email}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 justify-end pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowAddUserModal(false);
+                      setSelectedUserToAdd(null);
+                    }}
+                    data-testid="button-cancel-add-user"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleAddUserToConversation}
+                    disabled={!selectedUserToAdd || addUserToConversationMutation.isPending}
+                    data-testid="button-confirm-add-user"
+                  >
+                    {addUserToConversationMutation.isPending ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Add User
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No users available to add</p>
+                <p className="text-sm mt-1">All league members are already in this conversation.</p>
               </div>
             )}
           </div>
