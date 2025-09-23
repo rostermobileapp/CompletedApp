@@ -114,6 +114,13 @@ export interface IStorage {
   updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber'>>): Promise<User>;
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
   
+  // Permission management operations
+  getAllUsers(): Promise<User[]>;
+  getUsersByRole(role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User[]>;
+  updateUserPermissions(userId: string, updates: { role?: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'; specialPermissions?: ('admin' | 'stat_manager')[]; isPrimaryCommissioner?: boolean; }): Promise<User>;
+  addSpecialPermission(userId: string, permission: 'admin' | 'stat_manager'): Promise<User>;
+  removeSpecialPermission(userId: string, permission: 'admin' | 'stat_manager'): Promise<User>;
+  
   // League operations
   createLeague(league: InsertLeague): Promise<League>;
   getLeagues(sport?: string, search?: string): Promise<League[]>;
@@ -342,6 +349,85 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  // Permission management operations
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(users.lastName, users.firstName);
+  }
+
+  async getUsersByRole(role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, role)).orderBy(users.lastName, users.firstName);
+  }
+
+  async updateUserPermissions(
+    userId: string, 
+    updates: { 
+      role?: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'; 
+      specialPermissions?: ('admin' | 'stat_manager')[]; 
+      isPrimaryCommissioner?: boolean; 
+    }
+  ): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ...updates,
+        lastUpdated: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    if (!user) {
+      throw new Error(`User with id ${userId} not found`);
+    }
+    return user;
+  }
+
+  async addSpecialPermission(userId: string, permission: 'admin' | 'stat_manager'): Promise<User> {
+    return await db.transaction(async (tx) => {
+      const [user] = await tx.select().from(users).where(eq(users.id, userId));
+      if (!user) throw new Error('User not found');
+      
+      const currentPermissions = user.specialPermissions || [];
+      if (!currentPermissions.includes(permission)) {
+        const updatedPermissions = [...currentPermissions, permission];
+        const [updatedUser] = await tx
+          .update(users)
+          .set({
+            specialPermissions: updatedPermissions,
+            lastUpdated: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId))
+          .returning();
+        return updatedUser;
+      }
+      return user;
+    });
+  }
+
+  async removeSpecialPermission(userId: string, permission: 'admin' | 'stat_manager'): Promise<User> {
+    return await db.transaction(async (tx) => {
+      const [user] = await tx.select().from(users).where(eq(users.id, userId));
+      if (!user) throw new Error('User not found');
+      
+      const currentPermissions = user.specialPermissions || [];
+      const updatedPermissions = currentPermissions.filter(p => p !== permission);
+      if (updatedPermissions.length !== currentPermissions.length) {
+        const [updatedUser] = await tx
+          .update(users)
+          .set({
+            specialPermissions: updatedPermissions,
+            lastUpdated: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId))
+          .returning();
+        return updatedUser;
+      }
+      return user;
+    });
   }
 
   // League operations
@@ -3474,10 +3560,15 @@ export class DatabaseStorage implements IStorage {
         userAge: users.age,
         userPhoneNumber: users.phoneNumber,
         userCity: users.city,
-
         userPrimarySport: users.primarySport,
         userCreatedAt: users.createdAt,
         userUpdatedAt: users.updatedAt,
+        // New permission fields
+        userRole: users.role,
+        userSpecialPermissions: users.specialPermissions,
+        userIsPrimaryCommissioner: users.isPrimaryCommissioner,
+        userCreatedBy: users.createdBy,
+        userLastUpdated: users.lastUpdated,
         
         // Membership info
         membershipIsGoalie: leagueMemberships.isGoalie,
@@ -3536,6 +3627,12 @@ export class DatabaseStorage implements IStorage {
         primarySport: r.userPrimarySport,
         createdAt: r.userCreatedAt,
         updatedAt: r.userUpdatedAt,
+        // New permission fields
+        role: r.userRole,
+        specialPermissions: r.userSpecialPermissions,
+        isPrimaryCommissioner: r.userIsPrimaryCommissioner,
+        createdBy: r.userCreatedBy,
+        lastUpdated: r.userLastUpdated,
       }
     }));
   }
@@ -3709,10 +3806,15 @@ export class DatabaseStorage implements IStorage {
         userAge: users.age,
         userPhoneNumber: users.phoneNumber,
         userCity: users.city,
-
         userPrimarySport: users.primarySport,
         userCreatedAt: users.createdAt,
         userUpdatedAt: users.updatedAt,
+        // New permission fields
+        userRole: users.role,
+        userSpecialPermissions: users.specialPermissions,
+        userIsPrimaryCommissioner: users.isPrimaryCommissioner,
+        userCreatedBy: users.createdBy,
+        userLastUpdated: users.lastUpdated,
       })
       .from(gameGoalies)
       .innerJoin(games, eq(gameGoalies.gameId, games.id))
@@ -3765,6 +3867,12 @@ export class DatabaseStorage implements IStorage {
             primarySport: gameStat.userPrimarySport,
             createdAt: gameStat.userCreatedAt,
             updatedAt: gameStat.userUpdatedAt,
+            // New permission fields
+            role: gameStat.userRole,
+            specialPermissions: gameStat.userSpecialPermissions,
+            isPrimaryCommissioner: gameStat.userIsPrimaryCommissioner,
+            createdBy: gameStat.userCreatedBy,
+            lastUpdated: gameStat.userLastUpdated,
           }
         });
       }
