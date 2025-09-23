@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
-// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
+import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Trophy, Target, Clock, Medal, TrendingUp, Filter, Settings, Apple, Hand, Flag } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -27,8 +26,7 @@ import { PlayerStatsUnion, GoalieStats, SkaterStats } from '@shared/schema';
 
 export default function Stats() {
   const { user } = useAuth();
-  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
-  const hasAccess = () => true; // All features unlocked!
+  const { canAccessPremiumFeatures, canEditStats } = usePermissions();
   const [location, navigate] = useLocation();
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [sortField, setSortField] = useState<string>('points');
@@ -267,8 +265,8 @@ export default function Stats() {
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Player Stats</h1>
           </div>
           
-          {/* Commissioner Update Button */}
-          {hasAccess('commissioner') && (
+          {/* Stats Update Button */}
+          {canEditStats() && (
             <Button 
               onClick={() => {
                 setPageTransitionDirection('up');

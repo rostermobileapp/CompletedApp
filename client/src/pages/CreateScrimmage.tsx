@@ -9,9 +9,7 @@ import { ArrowLeft, Calendar, Crown, MapPin, Users, Search } from 'lucide-react'
 import { useLocation } from 'wouter';
 import { createScrimmageRequestSchema } from '@shared/schema';
 import { z } from 'zod';
-// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
-// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
-// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
+import { usePermissions } from '@/context/SubscriptionContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,8 +38,7 @@ export default function CreateScrimmage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
-  const hasAccess = () => true; // All features unlocked!
+  const { canAccessPremiumFeatures } = usePermissions();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 

@@ -719,7 +719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const team = await storage.getTeam(teamId);
       const user = await storage.getUser(userId);
       const isTeamCaptain = team && team.captainId === userId;
-      const isCommissioner = user && user.subscriptionTier === 'commissioner';
+      const isCommissioner = user && (user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin'));
       
       // Also check if user is a league member captain for this team's league
       let isLeagueMemberCaptain = false;
@@ -1869,7 +1869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'User not found' });
       }
 
-      const isCommissioner = user.subscriptionTier === 'commissioner';
+      const isCommissioner = user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin');
       
       let options: any;
       
@@ -2104,7 +2104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Only commissioners can manually trigger expiration
       const user = await storage.getUser(userId);
-      if (!user || user.subscriptionTier !== 'commissioner') {
+      if (!user || !(user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin'))) {
         return res.status(403).json({ message: 'Commissioner access required' });
       }
 
@@ -4326,7 +4326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(leagueId);
       
       // Verify user is commissioner of this league
-      if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
+      if (!league || !user || (league.commissionerId !== userId && !(user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin')))) {
         return res.status(403).json({ message: "Access denied - commissioner access required" });
       }
       
@@ -4378,7 +4378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(leagueId);
       
       // Verify user is commissioner of this league
-      if (!league || !user || (league.commissionerId !== userId && user.subscriptionTier !== 'commissioner')) {
+      if (!league || !user || (league.commissionerId !== userId && !(user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin')))) {
         return res.status(403).json({ message: "Access denied - commissioner access required" });
       }
       

@@ -13,9 +13,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Scrimmage, ScrimmageRequest, User } from '@shared/schema';
-// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
-// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
-// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
+import { usePermissions } from '@/context/SubscriptionContext';
 
 // Extended types with relationships for UI
 type ScrimmageWithCreatorAndCount = Scrimmage & {
@@ -33,8 +31,7 @@ export default function ScrimmageManagement() {
   const queryClient = useQueryClient();
   const [selectedScrimmage, setSelectedScrimmage] = useState<string | null>(null);
   const [viewRosterScrimmage, setViewRosterScrimmage] = useState<string | null>(null);
-  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
-  const hasAccess = () => true; // All features unlocked!
+  const { canAccessPremiumFeatures } = usePermissions();
 
   const handleBack = () => {
     setPageTransitionDirection('down');

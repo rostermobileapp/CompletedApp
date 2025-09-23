@@ -9,9 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
-// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
-// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
+import { usePermissions } from '@/context/SubscriptionContext';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import {
@@ -574,8 +572,7 @@ export default function LeagueManagement() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
-  const hasAccess = () => true; // All features unlocked!
+  const { canManageLeague } = usePermissions();
   const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('games');
   const [gamesViewMode, setGamesViewMode] = useState<'calendar' | 'list'>('calendar');
   const [showCreateTeam, setShowCreateTeam] = useState(false);

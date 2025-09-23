@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/context/SubscriptionContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,7 +52,7 @@ export default function Teams() {
     queryKey: ['/api/games/attendance/captain-overview'],
     enabled: !!(user && (
       (userTeams as any[])?.some((team: any) => team.captainId === (user as any)?.id) ||
-      (user as any)?.subscriptionTier === 'commissioner'
+      hasRole('secondary_commissioner')
     )),
   });
 
@@ -153,7 +154,8 @@ export default function Teams() {
   }
 
   const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
-  const isCommissioner = (user as any)?.subscriptionTier === 'commissioner';
+  const { hasRole } = usePermissions();
+  const isCommissioner = hasRole('secondary_commissioner');
   const canUploadLogo = isTeamCaptain || isCommissioner;
 
   // Fetch team stats for leaders
@@ -336,7 +338,7 @@ export default function Teams() {
                         </p>
                       </div>
                       {((team.captainId === (user as any)?.id) || 
-                        (user as any)?.subscriptionTier === 'commissioner') && (
+                        hasRole('secondary_commissioner')) && (
                         <ObjectUploader
                           maxNumberOfFiles={1}
                           maxFileSize={10485760}

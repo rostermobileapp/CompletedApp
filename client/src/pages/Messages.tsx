@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/context/SubscriptionContext';
 import { League } from '@shared/schema';
 
 import { MediaGallery } from '@/components/MediaGallery';
@@ -82,10 +83,8 @@ interface Contact {
 }
 
 export default function Messages() {
-  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
-  const hasAccess = () => true; // All features unlocked!
-  const tier = 'commissioner'; // Everyone is commissioner now!
   const { user } = useAuth();
+  const { canAccessPremiumFeatures } = usePermissions();
   const currentUserId = (user as any)?.id;
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');

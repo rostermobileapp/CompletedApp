@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { usePermissions } from '@/context/SubscriptionContext';
 
 interface CommissionerApprovalInterfaceProps {
   className?: string;
@@ -26,8 +27,9 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
     queryKey: ["/api/auth/user"],
   });
 
-  // Check if user is a commissioner
-  const isCommissioner = (currentUser as any)?.subscriptionTier === 'commissioner';
+  // Check if user has commissioner permissions
+  const { hasRole } = usePermissions();
+  const isCommissioner = hasRole('secondary_commissioner');
 
   // Fetch substitute requests pending commissioner approval (only if user is commissioner)
   const { data: pendingRequests = [], isLoading, error } = useQuery({

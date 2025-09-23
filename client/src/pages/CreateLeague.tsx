@@ -9,9 +9,7 @@ import { ArrowLeft, Crown, MapPin, Calendar } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { insertLeagueSchema } from '@shared/schema';
 import type { z } from 'zod';
-// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
-// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
-// import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
+import { usePermissions } from '@/context/SubscriptionContext';
 
 // Create a form schema that includes the new fields, making most fields optional
 const createLeagueSchema = insertLeagueSchema.extend({
@@ -33,9 +31,7 @@ export default function CreateLeague() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
-  const hasAccess = () => true; // All features unlocked!
-  const tier = 'commissioner'; // Everyone is commissioner now!
+  const { canManageLeague } = usePermissions();
   
   const form = useForm<CreateLeagueForm>({
     resolver: zodResolver(createLeagueSchema),
