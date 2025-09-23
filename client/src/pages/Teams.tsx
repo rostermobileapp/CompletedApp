@@ -198,23 +198,11 @@ export default function Teams() {
     const stats = Array.isArray(teamStats) ? teamStats : [];
     if (stats.length === 0) return null;
 
-    const topGoalScorer = stats.reduce((top: any, current: any) => {
-      return (current.goals || 0) > (top.goals || 0) ? current : top;
-    });
-    
-    const topAssistProvider = stats.reduce((top: any, current: any) => {
-      return (current.assists || 0) > (top.assists || 0) ? current : top;
-    });
-    
-    const topScorer = stats.reduce((top: any, current: any) => {
-      const topPoints = top.points || 0;
-      const currentPoints = current.points || 0;
-      return currentPoints > topPoints ? current : top;
-    });
-    
-    const mostPenaltyMinutes = stats.reduce((top: any, current: any) => {
-      return (current.penaltyMinutes || 0) > (top.penaltyMinutes || 0) ? current : top;
-    });
+    // Sort stats by each category to find actual leaders (not just first player with tied stats)
+    const topGoalScorer = [...stats].sort((a, b) => (b.goals || 0) - (a.goals || 0))[0];
+    const topAssistProvider = [...stats].sort((a, b) => (b.assists || 0) - (a.assists || 0))[0];
+    const topScorer = [...stats].sort((a, b) => (b.points || 0) - (a.points || 0))[0];
+    const mostPenaltyMinutes = [...stats].sort((a, b) => (b.penaltyMinutes || 0) - (a.penaltyMinutes || 0))[0];
 
     return { topGoalScorer, topAssistProvider, topScorer, mostPenaltyMinutes };
   };
