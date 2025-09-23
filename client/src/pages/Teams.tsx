@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Trophy, Users, Star, Upload, Coffee, Target, Award, TrendingUp, Apple, Flag } from 'lucide-react';
 import { ObjectUploader } from '@/components/ObjectUploader';
+import { LineManager } from '@/components/LineManager';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { UploadResult } from '@uppy/core';
@@ -454,6 +455,12 @@ export default function Teams() {
                   </div>
                 </div>
 
+                {/* Line Combinations Manager */}
+                <LineManager 
+                  teamId={team.id}
+                  isTeamCaptain={isTeamCaptain}
+                  teamMembers={teamMembers}
+                />
                 
               </TabsContent>
             ))}
