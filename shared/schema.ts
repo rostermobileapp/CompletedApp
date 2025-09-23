@@ -86,6 +86,20 @@ export const gameResultTypeEnum = pgEnum("game_result_type", [
   "shootout"
 ]);
 
+// User role enum
+export const userRoleEnum = pgEnum("user_role", [
+  "commissioner",
+  "secondary_commissioner", 
+  "player_pro",
+  "free_tier"
+]);
+
+// Special permissions enum
+export const specialPermissionEnum = pgEnum("special_permission", [
+  "admin",
+  "stat_manager"
+]);
+
 // Users table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -97,6 +111,12 @@ export const users = pgTable("users", {
   phoneNumber: varchar("phone_number"),
   city: varchar("city"),
   primarySport: sportEnum("primary_sport"),
+  // Permission system fields
+  role: userRoleEnum("role").default("free_tier").notNull(),
+  specialPermissions: specialPermissionEnum("special_permissions").array(),
+  isPrimaryCommissioner: boolean("is_primary_commissioner").default(false).notNull(),
+  createdBy: varchar("created_by"), // Will add reference after table definition
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1183,6 +1203,14 @@ export const insertUserSchema = createInsertSchema(users).pick({
   firstName: true,
   lastName: true,
   primarySport: true,
+});
+
+// Admin-only schema for updating user permissions (to be used by commissioners only)
+export const updateUserPermissionsSchema = createInsertSchema(users).pick({
+  role: true,
+  specialPermissions: true,
+  isPrimaryCommissioner: true,
+  createdBy: true,
 });
 
 export const insertLeagueSchema = createInsertSchema(leagues).omit({
