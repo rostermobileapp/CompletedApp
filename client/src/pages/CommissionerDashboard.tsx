@@ -261,7 +261,7 @@ function LeagueUserManagement({
               
               <div className="space-y-3">
                 {leagueUsers.map((membership) => (
-                  <div key={membership.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                  <div key={membership.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
                       {getRoleIcon(membership)}
                       <div>
