@@ -5158,11 +5158,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied - insufficient permissions' });
       }
       
-      const leagueUsers = await storage.getLeagueUsers(leagueId);
+      const leagueUsers = await storage.getLeagueUsersWithPermissions(leagueId);
       res.json(leagueUsers);
     } catch (error) {
       console.error('Error fetching league users:', error);
       res.status(500).json({ message: 'Failed to fetch league users' });
+    }
+  });
+
+  // Update league-specific user permissions
+  app.patch('/api/leagues/:leagueId/users/:userId/permissions', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const targetUserId = req.params.userId;
+      const updatingUserId = req.user.claims.sub;
+      const { leagueRole, leagueSpecialPermissions } = req.body;
+      
+      // Check if user can manage this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+      
+      const userPermissions = (req as any).userWithPermissions;
+      const canManageLeague = league.commissionerId === updatingUserId || 
+                             userPermissions.specialPermissions?.includes('admin') ||
+                             userPermissions.isPrimaryCommissioner;
+                             
+      if (!canManageLeague) {
+        return res.status(403).json({ message: 'Access denied - insufficient permissions' });
+      }
+      
+      const updates: any = {};
+      if (leagueRole !== undefined) updates.leagueRole = leagueRole;
+      if (leagueSpecialPermissions !== undefined) updates.leagueSpecialPermissions = leagueSpecialPermissions;
+      
+      const updatedMembership = await storage.updateLeagueUserPermissions(targetUserId, leagueId, updates);
+      res.json(updatedMembership);
+    } catch (error) {
+      console.error('Error updating league user permissions:', error);
+      res.status(500).json({ message: 'Failed to update league user permissions' });
+    }
+  });
+
+  // Add league special permission
+  app.post('/api/leagues/:leagueId/users/:userId/special-permissions/:permission', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const targetUserId = req.params.userId;
+      const permission = req.params.permission as 'admin' | 'stat_manager';
+      const updatingUserId = req.user.claims.sub;
+      
+      // Validate permission type
+      if (!['admin', 'stat_manager'].includes(permission)) {
+        return res.status(400).json({ message: 'Invalid permission type' });
+      }
+      
+      // Check if user can manage this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+      
+      const userPermissions = (req as any).userWithPermissions;
+      const canManageLeague = league.commissionerId === updatingUserId || 
+                             userPermissions.specialPermissions?.includes('admin') ||
+                             userPermissions.isPrimaryCommissioner;
+                             
+      if (!canManageLeague) {
+        return res.status(403).json({ message: 'Access denied - insufficient permissions' });
+      }
+      
+      const updatedMembership = await storage.addLeagueSpecialPermission(targetUserId, leagueId, permission);
+      res.json(updatedMembership);
+    } catch (error) {
+      console.error('Error adding league special permission:', error);
+      res.status(500).json({ message: 'Failed to add league special permission' });
+    }
+  });
+
+  // Remove league special permission
+  app.delete('/api/leagues/:leagueId/users/:userId/special-permissions/:permission', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const targetUserId = req.params.userId;
+      const permission = req.params.permission as 'admin' | 'stat_manager';
+      const updatingUserId = req.user.claims.sub;
+      
+      // Validate permission type
+      if (!['admin', 'stat_manager'].includes(permission)) {
+        return res.status(400).json({ message: 'Invalid permission type' });
+      }
+      
+      // Check if user can manage this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+      
+      const userPermissions = (req as any).userWithPermissions;
+      const canManageLeague = league.commissionerId === updatingUserId || 
+                             userPermissions.specialPermissions?.includes('admin') ||
+                             userPermissions.isPrimaryCommissioner;
+                             
+      if (!canManageLeague) {
+        return res.status(403).json({ message: 'Access denied - insufficient permissions' });
+      }
+      
+      const updatedMembership = await storage.removeLeagueSpecialPermission(targetUserId, leagueId, permission);
+      res.json(updatedMembership);
+    } catch (error) {
+      console.error('Error removing league special permission:', error);
+      res.status(500).json({ message: 'Failed to remove league special permission' });
+    }
+  });
+
+  // Get user's league-specific permissions
+  app.get('/api/leagues/:leagueId/users/:userId/permissions', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const targetUserId = req.params.userId;
+      const requestingUserId = req.user.claims.sub;
+      
+      // Users can only view their own permissions unless they have management rights
+      if (targetUserId !== requestingUserId) {
+        const league = await storage.getLeague(leagueId);
+        if (!league) {
+          return res.status(404).json({ message: 'League not found' });
+        }
+        
+        const userPermissions = await storage.getUserLeaguePermissions(requestingUserId, leagueId);
+        const canViewPermissions = league.commissionerId === requestingUserId || 
+                                 userPermissions?.leagueSpecialPermissions?.includes('admin');
+                                 
+        if (!canViewPermissions) {
+          return res.status(403).json({ message: 'Access denied - insufficient permissions' });
+        }
+      }
+      
+      const permissions = await storage.getUserLeaguePermissions(targetUserId, leagueId);
+      if (!permissions) {
+        return res.status(404).json({ message: 'User not found in league' });
+      }
+      
+      res.json(permissions);
+    } catch (error) {
+      console.error('Error fetching user league permissions:', error);
+      res.status(500).json({ message: 'Failed to fetch user league permissions' });
     }
   });
 
