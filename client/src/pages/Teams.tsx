@@ -163,19 +163,18 @@ export default function Teams() {
       const response = await apiRequest('GET', `/api/leagues/${currentTeam.leagueId}/stats`);
       const allStats = await response.json();
       
-      // Filter stats for current team players - more flexible matching
+      // Build a set of user IDs from team members
+      const memberUserIds = new Set((teamMembers || []).map((member: any) => 
+        String(member.userId ?? member.user?.id)
+      ));
+      
+      // Filter stats for current team players using proper user ID matching
       const filteredStats = allStats.filter((stat: any) => {
         if (stat.type !== 'skater') return false; // Only skaters for these stats
         
-        // Check multiple possible member ID fields for matching
-        const isMember = teamMembers?.some((member: any) => 
-          member.id === stat.userId || 
-          member.userId === stat.userId ||
-          member.id === stat.id ||
-          member.user?.id === stat.userId
-        );
-        
-        return isMember;
+        // Match user IDs properly
+        const statUserId = String(stat.userId ?? stat.user?.id);
+        return memberUserIds.has(statUserId);
       });
       
       return filteredStats;
@@ -465,11 +464,7 @@ export default function Teams() {
                       </>
                     ) : (
                       <div className="col-span-full text-center text-muted-foreground py-8">
-                        <div>Debug Info:</div>
-                        <div>Current Team: {currentTeam?.name || 'None'}</div>
-                        <div>Team Members: {Array.isArray(teamMembers) ? teamMembers.length : 'Not array'}</div>
-                        <div>Team Stats: {Array.isArray(teamStats) ? teamStats.length : 'Not array'}</div>
-                        <div>Team Leaders: {teamLeaders ? 'Available' : 'Null'}</div>
+                        No stats available for this team yet.
                       </div>
                     )}
                   </div>
