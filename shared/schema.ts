@@ -535,6 +535,51 @@ export const scrimmageRequests = pgTable("scrimmage_requests", {
   unique("unique_scrimmage_player_request").on(table.scrimmageId, table.playerId),
 ]);
 
+// Line combinations enum
+export const lineTypeEnum = pgEnum("line_type", [
+  "forward",
+  "defense"
+]);
+
+export const positionEnum = pgEnum("position", [
+  "LW", // Left Wing
+  "C",  // Center
+  "RW", // Right Wing
+  "LD", // Left Defense
+  "RD"  // Right Defense
+]);
+
+// Line combinations table - stores line setups for teams/games
+export const lineCombinations = pgTable("line_combinations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  gameId: varchar("game_id").references(() => games.id), // Optional - for game-specific lines
+  name: varchar("name").notNull(), // e.g., "Forward Line 1", "Defense Line 1"
+  lineType: lineTypeEnum("line_type").notNull(),
+  lineNumber: integer("line_number").notNull(), // 1, 2, 3, etc.
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_team_game_line").on(table.teamId, table.gameId, table.lineType, table.lineNumber),
+  index("idx_line_combinations_team").on(table.teamId),
+  index("idx_line_combinations_game").on(table.gameId),
+]);
+
+// Line combination assignments table - stores player assignments to line positions
+export const lineCombinationAssignments = pgTable("line_combination_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lineCombinationId: varchar("line_combination_id").references(() => lineCombinations.id).notNull(),
+  position: positionEnum("position").notNull(),
+  playerId: varchar("player_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_line_position").on(table.lineCombinationId, table.position),
+  index("idx_line_assignments_combination").on(table.lineCombinationId),
+  index("idx_line_assignments_player").on(table.playerId),
+]);
+
 // Draft status enum
 export const draftStatusEnum = pgEnum("draft_status", [
   "created",
@@ -1108,6 +1153,30 @@ export const substitutionApprovalsRelations = relations(substitutionApprovals, (
   }),
 }));
 
+// Line combinations relations
+export const lineCombinationsRelations = relations(lineCombinations, ({ one, many }) => ({
+  team: one(teams, {
+    fields: [lineCombinations.teamId],
+    references: [teams.id],
+  }),
+  game: one(games, {
+    fields: [lineCombinations.gameId],
+    references: [games.id],
+  }),
+  assignments: many(lineCombinationAssignments),
+}));
+
+export const lineCombinationAssignmentsRelations = relations(lineCombinationAssignments, ({ one }) => ({
+  lineCombination: one(lineCombinations, {
+    fields: [lineCombinationAssignments.lineCombinationId],
+    references: [lineCombinations.id],
+  }),
+  player: one(users, {
+    fields: [lineCombinationAssignments.playerId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
@@ -1426,6 +1495,40 @@ export const updateSubstituteRequestSchema = z.object({
   substitutePlayerId: z.string().optional(),
 });
 
+// Line combinations schemas
+export const insertLineCombinationSchema = createInsertSchema(lineCombinations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLineCombinationAssignmentSchema = createInsertSchema(lineCombinationAssignments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createLineCombinationRequestSchema = createInsertSchema(lineCombinations).omit({
+  id: true,
+  teamId: true, // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createLineCombinationAssignmentRequestSchema = createInsertSchema(lineCombinationAssignments).omit({
+  id: true,
+  lineCombinationId: true, // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateLineCombinationRequestSchema = createInsertSchema(lineCombinations).omit({
+  id: true,
+  teamId: true, // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+}).partial();
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1538,6 +1641,26 @@ export type InsertScrimmageRequest = z.infer<typeof insertScrimmageRequestSchema
 export type CreateScrimmageRequest = z.infer<typeof createScrimmageRequestSchema>;
 export type UpdateScrimmageRequest = z.infer<typeof updateScrimmageRequestSchema>;
 export type CreateScrimmageJoinRequest = z.infer<typeof createScrimmageJoinRequestSchema>;
+
+// Line combinations types
+export type LineCombination = typeof lineCombinations.$inferSelect;
+export type InsertLineCombination = z.infer<typeof insertLineCombinationSchema>;
+export type LineCombinationAssignment = typeof lineCombinationAssignments.$inferSelect;
+export type InsertLineCombinationAssignment = z.infer<typeof insertLineCombinationAssignmentSchema>;
+export type CreateLineCombinationRequest = z.infer<typeof createLineCombinationRequestSchema>;
+export type CreateLineCombinationAssignmentRequest = z.infer<typeof createLineCombinationAssignmentRequestSchema>;
+export type UpdateLineCombinationRequest = z.infer<typeof updateLineCombinationRequestSchema>;
+
+// Extended line combinations types
+export type LineCombinationWithAssignments = LineCombination & {
+  assignments: (LineCombinationAssignment & {
+    player: User;
+  })[];
+};
+
+export type LineAssignmentWithPlayer = LineCombinationAssignment & {
+  player: User;
+};
 
 // Extended types with relationships
 export type GameWithTeams = Game & {
