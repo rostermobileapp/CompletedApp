@@ -268,7 +268,6 @@ function LeagueUserManagement({
                         <p className="font-medium" data-testid={`user-name-${membership.user.id}`}>
                           {membership.user.firstName} {membership.user.lastName}
                         </p>
-                        <p className="text-sm text-gray-500">{membership.user.email}</p>
                       </div>
                     </div>
                     
