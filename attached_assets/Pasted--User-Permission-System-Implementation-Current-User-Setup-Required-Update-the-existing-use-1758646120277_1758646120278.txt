@@ -1,0 +1,148 @@
+# User Permission System Implementation
+
+## Current User Setup Required
+
+Update the existing user database to reflect these permission levels:
+
+**Users to Update:**
+- **Tobin Kern** → Commissioner (Primary)
+- **Nick Ciani** → Player Pro 
+- **Dale Barber** → Free Tier
+
+## Permission Levels Structure
+
+### 1. Commissioner (Primary)
+- Full system access
+- User management capabilities
+- Can promote Secondary Commissioners
+- Can assign special permissions (Admin/Stat Manager)
+- League settings and configuration
+- All Player Pro and Free Tier features
+
+### 2. Secondary Commissioner
+- Most Commissioner privileges
+- Cannot promote other Secondary Commissioners
+- Cannot demote the Primary Commissioner
+- Can assign special permissions with Primary Commissioner approval
+- League management access
+
+### 3. Player Pro
+- Enhanced player features
+- Advanced statistics access
+- Priority support
+- Custom notifications
+- All Free Tier features
+
+### 4. Free Tier
+- Basic player access
+- Standard game participation
+- Limited statistics view
+- Standard notifications
+
+### 5. Special Permissions (Additional Roles)
+- **Admin**: Can input and modify game scores/results
+- **Stat Manager**: Can update player statistics and records
+
+## Implementation Requirements
+
+### Core Features Needed:
+
+1. **User Role Management System**
+   ```
+   - Create user_roles table/collection
+   - Implement role hierarchy checking
+   - Add role assignment functions
+   ```
+
+2. **Commissioner Dashboard**
+   ```
+   - User management interface
+   - Role assignment controls
+   - Secondary Commissioner promotion tool
+   - Special permissions assignment (Admin & Stat Manager)
+   ```
+
+3. **Permission Middleware**
+   ```
+   - Route protection based on roles
+   - Feature access control
+   - API endpoint restrictions
+   ```
+
+4. **Secondary Commissioner Features**
+   ```
+   - Promotion interface for Primary Commissioner
+   - Separate secondary commissioner dashboard
+   - Limited admin capabilities
+   ```
+
+5. **Special Permissions System**
+   ```
+   - Admin interface for game management
+   - Stat Manager tools for player statistics
+   - Permission overlay system (users can have base role + special permissions)
+   ```
+
+## Database Schema Updates
+
+### Users Table/Collection
+```
+{
+  id: string,
+  name: string,
+  email: string,
+  role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier',
+  special_permissions: ['admin', 'stat_manager'], // array of special roles
+  is_primary_commissioner: boolean,
+  created_by: string, // ID of commissioner who created/modified
+  last_updated: timestamp
+}
+```
+
+## UI Components Required
+
+1. **Commissioner User Management Page**
+   - List all users with current roles
+   - Role change dropdowns
+   - Secondary Commissioner promotion button
+   - Special permissions checkboxes
+
+2. **Role-Based Navigation**
+   - Different menu items based on user role
+   - Feature access indicators
+   - Permission-based button visibility
+
+3. **Special Permissions Interface**
+   - Admin game entry forms
+   - Stat Manager player data forms
+   - Audit trail for changes made
+
+## Security Considerations
+
+- Primary Commissioner cannot be demoted by anyone
+- Secondary Commissioners cannot promote other Secondary Commissioners
+- Special permissions require Commissioner-level approval
+- All permission changes should be logged
+- Session validation for role-based access
+
+## Testing Checklist
+
+- [ ] Tobin Kern has full Commissioner access
+- [ ] Nick Ciani has Player Pro features only
+- [ ] Dale Barber has Free Tier restrictions
+- [ ] Commissioner can promote Secondary Commissioner
+- [ ] Commissioner can assign Admin permissions
+- [ ] Commissioner can assign Stat Manager permissions
+- [ ] Role-based menu navigation works
+- [ ] API endpoints respect permission levels
+- [ ] Permission changes are logged
+
+## Implementation Priority
+
+1. Update existing user records with new roles
+2. Create permission middleware system
+3. Build Commissioner user management interface
+4. Implement Secondary Commissioner promotion
+5. Add special permissions assignment
+6. Create role-based UI components
+7. Test all permission scenarios
