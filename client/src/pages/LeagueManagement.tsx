@@ -214,10 +214,7 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
             <p className="text-sm text-gray-600 dark:text-gray-300">
               {format(new Date(game.scheduledAt), 'MMM d, yyyy • h:mm a')}
             </p>
-            <div className="flex items-center gap-1 mt-1">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-              <span className="text-sm text-red-600 dark:text-red-400">{game.reason}</span>
-            </div>
+            
           </div>
         </div>
         {/* Show existing submissions if any */}
