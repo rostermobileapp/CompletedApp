@@ -432,7 +432,6 @@ export default function Teams() {
                             <Apple className="w-5 h-5 text-info" />
                             <div className="flex items-center gap-2">
                               <span className="text-lg font-bold">{teamLeaders.topAssistProvider?.assists || 0}</span>
-                              <span className="text-sm text-muted-foreground">Assists</span>
                             </div>
                           </div>
                           <span className="text-sm font-medium truncate" data-testid="text-assists-leader-name">{teamLeaders.topAssistProvider?.user?.lastName || 'N/A'}</span>
