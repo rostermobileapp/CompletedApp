@@ -113,6 +113,9 @@ export default function Messages() {
   
   // GIF search modal state
   const [gifModalOpen, setGifModalOpen] = useState(false);
+  
+  // Group members modal state
+  const [showMembersModal, setShowMembersModal] = useState(false);
 
   // Fetch user's leagues for contact discovery
   const { data: userLeagues = [], isLoading: userLeaguesLoading } = useQuery<League[]>({
@@ -1162,9 +1165,14 @@ export default function Messages() {
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+              <button 
+                onClick={() => setShowMembersModal(true)}
+                className="w-8 h-8 bg-muted rounded-full flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
+                data-testid="button-show-members"
+                title="View group members"
+              >
                 <Users className="w-4 h-4 text-muted-foreground" />
-              </div>
+              </button>
               <div className="flex-1">
                 <h2 className="font-semibold" data-testid="text-chat-title">{getChatTitle()}</h2>
                 <p className="text-xs text-muted-foreground" data-testid="text-chat-status">
@@ -1459,6 +1467,57 @@ export default function Messages() {
         onOpenChange={setGifModalOpen}
         onSelectGif={handleGifSelect}
       />
+
+      {/* Group Members Modal */}
+      <Dialog open={showMembersModal} onOpenChange={setShowMembersModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Group Members
+              {currentConversation?.participants && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  ({currentConversation.participants.length})
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {currentConversation?.participants?.map((participant) => (
+              <div
+                key={participant.id}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors"
+                data-testid={`member-${participant.userId}`}
+              >
+                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-medium text-primary">
+                    {participant.user?.displayName?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate" data-testid={`member-name-${participant.userId}`}>
+                    {participant.user?.displayName || 'Unknown User'}
+                  </p>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {participant.user?.email || ''}
+                  </p>
+                </div>
+                {participant.userId === currentUserId && (
+                  <span className="text-xs text-muted-foreground bg-accent px-2 py-1 rounded">
+                    You
+                  </span>
+                )}
+              </div>
+            ))}
+            {(!currentConversation?.participants || currentConversation.participants.length === 0) && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No members found</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
