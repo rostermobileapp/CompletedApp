@@ -4,6 +4,14 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { messagingService } from "./messagingService";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { 
+  loadUserPermissions, 
+  requireRole, 
+  requireLeagueManagement, 
+  requireStatsManagement, 
+  requireUserManagement,
+  requirePremiumFeatures 
+} from "./permissionMiddleware";
 import { db } from "./db";
 import { leagueMemberships, importedPlayers, teams, announcementPolls } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -244,15 +252,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/leagues", isAuthenticated, async (req: any, res) => {
+  app.post("/api/leagues", isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      // Check if user has commissioner tier
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
       
       const leagueData = insertLeagueSchema.parse({
         ...req.body,
@@ -503,7 +505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get league players for stats management
-  app.get('/api/leagues/:leagueId/players', isAuthenticated, async (req: any, res) => {
+  app.get('/api/leagues/:leagueId/players', isAuthenticated, loadUserPermissions, requireStatsManagement, async (req: any, res) => {
     try {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
@@ -531,8 +533,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // League members for scrimmage creation - accessible by Player Plus+ users who are members of the league
-  app.get("/api/leagues/:id/members-for-scrimmage", isAuthenticated, async (req: any, res) => {
+  // League members for scrimmage creation - accessible by Player Pro+ users who are members of the league
+  app.get("/api/leagues/:id/members-for-scrimmage", isAuthenticated, loadUserPermissions, requirePremiumFeatures, async (req: any, res) => {
     try {
       const leagueId = req.params.id;
       const userId = req.user.claims.sub;
@@ -760,7 +762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/teams/:id/captain", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/teams/:id/captain", isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const teamId = req.params.id;
