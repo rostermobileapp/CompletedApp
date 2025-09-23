@@ -271,64 +271,36 @@ function LeagueUserManagement({
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Badge className={roleColors[membership.leagueRole || 'free_tier']} data-testid={`user-league-role-${membership.user.id}`}>
-                          {roleDisplayNames[membership.leagueRole || 'free_tier']}
-                        </Badge>
-                        {membership.leagueSpecialPermissions?.map(permission => (
-                          <Badge key={permission} variant="outline" className="border-green-500 text-green-700">
-                            {permission}
-                          </Badge>
-                        ))}
-                      </div>
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        size="sm"
+                        onClick={() => onSpecialPermissionToggle(
+                          membership.user.id, 
+                          league.id, 
+                          'admin', 
+                          membership.leagueRole || 'free_tier', 
+                          membership.leagueSpecialPermissions || []
+                        )}
+                        variant="outline"
+                        data-testid={`button-toggle-league-admin-${membership.user.id}`}
+                      >
+                        {membership.leagueSpecialPermissions?.includes('admin') ? 'Remove Admin' : 'Make Admin'}
+                      </Button>
                       
-                      <div className="flex items-center space-x-2">
-                        <Select 
-                          value={membership.leagueRole || 'free_tier'} 
-                          onValueChange={(newRole) => onRoleUpdate(membership.user.id, league.id, newRole, membership.leagueSpecialPermissions || [])}
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="free_tier">Free Tier</SelectItem>
-                            <SelectItem value="player_pro">Player Pro</SelectItem>
-                            <SelectItem value="secondary_commissioner">Secondary Commissioner</SelectItem>
-                            <SelectItem value="commissioner">Commissioner</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        
-                        <Button 
-                          size="sm"
-                          onClick={() => onSpecialPermissionToggle(
-                            membership.user.id, 
-                            league.id, 
-                            'admin', 
-                            membership.leagueRole || 'free_tier', 
-                            membership.leagueSpecialPermissions || []
-                          )}
-                          variant="outline"
-                          data-testid={`button-toggle-league-admin-${membership.user.id}`}
-                        >
-                          {membership.leagueSpecialPermissions?.includes('admin') ? 'Remove Admin' : 'Make Admin'}
-                        </Button>
-                        
-                        <Button 
-                          size="sm"
-                          onClick={() => onSpecialPermissionToggle(
-                            membership.user.id, 
-                            league.id, 
-                            'stat_manager', 
-                            membership.leagueRole || 'free_tier', 
-                            membership.leagueSpecialPermissions || []
-                          )}
-                          variant="outline"
-                          data-testid={`button-toggle-league-stat-manager-${membership.user.id}`}
-                        >
-                          {membership.leagueSpecialPermissions?.includes('stat_manager') ? 'Remove Stat Manager' : 'Make Stat Manager'}
-                        </Button>
-                      </div>
+                      <Button 
+                        size="sm"
+                        onClick={() => onSpecialPermissionToggle(
+                          membership.user.id, 
+                          league.id, 
+                          'stat_manager', 
+                          membership.leagueRole || 'free_tier', 
+                          membership.leagueSpecialPermissions || []
+                        )}
+                        variant="outline"
+                        data-testid={`button-toggle-league-stat-manager-${membership.user.id}`}
+                      >
+                        {membership.leagueSpecialPermissions?.includes('stat_manager') ? 'Remove Stat Manager' : 'Make Stat Manager'}
+                      </Button>
                     </div>
                   </div>
                 ))}
