@@ -142,7 +142,7 @@ export function CommissionerDashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -166,11 +166,11 @@ export function CommissionerDashboard() {
         <CardHeader>
           <CardTitle>League-Specific User Management</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-gray-600 mb-6">
+        <CardContent className="p-6 pl-[2px] pr-[2px] pt-[2px] pb-[2px]">
+          <p className="text-gray-600 mb-4 sm:mb-6 text-sm sm:text-base px-2">
             Manage users within your leagues. Click on a league to expand and manage user roles and permissions.
           </p>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4 px-2">
             {userLeagues.map((league: any) => (
               <LeagueUserManagement 
                 key={league.id} 
@@ -261,7 +261,7 @@ function LeagueUserManagement({
               
               <div className="space-y-3">
                 {leagueUsers.map((membership) => (
-                  <div key={membership.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div key={membership.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg space-y-3 sm:space-y-0">
                     <div className="flex items-center space-x-4">
                       {getRoleIcon(membership)}
                       <div>
@@ -271,9 +271,10 @@ function LeagueUserManagement({
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                       <Button 
                         size="sm"
+                        className="w-full sm:w-auto text-xs sm:text-sm"
                         onClick={() => onSpecialPermissionToggle(
                           membership.user.id, 
                           league.id, 
@@ -289,6 +290,7 @@ function LeagueUserManagement({
                       
                       <Button 
                         size="sm"
+                        className="w-full sm:w-auto text-xs sm:text-sm"
                         onClick={() => onSpecialPermissionToggle(
                           membership.user.id, 
                           league.id, 
