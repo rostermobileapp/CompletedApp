@@ -941,7 +941,7 @@ export class DatabaseStorage implements IStorage {
           eq(leagueMemberships.status, "approved")
         )
       );
-    return result.map(r => ({ ...r.league_memberships, user: r.users }));
+    return result.map(r => ({ ...r.leagueMemberships, user: r.users }));
   }
 
   async getPendingLeagueMembers(leagueId: string): Promise<(LeagueMembership & { user: User })[]> {
@@ -955,7 +955,7 @@ export class DatabaseStorage implements IStorage {
           eq(leagueMemberships.status, "pending")
         )
       );
-    return result.map(r => ({ ...r.league_memberships, user: r.users }));
+    return result.map(r => ({ ...r.leagueMemberships, user: r.users }));
   }
 
   async updatePlayerSkillLevel(membershipId: string, skillLevel: string | null): Promise<LeagueMembership> {
