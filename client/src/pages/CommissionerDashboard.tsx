@@ -175,9 +175,6 @@ export function CommissionerDashboard() {
                             <p className="font-medium" data-testid={`user-name-${user.id}`}>
                               {user.firstName} {user.lastName}
                             </p>
-                            <p className="text-sm text-gray-600" data-testid={`user-email-${user.id}`}>
-                              {user.email}
-                            </p>
                           </div>
                         </div>
                         
