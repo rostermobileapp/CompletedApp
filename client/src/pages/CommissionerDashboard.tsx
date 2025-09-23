@@ -218,7 +218,7 @@ function LeagueUserManagement({
   });
 
   return (
-    <Card className="border-l-4 border-l-blue-500">
+    <Card className="border-l-4 border-l-blue-500 overflow-hidden">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -242,7 +242,7 @@ function LeagueUserManagement({
       </CardHeader>
 
       {isExpanded && (
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 px-2 sm:px-6">
           {isLoading ? (
             <div className="text-center py-8 text-gray-500">
               Loading league members...
@@ -252,17 +252,17 @@ function LeagueUserManagement({
               No members found in this league.
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 w-full overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="font-medium text-sm text-gray-700">
                   League Members ({leagueUsers.length})
                 </h4>
               </div>
               
-              <div className="space-y-3">
+              <div className="space-y-3 w-full">
                 {leagueUsers.map((membership) => (
-                  <div key={membership.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg space-y-3 sm:space-y-0">
-                    <div className="flex items-center space-x-4">
+                  <div key={membership.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-4 border rounded-lg space-y-3 sm:space-y-0 w-full overflow-hidden">
+                    <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-shrink">
                       {getRoleIcon(membership)}
                       <div>
                         <p className="font-medium" data-testid={`user-name-${membership.user.id}`}>
@@ -271,7 +271,7 @@ function LeagueUserManagement({
                       </div>
                     </div>
                     
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+                    <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 w-full sm:w-auto flex-shrink-0">
                       <Button 
                         size="sm"
                         className="w-full sm:w-auto text-xs sm:text-sm"
