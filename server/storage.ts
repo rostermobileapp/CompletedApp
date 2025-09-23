@@ -3430,11 +3430,10 @@ export class DatabaseStorage implements IStorage {
     // Build conditions for stats table join
     let statsConditions = [eq(playerStats.leagueId, leagueId)];
     
-    // Consistent season handling: undefined means non-seasonal stats (null seasonId)
+    // Only filter by season if a specific seasonId is provided
+    // If no seasonId is provided, return stats from all seasons
     if (seasonId) {
       statsConditions.push(eq(playerStats.seasonId, seasonId));
-    } else {
-      statsConditions.push(isNull(playerStats.seasonId));
     }
     
     // Get all approved league members and LEFT JOIN with their stats
