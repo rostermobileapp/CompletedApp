@@ -168,14 +168,32 @@ export default function Teams() {
         String(member.userId ?? member.user?.id)
       ));
       
+      // Debug logging
+      console.log('=== TEAM STATS DEBUG ===');
+      console.log('Team Members:', teamMembers?.slice(0, 2)); // First 2 members
+      console.log('Member User IDs:', Array.from(memberUserIds).slice(0, 5)); // First 5 IDs
+      console.log('All Stats (first 2):', allStats?.slice(0, 2));
+      console.log('All Stats count:', allStats?.length);
+      
       // Filter stats for current team players using proper user ID matching
       const filteredStats = allStats.filter((stat: any) => {
         if (stat.type !== 'skater') return false; // Only skaters for these stats
         
         // Match user IDs properly
         const statUserId = String(stat.userId ?? stat.user?.id);
-        return memberUserIds.has(statUserId);
+        const isMatch = memberUserIds.has(statUserId);
+        
+        // Debug a few entries
+        if (allStats.indexOf(stat) < 3) {
+          console.log(`Stat ${allStats.indexOf(stat)}: userId=${stat.userId}, user.id=${stat.user?.id}, statUserId="${statUserId}", isMatch=${isMatch}`);
+        }
+        
+        return isMatch;
       });
+      
+      console.log('Filtered Stats count:', filteredStats.length);
+      console.log('Filtered Stats (first 2):', filteredStats.slice(0, 2));
+      console.log('=== END DEBUG ===');
       
       return filteredStats;
     },
