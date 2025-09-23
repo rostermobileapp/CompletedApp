@@ -338,30 +338,27 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
           <div>
             <h4 className="font-medium mb-3">Available Players</h4>
             <div className="flex flex-wrap gap-2">
-              {teamMembers.map((member: any) => {
-                const isAssigned = lineCombinations.some((line: LineCombination) =>
-                  line.assignments.some(a => a.playerId === (member.user?.id || member.userId))
-                );
-                
-                return (
+              {teamMembers
+                .filter((member: any) => {
+                  const isAssigned = lineCombinations.some((line: LineCombination) =>
+                    line.assignments.some(a => a.playerId === (member.user?.id || member.userId))
+                  );
+                  return !isAssigned; // Only show unassigned players
+                })
+                .map((member: any) => (
                   <div
                     key={member.user?.id || member.userId}
-                    className={`flex items-center gap-2 p-2 border rounded-lg cursor-move ${
-                      isAssigned ? 'opacity-50 bg-muted' : 'hover:bg-accent'
-                    }`}
-                    draggable={!isAssigned}
-                    onDragStart={(e) => !isAssigned && handleDragStart(e, member)}
+                    className="flex items-center gap-2 p-2 border rounded-lg cursor-move hover:bg-accent"
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, member)}
                     data-testid={`player-${member.user?.id || member.userId}`}
                   >
                     <span className="text-sm font-medium">
                       {member.user?.lastName}
                     </span>
-                    {isAssigned && (
-                      <Badge variant="secondary" className="text-xs">Assigned</Badge>
-                    )}
                   </div>
-                );
-              })}
+                ))
+              }
             </div>
           </div>
         )}
