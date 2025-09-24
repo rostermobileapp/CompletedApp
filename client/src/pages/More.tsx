@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import videoUrl from '@assets/Black Coming Soon Greeting Mobile Video_1758747454877.mp4';
 
 export default function More() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -32,7 +33,7 @@ export default function More() {
         className="w-full h-full object-cover"
         data-testid="chirp-video"
       >
-        <source src="/path/to/your/video.mp4" type="video/mp4" />
+        <source src={videoUrl} type="video/mp4" />
         <p className="text-white text-center flex items-center justify-center h-full">
           Your browser does not support the video tag.
         </p>

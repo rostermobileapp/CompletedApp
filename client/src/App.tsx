@@ -47,6 +47,7 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/more" component={More} />
         <Route component={Landing} />
       </Switch>
     );
