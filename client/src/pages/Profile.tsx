@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required').optional(),
   lastName: z.string().min(1, 'Last name is required').optional(),
-  age: z.string().transform(val => val === '' ? undefined : Number(val)).optional(),
+  dateOfBirth: z.string().min(1, 'Date of birth is required').optional(),
   phoneNumber: z.string().optional(),
   city: z.string().optional(),
 });
@@ -44,7 +44,7 @@ export default function Profile() {
     defaultValues: {
       firstName: (user as any)?.firstName || '',
       lastName: (user as any)?.lastName || '',
-      age: (user as any)?.age?.toString() || '',
+      dateOfBirth: (user as any)?.dateOfBirth || '',
       phoneNumber: (user as any)?.phoneNumber || '',
       city: (user as any)?.city || '',
     },
@@ -310,9 +310,6 @@ export default function Profile() {
               : (user as any)?.firstName || 'User'
             }
           </h2>
-          <p className="text-muted-foreground mb-1" data-testid="text-user-email">
-            {(user as any)?.email || 'No email provided'}
-          </p>
           <p className="text-xs text-muted-foreground/70 mb-3" data-testid="text-user-id">
             ID: {(user as any)?.id}
           </p>
@@ -351,6 +348,14 @@ export default function Profile() {
             </button>
           </div>
           
+          {/* Email Display */}
+          <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Email:</span>
+              <span data-testid="text-profile-email">{(user as any)?.email || 'No email provided'}</span>
+            </div>
+          </div>
+          
           {isEditing ? (
             <form onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -373,12 +378,12 @@ export default function Profile() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">Age</label>
+                <label className="block text-sm font-medium mb-1">Date of Birth</label>
                 <input
-                  {...form.register('age')}
-                  type="number"
+                  {...form.register('dateOfBirth')}
+                  type="date"
                   className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  data-testid="input-age"
+                  data-testid="input-date-of-birth"
                 />
               </div>
               
@@ -416,8 +421,8 @@ export default function Profile() {
           ) : (
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Age:</span>
-                <span>{(user as any)?.age || 'Not specified'}</span>
+                <span className="text-muted-foreground">Date of Birth:</span>
+                <span>{(user as any)?.dateOfBirth || 'Not specified'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Phone:</span>
