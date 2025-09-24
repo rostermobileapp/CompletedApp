@@ -199,6 +199,17 @@ export default function Profile() {
       label: 'Privacy',
       action: () => {/* TODO: Navigate to privacy */},
     },
+    {
+      icon: Crown,
+      label: 'Manage Subscription',
+      locked: false,
+      requiredTier: null,
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/subscription');
+      },
+      highlight: role === 'free_tier',
+    },
   ];
 
   const FeatureButton = ({ feature, testId }: { feature: any, testId: string }) => (
