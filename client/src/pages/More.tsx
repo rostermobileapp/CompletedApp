@@ -14,162 +14,9 @@ export default function More() {
     role 
   } = usePermissions();
 
-  const teamFeatures = [
-    {
-      icon: Users,
-      label: 'Team Roster',
-      locked: false,
-      requiredTier: null,
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/roster');
-      },
-    },
-    {
-      icon: BarChart3,
-      label: 'Team Stats',
-      locked: !canAccessPremiumFeatures(),
-      requiredTier: 'PRO',
-      action: () => {/* TODO: Navigate to stats */},
-    },
-    {
-      icon: UserPlus,
-      label: 'Find Subs',
-      locked: !canAccessPremiumFeatures(),
-      requiredTier: 'PRO',
-      action: () => {/* TODO: Navigate to subs */},
-    },
-    {
-      icon: CheckCircle,
-      label: 'Substitute Confirmations',
-      locked: false,
-      requiredTier: null,
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/substitute-confirmations');
-      },
-    },
-  ];
+// All features have been moved to the Profile section
 
-  const leagueFeatures = [
-    {
-      icon: Plus,
-      label: 'Create League',
-      locked: !canManageLeague(),
-      requiredTier: 'COMMISSIONER',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/create-league');
-      },
-    },
-    {
-      icon: Calendar,
-      label: 'Schedule Scrimmage',
-      locked: !canAccessPremiumFeatures(),
-      requiredTier: 'PRO',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/create-scrimmage');
-      },
-    },
-    {
-      icon: Settings,
-      label: 'Manage Scrimmages',
-      locked: !canAccessPremiumFeatures(),
-      requiredTier: 'PRO',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/scrimmage-management');
-      },
-    },
-    {
-      icon: Crown,
-      label: 'League Management',
-      locked: !hasRole('secondary_commissioner'),
-      requiredTier: 'COMMISSIONER',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/league-list');
-      },
-    },
-    {
-      icon: Shield,
-      label: 'Commissioner Dashboard',
-      locked: !canManageUsers() && !canManageLeague() && !hasRole('commissioner'),
-      requiredTier: 'COMMISSIONER',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/commissioner');
-      },
-    },
-  ];
-
-  const accountFeatures = [
-    {
-      icon: Crown,
-      label: 'Upgrade Subscription',
-      locked: false,
-      requiredTier: null,
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/subscription');
-      },
-      highlight: role === 'free_tier',
-    },
-    {
-      icon: Settings,
-      label: 'Settings',
-      locked: false,
-      requiredTier: null,
-      action: () => {/* TODO: Navigate to settings */},
-    },
-    {
-      icon: Bell,
-      label: 'Notifications',
-      locked: false,
-      requiredTier: null,
-      action: () => {/* TODO: Navigate to notifications */},
-    },
-    {
-      icon: Shield,
-      label: 'Privacy',
-      locked: false,
-      requiredTier: null,
-      action: () => {/* TODO: Navigate to privacy */},
-    },
-  ];
-
-  const FeatureButton = ({ feature, testId }: { feature: any, testId: string }) => (
-    <button
-      onClick={feature.locked ? undefined : feature.action}
-      className={`w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between transition-opacity ${
-        feature.locked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card/80'
-      } ${feature.highlight ? 'border-warning' : ''}`}
-      disabled={feature.locked}
-      data-testid={testId}
-    >
-      <div className="flex items-center gap-3">
-        <feature.icon className={`w-5 h-5 ${feature.locked ? 'text-muted-foreground' : feature.highlight ? 'text-warning' : 'text-muted-foreground'}`} />
-        <span className={feature.locked ? 'text-muted-foreground' : ''}>{feature.label}</span>
-        {feature.requiredTier && (
-          <span className={`tier-badge text-xs px-2 py-1 rounded-full font-semibold ml-2 ${
-            feature.requiredTier === 'COMMISSIONER' ? 'bg-warning text-black' : 'bg-primary text-primary-foreground'
-          }`}>
-            {feature.requiredTier}
-          </span>
-        )}
-      </div>
-      {feature.locked ? (
-        <div className="w-4 h-4 text-muted-foreground">
-          🔒
-        </div>
-      ) : (
-        <div className="w-4 h-4 text-muted-foreground">
-          →
-        </div>
-      )}
-    </button>
-  );
+// FeatureButton component removed - features moved to Profile section
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="more-page">
@@ -178,60 +25,20 @@ export default function More() {
         <h1 className="text-2xl font-bold mb-6" data-testid="text-page-title">More</h1>
       </div>
       
-      {/* Feature Sections */}
+      {/* Content moved to Profile section */}
       <div className="px-6 space-y-6">
-        {/* Team Features */}
-        <div data-testid="section-team-features">
-          <h2 className="text-lg font-semibold mb-4" data-testid="text-team-features-title">Team Features</h2>
-          <div className="space-y-2">
-            {teamFeatures.map((feature, index) => (
-              <FeatureButton 
-                key={index} 
-                feature={feature} 
-                testId={`button-team-feature-${index}`}
-              />
-            ))}
-          </div>
-        </div>
-        
-        {/* League Features */}
-        <div data-testid="section-league-features">
-          <h2 className="text-lg font-semibold mb-4" data-testid="text-league-features-title">League Features</h2>
-          <div className="space-y-2">
-            {leagueFeatures.map((feature, index) => (
-              <FeatureButton 
-                key={index} 
-                feature={feature} 
-                testId={`button-league-feature-${index}`}
-              />
-            ))}
-          </div>
-        </div>
-        
-        {/* Account */}
-        <div data-testid="section-account">
-          <h2 className="text-lg font-semibold mb-4" data-testid="text-account-title">Account</h2>
-          <div className="space-y-2">
-            {accountFeatures.map((feature, index) => (
-              <FeatureButton 
-                key={index} 
-                feature={feature} 
-                testId={`button-account-feature-${index}`}
-              />
-            ))}
-            
-            {/* Sign Out */}
-            <button
-              onClick={() => window.location.href = '/api/logout'}
-              className="w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-card/80"
-              data-testid="button-sign-out"
-            >
-              <div className="flex items-center gap-3">
-                <LogOut className="w-5 h-5" />
-                <span>Sign Out</span>
-              </div>
-            </button>
-          </div>
+        <div className="bg-card rounded-xl border border-border p-6 text-center">
+          <p className="text-muted-foreground mb-4">All features have been moved to your Profile page for easier access.</p>
+          <button
+            onClick={() => {
+              setPageTransitionDirection('up');
+              navigate('/profile');
+            }}
+            className="bg-primary text-primary-foreground rounded-lg px-6 py-2 font-semibold"
+            data-testid="button-go-to-profile"
+          >
+            Go to Profile
+          </button>
         </div>
       </div>
     </div>
