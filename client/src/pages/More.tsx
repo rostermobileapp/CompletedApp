@@ -27,7 +27,6 @@ export default function More() {
         ref={videoRef}
         autoPlay
         muted
-        loop
         playsInline
         preload="metadata"
         className="w-full h-full object-cover"
