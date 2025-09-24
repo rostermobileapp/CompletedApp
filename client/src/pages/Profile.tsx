@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-// 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
-// import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
+import { usePermissions } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -11,7 +10,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users } from 'lucide-react';
+import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const profileSchema = z.object({
@@ -26,6 +25,13 @@ type ProfileForm = z.infer<typeof profileSchema>;
 
 export default function Profile() {
   const { user } = useAuth();
+  const { 
+    canManageUsers, 
+    canManageLeague, 
+    canAccessPremiumFeatures, 
+    hasRole,
+    role 
+  } = usePermissions();
   // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
   const tier = 'commissioner'; // Everyone is commissioner now!
   const [, navigate] = useLocation();
@@ -43,6 +49,59 @@ export default function Profile() {
       city: (user as any)?.city || '',
     },
   });
+
+  const leagueFeatures = [
+    {
+      icon: Plus,
+      label: 'Create League',
+      locked: !canManageLeague(),
+      requiredTier: 'COMMISSIONER',
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/create-league');
+      },
+    },
+    {
+      icon: Calendar,
+      label: 'Schedule Scrimmage',
+      locked: !canAccessPremiumFeatures(),
+      requiredTier: 'PRO',
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/create-scrimmage');
+      },
+    },
+    {
+      icon: Settings,
+      label: 'Manage Scrimmages',
+      locked: !canAccessPremiumFeatures(),
+      requiredTier: 'PRO',
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/scrimmage-management');
+      },
+    },
+    {
+      icon: Crown,
+      label: 'League Management',
+      locked: !hasRole('secondary_commissioner'),
+      requiredTier: 'COMMISSIONER',
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/league-list');
+      },
+    },
+    {
+      icon: Shield,
+      label: 'Commissioner Dashboard',
+      locked: !canManageUsers() && !canManageLeague() && !hasRole('commissioner'),
+      requiredTier: 'COMMISSIONER',
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/commissioner');
+      },
+    },
+  ];
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileForm) => {
@@ -140,7 +199,50 @@ export default function Profile() {
       label: 'Privacy',
       action: () => {/* TODO: Navigate to privacy */},
     },
+    {
+      icon: Crown,
+      label: 'Upgrade Subscription',
+      locked: false,
+      requiredTier: null,
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/subscription');
+      },
+      highlight: role === 'free_tier',
+    },
   ];
+
+  const FeatureButton = ({ feature, testId }: { feature: any, testId: string }) => (
+    <button
+      onClick={feature.locked ? undefined : feature.action}
+      className={`w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between transition-opacity ${
+        feature.locked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card/80'
+      } ${feature.highlight ? 'border-warning' : ''}`}
+      disabled={feature.locked}
+      data-testid={testId}
+    >
+      <div className="flex items-center gap-3">
+        <feature.icon className={`w-5 h-5 ${feature.locked ? 'text-muted-foreground' : feature.highlight ? 'text-warning' : 'text-muted-foreground'}`} />
+        <span className={feature.locked ? 'text-muted-foreground' : ''}>{feature.label}</span>
+        {feature.requiredTier && (
+          <span className={`tier-badge text-xs px-2 py-1 rounded-full font-semibold ml-2 ${
+            feature.requiredTier === 'COMMISSIONER' ? 'bg-warning text-black' : 'bg-primary text-primary-foreground'
+          }`}>
+            {feature.requiredTier}
+          </span>
+        )}
+      </div>
+      {feature.locked ? (
+        <div className="w-4 h-4 text-muted-foreground">
+          🔒
+        </div>
+      ) : (
+        <div className="w-4 h-4 text-muted-foreground">
+          →
+        </div>
+      )}
+    </button>
+  );
 
   const getTierDisplay = () => {
     switch (tier) {
@@ -330,26 +432,17 @@ export default function Profile() {
         </div>
       </div>
       
-      {/* User Stats */}
+      {/* League Features */}
       <div className="px-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4" data-testid="text-stats-title">Your Stats</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-card rounded-lg border border-border p-4 text-center" data-testid="card-stat-games">
-            <p className="text-2xl font-bold" data-testid="text-stat-games-value">12</p>
-            <p className="text-sm text-muted-foreground">Games Played</p>
-          </div>
-          <div className="bg-card rounded-lg border border-border p-4 text-center" data-testid="card-stat-goals">
-            <p className="text-2xl font-bold" data-testid="text-stat-goals-value">8</p>
-            <p className="text-sm text-muted-foreground">Goals</p>
-          </div>
-          <div className="bg-card rounded-lg border border-border p-4 text-center" data-testid="card-stat-assists">
-            <p className="text-2xl font-bold" data-testid="text-stat-assists-value">12</p>
-            <p className="text-sm text-muted-foreground">Assists</p>
-          </div>
-          <div className="bg-card rounded-lg border border-border p-4 text-center" data-testid="card-stat-points">
-            <p className="text-2xl font-bold" data-testid="text-stat-points-value">20</p>
-            <p className="text-sm text-muted-foreground">Total Points</p>
-          </div>
+        <h2 className="text-lg font-semibold mb-4" data-testid="text-league-features-title">League Features</h2>
+        <div className="space-y-2">
+          {leagueFeatures.map((feature, index) => (
+            <FeatureButton 
+              key={index} 
+              feature={feature} 
+              testId={`button-league-feature-${index}`}
+            />
+          ))}
         </div>
       </div>
       
@@ -414,18 +507,26 @@ export default function Profile() {
         <h2 className="text-lg font-semibold mb-4" data-testid="text-settings-title">Settings</h2>
         <div className="space-y-2">
           {settingsItems.map((item, index) => (
-            <button
-              key={index}
-              onClick={item.action}
-              className="w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:bg-card/80"
-              data-testid={`button-setting-${index}`}
-            >
-              <div className="flex items-center gap-3">
-                <item.icon className="w-5 h-5 text-muted-foreground" />
-                <span>{item.label}</span>
-              </div>
-              <div className="w-4 h-4 text-muted-foreground">→</div>
-            </button>
+            item.requiredTier !== undefined ? (
+              <FeatureButton 
+                key={index}
+                feature={item} 
+                testId={`button-setting-${index}`}
+              />
+            ) : (
+              <button
+                key={index}
+                onClick={item.action}
+                className="w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:bg-card/80"
+                data-testid={`button-setting-${index}`}
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon className="w-5 h-5 text-muted-foreground" />
+                  <span>{item.label}</span>
+                </div>
+                <div className="w-4 h-4 text-muted-foreground">→</div>
+              </button>
+            )
           ))}
           
           {/* Dark Mode Toggle */}
