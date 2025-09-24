@@ -20,10 +20,7 @@ export default function More() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="more-page">
-      {/* Header */}
-      <div className="p-6 pt-12">
-        <h1 className="text-2xl font-bold mb-6" data-testid="text-page-title">Chirp</h1>
-      </div>
+      
       
       
     </div>
