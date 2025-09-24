@@ -25,15 +25,15 @@ type ProfileForm = z.infer<typeof profileSchema>;
 
 export default function Profile() {
   const { user } = useAuth();
-  const { 
-    canManageUsers, 
-    canManageLeague, 
-    canAccessPremiumFeatures, 
-    hasRole,
-    role 
-  } = usePermissions();
+  const { role } = usePermissions();
   // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
   const tier = 'commissioner'; // Everyone is commissioner now!
+  
+  // Override permission functions to grant full access since subscription was removed
+  const canManageUsers = () => true;
+  const canManageLeague = () => true;
+  const canAccessPremiumFeatures = () => true;
+  const hasRole = (requiredRole: string) => true;
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -199,17 +199,6 @@ export default function Profile() {
       label: 'Privacy',
       action: () => {/* TODO: Navigate to privacy */},
     },
-    {
-      icon: Crown,
-      label: 'Upgrade Subscription',
-      locked: false,
-      requiredTier: null,
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/subscription');
-      },
-      highlight: role === 'free_tier',
-    },
   ];
 
   const FeatureButton = ({ feature, testId }: { feature: any, testId: string }) => (
@@ -247,8 +236,7 @@ export default function Profile() {
   const getTierDisplay = () => {
     switch (tier) {
       case 'commissioner': return { label: 'COMMISSIONER', class: 'bg-warning text-black' };
-      case 'player_plus': return { label: 'PLAYER PLUS', class: 'bg-primary text-primary-foreground' };
-      default: return { label: 'FREE TIER', class: 'bg-secondary text-secondary-foreground' };
+      default: return { label: 'COMMISSIONER', class: 'bg-warning text-black' };
     }
   };
 
@@ -321,15 +309,7 @@ export default function Profile() {
               {tierDisplay.label}
             </span>
           </div>
-          {tier === 'free' && (
-            <button 
-              onClick={() => navigate('/subscription')}
-              className="bg-primary text-primary-foreground rounded-lg px-6 py-2 font-semibold"
-              data-testid="button-upgrade-account"
-            >
-              Upgrade Account
-            </button>
-          )}
+          {/* Upgrade button removed as everyone is commissioner now */}
         </div>
       </div>
       
