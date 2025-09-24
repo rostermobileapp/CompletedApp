@@ -1,4 +1,4 @@
-import { Users, MessageCircle, MoreHorizontal, User } from 'lucide-react';
+import { Users, MessageCircle, Bird, User } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
@@ -8,7 +8,7 @@ const navItems = [
   { id: 'teams', icon: Users, label: 'Teams', path: '/teams' },
   { id: 'messages', icon: MessageCircle, label: 'Messages', path: '/messages' },
   { id: 'home', icon: null, label: 'Home', path: '/' },
-  { id: 'more', icon: MoreHorizontal, label: 'More', path: '/more' },
+  { id: 'more', icon: Bird, label: 'Chirp', path: '/more' },
   { id: 'profile', icon: User, label: 'Profile', path: '/profile' },
 ];
 
