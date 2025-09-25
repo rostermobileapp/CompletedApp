@@ -119,15 +119,41 @@ export default function Teams() {
     }
   };
 
-  const createTeamLogoUploadComplete = (teamId: string) => (files: File[]) => {
-    // For now, just log the files until upload is properly implemented
-    console.log('Files selected for upload:', files);
-    toast({
-      title: "Info",
-      description: "File upload feature coming soon!",
-    });
-    // TODO: Implement actual file upload logic
-    // updateTeamLogoMutation.mutate({ teamId, logoUrl: uploadURL });
+  const createTeamLogoUploadComplete = (teamId: string) => async (files: File[]) => {
+    if (files.length === 0) return;
+    
+    try {
+      // Get upload parameters for this file
+      const uploadParams = await handleGetTeamLogoUploadParameters();
+      const file = files[0]; // Only handle the first file since maxNumberOfFiles is 1
+      
+      // Upload the file to object storage using the pre-signed URL
+      const uploadResponse = await fetch(uploadParams.url, {
+        method: uploadParams.method,
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed with status: ${uploadResponse.status}`);
+      }
+      
+      // Extract the public URL from the upload URL (remove query parameters)
+      const logoUrl = uploadParams.url.split('?')[0];
+      
+      // Update the team logo in the database
+      updateTeamLogoMutation.mutate({ teamId, logoUrl });
+      
+    } catch (error) {
+      console.error('Upload failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload team logo. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleClaimBeverageDuty = (gameId: string) => {
