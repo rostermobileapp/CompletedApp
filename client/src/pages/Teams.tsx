@@ -119,17 +119,15 @@ export default function Teams() {
     }
   };
 
-  const createTeamLogoUploadComplete = (teamId: string) => (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful && result.successful[0]) {
-      const uploadURL = result.successful[0].uploadURL as string;
-      updateTeamLogoMutation.mutate({ teamId, logoUrl: uploadURL });
-    } else {
-      toast({
-        title: "Error",
-        description: "Failed to upload team logo. Please try again.",
-        variant: "destructive",
-      });
-    }
+  const createTeamLogoUploadComplete = (teamId: string) => (files: File[]) => {
+    // For now, just log the files until upload is properly implemented
+    console.log('Files selected for upload:', files);
+    toast({
+      title: "Info",
+      description: "File upload feature coming soon!",
+    });
+    // TODO: Implement actual file upload logic
+    // updateTeamLogoMutation.mutate({ teamId, logoUrl: uploadURL });
   };
 
   const handleClaimBeverageDuty = (gameId: string) => {
@@ -380,7 +378,6 @@ export default function Teams() {
                           <div className="text-2xl font-bold">
                             {teamStanding.wins}-{teamStanding.losses}-{teamStanding.ties}
                           </div>
-                          <div className="text-sm text-muted-foreground">Record</div>
                         </div>
                         <div className="text-center">
                           <div className={`text-2xl font-bold ${teamStanding.goalDifferential >= 0 ? 'text-green-600' : 'text-red-600'}`}>
