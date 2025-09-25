@@ -437,7 +437,7 @@ export default function Teams() {
                         </Card>
 
                         {/* Goals Leader */}
-                        <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-team-goals-leader">
+                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#212121]" data-testid="card-team-goals-leader">
                           <div className="flex items-center gap-3">
                             <Target className="w-5 h-5 text-success" />
                             <div className="flex items-center gap-2">
