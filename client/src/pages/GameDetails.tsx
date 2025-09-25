@@ -423,9 +423,20 @@ export default function GameDetails() {
   const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
                    userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
   const opponentTeam = userTeam?.id === game.homeTeam?.id ? game.awayTeam : game.homeTeam;
-  const hasBeverageDuty = game.homeBeverageDutyUserId === (user as User)?.id || game.awayBeverageDutyUserId === (user as User)?.id;
-  const beverageDutyClaimed = !!(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
-  const beverageDutyClaimedByOther = beverageDutyClaimed && !hasBeverageDuty;
+  
+  // Separate beverage duty logic for each team
+  const isUserOnHomeTeam = userTeam?.id === game.homeTeam?.id;
+  const isUserOnAwayTeam = userTeam?.id === game.awayTeam?.id;
+  
+  // Home team beverage duty state
+  const homeTeamHasBeverageDuty = game.homeBeverageDutyUserId === (user as User)?.id;
+  const homeTeamBeverageDutyClaimed = !!game.homeBeverageDutyUserId;
+  const homeTeamBeverageDutyClaimedByOther = homeTeamBeverageDutyClaimed && !homeTeamHasBeverageDuty;
+  
+  // Away team beverage duty state  
+  const awayTeamHasBeverageDuty = game.awayBeverageDutyUserId === (user as User)?.id;
+  const awayTeamBeverageDutyClaimed = !!game.awayBeverageDutyUserId;
+  const awayTeamBeverageDutyClaimedByOther = awayTeamBeverageDutyClaimed && !awayTeamHasBeverageDuty;
 
   // Score submission logic
   const gameStartTime = new Date(game.scheduledAt).getTime();
@@ -458,19 +469,21 @@ export default function GameDetails() {
     : [];
   const latestUserSubmission = userSubmissions.length > 0 ? userSubmissions[userSubmissions.length - 1] : null;
   
-  // Check if the claimed user actually exists in team members
-  const allTeamMembers = [...(homeTeamMembers || []), ...(awayTeamMembers || [])];
-  const beverageDutyClaimantId = game.homeBeverageDutyUserId || game.awayBeverageDutyUserId;
-  const validBeverageDutyClaimantId = beverageDutyClaimantId === (user as User)?.id;
-  const claimantExists = beverageDutyClaimantId ? allTeamMembers.some((member) => member.user?.id === beverageDutyClaimantId) : false;
+  // Home team claimant logic
+  const homeTeamClaimantId = game.homeBeverageDutyUserId;
+  const homeTeamClaimantExists = homeTeamClaimantId ? (homeTeamMembers || []).some((member) => member.user?.id === homeTeamClaimantId) : false;
+  const homeTeamClaimant = homeTeamClaimantId ? (homeTeamMembers || []).find((member) => member.user?.id === homeTeamClaimantId) : null;
+  const homeTeamClaimantName = homeTeamClaimant?.user ? `${homeTeamClaimant.user.firstName} ${homeTeamClaimant.user.lastName}` : 'A teammate';
+  const validHomeTeamBeverageDutyClaimed = homeTeamBeverageDutyClaimed && (homeTeamClaimantExists || homeTeamHasBeverageDuty);
+  const validHomeTeamBeverageDutyClaimedByOther = validHomeTeamBeverageDutyClaimed && !homeTeamHasBeverageDuty;
   
-  // Find the claimant's name
-  const beverageDutyClaimant = beverageDutyClaimantId ? allTeamMembers.find((member) => member.user?.id === beverageDutyClaimantId) : null;
-  const claimantName = beverageDutyClaimant?.user ? `${beverageDutyClaimant.user.firstName} ${beverageDutyClaimant.user.lastName}` : 'A teammate';
-  
-  // If duty is claimed but claimant doesn't exist in team members, treat as unclaimed
-  const validBeverageDutyClaimed = beverageDutyClaimed && (claimantExists || validBeverageDutyClaimantId);
-  const validBeverageDutyClaimedByOther = validBeverageDutyClaimed && !hasBeverageDuty;
+  // Away team claimant logic
+  const awayTeamClaimantId = game.awayBeverageDutyUserId;
+  const awayTeamClaimantExists = awayTeamClaimantId ? (awayTeamMembers || []).some((member) => member.user?.id === awayTeamClaimantId) : false;
+  const awayTeamClaimant = awayTeamClaimantId ? (awayTeamMembers || []).find((member) => member.user?.id === awayTeamClaimantId) : null;
+  const awayTeamClaimantName = awayTeamClaimant?.user ? `${awayTeamClaimant.user.firstName} ${awayTeamClaimant.user.lastName}` : 'A teammate';
+  const validAwayTeamBeverageDutyClaimed = awayTeamBeverageDutyClaimed && (awayTeamClaimantExists || awayTeamHasBeverageDuty);
+  const validAwayTeamBeverageDutyClaimedByOther = validAwayTeamBeverageDutyClaimed && !awayTeamHasBeverageDuty;
 
   return (
     <div className="min-h-screen bg-background">
@@ -576,11 +589,13 @@ export default function GameDetails() {
           </div>
         )}
 
-        {/* Beverage Responsibility */}
+        {/* Beverage Responsibility - Home Team */}
         <div className="bg-card rounded-xl border border-border p-6">
-            <h3 className="text-lg font-semibold mb-4" data-testid="text-beverage-title">Beverage Responsibility</h3>
+            <h3 className="text-lg font-semibold mb-4" data-testid="text-beverage-title-home">
+              Beverage Responsibility - {game.homeTeam?.name}
+            </h3>
             
-            {hasBeverageDuty ? (
+            {homeTeamHasBeverageDuty ? (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-primary w-10 h-10 rounded-lg flex items-center justify-center">
@@ -592,24 +607,24 @@ export default function GameDetails() {
                     />
                   </div>
                   <div>
-                    <p className="font-medium text-primary" data-testid="text-beverage-assigned">You Have Beverage Duty</p>
+                    <p className="font-medium text-primary" data-testid="text-beverage-assigned-home">You Have Beverage Duty</p>
                     <p className="text-sm text-muted-foreground">You're responsible for bringing beverages</p>
                   </div>
                 </div>
                 <Button
                   variant="outline"
                   onClick={() => {
-                    if (userTeam) {
-                      releaseBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                    if (game.homeTeam) {
+                      releaseBeverageDutyMutation.mutate({ gameId: game.id, teamId: game.homeTeam.id });
                     }
                   }}
                   disabled={releaseBeverageDutyMutation.isPending}
-                  data-testid="button-release-beverage-duty"
+                  data-testid="button-release-beverage-duty-home"
                 >
                   Release Duty
                 </Button>
               </div>
-            ) : validBeverageDutyClaimedByOther ? (
+            ) : validHomeTeamBeverageDutyClaimedByOther ? (
               <div className="flex items-center gap-3">
                 <div className="bg-muted w-10 h-10 rounded-lg flex items-center justify-center">
                   <img 
@@ -620,8 +635,8 @@ export default function GameDetails() {
                   />
                 </div>
                 <div>
-                  <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">Beverage Duty Claimed by Teammate</p>
-                  <p className="text-sm text-muted-foreground">{claimantName} is bringing beverages</p>
+                  <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed-home">Beverage Duty Claimed</p>
+                  <p className="text-sm text-muted-foreground">{homeTeamClaimantName} is bringing beverages</p>
                 </div>
               </div>
             ) : (
@@ -636,28 +651,120 @@ export default function GameDetails() {
                     />
                   </div>
                   <div>
-                    <p className="font-medium text-muted-foreground" data-testid="text-beverage-available">Beverage Duty Available</p>
+                    <p className="font-medium text-muted-foreground" data-testid="text-beverage-available-home">Beverage Duty Available</p>
                     <p className="text-sm text-muted-foreground">No one has claimed beverage responsibility yet</p>
                   </div>
                 </div>
+                {isUserOnHomeTeam && (
+                  <Button
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    onClick={() => {
+                      if (game.homeTeam) {
+                        claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: game.homeTeam.id });
+                      }
+                    }}
+                    disabled={claimBeverageDutyMutation.isPending}
+                    data-testid="button-claim-beverage-duty-home"
+                  >
+                    <img 
+                      src={beverageJarUrl}
+                      alt="Claim Beverage Duty"
+                      className="h-4 w-auto mr-2"
+                      style={{ aspectRatio: '9/16' }}
+                    />
+                    Claim Responsibility
+                  </Button>
+                )}
+              </div>
+            )}
+        </div>
+
+        {/* Beverage Responsibility - Away Team */}
+        <div className="bg-card rounded-xl border border-border p-6">
+            <h3 className="text-lg font-semibold mb-4" data-testid="text-beverage-title-away">
+              Beverage Responsibility - {game.awayTeam?.name}
+            </h3>
+            
+            {awayTeamHasBeverageDuty ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary w-10 h-10 rounded-lg flex items-center justify-center">
+                    <img 
+                      src={beverageJarUrl}
+                      alt="Beverage Duty"
+                      className="h-6 w-auto"
+                      style={{ aspectRatio: '9/16' }}
+                    />
+                  </div>
+                  <div>
+                    <p className="font-medium text-primary" data-testid="text-beverage-assigned-away">You Have Beverage Duty</p>
+                    <p className="text-sm text-muted-foreground">You're responsible for bringing beverages</p>
+                  </div>
+                </div>
                 <Button
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  variant="outline"
                   onClick={() => {
-                    if (userTeam) {
-                      claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
+                    if (game.awayTeam) {
+                      releaseBeverageDutyMutation.mutate({ gameId: game.id, teamId: game.awayTeam.id });
                     }
                   }}
-                  disabled={claimBeverageDutyMutation.isPending}
-                  data-testid="button-claim-beverage-duty"
+                  disabled={releaseBeverageDutyMutation.isPending}
+                  data-testid="button-release-beverage-duty-away"
                 >
+                  Release Duty
+                </Button>
+              </div>
+            ) : validAwayTeamBeverageDutyClaimedByOther ? (
+              <div className="flex items-center gap-3">
+                <div className="bg-muted w-10 h-10 rounded-lg flex items-center justify-center">
                   <img 
                     src={beverageJarUrl}
-                    alt="Claim Beverage Duty"
-                    className="h-4 w-auto mr-2"
+                    alt="Beverage Duty"
+                    className="h-6 w-auto opacity-50"
                     style={{ aspectRatio: '9/16' }}
                   />
-                  Claim Responsibility
-                </Button>
+                </div>
+                <div>
+                  <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed-away">Beverage Duty Claimed</p>
+                  <p className="text-sm text-muted-foreground">{awayTeamClaimantName} is bringing beverages</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-muted w-10 h-10 rounded-lg flex items-center justify-center">
+                    <img 
+                      src={beverageJarUrl}
+                      alt="Beverage Duty"
+                      className="h-6 w-auto opacity-50"
+                      style={{ aspectRatio: '9/16' }}
+                    />
+                  </div>
+                  <div>
+                    <p className="font-medium text-muted-foreground" data-testid="text-beverage-available-away">Beverage Duty Available</p>
+                    <p className="text-sm text-muted-foreground">No one has claimed beverage responsibility yet</p>
+                  </div>
+                </div>
+                {isUserOnAwayTeam && (
+                  <Button
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    onClick={() => {
+                      if (game.awayTeam) {
+                        claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: game.awayTeam.id });
+                      }
+                    }}
+                    disabled={claimBeverageDutyMutation.isPending}
+                    data-testid="button-claim-beverage-duty-away"
+                  >
+                    <img 
+                      src={beverageJarUrl}
+                      alt="Claim Beverage Duty"
+                      className="h-4 w-auto mr-2"
+                      style={{ aspectRatio: '9/16' }}
+                    />
+                    Claim Responsibility
+                  </Button>
+                )}
               </div>
             )}
         </div>
