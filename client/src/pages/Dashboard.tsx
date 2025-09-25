@@ -1340,7 +1340,7 @@ export default function Dashboard() {
               .slice(0, 4).map((game: any) => (
               <div 
                 key={game.id} 
-                className="bg-card rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors" 
+                className="bg-card rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px]" 
                 onClick={() => navigate(game.isScrimmage ? `/scrimmage/${game.id}` : `/game/${game.id}`)}
                 data-testid={`card-game-${game.id}`}
               >
