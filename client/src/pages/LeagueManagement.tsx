@@ -47,6 +47,7 @@ import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ObjectUploader } from '@/components/ObjectUploader';
 
 type LeagueMember = {
   id: string;
@@ -1054,6 +1055,79 @@ export default function LeagueManagement() {
   const handleScheduleFileUpload = () => {
     if (!scheduleImportFile) return;
     scheduleUploadMutation.mutate(scheduleImportFile);
+  };
+
+  // Team logo upload mutation
+  const updateTeamLogoMutation = useMutation({
+    mutationFn: async (data: { teamId: string; logoUrl: string }) => {
+      const response = await apiRequest('PATCH', `/api/teams/${data.teamId}/logo`, { logoUrl: data.logoUrl });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+      toast({
+        title: "Success",
+        description: "Team logo updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update team logo. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGetTeamLogoUploadParameters = async () => {
+    try {
+      const response = await apiRequest('POST', '/api/team-logos/upload');
+      const data = await response.json();
+      return {
+        method: 'PUT' as const,
+        url: data.uploadURL,
+      };
+    } catch (error) {
+      console.error('Failed to get upload URL:', error);
+      throw error;
+    }
+  };
+
+  const createTeamLogoUploadComplete = (teamId: string) => async (files: File[]) => {
+    if (files.length === 0) return;
+    
+    try {
+      // Get upload parameters for this file
+      const uploadParams = await handleGetTeamLogoUploadParameters();
+      const file = files[0]; // Only handle the first file since maxNumberOfFiles is 1
+      
+      // Upload the file to object storage using the pre-signed URL
+      const uploadResponse = await fetch(uploadParams.url, {
+        method: uploadParams.method,
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed with status: ${uploadResponse.status}`);
+      }
+      
+      // Extract the public URL from the upload URL (remove query parameters)
+      const logoUrl = uploadParams.url.split('?')[0];
+      
+      // Update the team logo in the database
+      updateTeamLogoMutation.mutate({ teamId, logoUrl });
+      
+    } catch (error) {
+      console.error('Upload failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload team logo. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const removeFromLeagueMutation = useMutation({
@@ -3742,6 +3816,52 @@ export default function LeagueManagement() {
                     return `${teamMembers.length} player${teamMembers.length !== 1 ? 's' : ''}`;
                   })()}
                 </p>
+              </div>
+
+              {/* Team Logo Section */}
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-medium">Team Logo</p>
+                  <ObjectUploader
+                    maxNumberOfFiles={1}
+                    maxFileSize={10485760}
+                    onGetUploadParameters={handleGetTeamLogoUploadParameters}
+                    onComplete={createTeamLogoUploadComplete(selectedTeamForEdit.id)}
+                    buttonClassName="h-8 px-3 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-3 h-3" />
+                      <span>Upload Logo</span>
+                    </div>
+                  </ObjectUploader>
+                </div>
+                
+                {/* Show current logo if exists */}
+                {(selectedTeamForEdit as any)?.logoUrl && (
+                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                    <img 
+                      src={(selectedTeamForEdit as any).logoUrl} 
+                      alt={`${selectedTeamForEdit.name} logo`}
+                      className="w-12 h-12 rounded-lg object-contain bg-background"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">Current Logo</p>
+                      <p className="text-xs text-muted-foreground">Upload a new logo to replace</p>
+                    </div>
+                  </div>
+                )}
+                
+                {!(selectedTeamForEdit as any)?.logoUrl && (
+                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                    <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center">
+                      <Trophy className="w-6 h-6 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">No Logo</p>
+                      <p className="text-xs text-muted-foreground">Upload a team logo</p>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="pt-4 border-t border-border">
