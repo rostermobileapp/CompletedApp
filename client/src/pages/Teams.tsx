@@ -448,7 +448,7 @@ export default function Teams() {
                         </Card>
 
                         {/* Assists Leader */}
-                        <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-team-assists-leader">
+                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#212121]" data-testid="card-team-assists-leader">
                           <div className="flex items-center gap-3">
                             <Apple className="w-5 h-5 text-info" />
                             <div className="flex items-center gap-2">
