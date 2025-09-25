@@ -1088,7 +1088,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="dashboard-page">
       {/* Header */}
-      <div className="p-6 pt-12">
+      <div className="p-6 pt-[0px] pb-[0px] pl-[32px] pr-[32px] mt-[20px] mb-[20px]">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <img 
