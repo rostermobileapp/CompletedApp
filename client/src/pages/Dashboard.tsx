@@ -1222,7 +1222,7 @@ export default function Dashboard() {
 
           {/* Standings Card */}
           <div 
-            className="bg-card rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors" 
+            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" 
             data-testid="card-standings"
             onClick={() => selectedLeagueId && setShowStandingsModal(true)}
           >
