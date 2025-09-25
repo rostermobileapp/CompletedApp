@@ -581,14 +581,6 @@ export default function GameDetails() {
           </div>
         )}
 
-        {/* Substitute Requests Dashboard for Commissioners */}
-        {isCommissioner && (
-          <div className="bg-card rounded-xl border border-border p-6">
-            <h3 className="text-lg font-semibold mb-4">Substitute Requests for This Game</h3>
-            <SubstituteRequestsDashboard gameId={game.id} />
-          </div>
-        )}
-
         {/* Beverage Responsibility - Only show for user's team */}
         {isUserOnHomeTeam && (
           <div className="bg-card rounded-xl border border-border p-6">
@@ -653,7 +645,6 @@ export default function GameDetails() {
                     </div>
                     <div>
                       <p className="font-medium text-muted-foreground" data-testid="text-beverage-available">Beverage Duty Available</p>
-                      <p className="text-sm text-muted-foreground">No one has claimed beverage responsibility yet</p>
                     </div>
                   </div>
                   <Button
@@ -742,7 +733,6 @@ export default function GameDetails() {
                     </div>
                     <div>
                       <p className="font-medium text-muted-foreground" data-testid="text-beverage-available">Beverage Duty Available</p>
-                      <p className="text-sm text-muted-foreground">No one has claimed beverage responsibility yet</p>
                     </div>
                   </div>
                   <Button
@@ -765,6 +755,14 @@ export default function GameDetails() {
                   </Button>
                 </div>
               )}
+          </div>
+        )}
+
+        {/* Substitute Requests Dashboard for Commissioners */}
+        {isCommissioner && (
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h3 className="text-lg font-semibold mb-4">Substitute Requests for This Game</h3>
+            <SubstituteRequestsDashboard gameId={game.id} />
           </div>
         )}
 
