@@ -243,42 +243,74 @@
     -moz-appearance: textfield;
   }
 
-  /* Uppy Dashboard Modal Size Overrides */
-  .uppy-Dashboard--modal .uppy-Dashboard-inner {
+  /* Uppy Dashboard Modal Size Overrides - More aggressive targeting */
+  body .uppy-Dashboard--modal .uppy-Dashboard-inner,
+  html body .uppy-Dashboard--modal .uppy-Dashboard-inner {
     width: 450px !important;
     height: 350px !important;
     max-width: 450px !important;
     max-height: 350px !important;
+    min-width: 450px !important;
+    min-height: 350px !important;
     border-radius: 8px !important;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+  }
+
+  /* Target the modal overlay */
+  body .uppy-Dashboard--modal,
+  html body .uppy-Dashboard--modal {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    z-index: 1000 !important;
   }
 
   /* Make the modal more compact */
-  .uppy-Dashboard-inner {
+  body .uppy-Dashboard-inner,
+  html body .uppy-Dashboard-inner {
     padding: 12px !important;
   }
 
-  .uppy-Dashboard-AddFiles {
-    min-height: 200px !important;
-    height: 200px !important;
+  body .uppy-Dashboard-AddFiles,
+  html body .uppy-Dashboard-AddFiles {
+    min-height: 180px !important;
+    height: 180px !important;
   }
 
-  .uppy-Dashboard-AddFilesPanel {
-    min-height: 150px !important;
+  body .uppy-Dashboard-AddFilesPanel,
+  html body .uppy-Dashboard-AddFilesPanel {
+    min-height: 120px !important;
   }
 
-  /* Hide the drag & drop instruction text for smaller modal */
-  .uppy-size--md .uppy-Dashboard-note {
+  /* Compact text and controls */
+  body .uppy-Dashboard-note,
+  html body .uppy-Dashboard-note {
     font-size: 12px !important;
     margin-top: 8px !important;
+    margin-bottom: 8px !important;
   }
 
-  /* Make file input area more compact */
-  .uppy-Dashboard-browse {
+  body .uppy-Dashboard-browse,
+  html body .uppy-Dashboard-browse {
     font-size: 14px !important;
   }
 
-  .uppy-Dashboard-dropFilesTitle {
+  body .uppy-Dashboard-dropFilesTitle,
+  html body .uppy-Dashboard-dropFilesTitle {
     font-size: 16px !important;
     margin-bottom: 8px !important;
+  }
+
+  /* Compact header */
+  body .uppy-Dashboard-title,
+  html body .uppy-Dashboard-title {
+    font-size: 18px !important;
+    margin-bottom: 10px !important;
   }
 }
