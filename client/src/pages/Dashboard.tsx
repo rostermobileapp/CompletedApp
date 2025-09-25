@@ -1261,7 +1261,7 @@ export default function Dashboard() {
             </div>
             <div className="bg-card rounded-xl border border-border p-4 pl-[10px] pr-[10px] pt-[2px] pb-[2px]" data-testid="card-record-stat">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#16a2497d]">
                   <TrendingUp className="w-5 h-5 text-accent-foreground" />
                 </div>
                 <div>
