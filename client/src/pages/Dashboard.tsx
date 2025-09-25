@@ -1353,7 +1353,7 @@ export default function Dashboard() {
                 onClick={() => navigate(game.isScrimmage ? `/scrimmage/${game.id}` : `/game/${game.id}`)}
                 data-testid={`card-game-${game.id}`}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 bg-[212121]">
                   <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
                     {(() => {
                       const opponentTeam = game.homeTeam?.id === primaryTeam?.id ? game.awayTeam : game.homeTeam;
