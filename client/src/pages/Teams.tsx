@@ -378,7 +378,7 @@ export default function Teams() {
                 </Card>
 
                 {/* Team Standings */}
-                <Card>
+                <Card className="rounded-lg border text-card-foreground shadow-sm bg-[#212121]">
                   <CardHeader className="flex flex-col space-y-1.5 p-6 pt-[5px] pb-[5px]">
                     <CardTitle className="text-2xl font-semibold leading-none tracking-tight text-center">League Standing</CardTitle>
                   </CardHeader>
