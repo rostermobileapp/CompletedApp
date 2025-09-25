@@ -1199,7 +1199,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-3 gap-3">
           {/* Announcements Card */}
           <Link href="/announcements">
-            <div className="bg-card rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors" data-testid="card-announcements">
+            <div className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#2b2b2b]" data-testid="card-announcements">
               <div className="h-full flex flex-col items-center justify-center">
                 <Megaphone className="w-8 h-8 text-orange-500 mb-3" />
                 <p className="text-xs font-medium">Announcements</p>
