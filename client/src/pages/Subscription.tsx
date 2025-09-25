@@ -126,7 +126,7 @@ export default function Subscription() {
     },
     {
       name: "Player Plus",
-      price: "$9.99",
+      price: "$8",
       period: "month",
       description: "Enhanced features for serious players",
       features: [
@@ -186,7 +186,7 @@ export default function Subscription() {
             <div className="mb-6 text-center">
               <Crown className="w-12 h-12 text-primary mx-auto mb-3" />
               <h2 className="text-xl font-semibold mb-2">Upgrade to Player Plus</h2>
-              <p className="text-muted-foreground">$9.99/month - Cancel anytime</p>
+              <p className="text-muted-foreground">$8/month - Cancel anytime</p>
             </div>
 
             <Elements stripe={stripePromise} options={{ clientSecret }}>
@@ -230,7 +230,7 @@ export default function Subscription() {
                 {isCommissioner ? 'Commissioner' : isPlayerPlus ? 'Player Plus' : 'Free Tier'}
               </p>
               <p className="text-sm text-muted-foreground">
-                {isCommissioner ? '$19.99/month' : isPlayerPlus ? '$9.99/month' : 'Free forever'}
+                {isCommissioner ? '$19.99/month' : isPlayerPlus ? '$8/month' : 'Free forever'}
               </p>
             </div>
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
