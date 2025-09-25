@@ -242,4 +242,43 @@
   input[type="number"] {
     -moz-appearance: textfield;
   }
+
+  /* Uppy Dashboard Modal Size Overrides */
+  .uppy-Dashboard--modal .uppy-Dashboard-inner {
+    width: 450px !important;
+    height: 350px !important;
+    max-width: 450px !important;
+    max-height: 350px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Make the modal more compact */
+  .uppy-Dashboard-inner {
+    padding: 12px !important;
+  }
+
+  .uppy-Dashboard-AddFiles {
+    min-height: 200px !important;
+    height: 200px !important;
+  }
+
+  .uppy-Dashboard-AddFilesPanel {
+    min-height: 150px !important;
+  }
+
+  /* Hide the drag & drop instruction text for smaller modal */
+  .uppy-size--md .uppy-Dashboard-note {
+    font-size: 12px !important;
+    margin-top: 8px !important;
+  }
+
+  /* Make file input area more compact */
+  .uppy-Dashboard-browse {
+    font-size: 14px !important;
+  }
+
+  .uppy-Dashboard-dropFilesTitle {
+    font-size: 16px !important;
+    margin-bottom: 8px !important;
+  }
 }
