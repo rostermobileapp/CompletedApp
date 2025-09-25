@@ -670,7 +670,7 @@ export default function GameDetails() {
         )}
 
         {isUserOnAwayTeam && (
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-6 mt-[2px] mb-[2px] pt-[2px] pb-[2px] pl-[2px] pr-[2px]">
               <h3 className="text-lg font-semibold mb-4" data-testid="text-beverage-title">
                 Beverage Responsibility
               </h3>
