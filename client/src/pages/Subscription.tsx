@@ -158,6 +158,24 @@ export default function Subscription() {
       buttonText: isCommissioner ? "Current Plan" : "Upgrade to Commissioner",
       buttonDisabled: isCommissioner,
       highlight: false,
+    },
+    {
+      name: "Custom League",
+      price: "Contact us",
+      period: "",
+      description: "Tailored solutions for large organizations",
+      features: [
+        "All Commissioner features",
+        "Unlimited leagues & teams",
+        "Custom integrations",
+        "Dedicated support team",
+        "White-label options",
+        "Advanced analytics & reporting"
+      ],
+      current: false,
+      buttonText: "Contact Roster",
+      buttonDisabled: false,
+      highlight: false,
     }
   ];
 
@@ -294,6 +312,8 @@ export default function Subscription() {
                 onClick={() => {
                   if (plan.name === "Player Plus" && !isPlayerPlus && !isCommissioner) {
                     setShowPaymentForm(true);
+                  } else if (plan.name === "Custom League") {
+                    window.open('mailto:sales@roster.com?subject=Custom League Pricing Inquiry&body=Hi, I\'m interested in learning more about custom league pricing options for my organization.', '_blank');
                   }
                 }}
                 disabled={plan.buttonDisabled}
