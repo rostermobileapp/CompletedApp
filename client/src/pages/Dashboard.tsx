@@ -1255,7 +1255,7 @@ export default function Dashboard() {
                   <p className="text-2xl font-bold" data-testid="text-games-remaining">
                     {(teamRecord as any)?.gamesRemaining ?? 0}
                   </p>
-                  <p className="text-xs text-muted-foreground">Games Remaining</p>
+                  <p className="text-muted-foreground text-[14px]">Games Left</p>
                 </div>
               </div>
             </div>
