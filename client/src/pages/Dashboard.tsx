@@ -1147,7 +1147,7 @@ export default function Dashboard() {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowLeagueDropdown(!showLeagueDropdown)}
-              className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
+              className="w-full border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#212121]"
               data-testid="button-league-selector"
             >
               <div className="flex items-center gap-2">
