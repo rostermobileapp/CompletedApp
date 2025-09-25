@@ -1240,7 +1240,16 @@ export default function Dashboard() {
             <div className="bg-card rounded-xl border border-border p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px]" data-testid="card-games-stat">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                  <Trophy className="w-5 h-5 text-primary-foreground" />
+                  {primaryTeam?.logoUrl ? (
+                    <img 
+                      src={primaryTeam.logoUrl} 
+                      alt={`${primaryTeam.name} logo`}
+                      className="w-full h-full rounded-lg object-cover"
+                      data-testid="img-team-logo"
+                    />
+                  ) : (
+                    <Trophy className="w-5 h-5 text-primary-foreground" />
+                  )}
                 </div>
                 <div>
                   <p className="text-2xl font-bold" data-testid="text-games-remaining">
