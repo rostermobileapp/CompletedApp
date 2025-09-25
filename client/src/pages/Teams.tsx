@@ -333,9 +333,6 @@ export default function Teams() {
                         <CardTitle className="text-2xl" data-testid={`text-team-name-${team.id}`}>
                           {team.name}
                         </CardTitle>
-                        <p className="text-muted-foreground">
-                          {team.wins}-{team.losses}-{team.ties} Record
-                        </p>
                       </div>
                       {((team.captainId === (user as any)?.id) || 
                         hasRole('secondary_commissioner')) && (
