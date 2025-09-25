@@ -464,6 +464,10 @@ export default function GameDetails() {
   const validBeverageDutyClaimantId = beverageDutyClaimantId === (user as User)?.id;
   const claimantExists = beverageDutyClaimantId ? allTeamMembers.some((member) => member.user?.id === beverageDutyClaimantId) : false;
   
+  // Find the claimant's name
+  const beverageDutyClaimant = beverageDutyClaimantId ? allTeamMembers.find((member) => member.user?.id === beverageDutyClaimantId) : null;
+  const claimantName = beverageDutyClaimant?.user ? `${beverageDutyClaimant.user.firstName} ${beverageDutyClaimant.user.lastName}` : 'A teammate';
+  
   // If duty is claimed but claimant doesn't exist in team members, treat as unclaimed
   const validBeverageDutyClaimed = beverageDutyClaimed && (claimantExists || validBeverageDutyClaimantId);
   const validBeverageDutyClaimedByOther = validBeverageDutyClaimed && !hasBeverageDuty;
@@ -617,7 +621,7 @@ export default function GameDetails() {
                 </div>
                 <div>
                   <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">Beverage Duty Claimed by Teammate</p>
-                  <p className="text-sm text-muted-foreground">A teammate is bringing beverages</p>
+                  <p className="text-sm text-muted-foreground">{claimantName} is bringing beverages</p>
                 </div>
               </div>
             ) : (
