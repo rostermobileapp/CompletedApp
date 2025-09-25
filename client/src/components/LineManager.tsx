@@ -305,7 +305,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-col space-y-1.5 p-6 pl-[0px] pr-[0px] pt-[2px] pb-[2px]">
         <CardTitle className="flex items-center gap-2">
           <Users className="w-5 h-5" />
           Line Combinations
