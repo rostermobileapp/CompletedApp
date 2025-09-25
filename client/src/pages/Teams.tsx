@@ -426,7 +426,7 @@ export default function Teams() {
                     {teamLeaders ? (
                       <>
                         {/* Points Leader */}
-                        <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-team-points-leader">
+                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#212121]" data-testid="card-team-points-leader">
                           <div className="flex items-center gap-3">
                             <TrendingUp className="w-5 h-5 text-primary" />
                             <div className="flex items-center gap-2">
