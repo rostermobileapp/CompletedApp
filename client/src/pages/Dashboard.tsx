@@ -1293,7 +1293,7 @@ export default function Dashboard() {
           <div className="bg-black dark:bg-black border border-gray-600 rounded-lg">
             <button
               onClick={() => setShowNeedsAttentionModal(true)}
-              className="w-full flex items-center justify-between hover:bg-gray-800 transition-colors rounded-lg px-3 py-2"
+              className="w-full flex items-center justify-between hover:bg-gray-800 transition-colors rounded-lg px-3 py-2 bg-[#212121]"
               data-testid="button-needs-attention-permanent"
             >
               <div className="flex items-center gap-3">
