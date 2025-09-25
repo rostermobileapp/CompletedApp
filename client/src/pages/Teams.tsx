@@ -339,7 +339,7 @@ export default function Teams() {
               <TabsContent key={team.id} value={team.id} className="space-y-6">
                 {/* Team Header Card */}
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="flex flex-col space-y-1.5 p-6 bg-[#212121]">
                     <div className="flex items-center gap-4">
                       <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${team.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
                         {team.logoUrl ? (
