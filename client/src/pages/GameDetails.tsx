@@ -507,10 +507,9 @@ export default function GameDetails() {
           </h1>
         </div>
       </div>
-
       {/* Game Info */}
       <div className="px-6 py-6 space-y-6">
-        <div className="bg-card rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-border p-6 pt-[2px] pb-[2px] pl-[5px] pr-[5px]">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center">
               {opponentTeam?.logoUrl ? (
@@ -1052,7 +1051,6 @@ export default function GameDetails() {
           </div>
         )}
       </div>
-      
       {/* RSVP Detail Modal */}
       <RSVPDetailModal
         gameId={game.id}
@@ -1066,7 +1064,6 @@ export default function GameDetails() {
         showSubstituteButtons={isCaptain}
         teamId={isCaptain ? captainTeamId : undefined}
       />
-      
       {/* Substitute Request Modal */}
       {substituteRequestData && (
         <SubstituteRequestModal
