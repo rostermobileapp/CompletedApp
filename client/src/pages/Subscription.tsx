@@ -143,7 +143,7 @@ export default function Subscription() {
     },
     {
       name: "Commissioner",
-      price: "$19.99", 
+      price: "$12", 
       period: "month",
       description: "Full league management capabilities",
       features: [
@@ -230,7 +230,7 @@ export default function Subscription() {
                 {isCommissioner ? 'Commissioner' : isPlayerPlus ? 'Player Plus' : 'Free Tier'}
               </p>
               <p className="text-sm text-muted-foreground">
-                {isCommissioner ? '$19.99/month' : isPlayerPlus ? '$8/month' : 'Free forever'}
+                {isCommissioner ? '$12/month' : isPlayerPlus ? '$8/month' : 'Free forever'}
               </p>
             </div>
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
