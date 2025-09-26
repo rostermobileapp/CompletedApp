@@ -3207,9 +3207,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           authorId: userId,
         });
         
-        // Create visibility records for targeted users
-        console.log(`🔒 Creating visibility records for ${validUserIds.length} users`);
-        await storage.createAnnouncementVisibility(announcement.id, validUserIds);
+        // Create visibility records for targeted users + author
+        const visibilityUserIds = [...new Set([...validUserIds, userId])]; // Include author and remove duplicates
+        console.log(`🔒 Creating visibility records for ${visibilityUserIds.length} users (including author)`);
+        await storage.createAnnouncementVisibility(announcement.id, visibilityUserIds);
         
         console.log(`✅ Created targeted announcement ${announcement.id} for users: ${validUserIds.join(', ')}`);
       } else {
@@ -3431,41 +3432,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { optionIndex } = req.body;
 
-      console.log('🗳️ Poll vote attempt:', { pollId, userId, optionIndex });
-
       if (optionIndex === undefined || optionIndex < 0) {
-        console.log('❌ Invalid option index:', optionIndex);
         return res.status(400).json({ message: 'Valid option index is required' });
       }
 
       // First get the poll to find the announcement it belongs to
       try {
         const polls = await db.select().from(announcementPolls).where(eq(announcementPolls.id, pollId));
-        console.log('🔍 Found polls:', polls.length);
         if (polls.length === 0) {
-          console.log('❌ No poll found with ID:', pollId);
           return res.status(404).json({ message: 'Poll not found' });
         }
         
         const announcement = await storage.getAnnouncement(polls[0].announcementId);
-        console.log('📢 Found announcement:', !!announcement);
         if (!announcement) {
-          console.log('❌ No announcement found for poll');
           return res.status(404).json({ message: 'Announcement not found' });
         }
 
         const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
-        console.log('👥 User membership:', !!membership, membership?.status);
         if (!membership || membership.status !== 'approved') {
-          console.log('❌ User access denied - no membership or not approved');
           return res.status(403).json({ message: 'Access denied' });
         }
 
         // Check if announcement is visible to this user (targeted visibility)
         const isVisible = await storage.isAnnouncementVisibleToUser(announcement.id, userId);
-        console.log('👁️ Announcement visible to user:', isVisible);
         if (!isVisible) {
-          console.log('❌ Announcement not visible to user');
           return res.status(404).json({ message: 'Poll not found' }); // Return 404 to not reveal existence
         }
       } catch (error) {
