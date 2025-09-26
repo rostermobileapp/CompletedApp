@@ -3503,14 +3503,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async isAnnouncementVisibleToUser(announcementId: string, userId: string): Promise<boolean> {
+    console.log('🔍 Checking visibility for announcement:', announcementId, 'user:', userId);
+    
     // Check if announcement has any visibility restrictions
     const visibilityCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(announcementVisibility)
       .where(eq(announcementVisibility.announcementId, announcementId));
     
+    console.log('👀 Visibility records count:', visibilityCount[0].count);
+    
     // If no visibility records exist, announcement is visible to all league members (default behavior)
     if (visibilityCount[0].count === 0) {
+      console.log('✅ No visibility restrictions - announcement is public');
       return true;
     }
     
@@ -3525,7 +3530,9 @@ export class DatabaseStorage implements IStorage {
         )
       );
     
-    return userVisibility.length > 0;
+    const isVisible = userVisibility.length > 0;
+    console.log('🎯 User has explicit visibility access:', isVisible);
+    return isVisible;
   }
 
   // Scrimmage operations
