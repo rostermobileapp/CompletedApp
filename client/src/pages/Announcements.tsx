@@ -804,11 +804,7 @@ function AnnouncementCard({
                     >
                       {/* Background progress bar */}
                       <div 
-                        className={`absolute inset-0 transition-all duration-500 ${
-                          userVoted 
-                            ? 'bg-primary/20' 
-                            : 'bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30'
-                        }`}
+                        className="absolute inset-0 transition-all duration-500 from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 bg-[#3883f6]"
                         style={{ width: `${Math.max(percentage, 8)}%` }}
                       />
                       
@@ -892,7 +888,6 @@ function AnnouncementCard({
           </div>
         )}
       </CardContent>
-      
       {/* Edit Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="max-w-2xl">
@@ -950,7 +945,6 @@ function AnnouncementCard({
           </div>
         </DialogContent>
       </Dialog>
-      
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
