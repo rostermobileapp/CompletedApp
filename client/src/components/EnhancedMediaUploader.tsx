@@ -172,6 +172,13 @@ export function EnhancedMediaUploader({
 
   return (
     <>
+      {/* Render children with click handler to open the modal */}
+      {children && (
+        <div onClick={() => setIsOpen(true)} style={{ display: 'contents' }}>
+          {children}
+        </div>
+      )}
+      
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="media-upload-dialog">
           <DialogHeader>
