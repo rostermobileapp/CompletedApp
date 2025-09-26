@@ -763,7 +763,7 @@ function AnnouncementCard({
         {/* Enhanced Poll */}
         {(announcement as any).polls && (announcement as any).polls.length > 0 && (
           <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-2 border-blue-200 dark:border-blue-800">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 bg-[#212121]">
               <div className="flex items-center justify-between">
                 <h4 className="font-semibold flex items-center gap-2 text-blue-800 dark:text-blue-200">
                   <BarChart3 className="w-5 h-5" />
