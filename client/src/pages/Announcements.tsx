@@ -19,7 +19,8 @@ import {
   Clock,
   Users,
   Edit2,
-  Trash2
+  Trash2,
+  FileText
 } from 'lucide-react';
 import { ScrimmageRSVPButtons } from '@/components/ScrimmageRSVPButtons';
 import { Button } from '@/components/ui/button';
@@ -679,6 +680,85 @@ function AnnouncementCard({
           {announcement.content}
         </p>
 
+        {/* Attachments */}
+        {(announcement as any).attachments && (announcement as any).attachments.length > 0 && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(announcement as any).attachments.map((attachment: any, index: number) => {
+                if (attachment.type === 'image') {
+                  return (
+                    <div 
+                      key={index} 
+                      className="relative border rounded-lg overflow-hidden bg-muted/30"
+                      data-testid={`attachment-image-${index}`}
+                    >
+                      <div className="aspect-video relative">
+                        <img
+                          src={attachment.url}
+                          alt={attachment.filename || 'Attached image'}
+                          className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                          onClick={() => window.open(attachment.url, '_blank')}
+                        />
+                      </div>
+                      {attachment.filename && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/75 text-white p-2">
+                          <p className="text-xs font-medium truncate">
+                            {attachment.filename}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                } else if (attachment.type === 'video') {
+                  return (
+                    <div 
+                      key={index} 
+                      className="relative border rounded-lg overflow-hidden bg-muted/30"
+                      data-testid={`attachment-video-${index}`}
+                    >
+                      <div className="aspect-video relative bg-black">
+                        <video
+                          src={attachment.url}
+                          className="w-full h-full object-cover"
+                          controls
+                        />
+                      </div>
+                      {attachment.filename && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/75 text-white p-2">
+                          <p className="text-xs font-medium truncate">
+                            {attachment.filename}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                } else {
+                  // Other file types (documents, etc.)
+                  return (
+                    <div 
+                      key={index} 
+                      className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer"
+                      onClick={() => window.open(attachment.url, '_blank')}
+                      data-testid={`attachment-file-${index}`}
+                    >
+                      <div className="flex items-center justify-center w-10 h-10 bg-muted rounded">
+                        <FileText className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {attachment.filename || 'File'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {attachment.type}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Enhanced Poll */}
         {announcement.poll && (
