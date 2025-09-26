@@ -17,7 +17,9 @@ import {
   MoreHorizontal,
   Calendar,
   Clock,
-  Users
+  Users,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { ScrimmageRSVPButtons } from '@/components/ScrimmageRSVPButtons';
 import { Button } from '@/components/ui/button';
@@ -26,6 +28,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -467,6 +479,12 @@ function AnnouncementCard({
   isCommissioner: boolean;
 }) {
   const { toast } = useToast();
+  
+  // Edit/Delete state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editContent, setEditContent] = useState(announcement.content);
+  const [editIsPinned, setEditIsPinned] = useState(announcement.isPinned);
 
   // Check if this is a scrimmage invitation
   const isScrimmageInvitation = announcement.content.includes('🏒 You\'re Invited!');
@@ -532,6 +550,36 @@ function AnnouncementCard({
     }
   });
 
+  // Edit announcement mutation
+  const updateAnnouncementMutation = useMutation({
+    mutationFn: async (data: { content: string; isPinned: boolean }) => {
+      return await apiRequest('PUT', `/api/announcements/${announcement.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      toast({ title: 'Announcement updated successfully!' });
+      setShowEditModal(false);
+    },
+    onError: () => {
+      toast({ title: 'Failed to update announcement', variant: 'destructive' });
+    }
+  });
+
+  // Delete announcement mutation
+  const deleteAnnouncementMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('DELETE', `/api/announcements/${announcement.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      toast({ title: 'Announcement deleted successfully!' });
+      setShowDeleteConfirm(false);
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete announcement', variant: 'destructive' });
+    }
+  });
+
   const handleReaction = (emoji: string) => {
     const isRemoving = userReactions.includes(emoji);
     toggleReactionMutation.mutate({ emoji, isRemoving });
@@ -579,17 +627,43 @@ function AnnouncementCard({
           </Avatar>
           
           <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">
-                {announcement.author.firstName} {announcement.author.lastName}
-              </span>
-              <Badge variant="secondary" className="text-xs">
-                Commissioner
-              </Badge>
-              {announcement.isPinned && (
-                <Badge variant="default" className="text-xs">
-                  Pinned
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">
+                  {announcement.author.firstName} {announcement.author.lastName}
+                </span>
+                <Badge variant="secondary" className="text-xs">
+                  Commissioner
                 </Badge>
+                {announcement.isPinned && (
+                  <Badge variant="default" className="text-xs">
+                    Pinned
+                  </Badge>
+                )}
+              </div>
+              
+              {/* Edit/Delete buttons for commissioners */}
+              {isCommissioner && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hover:bg-muted"
+                    onClick={() => setShowEditModal(true)}
+                    data-testid="button-edit-announcement"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    data-testid="button-delete-announcement"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               )}
             </div>
             
@@ -738,6 +812,93 @@ function AnnouncementCard({
           </div>
         )}
       </CardContent>
+      
+      {/* Edit Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="w-5 h-5" />
+              Edit Announcement
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="edit-content">Content</Label>
+              <Textarea
+                id="edit-content"
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                placeholder="What would you like to announce?"
+                className="min-h-[100px] resize-none"
+                data-testid="textarea-edit-content"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="edit-pin"
+                checked={editIsPinned}
+                onChange={(e) => setEditIsPinned(e.target.checked)}
+                data-testid="checkbox-edit-pin"
+              />
+              <Label htmlFor="edit-pin">Pin this announcement</Label>
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setEditContent(announcement.content);
+                  setEditIsPinned(announcement.isPinned);
+                  setShowEditModal(false);
+                }}
+                data-testid="button-cancel-edit"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => updateAnnouncementMutation.mutate({ content: editContent, isPinned: editIsPinned })}
+                disabled={!editContent.trim() || updateAnnouncementMutation.isPending}
+                data-testid="button-save-edit"
+              >
+                {updateAnnouncementMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-destructive" />
+              Delete Announcement
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this announcement? This action cannot be undone.
+              {announcement.poll && " This will also delete the poll and all its votes."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAnnouncementMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteAnnouncementMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteAnnouncementMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
@@ -753,9 +914,19 @@ export default function Announcements() {
     enabled: !!user
   });
 
+  // Get user league memberships to check for commissioner role
+  const { data: userMemberships = [] } = useQuery({
+    queryKey: ['/api/user/league-memberships'],
+    enabled: !!user
+  });
+
   const currentLeague = (userLeagues as any[])[0];
   const leagueId = currentLeague?.id;
-  const isCommissioner = currentLeague?.commissionerId === user?.id;
+  
+  // Check if user is commissioner - either league owner or has commissioner role in membership
+  const currentMembership = userMemberships.find((m: any) => m.leagueId === leagueId);
+  const isCommissioner = currentLeague?.commissionerId === user?.id || 
+                         currentMembership?.league_role === 'commissioner';
 
   // Fetch announcements
   const { data, isLoading } = useQuery<{ announcements: Announcement[]; pagination?: { page: number; pageSize: number; total: number } }>({

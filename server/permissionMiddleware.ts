@@ -168,8 +168,27 @@ export const requireLeagueManagement: RequestHandler = async (req, res, next) =>
   const userRole = user.role || 'free_tier';
   const hasAdmin = user.specialPermissions && user.specialPermissions.includes('admin');
   
+  // Check if user has global permissions
   if (user.isPrimaryCommissioner || hasAdmin || roleHierarchy[userRole] >= roleHierarchy['secondary_commissioner']) {
     return next();
+  }
+
+  // Check if user is already a commissioner of any existing league
+  try {
+    const userLeagues = await storage.getLeaguesByCommissioner(user.id);
+    if (userLeagues && userLeagues.length > 0) {
+      return next();
+    }
+
+    // Allow any authenticated user to create their first league
+    // This allows new users to become commissioners by creating their first league
+    const allUserLeagues = await storage.getUserLeagues(user.id);
+    if (!allUserLeagues || allUserLeagues.length === 0) {
+      console.log(`🎯 Allowing first league creation for new user ${user.id}`);
+      return next();
+    }
+  } catch (error) {
+    console.error('Error checking user league status:', error);
   }
 
   res.status(403).json({ 
