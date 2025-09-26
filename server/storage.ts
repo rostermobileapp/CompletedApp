@@ -3501,14 +3501,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async isAnnouncementVisibleToUser(announcementId: string, userId: string): Promise<boolean> {
+    console.log('🔍 Visibility check called for:', { announcementId, userId });
+    
     // Check if announcement has any visibility restrictions
     const visibilityCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(announcementVisibility)
       .where(eq(announcementVisibility.announcementId, announcementId));
     
+    console.log('🔍 Visibility records count:', visibilityCount[0].count);
+    
     // If no visibility records exist, announcement is visible to all league members (default behavior)
     if (visibilityCount[0].count === 0) {
+      console.log('🔍 No visibility restrictions - visible to all');
       return true;
     }
     
@@ -3522,6 +3527,17 @@ export class DatabaseStorage implements IStorage {
           eq(announcementVisibility.userId, userId)
         )
       );
+    
+    console.log('🔍 User in visibility list:', userVisibility.length > 0, 'records found:', userVisibility.length);
+    
+    // Debug: let's see what visibility records exist for this announcement
+    if (userVisibility.length === 0) {
+      const allVisibilityRecords = await db
+        .select()
+        .from(announcementVisibility)
+        .where(eq(announcementVisibility.announcementId, announcementId));
+      console.log('🔍 All visibility records for announcement:', allVisibilityRecords.map(r => ({ userId: r.userId, role: r.role, teamId: r.teamId })));
+    }
     
     return userVisibility.length > 0;
   }

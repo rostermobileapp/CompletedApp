@@ -3320,24 +3320,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { emoji } = req.body;
 
+      console.log('🎭 Reaction API called:', { announcementId, userId, emoji });
+
       if (!emoji) {
+        console.log('🎭 Missing emoji in request');
         return res.status(400).json({ message: 'Emoji is required' });
       }
 
       // Check if announcement exists and user has access
       const announcement = await storage.getAnnouncement(announcementId);
+      console.log('🎭 Announcement found:', !!announcement);
       if (!announcement) {
+        console.log('🎭 Announcement not found in database:', announcementId);
         return res.status(404).json({ message: 'Announcement not found' });
       }
 
       const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
+      console.log('🎭 User membership:', !!membership, membership?.status);
       if (!membership || membership.status !== 'approved') {
+        console.log('🎭 User not approved member of league:', userId, announcement.leagueId);
         return res.status(403).json({ message: 'Access denied' });
       }
 
       // Check if announcement is visible to this user (targeted visibility)
       const isVisible = await storage.isAnnouncementVisibleToUser(announcementId, userId);
+      console.log('🎭 Announcement visible to user:', isVisible);
       if (!isVisible) {
+        console.log('🎭 Announcement not visible to user:', announcementId, userId);
         return res.status(404).json({ message: 'Announcement not found' }); // Return 404 to not reveal existence
       }
 

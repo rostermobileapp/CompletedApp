@@ -553,7 +553,7 @@ function AnnouncementCard({
   // Edit announcement mutation
   const updateAnnouncementMutation = useMutation({
     mutationFn: async (data: { content: string; isPinned: boolean }) => {
-      return await apiRequest('PUT', `/api/announcements/${announcement.id}`, data);
+      return await apiRequest('PATCH', `/api/announcements/${announcement.id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
@@ -924,7 +924,7 @@ export default function Announcements() {
   const leagueId = currentLeague?.id;
   
   // Check if user is commissioner - either league owner or has commissioner role in membership
-  const currentMembership = userMemberships.find((m: any) => m.leagueId === leagueId);
+  const currentMembership = (userMemberships as any[]).find((m: any) => m.leagueId === leagueId);
   const isCommissioner = currentLeague?.commissionerId === user?.id || 
                          currentMembership?.league_role === 'commissioner';
 
