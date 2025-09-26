@@ -588,9 +588,9 @@ function AnnouncementCard({
 
   const handlePollVote = (pollId: string, optionIndex: number, allowMultiple: boolean) => {
     // For single-choice polls, check if user already voted on a different option
-    if (!allowMultiple && announcement.poll) {
-      const userCurrentVotes = announcement.poll.votes.filter(v => v.userId === currentUserId);
-      const hasVotedOnOption = userCurrentVotes.some(v => v.optionIndex === optionIndex);
+    if (!allowMultiple && (announcement as any).polls && (announcement as any).polls.length > 0) {
+      const userCurrentVotes = (announcement as any).polls[0].votes.filter((v: any) => v.userId === currentUserId);
+      const hasVotedOnOption = userCurrentVotes.some((v: any) => v.optionIndex === optionIndex);
       
       // If they clicked the same option they already voted on, don't do anything
       if (hasVotedOnOption) {
@@ -761,32 +761,32 @@ function AnnouncementCard({
         )}
 
         {/* Enhanced Poll */}
-        {announcement.poll && (
+        {(announcement as any).polls && (announcement as any).polls.length > 0 && (
           <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-2 border-blue-200 dark:border-blue-800">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <h4 className="font-semibold flex items-center gap-2 text-blue-800 dark:text-blue-200">
                   <BarChart3 className="w-5 h-5" />
-                  {announcement.poll.question}
+                  {(announcement as any).polls[0].question}
                 </h4>
                 <div className="flex items-center gap-2">
-                  {!announcement.poll.allowMultiple && (
+                  {!(announcement as any).polls[0].allowMultiple && (
                     <Badge variant="outline" className="text-xs">Single Choice</Badge>
                   )}
-                  {announcement.poll.allowMultiple && (
+                  {(announcement as any).polls[0].allowMultiple && (
                     <Badge variant="outline" className="text-xs">Multiple Choice</Badge>
                   )}
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {announcement.poll.options.map((option, index) => {
-                const votes = announcement.poll!.votes.filter(v => v.optionIndex === index).length;
-                const totalVotes = announcement.poll!.votes.length;
+              {(announcement as any).polls[0].options.map((option: string, index: number) => {
+                const votes = (announcement as any).polls[0].votes.filter((v: any) => v.optionIndex === index).length;
+                const totalVotes = (announcement as any).polls[0].votes.length;
                 const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
-                const userVoted = announcement.poll!.votes.some(v => v.userId === currentUserId && v.optionIndex === index);
-                const isTopChoice = votes > 0 && votes === Math.max(...announcement.poll!.options.map((_, i) => 
-                  announcement.poll!.votes.filter(v => v.optionIndex === i).length
+                const userVoted = (announcement as any).polls[0].votes.some((v: any) => v.userId === currentUserId && v.optionIndex === index);
+                const isTopChoice = votes > 0 && votes === Math.max(...(announcement as any).polls[0].options.map((_: any, i: number) => 
+                  (announcement as any).polls[0].votes.filter((v: any) => v.optionIndex === i).length
                 ));
 
                 return (
@@ -798,7 +798,7 @@ function AnnouncementCard({
                           ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20' 
                           : 'hover:bg-muted/50 border-dashed'
                       } ${isTopChoice && totalVotes > 0 ? 'ring-2 ring-green-400/30' : ''}`}
-                      onClick={() => handlePollVote(announcement.poll!.id, index, announcement.poll!.allowMultiple)}
+                      onClick={() => handlePollVote((announcement as any).polls[0].id, index, (announcement as any).polls[0].allowMultiple)}
                       disabled={voteOnPollMutation.isPending}
                       data-testid={`button-poll-option-${index}`}
                     >
@@ -841,7 +841,7 @@ function AnnouncementCard({
               <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground border-t">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
-                  <span>{announcement.poll.votes.length} total votes</span>
+                  <span>{(announcement as any).polls[0].votes.length} total votes</span>
                 </div>
                 {voteOnPollMutation.isPending && (
                   <div className="flex items-center gap-2 text-blue-600">
