@@ -46,6 +46,18 @@ Implemented a universal "Needs Attention" task management system that replaced t
 
 The system maintains strict team boundaries and role-based functionality while providing a unified interface for task management across all user types.
 
+## Announcements System Fixes (September 2025)
+
+Fixed multiple critical issues in the commissioner announcements functionality:
+
+- **Image Upload Functionality**: Resolved bug where "Add Images" button wasn't opening file picker. Fixed EnhancedMediaUploader component to properly handle clicks on children elements, restoring complete image upload workflow with drag-and-drop interface
+- **Poll System Verification**: Confirmed poll creation, submission, and voting functionality works correctly end-to-end with proper API responses
+- **Delete Posts**: Fixed foreign key constraint errors by adding proper cleanup for announcement_read_status and announcement_visibility tables
+- **Edit Posts**: Resolved HTTP method mismatch (PUT → PATCH) to align with server API endpoints
+- **Reaction Updates**: Fixed visibility filtering issues that were causing "Failed to update reaction" errors
+
+All core announcement features now function properly including post creation, editing, deletion, reactions, polls, and media uploads.
+
 # External Dependencies
 
 ## Third-Party Services
