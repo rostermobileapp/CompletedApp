@@ -170,6 +170,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Announcement media upload URL
+  app.post("/api/announcement-media/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getAnnouncementMediaUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting announcement media upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  // Serve announcement media
+  app.get("/announcement-media/:objectPath(*)", async (req, res) => {
+    try {
+      const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const fullPath = `/announcement-media/${req.params.objectPath}`;
+      const objectFile = await objectStorageService.getAnnouncementMediaFile(fullPath);
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving announcement media:", error);
+      if ((error as Error).name === 'ObjectNotFoundError') {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
   // Message attachment upload URL
   app.post("/api/message-attachments/upload", isAuthenticated, async (req: any, res) => {
     try {

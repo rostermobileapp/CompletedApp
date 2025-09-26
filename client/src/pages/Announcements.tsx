@@ -33,6 +33,7 @@ import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { EnhancedMediaUploader } from '@/components/EnhancedMediaUploader';
 
 // Types
 type AnnouncementReaction = {
@@ -87,6 +88,14 @@ const REACTION_EMOJIS = [
 // Character limit for announcements
 const CHAR_LIMIT = 280;
 
+// Types for media files
+interface MediaFile {
+  file: File;
+  preview: string;
+  type: 'image' | 'video' | 'document';
+  compressed?: File;
+}
+
 function CreateAnnouncementModal({ 
   isOpen, 
   onClose, 
@@ -104,6 +113,8 @@ function CreateAnnouncementModal({
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [allowMultiple, setAllowMultiple] = useState(false);
+  const [attachedMedia, setAttachedMedia] = useState<MediaFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
 
   const createAnnouncementMutation = useMutation({
@@ -129,27 +140,94 @@ function CreateAnnouncementModal({
     setPollQuestion('');
     setPollOptions(['', '']);
     setAllowMultiple(false);
+    setAttachedMedia([]);
+    setIsUploading(false);
+  };
+
+  // Upload media files to object storage
+  const uploadMediaFiles = async (mediaFiles: MediaFile[]): Promise<any[]> => {
+    const uploadedAttachments: any[] = [];
+    
+    for (const mediaFile of mediaFiles) {
+      try {
+        // Get upload URL
+        const uploadResponse = await apiRequest('POST', '/api/announcement-media/upload');
+        const { uploadURL } = await uploadResponse.json();
+        
+        // Use compressed version if available, otherwise use original
+        const fileToUpload = mediaFile.compressed || mediaFile.file;
+        
+        // Upload file to object storage
+        const uploadResult = await fetch(uploadURL, {
+          method: 'PUT',
+          body: fileToUpload,
+          headers: {
+            'Content-Type': fileToUpload.type,
+          },
+        });
+        
+        if (!uploadResult.ok) {
+          throw new Error('Failed to upload file');
+        }
+        
+        // Extract the object path from the upload URL for serving
+        const urlObj = new URL(uploadURL);
+        const objectPath = urlObj.pathname.split('/').pop();
+        
+        uploadedAttachments.push({
+          type: mediaFile.type,
+          url: `/announcement-media/${objectPath}`,
+          fileName: mediaFile.file.name,
+        });
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        throw new Error(`Failed to upload ${mediaFile.file.name}`);
+      }
+    }
+    
+    return uploadedAttachments;
+  };
+
+  const handleMediaSelection = (files: MediaFile[]) => {
+    setAttachedMedia(files);
   };
 
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!content.trim()) return;
 
-    const announcementData: any = {
-      content: content.trim(),
-      isPinned,
-attachments: []
-    };
+    try {
+      setIsUploading(true);
+      
+      // Upload media files first if any
+      let attachments: any[] = [];
+      if (attachedMedia.length > 0) {
+        attachments = await uploadMediaFiles(attachedMedia);
+      }
 
-    if (showPollCreator && pollQuestion.trim() && pollOptions.some(opt => opt.trim())) {
-      announcementData.poll = {
-        question: pollQuestion.trim(),
-        options: pollOptions.filter(opt => opt.trim()),
-        allowMultiple
+      const announcementData: any = {
+        content: content.trim(),
+        isPinned,
+        attachments
       };
-    }
 
-    createAnnouncementMutation.mutate(announcementData);
+      if (showPollCreator && pollQuestion.trim() && pollOptions.some(opt => opt.trim())) {
+        announcementData.poll = {
+          question: pollQuestion.trim(),
+          options: pollOptions.filter(opt => opt.trim()),
+          allowMultiple
+        };
+      }
+
+      createAnnouncementMutation.mutate(announcementData);
+    } catch (error) {
+      toast({ 
+        title: 'Upload failed', 
+        description: error instanceof Error ? error.message : 'Failed to upload media files',
+        variant: 'destructive' 
+      });
+      setIsUploading(false);
+    }
   };
 
   const addPollOption = () => {
@@ -300,6 +378,60 @@ attachments: []
             </Card>
           )}
 
+          {/* Media Uploader */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => document.getElementById('media-uploader-trigger')?.click()}
+                data-testid="button-add-media"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Images
+              </Button>
+              {attachedMedia.length > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  {attachedMedia.length} file{attachedMedia.length > 1 ? 's' : ''} selected
+                </span>
+              )}
+            </div>
+            
+            {/* Media Preview */}
+            {attachedMedia.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                {attachedMedia.map((media, index) => (
+                  <div key={index} className="relative">
+                    <img 
+                      src={media.preview} 
+                      alt={media.file.name}
+                      className="w-full h-20 object-cover rounded border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                      onClick={() => setAttachedMedia(prev => prev.filter((_, i) => i !== index))}
+                      data-testid={`button-remove-media-${index}`}
+                    >
+                      ×
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <EnhancedMediaUploader
+              maxFiles={5}
+              acceptedTypes={['image/*']}
+              onFilesSelected={handleMediaSelection}
+            >
+              <div id="media-uploader-trigger" />
+            </EnhancedMediaUploader>
+          </div>
+
           {/* Action Buttons */}
           <div className="flex justify-end gap-2">
             <Button
@@ -311,10 +443,10 @@ attachments: []
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!content.trim() || createAnnouncementMutation.isPending}
+              disabled={!content.trim() || createAnnouncementMutation.isPending || isUploading}
               data-testid="button-create-announcement"
             >
-              {createAnnouncementMutation.isPending ? 'Creating...' : 'Post Announcement'}
+              {isUploading ? 'Uploading...' : createAnnouncementMutation.isPending ? 'Creating...' : 'Post Announcement'}
             </Button>
           </div>
         </div>
