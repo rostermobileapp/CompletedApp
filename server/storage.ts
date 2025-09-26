@@ -3268,13 +3268,24 @@ export class DatabaseStorage implements IStorage {
       )
     )` : sql`1=1`; // If no userId provided, show all (for commissioner access)
 
-    // First get the total count with visibility filtering
+    // Build scrimmage date filter condition
+    // Logic: Hide scrimmage announcements if the associated scrimmage date has passed
+    const scrimmageFilter = sql`(
+      NOT EXISTS (
+        SELECT 1 FROM ${scrimmages} s 
+        WHERE s.announcement_id = ${announcements.id}
+        AND s.date_time < NOW()
+      )
+    )`;
+
+    // First get the total count with visibility and scrimmage filtering
     const [countResult] = await db
       .select({ count: sql<number>`count(*)` })
       .from(announcements)
       .where(and(
         eq(announcements.leagueId, leagueId),
-        visibilityFilter
+        visibilityFilter,
+        scrimmageFilter
       ));
     
     const total = countResult.count;
@@ -3285,7 +3296,8 @@ export class DatabaseStorage implements IStorage {
       .from(announcements)
       .where(and(
         eq(announcements.leagueId, leagueId),
-        visibilityFilter
+        visibilityFilter,
+        scrimmageFilter
       ))
       .orderBy(
         desc(announcements.isPinned),
