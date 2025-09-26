@@ -431,13 +431,12 @@ function AnnouncementCard({
   };
 
   return (
-    <Card className={`relative ${announcement.isPinned ? 'border-primary bg-primary/5' : ''}`}>
+    <Card className="rounded-lg border text-card-foreground shadow-sm relative border-primary bg-[#212121]">
       {announcement.isPinned && (
         <div className="absolute top-3 right-3">
           <Pin className="w-4 h-4 text-primary" />
         </div>
       )}
-      
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
           <Avatar className="w-10 h-10">
@@ -468,7 +467,6 @@ function AnnouncementCard({
           </div>
         </div>
       </CardHeader>
-
       <CardContent className="space-y-4">
         {/* Content */}
         <p className="text-base leading-relaxed whitespace-pre-wrap">
