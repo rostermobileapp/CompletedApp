@@ -1,0 +1,57 @@
+# Commissioner Announcement Page Enhancement
+
+Please enhance my existing commissioner announcement page with the following features:
+
+## Current Issues to Fix:
+1. **Fix the polls functionality** - Currently not working, need full poll creation, voting, and results display
+2. **Fix the picture upload feature** - Currently not working, need image upload and display functionality
+
+## New Features to Add:
+
+### 1. Post Management for Commissioner
+- Add **Edit Post** functionality for existing posts
+- Add **Delete Post** functionality with confirmation dialog
+- Only show edit/delete buttons when user is logged in as commissioner
+
+### 2. Real-Time Emoji Reactions
+- Add emoji reaction buttons to each post (👍, ❤️, 😂, 😠)
+- Display live count of reactions next to each emoji
+- Update reaction counts in real-time as users click
+- Store reaction data and persist between page refreshes
+
+### 3. Enhanced Poll System
+- Allow commissioner to create polls with multiple options (minimum 2, maximum 6 options)
+- Users can vote once per poll
+- Display real-time vote counts and percentages
+- Show visual progress bars for poll results
+- Prevent duplicate voting (track by user session/ID)
+
+### 4. Improved Image Handling
+- Support drag-and-drop image upload
+- Image preview before posting
+- Proper image sizing and optimization
+- Support common formats (JPG, PNG, GIF)
+
+### 5. Post Types
+Support different post types:
+- **Announcements** (general updates)
+- **Polls** (with voting functionality)
+- **Picture Posts** (image-focused posts)
+- **League Updates** (official league business)
+
+## Technical Requirements:
+- Maintain existing styling and layout
+- Use proper state management for real-time updates
+- Add proper error handling for file uploads and form submissions
+- Ensure mobile responsiveness
+- Add loading states for better UX
+- Implement proper data validation
+
+## UI/UX Improvements:
+- Add timestamps to all posts
+- Show "Commissioner" badge on posts
+- Add confirmation dialogs for destructive actions (delete)
+- Improve form layouts with proper labels and placeholders
+- Add success/error messages for user actions
+
+Please implement these features while keeping the existing code structure and styling intact. Focus on making the polls and image upload work first, then add the edit/delete and reaction features.
