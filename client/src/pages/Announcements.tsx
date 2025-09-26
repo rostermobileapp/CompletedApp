@@ -762,8 +762,8 @@ function AnnouncementCard({
 
         {/* Enhanced Poll */}
         {(announcement as any).polls && (announcement as any).polls.length > 0 && (
-          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-2 border-blue-200 dark:border-blue-800">
-            <CardHeader className="pb-3 bg-[#212121]">
+          <Card className="bg-[#212121]">
+            <CardHeader className="flex flex-col space-y-1.5 p-6 pb-3 bg-[#212121]">
               <div className="flex items-center justify-between">
                 <h4 className="font-semibold flex items-center gap-2 text-blue-800 dark:text-blue-200">
                   <BarChart3 className="w-5 h-5" />
@@ -779,7 +779,7 @@ function AnnouncementCard({
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="p-6 pt-0 space-y-3 bg-[#212121]">
               {(announcement as any).polls[0].options.map((option: string, index: number) => {
                 const votes = (announcement as any).polls[0].votes.filter((v: any) => v.optionIndex === index).length;
                 const totalVotes = (announcement as any).polls[0].votes.length;
