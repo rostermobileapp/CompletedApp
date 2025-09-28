@@ -621,9 +621,9 @@ export default function Messages() {
         };
       });
       
-      // Force refetch to get accurate global count
-      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'], refetchType: 'active' });
-      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'], refetchType: 'active' });
+      // Force immediate refetch of fresh data
+      await queryClient.refetchQueries({ queryKey: ['/api/messages/unread-count'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
     } catch (error) {
       console.error('Failed to mark all messages as read:', error);
     }
