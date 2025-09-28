@@ -599,27 +599,34 @@ export default function Messages() {
     });
   };
   
-  // Mark message as read when viewing conversation
+  // Mark message as read when viewing conversation (single message)
   const markMessageAsRead = async (messageId: string) => {
     try {
       await apiRequest('POST', `/api/messages/${messageId}/read`);
-      // Invalidate both global and per-conversation unread counts
-      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
     } catch (error) {
       console.error('Failed to mark message as read:', error);
     }
   };
-  
-  // Mark messages as read when conversation is opened
-  useEffect(() => {
-    if (messages.length > 0 && selectedConversation && currentUserId) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage && lastMessage.senderId !== currentUserId) {
-        markMessageAsRead(lastMessage.id);
-      }
+
+  // Mark all messages in conversation as read (atomic operation)
+  const markAllMessagesAsRead = async (conversationId: string) => {
+    try {
+      await apiRequest('POST', `/api/conversations/${conversationId}/mark-all-read`);
+      // Invalidate both global and per-conversation unread counts after atomic operation
+      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
+    } catch (error) {
+      console.error('Failed to mark all messages as read:', error);
     }
-  }, [messages, selectedConversation]);
+  };
+  
+  // Mark all unread messages as read when conversation is opened
+  useEffect(() => {
+    if (selectedConversation && currentUserId) {
+      // Use atomic operation to mark all messages as read
+      markAllMessagesAsRead(selectedConversation);
+    }
+  }, [selectedConversation, currentUserId]);
   
   // File upload functions
   const uploadFiles = async (files: File[]): Promise<any[]> => {

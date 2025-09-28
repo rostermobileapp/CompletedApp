@@ -5066,6 +5066,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mark all messages in a conversation as read
+  app.post('/api/conversations/:id/mark-all-read', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const conversationId = req.params.id;
+      
+      await messagingService.markAllMessagesInConversationAsRead(userId, conversationId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking all messages as read:', error);
+      if (error instanceof Error && error.message === 'User is not a participant in this conversation') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      res.status(500).json({ message: 'Failed to mark messages as read' });
+    }
+  });
+
   // ===== GIPHY API ROUTES =====
   
   // Import Giphy service

@@ -546,6 +546,47 @@ export class MessagingService {
     }));
   }
 
+  async markAllMessagesInConversationAsRead(userId: string, conversationId: string): Promise<void> {
+    // First verify the user is a participant in this conversation
+    const isParticipant = await this.isUserInConversation(userId, conversationId);
+    if (!isParticipant) {
+      throw new Error('User is not a participant in this conversation');
+    }
+
+    // Get all unread messages in the conversation for this user
+    const unreadMessages = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .leftJoin(
+        messageReadReceipts,
+        and(
+          eq(messages.id, messageReadReceipts.messageId),
+          eq(messageReadReceipts.userId, userId)
+        )
+      )
+      .where(
+        and(
+          eq(messages.conversationId, conversationId),
+          sql`${messages.senderId} != ${userId}`, // Don't mark own messages
+          sql`${messageReadReceipts.id} IS NULL` // Messages without read receipts
+        )
+      );
+
+    // If no unread messages, nothing to do
+    if (unreadMessages.length === 0) {
+      return;
+    }
+
+    // Create read receipts for all unread messages atomically
+    const readReceiptData = unreadMessages.map(message => ({
+      messageId: message.id,
+      userId: userId,
+      readAt: new Date()
+    }));
+
+    await db.insert(messageReadReceipts).values(readReceiptData);
+  }
+
   // Group conversation operations
   async createTeamGroupChat(teamId: string, leagueId: string, createdBy: string): Promise<Conversation> {
     // Get all approved team members first (needed for both existing and new chats)
