@@ -144,6 +144,19 @@ export default function Messages() {
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
+  // Fetch unread message counts per conversation
+  const { data: unreadCountsData } = useQuery<{ unreadCounts: Array<{ conversationId: string; unreadCount: number }> }>({
+    queryKey: ['/api/messages/unread-count-per-conversation'],
+    refetchInterval: 10000, // Poll every 10 seconds
+    staleTime: 5000, // Consider data stale after 5 seconds
+    enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
+  });
+
+  const unreadCountsMap = (unreadCountsData?.unreadCounts || []).reduce((acc, item) => {
+    acc[item.conversationId] = item.unreadCount;
+    return acc;
+  }, {} as Record<string, number>);
+
   // Fetch messages for selected conversation
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ['/api/conversations', selectedConversation, 'messages'],
@@ -433,6 +446,9 @@ export default function Messages() {
           if (data.conversationId === selectedConversation) {
             queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
           }
+          // Invalidate unread counts when read receipts are received
+          queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
           break;
       }
     };
@@ -587,6 +603,9 @@ export default function Messages() {
   const markMessageAsRead = async (messageId: string) => {
     try {
       await apiRequest('POST', `/api/messages/${messageId}/read`);
+      // Invalidate both global and per-conversation unread counts
+      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
     } catch (error) {
       console.error('Failed to mark message as read:', error);
     }
@@ -1132,15 +1151,9 @@ export default function Messages() {
                       {/* Enhanced Avatar Display */}
                       <div className="relative">
                         {conversation.type === 'team_group' || conversation.type === 'custom_group' ? (
-                          // Group chat avatar with member count
-                          <div className="relative">
-                            <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-                              <Users className="w-5 h-5 text-muted-foreground" />
-                            </div>
-                            {/* Member count badge */}
-                            <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid={`badge-member-count-${conversation.id}`}>
-                              {conversation.participants?.length || 0}
-                            </div>
+                          // Group chat avatar
+                          <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                            <Users className="w-5 h-5 text-muted-foreground" />
                           </div>
                         ) : (
                           // Direct message avatar
@@ -1157,6 +1170,12 @@ export default function Messages() {
                           <h3 className="font-semibold" data-testid={`text-conversation-name-${conversation.id}`}>
                             {getParticipantName(conversation)}
                           </h3>
+                          {/* Unread message indicator */}
+                          {unreadCountsMap[conversation.id] > 0 && (
+                            <div className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid={`badge-unread-${conversation.id}`}>
+                              {unreadCountsMap[conversation.id] > 99 ? '99+' : unreadCountsMap[conversation.id]}
+                            </div>
+                          )}
                           {/* Group chat type indicator */}
                           {conversation.type === 'captain_only' && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" data-testid={`badge-type-captain-${conversation.id}`}>

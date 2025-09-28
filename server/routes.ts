@@ -5054,6 +5054,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get unread message count per conversation for current user
+  app.get('/api/messages/unread-count-per-conversation', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const unreadCounts = await messagingService.getUnreadMessageCountPerConversation(userId);
+      res.json({ unreadCounts });
+    } catch (error) {
+      console.error('Error fetching unread message count per conversation:', error);
+      res.status(500).json({ message: 'Failed to fetch unread message count per conversation' });
+    }
+  });
+
   // ===== GIPHY API ROUTES =====
   
   // Import Giphy service

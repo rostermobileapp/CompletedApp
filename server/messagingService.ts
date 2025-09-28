@@ -500,6 +500,52 @@ export class MessagingService {
     return result?.count ?? 0;
   }
 
+  async getUnreadMessageCountPerConversation(userId: string): Promise<Array<{ conversationId: string; unreadCount: number }>> {
+    // Get all conversations the user is part of
+    const userConversations = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .innerJoin(
+        conversationParticipants,
+        eq(conversations.id, conversationParticipants.conversationId)
+      )
+      .where(eq(conversationParticipants.userId, userId));
+
+    if (userConversations.length === 0) {
+      return [];
+    }
+
+    const conversationIds = userConversations.map(c => c.id);
+
+    // Count unread messages per conversation
+    const results = await db
+      .select({ 
+        conversationId: messages.conversationId,
+        count: sql<number>`count(*)::int` 
+      })
+      .from(messages)
+      .leftJoin(
+        messageReadReceipts,
+        and(
+          eq(messages.id, messageReadReceipts.messageId),
+          eq(messageReadReceipts.userId, userId)
+        )
+      )
+      .where(
+        and(
+          inArray(messages.conversationId, conversationIds),
+          sql`${messages.senderId} != ${userId}`, // Don't count user's own messages
+          sql`${messageReadReceipts.id} IS NULL` // Messages without read receipts
+        )
+      )
+      .groupBy(messages.conversationId);
+
+    return results.map(result => ({
+      conversationId: result.conversationId,
+      unreadCount: result.count
+    }));
+  }
+
   // Group conversation operations
   async createTeamGroupChat(teamId: string, leagueId: string, createdBy: string): Promise<Conversation> {
     // Get all approved team members first (needed for both existing and new chats)
