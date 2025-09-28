@@ -612,9 +612,18 @@ export default function Messages() {
   const markAllMessagesAsRead = async (conversationId: string) => {
     try {
       await apiRequest('POST', `/api/conversations/${conversationId}/mark-all-read`);
-      // Invalidate both global and per-conversation unread counts after atomic operation
-      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
+      
+      // Immediate cache update - remove this conversation from unread counts
+      queryClient.setQueryData(['/api/messages/unread-count-per-conversation'], (old: any) => {
+        if (!old?.unreadCounts) return old;
+        return {
+          unreadCounts: old.unreadCounts.filter((item: any) => item.conversationId !== conversationId)
+        };
+      });
+      
+      // Force refetch to get accurate global count
+      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'], refetchType: 'active' });
     } catch (error) {
       console.error('Failed to mark all messages as read:', error);
     }
