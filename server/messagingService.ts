@@ -547,8 +547,11 @@ export class MessagingService {
   }
 
   async markAllMessagesInConversationAsRead(userId: string, conversationId: string): Promise<void> {
+    console.log(`[DEBUG] markAllMessagesInConversationAsRead called for user ${userId}, conversation ${conversationId}`);
+    
     // First verify the user is a participant in this conversation
     const isParticipant = await this.isUserInConversation(userId, conversationId);
+    console.log(`[DEBUG] User ${userId} is participant in conversation ${conversationId}:`, isParticipant);
     if (!isParticipant) {
       throw new Error('User is not a participant in this conversation');
     }
@@ -572,8 +575,11 @@ export class MessagingService {
         )
       );
 
+    console.log(`[DEBUG] Found ${unreadMessages.length} unread messages for user ${userId} in conversation ${conversationId}`);
+
     // If no unread messages, nothing to do
     if (unreadMessages.length === 0) {
+      console.log(`[DEBUG] No unread messages to mark as read for user ${userId} in conversation ${conversationId}`);
       return;
     }
 
@@ -584,7 +590,9 @@ export class MessagingService {
       readAt: new Date()
     }));
 
-    await db.insert(messageReadReceipts).values(readReceiptData);
+    console.log(`[DEBUG] Creating read receipts for ${readReceiptData.length} messages`);
+    const result = await db.insert(messageReadReceipts).values(readReceiptData);
+    console.log(`[DEBUG] Successfully created read receipts, result:`, result);
   }
 
   // Group conversation operations
