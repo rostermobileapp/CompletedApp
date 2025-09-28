@@ -631,14 +631,7 @@ export default function Messages() {
   
   // Mark all unread messages as read when conversation is opened
   useEffect(() => {
-    console.log('[DEBUG] Mark messages as read useEffect triggered', {
-      selectedConversation,
-      currentUserId,
-      shouldMarkAsRead: selectedConversation && currentUserId
-    });
-    
     if (selectedConversation && currentUserId) {
-      console.log('[DEBUG] Calling markAllMessagesAsRead for conversation:', selectedConversation);
       // Use atomic operation to mark all messages as read
       markAllMessagesAsRead(selectedConversation);
     }
