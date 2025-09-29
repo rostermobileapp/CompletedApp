@@ -5156,10 +5156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Poll is closed' });
       }
 
-      // Check if poll has expired
-      if (poll.expiresAt && new Date() > poll.expiresAt) {
-        return res.status(400).json({ message: 'Poll has expired' });
-      }
+      // Chat polls don't have expiration - this check is only for announcement polls
 
       // Get message to check conversation access
       const message = await messagingService.getMessageById(poll.messageId);
