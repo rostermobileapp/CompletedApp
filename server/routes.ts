@@ -4892,7 +4892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: conversationId } = req.params;
       const requestSchema = z.object({
         content: z.string().min(1).max(10000),
-        messageType: z.enum(['text', 'image', 'gif', 'file']).default('text'),
+        messageType: z.enum(['text', 'image', 'gif', 'file', 'poll']).default('text'),
         replyToId: z.string().optional(),
         attachments: z.array(z.object({
           fileName: z.string(),

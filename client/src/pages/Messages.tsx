@@ -327,7 +327,6 @@ export default function Messages() {
   const [showPollCreator, setShowPollCreator] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
-  const [pollDuration, setPollDuration] = useState<string>('1d');
 
   // Fetch user's leagues for contact discovery
   const { data: userLeagues = [], isLoading: userLeaguesLoading } = useQuery<League[]>({
@@ -577,7 +576,6 @@ export default function Messages() {
       setShowPollCreator(false);
       setPollQuestion('');
       setPollOptions(['', '']);
-      setPollDuration('1d');
       toast({
         title: 'Poll created',
         description: 'Your poll has been created successfully'
@@ -666,25 +664,12 @@ export default function Messages() {
       return;
     }
 
-    const expiresAt = pollDuration !== 'no-expiry' ? getExpirationDate(pollDuration) : undefined;
     createPollMutation.mutate({
       question: pollQuestion.trim(),
-      options: pollOptions.filter(option => option.trim()),
-      expiresAt
+      options: pollOptions.filter(option => option.trim())
     });
   };
 
-  const getExpirationDate = (duration: string): string => {
-    const now = new Date();
-    switch (duration) {
-      case '1h': return new Date(now.getTime() + 60 * 60 * 1000).toISOString();
-      case '6h': return new Date(now.getTime() + 6 * 60 * 60 * 1000).toISOString();
-      case '1d': return new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-      case '3d': return new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
-      case '1w': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      default: return new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-    }
-  };
 
   const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent conversation selection when clicking delete
@@ -1925,22 +1910,6 @@ export default function Messages() {
                 )}
               </div>
               
-              <div>
-                <label className="text-sm font-medium mb-1 block">Duration</label>
-                <select
-                  value={pollDuration}
-                  onChange={(e) => setPollDuration(e.target.value)}
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary"
-                  data-testid="select-poll-duration"
-                >
-                  <option value="1h">1 hour</option>
-                  <option value="6h">6 hours</option>
-                  <option value="1d">1 day</option>
-                  <option value="3d">3 days</option>
-                  <option value="1w">1 week</option>
-                  <option value="no-expiry">No expiry</option>
-                </select>
-              </div>
               
               <div className="flex gap-2">
                 <Button
