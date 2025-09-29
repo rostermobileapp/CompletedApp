@@ -102,7 +102,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
 
   // Fetch poll results
   const { data: pollVotes = [] } = useQuery<ChatPollVote[]>({
-    queryKey: ['/api/chat-polls', poll?.id, 'votes'],
+    queryKey: ['/api/chat-polls', poll?.id, 'results'],
     enabled: !!poll?.id
     // Real-time updates now handled via WebSocket events
   });
@@ -113,7 +113,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'votes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'results'] });
       toast({
         title: 'Vote recorded',
         description: 'Your vote has been recorded'
@@ -136,7 +136,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/messages', message.id, 'polls'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'votes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'results'] });
       toast({
         title: 'Poll closed',
         description: 'The poll has been closed'
