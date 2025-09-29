@@ -1328,6 +1328,8 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  messageType: z.enum(['text', 'image', 'gif', 'file', 'poll']).default('text'),
 });
 
 export const insertMessageAttachmentSchema = createInsertSchema(messageAttachments).omit({
