@@ -101,8 +101,8 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
   const poll = polls[0]; // Assuming one poll per message
 
   // Fetch poll results
-  const { data: resultsData } = useQuery({
-    queryKey: ['/api/chat-polls', poll?.id, 'results'],
+  const { data: pollVotes = [] } = useQuery<ChatPollVote[]>({
+    queryKey: ['/api/chat-polls', poll?.id, 'votes'],
     enabled: !!poll?.id
     // Real-time updates now handled via WebSocket events
   });
@@ -113,7 +113,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'results'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'votes'] });
       toast({
         title: 'Vote recorded',
         description: 'Your vote has been recorded'
@@ -136,7 +136,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/messages', message.id, 'polls'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'results'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'votes'] });
       toast({
         title: 'Poll closed',
         description: 'The poll has been closed'
@@ -145,13 +145,13 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
   });
 
   useEffect(() => {
-    if (resultsData) {
-      setPollResults(resultsData.results || []);
-      const userVoteData = resultsData.results?.find((vote: ChatPollVote) => vote.userId === currentUserId);
+    if (pollVotes) {
+      setPollResults(pollVotes);
+      const userVoteData = pollVotes.find((vote: ChatPollVote) => vote.userId === currentUserId);
       setUserVote(userVoteData || null);
-      setShowResults(!!userVoteData || resultsData.poll?.status === 'closed');
+      setShowResults(!!userVoteData || poll?.status === 'closed');
     }
-  }, [resultsData, currentUserId]);
+  }, [pollVotes, currentUserId, poll?.status]);
 
   if (!poll) {
     return null;
@@ -184,8 +184,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
     return Math.round((getVoteCount(optionIndex) / total) * 100);
   };
 
-  const isPollExpired = poll.expiresAt && new Date() > new Date(poll.expiresAt);
-  const canVote = poll.status === 'active' && !isPollExpired && !userVote;
+  const canVote = poll.status === 'active' && !userVote;
   const canClosePoll = message.senderId === currentUserId && poll.status === 'active';
 
   return (
@@ -198,11 +197,6 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
           {poll.status === 'closed' && (
             <div className="bg-muted text-muted-foreground text-xs px-2 py-1 rounded">
               CLOSED
-            </div>
-          )}
-          {isPollExpired && (
-            <div className="bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded">
-              EXPIRED
             </div>
           )}
         </div>
@@ -222,7 +216,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
       </h4>
 
       <div className="space-y-2">
-        {poll.options.map((option: string, index: number) => {
+        {(poll.options as string[]).map((option: string, index: number) => {
           const voteCount = getVoteCount(index);
           const percentage = getVotePercentage(index);
           const isUserChoice = userVote?.optionIndex === index;
@@ -273,14 +267,6 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
           <p className="text-xs text-muted-foreground" data-testid="poll-total-votes">
             Total votes: {getTotalVotes()}
           </p>
-          {poll.expiresAt && (
-            <p className="text-xs text-muted-foreground">
-              {isPollExpired 
-                ? `Expired ${format(new Date(poll.expiresAt), 'MMM d, yyyy h:mm a')}`
-                : `Expires ${format(new Date(poll.expiresAt), 'MMM d, yyyy h:mm a')}`
-              }
-            </p>
-          )}
         </div>
       )}
     </div>

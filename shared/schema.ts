@@ -454,13 +454,11 @@ export const chatPolls = pgTable("chat_polls", {
   messageId: varchar("message_id").references(() => messages.id).notNull(),
   question: text("question").notNull(),
   options: jsonb("options").notNull(), // Array of poll options
-  expiresAt: timestamp("expires_at"),
   status: varchar("status").default("active").notNull(), // "active" or "closed"
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_chat_polls_message").on(table.messageId),
   index("idx_chat_polls_status").on(table.status),
-  index("idx_chat_polls_expires").on(table.expiresAt),
 ]);
 
 // Chat poll votes table
