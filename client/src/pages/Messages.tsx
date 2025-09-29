@@ -101,11 +101,16 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
   const poll = polls[0]; // Assuming one poll per message
 
   // Fetch poll results
-  const { data: pollVotes = [] } = useQuery<ChatPollVote[]>({
+  const { data: pollVotesRaw } = useQuery<ChatPollVote[]>({
     queryKey: ['/api/chat-polls', poll?.id, 'results'],
     enabled: !!poll?.id
     // Real-time updates now handled via WebSocket events
   });
+
+  // Memoize poll votes to prevent infinite re-renders and ensure it's always an array
+  const pollVotes = useMemo(() => {
+    return Array.isArray(pollVotesRaw) ? pollVotesRaw : [];
+  }, [pollVotesRaw]);
 
   const voteOnPollMutation = useMutation({
     mutationFn: async ({ pollId, optionIndex }: { pollId: string; optionIndex: number }) => {
@@ -148,7 +153,8 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
   const pollStatus = useMemo(() => poll?.status, [poll?.id, poll?.status]);
   
   useEffect(() => {
-    if (pollVotes) {
+    // Only update state if we have a valid array of poll votes
+    if (Array.isArray(pollVotes) && pollVotes.length >= 0) {
       setPollResults(pollVotes);
       const userVoteData = pollVotes.find((vote: ChatPollVote) => vote.userId === currentUserId);
       setUserVote(userVoteData || null);
