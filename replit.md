@@ -46,6 +46,19 @@ Implemented a universal "Needs Attention" task management system that replaced t
 
 The system maintains strict team boundaries and role-based functionality while providing a unified interface for task management across all user types.
 
+## Team Captain Announcements Feature (September 2025)
+
+Extended the announcements system to allow both commissioners and team captains to post announcements with team-based visibility controls. This empowers team captains to communicate directly with their teams while maintaining commissioner oversight of league-wide announcements.
+
+- **Dual Posting Permissions**: Both commissioners and team captains can create announcements
+- **Team-Based Visibility**: Commissioner posts (teamId = null) are visible to all league members, while team captain posts (teamId = specific team) are only visible to that team's members
+- **Role-Based Badges**: Announcements display "Commissioner" or "Team Captain" badges based on the author's role
+- **Edit/Delete Permissions**: Authors can edit/delete their own posts, commissioners can manage all posts
+- **Database Schema**: Added teamId field to announcements table to support team-specific visibility filtering
+- **Backward Compatibility**: Existing commissioner announcements continue to work with null teamId
+
+This feature provides team captains with autonomy for team-specific communications while preserving the league-wide broadcast capability for commissioners.
+
 ## Announcements System Fixes (September 2025)
 
 Fixed multiple critical issues in the commissioner announcements functionality:
