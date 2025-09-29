@@ -771,94 +771,97 @@ function AnnouncementCard({
         )}
 
         {/* Enhanced Poll */}
-        {(announcement as any).polls && (announcement as any).polls.length > 0 && (
-          <Card className="bg-[#212121]">
-            <CardHeader className="flex flex-col space-y-1.5 p-6 pb-3 bg-[#212121]">
-              <div className="flex items-center justify-between">
-                <h4 className="font-semibold flex items-center gap-2 text-blue-800 dark:text-blue-200">
-                  <BarChart3 className="w-5 h-5" />
-                  {(announcement as any).polls[0].question}
-                </h4>
-                <div className="flex items-center gap-2">
-                  {!(announcement as any).polls[0].allowMultiple && (
-                    <Badge variant="outline" className="text-xs">Single Choice</Badge>
-                  )}
-                  {(announcement as any).polls[0].allowMultiple && (
-                    <Badge variant="outline" className="text-xs">Multiple Choice</Badge>
-                  )}
+        {announcement.polls && announcement.polls.length > 0 && (() => {
+          const poll = announcement.polls[0];
+          return (
+            <Card className="bg-[#212121]">
+              <CardHeader className="flex flex-col space-y-1.5 p-6 pb-3 bg-[#212121]">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold flex items-center gap-2 text-blue-800 dark:text-blue-200">
+                    <BarChart3 className="w-5 h-5" />
+                    {poll.question}
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    {!poll.allowMultiple && (
+                      <Badge variant="outline" className="text-xs">Single Choice</Badge>
+                    )}
+                    {poll.allowMultiple && (
+                      <Badge variant="outline" className="text-xs">Multiple Choice</Badge>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-0 space-y-3 bg-[#212121]">
-              {(announcement as any).polls[0].options.map((option: string, index: number) => {
-                const votes = (announcement as any).polls[0].votes.filter((v: any) => v.optionIndex === index).length;
-                const totalVotes = (announcement as any).polls[0].votes.length;
-                const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
-                const userVoted = (announcement as any).polls[0].votes.some((v: any) => v.userId === currentUserId && v.optionIndex === index);
-                const isTopChoice = votes > 0 && votes === Math.max(...(announcement as any).polls[0].options.map((_: any, i: number) => 
-                  (announcement as any).polls[0].votes.filter((v: any) => v.optionIndex === i).length
-                ));
+              </CardHeader>
+              <CardContent className="p-6 pt-0 space-y-3 bg-[#212121]">
+                {poll.options.map((option, index) => {
+                  const votes = poll.votes.filter(v => v.optionIndex === index).length;
+                  const totalVotes = poll.votes.length;
+                  const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
+                  const userVoted = poll.votes.some(v => v.userId === currentUserId && v.optionIndex === index);
+                  const isTopChoice = votes > 0 && votes === Math.max(...poll.options.map((_, i) => 
+                    poll.votes.filter(v => v.optionIndex === i).length
+                  ));
 
-                return (
-                  <div key={index} className="relative">
-                    <Button
-                      variant={userVoted ? "default" : "outline"}
-                      className={`w-full justify-between h-auto p-4 relative overflow-hidden transition-all duration-200 ${
-                        userVoted 
-                          ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20' 
-                          : 'hover:bg-muted/50 border-dashed'
-                      } ${isTopChoice && totalVotes > 0 ? 'ring-2 ring-green-400/30' : ''}`}
-                      onClick={() => handlePollVote((announcement as any).polls[0].id, index, (announcement as any).polls[0].allowMultiple)}
-                      disabled={voteOnPollMutation.isPending}
-                      data-testid={`button-poll-option-${index}`}
-                    >
-                      {/* Background progress bar */}
-                      <div 
-                        className="absolute inset-0 transition-all duration-500 from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 bg-[#3883f6]"
-                        style={{ width: `${Math.max(percentage, 8)}%` }}
-                      />
-                      
-                      <div className="relative flex items-center justify-between w-full">
-                        <div className="flex items-center gap-2">
-                          {userVoted && (
-                            <div className="w-2 h-2 rounded-full bg-current animate-pulse" />
-                          )}
-                          <span className="font-medium text-left">{option}</span>
-                          {isTopChoice && totalVotes > 0 && (
-                            <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full">
-                              Leading
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-semibold">
-                            {percentage.toFixed(1)}%
+                  return (
+                    <div key={index} className="relative">
+                      <Button
+                        variant={userVoted ? "default" : "outline"}
+                        className={`w-full justify-between h-auto p-4 relative overflow-hidden transition-all duration-200 ${
+                          userVoted 
+                            ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20' 
+                            : 'hover:bg-muted/50 border-dashed'
+                        } ${isTopChoice && totalVotes > 0 ? 'ring-2 ring-green-400/30' : ''}`}
+                        onClick={() => handlePollVote(poll.id, index, poll.allowMultiple)}
+                        disabled={voteOnPollMutation.isPending}
+                        data-testid={`button-poll-option-${index}`}
+                      >
+                        {/* Background progress bar */}
+                        <div 
+                          className="absolute inset-0 transition-all duration-500 from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 bg-[#3883f6]"
+                          style={{ width: `${Math.max(percentage, 8)}%` }}
+                        />
+                        
+                        <div className="relative flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2">
+                            {userVoted && (
+                              <div className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                            )}
+                            <span className="font-medium text-left">{option}</span>
+                            {isTopChoice && totalVotes > 0 && (
+                              <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full">
+                                Leading
+                              </span>
+                            )}
                           </div>
-                          <div className="text-xs opacity-75">
-                            {votes} vote{votes !== 1 ? 's' : ''}
+                          <div className="text-right">
+                            <div className="text-sm font-semibold">
+                              {percentage.toFixed(1)}%
+                            </div>
+                            <div className="text-xs opacity-75">
+                              {votes} vote{votes !== 1 ? 's' : ''}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Button>
+                      </Button>
+                    </div>
+                  );
+                })}
+                
+                <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground border-t">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    <span>{poll.votes.length} total votes</span>
                   </div>
-                );
-              })}
-              
-              <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground border-t">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  <span>{(announcement as any).polls[0].votes.length} total votes</span>
+                  {voteOnPollMutation.isPending && (
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs">Recording vote...</span>
+                    </div>
+                  )}
                 </div>
-                {voteOnPollMutation.isPending && (
-                  <div className="flex items-center gap-2 text-blue-600">
-                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs">Recording vote...</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         <Separator />
 
