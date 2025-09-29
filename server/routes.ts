@@ -5230,7 +5230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const results = await messagingService.getChatPollResults(pollId);
-      res.json({ poll, results });
+      res.json(results);
     } catch (error) {
       console.error('Error fetching poll results:', error);
       res.status(500).json({ message: 'Failed to fetch poll results' });

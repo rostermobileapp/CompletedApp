@@ -169,7 +169,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
       setPollResults(pollVotes);
       const userVoteData = pollVotes.find((vote: ChatPollVote) => vote.userId === currentUserId);
       setUserVote(userVoteData || null);
-      setShowResults(!!userVoteData || pollStatus === 'closed');
+      setShowResults(!!userVoteData || pollStatus === 'closed' || pollVotes.length > 0);
     }
   }, [pollVotes, currentUserId, pollStatus]);
 
