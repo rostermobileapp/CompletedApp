@@ -246,14 +246,14 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
               <button
                 onClick={() => handleVote(index)}
                 disabled={!canVote}
-                className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                className={`w-full p-3 rounded-lg border text-left transition-colors bg-white text-black ${
                   canVote
-                    ? 'hover:bg-accent border-border'
+                    ? 'hover:bg-gray-50 border-border'
                     : 'cursor-default border-border'
                 } ${
                   isUserChoice
-                    ? 'bg-primary/10 border-primary'
-                    : 'bg-background'
+                    ? 'border-primary'
+                    : 'border-border'
                 }`}
                 data-testid={`poll-option-${index}`}
               >
