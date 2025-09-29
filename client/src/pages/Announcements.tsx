@@ -478,6 +478,106 @@ function CreateAnnouncementModal({
   );
 }
 
+function PollCard({
+  poll,
+  currentUserId,
+  onVote,
+  isPending
+}: {
+  poll: AnnouncementPoll;
+  currentUserId: string;
+  onVote: (pollId: string, optionIndex: number, allowMultiple: boolean) => void;
+  isPending: boolean;
+}) {
+  return (
+    <Card className="bg-[#212121]">
+      <CardHeader className="flex flex-col space-y-1.5 p-6 pb-3 bg-[#212121]">
+        <div className="flex items-center justify-between">
+          <h4 className="font-semibold flex items-center gap-2 text-blue-800 dark:text-blue-200">
+            <BarChart3 className="w-5 h-5" />
+            {poll.question}
+          </h4>
+          <div className="flex items-center gap-2">
+            {!poll.allowMultiple && (
+              <Badge variant="outline" className="text-xs">Single Choice</Badge>
+            )}
+            {poll.allowMultiple && (
+              <Badge variant="outline" className="text-xs">Multiple Choice</Badge>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-6 pt-0 space-y-3 bg-[#212121]">
+        {poll.options.map((option, index) => {
+          const votes = poll.votes.filter(v => v.optionIndex === index).length;
+          const totalVotes = poll.votes.length;
+          const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
+          const userVoted = poll.votes.some(v => v.userId === currentUserId && v.optionIndex === index);
+          const isTopChoice = votes > 0 && votes === Math.max(...poll.options.map((_, i) => 
+            poll.votes.filter(v => v.optionIndex === i).length
+          ));
+
+          return (
+            <div key={index} className="relative">
+              <Button
+                variant={userVoted ? "default" : "outline"}
+                className={`w-full justify-between h-auto p-4 relative overflow-hidden transition-all duration-200 ${
+                  userVoted 
+                    ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20' 
+                    : 'hover:bg-muted/50 border-dashed'
+                } ${isTopChoice && totalVotes > 0 ? 'ring-2 ring-green-400/30' : ''}`}
+                onClick={() => onVote(poll.id, index, poll.allowMultiple)}
+                disabled={isPending}
+                data-testid={`button-poll-option-${index}`}
+              >
+                <div 
+                  className="absolute inset-0 transition-all duration-500 from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 bg-[#3883f6]"
+                  style={{ width: `${Math.max(percentage, 8)}%` }}
+                />
+                
+                <div className="relative flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    {userVoted && (
+                      <div className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                    )}
+                    <span className="font-medium text-left">{option}</span>
+                    {isTopChoice && totalVotes > 0 && (
+                      <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full">
+                        Leading
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold">
+                      {percentage.toFixed(1)}%
+                    </div>
+                    <div className="text-xs opacity-75">
+                      {votes} vote{votes !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </div>
+              </Button>
+            </div>
+          );
+        })}
+        
+        <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground border-t">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            <span>{poll.votes.length} total votes</span>
+          </div>
+          {isPending && (
+            <div className="flex items-center gap-2 text-blue-600">
+              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs">Recording vote...</span>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function AnnouncementCard({ 
   announcement, 
   leagueId, 
@@ -771,97 +871,14 @@ function AnnouncementCard({
         )}
 
         {/* Enhanced Poll */}
-        {announcement.polls && announcement.polls.length > 0 && (() => {
-          const poll = announcement.polls[0];
-          return (
-            <Card className="bg-[#212121]">
-              <CardHeader className="flex flex-col space-y-1.5 p-6 pb-3 bg-[#212121]">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold flex items-center gap-2 text-blue-800 dark:text-blue-200">
-                    <BarChart3 className="w-5 h-5" />
-                    {poll.question}
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    {!poll.allowMultiple && (
-                      <Badge variant="outline" className="text-xs">Single Choice</Badge>
-                    )}
-                    {poll.allowMultiple && (
-                      <Badge variant="outline" className="text-xs">Multiple Choice</Badge>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0 space-y-3 bg-[#212121]">
-                {poll.options.map((option, index) => {
-                  const votes = poll.votes.filter(v => v.optionIndex === index).length;
-                  const totalVotes = poll.votes.length;
-                  const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
-                  const userVoted = poll.votes.some(v => v.userId === currentUserId && v.optionIndex === index);
-                  const isTopChoice = votes > 0 && votes === Math.max(...poll.options.map((_, i) => 
-                    poll.votes.filter(v => v.optionIndex === i).length
-                  ));
-
-                  return (
-                    <div key={index} className="relative">
-                      <Button
-                        variant={userVoted ? "default" : "outline"}
-                        className={`w-full justify-between h-auto p-4 relative overflow-hidden transition-all duration-200 ${
-                          userVoted 
-                            ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20' 
-                            : 'hover:bg-muted/50 border-dashed'
-                        } ${isTopChoice && totalVotes > 0 ? 'ring-2 ring-green-400/30' : ''}`}
-                        onClick={() => handlePollVote(poll.id, index, poll.allowMultiple)}
-                        disabled={voteOnPollMutation.isPending}
-                        data-testid={`button-poll-option-${index}`}
-                      >
-                        {/* Background progress bar */}
-                        <div 
-                          className="absolute inset-0 transition-all duration-500 from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 bg-[#3883f6]"
-                          style={{ width: `${Math.max(percentage, 8)}%` }}
-                        />
-                        
-                        <div className="relative flex items-center justify-between w-full">
-                          <div className="flex items-center gap-2">
-                            {userVoted && (
-                              <div className="w-2 h-2 rounded-full bg-current animate-pulse" />
-                            )}
-                            <span className="font-medium text-left">{option}</span>
-                            {isTopChoice && totalVotes > 0 && (
-                              <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full">
-                                Leading
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-semibold">
-                              {percentage.toFixed(1)}%
-                            </div>
-                            <div className="text-xs opacity-75">
-                              {votes} vote{votes !== 1 ? 's' : ''}
-                            </div>
-                          </div>
-                        </div>
-                      </Button>
-                    </div>
-                  );
-                })}
-                
-                <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground border-t">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    <span>{poll.votes.length} total votes</span>
-                  </div>
-                  {voteOnPollMutation.isPending && (
-                    <div className="flex items-center gap-2 text-blue-600">
-                      <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs">Recording vote...</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
+        {announcement.polls && announcement.polls.length > 0 && announcement.polls[0] && (
+          <PollCard 
+            poll={announcement.polls[0]} 
+            currentUserId={currentUserId}
+            onVote={handlePollVote}
+            isPending={voteOnPollMutation.isPending}
+          />
+        )}
 
         <Separator />
 
@@ -1051,6 +1068,15 @@ export default function Announcements() {
   // Normalize the data to handle both array and object responses
   const announcements: Announcement[] = Array.isArray(data) ? data : (data?.announcements ?? []);
   const pagination = Array.isArray(data) ? undefined : data?.pagination;
+  
+  console.log('🔍 Announcements debug:', { 
+    rawData: data, 
+    announcements, 
+    count: announcements.length,
+    isLoading,
+    user: user?.id,
+    leagueId 
+  });
 
   if (!user) {
     navigate('/');
