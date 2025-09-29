@@ -34,6 +34,19 @@ Authorization is implemented at both the API level (middleware checks) and UI le
 
 # Recent Changes
 
+## Landing Page Redesign with Pricing (September 2025)
+
+Redesigned the landing page with an Apple Fitness+ inspired aesthetic and hockey-focused messaging:
+
+- **Visual Design**: Large typography (text-5xl to text-8xl), parallax scrolling effects, rounded cards with backdrop-blur, and clean spacing
+- **Hockey-First Messaging**: Direct, Tucker Carlson-style copy targeting beer league hockey players with headline "Your Beer League Team, Organized" and tagline "Enough chaos—play hockey"
+- **Pricing Section**: Added comprehensive pricing display with three tiers:
+  - **Free ($0)**: Basic features for casual players (league joining, roster viewing, basic messaging, game notifications)
+  - **Player Plus ($8/month)**: Advanced features marked as "Most Popular" (all Free features plus advanced stats, scrimmage scheduling, team statistics, priority support)
+  - **Commissioner ($12/month)**: League management features (all Player Plus features plus league creation/management, commissioner dashboard, league statistics, advanced team management)
+- **Responsive Design**: Fully optimized for both desktop (1920x1080) and mobile (375x667) viewports with cards stacking vertically on mobile
+- **CTA Optimization**: Updated call-to-action buttons to "Download Roster" with direct messaging
+
 ## Universal Needs Attention System (September 2025)
 
 Implemented a universal "Needs Attention" task management system that replaced the previous commissioner-only todo system. This system provides a persistent black notification bar on the dashboard for all users, displaying pending tasks that require user action. The system includes:

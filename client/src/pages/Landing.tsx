@@ -1,4 +1,4 @@
-import { Users, Calendar, Trophy, MessageCircle, ArrowRight, Zap, Shield, BarChart3 } from 'lucide-react';
+import { Users, Calendar, Trophy, MessageCircle, ArrowRight, Zap, Shield, BarChart3, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function Landing() {
@@ -151,6 +151,132 @@ export default function Landing() {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-24 px-6 bg-card/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-6xl font-bold mb-4" data-testid="text-pricing-heading">
+              Simple pricing.
+              <br />
+              <span className="text-muted-foreground">No surprises.</span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
+            {/* Free Tier */}
+            <div className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 border border-border/50" data-testid="card-pricing-free">
+              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-free">Free</h3>
+              <div className="mb-6">
+                <span className="text-5xl font-bold" data-testid="text-price-free">$0</span>
+              </div>
+              <p className="text-muted-foreground mb-6">For casual players</p>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-start gap-3" data-testid="feature-free-0">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Join leagues and view rosters</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-free-1">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Basic team messaging</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-free-2">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Game notifications</span>
+                </li>
+              </ul>
+              <button 
+                onClick={() => window.location.href = '/api/login'}
+                className="w-full py-3 px-6 rounded-full border-2 border-border hover:border-primary transition-colors font-semibold"
+                data-testid="button-pricing-free"
+              >
+                Get Started
+              </button>
+            </div>
+
+            {/* Player Plus Tier */}
+            <div className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 border-2 border-primary relative" data-testid="card-pricing-player">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-sm font-semibold px-4 py-1 rounded-full" data-testid="badge-popular">
+                Most Popular
+              </div>
+              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-player">Player Plus</h3>
+              <div className="mb-6">
+                <span className="text-5xl font-bold" data-testid="text-price-player">$8</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+              <p className="text-muted-foreground mb-6">For serious players</p>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-start gap-3" data-testid="feature-player-0">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Everything in Free</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-player-1">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Advanced stats tracking</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-player-2">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Scrimmage scheduling</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-player-3">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Team statistics</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-player-4">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Priority support</span>
+                </li>
+              </ul>
+              <button 
+                onClick={() => window.location.href = '/api/login'}
+                className="w-full py-3 px-6 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-semibold"
+                data-testid="button-pricing-player"
+              >
+                Get Started
+              </button>
+            </div>
+
+            {/* Commissioner Tier */}
+            <div className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 border border-border/50" data-testid="card-pricing-commissioner">
+              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-commissioner">Commissioner</h3>
+              <div className="mb-6">
+                <span className="text-5xl font-bold" data-testid="text-price-commissioner">$12</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+              <p className="text-muted-foreground mb-6">For league organizers</p>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-start gap-3" data-testid="feature-commissioner-0">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Everything in Player Plus</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-commissioner-1">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">League creation & management</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-commissioner-2">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Commissioner dashboard</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-commissioner-3">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">League statistics</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-commissioner-4">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Advanced team management</span>
+                </li>
+              </ul>
+              <button 
+                onClick={() => window.location.href = '/api/login'}
+                className="w-full py-3 px-6 rounded-full border-2 border-border hover:border-primary transition-colors font-semibold"
+                data-testid="button-pricing-commissioner"
+              >
+                Get Started
+              </button>
+            </div>
           </div>
         </div>
       </section>
