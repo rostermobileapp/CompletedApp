@@ -3284,7 +3284,7 @@ export class DatabaseStorage implements IStorage {
     )` : sql`1=1`; // If no userId provided, show all (for commissioner access)
 
     // Build team-based filter condition
-    // Logic: Show commissioner posts (teamId is null) to everyone, and team captain posts only to their team members
+    // Logic: Show commissioner posts (teamId is null) to everyone, and team captain posts only to their team members or the captain themselves
     const teamFilter = userId ? sql`(
       ${announcements.teamId} IS NULL
       OR 
@@ -3293,6 +3293,12 @@ export class DatabaseStorage implements IStorage {
         WHERE tm.team_id = ${announcements.teamId} 
         AND tm.user_id = ${userId}
         AND tm.status = 'approved'
+      )
+      OR
+      EXISTS (
+        SELECT 1 FROM ${teams} t 
+        WHERE t.id = ${announcements.teamId} 
+        AND t.captain_id = ${userId}
       )
     )` : sql`1=1`; // If no userId provided, show all (for commissioner access)
 
