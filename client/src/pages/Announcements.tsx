@@ -1068,15 +1068,6 @@ export default function Announcements() {
   // Normalize the data to handle both array and object responses
   const announcements: Announcement[] = Array.isArray(data) ? data : (data?.announcements ?? []);
   const pagination = Array.isArray(data) ? undefined : data?.pagination;
-  
-  console.log('🔍 Announcements debug:', { 
-    rawData: data, 
-    announcements, 
-    count: announcements.length,
-    isLoading,
-    user: user?.id,
-    leagueId 
-  });
 
   if (!user) {
     navigate('/');
