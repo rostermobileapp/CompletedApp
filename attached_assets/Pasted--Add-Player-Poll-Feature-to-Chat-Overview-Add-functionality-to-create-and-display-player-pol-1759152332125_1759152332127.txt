@@ -1,0 +1,98 @@
+# Add Player Poll Feature to Chat
+
+## Overview
+Add functionality to create and display player polls in the chat feature, similar to how commissioner announcements work. Polls should be interactive, display real-time results, and be stored persistently.
+
+## Requirements
+
+### 1. Poll Creation Interface
+- Add a "Create Poll" button or option in the chat interface (available to all users)
+- Create a modal/form with the following fields:
+  - Poll question (text input, required)
+  - Poll options (minimum 2, maximum 6 options - text inputs with add/remove buttons)
+  - Optional: Poll duration/expiry (dropdown: 1 hour, 6 hours, 1 day, 3 days, 1 week, or "No expiry")
+  - "Post to Chat" button
+
+### 2. Poll Display in Chat
+- Display polls as distinct message cards in the chat feed with:
+  - "POLL" badge/indicator at the top
+  - Poll question prominently displayed
+  - List of options as clickable buttons/cards
+  - Vote counts and percentages for each option (visible after voting)
+  - Total vote count
+  - Timestamp of poll creation
+  - Poll status indicator (Active/Closed)
+  - Username of player who created the poll
+
+### 3. Voting Functionality
+- Players can vote on active polls by clicking an option
+- Each player can vote only once per poll
+- After voting:
+  - Show visual confirmation of their vote (highlight selected option)
+  - Display vote counts and percentages for all options
+  - Update results in real-time for all users viewing the chat
+- Players can see results even if they haven't voted yet (but must vote to see which option they selected)
+- Closed polls should be visible but not votable
+
+### 4. Data Structure
+Store polls with the following structure:
+```javascript
+{
+  id: unique_id,
+  type: "poll",
+  question: "Poll question text",
+  options: [
+    { id: option_id, text: "Option 1", votes: [] }, // votes array contains player IDs
+    { id: option_id, text: "Option 2", votes: [] },
+    // ...
+  ],
+  createdBy: user_id,
+  createdAt: timestamp,
+  expiresAt: timestamp or null,
+  status: "active" or "closed"
+}
+```
+
+### 5. Poll Management
+- Poll creators and commissioners can manually close a poll early
+- Polls automatically close when expiry time is reached
+- Include a small menu (three dots) on each poll for poll creators/commissioners with options:
+  - "Close Poll" (if active)
+  - "Delete Poll" (confirmation required) - only available to poll creator or commissioners
+
+### 6. Visual Design
+- Make polls visually distinct from regular chat messages
+- Use a different background color or border for poll cards
+- Show vote percentages with visual progress bars
+- Highlight the user's selected option after voting
+- Display "Voted" badge on polls the user has participated in
+- Show "Closed" badge on expired polls
+
+### 7. Real-time Updates
+- When any player votes, update the poll results for all users viewing the chat in real-time
+- When a user closes a poll, update status for all users immediately
+
+### 8. Additional Features
+- Add a poll icon/button near the message input that commissioners can use to create polls
+- Show a notification/indicator when a new poll is posted
+- Optional: Add a "Polls" tab or section to view all polls (active and past)
+
+## Technical Notes
+- Maintain consistency with existing chat and announcement features
+- Ensure polls are stored in the same database/storage system as other chat messages
+- Use the existing real-time update mechanism for live vote count updates
+- Follow the app's existing design system and styling patterns
+- Ensure mobile responsiveness for poll cards and voting interface
+
+## Testing Checklist
+- [ ] Commissioner can create polls with 2-6 options
+- [ ] Polls appear correctly in chat feed
+- [ ] Players can vote and see results update
+- [ ] Each player can only vote once per poll
+- [ ] Vote percentages calculate correctly
+- [ ] Real-time updates work for all users
+- [ ] Polls expire correctly based on set duration
+- [ ] Commissioner can manually close polls
+- [ ] Closed polls display correctly but can't be voted on
+- [ ] UI is responsive on mobile devices
+- [ ] Poll data persists after page refresh
