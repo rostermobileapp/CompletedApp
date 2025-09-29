@@ -13,7 +13,7 @@ import {
   requirePremiumFeatures 
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagueMemberships, importedPlayers, teams, announcementPolls } from "@shared/schema";
+import { leagueMemberships, importedPlayers, teams, announcementPolls, createChatPollRequestSchema } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import {
@@ -5080,6 +5080,237 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
       res.status(500).json({ message: 'Failed to mark messages as read' });
+    }
+  });
+
+  // ===== CHAT POLL ROUTES =====
+
+  // Create a poll on a message
+  app.post('/api/messages/:id/polls', isAuthenticated, async (req: any, res) => {
+    try {
+      const messageId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Get message to check if user can create polls on it
+      const message = await messagingService.getMessageById(messageId);
+      if (!message) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+
+      // Check if user is participant in the conversation
+      const isParticipant = await messagingService.isUserInConversation(userId, message.conversationId);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Only the message sender can add polls to their message
+      if (message.senderId !== userId) {
+        return res.status(403).json({ message: 'Only message sender can add polls' });
+      }
+
+      const pollData = createChatPollRequestSchema.parse(req.body);
+      const poll = await messagingService.createChatPoll({
+        ...pollData,
+        messageId,
+      });
+
+      // Broadcast poll creation to all conversation participants via WebSocket
+      const participants = await messagingService.getConversationParticipants(message.conversationId);
+      broadcastToParticipants(participants, {
+        type: 'poll_created',
+        conversationId: message.conversationId,
+        messageId,
+        poll,
+        createdBy: userId
+      });
+
+      res.json(poll);
+    } catch (error) {
+      console.error('Error creating chat poll:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid poll data', details: error.errors });
+      }
+      res.status(500).json({ message: 'Failed to create poll' });
+    }
+  });
+
+  // Vote on a chat poll
+  app.post('/api/chat-polls/:id/votes', isAuthenticated, async (req: any, res) => {
+    try {
+      const pollId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { optionIndex } = req.body;
+
+      if (optionIndex === undefined || optionIndex < 0) {
+        return res.status(400).json({ message: 'Valid option index is required' });
+      }
+
+      // Get the poll to find the message it belongs to
+      const poll = await messagingService.getChatPoll(pollId);
+      if (!poll) {
+        return res.status(404).json({ message: 'Poll not found' });
+      }
+
+      // Check if poll is still active
+      if (poll.status === 'closed') {
+        return res.status(400).json({ message: 'Poll is closed' });
+      }
+
+      // Check if poll has expired
+      if (poll.expiresAt && new Date() > poll.expiresAt) {
+        return res.status(400).json({ message: 'Poll has expired' });
+      }
+
+      // Get message to check conversation access
+      const message = await messagingService.getMessageById(poll.messageId);
+      if (!message) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+
+      // Check if user is participant in the conversation
+      const isParticipant = await messagingService.isUserInConversation(userId, message.conversationId);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Check if user has already voted
+      const existingVote = await messagingService.getUserVoteOnPoll(pollId, userId);
+      if (existingVote) {
+        return res.status(400).json({ message: 'You have already voted on this poll' });
+      }
+
+      // Validate option index
+      const options = poll.options as any[];
+      if (optionIndex >= options.length) {
+        return res.status(400).json({ message: 'Invalid option index' });
+      }
+
+      const vote = await messagingService.voteOnChatPoll({
+        pollId,
+        userId,
+        optionIndex,
+      });
+
+      // Broadcast vote update to all conversation participants via WebSocket
+      const participants = await messagingService.getConversationParticipants(message.conversationId);
+      broadcastToParticipants(participants, {
+        type: 'poll_vote',
+        conversationId: message.conversationId,
+        pollId,
+        vote,
+        votedBy: userId
+      });
+
+      res.json(vote);
+    } catch (error) {
+      console.error('Error voting on chat poll:', error);
+      res.status(500).json({ message: 'Failed to vote on poll' });
+    }
+  });
+
+  // Get poll results
+  app.get('/api/chat-polls/:id/results', isAuthenticated, async (req: any, res) => {
+    try {
+      const pollId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Get the poll to find the message it belongs to
+      const poll = await messagingService.getChatPoll(pollId);
+      if (!poll) {
+        return res.status(404).json({ message: 'Poll not found' });
+      }
+
+      // Get message to check conversation access
+      const message = await messagingService.getMessageById(poll.messageId);
+      if (!message) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+
+      // Check if user is participant in the conversation
+      const isParticipant = await messagingService.isUserInConversation(userId, message.conversationId);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const results = await messagingService.getChatPollResults(pollId);
+      res.json({ poll, results });
+    } catch (error) {
+      console.error('Error fetching poll results:', error);
+      res.status(500).json({ message: 'Failed to fetch poll results' });
+    }
+  });
+
+  // Close a chat poll
+  app.post('/api/chat-polls/:id/close', isAuthenticated, async (req: any, res) => {
+    try {
+      const pollId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Get the poll to find the message it belongs to
+      const poll = await messagingService.getChatPoll(pollId);
+      if (!poll) {
+        return res.status(404).json({ message: 'Poll not found' });
+      }
+
+      // Get message to check permissions
+      const message = await messagingService.getMessageById(poll.messageId);
+      if (!message) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+
+      // Check if user is participant in the conversation
+      const isParticipant = await messagingService.isUserInConversation(userId, message.conversationId);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Only poll creator (message sender) can close the poll
+      if (message.senderId !== userId) {
+        return res.status(403).json({ message: 'Only poll creator can close the poll' });
+      }
+
+      const closedPoll = await messagingService.closeChatPoll(pollId);
+
+      // Broadcast poll closure to all conversation participants via WebSocket
+      const participants = await messagingService.getConversationParticipants(message.conversationId);
+      broadcastToParticipants(participants, {
+        type: 'poll_closed',
+        conversationId: message.conversationId,
+        pollId,
+        poll: closedPoll,
+        closedBy: userId
+      });
+
+      res.json(closedPoll);
+    } catch (error) {
+      console.error('Error closing chat poll:', error);
+      res.status(500).json({ message: 'Failed to close poll' });
+    }
+  });
+
+  // Get polls for a message
+  app.get('/api/messages/:id/polls', isAuthenticated, async (req: any, res) => {
+    try {
+      const messageId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Get message to check conversation access
+      const message = await messagingService.getMessageById(messageId);
+      if (!message) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+
+      // Check if user is participant in the conversation
+      const isParticipant = await messagingService.isUserInConversation(userId, message.conversationId);
+      if (!isParticipant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const polls = await messagingService.getChatPollsByMessage(messageId);
+      res.json(polls);
+    } catch (error) {
+      console.error('Error fetching message polls:', error);
+      res.status(500).json({ message: 'Failed to fetch polls' });
     }
   });
 

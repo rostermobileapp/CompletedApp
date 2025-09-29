@@ -2,7 +2,7 @@
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
-import { League } from '@shared/schema';
+import { League, ChatPoll, ChatPollVote } from '@shared/schema';
 
 import { MediaGallery } from '@/components/MediaGallery';
 import GifSearchModal from '@/components/GifSearchModal';
@@ -22,7 +22,7 @@ interface Message {
   conversationId: string;
   senderId: string;
   content: string;
-  messageType: 'text' | 'image' | 'gif' | 'file';
+  messageType: 'text' | 'image' | 'gif' | 'file' | 'poll';
   sentAt: string;
   replyToId?: string;
   attachments: MessageAttachment[];
@@ -69,6 +69,7 @@ interface ConversationParticipant {
   };
 }
 
+
 interface Contact {
   id: string;
   firstName: string;
@@ -80,6 +81,209 @@ interface Contact {
   position?: string;
   jerseyNumber?: number;
   skillLevel?: string;
+}
+
+// Poll Card Component
+function PollCard({ message, currentUserId }: { message: any; currentUserId: string }) {
+  const [pollData, setPollData] = useState<any>(null);
+  const [userVote, setUserVote] = useState<ChatPollVote | null>(null);
+  const [pollResults, setPollResults] = useState<ChatPollVote[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const { toast } = useToast();
+
+  // Fetch poll data for this message
+  const { data: polls = [] } = useQuery<ChatPoll[]>({
+    queryKey: ['/api/messages', message.id, 'polls'],
+    enabled: !!message.id && message.messageType === 'poll'
+  });
+
+  const poll = polls[0]; // Assuming one poll per message
+
+  // Fetch poll results
+  const { data: resultsData } = useQuery({
+    queryKey: ['/api/chat-polls', poll?.id, 'results'],
+    enabled: !!poll?.id
+    // Real-time updates now handled via WebSocket events
+  });
+
+  const voteOnPollMutation = useMutation({
+    mutationFn: async ({ pollId, optionIndex }: { pollId: string; optionIndex: number }) => {
+      const response = await apiRequest('POST', `/api/chat-polls/${pollId}/votes`, { optionIndex });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'results'] });
+      toast({
+        title: 'Vote recorded',
+        description: 'Your vote has been recorded'
+      });
+    },
+    onError: (error) => {
+      console.error('Error voting on poll:', error);
+      toast({
+        title: 'Failed to vote',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const closePollMutation = useMutation({
+    mutationFn: async (pollId: string) => {
+      const response = await apiRequest('POST', `/api/chat-polls/${pollId}/close`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/messages', message.id, 'polls'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'results'] });
+      toast({
+        title: 'Poll closed',
+        description: 'The poll has been closed'
+      });
+    }
+  });
+
+  useEffect(() => {
+    if (resultsData) {
+      setPollResults(resultsData.results || []);
+      const userVoteData = resultsData.results?.find((vote: ChatPollVote) => vote.userId === currentUserId);
+      setUserVote(userVoteData || null);
+      setShowResults(!!userVoteData || resultsData.poll?.status === 'closed');
+    }
+  }, [resultsData, currentUserId]);
+
+  if (!poll) {
+    return null;
+  }
+
+  const handleVote = (optionIndex: number) => {
+    if (poll.status === 'closed' || userVote) {
+      return;
+    }
+    voteOnPollMutation.mutate({ pollId: poll.id, optionIndex });
+  };
+
+  const handleClosePoll = () => {
+    if (window.confirm('Are you sure you want to close this poll?')) {
+      closePollMutation.mutate(poll.id);
+    }
+  };
+
+  const getVoteCount = (optionIndex: number) => {
+    return pollResults.filter(vote => vote.optionIndex === optionIndex).length;
+  };
+
+  const getTotalVotes = () => {
+    return pollResults.length;
+  };
+
+  const getVotePercentage = (optionIndex: number) => {
+    const total = getTotalVotes();
+    if (total === 0) return 0;
+    return Math.round((getVoteCount(optionIndex) / total) * 100);
+  };
+
+  const isPollExpired = poll.expiresAt && new Date() > new Date(poll.expiresAt);
+  const canVote = poll.status === 'active' && !isPollExpired && !userVote;
+  const canClosePoll = message.senderId === currentUserId && poll.status === 'active';
+
+  return (
+    <div className="mt-3 p-4 border border-primary/20 rounded-lg bg-primary/5" data-testid={`poll-card-${poll.id}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded font-medium">
+            POLL
+          </div>
+          {poll.status === 'closed' && (
+            <div className="bg-muted text-muted-foreground text-xs px-2 py-1 rounded">
+              CLOSED
+            </div>
+          )}
+          {isPollExpired && (
+            <div className="bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded">
+              EXPIRED
+            </div>
+          )}
+        </div>
+        {canClosePoll && (
+          <button
+            onClick={handleClosePoll}
+            className="text-xs text-muted-foreground hover:text-foreground"
+            data-testid="button-close-poll"
+          >
+            Close Poll
+          </button>
+        )}
+      </div>
+
+      <h4 className="font-medium text-base mb-4" data-testid="poll-question">
+        {poll.question}
+      </h4>
+
+      <div className="space-y-2">
+        {poll.options.map((option: string, index: number) => {
+          const voteCount = getVoteCount(index);
+          const percentage = getVotePercentage(index);
+          const isUserChoice = userVote?.optionIndex === index;
+
+          return (
+            <div key={index} className="relative">
+              <button
+                onClick={() => handleVote(index)}
+                disabled={!canVote}
+                className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                  canVote
+                    ? 'hover:bg-accent border-border'
+                    : 'cursor-default border-border'
+                } ${
+                  isUserChoice
+                    ? 'bg-primary/10 border-primary'
+                    : 'bg-background'
+                }`}
+                data-testid={`poll-option-${index}`}
+              >
+                <div className="flex items-center justify-between relative z-10">
+                  <span className="text-sm font-medium">{option}</span>
+                  {showResults && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {voteCount} vote{voteCount !== 1 ? 's' : ''} ({percentage}%)
+                      </span>
+                      {isUserChoice && (
+                        <div className="w-2 h-2 bg-primary rounded-full" data-testid="user-vote-indicator" />
+                      )}
+                    </div>
+                  )}
+                </div>
+                {showResults && percentage > 0 && (
+                  <div
+                    className="absolute inset-0 bg-primary/10 rounded-lg transition-all duration-300"
+                    style={{ width: `${percentage}%` }}
+                  />
+                )}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {showResults && (
+        <div className="mt-3 pt-3 border-t border-border">
+          <p className="text-xs text-muted-foreground" data-testid="poll-total-votes">
+            Total votes: {getTotalVotes()}
+          </p>
+          {poll.expiresAt && (
+            <p className="text-xs text-muted-foreground">
+              {isPollExpired 
+                ? `Expired ${format(new Date(poll.expiresAt), 'MMM d, yyyy h:mm a')}`
+                : `Expires ${format(new Date(poll.expiresAt), 'MMM d, yyyy h:mm a')}`
+              }
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Messages() {
@@ -118,6 +322,12 @@ export default function Messages() {
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [selectedUserToAdd, setSelectedUserToAdd] = useState<string | null>(null);
+
+  // Poll state
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+  const [pollDuration, setPollDuration] = useState<string>('1d');
 
   // Fetch user's leagues for contact discovery
   const { data: userLeagues = [], isLoading: userLeaguesLoading } = useQuery<League[]>({
@@ -348,6 +558,134 @@ export default function Messages() {
     }
   });
 
+  // Poll mutations
+  const createPollMutation = useMutation({
+    mutationFn: async (pollData: { question: string; options: string[]; expiresAt?: string }) => {
+      // We'll need to create a message first, then add the poll to it
+      // For now, let's create a special poll message
+      const messageResponse = await apiRequest('POST', `/api/conversations/${selectedConversation}/messages`, {
+        content: `📊 ${pollData.question}`,
+        messageType: 'poll'
+      });
+      const message = await messageResponse.json();
+      
+      const pollResponse = await apiRequest('POST', `/api/messages/${message.id}/polls`, pollData);
+      return pollResponse.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
+      setShowPollCreator(false);
+      setPollQuestion('');
+      setPollOptions(['', '']);
+      setPollDuration('1d');
+      toast({
+        title: 'Poll created',
+        description: 'Your poll has been created successfully'
+      });
+    },
+    onError: (error) => {
+      console.error('Error creating poll:', error);
+      toast({
+        title: 'Failed to create poll',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const voteOnPollMutation = useMutation({
+    mutationFn: async ({ pollId, optionIndex }: { pollId: string; optionIndex: number }) => {
+      const response = await apiRequest('POST', `/api/chat-polls/${pollId}/votes`, { optionIndex });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
+      toast({
+        title: 'Vote recorded',
+        description: 'Your vote has been recorded'
+      });
+    },
+    onError: (error) => {
+      console.error('Error voting on poll:', error);
+      toast({
+        title: 'Failed to vote',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const closePollMutation = useMutation({
+    mutationFn: async (pollId: string) => {
+      const response = await apiRequest('POST', `/api/chat-polls/${pollId}/close`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
+      toast({
+        title: 'Poll closed',
+        description: 'The poll has been closed'
+      });
+    },
+    onError: (error) => {
+      console.error('Error closing poll:', error);
+      toast({
+        title: 'Failed to close poll',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Poll helper functions
+  const addPollOption = () => {
+    if (pollOptions.length < 6) {
+      setPollOptions([...pollOptions, '']);
+    }
+  };
+
+  const removePollOption = (index: number) => {
+    if (pollOptions.length > 2) {
+      setPollOptions(pollOptions.filter((_, i) => i !== index));
+    }
+  };
+
+  const updatePollOption = (index: number, value: string) => {
+    const newOptions = [...pollOptions];
+    newOptions[index] = value;
+    setPollOptions(newOptions);
+  };
+
+  const handleCreatePoll = () => {
+    if (!pollQuestion.trim() || pollOptions.some(option => !option.trim())) {
+      toast({
+        title: 'Invalid poll data',
+        description: 'Please fill in the question and all options',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const expiresAt = pollDuration !== 'no-expiry' ? getExpirationDate(pollDuration) : undefined;
+    createPollMutation.mutate({
+      question: pollQuestion.trim(),
+      options: pollOptions.filter(option => option.trim()),
+      expiresAt
+    });
+  };
+
+  const getExpirationDate = (duration: string): string => {
+    const now = new Date();
+    switch (duration) {
+      case '1h': return new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+      case '6h': return new Date(now.getTime() + 6 * 60 * 60 * 1000).toISOString();
+      case '1d': return new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      case '3d': return new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
+      case '1w': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      default: return new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    }
+  };
+
   const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent conversation selection when clicking delete
     
@@ -386,8 +724,19 @@ export default function Messages() {
   useEffect(() => {
     // 🚨 FREE ACCESS - WEBSOCKET ENABLED FOR EVERYONE! 🚨
 
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${location.host}/ws`;
+    // More robust WebSocket URL construction for different environments
+    let wsUrl;
+    try {
+      // Use window.location.origin and convert to WebSocket protocol
+      const origin = window.location.origin;
+      wsUrl = origin.replace('https:', 'wss:').replace('http:', 'ws:') + '/ws';
+    } catch (error) {
+      // Fallback for development environment
+      console.warn('Failed to get origin, using fallback:', error);
+      wsUrl = 'ws://localhost:5000/ws';
+    }
+    
+    console.log('Connecting to WebSocket at:', wsUrl);
     
     const websocket = new WebSocket(wsUrl);
     
@@ -449,6 +798,29 @@ export default function Messages() {
           // Invalidate unread counts when read receipts are received
           queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
           queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
+          break;
+
+        case 'poll_created':
+          // Refresh messages to show new poll
+          if (data.conversationId === selectedConversation) {
+            queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/messages', data.messageId, 'polls'] });
+          }
+          break;
+
+        case 'poll_vote':
+          // Refresh poll results to show new vote
+          if (data.conversationId === selectedConversation) {
+            queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', data.pollId, 'results'] });
+          }
+          break;
+
+        case 'poll_closed':
+          // Refresh poll data to show closed status
+          if (data.conversationId === selectedConversation) {
+            queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', data.pollId, 'results'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/messages', data.messageId, 'polls'] });
+          }
           break;
       }
     };
@@ -1332,6 +1704,12 @@ export default function Messages() {
                             {message.content}
                           </p>
                         )}
+                        
+                        {/* Poll Display */}
+                        {message.messageType === 'poll' && (
+                          <PollCard message={message} currentUserId={currentUserId} />
+                        )}
+                        
                         {message.attachments && message.attachments.length > 0 && (
                           <div className="mt-2 space-y-2" data-testid={`message-attachments-${message.id}`}>
                             {message.attachments.map((attachment: any, index: number) => {
@@ -1486,6 +1864,105 @@ export default function Messages() {
           </div>
         )}
         
+        {/* Poll Creator */}
+        {showPollCreator && (
+          <div className="mb-3 p-4 bg-muted rounded-lg border" data-testid="poll-creator">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium">Create Poll</h4>
+              <button
+                onClick={() => setShowPollCreator(false)}
+                className="p-1 hover:bg-accent rounded"
+                data-testid="button-close-poll-creator"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Poll Question</label>
+                <Input
+                  value={pollQuestion}
+                  onChange={(e) => setPollQuestion(e.target.value)}
+                  placeholder="Ask a question..."
+                  data-testid="input-poll-question"
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-1 block">Options</label>
+                <div className="space-y-2">
+                  {pollOptions.map((option, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={option}
+                        onChange={(e) => updatePollOption(index, e.target.value)}
+                        placeholder={`Option ${index + 1}`}
+                        data-testid={`input-poll-option-${index}`}
+                      />
+                      {pollOptions.length > 2 && (
+                        <button
+                          onClick={() => removePollOption(index)}
+                          className="p-2 hover:bg-accent rounded"
+                          data-testid={`button-remove-option-${index}`}
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                {pollOptions.length < 6 && (
+                  <button
+                    onClick={addPollOption}
+                    className="mt-2 flex items-center gap-1 text-sm text-primary hover:underline"
+                    data-testid="button-add-poll-option"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add option
+                  </button>
+                )}
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-1 block">Duration</label>
+                <select
+                  value={pollDuration}
+                  onChange={(e) => setPollDuration(e.target.value)}
+                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="select-poll-duration"
+                >
+                  <option value="1h">1 hour</option>
+                  <option value="6h">6 hours</option>
+                  <option value="1d">1 day</option>
+                  <option value="3d">3 days</option>
+                  <option value="1w">1 week</option>
+                  <option value="no-expiry">No expiry</option>
+                </select>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleCreatePoll}
+                  disabled={createPollMutation.isPending}
+                  className="flex-1"
+                  data-testid="button-post-poll"
+                >
+                  {createPollMutation.isPending ? 'Creating...' : 'Post Poll'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPollCreator(false)}
+                  data-testid="button-cancel-poll"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div className="flex items-center gap-2">
           <button 
             onClick={() => fileInputRef.current?.click()}
@@ -1502,6 +1979,14 @@ export default function Messages() {
             title="Send GIF"
           >
             <Smile className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => setShowPollCreator(!showPollCreator)}
+            className="p-2 hover:bg-accent rounded transition-colors"
+            data-testid="button-create-poll"
+            title="Create Poll"
+          >
+            <BarChart3 className="w-4 h-4" />
           </button>
           <Input
             placeholder="Type a message..."

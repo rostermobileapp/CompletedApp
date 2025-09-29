@@ -448,6 +448,34 @@ export const userOnlineStatus = pgTable("user_online_status", {
   index("idx_user_online_status_user").on(table.userId),
 ]);
 
+// Chat polls table
+export const chatPolls = pgTable("chat_polls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").references(() => messages.id).notNull(),
+  question: text("question").notNull(),
+  options: jsonb("options").notNull(), // Array of poll options
+  expiresAt: timestamp("expires_at"),
+  status: varchar("status").default("active").notNull(), // "active" or "closed"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_chat_polls_message").on(table.messageId),
+  index("idx_chat_polls_status").on(table.status),
+  index("idx_chat_polls_expires").on(table.expiresAt),
+]);
+
+// Chat poll votes table
+export const chatPollVotes = pgTable("chat_poll_votes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pollId: varchar("poll_id").references(() => chatPolls.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  optionIndex: integer("option_index").notNull(), // Index of selected option in options array
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_chat_poll_user_vote").on(table.pollId, table.userId),
+  index("idx_chat_poll_votes_poll").on(table.pollId),
+  index("idx_chat_poll_votes_user").on(table.userId),
+]);
+
 // Announcements table
 export const announcements = pgTable("announcements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -920,6 +948,7 @@ export const messagesRelations = relations(messages, ({ one, many }) => ({
   }),
   attachments: many(messageAttachments),
   readReceipts: many(messageReadReceipts),
+  chatPolls: many(chatPolls),
   replyTo: one(messages, {
     fields: [messages.replyToId],
     references: [messages.id],
@@ -944,6 +973,25 @@ export const messageReadReceiptsRelations = relations(messageReadReceipts, ({ on
   }),
   user: one(users, {
     fields: [messageReadReceipts.userId],
+    references: [users.id],
+  }),
+}));
+
+export const chatPollsRelations = relations(chatPolls, ({ one, many }) => ({
+  message: one(messages, {
+    fields: [chatPolls.messageId],
+    references: [messages.id],
+  }),
+  votes: many(chatPollVotes),
+}));
+
+export const chatPollVotesRelations = relations(chatPollVotes, ({ one }) => ({
+  poll: one(chatPolls, {
+    fields: [chatPollVotes.pollId],
+    references: [chatPolls.id],
+  }),
+  user: one(users, {
+    fields: [chatPollVotes.userId],
     references: [users.id],
   }),
 }));
@@ -1391,6 +1439,16 @@ export const insertAnnouncementPollVoteSchema = createInsertSchema(announcementP
   createdAt: true,
 });
 
+export const insertChatPollSchema = createInsertSchema(chatPolls).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertChatPollVoteSchema = createInsertSchema(chatPollVotes).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertScrimmageSchema = createInsertSchema(scrimmages).omit({
   id: true,
   createdAt: true,
@@ -1456,6 +1514,19 @@ export const createAnnouncementPollRequestSchema = createInsertSchema(announceme
 });
 
 export const createAnnouncementPollVoteRequestSchema = createInsertSchema(announcementPollVotes).omit({
+  id: true,
+  pollId: true,    // Server-controlled
+  userId: true,    // Server-controlled
+  createdAt: true,
+});
+
+export const createChatPollRequestSchema = createInsertSchema(chatPolls).omit({
+  id: true,
+  messageId: true, // Server-controlled
+  createdAt: true,
+});
+
+export const createChatPollVoteRequestSchema = createInsertSchema(chatPollVotes).omit({
   id: true,
   pollId: true,    // Server-controlled
   userId: true,    // Server-controlled
@@ -1665,6 +1736,12 @@ export type CreateAnnouncementAttachmentRequest = z.infer<typeof createAnnouncem
 export type CreateAnnouncementReactionRequest = z.infer<typeof createAnnouncementReactionRequestSchema>;
 export type CreateAnnouncementPollRequest = z.infer<typeof createAnnouncementPollRequestSchema>;
 export type CreateAnnouncementPollVoteRequest = z.infer<typeof createAnnouncementPollVoteRequestSchema>;
+export type ChatPoll = typeof chatPolls.$inferSelect;
+export type InsertChatPoll = z.infer<typeof insertChatPollSchema>;
+export type ChatPollVote = typeof chatPollVotes.$inferSelect;
+export type InsertChatPollVote = z.infer<typeof insertChatPollVoteSchema>;
+export type CreateChatPollRequest = z.infer<typeof createChatPollRequestSchema>;
+export type CreateChatPollVoteRequest = z.infer<typeof createChatPollVoteRequestSchema>;
 export type Scrimmage = typeof scrimmages.$inferSelect;
 export type InsertScrimmage = z.infer<typeof insertScrimmageSchema>;
 export type ScrimmageRequest = typeof scrimmageRequests.$inferSelect;

@@ -9,6 +9,8 @@ import {
   users,
   teamMemberships,
   teams,
+  chatPolls,
+  chatPollVotes,
   type Conversation,
   type InsertConversation,
   type ConversationParticipant,
@@ -23,6 +25,10 @@ import {
   type InsertTypingIndicator,
   type UserOnlineStatus,
   type InsertUserOnlineStatus,
+  type ChatPoll,
+  type InsertChatPoll,
+  type ChatPollVote,
+  type InsertChatPollVote,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
@@ -974,6 +980,87 @@ export class MessagingService {
       ));
     
     return result;
+  }
+
+  // Message retrieval
+  async getMessageById(messageId: string): Promise<Message | undefined> {
+    const [message] = await db
+      .select()
+      .from(messages)
+      .where(eq(messages.id, messageId))
+      .limit(1);
+    return message;
+  }
+
+  // Chat Poll operations
+  async createChatPoll(poll: InsertChatPoll): Promise<ChatPoll> {
+    const [newPoll] = await db.insert(chatPolls).values(poll).returning();
+    return newPoll;
+  }
+
+  async getChatPoll(pollId: string): Promise<ChatPoll | undefined> {
+    const [poll] = await db
+      .select()
+      .from(chatPolls)
+      .where(eq(chatPolls.id, pollId))
+      .limit(1);
+    return poll;
+  }
+
+  async getChatPollsByMessage(messageId: string): Promise<ChatPoll[]> {
+    return await db
+      .select()
+      .from(chatPolls)
+      .where(eq(chatPolls.messageId, messageId));
+  }
+
+  async voteOnChatPoll(vote: InsertChatPollVote): Promise<ChatPollVote> {
+    const [newVote] = await db.insert(chatPollVotes).values(vote).returning();
+    return newVote;
+  }
+
+  async getChatPollResults(pollId: string): Promise<(ChatPollVote & { user: any })[]> {
+    const results = await db
+      .select({
+        id: chatPollVotes.id,
+        pollId: chatPollVotes.pollId,
+        userId: chatPollVotes.userId,
+        optionIndex: chatPollVotes.optionIndex,
+        createdAt: chatPollVotes.createdAt,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          displayName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
+        }
+      })
+      .from(chatPollVotes)
+      .innerJoin(users, eq(chatPollVotes.userId, users.id))
+      .where(eq(chatPollVotes.pollId, pollId));
+    
+    return results as (ChatPollVote & { user: any })[];
+  }
+
+  async closeChatPoll(pollId: string): Promise<ChatPoll> {
+    const [closedPoll] = await db
+      .update(chatPolls)
+      .set({ status: "closed" })
+      .where(eq(chatPolls.id, pollId))
+      .returning();
+    return closedPoll;
+  }
+
+  async getUserVoteOnPoll(pollId: string, userId: string): Promise<ChatPollVote | undefined> {
+    const [vote] = await db
+      .select()
+      .from(chatPollVotes)
+      .where(and(
+        eq(chatPollVotes.pollId, pollId),
+        eq(chatPollVotes.userId, userId)
+      ))
+      .limit(1);
+    return vote;
   }
 }
 

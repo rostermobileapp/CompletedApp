@@ -36,6 +36,9 @@ import {
   messageReadReceipts,
   typingIndicators,
   userOnlineStatus,
+  // Chat polls tables
+  chatPolls,
+  chatPollVotes,
   type User,
   type UpsertUser,
   type League,
@@ -103,6 +106,10 @@ import {
   type InsertLineCombinationAssignment,
   type LineCombinationWithAssignments,
   type LineAssignmentWithPlayer,
+  type ChatPoll,
+  type InsertChatPoll,
+  type ChatPollVote,
+  type InsertChatPollVote,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, not } from "drizzle-orm";
@@ -250,6 +257,14 @@ export interface IStorage {
   createAnnouncementPoll(poll: InsertAnnouncementPoll): Promise<AnnouncementPoll>;
   voteOnPoll(vote: InsertAnnouncementPollVote): Promise<AnnouncementPollVote>;
   getPollResults(pollId: string): Promise<(AnnouncementPollVote & { user: User })[]>;
+  
+  // Chat poll operations
+  createChatPoll(poll: InsertChatPoll): Promise<ChatPoll>;
+  getChatPoll(pollId: string): Promise<ChatPoll | undefined>;
+  voteOnChatPoll(vote: InsertChatPollVote): Promise<ChatPollVote>;
+  getChatPollResults(pollId: string): Promise<(ChatPollVote & { user: User })[]>;
+  getChatPollsByMessage(messageId: string): Promise<ChatPoll[]>;
+  closeChatPoll(pollId: string): Promise<ChatPoll>;
   
   // Announcement visibility operations (for targeted announcements)
   createAnnouncementVisibility(announcementId: string, userIds: string[]): Promise<void>;
@@ -3491,6 +3506,52 @@ export class DatabaseStorage implements IStorage {
       .where(eq(announcementPollVotes.pollId, pollId));
     
     return results.map(r => ({ ...r.announcement_poll_votes, user: r.users }));
+  }
+
+  // Chat poll operations
+  async createChatPoll(poll: InsertChatPoll): Promise<ChatPoll> {
+    const [newPoll] = await db.insert(chatPolls).values(poll).returning();
+    return newPoll;
+  }
+
+  async getChatPoll(pollId: string): Promise<ChatPoll | undefined> {
+    const [poll] = await db
+      .select()
+      .from(chatPolls)
+      .where(eq(chatPolls.id, pollId))
+      .limit(1);
+    return poll;
+  }
+
+  async voteOnChatPoll(vote: InsertChatPollVote): Promise<ChatPollVote> {
+    const [newVote] = await db.insert(chatPollVotes).values(vote).returning();
+    return newVote;
+  }
+
+  async getChatPollResults(pollId: string): Promise<(ChatPollVote & { user: User })[]> {
+    const results = await db
+      .select()
+      .from(chatPollVotes)
+      .innerJoin(users, eq(chatPollVotes.userId, users.id))
+      .where(eq(chatPollVotes.pollId, pollId));
+    
+    return results.map(r => ({ ...r.chat_poll_votes, user: r.users }));
+  }
+
+  async getChatPollsByMessage(messageId: string): Promise<ChatPoll[]> {
+    return await db
+      .select()
+      .from(chatPolls)
+      .where(eq(chatPolls.messageId, messageId));
+  }
+
+  async closeChatPoll(pollId: string): Promise<ChatPoll> {
+    const [closedPoll] = await db
+      .update(chatPolls)
+      .set({ status: "closed" })
+      .where(eq(chatPolls.id, pollId))
+      .returning();
+    return closedPoll;
   }
 
   // Announcement visibility operations (for targeted announcements)
