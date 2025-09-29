@@ -3,7 +3,7 @@
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -144,14 +144,17 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
     }
   });
 
+  // Memoize poll status to prevent infinite re-renders
+  const pollStatus = useMemo(() => poll?.status, [poll?.id, poll?.status]);
+  
   useEffect(() => {
     if (pollVotes) {
       setPollResults(pollVotes);
       const userVoteData = pollVotes.find((vote: ChatPollVote) => vote.userId === currentUserId);
       setUserVote(userVoteData || null);
-      setShowResults(!!userVoteData || poll?.status === 'closed');
+      setShowResults(!!userVoteData || pollStatus === 'closed');
     }
-  }, [pollVotes, currentUserId, poll?.status]);
+  }, [pollVotes, currentUserId, pollStatus]);
 
   if (!poll) {
     return null;
