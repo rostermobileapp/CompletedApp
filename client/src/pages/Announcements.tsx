@@ -73,6 +73,14 @@ type AnnouncementPoll = {
   }[];
 };
 
+type AnnouncementAttachment = {
+  id: string;
+  filename: string;
+  url: string;
+  type: string;
+  size: number;
+};
+
 type Announcement = {
   id: string;
   content: string;
@@ -85,8 +93,9 @@ type Announcement = {
     lastName: string;
     profileImageUrl?: string;
   };
+  attachments: AnnouncementAttachment[];
   reactions: AnnouncementReaction[];
-  poll?: AnnouncementPoll;
+  polls: AnnouncementPoll[];
 };
 
 // Emoji reactions available
@@ -682,10 +691,10 @@ function AnnouncementCard({
         </p>
 
         {/* Attachments */}
-        {(announcement as any).attachments && (announcement as any).attachments.length > 0 && (
+        {announcement.attachments && announcement.attachments.length > 0 && (
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(announcement as any).attachments.map((attachment: any, index: number) => {
+              {announcement.attachments.map((attachment, index) => {
                 if (attachment.type === 'image') {
                   return (
                     <div 
@@ -956,7 +965,7 @@ function AnnouncementCard({
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this announcement? This action cannot be undone.
-              {announcement.poll && " This will also delete the poll and all its votes."}
+              {announcement.polls && announcement.polls.length > 0 && " This will also delete the poll and all its votes."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
