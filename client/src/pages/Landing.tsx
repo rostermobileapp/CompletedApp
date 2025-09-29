@@ -66,15 +66,21 @@ export default function Landing() {
             className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight"
             data-testid="text-hero-title"
           >
-            Manage your team.
+            Your Beer League Team,
             <br />
-            <span className="text-primary">Like a champion.</span>
+            <span className="text-primary">Organized</span>
           </h1>
           <p 
-            className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed"
+            className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed font-medium"
             data-testid="text-hero-subtitle"
           >
-            From beer league hockey to competitive basketball. Everything your team needs in one powerful, easy-to-use app.
+            Stop chasing teammates. Start playing hockey.
+          </p>
+          <p 
+            className="text-base md:text-lg text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed"
+            data-testid="text-hero-body"
+          >
+            "Beer league hockey shouldn't feel like herding cats. But it does—because nobody knows who's playing, nobody knows the game time, and half the guys ghost. Why? Group texts and spreadsheets. Total clown show. Roster fixes all of it. One app, built by hockey players, for hockey players. Your schedule, your lineup, your team—organized. Finally."
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <button 
@@ -82,12 +88,12 @@ export default function Landing() {
               className="group bg-primary text-primary-foreground rounded-full py-4 px-10 font-semibold text-lg hover:bg-primary/90 transition-all hover:scale-105 flex items-center gap-2"
               data-testid="button-get-started"
             >
-              Get Started Free
+              Download Roster
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
           <p className="text-sm text-muted-foreground mt-6" data-testid="text-pricing-info">
-            Free forever • No credit card required
+            Enough chaos—play hockey.
           </p>
         </div>
       </section>
@@ -152,20 +158,17 @@ export default function Landing() {
       {/* CTA Section */}
       <section className="py-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl md:text-6xl font-bold mb-6" data-testid="text-cta-heading">
-            Ready to elevate
+          <h2 className="text-4xl md:text-6xl font-bold mb-10" data-testid="text-cta-heading">
+            Download Roster.
             <br />
-            your team?
+            Enough chaos—play hockey.
           </h2>
-          <p className="text-xl text-muted-foreground mb-10" data-testid="text-cta-subtitle">
-            Join thousands of teams already using Rosters.
-          </p>
           <button 
             onClick={() => window.location.href = '/api/login'}
             className="group bg-primary text-primary-foreground rounded-full py-4 px-10 font-semibold text-lg hover:bg-primary/90 transition-all hover:scale-105 inline-flex items-center gap-2"
             data-testid="button-cta-get-started"
           >
-            Get Started Free
+            Download Roster
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
