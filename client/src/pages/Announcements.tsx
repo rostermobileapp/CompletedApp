@@ -77,6 +77,7 @@ type Announcement = {
   id: string;
   content: string;
   isPinned: boolean;
+  teamId?: string | null;
   createdAt: string;
   author: {
     id: string;
@@ -113,12 +114,12 @@ function CreateAnnouncementModal({
   isOpen, 
   onClose, 
   leagueId, 
-  isCommissioner 
+  canPost 
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
   leagueId: string;
-  isCommissioner: boolean;
+  canPost: boolean;
 }) {
   const [content, setContent] = useState('');
   const [isPinned, setIsPinned] = useState(false);
@@ -261,7 +262,7 @@ function CreateAnnouncementModal({
     setPollOptions(newOptions);
   };
 
-  if (!isCommissioner) return null;
+  if (!canPost) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -634,7 +635,7 @@ function AnnouncementCard({
                   {announcement.author.firstName} {announcement.author.lastName}
                 </span>
                 <Badge variant="secondary" className="text-xs">
-                  Commissioner
+                  {announcement.teamId ? 'Team Captain' : 'Commissioner'}
                 </Badge>
                 {announcement.isPinned && (
                   <Badge variant="default" className="text-xs">
@@ -643,8 +644,8 @@ function AnnouncementCard({
                 )}
               </div>
               
-              {/* Edit/Delete buttons for commissioners */}
-              {isCommissioner && (
+              {/* Edit/Delete buttons for commissioners and announcement authors */}
+              {(isCommissioner || announcement.author.id === currentUserId) && (
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
@@ -1002,6 +1003,18 @@ export default function Announcements() {
   const isCommissioner = currentLeague?.commissionerId === user?.id || 
                          currentMembership?.league_role === 'commissioner';
 
+  // Get teams in the league to check if user is a team captain
+  const { data: teams = [] } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'teams'],
+    enabled: !!leagueId
+  });
+
+  // Check if user is a team captain in this league
+  const isTeamCaptain = (teams as any[]).some((team: any) => team.captainId === user?.id);
+  
+  // User can post if they're a commissioner or team captain
+  const canPost = isCommissioner || isTeamCaptain;
+
   // Fetch announcements
   const { data, isLoading } = useQuery<{ announcements: Announcement[]; pagination?: { page: number; pageSize: number; total: number } }>({
     queryKey: ['/api/leagues', leagueId, 'announcements'],
@@ -1062,7 +1075,7 @@ export default function Announcements() {
               </div>
             </div>
             
-            {isCommissioner && (
+            {canPost && (
               <Button 
                 onClick={() => setShowCreateModal(true)}
                 size="sm"
@@ -1105,12 +1118,12 @@ export default function Announcements() {
             <Megaphone className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">No Announcements Yet</h2>
             <p className="text-muted-foreground mb-4">
-              {isCommissioner 
-                ? 'Be the first to share an announcement with your league!'
-                : 'Check back later for updates from your commissioner.'
+              {canPost 
+                ? 'Be the first to share an announcement!'
+                : 'Check back later for updates.'
               }
             </p>
-            {isCommissioner && (
+            {canPost && (
               <Button onClick={() => setShowCreateModal(true)}>
                 <Plus className="w-4 h-4 mr-1" />
                 Create First Announcement
@@ -1137,7 +1150,7 @@ export default function Announcements() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         leagueId={leagueId}
-        isCommissioner={isCommissioner}
+        canPost={canPost}
       />
     </div>
   );
