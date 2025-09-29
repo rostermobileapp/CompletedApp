@@ -3283,6 +3283,19 @@ export class DatabaseStorage implements IStorage {
       )
     )` : sql`1=1`; // If no userId provided, show all (for commissioner access)
 
+    // Build team-based filter condition
+    // Logic: Show commissioner posts (teamId is null) to everyone, and team captain posts only to their team members
+    const teamFilter = userId ? sql`(
+      ${announcements.teamId} IS NULL
+      OR 
+      EXISTS (
+        SELECT 1 FROM ${teamMemberships} tm 
+        WHERE tm.team_id = ${announcements.teamId} 
+        AND tm.user_id = ${userId}
+        AND tm.status = 'approved'
+      )
+    )` : sql`1=1`; // If no userId provided, show all (for commissioner access)
+
     // Build scrimmage date filter condition
     // Logic: Hide scrimmage announcements if the associated scrimmage date has passed
     const scrimmageFilter = sql`(
@@ -3293,13 +3306,14 @@ export class DatabaseStorage implements IStorage {
       )
     )`;
 
-    // First get the total count with visibility and scrimmage filtering
+    // First get the total count with visibility, team, and scrimmage filtering
     const [countResult] = await db
       .select({ count: sql<number>`count(*)` })
       .from(announcements)
       .where(and(
         eq(announcements.leagueId, leagueId),
         visibilityFilter,
+        teamFilter,
         scrimmageFilter
       ));
     
@@ -3312,6 +3326,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(announcements.leagueId, leagueId),
         visibilityFilter,
+        teamFilter,
         scrimmageFilter
       ))
       .orderBy(

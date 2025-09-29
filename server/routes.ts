@@ -3164,22 +3164,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create announcement (commissioner only)
+  // Create announcement (commissioner or team captain)
   app.post('/api/leagues/:leagueId/announcements', isAuthenticated, async (req: any, res) => {
     try {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
 
-      // Check if user is commissioner
+      // Check if user is commissioner or team captain
       const league = await storage.getLeague(leagueId);
-      if (!league || league.commissionerId !== userId) {
-        return res.status(403).json({ message: 'Only commissioners can create announcements' });
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      const isCommissioner = league.commissionerId === userId;
+      
+      // Check if user is a team captain in this league
+      const teams = await storage.getTeamsByLeague(leagueId);
+      const captainTeam = teams.find(team => team.captainId === userId);
+      const isTeamCaptain = !!captainTeam;
+
+      if (!isCommissioner && !isTeamCaptain) {
+        return res.status(403).json({ message: 'Only commissioners and team captains can create announcements' });
       }
 
       const requestBody = req.body;
       console.log('📝 Creating announcement with data:', JSON.stringify(requestBody, null, 2));
       
       const { targetUserIds, ...announcementData } = createAnnouncementRequestSchema.parse(requestBody);
+      
+      // Set teamId based on user role:
+      // - Commissioner posts: teamId = null (visible to everyone in league)
+      // - Team captain posts: teamId = their team's ID (visible only to their team)
+      const teamId = isCommissioner ? null : (captainTeam?.id || null);
       
       let announcement;
       
@@ -3205,6 +3221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...announcementData,
           leagueId,
           authorId: userId,
+          teamId,
         });
         
         // Create visibility records for targeted users + author
@@ -3214,14 +3231,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`✅ Created targeted announcement ${announcement.id} for users: ${validUserIds.join(', ')}`);
       } else {
-        // Create regular public announcement (visible to all league members)
+        // Create regular announcement
+        // Commissioner: visible to all league members (teamId = null)
+        // Team Captain: visible only to their team (teamId = team's ID)
         announcement = await storage.createAnnouncement({
           ...announcementData,
           leagueId,
           authorId: userId,
+          teamId,
         });
         
-        console.log(`📢 Created public announcement ${announcement.id}`);
+        if (isCommissioner) {
+          console.log(`📢 Created commissioner announcement ${announcement.id} (visible to all)`);
+        } else {
+          console.log(`👥 Created team captain announcement ${announcement.id} for team ${teamId} (visible to team only)`);
+        }
       }
 
       // Handle attachments if provided
@@ -3257,7 +3281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update announcement (commissioner only)
+  // Update announcement (commissioner or author)
   app.patch('/api/announcements/:id', isAuthenticated, async (req: any, res) => {
     try {
       const announcementId = req.params.id;
@@ -3269,13 +3293,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Announcement not found' });
       }
 
-      // Check if user is commissioner of the league
+      // Check if user is commissioner of the league or the author of the announcement
       const league = await storage.getLeague(announcement.leagueId);
-      if (!league || league.commissionerId !== userId) {
-        return res.status(403).json({ message: 'Only commissioners can edit announcements' });
-      }
+      const isCommissioner = league && league.commissionerId === userId;
+      const isAuthor = announcement.authorId === userId;
 
-      // Commissioners can see and edit all announcements in their leagues regardless of visibility
+      if (!isCommissioner && !isAuthor) {
+        return res.status(403).json({ message: 'Only commissioners and announcement authors can edit announcements' });
+      }
 
       const updates = updateAnnouncementRequestSchema.parse(req.body);
       const updatedAnnouncement = await storage.updateAnnouncement(announcementId, updates);
@@ -3286,7 +3311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete announcement (commissioner only)
+  // Delete announcement (commissioner or author)
   app.delete('/api/announcements/:id', isAuthenticated, async (req: any, res) => {
     try {
       const announcementId = req.params.id;
@@ -3298,13 +3323,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Announcement not found' });
       }
 
-      // Check if user is commissioner of the league
+      // Check if user is commissioner of the league or the author of the announcement
       const league = await storage.getLeague(announcement.leagueId);
-      if (!league || league.commissionerId !== userId) {
-        return res.status(403).json({ message: 'Only commissioners can delete announcements' });
-      }
+      const isCommissioner = league && league.commissionerId === userId;
+      const isAuthor = announcement.authorId === userId;
 
-      // Commissioners can see and delete all announcements in their leagues regardless of visibility
+      if (!isCommissioner && !isAuthor) {
+        return res.status(403).json({ message: 'Only commissioners and announcement authors can delete announcements' });
+      }
 
       await storage.deleteAnnouncement(announcementId);
       res.json({ success: true });
