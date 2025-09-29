@@ -595,49 +595,6 @@ export default function Messages() {
     }
   });
 
-  const voteOnPollMutation = useMutation({
-    mutationFn: async ({ pollId, optionIndex }: { pollId: string; optionIndex: number }) => {
-      const response = await apiRequest('POST', `/api/chat-polls/${pollId}/votes`, { optionIndex });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
-      toast({
-        title: 'Vote recorded',
-        description: 'Your vote has been recorded'
-      });
-    },
-    onError: (error) => {
-      console.error('Error voting on poll:', error);
-      toast({
-        title: 'Failed to vote',
-        description: 'Please try again',
-        variant: 'destructive'
-      });
-    }
-  });
-
-  const closePollMutation = useMutation({
-    mutationFn: async (pollId: string) => {
-      const response = await apiRequest('POST', `/api/chat-polls/${pollId}/close`);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
-      toast({
-        title: 'Poll closed',
-        description: 'The poll has been closed'
-      });
-    },
-    onError: (error) => {
-      console.error('Error closing poll:', error);
-      toast({
-        title: 'Failed to close poll',
-        description: 'Please try again',
-        variant: 'destructive'
-      });
-    }
-  });
 
   // Poll helper functions
   const addPollOption = () => {
