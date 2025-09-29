@@ -62,6 +62,7 @@ function Router() {
             <Route path="/league-search" component={LeagueSearch} />
             <Route path="/teams" component={Teams} />
             <Route path="/messages" component={Messages} />
+            <Route path="/messages/:conversationId" component={Messages} />
             <Route path="/more" component={More} />
             <Route path="/profile" component={Profile} />
             <Route path="/subscription" component={Subscription} />

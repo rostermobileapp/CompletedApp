@@ -4,6 +4,7 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -290,7 +291,15 @@ export default function Messages() {
   const { user } = useAuth();
   const { canAccessPremiumFeatures } = usePermissions();
   const currentUserId = (user as any)?.id;
+  const params = useParams();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+
+  // Handle conversation ID from URL parameter
+  useEffect(() => {
+    if (params.conversationId) {
+      setSelectedConversation(params.conversationId);
+    }
+  }, [params.conversationId]);
   const [newMessage, setNewMessage] = useState('');
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
