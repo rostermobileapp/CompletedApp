@@ -3325,6 +3325,8 @@ export class DatabaseStorage implements IStorage {
     
     const total = countResult.count;
     
+    console.log(`📊 getLeagueAnnouncements for user ${userId}: Found ${total} announcements after filtering`);
+    
     // Build paginated announcement query
     const baseQuery = db
       .select()
