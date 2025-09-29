@@ -1,0 +1,52 @@
+client:536 WebSocket connection to 'wss://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/?token=A0z_d3nIJROf' failed: 
+setupWebSocket @ client:536Understand this error
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=A0z_d3nIJROf' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)Understand this error
+chunk-RPCDYKBN.js?v=c1333ca5:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+2Announcements.tsx:736 Uncaught TypeError: Cannot read properties of null (reading '0')
+    at AnnouncementCard (Announcements.tsx:736:36)
+    at renderWithHooks (chunk-RPCDYKBN.js?v=c1333ca5:11548:26)
+    at mountIndeterminateComponent (chunk-RPCDYKBN.js?v=c1333ca5:14926:21)
+    at beginWork (chunk-RPCDYKBN.js?v=c1333ca5:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-RPCDYKBN.js?v=c1333ca5:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-RPCDYKBN.js?v=c1333ca5:3699:24)
+    at invokeGuardedCallback (chunk-RPCDYKBN.js?v=c1333ca5:3733:39)
+    at beginWork$1 (chunk-RPCDYKBN.js?v=c1333ca5:19765:15)
+    at performUnitOfWork (chunk-RPCDYKBN.js?v=c1333ca5:19198:20)
+    at workLoopSync (chunk-RPCDYKBN.js?v=c1333ca5:19137:13)Understand this error
+chunk-RPCDYKBN.js?v=c1333ca5:14032 The above error occurred in the <AnnouncementCard> component:
+
+    at AnnouncementCard (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/pages/Announcements.tsx?t=1759179890880:876:3)
+    at div
+    at div
+    at div
+    at Announcements (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/pages/Announcements.tsx?t=1759179890880:1612:20)
+    at Route (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=c1333ca5:191:16)
+    at Switch (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=c1333ca5:247:17)
+    at div
+    at PageTransition (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/components/PageTransition.tsx:19:34)
+    at div
+    at PermissionProvider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/context/SubscriptionContext.tsx:28:38)
+    at Router (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/App.tsx?t=1759179890880&v=jFJC8nBXljxbdqX5m36Ob:51:42)
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=c1333ca5:38:15)
+    at TooltipProvider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=c1333ca5:63:5)
+    at QueryClientProvider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=c1333ca5:2805:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-RPCDYKBN.js?v=c1333ca5:14032Understand this error
+chunk-RPCDYKBN.js?v=c1333ca5:9129 Uncaught TypeError: Cannot read properties of null (reading '0')
+    at AnnouncementCard (Announcements.tsx:736:36)
+    at renderWithHooks (chunk-RPCDYKBN.js?v=c1333ca5:11548:26)
+    at mountIndeterminateComponent (chunk-RPCDYKBN.js?v=c1333ca5:14926:21)
+    at beginWork (chunk-RPCDYKBN.js?v=c1333ca5:15914:22)
+    at beginWork$1 (chunk-RPCDYKBN.js?v=c1333ca5:19753:22)
+    at performUnitOfWork (chunk-RPCDYKBN.js?v=c1333ca5:19198:20)
+    at workLoopSync (chunk-RPCDYKBN.js?v=c1333ca5:19137:13)
+    at renderRootSync (chunk-RPCDYKBN.js?v=c1333ca5:19116:15)
+    at recoverFromConcurrentError (chunk-RPCDYKBN.js?v=c1333ca5:18736:28)
+    at performSyncWorkOnRoot (chunk-RPCDYKBN.js?v=c1333ca5:18879:28)Understand this error
+api/substitute-requests/pending-approvals?leagueId=e47adf39-ccfb-4437-90cd-fd6f2bf3b9d1:1  Failed to load resource: the server responded with a status of 403 (Forbidden)

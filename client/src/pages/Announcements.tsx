@@ -733,7 +733,7 @@ function AnnouncementCard({
           <Avatar className="w-10 h-10">
             <AvatarImage src={announcement.author.profileImageUrl} />
             <AvatarFallback>
-              {announcement.author.firstName[0]}{announcement.author.lastName[0]}
+              {announcement.author.firstName?.[0] || '?'}{announcement.author.lastName?.[0] || '?'}
             </AvatarFallback>
           </Avatar>
           
@@ -741,7 +741,7 @@ function AnnouncementCard({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-semibold">
-                  {announcement.author.firstName} {announcement.author.lastName}
+                  {announcement.author.firstName || 'Unknown'} {announcement.author.lastName || 'User'}
                 </span>
                 <Badge variant="secondary" className="text-xs">
                   {announcement.teamId ? 'Team Captain' : 'Commissioner'}
