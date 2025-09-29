@@ -124,13 +124,24 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
         description: 'Your vote has been recorded'
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error voting on poll:', error);
-      toast({
-        title: 'Failed to vote',
-        description: 'Please try again',
-        variant: 'destructive'
-      });
+      // Check if it's a duplicate vote error
+      if (error?.message?.includes('already voted') || error?.status === 400) {
+        toast({
+          title: 'Already voted',
+          description: 'You have already cast your vote on this poll',
+          variant: 'destructive'
+        });
+        // Force refresh poll results to sync UI state
+        queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', poll?.id, 'results'] });
+      } else {
+        toast({
+          title: 'Failed to vote',
+          description: 'Please try again',
+          variant: 'destructive'
+        });
+      }
     }
   });
 
