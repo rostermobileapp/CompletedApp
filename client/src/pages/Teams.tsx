@@ -290,12 +290,6 @@ export default function Teams() {
   return (
     <div className="container mx-auto px-4 py-6 pb-20">
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold" data-testid="page-title">Teams</h1>
-          <Users className="w-8 h-8 text-primary" />
-        </div>
-
         {(userTeams as any[]).length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
