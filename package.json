@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.17.0",
+    "@googlemaps/js-api-loader": "^2.0.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",
@@ -45,6 +46,7 @@
     "@stripe/react-stripe-js": "^4.0.2",
     "@stripe/stripe-js": "^7.9.0",
     "@tanstack/react-query": "^5.60.5",
+    "@types/google.maps": "^3.58.1",
     "@types/memoizee": "^0.4.12",
     "@types/multer": "^2.0.0",
     "@types/papaparse": "^5.3.16",
