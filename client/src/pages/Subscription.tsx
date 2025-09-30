@@ -49,7 +49,7 @@ const SubscribeForm = ({ onSuccess }: { onSuccess: () => void }) => {
     } else {
       toast({
         title: "Payment Successful",
-        description: "You are now subscribed to Player Plus!",
+        description: "You are now subscribed to Player Pro!",
       });
       onSuccess();
     }
@@ -64,7 +64,7 @@ const SubscribeForm = ({ onSuccess }: { onSuccess: () => void }) => {
         className="w-full bg-primary text-primary-foreground rounded-lg py-3 font-semibold disabled:opacity-50"
         data-testid="button-subscribe"
       >
-        {isLoading ? 'Processing...' : 'Subscribe to Player Plus'}
+        {isLoading ? 'Processing...' : 'Subscribe to Player Pro'}
       </button>
     </form>
   );
@@ -115,29 +115,32 @@ export default function Subscription() {
       period: "forever",
       description: "Basic features for casual players",
       features: [
-        "Join leagues",
-        "View team roster", 
-        "Basic messaging",
-        "Game notifications"
+        "Join Leagues / Teams",
+        "Scheduling", 
+        "RSVP Function",
+        "Team Only Stats"
       ],
       current: isFree,
       buttonText: isFree ? "Current Plan" : "Downgrade",
       buttonDisabled: true,
     },
     {
-      name: "Player Plus",
+      name: "Player Pro",
       price: "$8",
       period: "month",
       description: "Enhanced features for serious players",
       features: [
-        "All Free features",
-        "Advanced stats tracking",
-        "Schedule scrimmages",
-        "Team statistics",
-        "Priority support"
+        "FREE +",
+        "Team Management",
+        "In-App Messaging",
+        "In-App Payments",
+        "Team Scheduling",
+        "League Stats",
+        "League Standings",
+        "League Announcements"
       ],
       current: isPlayerPlus,
-      buttonText: isPlayerPlus ? "Current Plan" : "Upgrade to Player Plus",
+      buttonText: isPlayerPlus ? "Current Plan" : "Upgrade to Player Pro",
       buttonDisabled: isPlayerPlus,
       highlight: !isCommissioner,
     },
@@ -147,12 +150,13 @@ export default function Subscription() {
       period: "month",
       description: "Full league management capabilities",
       features: [
-        "All Player Plus features",
-        "Create & manage leagues",
-        "Commissioner dashboard",
-        "League statistics",
-        "Advanced team management",
-        "Custom league settings"
+        "FREE & PLAYER PRO +",
+        "League Scheduling",
+        "Scorekeeping",
+        "Player Management",
+        "League Wide Posts",
+        "Awards & Records",
+        "Bracket Management"
       ],
       current: isCommissioner,
       buttonText: isCommissioner ? "Current Plan" : "Upgrade to Commissioner",
@@ -185,7 +189,7 @@ export default function Subscription() {
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="mb-6 text-center">
               <Crown className="w-12 h-12 text-primary mx-auto mb-3" />
-              <h2 className="text-xl font-semibold mb-2">Upgrade to Player Plus</h2>
+              <h2 className="text-xl font-semibold mb-2">Upgrade to Player Pro</h2>
               <p className="text-muted-foreground">$8/month - Cancel anytime</p>
             </div>
 
@@ -227,7 +231,7 @@ export default function Subscription() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">
-                {isCommissioner ? 'Commissioner' : isPlayerPlus ? 'Player Plus' : 'Free Tier'}
+                {isCommissioner ? 'Commissioner' : isPlayerPlus ? 'Player Pro' : 'Free Tier'}
               </p>
               <p className="text-sm text-muted-foreground">
                 {isCommissioner ? '$12/month' : isPlayerPlus ? '$8/month' : 'Free forever'}
@@ -292,7 +296,7 @@ export default function Subscription() {
 
               <button
                 onClick={() => {
-                  if (plan.name === "Player Plus" && !isPlayerPlus && !isCommissioner) {
+                  if (plan.name === "Player Pro" && !isPlayerPlus && !isCommissioner) {
                     setShowPaymentForm(true);
                   }
                 }}
