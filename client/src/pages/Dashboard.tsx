@@ -1181,7 +1181,7 @@ export default function Dashboard() {
         />
       )}
       {/* Upcoming Games */}
-      <div className="px-6 mb-6">
+      <div className="px-6 mt-[8px] mb-[8px]">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold" data-testid="text-schedule-title">Schedule</h2>
           <button 
