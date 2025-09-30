@@ -1275,7 +1275,6 @@ export default function Dashboard() {
         <div className="bg-card rounded-lg border border-border px-2 py-1 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Search className="w-4 h-4 text-primary" />
-            <span className="font-medium text-sm">Looking for a League?</span>
           </div>
           <button
             onClick={() => navigate('/league-search')}
