@@ -3239,9 +3239,19 @@ export class DatabaseStorage implements IStorage {
       }
 
       // 2. SECURITY: Validate workflow state transition
-      const expectedStatus = this.getExpectedStatusForApproverType(approverType);
-      if (request.status !== expectedStatus) {
-        throw new Error(`Invalid workflow state: request is ${request.status}, expected ${expectedStatus} for ${approverType}`);
+      // Commissioners can approve/deny at any pending stage (pending_opponent_approval or pending_commissioner_approval)
+      // Other approvers must match the expected status
+      if (approverType === 'commissioner') {
+        // Commissioner can act on either pending_opponent_approval or pending_commissioner_approval
+        if (request.status !== 'pending_opponent_approval' && request.status !== 'pending_commissioner_approval') {
+          throw new Error(`Invalid workflow state: request is ${request.status}, commissioners can only act on pending_opponent_approval or pending_commissioner_approval`);
+        }
+      } else {
+        // For opposing_captain and substitute_player, enforce strict status matching
+        const expectedStatus = this.getExpectedStatusForApproverType(approverType);
+        if (request.status !== expectedStatus) {
+          throw new Error(`Invalid workflow state: request is ${request.status}, expected ${expectedStatus} for ${approverType}`);
+        }
       }
 
       // 3. SECURITY: Validate approver authorization
@@ -3502,9 +3512,11 @@ export class DatabaseStorage implements IStorage {
         return 'pending_commissioner_approval';
         
       case 'commissioner':
-        if (currentStatus !== 'pending_commissioner_approval') {
+        // Commissioners can approve at either pending_opponent_approval or pending_commissioner_approval
+        if (currentStatus !== 'pending_opponent_approval' && currentStatus !== 'pending_commissioner_approval') {
           throw new Error(`Invalid transition: cannot process commissioner approval from status ${currentStatus}`);
         }
+        // When commissioner approves, move to pending_substitute_approval
         return 'pending_substitute_approval';
         
       case 'substitute_player':
