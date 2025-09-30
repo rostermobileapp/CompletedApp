@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
 
 interface GoogleAddressAutocompleteProps {
   value: string;
@@ -19,6 +18,7 @@ export function GoogleAddressAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const autocompleteRef = useRef<any>(null);
 
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -29,20 +29,34 @@ export function GoogleAddressAutocomplete({
       return;
     }
 
-    const loader: any = new Loader({
-      apiKey,
-      version: 'weekly',
-      libraries: ['places'],
-    });
-
     const initAutocomplete = async () => {
       try {
-        // Use the loader's importLibrary method
-        const placesLibrary: any = await loader.importLibrary('places');
-        
-        if (!inputRef.current) return;
+        // Load the Google Maps script
+        if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
+          const script = document.createElement('script');
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+          script.async = true;
+          script.defer = true;
+          
+          await new Promise((resolve, reject) => {
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+        }
 
-        const autocomplete = new placesLibrary.Autocomplete(inputRef.current, {
+        // Wait for Google Maps to be available
+        let attempts = 0;
+        while (!(window as any).google?.maps?.places && attempts < 50) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+
+        if (!(window as any).google?.maps?.places || !inputRef.current) {
+          throw new Error('Google Maps Places library failed to load');
+        }
+
+        const autocomplete = new (window as any).google.maps.places.Autocomplete(inputRef.current, {
           types: ['address'],
           fields: ['formatted_address', 'address_components', 'geometry'],
         });
@@ -55,6 +69,7 @@ export function GoogleAddressAutocomplete({
           }
         });
 
+        autocompleteRef.current = autocomplete;
         setIsLoading(false);
       } catch (err) {
         console.error('Error loading Google Maps:', err);
@@ -64,6 +79,13 @@ export function GoogleAddressAutocomplete({
     };
 
     initAutocomplete();
+
+    return () => {
+      // Cleanup
+      if (autocompleteRef.current && (window as any).google?.maps?.event) {
+        (window as any).google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+    };
   }, [onChange]);
 
   if (error) {
