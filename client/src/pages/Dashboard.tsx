@@ -367,76 +367,99 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       ))}
                       
                       {/* Commissioner Approvals */}
-                      {pendingSubstituteApprovals.commissioner.map((request: any) => (
-                        <div 
-                          key={request.id}
-                          className="dark:bg-card border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-[#ffffff] bg-[#000000]"
-                          data-testid={`pending-substitute-commissioner-${request.id}`}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
-                              
-                              <div>
-                                <p className="font-medium text-[#000000]">
-                                  {request.game.homeTeam.name} vs {request.game.awayTeam.name}
-                                </p>
-                                <p className="text-sm text-[#ffffff]">
-                                  {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
-                                </p>
-                                <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] text-[#de0000] bg-[#ffffff00] text-[16px] font-extrabold text-left pl-[0px] pr-[0px]">Substitution requires approval</p>
-                                {request.originalPlayer && (
-                                  <p className="text-sm font-bold text-[#ffffff]">
-                                    Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
-                                    {request.originalPlayer.skillLevel && ` • Skill: ${request.originalPlayer.skillLevel}`}
+                      {pendingSubstituteApprovals.commissioner.map((request: any) => {
+                        const isPendingCommissionerApproval = request.status === 'pending_commissioner_approval';
+                        const isOversightOnly = request.status === 'pending_opponent_approval';
+                        
+                        return (
+                          <div 
+                            key={request.id}
+                            className="dark:bg-card border border-purple-200 dark:border-purple-800 rounded-lg p-3 text-[#ffffff] bg-[#000000]"
+                            data-testid={`pending-substitute-commissioner-${request.id}`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                
+                                <div>
+                                  <p className="font-medium text-[#000000]">
+                                    {request.game.homeTeam.name} vs {request.game.awayTeam.name}
                                   </p>
-                                )}
-                                {request.substitutePlayer && (
-                                  <p className="text-sm text-[#ffffff] font-bold">
-                                    Substitute: {request.substitutePlayer.firstName} {request.substitutePlayer.lastName}
-                                    {request.substitutePlayer.skillLevel && ` • Skill: ${request.substitutePlayer.skillLevel}`}
+                                  <p className="text-sm text-[#ffffff]">
+                                    {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
                                   </p>
-                                )}
+                                  {isOversightOnly ? (
+                                    <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] text-[#ffa500] bg-[#ffffff00] text-[16px] font-extrabold text-left pl-[0px] pr-[0px]">
+                                      For Oversight Only - Awaiting Captain Approval
+                                    </p>
+                                  ) : (
+                                    <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] text-[#de0000] bg-[#ffffff00] text-[16px] font-extrabold text-left pl-[0px] pr-[0px]">Substitution requires approval</p>
+                                  )}
+                                  {request.originalPlayer && (
+                                    <p className="text-sm font-bold text-[#ffffff]">
+                                      Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
+                                      {request.originalPlayer.skillLevel && ` • Skill: ${request.originalPlayer.skillLevel}`}
+                                    </p>
+                                  )}
+                                  {request.substitutePlayer && (
+                                    <p className="text-sm text-[#ffffff] font-bold">
+                                      Substitute: {request.substitutePlayer.firstName} {request.substitutePlayer.lastName}
+                                      {request.substitutePlayer.skillLevel && ` • Skill: ${request.substitutePlayer.skillLevel}`}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                             </div>
+                            
+                            {isPendingCommissionerApproval && (
+                              <>
+                                {/* Comments Input */}
+                                <div className="mb-3">
+                                  <Textarea
+                                    value={selectedRequest === request.id ? comments : ""}
+                                    onChange={(e) => {
+                                      setSelectedRequest(request.id);
+                                      setComments(e.target.value);
+                                    }}
+                                    placeholder="Optional comments..."
+                                    className="min-h-[60px]"
+                                    data-testid={`textarea-comments-commissioner-${request.id}`}
+                                  />
+                                </div>
+                                
+                                {/* Action Buttons */}
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => handleApprove(request, 'commissioner')}
+                                    disabled={processApprovalMutation.isPending}
+                                    className="bg-green-600 hover:bg-green-700 text-white"
+                                    data-testid={`button-approve-commissioner-substitute-${request.id}`}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => handleDeny(request, 'commissioner')}
+                                    disabled={processApprovalMutation.isPending}
+                                    className="bg-red-600 hover:bg-red-700 text-white"
+                                    data-testid={`button-deny-commissioner-substitute-${request.id}`}
+                                  >
+                                    Deny
+                                  </Button>
+                                </div>
+                              </>
+                            )}
+                            
+                            {isOversightOnly && (
+                              <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded text-center">
+                                <p className="text-sm text-yellow-200">
+                                  This request is awaiting approval from the opposing team captain. No action required from you at this time.
+                                </p>
+                              </div>
+                            )}
                           </div>
-                          
-                          {/* Comments Input */}
-                          <div className="mb-3">
-                            <Textarea
-                              value={selectedRequest === request.id ? comments : ""}
-                              onChange={(e) => {
-                                setSelectedRequest(request.id);
-                                setComments(e.target.value);
-                              }}
-                              placeholder="Optional comments..."
-                              className="min-h-[60px]"
-                              data-testid={`textarea-comments-commissioner-${request.id}`}
-                            />
-                          </div>
-                          
-                          {/* Action Buttons */}
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleApprove(request, 'commissioner')}
-                              disabled={processApprovalMutation.isPending}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                              data-testid={`button-approve-commissioner-substitute-${request.id}`}
-                            >
-                              Approve
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleDeny(request, 'commissioner')}
-                              disabled={processApprovalMutation.isPending}
-                              className="bg-red-600 hover:bg-red-700 text-white"
-                              data-testid={`button-deny-commissioner-substitute-${request.id}`}
-                            >
-                              Deny
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
