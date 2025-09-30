@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, Target, AlertCircle, Settings, UserCheck, Shield } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -699,137 +699,6 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
   return null;
 }
 
-// Captain To-Do Component for Score Submission Tasks
-function CaptainToDo({ leagueId, userTeams, onNavigate, onOpenScoreModal }: { 
-  leagueId: string; 
-  userTeams: any[]; 
-  onNavigate: (path: string) => void; 
-  onOpenScoreModal: (game: any) => void;
-}) {
-  const { toast } = useToast();
-
-  // Fetch games that need score submission
-  const { data: gamesNeedingScores = [] } = useQuery({
-    queryKey: ['/api/leagues', leagueId, 'games-needing-scores'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
-      const allGames = await response.json();
-      
-      if (!Array.isArray(allGames)) return [];
-      
-      const now = new Date();
-      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-      
-      // Filter games that need score submission and check if user has already submitted
-      const gamesNeedingUserSubmission = [];
-      
-      for (const game of allGames) {
-        const gameStartTime = new Date(game.scheduledAt);
-        const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
-        const isUserGame = userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
-        
-        // Check basic criteria first
-        if (!isUserGame || gameStartTime >= oneHourAgo || game.isCompleted) {
-          continue;
-        }
-        
-        // Check if user has already submitted their score for this game
-        try {
-          const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
-          const submissions = await submissionsResponse.json();
-          
-          // Check if current user has already submitted a score
-          const userSubmission = Array.isArray(submissions) ? 
-            submissions.find((sub: any) => userTeamIds.includes(sub.teamId)) : null;
-          
-          // Only include if user hasn't submitted yet
-          if (!userSubmission) {
-            gamesNeedingUserSubmission.push(game);
-          }
-        } catch (error) {
-          // If we can't fetch submissions, include the game to be safe
-          gamesNeedingUserSubmission.push(game);
-        }
-      }
-      
-      return gamesNeedingUserSubmission;
-    },
-    enabled: !!leagueId && Array.isArray(userTeams) && userTeams.length > 0,
-  });
-
-  if (!Array.isArray(gamesNeedingScores) || gamesNeedingScores.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="px-6 mb-6">
-      <div className="bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Target className="w-5 h-5 text-orange-600" />
-          <h2 className="text-lg font-semibold text-orange-600">Captain To-Do</h2>
-          <div className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">{gamesNeedingScores.length}</span>
-          </div>
-        </div>
-        
-        <div className="space-y-3">
-          {gamesNeedingScores.slice(0, 3).map((game: any) => (
-            <div 
-              key={game.id}
-              className="bg-white dark:bg-card border border-orange-200 dark:border-orange-800 rounded-lg p-3 cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
-              onClick={() => onNavigate(`/game/${game.id}`)}
-              data-testid={`card-score-needed-${game.id}`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="w-4 h-4 text-orange-500" />
-                  <div>
-                    <p className="text-sm font-medium text-orange-600">
-                      Score submission needed
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {game.homeTeam?.name} vs {game.awayTeam?.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className="text-xs h-7 px-2 bg-orange-500 text-white hover:bg-orange-600 border-orange-500"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenScoreModal(game);
-                    }}
-                    data-testid={`button-submit-score-${game.id}`}
-                  >
-                    Submit Score
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
-          
-          {gamesNeedingScores.length > 3 && (
-            <div className="text-center pt-2">
-              <button
-                onClick={() => onNavigate('/calendar')}
-                className="text-orange-600 text-sm hover:underline"
-                data-testid="button-view-all-score-tasks"
-              >
-                View all {gamesNeedingScores.length} games needing scores
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Dashboard() {
   const { user } = useAuth();
   // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
@@ -1274,18 +1143,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      )}
-      {/* Captain To-Do Section */}
-      {isTeamCaptainInSelectedLeague && selectedLeagueId && (
-        <CaptainToDo 
-          leagueId={selectedLeagueId} 
-          userTeams={userTeams as any[]} 
-          onNavigate={navigate}
-          onOpenScoreModal={(game) => {
-            setSelectedGameForScore(game);
-            setShowScoreModal(true);
-          }}
-        />
       )}
       {/* Permanent Needs Attention Bar */}
       {selectedLeagueId && needsAttentionData && (
