@@ -155,8 +155,8 @@ export default function Subscription() {
         "Scorekeeping",
         "Player Management",
         "League Wide Posts",
-        "Awards & Records",
-        "Bracket Management"
+        "Awards & Records*",
+        "Bracket Management*"
       ],
       current: isCommissioner,
       buttonText: isCommissioner ? "Current Plan" : "Upgrade to Commissioner",
@@ -316,8 +316,15 @@ export default function Subscription() {
           ))}
         </div>
 
+        {/* Coming soon footnote */}
+        <div className="mt-4 px-2">
+          <p className="text-xs text-muted-foreground">
+            * Coming soon
+          </p>
+        </div>
+
         {/* Note about current free access */}
-        <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+        <div className="mt-4 p-4 bg-muted/50 rounded-lg">
           <p className="text-sm text-muted-foreground text-center">
             <strong>Note:</strong> During beta, all features are currently free and accessible to everyone. 
             Subscription plans will be activated after the beta period.
