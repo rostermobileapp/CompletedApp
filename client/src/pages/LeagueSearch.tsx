@@ -7,38 +7,22 @@ import { useLocation } from 'wouter';
 import { apiRequest } from '@/lib/queryClient';
 import { isUnauthorizedError } from '@/lib/authUtils';
 
-const sports = [
-  { value: 'all', label: 'All Sports' },
-  { value: 'hockey', label: 'Hockey' },
-  { value: 'basketball', label: 'Basketball' },
-  { value: 'soccer', label: 'Soccer' },
-  { value: 'baseball', label: 'Baseball' },
-  { value: 'softball', label: 'Softball' },
-  { value: 'football', label: 'Football' },
-];
-
 const sportBadgeColors: Record<string, string> = {
   hockey: 'bg-primary text-primary-foreground',
-  basketball: 'bg-warning text-black',
-  soccer: 'bg-success text-accent-foreground',
-  baseball: 'bg-destructive text-destructive-foreground',
-  softball: 'bg-accent text-accent-foreground',
-  football: 'bg-secondary text-secondary-foreground',
 };
 
 export default function LeagueSearch() {
   const [search, setSearch] = useState('');
-  const [selectedSport, setSelectedSport] = useState('all');
   const { user } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
   const { data: leagues, isLoading } = useQuery({
-    queryKey: ['/api/leagues', { sport: selectedSport, search }],
+    queryKey: ['/api/leagues', { sport: 'hockey', search }],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (selectedSport !== 'all') params.append('sport', selectedSport);
+      params.append('sport', 'hockey');
       if (search) params.append('search', search);
       
       const response = await fetch(`/api/leagues?${params}`);
@@ -106,24 +90,6 @@ export default function LeagueSearch() {
             className="w-full bg-input border border-border rounded-lg pl-10 pr-4 py-3 text-foreground"
             data-testid="input-search"
           />
-        </div>
-        
-        {/* Sport Filters */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
-          {sports.map((sport) => (
-            <button
-              key={sport.value}
-              onClick={() => setSelectedSport(sport.value)}
-              className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition-colors ${
-                selectedSport === sport.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground'
-              }`}
-              data-testid={`filter-sport-${sport.value}`}
-            >
-              {sport.label}
-            </button>
-          ))}
         </div>
       </div>
       
