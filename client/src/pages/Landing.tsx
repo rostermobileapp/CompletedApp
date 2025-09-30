@@ -1,5 +1,6 @@
 import { Users, Calendar, Trophy, MessageCircle, ArrowRight, Zap, Shield, BarChart3, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import logoWhite from '@assets/Roster Logo White_1759233840726.png';
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
@@ -44,6 +45,12 @@ export default function Landing() {
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <img 
+            src={logoWhite} 
+            alt="Roster Logo" 
+            className="h-8"
+            data-testid="logo-image"
+          />
           <button 
             onClick={() => window.location.href = '/api/login'}
             className="text-sm font-medium hover:text-primary transition-colors"
