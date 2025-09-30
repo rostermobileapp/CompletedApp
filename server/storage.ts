@@ -668,18 +668,57 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLeaguesByCommissioner(commissionerId: string): Promise<League[]> {
-    const result = await db
+    // Get leagues where user is the primary commissioner
+    const primaryCommissionerLeagues = await db
       .select()
       .from(leagues)
       .where(eq(leagues.commissionerId, commissionerId));
-    return result;
+    
+    // Get leagues where user is a co-commissioner (secondary_commissioner)
+    const coCommissionerLeagues = await db
+      .select({ league: leagues })
+      .from(leagues)
+      .innerJoin(leagueMemberships, eq(leagues.id, leagueMemberships.leagueId))
+      .where(
+        and(
+          eq(leagueMemberships.userId, commissionerId),
+          eq(leagueMemberships.leagueRole, 'secondary_commissioner'),
+          eq(leagueMemberships.status, 'approved')
+        )
+      );
+    
+    // Combine and deduplicate (in case someone is both primary and co-commissioner)
+    const allLeagues = [...primaryCommissionerLeagues, ...coCommissionerLeagues.map(r => r.league)];
+    const uniqueLeagues = Array.from(new Map(allLeagues.map(league => [league.id, league])).values());
+    
+    return uniqueLeagues;
   }
 
   async getCommissionerLeagues(userId: string): Promise<League[]> {
-    return await db
+    // Get leagues where user is the primary commissioner
+    const primaryCommissionerLeagues = await db
       .select()
       .from(leagues)
       .where(eq(leagues.commissionerId, userId));
+    
+    // Get leagues where user is a co-commissioner (secondary_commissioner)
+    const coCommissionerLeagues = await db
+      .select({ league: leagues })
+      .from(leagues)
+      .innerJoin(leagueMemberships, eq(leagues.id, leagueMemberships.leagueId))
+      .where(
+        and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.leagueRole, 'secondary_commissioner'),
+          eq(leagueMemberships.status, 'approved')
+        )
+      );
+    
+    // Combine and deduplicate (in case someone is both primary and co-commissioner)
+    const allLeagues = [...primaryCommissionerLeagues, ...coCommissionerLeagues.map(r => r.league)];
+    const uniqueLeagues = Array.from(new Map(allLeagues.map(league => [league.id, league])).values());
+    
+    return uniqueLeagues;
   }
 
   async getLeagueByUniqueId(uniqueLeagueId: string): Promise<League | undefined> {
