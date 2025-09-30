@@ -322,14 +322,6 @@ export default function Subscription() {
             * Coming soon
           </p>
         </div>
-
-        {/* Note about current free access */}
-        <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-          <p className="text-sm text-muted-foreground text-center">
-            <strong>Note:</strong> During beta, all features are currently free and accessible to everyone. 
-            Subscription plans will be activated after the beta period.
-          </p>
-        </div>
       </div>
     </div>
   );
