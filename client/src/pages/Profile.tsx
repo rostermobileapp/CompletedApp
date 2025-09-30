@@ -91,16 +91,6 @@ export default function Profile() {
         navigate('/league-list');
       },
     },
-    {
-      icon: Shield,
-      label: 'Commissioner Dashboard',
-      locked: !canManageUsers() && !canManageLeague() && !hasRole('commissioner'),
-      requiredTier: 'COMMISSIONER',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/commissioner');
-      },
-    },
   ];
 
   const updateProfileMutation = useMutation({

@@ -28,7 +28,6 @@ import Announcements from "@/pages/Announcements";
 import SubstituteConfirmations from "@/pages/SubstituteConfirmations";
 import Stats from "@/pages/Stats";
 import StatsManagement from "@/pages/StatsManagement";
-import { CommissionerDashboard } from "@/pages/CommissionerDashboard";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -79,7 +78,6 @@ function Router() {
             <Route path="/substitute-confirmations" component={SubstituteConfirmations} />
             <Route path="/stats" component={Stats} />
             <Route path="/stats-management" component={StatsManagement} />
-            <Route path="/commissioner" component={CommissionerDashboard} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>

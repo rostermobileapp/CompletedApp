@@ -565,12 +565,7 @@ export default function StatsManagement() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/commissioner">
-              <Button variant="ghost" size="sm" data-testid="button-back">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Commissioner Dashboard
-              </Button>
-            </Link>
+            <h1 className="text-3xl font-bold">Stats Management</h1>
           </div>
         </div>
 
