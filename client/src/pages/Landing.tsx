@@ -44,7 +44,6 @@ export default function Landing() {
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="text-2xl font-bold" data-testid="text-app-name">Rosters</div>
           <button 
             onClick={() => window.location.href = '/api/login'}
             className="text-sm font-medium hover:text-primary transition-colors"
