@@ -374,6 +374,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Co-commissioner management routes
+  app.post("/api/leagues/:leagueId/co-commissioner", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const leagueId = req.params.leagueId;
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Verify that the user is the commissioner of this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: "Only the commissioner can add co-commissioners" });
+      }
+
+      // Find the user by email
+      const targetUser = await storage.getUserByEmail(email);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found with that email" });
+      }
+
+      // Check if user is already a member
+      const existingMembership = await storage.getUserLeagueMembership(targetUser.id, leagueId);
+      
+      if (existingMembership) {
+        // If already a member, update their role to secondary_commissioner
+        const updatedMembership = await storage.updateLeagueMember(existingMembership.id, {
+          leagueRole: 'secondary_commissioner',
+          status: 'approved'
+        });
+        return res.json(updatedMembership);
+      } else {
+        // Create new membership with secondary_commissioner role
+        const membership = await storage.requestLeagueMembership({
+          userId: targetUser.id,
+          leagueId: leagueId,
+        });
+        
+        // Update the membership to secondary_commissioner and approved
+        const updatedMembership = await storage.updateLeagueMember(membership.id, {
+          leagueRole: 'secondary_commissioner',
+          status: 'approved'
+        });
+        return res.json(updatedMembership);
+      }
+    } catch (error) {
+      console.error("Error adding co-commissioner:", error);
+      res.status(500).json({ message: "Failed to add co-commissioner" });
+    }
+  });
+
+  app.delete("/api/leagues/:leagueId/co-commissioner/:memberId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId, memberId } = req.params;
+
+      // Verify that the user is the commissioner of this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: "Only the commissioner can remove co-commissioners" });
+      }
+
+      // Fetch the membership to verify it belongs to this league
+      const members = await storage.getLeagueMembers(leagueId);
+      const membership = members.find(m => m.id === memberId);
+      
+      if (!membership) {
+        return res.status(404).json({ message: "Membership not found in this league" });
+      }
+
+      // Verify the membership belongs to the specified league
+      if (membership.leagueId !== leagueId) {
+        return res.status(403).json({ message: "Cannot modify memberships from other leagues" });
+      }
+
+      // Update the member's role back to free_tier
+      const updatedMembership = await storage.updateLeagueMember(memberId, {
+        leagueRole: 'free_tier'
+      });
+
+      res.json(updatedMembership);
+    } catch (error) {
+      console.error("Error removing co-commissioner:", error);
+      res.status(500).json({ message: "Failed to remove co-commissioner" });
+    }
+  });
+
   // Season routes
   app.get("/api/leagues/:leagueId/seasons", async (req, res) => {
     try {

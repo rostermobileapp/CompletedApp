@@ -617,6 +617,9 @@ export default function LeagueManagement() {
   const [showEditTeam, setShowEditTeam] = useState(false);
   const [selectedTeamForEdit, setSelectedTeamForEdit] = useState<Team | null>(null);
   
+  // Co-commissioner management state
+  const [coCommissionerEmail, setCoCommissionerEmail] = useState('');
+  
   // Close date picker when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -766,6 +769,12 @@ export default function LeagueManagement() {
   const isCommissioner = React.useMemo(() => {
     return Boolean(league && user && league.commissionerId === user.id);
   }, [league, user]);
+
+  // Get current co-commissioners from members with secondary_commissioner role
+  const coCommissioners = React.useMemo(() => {
+    if (!members || !Array.isArray(members)) return [];
+    return members.filter((member: any) => member.leagueRole === 'secondary_commissioner');
+  }, [members]);
 
   // Form for creating teams
   const teamForm = useForm<CreateTeamForm>({
@@ -1148,6 +1157,51 @@ export default function LeagueManagement() {
       toast({
         title: 'Remove Failed',
         description: 'Failed to remove player from league.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Add co-commissioner mutation
+  const addCoCommissionerMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/co-commissioner`, { email });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Co-Commissioner Added',
+        description: 'User has been granted co-commissioner privileges.',
+      });
+      setCoCommissionerEmail('');
+      refetchMembers();
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to Add Co-Commissioner',
+        description: error.message || 'Please check the email and try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Remove co-commissioner mutation
+  const removeCoCommissionerMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      const response = await apiRequest('DELETE', `/api/leagues/${leagueId}/co-commissioner/${memberId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Co-Commissioner Removed',
+        description: 'Co-commissioner privileges have been revoked.',
+      });
+      refetchMembers();
+    },
+    onError: () => {
+      toast({
+        title: 'Failed to Remove Co-Commissioner',
+        description: 'Please try again.',
         variant: 'destructive',
       });
     },
@@ -2821,6 +2875,72 @@ export default function LeagueManagement() {
                     />
                     <span className="text-sm font-medium">League is active</span>
                   </label>
+                </div>
+
+                {/* Co-Commissioner Management */}
+                <div className="border-t pt-4">
+                  <h3 className="font-medium mb-3">Co-Commissioners</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Grant co-commissioner privileges to other users. They will have full management access to this league.
+                  </p>
+                  
+                  {/* Current co-commissioners list */}
+                  {coCommissioners.length > 0 && (
+                    <div className="mb-3 space-y-2">
+                      {coCommissioners.map((coComm: any) => (
+                        <div key={coComm.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Crown className="w-4 h-4 text-yellow-600" />
+                            <span className="text-sm">
+                              {coComm.user.firstName && coComm.user.lastName 
+                                ? `${coComm.user.firstName} ${coComm.user.lastName}` 
+                                : coComm.user.email}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm('Remove co-commissioner privileges from this user?')) {
+                                removeCoCommissionerMutation.mutate(coComm.id);
+                              }
+                            }}
+                            disabled={removeCoCommissionerMutation.isPending}
+                            className="text-red-500 hover:text-red-600 text-sm"
+                            data-testid={`button-remove-cocommissioner-${coComm.id}`}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Add new co-commissioner */}
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={coCommissionerEmail}
+                      onChange={(e) => setCoCommissionerEmail(e.target.value)}
+                      placeholder="Enter user's email"
+                      className="flex-1 p-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      data-testid="input-cocommissioner-email"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!coCommissionerEmail) {
+                          toast({ title: 'Please enter an email address', variant: 'destructive' });
+                          return;
+                        }
+                        addCoCommissionerMutation.mutate(coCommissionerEmail);
+                      }}
+                      disabled={addCoCommissionerMutation.isPending || !coCommissionerEmail}
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                      data-testid="button-add-cocommissioner"
+                    >
+                      {addCoCommissionerMutation.isPending ? 'Adding...' : 'Add'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Commissioner Transfer */}
