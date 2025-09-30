@@ -264,8 +264,8 @@ export default function Profile() {
       
       {/* Profile Info */}
       <div className="px-6 mb-6">
-        <div className="bg-card rounded-xl border border-border p-6 text-center" data-testid="card-profile-info">
-          <div className="relative w-20 h-20 mx-auto mb-4">
+        <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4" data-testid="card-profile-info">
+          <div className="relative flex-shrink-0">
             <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
               {(user as any)?.profileImageUrl ? (
                 <img 
@@ -293,22 +293,24 @@ export default function Profile() {
             </div>
           </div>
           
-          <h2 className="text-xl font-bold mb-1" data-testid="text-user-name">
-            {(user as any)?.firstName && (user as any)?.lastName 
-              ? `${(user as any).lastName}, ${(user as any).firstName}`
-              : (user as any)?.firstName || 'User'
-            }
-          </h2>
-          <p className="text-xs text-muted-foreground/70 mb-3" data-testid="text-user-id">
-            ID: {(user as any)?.id}
-          </p>
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <span 
-              className={`tier-badge text-xs px-3 py-1 rounded-full font-semibold ${tierDisplay.class}`}
-              data-testid="badge-user-tier"
-            >
-              {tierDisplay.label}
-            </span>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold mb-1" data-testid="text-user-name">
+              {(user as any)?.firstName && (user as any)?.lastName 
+                ? `${(user as any).lastName}, ${(user as any).firstName}`
+                : (user as any)?.firstName || 'User'
+              }
+            </h2>
+            <p className="text-xs text-muted-foreground/70 mb-2" data-testid="text-user-id">
+              ID: {(user as any)?.id}
+            </p>
+            <div className="flex items-center gap-2">
+              <span 
+                className={`tier-badge text-xs px-3 py-1 rounded-full font-semibold ${tierDisplay.class}`}
+                data-testid="badge-user-tier"
+              >
+                {tierDisplay.label}
+              </span>
+            </div>
           </div>
           {/* Upgrade button removed as everyone is commissioner now */}
         </div>
