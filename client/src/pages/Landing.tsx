@@ -54,7 +54,6 @@ export default function Landing() {
           </button>
         </div>
       </header>
-
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-6 overflow-hidden">
         <div 
@@ -73,9 +72,7 @@ export default function Landing() {
           <p 
             className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed font-medium"
             data-testid="text-hero-subtitle"
-          >
-            Stop chasing teammates. Start playing hockey.
-          </p>
+          >Make Beer League Great Again</p>
           <p 
             className="text-base md:text-lg text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed"
             data-testid="text-hero-body"
@@ -97,7 +94,6 @@ export default function Landing() {
           </p>
         </div>
       </section>
-
       {/* Highlights Bar */}
       <section className="py-12 px-6 border-y border-border/50 bg-card/30">
         <div className="max-w-6xl mx-auto">
@@ -115,7 +111,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Features Section */}
       <section className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
@@ -154,7 +149,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Pricing Section */}
       <section className="py-24 px-6 bg-card/30">
         <div className="max-w-7xl mx-auto">
@@ -280,7 +274,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* CTA Section */}
       <section className="py-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
@@ -299,7 +292,6 @@ export default function Landing() {
           </button>
         </div>
       </section>
-
       {/* Footer */}
       <footer className="border-t border-border/50 py-12 px-6">
         <div className="max-w-7xl mx-auto text-center text-muted-foreground">
