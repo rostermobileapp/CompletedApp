@@ -1272,18 +1272,13 @@ export default function Dashboard() {
       </div>
       {/* Find a League Section - Bottom */}
       <div className="px-6">
-        <div className="bg-card rounded-lg border border-border px-2 py-1 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Search className="w-4 h-4 text-primary" />
-          </div>
-          <button
-            onClick={() => navigate('/league-search')}
-            className="bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
-            data-testid="button-find-league"
-          >
-            Find a League
-          </button>
-        </div>
+        <button
+          onClick={() => navigate('/league-search')}
+          className="w-full bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
+          data-testid="button-find-league"
+        >
+          Find a League
+        </button>
       </div>
       {/* Score Submission Modal */}
       <Dialog open={showScoreModal} onOpenChange={setShowScoreModal}>
