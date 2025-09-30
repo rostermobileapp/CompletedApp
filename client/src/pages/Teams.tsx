@@ -392,7 +392,7 @@ export default function Teams() {
                               type="text"
                               value={editedTeamName}
                               onChange={(e) => setEditedTeamName(e.target.value)}
-                              className="flex-1 px-3 py-1.5 bg-card border border-border rounded-lg text-xl font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
+                              className="w-full max-w-[50vw] px-3 py-1.5 bg-card border border-border rounded-lg text-xl font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
                               placeholder="Team name"
                               autoFocus
                               data-testid={`input-team-name-${team.id}`}
