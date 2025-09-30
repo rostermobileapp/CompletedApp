@@ -76,7 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/auth/user/profile', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { firstName, lastName, city, age, phoneNumber } = req.body;
+      const { firstName, lastName, city, age, phoneNumber, dateOfBirth } = req.body;
       
       const profileData: any = {};
       if (firstName !== undefined) profileData.firstName = firstName;
@@ -84,6 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (city !== undefined) profileData.city = city;
       if (age !== undefined) profileData.age = parseInt(age);
       if (phoneNumber !== undefined) profileData.phoneNumber = phoneNumber;
+      if (dateOfBirth !== undefined) profileData.dateOfBirth = dateOfBirth;
 
       const user = await storage.updateUserProfile(userId, profileData);
       res.json(user);

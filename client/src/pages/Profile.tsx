@@ -293,7 +293,7 @@ export default function Profile() {
             <div className="absolute -bottom-2 -right-2">
               <ObjectUploader
                 maxNumberOfFiles={1}
-                maxFileSize={5242880} // 5MB
+                maxFileSize={15728640} // 15MB
                 onGetUploadParameters={handleGetUploadParameters}
                 onComplete={handleUploadComplete}
                 buttonClassName="w-8 h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full flex items-center justify-center border-2 border-background"

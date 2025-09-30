@@ -108,6 +108,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   age: integer("age"),
+  dateOfBirth: varchar("date_of_birth"),
   phoneNumber: varchar("phone_number"),
   city: varchar("city"),
   primarySport: sportEnum("primary_sport"),
