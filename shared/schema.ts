@@ -786,6 +786,21 @@ export const playerStats = pgTable("player_stats", {
   index("idx_player_stats_user_id").on(table.userId),
 ]);
 
+// Feedback category enum
+export const feedbackCategoryEnum = pgEnum("feedback_category", [
+  "product_improvement",
+  "report_issue"
+]);
+
+// Feedback submissions table
+export const feedbackSubmissions = pgTable("feedback_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  category: feedbackCategoryEnum("category").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   leagueMemberships: many(leagueMemberships),
@@ -1633,6 +1648,18 @@ export const updateLineCombinationRequestSchema = createInsertSchema(lineCombina
   updatedAt: true,
 }).partial();
 
+// Feedback schemas
+export const insertFeedbackSubmissionSchema = createInsertSchema(feedbackSubmissions).omit({
+  id: true,
+  userId: true, // Server-controlled
+  createdAt: true,
+});
+
+export const createFeedbackSubmissionSchema = z.object({
+  category: z.enum(["product_improvement", "report_issue"]),
+  message: z.string().min(1, "Message is required").max(5000, "Message is too long"),
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1783,3 +1810,8 @@ export type TeamMemberWithUser = TeamMembership & {
 };
 
 export type UserTeam = Team;
+
+// Feedback types
+export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
+export type InsertFeedbackSubmission = z.infer<typeof insertFeedbackSubmissionSchema>;
+export type CreateFeedbackSubmissionRequest = z.infer<typeof createFeedbackSubmissionSchema>;
