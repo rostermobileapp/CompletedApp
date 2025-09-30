@@ -174,23 +174,27 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
             {/* Free Tier */}
             <div className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 border border-border/50" data-testid="card-pricing-free">
-              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-free">Free</h3>
+              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-free">FREE</h3>
               <div className="mb-6">
                 <span className="text-5xl font-bold" data-testid="text-price-free">$0</span>
+                <span className="text-muted-foreground"> / Month</span>
               </div>
-              <p className="text-muted-foreground mb-6">For casual players</p>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-start gap-3" data-testid="feature-free-0">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Join leagues and view rosters</span>
+                  <span className="text-sm">Join Leagues / Teams</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-free-1">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Basic team messaging</span>
+                  <span className="text-sm">Scheduling</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-free-2">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Game notifications</span>
+                  <span className="text-sm">RSVP Function</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-free-3">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Team Only Stats</span>
                 </li>
               </ul>
               <button 
@@ -202,37 +206,48 @@ export default function Landing() {
               </button>
             </div>
 
-            {/* Player Plus Tier */}
+            {/* Player Pro Tier */}
             <div className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 border-2 border-primary relative" data-testid="card-pricing-player">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-sm font-semibold px-4 py-1 rounded-full" data-testid="badge-popular">
                 Most Popular
               </div>
-              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-player">Player Plus</h3>
+              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-player">PLAYER PRO</h3>
               <div className="mb-6">
                 <span className="text-5xl font-bold" data-testid="text-price-player">$8</span>
-                <span className="text-muted-foreground">/month</span>
+                <span className="text-muted-foreground"> / Month</span>
               </div>
-              <p className="text-muted-foreground mb-6">For serious players</p>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-start gap-3" data-testid="feature-player-0">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Everything in Free</span>
+                  <span className="text-sm">FREE +</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-player-1">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Advanced stats tracking</span>
+                  <span className="text-sm">Team Management</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-player-2">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Scrimmage scheduling</span>
+                  <span className="text-sm">In-App Messaging</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-player-3">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Team statistics</span>
+                  <span className="text-sm">In-App Payments</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-player-4">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Priority support</span>
+                  <span className="text-sm">Team Scheduling</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-player-5">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">League Stats</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-player-6">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">League Standings</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-player-7">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">League Announcements</span>
                 </li>
               </ul>
               <button 
@@ -246,32 +261,39 @@ export default function Landing() {
 
             {/* Commissioner Tier */}
             <div className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 border border-border/50" data-testid="card-pricing-commissioner">
-              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-commissioner">Commissioner</h3>
+              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-commissioner">COMMISSIONER</h3>
               <div className="mb-6">
                 <span className="text-5xl font-bold" data-testid="text-price-commissioner">$12</span>
-                <span className="text-muted-foreground">/month</span>
+                <span className="text-muted-foreground"> / Month</span>
               </div>
-              <p className="text-muted-foreground mb-6">For league organizers</p>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-start gap-3" data-testid="feature-commissioner-0">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Everything in Player Plus</span>
+                  <span className="text-sm">FREE & PLAYER PRO +</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-commissioner-1">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">League creation & management</span>
+                  <span className="text-sm">League Scheduling</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-commissioner-2">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Commissioner dashboard</span>
+                  <span className="text-sm">Scorekeeping</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-commissioner-3">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">League statistics</span>
+                  <span className="text-sm">Player Management</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-commissioner-4">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Advanced team management</span>
+                  <span className="text-sm">League Wide Posts</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-commissioner-5">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Awards & Records</span>
+                </li>
+                <li className="flex items-start gap-3" data-testid="feature-commissioner-6">
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">Bracket Management</span>
                 </li>
               </ul>
               <button 
