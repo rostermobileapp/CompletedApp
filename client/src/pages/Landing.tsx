@@ -1,4 +1,4 @@
-import { Users, Calendar, Trophy, MessageCircle, ArrowRight, Zap, Shield, BarChart3, Check } from 'lucide-react';
+import { Users, Calendar, Trophy, MessageCircle, ArrowRight, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import logoWhite from '@assets/Roster Logo White_1759233840726.png';
 
@@ -32,12 +32,6 @@ export default function Landing() {
       title: 'Real-time Communication',
       description: 'Stay connected with team and league-wide chat. Share updates, photos, and coordinate on the fly.',
     },
-  ];
-
-  const highlights = [
-    { icon: Zap, text: 'Lightning fast performance' },
-    { icon: Shield, text: 'Secure and reliable' },
-    { icon: BarChart3, text: 'Powerful analytics' },
   ];
 
   return (
@@ -107,19 +101,24 @@ export default function Landing() {
         </div>
       </section>
       {/* Highlights Bar */}
-      <section className="py-12 px-6 border-y border-border/50 bg-card/30">
+      <section className="py-16 px-6 border-y border-border/50 bg-card/30">
         <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-10" data-testid="text-highlights-heading">
+            Running on spreadsheets?
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {highlights.map((highlight, index) => (
-              <div 
-                key={index}
-                className="flex items-center justify-center gap-3 text-muted-foreground"
-                data-testid={`highlight-${index}`}
-              >
-                <highlight.icon className="w-5 h-5" />
-                <span className="font-medium">{highlight.text}</span>
-              </div>
-            ))}
+            <div className="flex items-center justify-center gap-3" data-testid="highlight-0">
+              <Check className="w-5 h-5 text-primary flex-shrink-0" />
+              <span className="font-medium">Upload your roster & schedule</span>
+            </div>
+            <div className="flex items-center justify-center gap-3" data-testid="highlight-1">
+              <Check className="w-5 h-5 text-primary flex-shrink-0" />
+              <span className="font-medium">Roster populates your whole season in seconds</span>
+            </div>
+            <div className="flex items-center justify-center gap-3" data-testid="highlight-2">
+              <Check className="w-5 h-5 text-primary flex-shrink-0" />
+              <span className="font-medium">Enjoy how it was meant to be</span>
+            </div>
           </div>
         </div>
       </section>
