@@ -305,6 +305,12 @@ export default function Landing() {
               </button>
             </div>
           </div>
+          
+          <div className="text-center mt-8">
+            <p className="text-sm text-muted-foreground" data-testid="text-pricing-footnote">
+              * Coming soon
+            </p>
+          </div>
         </div>
       </section>
       {/* CTA Section */}
