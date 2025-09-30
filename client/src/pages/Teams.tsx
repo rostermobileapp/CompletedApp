@@ -92,7 +92,10 @@ export default function Teams() {
       return apiRequest('PATCH', `/api/teams/${data.teamId}`, { name: data.name });
     },
     onSuccess: () => {
+      // Invalidate all queries that might display team names
       queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues'] }); // Invalidate all league queries (includes games)
+      queryClient.invalidateQueries({ queryKey: ['/api/teams'] }); // Invalidate team-specific queries
       setIsEditingTeamName(false);
       toast({
         title: "Success",
