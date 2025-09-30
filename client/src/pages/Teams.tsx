@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trophy, Users, Star, Upload, Coffee, Target, Award, TrendingUp, Apple, Flag } from 'lucide-react';
+import { Trophy, Users, Star, Upload, Coffee, Target, Award, TrendingUp, Apple, Flag, Edit2, X } from 'lucide-react';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { LineManager } from '@/components/LineManager';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,8 @@ export default function Teams() {
   const { hasRole } = usePermissions();
   const { toast } = useToast();
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const [isEditingTeamName, setIsEditingTeamName] = useState(false);
+  const [editedTeamName, setEditedTeamName] = useState('');
 
   // Get user's teams
   const { data: userTeams = [] } = useQuery({
@@ -79,6 +81,28 @@ export default function Teams() {
       toast({
         title: "Error",
         description: "Failed to update team logo. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Team name update mutation
+  const updateTeamNameMutation = useMutation({
+    mutationFn: async (data: { teamId: string; name: string }) => {
+      return apiRequest('PATCH', `/api/teams/${data.teamId}`, { name: data.name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
+      setIsEditingTeamName(false);
+      toast({
+        title: "Success",
+        description: "Team name updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update team name. Please try again.",
         variant: "destructive",
       });
     },
@@ -341,38 +365,89 @@ export default function Teams() {
                 <Card>
                   <CardHeader className="flex flex-col space-y-1.5 p-6 bg-[#212121]">
                     <div className="flex items-center gap-4">
-                      <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${team.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
-                        {team.logoUrl ? (
-                          <img 
-                            src={team.logoUrl} 
-                            alt={`${team.name} logo`}
-                            className="w-full h-full rounded-lg object-contain"
-                            data-testid={`img-team-logo-${team.id}`}
-                          />
-                        ) : (
-                          <Trophy className="w-8 h-8 text-primary-foreground" />
+                      <div className="relative group">
+                        <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${team.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
+                          {team.logoUrl ? (
+                            <img 
+                              src={team.logoUrl} 
+                              alt={`${team.name} logo`}
+                              className="w-full h-full rounded-lg object-contain"
+                              data-testid={`img-team-logo-${team.id}`}
+                            />
+                          ) : (
+                            <Trophy className="w-8 h-8 text-primary-foreground" />
+                          )}
+                        </div>
+                        {((team.captainId === (user as any)?.id) || 
+                          hasRole('secondary_commissioner')) && (
+                          <ObjectUploader
+                            maxNumberOfFiles={1}
+                            maxFileSize={10485760}
+                            onGetUploadParameters={handleGetTeamLogoUploadParameters}
+                            onComplete={createTeamLogoUploadComplete(team.id)}
+                            buttonClassName="absolute inset-0 w-full h-full rounded-lg opacity-0 hover:opacity-100 bg-black/50 flex items-center justify-center transition-opacity"
+                          >
+                            <Upload className="w-6 h-6 text-white" />
+                          </ObjectUploader>
                         )}
                       </div>
                       <div className="flex-1">
-                        <CardTitle className="text-2xl" data-testid={`text-team-name-${team.id}`}>
-                          {team.name}
-                        </CardTitle>
-                      </div>
-                      {((team.captainId === (user as any)?.id) || 
-                        hasRole('secondary_commissioner')) && (
-                        <ObjectUploader
-                          maxNumberOfFiles={1}
-                          maxFileSize={10485760}
-                          onGetUploadParameters={handleGetTeamLogoUploadParameters}
-                          onComplete={createTeamLogoUploadComplete(team.id)}
-                          buttonClassName="h-9"
-                        >
+                        {isEditingTeamName && selectedTeam === team.id ? (
                           <div className="flex items-center gap-2">
-                            <Upload className="w-4 h-4" />
-                            <span>Upload Logo</span>
+                            <input
+                              type="text"
+                              value={editedTeamName}
+                              onChange={(e) => setEditedTeamName(e.target.value)}
+                              className="flex-1 px-3 py-1.5 bg-card border border-border rounded-lg text-xl font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
+                              placeholder="Team name"
+                              autoFocus
+                              data-testid={`input-team-name-${team.id}`}
+                            />
+                            <button
+                              onClick={() => {
+                                if (editedTeamName.trim()) {
+                                  updateTeamNameMutation.mutate({ teamId: team.id, name: editedTeamName.trim() });
+                                }
+                              }}
+                              disabled={!editedTeamName.trim() || updateTeamNameMutation.isPending}
+                              className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
+                              data-testid={`button-save-team-name-${team.id}`}
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => {
+                                setIsEditingTeamName(false);
+                                setEditedTeamName('');
+                              }}
+                              className="p-1.5 text-muted-foreground hover:text-foreground"
+                              data-testid={`button-cancel-team-name-${team.id}`}
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
                           </div>
-                        </ObjectUploader>
-                      )}
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-2xl" data-testid={`text-team-name-${team.id}`}>
+                              {team.name}
+                            </CardTitle>
+                            {((team.captainId === (user as any)?.id) || 
+                              hasRole('secondary_commissioner')) && (
+                              <button
+                                onClick={() => {
+                                  setIsEditingTeamName(true);
+                                  setEditedTeamName(team.name);
+                                  setSelectedTeam(team.id);
+                                }}
+                                className="p-1 text-muted-foreground hover:text-foreground rounded"
+                                data-testid={`button-edit-team-name-${team.id}`}
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                 </Card>
