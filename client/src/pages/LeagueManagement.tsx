@@ -48,6 +48,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ObjectUploader } from '@/components/ObjectUploader';
+import { GoogleAddressAutocomplete } from '@/components/GoogleAddressAutocomplete';
 
 type LeagueMember = {
   id: string;
@@ -2782,12 +2783,18 @@ export default function LeagueManagement() {
                 {/* Location */}
                 <div>
                   <label className="block text-sm font-medium mb-2">League Address</label>
-                  <input
-                    {...editLeagueForm.register('location')}
-                    type="text"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="League location"
-                    data-testid="input-league-location"
+                  <Controller
+                    name="location"
+                    control={editLeagueForm.control}
+                    render={({ field }) => (
+                      <GoogleAddressAutocomplete
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        placeholder="Enter league address"
+                        className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        dataTestId="input-league-location"
+                      />
+                    )}
                   />
                 </div>
 
