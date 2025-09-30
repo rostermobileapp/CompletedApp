@@ -10,6 +10,13 @@ import {
 } from "@/components/ui/dialog";
 import { Upload, X } from "lucide-react";
 
+interface UploadResult {
+  successful?: Array<{
+    uploadURL: string;
+  }>;
+  failed?: Array<any>;
+}
+
 interface ObjectUploaderProps {
   maxNumberOfFiles?: number;
   maxFileSize?: number;
@@ -17,7 +24,7 @@ interface ObjectUploaderProps {
     method: "PUT";
     url: string;
   }>;
-  onComplete?: (files: File[]) => void;
+  onComplete?: (result: UploadResult) => void;
   buttonClassName?: string;
   children: ReactNode;
 }
@@ -51,6 +58,7 @@ export function ObjectUploader({
   const [showModal, setShowModal] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (files: FileList | null) => {
@@ -99,15 +107,47 @@ export function ObjectUploader({
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
     
+    setIsUploading(true);
     try {
-      // For now, just call onComplete with the selected files
-      // In a real implementation, you'd upload to S3 here
-      onComplete?.(selectedFiles);
+      const successful: Array<{ uploadURL: string }> = [];
+      const failed: Array<any> = [];
+      
+      for (const file of selectedFiles) {
+        try {
+          // Get upload parameters from the parent component
+          const { method, url } = await onGetUploadParameters();
+          
+          // Upload the file to object storage
+          const uploadResponse = await fetch(url, {
+            method,
+            body: file,
+            headers: {
+              'Content-Type': file.type,
+            },
+          });
+          
+          if (!uploadResponse.ok) {
+            throw new Error(`Upload failed with status ${uploadResponse.status}`);
+          }
+          
+          // Store the upload URL (use the signed URL but remove query parameters for storage)
+          const uploadURL = url.split('?')[0];
+          successful.push({ uploadURL });
+        } catch (error) {
+          console.error('Failed to upload file:', file.name, error);
+          failed.push({ file: file.name, error });
+        }
+      }
+      
+      // Call onComplete with the result
+      onComplete?.({ successful, failed });
       setShowModal(false);
       setSelectedFiles([]);
     } catch (error) {
       console.error('Upload failed:', error);
       alert('Upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -203,16 +243,17 @@ export function ObjectUploader({
                   setShowModal(false);
                   setSelectedFiles([]);
                 }}
+                disabled={isUploading}
                 data-testid="button-cancel"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleUpload}
-                disabled={selectedFiles.length === 0}
+                disabled={selectedFiles.length === 0 || isUploading}
                 data-testid="button-confirm-upload"
               >
-                Upload {selectedFiles.length > 0 && `(${selectedFiles.length})`}
+                {isUploading ? 'Uploading...' : `Upload${selectedFiles.length > 0 ? ` (${selectedFiles.length})` : ''}`}
               </Button>
             </div>
           </div>
