@@ -52,16 +52,6 @@ export default function Profile() {
 
   const leagueFeatures = [
     {
-      icon: Plus,
-      label: 'Create League',
-      locked: !canManageLeague(),
-      requiredTier: 'COMMISSIONER',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/create-league');
-      },
-    },
-    {
       icon: Calendar,
       label: 'Schedule Scrimmage',
       locked: !canAccessPremiumFeatures(),
@@ -79,6 +69,16 @@ export default function Profile() {
       action: () => {
         setPageTransitionDirection('up');
         navigate('/scrimmage-management');
+      },
+    },
+    {
+      icon: Plus,
+      label: 'Create League',
+      locked: !canManageLeague(),
+      requiredTier: 'COMMISSIONER',
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/create-league');
       },
     },
     {
