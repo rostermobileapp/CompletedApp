@@ -90,34 +90,20 @@ export default function LeagueList() {
                 onClick={() => navigate(`/league-management?league=${league.id}`)}
                 data-testid={`league-card-${league.id}`}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-1">{league.name}</h3>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="capitalize">{league.sport}</span>
-                      {league.location && (
-                        <>
-                          <span>•</span>
-                          <span>{league.location}</span>
-                        </>
-                      )}
-                      <span>•</span>
-                      <span className={league.isActive ? 'text-green-600/50' : 'text-yellow-600/50'}>
-                        {league.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/league-management?league=${league.id}&edit=true`);
-                      }}
-                      className="text-sm text-primary hover:underline"
-                      data-testid={`button-edit-league-${league.id}`}
-                    >
-                      Edit League
-                    </button>
+                <div className="mb-3">
+                  <h3 className="text-lg font-semibold mb-1">{league.name}</h3>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span className="capitalize">{league.sport}</span>
+                    {league.location && (
+                      <>
+                        <span>•</span>
+                        <span>{league.location}</span>
+                      </>
+                    )}
+                    <span>•</span>
+                    <span className={league.isActive ? 'text-green-600/50' : 'text-yellow-600/50'}>
+                      {league.isActive ? 'Active' : 'Inactive'}
+                    </span>
                   </div>
                 </div>
                 
