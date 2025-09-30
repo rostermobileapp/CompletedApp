@@ -289,7 +289,7 @@ export default function Landing() {
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-commissioner-5">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Awards & Records</span>
+                  <span className="text-sm">Awards & Records*</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-commissioner-6">
                   <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
