@@ -29,6 +29,8 @@ import {
   playerStats,
   lineCombinations,
   lineCombinationAssignments,
+  drafts,
+  draftPicks,
   // New messaging tables
   conversations,
   conversationParticipants,
@@ -689,7 +691,193 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteLeague(id: string): Promise<void> {
-    // TODO: Implement cascade deletion of related data (teams, games, memberships)
+    // Cascade deletion of all related data in the correct order to respect foreign key constraints
+    
+    // Get all teams in this league first (needed for some queries)
+    const leagueTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, id));
+    const teamIds = leagueTeams.map(t => t.id);
+    
+    // Get all games in this league first (needed for some queries)
+    const leagueGames = await db.select({ id: games.id }).from(games).where(eq(games.leagueId, id));
+    const gameIds = leagueGames.map(g => g.id);
+    
+    // Get all seasons in this league first (needed for cleanup)
+    const leagueSeasons = await db.select({ id: seasons.id }).from(seasons).where(eq(seasons.leagueId, id));
+    const seasonIds = leagueSeasons.map(s => s.id);
+    
+    // 1. Delete chat poll votes and chat polls (depends on messages → conversations)
+    const leagueConversationsForPolls = await db.select({ id: conversations.id }).from(conversations).where(eq(conversations.leagueId, id));
+    if (leagueConversationsForPolls.length > 0) {
+      const conversationIdsForPolls = leagueConversationsForPolls.map(c => c.id);
+      const conversationMessagesForPolls = await db.select({ id: messages.id }).from(messages).where(inArray(messages.conversationId, conversationIdsForPolls));
+      if (conversationMessagesForPolls.length > 0) {
+        const messageIdsForPolls = conversationMessagesForPolls.map(m => m.id);
+        const leagueChatPolls = await db.select({ id: chatPolls.id }).from(chatPolls).where(inArray(chatPolls.messageId, messageIdsForPolls));
+        if (leagueChatPolls.length > 0) {
+          const pollIds = leagueChatPolls.map(p => p.id);
+          // Delete chat poll votes
+          await db.delete(chatPollVotes).where(inArray(chatPollVotes.pollId, pollIds));
+          // Delete chat polls
+          await db.delete(chatPolls).where(inArray(chatPolls.id, pollIds));
+        }
+      }
+    }
+    
+    // 3. Delete announcement poll votes (depends on announcementPolls)
+    const leagueAnnouncements = await db.select({ id: announcements.id }).from(announcements).where(eq(announcements.leagueId, id));
+    if (leagueAnnouncements.length > 0) {
+      const announcementIds = leagueAnnouncements.map(a => a.id);
+      const leagueAnnouncementPolls = await db.select({ id: announcementPolls.id }).from(announcementPolls).where(inArray(announcementPolls.announcementId, announcementIds));
+      if (leagueAnnouncementPolls.length > 0) {
+        const announcementPollIds = leagueAnnouncementPolls.map(p => p.id);
+        await db.delete(announcementPollVotes).where(inArray(announcementPollVotes.pollId, announcementPollIds));
+      }
+      
+      // 4. Delete announcement polls
+      await db.delete(announcementPolls).where(inArray(announcementPolls.announcementId, announcementIds));
+      
+      // 5. Delete announcement reactions
+      await db.delete(announcementReactions).where(inArray(announcementReactions.announcementId, announcementIds));
+      
+      // 6. Delete announcement read status
+      await db.delete(announcementReadStatus).where(inArray(announcementReadStatus.announcementId, announcementIds));
+      
+      // 7. Delete announcement visibility
+      await db.delete(announcementVisibility).where(inArray(announcementVisibility.announcementId, announcementIds));
+      
+      // 8. Delete announcement attachments
+      await db.delete(announcementAttachments).where(inArray(announcementAttachments.announcementId, announcementIds));
+    }
+    
+    // 9. Delete announcements
+    await db.delete(announcements).where(eq(announcements.leagueId, id));
+    
+    // 10. Delete message-related data (depends on conversations)
+    const leagueConversations = await db.select({ id: conversations.id }).from(conversations).where(eq(conversations.leagueId, id));
+    if (leagueConversations.length > 0) {
+      const conversationIds = leagueConversations.map(c => c.id);
+      const conversationMessages = await db.select({ id: messages.id }).from(messages).where(inArray(messages.conversationId, conversationIds));
+      if (conversationMessages.length > 0) {
+        const messageIds = conversationMessages.map(m => m.id);
+        
+        // Delete message read receipts
+        await db.delete(messageReadReceipts).where(inArray(messageReadReceipts.messageId, messageIds));
+        
+        // Delete message attachments
+        await db.delete(messageAttachments).where(inArray(messageAttachments.messageId, messageIds));
+      }
+      
+      // Delete messages
+      await db.delete(messages).where(inArray(messages.conversationId, conversationIds));
+      
+      // Delete conversation participants
+      await db.delete(conversationParticipants).where(inArray(conversationParticipants.conversationId, conversationIds));
+    }
+    
+    // 11. Delete conversations
+    await db.delete(conversations).where(eq(conversations.leagueId, id));
+    
+    // 12. Delete game-related data if there are games
+    if (gameIds.length > 0) {
+      // Delete substitution approvals (depends on substituteRequests)
+      const gameSubRequests = await db.select({ id: substituteRequests.id }).from(substituteRequests).where(inArray(substituteRequests.gameId, gameIds));
+      if (gameSubRequests.length > 0) {
+        const subRequestIds = gameSubRequests.map(r => r.id);
+        await db.delete(substitutionApprovals).where(inArray(substitutionApprovals.substitutionRequestId, subRequestIds));
+      }
+      
+      // Delete substitute requests
+      await db.delete(substituteRequests).where(inArray(substituteRequests.gameId, gameIds));
+      
+      // Delete game RSVPs
+      await db.delete(gameRsvps).where(inArray(gameRsvps.gameId, gameIds));
+      
+      // Delete game score submissions
+      await db.delete(gameScoreSubmissions).where(inArray(gameScoreSubmissions.gameId, gameIds));
+      
+      // Delete game goalies
+      await db.delete(gameGoalies).where(inArray(gameGoalies.gameId, gameIds));
+    }
+    
+    // 13. Delete player stats (depends on leagues, teams, games)
+    await db.delete(playerStats).where(eq(playerStats.leagueId, id));
+    
+    // 14. Delete line combinations and assignments (depends on teams)
+    if (teamIds.length > 0) {
+      const teamLineCombinations = await db.select({ id: lineCombinations.id }).from(lineCombinations).where(inArray(lineCombinations.teamId, teamIds));
+      if (teamLineCombinations.length > 0) {
+        const lineCombinationIds = teamLineCombinations.map(lc => lc.id);
+        await db.delete(lineCombinationAssignments).where(inArray(lineCombinationAssignments.lineCombinationId, lineCombinationIds));
+      }
+      await db.delete(lineCombinations).where(inArray(lineCombinations.teamId, teamIds));
+    }
+    
+    // 15. Delete drafts and draft picks
+    const leagueDrafts = await db.select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, id));
+    if (leagueDrafts.length > 0) {
+      const draftIds = leagueDrafts.map(d => d.id);
+      await db.delete(draftPicks).where(inArray(draftPicks.draftId, draftIds));
+    }
+    await db.delete(drafts).where(eq(drafts.leagueId, id));
+    
+    // 16. Delete scrimmage requests and scrimmages
+    const leagueScrimmages = await db.select({ id: scrimmages.id }).from(scrimmages).where(eq(scrimmages.leagueId, id));
+    if (leagueScrimmages.length > 0) {
+      const scrimmageIds = leagueScrimmages.map(s => s.id);
+      await db.delete(scrimmageRequests).where(inArray(scrimmageRequests.scrimmageId, scrimmageIds));
+    }
+    await db.delete(scrimmages).where(eq(scrimmages.leagueId, id));
+    
+    // 17. Delete player imports and related data
+    const leaguePlayerImports = await db.select({ id: playerImports.id }).from(playerImports).where(eq(playerImports.leagueId, id));
+    if (leaguePlayerImports.length > 0) {
+      const importIds = leaguePlayerImports.map(pi => pi.id);
+      
+      // Get imported players for this import
+      const leagueImportedPlayers = await db.select({ id: importedPlayers.id }).from(importedPlayers).where(inArray(importedPlayers.importId, importIds));
+      if (leagueImportedPlayers.length > 0) {
+        const importedPlayerIds = leagueImportedPlayers.map(ip => ip.id);
+        // Delete player merge requests
+        await db.delete(playerMergeRequests).where(inArray(playerMergeRequests.importedPlayerId, importedPlayerIds));
+      }
+      
+      // Delete imported players
+      await db.delete(importedPlayers).where(inArray(importedPlayers.importId, importIds));
+    }
+    await db.delete(playerImports).where(eq(playerImports.leagueId, id));
+    
+    // 18. Delete schedule imports and related data
+    const leagueScheduleImports = await db.select({ id: scheduleImports.id }).from(scheduleImports).where(eq(scheduleImports.leagueId, id));
+    if (leagueScheduleImports.length > 0) {
+      const scheduleImportIds = leagueScheduleImports.map(si => si.id);
+      await db.delete(importedSchedules).where(inArray(importedSchedules.importId, scheduleImportIds));
+    }
+    await db.delete(scheduleImports).where(eq(scheduleImports.leagueId, id));
+    
+    // 19. Delete games
+    if (gameIds.length > 0) {
+      await db.delete(games).where(inArray(games.id, gameIds));
+    }
+    
+    // 20. Delete team memberships (depends on teams)
+    if (teamIds.length > 0) {
+      await db.delete(teamMemberships).where(inArray(teamMemberships.teamId, teamIds));
+    }
+    
+    // 21. Delete teams
+    if (teamIds.length > 0) {
+      await db.delete(teams).where(inArray(teams.id, teamIds));
+    }
+    
+    // 22. Delete seasons
+    if (seasonIds.length > 0) {
+      await db.delete(seasons).where(inArray(seasons.id, seasonIds));
+    }
+    
+    // 23. Delete league memberships
+    await db.delete(leagueMemberships).where(eq(leagueMemberships.leagueId, id));
+    
+    // 24. Finally, delete the league itself
     await db.delete(leagues).where(eq(leagues.id, id));
   }
 
