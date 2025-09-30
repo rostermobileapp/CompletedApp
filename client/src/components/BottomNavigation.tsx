@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
 const navItems = [
-  { id: 'teams', icon: Users, label: 'Teams', path: '/teams' },
+  { id: 'teams', icon: Users, label: 'My Team', path: '/teams' },
   { id: 'messages', icon: MessageCircle, label: 'Messages', path: '/messages' },
   { id: 'home', icon: null, label: 'Home', path: '/' },
   { id: 'more', icon: Bird, label: 'Chirp', path: '/more' },
