@@ -49,6 +49,7 @@ import {
   createLineCombinationRequestSchema,
   createLineCombinationAssignmentRequestSchema,
   updateLineCombinationRequestSchema,
+  createFeedbackSubmissionSchema,
 } from "@shared/schema";
 import { z, ZodError } from "zod";
 import multer from "multer";
@@ -5946,6 +5947,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   }
+
+  // Feedback submission route
+  app.post('/api/feedback', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Validate request body
+      const validatedData = createFeedbackSubmissionSchema.parse(req.body);
+
+      // Store feedback in database
+      const feedback = await storage.createFeedbackSubmission({
+        userId,
+        category: validatedData.category,
+        message: validatedData.message,
+      });
+
+      // Send email using Resend
+      try {
+        const { getUncachableResendClient } = await import('./resend');
+        const { client, fromEmail } = await getUncachableResendClient();
+        
+        const categoryLabel = validatedData.category === 'product_improvement' 
+          ? 'Product Improvement' 
+          : 'Report an Issue';
+
+        await client.emails.send({
+          from: fromEmail,
+          to: process.env.FEEDBACK_EMAIL || fromEmail,
+          subject: `Rosters Feedback: ${categoryLabel}`,
+          html: `
+            <h2>New Feedback Submission</h2>
+            <p><strong>Category:</strong> ${categoryLabel}</p>
+            <p><strong>From:</strong> ${user.firstName} ${user.lastName} (${user.email})</p>
+            <p><strong>User ID:</strong> ${userId}</p>
+            <p><strong>Submitted:</strong> ${new Date().toISOString()}</p>
+            <hr />
+            <h3>Message:</h3>
+            <p>${validatedData.message.replace(/\n/g, '<br />')}</p>
+          `,
+        });
+      } catch (emailError) {
+        console.error("Error sending feedback email:", emailError);
+        // Don't fail the request if email fails - feedback is still saved
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Feedback submitted successfully",
+        id: feedback.id 
+      });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid feedback data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error submitting feedback:", error);
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
 
   return httpServer;
 }
