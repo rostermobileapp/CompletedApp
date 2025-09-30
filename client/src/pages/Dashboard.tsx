@@ -1271,13 +1271,20 @@ export default function Dashboard() {
         )}
       </div>
       {/* Find a League Section - Bottom */}
-      <div className="px-6">
+      <div className="px-6 flex gap-2">
         <button
           onClick={() => navigate('/league-search')}
-          className="w-full bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
+          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
           data-testid="button-find-league"
         >
           Find a League
+        </button>
+        <button
+          onClick={() => {}}
+          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
+          data-testid="button-placeholder"
+        >
+          Placeholder Button
         </button>
       </div>
       {/* Score Submission Modal */}
