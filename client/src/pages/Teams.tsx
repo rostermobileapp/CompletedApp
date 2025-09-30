@@ -387,7 +387,7 @@ export default function Teams() {
                       </div>
                       <div className="flex-1">
                         {isEditingTeamName && selectedTeam === team.id ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <input
                               type="text"
                               value={editedTeamName}
@@ -397,28 +397,30 @@ export default function Teams() {
                               autoFocus
                               data-testid={`input-team-name-${team.id}`}
                             />
-                            <button
-                              onClick={() => {
-                                if (editedTeamName.trim()) {
-                                  updateTeamNameMutation.mutate({ teamId: team.id, name: editedTeamName.trim() });
-                                }
-                              }}
-                              disabled={!editedTeamName.trim() || updateTeamNameMutation.isPending}
-                              className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
-                              data-testid={`button-save-team-name-${team.id}`}
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => {
-                                setIsEditingTeamName(false);
-                                setEditedTeamName('');
-                              }}
-                              className="p-1.5 text-muted-foreground hover:text-foreground"
-                              data-testid={`button-cancel-team-name-${team.id}`}
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  if (editedTeamName.trim()) {
+                                    updateTeamNameMutation.mutate({ teamId: team.id, name: editedTeamName.trim() });
+                                  }
+                                }}
+                                disabled={!editedTeamName.trim() || updateTeamNameMutation.isPending}
+                                className="flex-1 sm:flex-none px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm whitespace-nowrap"
+                                data-testid={`button-save-team-name-${team.id}`}
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsEditingTeamName(false);
+                                  setEditedTeamName('');
+                                }}
+                                className="p-1.5 text-muted-foreground hover:text-foreground"
+                                data-testid={`button-cancel-team-name-${team.id}`}
+                              >
+                                <X className="w-5 h-5" />
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
