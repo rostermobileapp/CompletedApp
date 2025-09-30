@@ -80,11 +80,15 @@ export default function Landing() {
             data-testid="text-hero-subtitle"
           >Make Beer League Great Again</p>
           <p 
-            className="text-base md:text-lg text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed"
+            className="text-base md:text-lg mb-12 max-w-3xl mx-auto leading-relaxed text-[#ffffff]"
             data-testid="text-hero-body"
-          >
-            "Beer league hockey shouldn't feel like herding cats. But it does—because nobody knows who's playing, nobody knows the game time, and half the guys ghost. Why? Group texts and spreadsheets. Total clown show. Roster fixes all of it. One app, built by hockey players, for hockey players. Your schedule, your lineup, your team—organized. Finally."
-          </p>
+          >Beer league hockey shouldn't feel like herding cats. 
+          A league of grown men relying on group emails and spreadsheets leads to a short roster.
+
+          Amateur Hour
+
+          Roster fixes all of it. One app, built by players, for players. 
+          Your schedule, your lineup, your team—organized. Finally.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <button 
               onClick={() => window.location.href = '/api/login'}
