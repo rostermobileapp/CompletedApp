@@ -41,6 +41,7 @@ import {
   // Chat polls tables
   chatPolls,
   chatPollVotes,
+  feedbackSubmissions,
   type User,
   type UpsertUser,
   type League,
@@ -112,6 +113,8 @@ import {
   type InsertChatPoll,
   type ChatPollVote,
   type InsertChatPollVote,
+  type FeedbackSubmission,
+  type InsertFeedbackSubmission,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, not } from "drizzle-orm";
@@ -315,6 +318,9 @@ export interface IStorage {
   
   // Player merge operations
   mergeUsersInLeague(leagueId: string, fromUserId: string, toUserId: string, preserveName?: boolean): Promise<LeagueMembership>;
+  
+  // Feedback operations
+  createFeedbackSubmission(feedbackData: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5112,6 +5118,15 @@ export class DatabaseStorage implements IStorage {
       ...result.assignment,
       player: result.user,
     };
+  }
+
+  // Feedback operations
+  async createFeedbackSubmission(feedbackData: InsertFeedbackSubmission): Promise<FeedbackSubmission> {
+    const [feedback] = await db
+      .insert(feedbackSubmissions)
+      .values(feedbackData)
+      .returning();
+    return feedback;
   }
 }
 
