@@ -261,10 +261,9 @@ export default function Profile() {
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Profile</h1>
         </div>
       </div>
-      
       {/* Profile Info */}
       <div className="px-6 mb-6">
-        <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4" data-testid="card-profile-info">
+        <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
           <div className="relative flex-shrink-0">
             <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
               {(user as any)?.profileImageUrl ? (
@@ -315,7 +314,6 @@ export default function Profile() {
           {/* Upgrade button removed as everyone is commissioner now */}
         </div>
       </div>
-      
       {/* Profile Details */}
       <div className="px-6 mb-6">
         <div className="bg-card rounded-xl border border-border p-6">
@@ -419,7 +417,6 @@ export default function Profile() {
           )}
         </div>
       </div>
-      
       {/* League Features */}
       <div className="px-6 mb-6">
         <h2 className="text-lg font-semibold mb-4" data-testid="text-league-features-title">League Features</h2>
@@ -433,7 +430,6 @@ export default function Profile() {
           ))}
         </div>
       </div>
-      
       {/* League Management */}
       {userLeagues && Array.isArray(userLeagues) && userLeagues.length > 0 && (
         <div className="px-6 mb-6">
@@ -489,7 +485,6 @@ export default function Profile() {
           </div>
         </div>
       )}
-      
       {/* Settings */}
       <div className="px-6">
         <h2 className="text-lg font-semibold mb-4" data-testid="text-settings-title">Settings</h2>
