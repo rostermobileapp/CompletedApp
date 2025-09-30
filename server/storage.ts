@@ -160,6 +160,7 @@ export interface IStorage {
   getTeamsByLeague(leagueId: string): Promise<Team[]>;
   getTeam(id: string): Promise<Team | undefined>;
   getUserTeams(userId: string): Promise<Team[]>;
+  updateTeam(id: string, data: Partial<Pick<Team, 'name'>>): Promise<Team>;
   updateTeamLogo(id: string, logoUrl: string): Promise<Team>;
   setTeamCaptain(teamId: string, captainId: string | null): Promise<Team>;
   
@@ -1033,6 +1034,18 @@ export class DatabaseStorage implements IStorage {
       );
 
     return leagueMembershipResult.map(r => r.team);
+  }
+
+  async updateTeam(id: string, data: Partial<Pick<Team, 'name'>>): Promise<Team> {
+    const [team] = await db
+      .update(teams)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(teams.id, id))
+      .returning();
+    return team;
   }
 
   async updateTeamLogo(id: string, logoUrl: string): Promise<Team> {

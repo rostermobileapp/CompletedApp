@@ -833,6 +833,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/teams/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const teamId = req.params.id;
+      const { name } = req.body;
+
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ message: "Team name is required" });
+      }
+
+      // Check if user is the team captain or commissioner
+      const team = await storage.getTeam(teamId);
+      const user = await storage.getUser(userId);
+      const isTeamCaptain = team && team.captainId === userId;
+      const isCommissioner = user && (user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin'));
+      
+      if (!team || (!isTeamCaptain && !isCommissioner)) {
+        return res.status(403).json({ message: "Only team captains and commissioners can update team name" });
+      }
+
+      const updatedTeam = await storage.updateTeam(teamId, { name: name.trim() });
+      res.json(updatedTeam);
+    } catch (error) {
+      console.error("Error updating team name:", error);
+      res.status(500).json({ message: "Failed to update team name" });
+    }
+  });
+
   app.patch("/api/teams/:id/logo", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
