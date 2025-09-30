@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
+import FeedbackModal from '@/components/FeedbackModal';
 
 // Notification Badge Component
 function AnnouncementBadge({ leagueId }: { leagueId: string | null }) {
@@ -723,6 +724,9 @@ export default function Dashboard() {
   // Needs Attention modal state
   const [showNeedsAttentionModal, setShowNeedsAttentionModal] = useState(false);
   
+  // Feedback modal state
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  
   const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
     select: (games) => {
@@ -1280,11 +1284,11 @@ export default function Dashboard() {
           Find a League
         </button>
         <button
-          onClick={() => {}}
+          onClick={() => setShowFeedbackModal(true)}
           className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
-          data-testid="button-placeholder"
+          data-testid="button-send-feedback"
         >
-          Placeholder Button
+          Send Feedback
         </button>
       </div>
       {/* Score Submission Modal */}
@@ -1368,6 +1372,11 @@ export default function Dashboard() {
         onClose={() => setShowNeedsAttentionModal(false)}
         leagueId={selectedLeagueId}
         onNavigate={navigate}
+      />
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
       />
     </div>
   );
