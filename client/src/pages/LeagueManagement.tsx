@@ -2781,7 +2781,7 @@ export default function LeagueManagement() {
 
                 {/* Location */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Location</label>
+                  <label className="block text-sm font-medium mb-2">League Address</label>
                   <input
                     {...editLeagueForm.register('location')}
                     type="text"
