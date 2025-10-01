@@ -154,9 +154,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create billing portal session
       let portalSession;
       try {
+        // Use REPLIT_DOMAINS for the return URL (not REPL_HOME which is a file path)
+        const appUrl = process.env.REPLIT_DOMAINS 
+          ? `https://${process.env.REPLIT_DOMAINS}` 
+          : 'http://localhost:5000';
+        
         portalSession = await stripe.billingPortal.sessions.create({
           customer: customerId,
-          return_url: `${process.env.REPL_HOME || 'http://localhost:5000'}/subscription`,
+          return_url: `${appUrl}/subscription`,
         });
       } catch (error: any) {
         // If customer doesn't exist in Stripe, create a new one
@@ -177,9 +182,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('[Stripe] Created new customer:', customerId);
           
           // Retry creating portal session with new customer
+          const appUrl = process.env.REPLIT_DOMAINS 
+            ? `https://${process.env.REPLIT_DOMAINS}` 
+            : 'http://localhost:5000';
+          
           portalSession = await stripe.billingPortal.sessions.create({
             customer: customerId,
-            return_url: `${process.env.REPL_HOME || 'http://localhost:5000'}/subscription`,
+            return_url: `${appUrl}/subscription`,
           });
         } else {
           throw error;
