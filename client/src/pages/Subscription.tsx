@@ -85,12 +85,24 @@ export default function Subscription() {
   useEffect(() => {
     // Only fetch payment intent if user wants to upgrade
     if (showPaymentForm && !clientSecret) {
+      console.log('[Subscription Frontend] Calling /api/get-or-create-subscription');
       apiRequest("POST", "/api/get-or-create-subscription")
-        .then((res) => res.json())
+        .then((res) => {
+          console.log('[Subscription Frontend] Response status:', res.status);
+          if (!res.ok) {
+            return res.text().then(text => {
+              console.error('[Subscription Frontend] Error response:', text);
+              throw new Error(`Server error: ${res.status}`);
+            });
+          }
+          return res.json();
+        })
         .then((data) => {
+          console.log('[Subscription Frontend] Got clientSecret:', !!data.clientSecret);
           setClientSecret(data.clientSecret);
         })
         .catch((error) => {
+          console.error('[Subscription Frontend] Error:', error);
           toast({
             title: "Error",
             description: "Failed to initialize payment. Please try again.",
