@@ -98,7 +98,10 @@ const SubscribeForm = ({ onSuccess, tierName, mode = 'payment' }: { onSuccess: (
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement />
+      <PaymentElement options={{ 
+        layout: 'tabs',
+        paymentMethodOrder: ['card']
+      }} />
       <button
         type="submit"
         disabled={!stripe || isLoading}
