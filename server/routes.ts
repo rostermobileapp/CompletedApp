@@ -172,15 +172,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
       });
 
+      // Create a product for Player Pro
+      const product = await stripe.products.create({
+        name: 'Player Pro',
+        description: 'Enhanced features for serious players',
+      });
+
       // Create subscription with Player Pro tier ($8/month)
       const subscription = await stripe.subscriptions.create({
         customer: customer.id,
         items: [{
           price_data: {
             currency: 'usd',
-            product: {
-              name: 'Player Pro',
-            },
+            product: product.id,
             recurring: {
               interval: 'month',
             },
