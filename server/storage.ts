@@ -315,8 +315,8 @@ export interface IStorage {
   getPlayerStats(leagueId: string, seasonId?: string): Promise<(PlayerStats & { user: User })[]>;
   getPlayerStatsByUser(userId: string, leagueId: string, seasonId?: string): Promise<PlayerStats | undefined>;
   createPlayerStats(stats: InsertPlayerStats): Promise<PlayerStats>;
-  updatePlayerStats(userId: string, leagueId: string, seasonId?: string, updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>>): Promise<PlayerStats>;
-  bulkUpdatePlayerStats(leagueId: string, seasonId?: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[], mode?: 'increment' | 'set'): Promise<void>;
+  updatePlayerStats(userId: string, leagueId: string, updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>>, seasonId?: string): Promise<PlayerStats>;
+  bulkUpdatePlayerStats(leagueId: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[], mode?: 'increment' | 'set', seasonId?: string): Promise<void>;
   
   // Player merge operations
   mergeUsersInLeague(leagueId: string, fromUserId: string, toUserId: string, preserveName?: boolean): Promise<LeagueMembership>;
@@ -1746,7 +1746,8 @@ export class DatabaseStorage implements IStorage {
       },
       // Mark as scrimmage for frontend identification
       isScrimmage: true,
-      scrimmageTitle: scrimmage.title
+      scrimmageTitle: scrimmage.title,
+      resultType: null
     }));
 
     // Combine regular games and scrimmages, then sort by scheduled time
@@ -1970,6 +1971,7 @@ export class DatabaseStorage implements IStorage {
       homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at as Date | null,
       awayBeverageDutyUserId: row.away_beverage_duty_user_id as string | null,
       awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at as Date | null,
+      resultType: row.result_type as "regulation" | "overtime" | "shootout" | null,
       createdAt: row.created_at as Date,
       homeTeam: {
         id: row.home_team_id as string,
@@ -2133,6 +2135,7 @@ export class DatabaseStorage implements IStorage {
       homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at as Date | null,
       awayBeverageDutyUserId: row.away_beverage_duty_user_id as string | null,
       awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at as Date | null,
+      resultType: row.result_type as "regulation" | "overtime" | "shootout" | null,
       createdAt: row.created_at as Date,
       homeTeam: {
         id: row.home_team_id as string,
@@ -2206,6 +2209,7 @@ export class DatabaseStorage implements IStorage {
       homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at as Date | null,
       awayBeverageDutyUserId: row.away_beverage_duty_user_id as string | null,
       awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at as Date | null,
+      resultType: row.result_type as "regulation" | "overtime" | "shootout" | null,
       createdAt: row.created_at as Date,
       homeTeam: {
         id: row.home_team_id as string,
@@ -2247,34 +2251,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTeamMessages(teamId: string): Promise<(Message & { sender: User })[]> {
-    const result = await db
-      .select()
-      .from(messages)
-      .innerJoin(users, eq(messages.senderId, users.id))
-      .where(eq(messages.teamId, teamId))
-      .orderBy(desc(messages.createdAt));
-
-    return result.map(r => ({ ...r.messages, sender: r.users }));
+    // Legacy method - messaging now uses conversations system
+    return [];
   }
 
   async getDirectMessages(userId1: string, userId2: string): Promise<(Message & { sender: User })[]> {
-    const result = await db
-      .select()
-      .from(messages)
-      .innerJoin(users, eq(messages.senderId, users.id))
-      .where(
-        and(
-          or(
-            and(eq(messages.senderId, userId1), eq(messages.recipientId, userId2)),
-            and(eq(messages.senderId, userId2), eq(messages.recipientId, userId1))
-          ),
-          sql`${messages.teamId} IS NULL`,
-          sql`${messages.leagueId} IS NULL`
-        )
-      )
-      .orderBy(desc(messages.createdAt));
-
-    return result.map(r => ({ ...r.messages, sender: r.users }));
+    // Legacy method - messaging now uses conversations system
+    return [];
   }
 
   // Bulk import operations
@@ -2666,7 +2649,7 @@ export class DatabaseStorage implements IStorage {
       ...notAttending.map(n => n.user.id),
       ...noResponse.map(n => n.id)
     ];
-    const uniqueUserIds = [...new Set(allUserIds)];
+    const uniqueUserIds = Array.from(new Set(allUserIds));
     const skillMap = await this.fetchUserSkills(uniqueUserIds, game.leagueId);
 
     // Attach skill levels to user objects
@@ -2748,7 +2731,7 @@ export class DatabaseStorage implements IStorage {
       ...notAttending.map(n => n.user.id),
       ...noResponse.map(n => n.id)
     ];
-    const uniqueUserIds = [...new Set(allUserIds)];
+    const uniqueUserIds = Array.from(new Set(allUserIds));
     const skillMap = await this.fetchUserSkills(uniqueUserIds, game.leagueId);
 
     // Attach skill levels to user objects
@@ -4171,6 +4154,9 @@ export class DatabaseStorage implements IStorage {
         isPrimaryCommissioner: r.userIsPrimaryCommissioner,
         createdBy: r.userCreatedBy,
         lastUpdated: r.userLastUpdated,
+        dateOfBirth: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
       }
     }));
   }
@@ -4205,7 +4191,7 @@ export class DatabaseStorage implements IStorage {
     return newStats;
   }
 
-  async updatePlayerStats(userId: string, leagueId: string, seasonId?: string, updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>>): Promise<PlayerStats> {
+  async updatePlayerStats(userId: string, leagueId: string, updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>>, seasonId?: string): Promise<PlayerStats> {
     let conditions = [
       eq(playerStats.userId, userId),
       eq(playerStats.leagueId, leagueId)
@@ -4249,7 +4235,7 @@ export class DatabaseStorage implements IStorage {
     return updatedStats;
   }
 
-  async bulkUpdatePlayerStats(leagueId: string, seasonId?: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[], mode: 'increment' | 'set' = 'set'): Promise<void> {
+  async bulkUpdatePlayerStats(leagueId: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[], mode: 'increment' | 'set' = 'set', seasonId?: string): Promise<void> {
     await db.transaction(async (tx) => {
       for (const { userId, updates } of statsUpdates) {
         let conditions = [
@@ -4411,6 +4397,9 @@ export class DatabaseStorage implements IStorage {
             isPrimaryCommissioner: gameStat.userIsPrimaryCommissioner,
             createdBy: gameStat.userCreatedBy,
             lastUpdated: gameStat.userLastUpdated,
+            dateOfBirth: null,
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
           }
         });
       }
@@ -4591,9 +4580,9 @@ export class DatabaseStorage implements IStorage {
         rsvpConflicts.get(key)!.push(rsvp);
       });
 
-      for (const [, rsvpsForGame] of rsvpConflicts) {
-        const fromRsvp = rsvpsForGame.find(r => r.game_rsvps.userId === fromUserId);
-        const toRsvp = rsvpsForGame.find(r => r.game_rsvps.userId === toUserId);
+      for (const [, rsvpsForGame] of Array.from(rsvpConflicts)) {
+        const fromRsvp = rsvpsForGame.find((r: any) => r.game_rsvps.userId === fromUserId);
+        const toRsvp = rsvpsForGame.find((r: any) => r.game_rsvps.userId === toUserId);
         
         if (fromRsvp && toRsvp) {
           // Conflict: prefer non-default status or more recent timestamp
@@ -4676,22 +4665,7 @@ export class DatabaseStorage implements IStorage {
           )`
         ));
 
-      // Update messages (league scoped)
-      await tx
-        .update(messages)
-        .set({ senderId: toUserId })
-        .where(and(
-          eq(messages.senderId, fromUserId),
-          eq(messages.leagueId, leagueId)
-        ));
-
-      await tx
-        .update(messages)
-        .set({ recipientId: toUserId })
-        .where(and(
-          eq(messages.recipientId, fromUserId),
-          eq(messages.leagueId, leagueId)
-        ));
+      // Legacy message updates removed - messaging now uses conversations system
 
       // Update announcements
       await tx

@@ -118,7 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
   }
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2024-11-20.acacia",
+    apiVersion: "2025-09-30.clover",
   });
 
   // Create checkout session for new subscriptions
@@ -2645,7 +2645,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = await storage.sendMessage({
         ...messageData,
         senderId: req.user.claims.sub,
-        teamId: req.params.id,
       });
       res.json(message);
     } catch (error) {
@@ -2802,7 +2801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Auto-create missing teams if they were referenced in the import
       const createdTeams = new Map<string, string>(); // teamName -> teamId
-      for (const teamName of teamsToCreate) {
+      for (const teamName of Array.from(teamsToCreate)) {
         try {
           const newTeam = await storage.createTeam({
             name: teamName,
@@ -3138,7 +3137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create missing teams
       const createdTeams = new Map<string, string>();
-      for (const teamName of teamsToCreate) {
+      for (const teamName of Array.from(teamsToCreate)) {
         try {
           const newTeam = await storage.createTeam({
             name: teamName,
@@ -3449,7 +3448,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const newTeam = await storage.createTeam({
             name: player.teamName,
             leagueId: leagueId,
-            createdBy: userId
           });
           team = [newTeam];
         }
@@ -3464,7 +3462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.update(importedPlayers)
         .set({ 
           mergedWithUserId: (await db.select().from(leagueMemberships).where(eq(leagueMemberships.id, membershipId)).limit(1))[0].userId,
-          updatedAt: new Date()
+          mergedAt: new Date()
         })
         .where(eq(importedPlayers.id, importedPlayerId));
 
@@ -3683,7 +3681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Create visibility records for targeted users + author
-        const visibilityUserIds = [...new Set([...validUserIds, userId])]; // Include author and remove duplicates
+        const visibilityUserIds = Array.from(new Set([...validUserIds, userId])); // Include author and remove duplicates
         console.log(`🔒 Creating visibility records for ${visibilityUserIds.length} users (including author)`);
         await storage.createAnnouncementVisibility(announcement.id, visibilityUserIds);
         
@@ -3714,7 +3712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             announcementId: announcement.id,
             type: attachment.type,
             url: attachment.url,
-            fileName: attachment.fileName,
+            filename: attachment.fileName,
           });
         }
       }
@@ -4871,8 +4869,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedStats = await storage.updatePlayerStats(
         playerId, 
         leagueId, 
-        seasonId, 
-        validatedData
+        validatedData,
+        seasonId
       );
       
       res.json(updatedStats);
@@ -4940,7 +4938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates: update.stats
       }));
       
-      await storage.bulkUpdatePlayerStats(leagueId, seasonId, statsUpdates, validatedData.mode);
+      await storage.bulkUpdatePlayerStats(leagueId, statsUpdates, validatedData.mode, seasonId);
       
       res.json({ message: 'Player stats updated successfully', updatedCount: statsUpdates.length });
     } catch (error) {
@@ -5902,7 +5900,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (specialPermissions !== undefined) permissionData.specialPermissions = specialPermissions;
       if (isPrimaryCommissioner !== undefined) permissionData.isPrimaryCommissioner = isPrimaryCommissioner;
       
-      const updatedUser = await storage.updateUserPermissions(targetUserId, permissionData, updatedById);
+      const updatedUser = await storage.updateUserPermissions(targetUserId, permissionData);
       res.json(updatedUser);
     } catch (error) {
       console.error('Error updating user permissions:', error);
@@ -6149,9 +6147,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               for (const attachment of attachments) {
                 await messagingService.createMessageAttachment({
                   messageId: message.id,
-                  fileName: attachment.fileName,
-                  fileUrl: attachment.fileUrl,
-                  fileType: attachment.fileType,
+                  type: attachment.fileType,
+                  url: attachment.fileUrl,
+                  filename: attachment.fileName,
                   fileSize: attachment.fileSize
                 });
               }
@@ -6262,7 +6260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       lastSeen: new Date().toISOString()
     };
 
-    for (const [contactId, connection] of activeConnections) {
+    for (const [contactId, connection] of Array.from(activeConnections)) {
       if (contactId !== userId && connection.readyState === WebSocket.OPEN) {
         connection.send(JSON.stringify(statusMessage));
       }
