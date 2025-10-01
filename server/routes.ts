@@ -118,7 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
   }
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2025-09-30.clover",
+    apiVersion: "2025-09-30.clover" as any,
   });
 
   // Validate promotion code
@@ -130,32 +130,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Promo code is required" });
       }
 
-      // Search for promotion code in Stripe
+      const searchCode = code.trim().toUpperCase();
+      console.log('[PromoCode] Searching for code:', searchCode);
+
+      // Search for promotion code with expanded coupon (no filtering to avoid API issues)
       const promoCodes = await stripe.promotionCodes.list({
-        code: code.trim(),
-        active: true,
-        limit: 1,
+        expand: ['data.coupon'],
       });
 
-      if (promoCodes.data.length === 0) {
+      // Filter client-side for case-insensitive match and active status
+      const matchingPromo = promoCodes.data.find(
+        promo => promo.code.toUpperCase() === searchCode && promo.active === true
+      );
+
+      if (!matchingPromo) {
+        console.log('[PromoCode] No active promo code found for:', searchCode);
         return res.status(404).json({ message: "Invalid promo code" });
       }
 
-      const promoCode = promoCodes.data[0];
-      
-      // The coupon ID can be in different places depending on API version
-      const couponId = (promoCode as any).promotion?.coupon || (promoCode as any).coupon;
+      console.log('[PromoCode] Found promo code:', matchingPromo.id);
 
-      if (!couponId) {
-        return res.status(400).json({ message: "Invalid promo code structure" });
+      // Extract coupon - it's already expanded, but might be string or object
+      const promoCoupon = (matchingPromo as any).coupon;
+      let coupon;
+      if (typeof promoCoupon === 'string') {
+        coupon = await stripe.coupons.retrieve(promoCoupon);
+      } else {
+        coupon = promoCoupon;
       }
 
-      // Retrieve the full coupon details
-      const coupon = await stripe.coupons.retrieve(couponId);
-
+      // Prevent caching
+      res.set('Cache-Control', 'no-store');
+      
       res.json({
-        id: promoCode.id,
-        code: promoCode.code,
+        id: matchingPromo.id,
+        code: matchingPromo.code,
         coupon: {
           id: coupon.id,
           percent_off: coupon.percent_off,
