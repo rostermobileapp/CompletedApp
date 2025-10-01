@@ -123,12 +123,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/get-or-create-subscription', isAuthenticated, async (req: any, res) => {
     try {
+      console.log('[Subscription] Creating subscription for user');
       const userId = req.user.claims.sub;
+      console.log('[Subscription] User ID:', userId);
       const user = await storage.getUser(userId);
 
       if (!user) {
+        console.log('[Subscription] User not found');
         return res.status(404).json({ message: "User not found" });
       }
+      console.log('[Subscription] User found:', user.email);
 
       // If user already has a subscription, retrieve it
       if (user.stripeSubscriptionId) {
@@ -210,7 +214,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientSecret,
       });
     } catch (error: any) {
-      console.error("Error creating subscription:", error);
+      console.error('[Subscription] Error creating subscription:', error);
+      console.error('[Subscription] Error stack:', error.stack);
       res.status(500).json({ message: "Failed to create subscription", error: error.message });
     }
   });
