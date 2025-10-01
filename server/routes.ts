@@ -193,55 +193,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: config.description,
       });
 
-      // Create subscription
+      // Create a price
+      const price = await stripe.prices.create({
+        product: product.id,
+        currency: 'usd',
+        recurring: {
+          interval: 'month',
+        },
+        unit_amount: config.amount,
+      });
+
+      // Create subscription with the price
       const subscription = await stripe.subscriptions.create({
         customer: customer.id,
-        items: [{
-          price_data: {
-            currency: 'usd',
-            product: product.id,
-            recurring: {
-              interval: 'month',
-            },
-            unit_amount: config.amount,
-          },
-        }],
+        items: [{ price: price.id }],
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
         expand: ['latest_invoice.payment_intent'],
       });
 
-      // Extract client secret FIRST before updating user
-      console.log('[Subscription] Extracting client secret from subscription');
-      console.log('[Subscription] Latest invoice type:', typeof subscription.latest_invoice);
-      console.log('[Subscription] Latest invoice:', subscription.latest_invoice);
+      console.log('[Subscription] Subscription created:', subscription.id);
+      console.log('[Subscription] Subscription status:', subscription.status);
       
+      // Extract client secret from the payment intent
       const latestInvoice = subscription.latest_invoice;
       let clientSecret: string | null = null;
       
       if (typeof latestInvoice === 'object' && latestInvoice?.payment_intent) {
         const paymentIntent = latestInvoice.payment_intent;
-        console.log('[Subscription] Payment intent type:', typeof paymentIntent);
-        console.log('[Subscription] Payment intent:', paymentIntent);
-        if (typeof paymentIntent === 'object') {
-          clientSecret = paymentIntent.client_secret || null;
-          console.log('[Subscription] Client secret extracted:', !!clientSecret);
+        if (typeof paymentIntent === 'object' && paymentIntent.client_secret) {
+          clientSecret = paymentIntent.client_secret;
+          console.log('[Subscription] Client secret found in payment intent');
         }
       }
 
+      // If no client secret from subscription, create a standalone PaymentIntent
       if (!clientSecret) {
-        console.error('[Subscription] WARNING: No client secret found in subscription!');
+        console.log('[Subscription] No payment intent from subscription, creating standalone PaymentIntent');
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: config.amount,
+          currency: 'usd',
+          customer: customer.id,
+          description: `Subscription to ${config.name}`,
+          metadata: {
+            subscriptionId: subscription.id,
+            tier: tier,
+          },
+          automatic_payment_methods: {
+            enabled: true,
+          },
+        });
+        
+        clientSecret = paymentIntent.client_secret;
+        console.log('[Subscription] Standalone PaymentIntent created');
+      }
+
+      if (!clientSecret) {
+        console.error('[Subscription] ERROR: Failed to create payment intent');
+        // Clean up the subscription since we can't get payment
+        await stripe.subscriptions.cancel(subscription.id);
         return res.status(500).json({ 
           message: "Failed to create payment intent",
-          error: "Client secret not found in subscription response"
+          error: "Could not generate client secret"
         });
       }
 
-      // Update user with Stripe info
+      // Update user with Stripe info (but don't update role until payment succeeds)
       await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
-      
-      // Update user role
-      await storage.updateUserRole(userId, config.role as any);
 
       console.log('[Subscription] Successfully created subscription with client secret');
       res.json({
