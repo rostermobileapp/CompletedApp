@@ -1654,7 +1654,6 @@ export const updateLineCombinationRequestSchema = createInsertSchema(lineCombina
 // Feedback schemas
 export const insertFeedbackSubmissionSchema = createInsertSchema(feedbackSubmissions).omit({
   id: true,
-  userId: true, // Server-controlled
   createdAt: true,
 });
 
