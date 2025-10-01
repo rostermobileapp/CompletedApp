@@ -26,7 +26,7 @@ if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
 }
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
-const SubscribeForm = ({ onSuccess, tierName }: { onSuccess: () => void, tierName: string }) => {
+const SubscribeForm = ({ onSuccess, tierName, mode = 'payment' }: { onSuccess: () => void, tierName: string, mode?: 'payment' | 'setup' }) => {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
@@ -41,29 +41,60 @@ const SubscribeForm = ({ onSuccess, tierName }: { onSuccess: () => void, tierNam
       return;
     }
 
-    const { error } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: window.location.origin + '/subscription',
-      },
-    });
-
-    setIsLoading(false);
-
-    if (error) {
-      toast({
-        title: "Payment Failed",
-        description: error.message,
-        variant: "destructive",
+    if (mode === 'setup') {
+      // Setup mode: collect card without charging (for 100% off promo codes)
+      const { error } = await stripe.confirmSetup({
+        elements,
+        confirmParams: {
+          return_url: window.location.origin + '/subscription',
+        },
       });
+
+      setIsLoading(false);
+
+      if (error) {
+        toast({
+          title: "Card Setup Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Card Saved Successfully",
+          description: `Your subscription to ${tierName} is now active!`,
+        });
+        onSuccess();
+      }
     } else {
-      toast({
-        title: "Payment Successful",
-        description: `You are now subscribed to ${tierName}!`,
+      // Payment mode: charge the card
+      const { error } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.origin + '/subscription',
+        },
       });
-      onSuccess();
+
+      setIsLoading(false);
+
+      if (error) {
+        toast({
+          title: "Payment Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Payment Successful",
+          description: `You are now subscribed to ${tierName}!`,
+        });
+        onSuccess();
+      }
     }
   };
+
+  const buttonText = mode === 'setup' 
+    ? (isLoading ? 'Saving Card...' : 'Add Card to Start Free Period')
+    : (isLoading ? 'Processing...' : `Subscribe to ${tierName}`);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -74,7 +105,7 @@ const SubscribeForm = ({ onSuccess, tierName }: { onSuccess: () => void, tierNam
         className="w-full bg-primary text-primary-foreground rounded-lg py-3 font-semibold disabled:opacity-50"
         data-testid="button-subscribe"
       >
-        {isLoading ? 'Processing...' : `Subscribe to ${tierName}`}
+        {buttonText}
       </button>
     </form>
   );
@@ -98,6 +129,7 @@ export default function Subscription() {
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<any>(null);
   const [refreshingPayment, setRefreshingPayment] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<'payment' | 'setup'>('payment');
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
@@ -135,18 +167,8 @@ export default function Subscription() {
       }
       const subData = await subResponse.json();
       
-      // Check if promo code means no payment is needed
-      if (subData.noPaymentNeeded) {
-        toast({
-          title: "Upgrade Successful!",
-          description: "Your subscription has been activated with the promo code.",
-        });
-        // Reload to update user role
-        window.location.reload();
-        return;
-      }
-      
       setClientSecret(subData.clientSecret);
+      setPaymentMode(subData.mode || 'payment');
       
       toast({
         title: "Promo Code Applied!",
@@ -183,6 +205,7 @@ export default function Subscription() {
       }
       const data = await response.json();
       setClientSecret(data.clientSecret);
+      setPaymentMode(data.mode || 'payment');
     } catch (error) {
       console.error("Error removing promo code:", error);
     } finally {
@@ -206,6 +229,7 @@ export default function Subscription() {
         })
         .then((data) => {
           setClientSecret(data.clientSecret);
+          setPaymentMode(data.mode || 'payment');
         })
         .catch((error) => {
           toast({
@@ -481,7 +505,7 @@ export default function Subscription() {
                 </div>
               )}
               <Elements stripe={stripePromise} options={{ clientSecret }}>
-                <SubscribeForm onSuccess={handleUpgradeSuccess} tierName={tierInfo.name} />
+                <SubscribeForm onSuccess={handleUpgradeSuccess} tierName={tierInfo.name} mode={paymentMode} />
               </Elements>
             </div>
           </div>

@@ -280,7 +280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items: [{ price: price.id }],
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
-        expand: ['latest_invoice.payment_intent'],
+        expand: ['latest_invoice.payment_intent', 'pending_setup_intent', 'latest_invoice'],
       };
 
       // Apply promotion code if provided
@@ -294,91 +294,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[Subscription] Subscription created:', subscription.id);
       console.log('[Subscription] Subscription status:', subscription.status);
       
-      // Extract client secret from the payment intent
+      // Extract client secret from payment intent or setup intent
       const latestInvoice = subscription.latest_invoice;
       let clientSecret: string | null = null;
+      let mode: 'payment' | 'setup' = 'payment';
       
+      // Check for payment intent first (when there's a charge)
       if (typeof latestInvoice === 'object' && latestInvoice?.payment_intent) {
         const paymentIntent = latestInvoice.payment_intent;
         if (typeof paymentIntent === 'object' && paymentIntent.client_secret) {
           clientSecret = paymentIntent.client_secret;
+          mode = 'payment';
           console.log('[Subscription] Client secret found in payment intent');
         }
       }
-
-      // If no client secret from subscription
-      if (!clientSecret) {
-        // If promo code is applied and subscription is active, no payment is needed
-        if (promoCodeId && subscription.status === 'active') {
-          console.log('[Subscription] Promo code applied - subscription is active with no payment needed');
-          // Return a special flag indicating no payment is needed
-          await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
-          // Update user role immediately since no payment is needed
-          await storage.updateUserRole(userId, config.role);
-          
-          return res.json({
-            subscriptionId: subscription.id,
-            clientSecret: null,
-            noPaymentNeeded: true,
-          });
+      
+      // If no payment intent, check for setup intent (when amount is $0 due to promo)
+      if (!clientSecret && (subscription as any).pending_setup_intent) {
+        const setupIntent = (subscription as any).pending_setup_intent;
+        if (typeof setupIntent === 'object' && setupIntent.client_secret) {
+          clientSecret = setupIntent.client_secret;
+          mode = 'setup';
+          console.log('[Subscription] Client secret found in setup intent (card collection only)');
         }
-        
-        console.log('[Subscription] No payment intent from subscription, creating standalone PaymentIntent');
-        
-        // Calculate discounted amount if promo code is applied
-        let paymentAmount = config.amount;
-        if (promoCodeId) {
-          try {
-            const promoCode = await stripe.promotionCodes.retrieve(promoCodeId);
-            const couponId = (promoCode as any).promotion?.coupon || (promoCode as any).coupon;
-            if (couponId) {
-              const coupon = await stripe.coupons.retrieve(couponId);
-              if (coupon.percent_off) {
-                paymentAmount = Math.round(config.amount * (1 - coupon.percent_off / 100));
-              } else if (coupon.amount_off) {
-                paymentAmount = Math.max(0, config.amount - coupon.amount_off);
-              }
-              console.log('[Subscription] Discounted amount:', paymentAmount);
-            }
-          } catch (error) {
-            console.error('[Subscription] Error calculating discount:', error);
-          }
-        }
-        
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: paymentAmount,
-          currency: 'usd',
-          customer: customer.id,
-          description: `Subscription to ${config.name}`,
-          metadata: {
-            subscriptionId: subscription.id,
-            tier: tier,
-            promoCodeId: promoCodeId || '',
-          },
-          payment_method_types: ['card'],
-        });
-        
-        clientSecret = paymentIntent.client_secret;
-        console.log('[Subscription] Standalone PaymentIntent created with amount:', paymentAmount);
       }
 
       if (!clientSecret) {
-        console.error('[Subscription] ERROR: Failed to create payment intent');
-        // Clean up the subscription since we can't get payment
+        console.error('[Subscription] ERROR: No client secret found in payment or setup intent');
         await stripe.subscriptions.cancel(subscription.id);
         return res.status(500).json({ 
-          message: "Failed to create payment intent",
+          message: "Failed to create payment or setup intent",
           error: "Could not generate client secret"
         });
       }
 
-      // Update user with Stripe info (but don't update role until payment succeeds)
+      // Update user with Stripe info (but don't update role until payment/setup succeeds)
       await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
 
-      console.log('[Subscription] Successfully created subscription with client secret');
+      console.log(`[Subscription] Successfully created subscription with ${mode} intent`);
       res.json({
         subscriptionId: subscription.id,
         clientSecret,
+        mode,
       });
     } catch (error: any) {
       console.error('[Subscription] Error creating subscription:', error);
