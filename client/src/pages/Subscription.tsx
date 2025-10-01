@@ -6,8 +6,18 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, Check, Star } from 'lucide-react';
+import { ArrowLeft, Crown, Check, Star, AlertTriangle } from 'lucide-react';
 import { useLocation } from 'wouter';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Make sure to call `loadStripe` outside of a component's render to avoid
 // recreating the `Stripe` object on every render.
@@ -78,6 +88,9 @@ export default function Subscription() {
   const [clientSecret, setClientSecret] = useState("");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedTier, setSelectedTier] = useState<'player_pro' | 'commissioner'>('player_pro');
+  const [showDowngradeDialog, setShowDowngradeDialog] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [pendingTier, setPendingTier] = useState<'player_pro' | 'commissioner'>('player_pro');
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
@@ -121,7 +134,8 @@ export default function Subscription() {
     window.location.reload();
   };
 
-  const handleDowngrade = async () => {
+  const confirmDowngrade = async () => {
+    setShowDowngradeDialog(false);
     try {
       const response = await apiRequest("POST", "/api/cancel-subscription");
       if (!response.ok) {
@@ -139,6 +153,12 @@ export default function Subscription() {
         variant: "destructive",
       });
     }
+  };
+
+  const confirmUpgrade = () => {
+    setShowUpgradeDialog(false);
+    setSelectedTier(pendingTier);
+    setShowPaymentForm(true);
   };
 
   const subscriptionPlans = [
@@ -339,16 +359,16 @@ export default function Subscription() {
                   if (plan.current) return; // Already on this plan
                   
                   if (plan.tier === 'free_tier') {
-                    // Downgrade to free
-                    handleDowngrade();
+                    // Show downgrade confirmation dialog
+                    setShowDowngradeDialog(true);
                   } else if (plan.tier === 'player_pro') {
-                    // Upgrade to Player Pro
-                    setSelectedTier('player_pro');
-                    setShowPaymentForm(true);
+                    // Show upgrade confirmation dialog for Player Pro
+                    setPendingTier('player_pro');
+                    setShowUpgradeDialog(true);
                   } else if (plan.tier === 'commissioner') {
-                    // Upgrade to Commissioner
-                    setSelectedTier('commissioner');
-                    setShowPaymentForm(true);
+                    // Show upgrade confirmation dialog for Commissioner
+                    setPendingTier('commissioner');
+                    setShowUpgradeDialog(true);
                   }
                 }}
                 disabled={plan.buttonDisabled}
@@ -374,6 +394,107 @@ export default function Subscription() {
           </p>
         </div>
       </div>
+
+      {/* Downgrade Confirmation Dialog */}
+      <AlertDialog open={showDowngradeDialog} onOpenChange={setShowDowngradeDialog}>
+        <AlertDialogContent data-testid="dialog-downgrade-confirm">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <AlertTriangle className="w-6 h-6 text-warning" />
+              <AlertDialogTitle>Downgrade to Free Tier?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              You are about to cancel your subscription and downgrade to the Free tier. 
+              You will lose access to:
+              <ul className="mt-3 space-y-1 ml-4 list-disc">
+                <li>Team Management</li>
+                <li>In-App Messaging</li>
+                <li>In-App Payments</li>
+                <li>League Stats & Standings</li>
+                <li>League Announcements</li>
+                {isCommissioner && (
+                  <>
+                    <li>League Scheduling</li>
+                    <li>Scorekeeping</li>
+                    <li>Player Management</li>
+                  </>
+                )}
+              </ul>
+              <p className="mt-3 font-semibold">
+                Your subscription will be cancelled immediately.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-downgrade">Keep My Subscription</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDowngrade}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-downgrade"
+            >
+              Downgrade to Free
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Upgrade Confirmation Dialog */}
+      <AlertDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <AlertDialogContent data-testid="dialog-upgrade-confirm">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <Crown className="w-6 h-6 text-primary" />
+              <AlertDialogTitle>
+                Upgrade to {pendingTier === 'commissioner' ? 'Commissioner' : 'Player Pro'}?
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              {pendingTier === 'commissioner' ? (
+                <>
+                  <p className="mb-3">You'll get full league management capabilities including:</p>
+                  <ul className="space-y-1 ml-4 list-disc">
+                    <li>All Player Pro features</li>
+                    <li>League Scheduling</li>
+                    <li>Scorekeeping</li>
+                    <li>Player Management</li>
+                    <li>League Wide Posts</li>
+                  </ul>
+                  <p className="mt-3 font-semibold">
+                    Price: $12/month - Cancel anytime
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mb-3">You'll get enhanced features for serious players including:</p>
+                  <ul className="space-y-1 ml-4 list-disc">
+                    <li>Team Management</li>
+                    <li>In-App Messaging</li>
+                    <li>In-App Payments</li>
+                    <li>Team Scheduling</li>
+                    <li>League Stats & Standings</li>
+                    <li>League Announcements</li>
+                  </ul>
+                  <p className="mt-3 font-semibold">
+                    Price: $8/month - Cancel anytime
+                  </p>
+                </>
+              )}
+              <p className="mt-3 text-sm">
+                You'll be redirected to enter your payment information on the next screen.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-upgrade">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmUpgrade}
+              data-testid="button-confirm-upgrade"
+            >
+              Continue to Payment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
