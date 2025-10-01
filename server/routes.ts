@@ -133,7 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let customerId = user.stripeCustomerId;
 
-      // Create Stripe customer if they don't have one
+      // Create Stripe customer if they don't have one or if the saved one doesn't exist
       if (!customerId) {
         console.log('[Stripe] Creating new customer for user:', userId);
         const customer = await stripe.customers.create({
@@ -152,10 +152,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create billing portal session
-      const portalSession = await stripe.billingPortal.sessions.create({
-        customer: customerId,
-        return_url: `${process.env.REPL_HOME || 'http://localhost:5000'}/subscription`,
-      });
+      let portalSession;
+      try {
+        portalSession = await stripe.billingPortal.sessions.create({
+          customer: customerId,
+          return_url: `${process.env.REPL_HOME || 'http://localhost:5000'}/subscription`,
+        });
+      } catch (error: any) {
+        // If customer doesn't exist in Stripe, create a new one
+        if (error.code === 'resource_missing') {
+          console.log('[Stripe] Saved customer ID not found in Stripe, creating new customer for user:', userId);
+          const customer = await stripe.customers.create({
+            email: user.email || undefined,
+            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+            metadata: {
+              userId: userId,
+            },
+          });
+          
+          customerId = customer.id;
+          
+          // Update database with new customer ID
+          await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
+          console.log('[Stripe] Created new customer:', customerId);
+          
+          // Retry creating portal session with new customer
+          portalSession = await stripe.billingPortal.sessions.create({
+            customer: customerId,
+            return_url: `${process.env.REPL_HOME || 'http://localhost:5000'}/subscription`,
+          });
+        } else {
+          throw error;
+        }
+      }
 
       res.json({ url: portalSession.url });
     } catch (error: any) {
