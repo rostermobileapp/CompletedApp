@@ -91,35 +91,82 @@ export default function Subscription() {
   const [showDowngradeDialog, setShowDowngradeDialog] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [pendingTier, setPendingTier] = useState<'player_pro' | 'commissioner'>('player_pro');
+  
+  // Promo code state
+  const [promoCode, setPromoCode] = useState("");
+  const [promoCodeId, setPromoCodeId] = useState<string | null>(null);
+  const [validatingPromo, setValidatingPromo] = useState(false);
+  const [promoDiscount, setPromoDiscount] = useState<any>(null);
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
   const isFree = role === 'free_tier';
 
+  const validatePromoCode = async () => {
+    if (!promoCode.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a promo code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setValidatingPromo(true);
+    try {
+      const response = await apiRequest("POST", "/api/validate-promo-code", { code: promoCode });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || "Invalid promo code");
+      }
+      const data = await response.json();
+      setPromoCodeId(data.id);
+      setPromoDiscount(data.coupon);
+      toast({
+        title: "Promo Code Applied!",
+        description: data.coupon.percent_off 
+          ? `${data.coupon.percent_off}% discount applied`
+          : `$${(data.coupon.amount_off / 100).toFixed(2)} discount applied`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Invalid Promo Code",
+        description: error.message,
+        variant: "destructive",
+      });
+      setPromoCodeId(null);
+      setPromoDiscount(null);
+    } finally {
+      setValidatingPromo(false);
+    }
+  };
+
+  const removePromoCode = () => {
+    setPromoCode("");
+    setPromoCodeId(null);
+    setPromoDiscount(null);
+  };
+
   useEffect(() => {
-    console.log('[useEffect] Triggered - showPaymentForm:', showPaymentForm, 'clientSecret:', !!clientSecret, 'selectedTier:', selectedTier);
     // Only fetch payment intent if user wants to upgrade
     if (showPaymentForm && !clientSecret) {
-      console.log('[Subscription Frontend] Calling /api/get-or-create-subscription with tier:', selectedTier);
-      apiRequest("POST", "/api/get-or-create-subscription", { tier: selectedTier })
+      const requestData: any = { tier: selectedTier };
+      if (promoCodeId) {
+        requestData.promoCodeId = promoCodeId;
+      }
+      apiRequest("POST", "/api/get-or-create-subscription", requestData)
         .then((res) => {
-          console.log('[Subscription Frontend] Response status:', res.status);
           if (!res.ok) {
             return res.text().then(text => {
-              console.error('[Subscription Frontend] Error response:', text);
               throw new Error(`Server error: ${res.status}`);
             });
           }
           return res.json();
         })
         .then((data) => {
-          console.log('[Subscription Frontend] Got data:', data);
-          console.log('[Subscription Frontend] Got clientSecret:', !!data.clientSecret, 'value:', data.clientSecret);
           setClientSecret(data.clientSecret);
-          console.log('[Subscription Frontend] clientSecret state updated');
         })
         .catch((error) => {
-          console.error('[Subscription Frontend] Error:', error);
           toast({
             title: "Error",
             description: "Failed to initialize payment. Please try again.",
@@ -128,7 +175,7 @@ export default function Subscription() {
           setShowPaymentForm(false);
         });
     }
-  }, [showPaymentForm, clientSecret, toast, selectedTier]);
+  }, [showPaymentForm, clientSecret, toast, selectedTier, promoCodeId]);
 
   const handleUpgradeSuccess = () => {
     setShowPaymentForm(false);
@@ -159,11 +206,9 @@ export default function Subscription() {
   };
 
   const confirmUpgrade = () => {
-    console.log('[confirmUpgrade] Starting upgrade flow, pendingTier:', pendingTier);
     setShowUpgradeDialog(false);
     setSelectedTier(pendingTier);
     setShowPaymentForm(true);
-    console.log('[confirmUpgrade] State updates triggered');
   };
 
   const subscriptionPlans = [
@@ -226,10 +271,7 @@ export default function Subscription() {
     }
   ];
 
-  console.log('[Render] State check - showPaymentForm:', showPaymentForm, 'clientSecret:', !!clientSecret, 'clientSecret length:', clientSecret?.length);
-
   if (showPaymentForm && clientSecret) {
-    console.log('[Render] Rendering payment form for tier:', selectedTier);
     const tierInfo = selectedTier === 'commissioner' 
       ? { name: 'Commissioner', price: '$12' } 
       : { name: 'Player Pro', price: '$8' };
@@ -259,6 +301,61 @@ export default function Subscription() {
               <Crown className="w-12 h-12 text-primary mx-auto mb-3" />
               <h2 className="text-xl font-semibold mb-2">Upgrade to {tierInfo.name}</h2>
               <p className="text-muted-foreground">{tierInfo.price}/month - Cancel anytime</p>
+            </div>
+
+            {/* Promo Code Section */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Promo Code (Optional)</label>
+              {promoDiscount ? (
+                <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <div>
+                      <p className="font-medium text-green-900 dark:text-green-100">{promoCode}</p>
+                      <p className="text-sm text-green-700 dark:text-green-300">
+                        {promoDiscount.percent_off 
+                          ? `${promoDiscount.percent_off}% off` 
+                          : `$${(promoDiscount.amount_off / 100).toFixed(2)} off`}
+                        {promoDiscount.duration === 'once' && ' (first payment)'}
+                        {promoDiscount.duration === 'repeating' && ` (${promoDiscount.duration_in_months} months)`}
+                        {promoDiscount.duration === 'forever' && ' (forever)'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={removePromoCode}
+                    className="text-red-600 hover:text-red-700 text-sm font-medium"
+                    data-testid="button-remove-promo"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    placeholder="Enter code"
+                    className="flex-1 px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-promo-code"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        validatePromoCode();
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={validatePromoCode}
+                    disabled={validatingPromo || !promoCode.trim()}
+                    className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 disabled:opacity-50"
+                    data-testid="button-validate-promo"
+                  >
+                    {validatingPromo ? 'Checking...' : 'Apply'}
+                  </button>
+                </div>
+              )}
             </div>
 
             <Elements stripe={stripePromise} options={{ clientSecret }}>
