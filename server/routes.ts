@@ -6306,12 +6306,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? 'Product Improvement' 
           : 'Report an Issue';
 
-        const recipientEmail = process.env.FEEDBACK_EMAIL || fromEmail;
+        // Override from email to use verified domain
+        const verifiedFromEmail = 'contact@notifications.roster-app.com';
+        const recipientEmail = process.env.FEEDBACK_EMAIL || verifiedFromEmail;
         
-        console.log(`📧 Sending feedback email from ${fromEmail} to ${recipientEmail}`);
+        console.log(`📧 Sending feedback email from ${verifiedFromEmail} to ${recipientEmail}`);
 
         const result = await client.emails.send({
-          from: fromEmail,
+          from: verifiedFromEmail,
           to: recipientEmail,
           subject: `Rosters Feedback: ${categoryLabel}`,
           html: `
