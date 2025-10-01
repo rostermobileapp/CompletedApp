@@ -316,23 +316,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!clientSecret && typeof latestInvoice === 'object' && latestInvoice.id) {
         console.log('[Subscription] No payment intent found, creating one manually for invoice:', latestInvoice.id);
         
-        // Finalize the invoice to create a payment intent
-        const finalizedInvoice = await stripe.invoices.finalizeInvoice(latestInvoice.id, {
-          auto_advance: true,
+        // Create a PaymentIntent manually for this invoice
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: (latestInvoice as any).amount_due,
+          currency: (latestInvoice as any).currency,
+          customer: customer.id,
+          setup_future_usage: 'off_session',
+          metadata: {
+            invoice_id: latestInvoice.id,
+            subscription_id: subscription.id,
+          },
         });
         
-        // Retrieve the invoice with the payment intent expanded
-        const invoiceWithPaymentIntent = await stripe.invoices.retrieve(finalizedInvoice.id, {
-          expand: ['payment_intent'],
-        });
-        
-        if (invoiceWithPaymentIntent.payment_intent) {
-          const paymentIntent = invoiceWithPaymentIntent.payment_intent;
-          if (typeof paymentIntent === 'object' && paymentIntent.client_secret) {
-            clientSecret = paymentIntent.client_secret;
-            mode = 'payment';
-            console.log('[Subscription] Client secret created via manual invoice finalization');
-          }
+        if (paymentIntent.client_secret) {
+          clientSecret = paymentIntent.client_secret;
+          mode = 'payment';
+          console.log('[Subscription] Client secret created via manual PaymentIntent');
         }
       }
       
