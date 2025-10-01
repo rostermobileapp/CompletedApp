@@ -122,6 +122,10 @@ export default function Subscription() {
       const data = await response.json();
       setPromoCodeId(data.id);
       setPromoDiscount(data.coupon);
+      
+      // Reset the client secret to force a new subscription with the promo code
+      setClientSecret("");
+      
       toast({
         title: "Promo Code Applied!",
         description: data.coupon.percent_off 
@@ -145,6 +149,8 @@ export default function Subscription() {
     setPromoCode("");
     setPromoCodeId(null);
     setPromoDiscount(null);
+    // Reset the client secret to create a new subscription without promo code
+    setClientSecret("");
   };
 
   useEffect(() => {
