@@ -16,7 +16,7 @@ if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
 }
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
-const SubscribeForm = ({ onSuccess }: { onSuccess: () => void }) => {
+const SubscribeForm = ({ onSuccess, tierName }: { onSuccess: () => void, tierName: string }) => {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
@@ -49,7 +49,7 @@ const SubscribeForm = ({ onSuccess }: { onSuccess: () => void }) => {
     } else {
       toast({
         title: "Payment Successful",
-        description: "You are now subscribed to Player Pro!",
+        description: `You are now subscribed to ${tierName}!`,
       });
       onSuccess();
     }
@@ -64,7 +64,7 @@ const SubscribeForm = ({ onSuccess }: { onSuccess: () => void }) => {
         className="w-full bg-primary text-primary-foreground rounded-lg py-3 font-semibold disabled:opacity-50"
         data-testid="button-subscribe"
       >
-        {isLoading ? 'Processing...' : 'Subscribe to Player Pro'}
+        {isLoading ? 'Processing...' : `Subscribe to ${tierName}`}
       </button>
     </form>
   );
@@ -77,6 +77,7 @@ export default function Subscription() {
   const { toast } = useToast();
   const [clientSecret, setClientSecret] = useState("");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<'player_pro' | 'commissioner'>('player_pro');
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
@@ -86,7 +87,7 @@ export default function Subscription() {
     // Only fetch payment intent if user wants to upgrade
     if (showPaymentForm && !clientSecret) {
       console.log('[Subscription Frontend] Calling /api/get-or-create-subscription');
-      apiRequest("POST", "/api/get-or-create-subscription")
+      apiRequest("POST", "/api/get-or-create-subscription", { tier: selectedTier })
         .then((res) => {
           console.log('[Subscription Frontend] Response status:', res.status);
           if (!res.ok) {
@@ -111,13 +112,33 @@ export default function Subscription() {
           setShowPaymentForm(false);
         });
     }
-  }, [showPaymentForm, clientSecret, toast]);
+  }, [showPaymentForm, clientSecret, toast, selectedTier]);
 
   const handleUpgradeSuccess = () => {
     setShowPaymentForm(false);
     setClientSecret("");
     // Refresh the page to update user role
     window.location.reload();
+  };
+
+  const handleDowngrade = async () => {
+    try {
+      const response = await apiRequest("POST", "/api/cancel-subscription");
+      if (!response.ok) {
+        throw new Error('Failed to cancel subscription');
+      }
+      toast({
+        title: "Subscription Cancelled",
+        description: "You have been downgraded to the Free tier.",
+      });
+      window.location.reload();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to cancel subscription. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const subscriptionPlans = [
@@ -133,8 +154,9 @@ export default function Subscription() {
         "Team Only Stats"
       ],
       current: isFree,
-      buttonText: isFree ? "Current Plan" : "Downgrade",
-      buttonDisabled: true,
+      buttonText: isFree ? "Current Plan" : "Downgrade to Free",
+      buttonDisabled: isFree,
+      tier: 'free_tier' as const,
     },
     {
       name: "Player Pro",
@@ -155,6 +177,7 @@ export default function Subscription() {
       buttonText: isPlayerPlus ? "Current Plan" : "Upgrade to Player Pro",
       buttonDisabled: isPlayerPlus,
       highlight: !isCommissioner,
+      tier: 'player_pro' as const,
     },
     {
       name: "Commissioner",
@@ -174,10 +197,15 @@ export default function Subscription() {
       buttonText: isCommissioner ? "Current Plan" : "Upgrade to Commissioner",
       buttonDisabled: isCommissioner,
       highlight: false,
+      tier: 'commissioner' as const,
     }
   ];
 
   if (showPaymentForm && clientSecret) {
+    const tierInfo = selectedTier === 'commissioner' 
+      ? { name: 'Commissioner', price: '$12' } 
+      : { name: 'Player Pro', price: '$8' };
+
     return (
       <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
         {/* Header */}
@@ -201,12 +229,12 @@ export default function Subscription() {
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="mb-6 text-center">
               <Crown className="w-12 h-12 text-primary mx-auto mb-3" />
-              <h2 className="text-xl font-semibold mb-2">Upgrade to Player Pro</h2>
-              <p className="text-muted-foreground">$8/month - Cancel anytime</p>
+              <h2 className="text-xl font-semibold mb-2">Upgrade to {tierInfo.name}</h2>
+              <p className="text-muted-foreground">{tierInfo.price}/month - Cancel anytime</p>
             </div>
 
             <Elements stripe={stripePromise} options={{ clientSecret }}>
-              <SubscribeForm onSuccess={handleUpgradeSuccess} />
+              <SubscribeForm onSuccess={handleUpgradeSuccess} tierName={tierInfo.name} />
             </Elements>
           </div>
         </div>
@@ -308,7 +336,18 @@ export default function Subscription() {
 
               <button
                 onClick={() => {
-                  if (plan.name === "Player Pro" && !isPlayerPlus && !isCommissioner) {
+                  if (plan.current) return; // Already on this plan
+                  
+                  if (plan.tier === 'free_tier') {
+                    // Downgrade to free
+                    handleDowngrade();
+                  } else if (plan.tier === 'player_pro') {
+                    // Upgrade to Player Pro
+                    setSelectedTier('player_pro');
+                    setShowPaymentForm(true);
+                  } else if (plan.tier === 'commissioner') {
+                    // Upgrade to Commissioner
+                    setSelectedTier('commissioner');
                     setShowPaymentForm(true);
                   }
                 }}

@@ -125,7 +125,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('[Subscription] Creating subscription for user');
       const userId = req.user.claims.sub;
+      const { tier = 'player_pro' } = req.body; // Support different tiers
       console.log('[Subscription] User ID:', userId);
+      console.log('[Subscription] Tier:', tier);
       const user = await storage.getUser(userId);
 
       if (!user) {
@@ -134,27 +136,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.log('[Subscription] User found:', user.email);
 
-      // If user already has a subscription, retrieve it
+      // If user already has a subscription, check if it's for a different tier
       if (user.stripeSubscriptionId) {
         try {
           const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
           
-          // If subscription exists and is active/incomplete
+          // If subscription exists and is active/incomplete, cancel it if upgrading tiers
           if (subscription && (subscription.status === 'active' || subscription.status === 'incomplete')) {
-            const latestInvoice = subscription.latest_invoice;
-            let clientSecret: string | null = null;
-            
-            if (typeof latestInvoice === 'object' && latestInvoice?.payment_intent) {
-              const paymentIntent = latestInvoice.payment_intent;
-              if (typeof paymentIntent === 'object') {
-                clientSecret = paymentIntent.client_secret || null;
-              }
-            }
-
-            return res.json({
-              subscriptionId: subscription.id,
-              clientSecret,
-            });
+            // Cancel existing subscription to create a new one for the requested tier
+            console.log('[Subscription] Cancelling existing subscription to upgrade tier');
+            await stripe.subscriptions.cancel(user.stripeSubscriptionId);
           }
         } catch (error: any) {
           // If subscription doesn't exist anymore, we'll create a new one below
@@ -167,18 +158,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'User email is required for subscription' });
       }
 
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
-      });
+      // Determine product details based on tier
+      const tierConfig = {
+        player_pro: {
+          name: 'Player Pro',
+          description: 'Enhanced features for serious players',
+          amount: 800, // $8.00
+          role: 'player_pro'
+        },
+        commissioner: {
+          name: 'Commissioner',
+          description: 'Full league management capabilities',
+          amount: 1200, // $12.00
+          role: 'commissioner'
+        }
+      };
 
-      // Create a product for Player Pro
+      const config = tierConfig[tier as keyof typeof tierConfig] || tierConfig.player_pro;
+
+      const customer = user.stripeCustomerId 
+        ? await stripe.customers.retrieve(user.stripeCustomerId)
+        : await stripe.customers.create({
+            email: user.email,
+            name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+          });
+
+      if (typeof customer === 'string') {
+        throw new Error('Invalid customer ID');
+      }
+
+      // Create a product
       const product = await stripe.products.create({
-        name: 'Player Pro',
-        description: 'Enhanced features for serious players',
+        name: config.name,
+        description: config.description,
       });
 
-      // Create subscription with Player Pro tier ($8/month)
+      // Create subscription
       const subscription = await stripe.subscriptions.create({
         customer: customer.id,
         items: [{
@@ -188,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             recurring: {
               interval: 'month',
             },
-            unit_amount: 800, // $8.00 in cents
+            unit_amount: config.amount,
           },
         }],
         payment_behavior: 'default_incomplete',
@@ -199,8 +214,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user with Stripe info
       await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
       
-      // Update user role to player_pro
-      await storage.updateUserRole(userId, 'player_pro');
+      // Update user role
+      await storage.updateUserRole(userId, config.role as any);
 
       const latestInvoice = subscription.latest_invoice;
       let clientSecret: string | null = null;
@@ -220,6 +235,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('[Subscription] Error creating subscription:', error);
       console.error('[Subscription] Error stack:', error.stack);
       res.status(500).json({ message: "Failed to create subscription", error: error.message });
+    }
+  });
+
+  // Cancel subscription (downgrade to free)
+  app.post('/api/cancel-subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!user.stripeSubscriptionId) {
+        return res.status(400).json({ message: "No active subscription to cancel" });
+      }
+
+      // Cancel the Stripe subscription
+      await stripe.subscriptions.cancel(user.stripeSubscriptionId);
+
+      // Update user role to free_tier
+      await storage.updateUserRole(userId, 'free_tier');
+      
+      // Clear subscription ID
+      await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
+
+      res.json({ message: "Subscription cancelled successfully" });
+    } catch (error: any) {
+      console.error('[Subscription] Error cancelling subscription:', error);
+      res.status(500).json({ message: "Failed to cancel subscription", error: error.message });
     }
   });
 
