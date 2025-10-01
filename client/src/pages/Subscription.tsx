@@ -45,9 +45,7 @@ const SubscribeForm = ({ onSuccess, tierName, mode = 'payment' }: { onSuccess: (
       // Setup mode: collect card without charging (for 100% off promo codes)
       const { error } = await stripe.confirmSetup({
         elements,
-        confirmParams: {
-          return_url: window.location.origin + '/subscription',
-        },
+        redirect: 'if_required',
       });
 
       setIsLoading(false);
@@ -69,9 +67,7 @@ const SubscribeForm = ({ onSuccess, tierName, mode = 'payment' }: { onSuccess: (
       // Payment mode: charge the card
       const { error } = await stripe.confirmPayment({
         elements,
-        confirmParams: {
-          return_url: window.location.origin + '/subscription',
-        },
+        redirect: 'if_required',
       });
 
       setIsLoading(false);
