@@ -37,54 +37,73 @@ const SubscribeForm = ({ onSuccess, tierName, mode = 'payment' }: { onSuccess: (
     setIsLoading(true);
 
     if (!stripe || !elements) {
+      console.error('[Payment] Stripe or Elements not loaded');
       setIsLoading(false);
       return;
     }
 
-    if (mode === 'setup') {
-      // Setup mode: collect card without charging (for 100% off promo codes)
-      const { error } = await stripe.confirmSetup({
-        elements,
-        redirect: 'if_required',
-      });
-
-      setIsLoading(false);
-
-      if (error) {
-        toast({
-          title: "Card Setup Failed",
-          description: error.message,
-          variant: "destructive",
+    try {
+      if (mode === 'setup') {
+        console.log('[Payment] Starting SetupIntent confirmation');
+        // Setup mode: collect card without charging (for 100% off promo codes)
+        const result = await stripe.confirmSetup({
+          elements,
+          redirect: 'if_required',
         });
+
+        console.log('[Payment] SetupIntent result:', result);
+        setIsLoading(false);
+
+        if (result.error) {
+          console.error('[Payment] SetupIntent error:', result.error);
+          toast({
+            title: "Card Setup Failed",
+            description: result.error.message,
+            variant: "destructive",
+          });
+        } else {
+          console.log('[Payment] SetupIntent succeeded');
+          toast({
+            title: "Card Saved Successfully",
+            description: `Your subscription to ${tierName} is now active!`,
+          });
+          onSuccess();
+        }
       } else {
-        toast({
-          title: "Card Saved Successfully",
-          description: `Your subscription to ${tierName} is now active!`,
+        console.log('[Payment] Starting PaymentIntent confirmation');
+        // Payment mode: charge the card
+        const result = await stripe.confirmPayment({
+          elements,
+          redirect: 'if_required',
         });
-        onSuccess();
-      }
-    } else {
-      // Payment mode: charge the card
-      const { error } = await stripe.confirmPayment({
-        elements,
-        redirect: 'if_required',
-      });
 
+        console.log('[Payment] PaymentIntent result:', result);
+        setIsLoading(false);
+
+        if (result.error) {
+          console.error('[Payment] PaymentIntent error:', result.error);
+          toast({
+            title: "Payment Failed",
+            description: result.error.message,
+            variant: "destructive",
+          });
+        } else {
+          console.log('[Payment] PaymentIntent succeeded');
+          toast({
+            title: "Payment Successful",
+            description: `You are now subscribed to ${tierName}!`,
+          });
+          onSuccess();
+        }
+      }
+    } catch (err) {
+      console.error('[Payment] Unexpected error:', err);
       setIsLoading(false);
-
-      if (error) {
-        toast({
-          title: "Payment Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Payment Successful",
-          description: `You are now subscribed to ${tierName}!`,
-        });
-        onSuccess();
-      }
+      toast({
+        title: "Payment Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
