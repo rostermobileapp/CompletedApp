@@ -134,6 +134,18 @@ export default function Subscription() {
         throw new Error("Failed to apply promo code");
       }
       const subData = await subResponse.json();
+      
+      // Check if promo code means no payment is needed
+      if (subData.noPaymentNeeded) {
+        toast({
+          title: "Upgrade Successful!",
+          description: "Your subscription has been activated with the promo code.",
+        });
+        // Reload to update user role
+        window.location.reload();
+        return;
+      }
+      
       setClientSecret(subData.clientSecret);
       
       toast({

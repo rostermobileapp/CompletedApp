@@ -306,23 +306,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // If no client secret from subscription, create a standalone PaymentIntent
+      // If no client secret from subscription
       if (!clientSecret) {
+        // If promo code is applied and subscription is active, no payment is needed
+        if (promoCodeId && subscription.status === 'active') {
+          console.log('[Subscription] Promo code applied - subscription is active with no payment needed');
+          // Return a special flag indicating no payment is needed
+          await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
+          // Update user role immediately since no payment is needed
+          await storage.updateUserRole(userId, config.role);
+          
+          return res.json({
+            subscriptionId: subscription.id,
+            clientSecret: null,
+            noPaymentNeeded: true,
+          });
+        }
+        
         console.log('[Subscription] No payment intent from subscription, creating standalone PaymentIntent');
+        
+        // Calculate discounted amount if promo code is applied
+        let paymentAmount = config.amount;
+        if (promoCodeId) {
+          try {
+            const promoCode = await stripe.promotionCodes.retrieve(promoCodeId);
+            const couponId = (promoCode as any).promotion?.coupon || (promoCode as any).coupon;
+            if (couponId) {
+              const coupon = await stripe.coupons.retrieve(couponId);
+              if (coupon.percent_off) {
+                paymentAmount = Math.round(config.amount * (1 - coupon.percent_off / 100));
+              } else if (coupon.amount_off) {
+                paymentAmount = Math.max(0, config.amount - coupon.amount_off);
+              }
+              console.log('[Subscription] Discounted amount:', paymentAmount);
+            }
+          } catch (error) {
+            console.error('[Subscription] Error calculating discount:', error);
+          }
+        }
+        
         const paymentIntent = await stripe.paymentIntents.create({
-          amount: config.amount,
+          amount: paymentAmount,
           currency: 'usd',
           customer: customer.id,
           description: `Subscription to ${config.name}`,
           metadata: {
             subscriptionId: subscription.id,
             tier: tier,
+            promoCodeId: promoCodeId || '',
           },
           payment_method_types: ['card'],
         });
         
         clientSecret = paymentIntent.client_secret;
-        console.log('[Subscription] Standalone PaymentIntent created');
+        console.log('[Subscription] Standalone PaymentIntent created with amount:', paymentAmount);
       }
 
       if (!clientSecret) {
