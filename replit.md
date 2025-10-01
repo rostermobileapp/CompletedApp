@@ -34,20 +34,32 @@ Authorization is implemented at both the API level (middleware checks) and UI le
 
 # Recent Changes
 
-## Stripe Customer Synchronization (October 2025)
+## Stripe Checkout Integration (October 2025)
 
-Fixed critical customer synchronization issue where users' email addresses were not being synced to Stripe, preventing them from accessing the billing portal:
+Replaced in-app payment processing with direct Stripe Checkout and Billing Portal integration for a secure, seamless subscription management experience:
 
-- **Automatic Customer Creation**: Added `/api/stripe/create-portal-session` endpoint that creates Stripe customers on-demand when users access subscription management
-- **Customer Data Sync**: Stripe customers are created with user's email, full name, and userId metadata for proper identification
-- **Database Persistence**: Customer IDs are saved to `users.stripe_customer_id` for future reference
-- **Billing Portal Integration**: Users are redirected to personalized Stripe billing portal sessions instead of static login links
-- **Webhook Enhancement**: Existing webhook handler can now properly match subscription events to users via customer ID
+- **Stripe Checkout for New Subscriptions**: Free users upgrading to paid plans are redirected to Stripe Checkout with secure price ID validation and automatic customer creation
+- **Billing Portal for Subscription Management**: Paid users access the Stripe Billing Portal to manage subscriptions, update payment methods, view invoices, and cancel subscriptions
+- **Automatic Role Synchronization**: Webhook handlers map Stripe price IDs to user roles (free_tier, player_pro, commissioner) and automatically update permissions when subscriptions change
+- **Security Enhancements**: 
+  - Server-side price ID allowlist validation prevents unauthorized checkout sessions
+  - Webhook signature verification ensures only legitimate Stripe events are processed
+  - Customer creation includes email and full name for proper billing records
+- **Smart URL Handling**: Return URLs are dynamically built from request context for reliable redirects across environments
+- **Comprehensive Event Handling**: Supports `checkout.session.completed`, `customer.subscription.*`, and `invoice.payment_succeeded` events
 
-**Setup Required**: For this feature to work in production, you must configure a valid Stripe secret key:
-1. Get your Stripe secret key from the Stripe Dashboard (starts with `sk_live_` for production or `sk_test_` for testing)
-2. Set the `STRIPE_SECRET_KEY` environment variable in Replit
-3. Optionally set `STRIPE_WEBHOOK_SECRET` for secure webhook signature verification
+**Required Environment Variables**:
+- `STRIPE_SECRET_KEY`: Your Stripe secret key (sk_live_* for production, sk_test_* for testing)
+- `STRIPE_PRICE_PLAYER_PRO_MONTHLY`: Price ID for Player Pro monthly subscription
+- `STRIPE_PRICE_COMMISSIONER_MONTHLY`: Price ID for Commissioner monthly subscription  
+- `STRIPE_PRICE_PLAYER_PRO_YEARLY`: Price ID for Player Pro yearly subscription (optional)
+- `STRIPE_PRICE_COMMISSIONER_YEARLY`: Price ID for Commissioner yearly subscription (optional)
+- `STRIPE_WEBHOOK_SECRET`: Webhook signing secret for signature verification (recommended for production)
+
+**User Experience**:
+- Free users see "Upgrade Plan" buttons that redirect to Stripe Checkout
+- Paid users see "Manage Subscription via Stripe" button that opens the Billing Portal
+- Subscriptions are automatically synced to user roles within seconds via webhooks
 
 ## Landing Page Redesign with Pricing (September 2025)
 
