@@ -96,6 +96,35 @@ export default function Subscription() {
     }
   };
 
+  const handleUpgradePlan = async (tier: 'player_pro' | 'commissioner') => {
+    setIsLoading(true);
+    try {
+      // Stripe Price IDs (monthly subscriptions)
+      const STRIPE_PRICES = {
+        player_pro: 'price_1SDUByBRVRpXAintAWGODStk',
+        commissioner: 'price_1SDTIvBRVRpXAintvxPYZCb7',
+      };
+
+      const priceId = STRIPE_PRICES[tier];
+
+      const response = await apiRequest('POST', '/api/stripe/create-checkout-session', {
+        priceId,
+      });
+      const data = await response.json() as { url: string };
+      
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch (error: any) {
+      console.error('Error creating checkout session:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to start checkout. Please try again.',
+        variant: 'destructive',
+      });
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
       {/* Header */}
@@ -204,7 +233,18 @@ export default function Subscription() {
               </div>
 
               <button
-                onClick={handleManageSubscription}
+                onClick={() => {
+                  if (plan.current) return;
+                  
+                  // Free users upgrading to paid plan -> Checkout
+                  if (isFree && plan.tier !== 'free_tier') {
+                    handleUpgradePlan(plan.tier);
+                  } 
+                  // Paid users managing subscription -> Portal
+                  else {
+                    handleManageSubscription();
+                  }
+                }}
                 disabled={plan.buttonDisabled || isLoading}
                 className={`w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${
                   plan.current

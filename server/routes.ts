@@ -121,6 +121,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     apiVersion: "2024-11-20.acacia",
   });
 
+  // Create checkout session for new subscriptions
+  app.post('/api/stripe/create-checkout-session', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { priceId } = req.body;
+
+      if (!priceId) {
+        return res.status(400).json({ message: 'Price ID is required' });
+      }
+
+      // Allowlist of valid price IDs - reject anything else for security
+      const ALLOWED_PRICES = [
+        process.env.STRIPE_PRICE_PLAYER_PRO_MONTHLY,
+        process.env.STRIPE_PRICE_COMMISSIONER_MONTHLY,
+        process.env.STRIPE_PRICE_PLAYER_PRO_YEARLY,
+        process.env.STRIPE_PRICE_COMMISSIONER_YEARLY,
+      ].filter(Boolean);
+
+      if (!ALLOWED_PRICES.includes(priceId)) {
+        console.warn('[Stripe] Rejected invalid price ID:', priceId);
+        return res.status(400).json({ message: 'Invalid price ID' });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      let customerId = user.stripeCustomerId;
+
+      // Create Stripe customer if they don't have one
+      if (!customerId) {
+        console.log('[Stripe] Creating new customer for checkout:', userId);
+        const customer = await stripe.customers.create({
+          email: user.email || undefined,
+          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+          metadata: {
+            userId: userId,
+          },
+        });
+        
+        customerId = customer.id;
+        await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
+        console.log('[Stripe] Created customer:', customerId);
+      }
+
+      // Build URL from request for reliability
+      const protocol = req.protocol || 'https';
+      const host = req.get('host') || (process.env.REPLIT_DOMAINS 
+        ? `${process.env.REPLIT_DOMAINS}` 
+        : 'localhost:5000');
+      const appUrl = `${protocol}://${host}`;
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: `${appUrl}/subscription?success=true`,
+        cancel_url: `${appUrl}/subscription`,
+        client_reference_id: userId,
+        metadata: {
+          userId: userId,
+        },
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error('[Stripe] Error creating checkout session:', error);
+      res.status(500).json({ message: 'Failed to create checkout session' });
+    }
+  });
+
   // Create billing portal session - creates customer in Stripe if needed
   app.post('/api/stripe/create-portal-session', isAuthenticated, async (req: any, res) => {
     try {
@@ -235,7 +313,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Handle the event
     try {
+      // Map Stripe price IDs to user roles
+      const PRICE_TO_ROLE: Record<string, 'player_pro' | 'commissioner'> = {
+        // Monthly prices
+        [process.env.STRIPE_PRICE_PLAYER_PRO_MONTHLY || '']: 'player_pro',
+        [process.env.STRIPE_PRICE_COMMISSIONER_MONTHLY || '']: 'commissioner',
+        // Yearly prices
+        [process.env.STRIPE_PRICE_PLAYER_PRO_YEARLY || '']: 'player_pro',
+        [process.env.STRIPE_PRICE_COMMISSIONER_YEARLY || '']: 'commissioner',
+      };
+
       switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          console.log('[Webhook] Checkout session completed:', session.id);
+          
+          if (session.subscription && session.customer) {
+            const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+            const users = await storage.getAllUsers();
+            let user = users.find(u => u.stripeCustomerId === session.customer);
+            
+            if (user) {
+              // Update customer ID and subscription ID
+              await storage.updateUserStripeInfo(user.id, session.customer as string, subscription.id);
+              
+              // Determine tier from price ID
+              const priceId = subscription.items.data[0]?.price?.id;
+              const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
+              
+              if (tier) {
+                console.log('[Webhook] Checkout completed - updating user', user.id, 'to tier:', tier);
+                await storage.updateUserRole(user.id, tier);
+              } else {
+                console.warn('[Webhook] Unknown price ID:', priceId);
+              }
+            } else {
+              console.log('[Webhook] User not found for customer:', session.customer);
+            }
+          }
+          break;
+        }
+
         case 'customer.subscription.updated':
         case 'customer.subscription.deleted':
         case 'customer.subscription.created': {
@@ -251,25 +369,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           if (user) {
-            // Determine tier from subscription price
-            let tier: 'free_tier' | 'player_pro' | 'commissioner' = 'free_tier';
-            
             if (subscription.status === 'active' || subscription.status === 'trialing') {
-              // Get the price amount to determine tier
-              const priceAmount = subscription.items.data[0]?.price?.unit_amount || 0;
+              // Get the price ID to determine tier
+              const priceId = subscription.items.data[0]?.price?.id;
+              const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
-              if (priceAmount === 800) {
-                tier = 'player_pro';
-              } else if (priceAmount === 1200) {
-                tier = 'commissioner';
-              }
-              
-              console.log('[Webhook] Updating user', user.id, 'to tier:', tier, 'from subscription amount:', priceAmount);
-              await storage.updateUserRole(user.id, tier);
-              
-              // Update subscription ID if it changed
-              if (user.stripeSubscriptionId !== subscription.id) {
-                await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', subscription.id);
+              if (tier) {
+                console.log('[Webhook] Subscription active - updating user', user.id, 'to tier:', tier);
+                await storage.updateUserRole(user.id, tier);
+                
+                // Update subscription ID if it changed
+                if (user.stripeSubscriptionId !== subscription.id) {
+                  await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', subscription.id);
+                }
+              } else {
+                console.warn('[Webhook] Unknown price ID in subscription:', priceId);
               }
             } else if (subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
               console.log('[Webhook] Downgrading user', user.id, 'to free_tier due to status:', subscription.status || 'deleted');
@@ -280,35 +394,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           } else {
             console.log('[Webhook] User not found for subscription:', subscription.id);
-          }
-          break;
-        }
-
-        case 'checkout.session.completed': {
-          const session = event.data.object as Stripe.Checkout.Session;
-          console.log('[Webhook] Checkout session completed:', session.id);
-          
-          if (session.subscription && session.customer) {
-            const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-            const users = await storage.getAllUsers();
-            let user = users.find(u => u.stripeCustomerId === session.customer);
-            
-            if (user && subscription.status === 'active') {
-              const priceAmount = subscription.items.data[0]?.price?.unit_amount || 0;
-              let tier: 'free_tier' | 'player_pro' | 'commissioner' = 'free_tier';
-              
-              if (priceAmount === 800) {
-                tier = 'player_pro';
-              } else if (priceAmount === 1200) {
-                tier = 'commissioner';
-              }
-              
-              console.log('[Webhook] Checkout complete - updating user', user.id, 'to tier:', tier);
-              await storage.updateUserRole(user.id, tier);
-              
-              // Update subscription info
-              await storage.updateUserStripeInfo(user.id, session.customer as string, subscription.id);
-            }
           }
           break;
         }
@@ -325,18 +410,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const user = users.find(u => u.stripeSubscriptionId === subscription.id);
             
             if (user && subscription.status === 'active') {
-              // Determine tier from subscription price
-              const priceAmount = subscription.items.data[0]?.price?.unit_amount || 0;
-              let tier: 'free_tier' | 'player_pro' | 'commissioner' = 'free_tier';
+              // Get the price ID to determine tier
+              const priceId = subscription.items.data[0]?.price?.id;
+              const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
-              if (priceAmount === 800) {
-                tier = 'player_pro';
-              } else if (priceAmount === 1200) {
-                tier = 'commissioner';
+              if (tier) {
+                console.log('[Webhook] Payment success - updating user', user.id, 'to tier:', tier);
+                await storage.updateUserRole(user.id, tier);
+              } else {
+                console.warn('[Webhook] Unknown price ID in invoice:', priceId);
               }
-              
-              console.log('[Webhook] Payment success - updating user', user.id, 'to tier:', tier);
-              await storage.updateUserRole(user.id, tier);
             }
           }
           break;
