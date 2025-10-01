@@ -147,16 +147,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const promoCode = promoCodes.data[0];
       console.log('[PromoCode] Promo code object:', promoCode);
-      console.log('[PromoCode] Coupon ID:', promoCode.coupon);
+      
+      // The coupon ID can be in different places depending on API version
+      const couponId = (promoCode as any).promotion?.coupon || (promoCode as any).coupon;
+      console.log('[PromoCode] Coupon ID:', couponId);
 
-      // Retrieve the full coupon details
-      let coupon;
-      if (typeof promoCode.coupon === 'string') {
-        coupon = await stripe.coupons.retrieve(promoCode.coupon);
-      } else {
-        coupon = promoCode.coupon;
+      if (!couponId) {
+        return res.status(400).json({ message: "Invalid promo code structure" });
       }
 
+      // Retrieve the full coupon details
+      const coupon = await stripe.coupons.retrieve(couponId);
       console.log('[PromoCode] Coupon details:', coupon);
 
       res.json({
