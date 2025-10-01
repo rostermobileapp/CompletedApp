@@ -239,9 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             subscriptionId: subscription.id,
             tier: tier,
           },
-          automatic_payment_methods: {
-            enabled: true,
-          },
+          payment_method_types: ['card'],
         });
         
         clientSecret = paymentIntent.client_secret;
