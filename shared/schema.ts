@@ -117,6 +117,9 @@ export const users = pgTable("users", {
   specialPermissions: specialPermissionEnum("special_permissions").array(),
   isPrimaryCommissioner: boolean("is_primary_commissioner").default(false).notNull(),
   createdBy: varchar("created_by"), // Will add reference after table definition
+  // Stripe subscription fields
+  stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
