@@ -1,0 +1,122 @@
+client:536 WebSocket connection to 'wss://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/?token=kvZPPC_pUDrh' failed: 
+setupWebSocket @ client:536Understand this error
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=kvZPPC_pUDrh' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)Understand this error
+chunk-RPCDYKBN.js?v=f724d69e:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+Subscription.tsx:229 [Render] State check - showPaymentForm: false clientSecret: false clientSecret length: 0
+Subscription.tsx:100 [useEffect] Triggered - showPaymentForm: false clientSecret: false selectedTier: player_pro
+Subscription.tsx:229 [Render] State check - showPaymentForm: false clientSecret: false clientSecret length: 0
+chunk-RPCDYKBN.js?v=f724d69e:521 Warning: validateDOMNesting(...): <p> cannot appear as a descendant of <p>.
+    at p
+    at p
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=f724d69e:42:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:283:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=f724d69e:132:11
+    at _c9 (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/components/ui/alert-dialog.tsx:158:12)
+    at div
+    at AlertDialogHeader (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/components/ui/alert-dialog.tsx:86:3)
+    at Slottable2 (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=f724d69e:95:25)
+    at div
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=f724d69e:42:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EUSKUYU3.js?v=f724d69e:61:7
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=f724d69e:79:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=f724d69e:56:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=f724d69e:42:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-WYKWB3L4.js?v=f724d69e:57:5
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:235:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:158:58
+    at Presence (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-HSXLETPZ.js?v=f724d69e:24:11)
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:149:64
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=f724d69e:38:15)
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=f724d69e:17:13)
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=f724d69e:85:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=f724d69e:79:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=f724d69e:56:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=f724d69e:42:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EUSKUYU3.js?v=f724d69e:260:22
+    at Presence (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-HSXLETPZ.js?v=f724d69e:24:11)
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=f724d69e:38:15)
+    at DialogPortal (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:111:11)
+    at AlertDialogPortal (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=f724d69e:66:11)
+    at _c3 (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/components/ui/alert-dialog.tsx:50:12)
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=f724d69e:38:15)
+    at Dialog (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:52:5)
+    at AlertDialog (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=f724d69e:50:11)
+    at div
+    at Subscription (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/pages/Subscription.tsx:114:20)
+    at Route (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=f724d69e:323:16)
+    at Switch (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=f724d69e:379:17)
+    at div
+    at PageTransition (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/components/PageTransition.tsx:19:34)
+    at div
+    at PermissionProvider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/context/SubscriptionContext.tsx:28:38)
+    at Router (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/App.tsx?v=wq7C9HvD8VmzGrvTb3tGD:50:42)
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=f724d69e:38:15)
+    at TooltipProvider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=f724d69e:63:5)
+    at QueryClientProvider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=f724d69e:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=f724d69e:521Understand this error
+chunk-RPCDYKBN.js?v=f724d69e:521 Warning: validateDOMNesting(...): <ul> cannot appear as a descendant of <p>.
+    at ul
+    at p
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=f724d69e:42:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:283:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=f724d69e:132:11
+    at _c9 (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/components/ui/alert-dialog.tsx:158:12)
+    at div
+    at AlertDialogHeader (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/components/ui/alert-dialog.tsx:86:3)
+    at Slottable2 (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=f724d69e:95:25)
+    at div
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=f724d69e:42:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EUSKUYU3.js?v=f724d69e:61:7
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=f724d69e:79:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=f724d69e:56:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=f724d69e:42:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-WYKWB3L4.js?v=f724d69e:57:5
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:235:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:158:58
+    at Presence (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-HSXLETPZ.js?v=f724d69e:24:11)
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:149:64
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=f724d69e:38:15)
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=f724d69e:17:13)
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=f724d69e:85:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=f724d69e:79:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EVLBUYTV.js?v=f724d69e:56:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BOL2CCOG.js?v=f724d69e:42:13
+    at https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-EUSKUYU3.js?v=f724d69e:260:22
+    at Presence (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-HSXLETPZ.js?v=f724d69e:24:11)
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=f724d69e:38:15)
+    at DialogPortal (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:111:11)
+    at AlertDialogPortal (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=f724d69e:66:11)
+    at _c3 (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/components/ui/alert-dialog.tsx:50:12)
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=f724d69e:38:15)
+    at Dialog (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-ZY5HRVSR.js?v=f724d69e:52:5)
+    at AlertDialog (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=f724d69e:50:11)
+    at div
+    at Subscription (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/pages/Subscription.tsx:114:20)
+    at Route (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=f724d69e:323:16)
+    at Switch (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=f724d69e:379:17)
+    at div
+    at PageTransition (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/components/PageTransition.tsx:19:34)
+    at div
+    at PermissionProvider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/context/SubscriptionContext.tsx:28:38)
+    at Router (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/src/App.tsx?v=wq7C9HvD8VmzGrvTb3tGD:50:42)
+    at Provider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-5AJU3CG7.js?v=f724d69e:38:15)
+    at TooltipProvider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=f724d69e:63:5)
+    at QueryClientProvider (https://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=f724d69e:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=f724d69e:521Understand this error
+Subscription.tsx:162 [confirmUpgrade] Starting upgrade flow, pendingTier: commissioner
+Subscription.tsx:166 [confirmUpgrade] State updates triggered
+Subscription.tsx:229 [Render] State check - showPaymentForm: true clientSecret: false clientSecret length: 0
+Subscription.tsx:100 [useEffect] Triggered - showPaymentForm: true clientSecret: false selectedTier: commissioner
+Subscription.tsx:103 [Subscription Frontend] Calling /api/get-or-create-subscription with tier: commissioner
+Subscription.tsx:106 [Subscription Frontend] Response status: 200
+Subscription.tsx:116 [Subscription Frontend] Got data: {subscriptionId: 'sub_1SDOwaBRVRpXAintSgcM6Rc1', clientSecret: null}
+Subscription.tsx:117 [Subscription Frontend] Got clientSecret: false value: null
+Subscription.tsx:119 [Subscription Frontend] clientSecret state updated
+Subscription.tsx:229 [Render] State check - showPaymentForm: true clientSecret: false clientSecret length: undefined
+Subscription.tsx:100 [useEffect] Triggered - showPaymentForm: true clientSecret: false selectedTier: commissioner
+Subscription.tsx:103 [Subscription Frontend] Calling /api/get-or-create-subscription with tier: commissioner

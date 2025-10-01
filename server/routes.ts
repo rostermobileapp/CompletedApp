@@ -211,22 +211,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expand: ['latest_invoice.payment_intent'],
       });
 
+      // Extract client secret FIRST before updating user
+      console.log('[Subscription] Extracting client secret from subscription');
+      console.log('[Subscription] Latest invoice type:', typeof subscription.latest_invoice);
+      console.log('[Subscription] Latest invoice:', subscription.latest_invoice);
+      
+      const latestInvoice = subscription.latest_invoice;
+      let clientSecret: string | null = null;
+      
+      if (typeof latestInvoice === 'object' && latestInvoice?.payment_intent) {
+        const paymentIntent = latestInvoice.payment_intent;
+        console.log('[Subscription] Payment intent type:', typeof paymentIntent);
+        console.log('[Subscription] Payment intent:', paymentIntent);
+        if (typeof paymentIntent === 'object') {
+          clientSecret = paymentIntent.client_secret || null;
+          console.log('[Subscription] Client secret extracted:', !!clientSecret);
+        }
+      }
+
+      if (!clientSecret) {
+        console.error('[Subscription] WARNING: No client secret found in subscription!');
+        return res.status(500).json({ 
+          message: "Failed to create payment intent",
+          error: "Client secret not found in subscription response"
+        });
+      }
+
       // Update user with Stripe info
       await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
       
       // Update user role
       await storage.updateUserRole(userId, config.role as any);
 
-      const latestInvoice = subscription.latest_invoice;
-      let clientSecret: string | null = null;
-      
-      if (typeof latestInvoice === 'object' && latestInvoice?.payment_intent) {
-        const paymentIntent = latestInvoice.payment_intent;
-        if (typeof paymentIntent === 'object') {
-          clientSecret = paymentIntent.client_secret || null;
-        }
-      }
-
+      console.log('[Subscription] Successfully created subscription with client secret');
       res.json({
         subscriptionId: subscription.id,
         clientSecret,
