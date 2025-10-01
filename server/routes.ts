@@ -314,24 +314,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If no payment intent on the invoice, manually create one
       if (!clientSecret && typeof latestInvoice === 'object' && latestInvoice.id) {
-        console.log('[Subscription] No payment intent found, creating one manually for invoice:', latestInvoice.id);
+        const invoiceAmount = (latestInvoice as any).amount_due || 0;
+        console.log('[Subscription] No payment intent found, invoice amount:', invoiceAmount);
         
-        // Create a PaymentIntent manually for this invoice
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: (latestInvoice as any).amount_due,
-          currency: (latestInvoice as any).currency,
-          customer: customer.id,
-          setup_future_usage: 'off_session',
-          metadata: {
-            invoice_id: latestInvoice.id,
-            subscription_id: subscription.id,
-          },
-        });
-        
-        if (paymentIntent.client_secret) {
-          clientSecret = paymentIntent.client_secret;
-          mode = 'payment';
-          console.log('[Subscription] Client secret created via manual PaymentIntent');
+        // If amount is $0 (due to 100% promo), create a SetupIntent to save card without charging
+        if (invoiceAmount === 0) {
+          console.log('[Subscription] Creating SetupIntent for $0 invoice (promo code)');
+          const setupIntent = await stripe.setupIntents.create({
+            customer: customer.id,
+            payment_method_types: ['card'],
+            metadata: {
+              invoice_id: latestInvoice.id,
+              subscription_id: subscription.id,
+            },
+          });
+          
+          if (setupIntent.client_secret) {
+            clientSecret = setupIntent.client_secret;
+            mode = 'setup';
+            console.log('[Subscription] Client secret created via SetupIntent (card collection only)');
+          }
+        } else {
+          // Create a PaymentIntent for non-zero amounts
+          console.log('[Subscription] Creating PaymentIntent for invoice amount:', invoiceAmount);
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: invoiceAmount,
+            currency: (latestInvoice as any).currency,
+            customer: customer.id,
+            setup_future_usage: 'off_session',
+            metadata: {
+              invoice_id: latestInvoice.id,
+              subscription_id: subscription.id,
+            },
+          });
+          
+          if (paymentIntent.client_secret) {
+            clientSecret = paymentIntent.client_secret;
+            mode = 'payment';
+            console.log('[Subscription] Client secret created via manual PaymentIntent');
+          }
         }
       }
       
