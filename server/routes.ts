@@ -279,8 +279,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customer: customer.id,
         items: [{ price: price.id }],
         payment_behavior: 'default_incomplete',
-        payment_settings: { save_default_payment_method: 'on_subscription' },
-        expand: ['latest_invoice.payment_intent', 'pending_setup_intent', 'latest_invoice'],
+        payment_settings: { 
+          save_default_payment_method: 'on_subscription',
+          payment_method_types: ['card']
+        },
+        expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
       };
 
       // Apply promotion code if provided
@@ -293,19 +296,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[Subscription] Subscription created:', subscription.id);
       console.log('[Subscription] Subscription status:', subscription.status);
-      console.log('[Subscription] Latest invoice type:', typeof subscription.latest_invoice);
-      console.log('[Subscription] Latest invoice:', JSON.stringify(subscription.latest_invoice, null, 2));
       
       // Extract client secret from payment intent or setup intent
-      const latestInvoice = subscription.latest_invoice;
+      let latestInvoice = subscription.latest_invoice;
       let clientSecret: string | null = null;
       let mode: 'payment' | 'setup' = 'payment';
       
       // Check for payment intent first (when there's a charge)
       if (typeof latestInvoice === 'object' && latestInvoice?.payment_intent) {
         const paymentIntent = latestInvoice.payment_intent;
-        console.log('[Subscription] Payment intent type:', typeof paymentIntent);
-        console.log('[Subscription] Payment intent:', JSON.stringify(paymentIntent, null, 2));
         if (typeof paymentIntent === 'object' && paymentIntent.client_secret) {
           clientSecret = paymentIntent.client_secret;
           mode = 'payment';
@@ -313,11 +312,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // If no payment intent, check for setup intent (when amount is $0 due to promo)
+      // If no payment intent on the invoice, manually create one
+      if (!clientSecret && typeof latestInvoice === 'object' && latestInvoice.id) {
+        console.log('[Subscription] No payment intent found, creating one manually for invoice:', latestInvoice.id);
+        
+        // Finalize the invoice to create a payment intent
+        const finalizedInvoice = await stripe.invoices.finalizeInvoice(latestInvoice.id, {
+          auto_advance: true,
+        });
+        
+        // Retrieve the invoice with the payment intent expanded
+        const invoiceWithPaymentIntent = await stripe.invoices.retrieve(finalizedInvoice.id, {
+          expand: ['payment_intent'],
+        });
+        
+        if (invoiceWithPaymentIntent.payment_intent) {
+          const paymentIntent = invoiceWithPaymentIntent.payment_intent;
+          if (typeof paymentIntent === 'object' && paymentIntent.client_secret) {
+            clientSecret = paymentIntent.client_secret;
+            mode = 'payment';
+            console.log('[Subscription] Client secret created via manual invoice finalization');
+          }
+        }
+      }
+      
+      // If still no payment intent, check for setup intent (when amount is $0 due to promo)
       if (!clientSecret && (subscription as any).pending_setup_intent) {
         const setupIntent = (subscription as any).pending_setup_intent;
-        console.log('[Subscription] Setup intent type:', typeof setupIntent);
-        console.log('[Subscription] Setup intent:', JSON.stringify(setupIntent, null, 2));
         if (typeof setupIntent === 'object' && setupIntent.client_secret) {
           clientSecret = setupIntent.client_secret;
           mode = 'setup';
@@ -326,8 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!clientSecret) {
-        console.error('[Subscription] ERROR: No client secret found in payment or setup intent');
-        console.error('[Subscription] Full subscription object:', JSON.stringify(subscription, null, 2));
+        console.error('[Subscription] ERROR: No client secret found after all attempts');
         await stripe.subscriptions.cancel(subscription.id);
         return res.status(500).json({ 
           message: "Failed to create payment or setup intent",
