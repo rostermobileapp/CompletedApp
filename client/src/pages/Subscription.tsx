@@ -398,57 +398,66 @@ export default function Subscription() {
             </div>
 
             {/* Pricing Breakdown */}
-            {promoDiscount && (
-              <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border">
-                <h3 className="text-sm font-semibold mb-3">Pricing Summary</h3>
-                <div className="space-y-2">
+            <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border">
+              <h3 className="text-sm font-semibold mb-3">Pricing Summary</h3>
+              <div className="space-y-2">
+                {promoDiscount ? (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Original Price</span>
+                      <span className="text-sm line-through text-muted-foreground" data-testid="text-original-price">
+                        {tierInfo.price}/month
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Discount</span>
+                      <span className="text-sm text-green-600 font-medium">
+                        -{promoDiscount.percent_off 
+                          ? `${promoDiscount.percent_off}%` 
+                          : `$${(promoDiscount.amount_off / 100).toFixed(2)}`}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-border">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold">Total</span>
+                        <span className="text-lg font-bold text-primary" data-testid="text-discounted-price">
+                          {(() => {
+                            const originalPrice = selectedTier === 'commissioner' ? 12 : 8;
+                            let discountedPrice = originalPrice;
+                            
+                            if (promoDiscount.percent_off) {
+                              discountedPrice = originalPrice * (1 - promoDiscount.percent_off / 100);
+                            } else if (promoDiscount.amount_off) {
+                              discountedPrice = originalPrice - (promoDiscount.amount_off / 100);
+                            }
+                            
+                            return `$${Math.max(0, discountedPrice).toFixed(2)}`;
+                          })()}/month
+                        </span>
+                      </div>
+                      {promoDiscount.duration === 'once' && (
+                        <p className="text-xs text-muted-foreground mt-1 text-right">First month only</p>
+                      )}
+                      {promoDiscount.duration === 'repeating' && promoDiscount.duration_in_months && (
+                        <p className="text-xs text-muted-foreground mt-1 text-right">
+                          For {promoDiscount.duration_in_months} months
+                        </p>
+                      )}
+                      {promoDiscount.duration === 'forever' && (
+                        <p className="text-xs text-muted-foreground mt-1 text-right">Every month</p>
+                      )}
+                    </div>
+                  </>
+                ) : (
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Original Price</span>
-                    <span className="text-sm line-through text-muted-foreground" data-testid="text-original-price">
+                    <span className="font-semibold">Monthly Price</span>
+                    <span className="text-lg font-bold text-primary" data-testid="text-regular-price">
                       {tierInfo.price}/month
                     </span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Discount</span>
-                    <span className="text-sm text-green-600 font-medium">
-                      -{promoDiscount.percent_off 
-                        ? `${promoDiscount.percent_off}%` 
-                        : `$${(promoDiscount.amount_off / 100).toFixed(2)}`}
-                    </span>
-                  </div>
-                  <div className="pt-2 border-t border-border">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold">Total</span>
-                      <span className="text-lg font-bold text-primary" data-testid="text-discounted-price">
-                        {(() => {
-                          const originalPrice = selectedTier === 'commissioner' ? 12 : 8;
-                          let discountedPrice = originalPrice;
-                          
-                          if (promoDiscount.percent_off) {
-                            discountedPrice = originalPrice * (1 - promoDiscount.percent_off / 100);
-                          } else if (promoDiscount.amount_off) {
-                            discountedPrice = originalPrice - (promoDiscount.amount_off / 100);
-                          }
-                          
-                          return `$${Math.max(0, discountedPrice).toFixed(2)}`;
-                        })()}/month
-                      </span>
-                    </div>
-                    {promoDiscount.duration === 'once' && (
-                      <p className="text-xs text-muted-foreground mt-1 text-right">First month only</p>
-                    )}
-                    {promoDiscount.duration === 'repeating' && promoDiscount.duration_in_months && (
-                      <p className="text-xs text-muted-foreground mt-1 text-right">
-                        For {promoDiscount.duration_in_months} months
-                      </p>
-                    )}
-                    {promoDiscount.duration === 'forever' && (
-                      <p className="text-xs text-muted-foreground mt-1 text-right">Every month</p>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
-            )}
+            </div>
 
             <div className="relative">
               {refreshingPayment && (
