@@ -183,9 +183,17 @@ export default function Subscription() {
     }
   }, [showPaymentForm, clientSecret, toast, selectedTier, promoCodeId]);
 
-  const handleUpgradeSuccess = () => {
+  const handleUpgradeSuccess = async () => {
     setShowPaymentForm(false);
     setClientSecret("");
+    
+    // Sync subscription status from Stripe
+    try {
+      await apiRequest("POST", "/api/sync-subscription-status");
+    } catch (error) {
+      console.error("Error syncing subscription:", error);
+    }
+    
     // Refresh the page to update user role
     window.location.reload();
   };

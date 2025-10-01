@@ -266,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Apply promotion code if provided
       if (promoCodeId) {
-        subscriptionData.promotion_code = promoCodeId;
+        subscriptionData.discounts = [{ promotion_code: promoCodeId }];
         console.log('[Subscription] Applying promotion code:', promoCodeId);
       }
 
@@ -361,6 +361,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sync subscription status from Stripe (useful for testing when webhooks don't fire)
+  app.post('/api/sync-subscription-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.stripeSubscriptionId) {
+        return res.status(404).json({ message: "No subscription found" });
+      }
+
+      // Retrieve subscription from Stripe
+      const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+      
+      // Determine tier from subscription price
+      let tier: 'free_tier' | 'player_pro' | 'commissioner' = 'free_tier';
+      
+      if (subscription.status === 'active' || subscription.status === 'trialing') {
+        const priceAmount = subscription.items.data[0]?.price?.unit_amount || 0;
+        
+        if (priceAmount === 800) {
+          tier = 'player_pro';
+        } else if (priceAmount === 1200) {
+          tier = 'commissioner';
+        }
+        
+        console.log('[Sync] Updating user', user.id, 'to tier:', tier, 'from subscription amount:', priceAmount);
+        await storage.updateUserRole(userId, tier);
+        
+        res.json({ 
+          message: "Subscription synced successfully", 
+          tier,
+          subscriptionStatus: subscription.status 
+        });
+      } else {
+        console.log('[Sync] Subscription not active, status:', subscription.status);
+        res.json({ 
+          message: "Subscription not active", 
+          subscriptionStatus: subscription.status 
+        });
+      }
+    } catch (error: any) {
+      console.error('[Sync] Error syncing subscription:', error);
+      res.status(500).json({ message: "Failed to sync subscription", error: error.message });
+    }
+  });
+
   // Stripe webhook handler
   app.post('/api/stripe-webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -384,7 +430,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       switch (event.type) {
         case 'customer.subscription.updated':
-        case 'customer.subscription.deleted': {
+        case 'customer.subscription.deleted':
+        case 'customer.subscription.created': {
           const subscription = event.data.object as Stripe.Subscription;
           
           // Find user by subscription ID
@@ -392,10 +439,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = users.find(u => u.stripeSubscriptionId === subscription.id);
           
           if (user) {
-            // Update user role based on subscription status
-            if (subscription.status === 'active') {
-              await storage.updateUserRole(user.id, 'player_pro');
+            // Determine tier from subscription price
+            let tier: 'free_tier' | 'player_pro' | 'commissioner' = 'free_tier';
+            
+            if (subscription.status === 'active' || subscription.status === 'trialing') {
+              // Get the price amount to determine tier
+              const priceAmount = subscription.items.data[0]?.price?.unit_amount || 0;
+              
+              if (priceAmount === 800) {
+                tier = 'player_pro';
+              } else if (priceAmount === 1200) {
+                tier = 'commissioner';
+              }
+              
+              console.log('[Webhook] Updating user', user.id, 'to tier:', tier, 'from subscription amount:', priceAmount);
+              await storage.updateUserRole(user.id, tier);
             } else if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
+              console.log('[Webhook] Downgrading user', user.id, 'to free_tier');
               await storage.updateUserRole(user.id, 'free_tier');
             }
           }
@@ -404,7 +464,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         case 'invoice.payment_succeeded': {
           const invoice = event.data.object as Stripe.Invoice;
-          console.log('Payment succeeded for invoice:', invoice.id);
+          console.log('[Webhook] Payment succeeded for invoice:', invoice.id);
+          
+          // If this invoice has a subscription, update the user's role
+          if (invoice.subscription) {
+            const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+            const users = await storage.getAllUsers();
+            const user = users.find(u => u.stripeSubscriptionId === subscription.id);
+            
+            if (user && subscription.status === 'active') {
+              // Determine tier from subscription price
+              const priceAmount = subscription.items.data[0]?.price?.unit_amount || 0;
+              let tier: 'free_tier' | 'player_pro' | 'commissioner' = 'free_tier';
+              
+              if (priceAmount === 800) {
+                tier = 'player_pro';
+              } else if (priceAmount === 1200) {
+                tier = 'commissioner';
+              }
+              
+              console.log('[Webhook] Payment success - updating user', user.id, 'to tier:', tier);
+              await storage.updateUserRole(user.id, tier);
+            }
+          }
           break;
         }
 
