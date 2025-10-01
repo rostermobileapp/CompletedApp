@@ -34,6 +34,21 @@ Authorization is implemented at both the API level (middleware checks) and UI le
 
 # Recent Changes
 
+## Stripe Customer Synchronization (October 2025)
+
+Fixed critical customer synchronization issue where users' email addresses were not being synced to Stripe, preventing them from accessing the billing portal:
+
+- **Automatic Customer Creation**: Added `/api/stripe/create-portal-session` endpoint that creates Stripe customers on-demand when users access subscription management
+- **Customer Data Sync**: Stripe customers are created with user's email, full name, and userId metadata for proper identification
+- **Database Persistence**: Customer IDs are saved to `users.stripe_customer_id` for future reference
+- **Billing Portal Integration**: Users are redirected to personalized Stripe billing portal sessions instead of static login links
+- **Webhook Enhancement**: Existing webhook handler can now properly match subscription events to users via customer ID
+
+**Setup Required**: For this feature to work in production, you must configure a valid Stripe secret key:
+1. Get your Stripe secret key from the Stripe Dashboard (starts with `sk_live_` for production or `sk_test_` for testing)
+2. Set the `STRIPE_SECRET_KEY` environment variable in Replit
+3. Optionally set `STRIPE_WEBHOOK_SECRET` for secure webhook signature verification
+
 ## Landing Page Redesign with Pricing (September 2025)
 
 Redesigned the landing page with an Apple Fitness+ inspired aesthetic and hockey-focused messaging:
