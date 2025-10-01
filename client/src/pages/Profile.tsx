@@ -25,15 +25,7 @@ type ProfileForm = z.infer<typeof profileSchema>;
 
 export default function Profile() {
   const { user } = useAuth();
-  const { role } = usePermissions();
-  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
-  const tier = 'commissioner'; // Everyone is commissioner now!
-  
-  // Override permission functions to grant full access since subscription was removed
-  const canManageUsers = () => true;
-  const canManageLeague = () => true;
-  const canAccessPremiumFeatures = () => true;
-  const hasRole = (requiredRole: string) => true;
+  const { role, hasRole, canManageLeague, canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -235,9 +227,12 @@ export default function Profile() {
   );
 
   const getTierDisplay = () => {
-    switch (tier) {
+    switch (role) {
+      case 'free_tier': return { label: 'FREE', class: 'bg-muted text-muted-foreground' };
+      case 'player_pro': return { label: 'PLAYER PRO', class: 'bg-primary text-primary-foreground' };
+      case 'secondary_commissioner':
       case 'commissioner': return { label: 'COMMISSIONER', class: 'bg-warning text-black' };
-      default: return { label: 'COMMISSIONER', class: 'bg-warning text-black' };
+      default: return { label: 'FREE', class: 'bg-muted text-muted-foreground' };
     }
   };
 
