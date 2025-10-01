@@ -6309,10 +6309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Override from email to use verified domain
         const verifiedFromEmail = 'contact@notifications.roster-app.com';
         const recipientEmail = process.env.FEEDBACK_EMAIL || verifiedFromEmail;
-        
-        console.log(`📧 Sending feedback email from ${verifiedFromEmail} to ${recipientEmail}`);
 
-        const result = await client.emails.send({
+        await client.emails.send({
           from: verifiedFromEmail,
           to: recipientEmail,
           subject: `Rosters Feedback: ${categoryLabel}`,
@@ -6327,10 +6325,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             <p>${validatedData.message.replace(/\n/g, '<br />')}</p>
           `,
         });
-        
-        console.log(`✅ Feedback email sent successfully. Email ID: ${result.data?.id}`);
       } catch (emailError) {
-        console.error("❌ Error sending feedback email:", emailError);
+        console.error("Error sending feedback email:", emailError);
         // Don't fail the request if email fails - feedback is still saved
       }
 
