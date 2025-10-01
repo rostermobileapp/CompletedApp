@@ -126,6 +126,8 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber'>>): Promise<User>;
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
+  updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
+  updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User>;
   
   // Permission management operations (global - deprecated, use league-specific instead)
   getAllUsers(): Promise<User[]>;
@@ -381,6 +383,32 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({
         profileImageUrl: normalizedUrl,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        stripeCustomerId,
+        stripeSubscriptionId,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        role,
+        lastUpdated: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(users.id, id))
