@@ -130,20 +130,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Promo code is required" });
       }
 
-      // Search for promotion code in Stripe with expanded coupon
+      console.log('[PromoCode] Validating code:', code.trim());
+
+      // Search for promotion code in Stripe
       const promoCodes = await stripe.promotionCodes.list({
         code: code.trim(),
         active: true,
         limit: 1,
-        expand: ['data.coupon'],
       });
+
+      console.log('[PromoCode] Found promo codes:', promoCodes.data.length);
 
       if (promoCodes.data.length === 0) {
         return res.status(404).json({ message: "Invalid promo code" });
       }
 
       const promoCode = promoCodes.data[0];
-      const coupon = promoCode.coupon as any; // Already expanded
+      console.log('[PromoCode] Promo code object:', promoCode);
+      console.log('[PromoCode] Coupon ID:', promoCode.coupon);
+
+      // Retrieve the full coupon details
+      let coupon;
+      if (typeof promoCode.coupon === 'string') {
+        coupon = await stripe.coupons.retrieve(promoCode.coupon);
+      } else {
+        coupon = promoCode.coupon;
+      }
+
+      console.log('[PromoCode] Coupon details:', coupon);
 
       res.json({
         id: promoCode.id,
