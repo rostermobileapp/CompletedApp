@@ -178,9 +178,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items: [{
           price_data: {
             currency: 'usd',
-            product_data: {
+            product: {
               name: 'Player Pro',
-              description: 'Enhanced features for serious players',
             },
             recurring: {
               interval: 'month',
