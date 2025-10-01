@@ -184,6 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quantity: 1,
           },
         ],
+        allow_promotion_codes: true,
         success_url: `${appUrl}/subscription?success=true`,
         cancel_url: `${appUrl}/subscription`,
         client_reference_id: userId,
