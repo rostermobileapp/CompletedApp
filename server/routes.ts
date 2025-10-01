@@ -121,13 +121,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     apiVersion: "2025-09-30.clover",
   });
 
+  // Validate promotion code
+  app.post('/api/validate-promo-code', isAuthenticated, async (req: any, res) => {
+    try {
+      const { code } = req.body;
+      
+      if (!code || !code.trim()) {
+        return res.status(400).json({ message: "Promo code is required" });
+      }
+
+      // Search for promotion code in Stripe
+      const promoCodes = await stripe.promotionCodes.list({
+        code: code.trim(),
+        active: true,
+        limit: 1,
+      });
+
+      if (promoCodes.data.length === 0) {
+        return res.status(404).json({ message: "Invalid promo code" });
+      }
+
+      const promoCode = promoCodes.data[0];
+      
+      // Expand the coupon details
+      const coupon = await stripe.coupons.retrieve(promoCode.coupon as string);
+
+      res.json({
+        id: promoCode.id,
+        code: promoCode.code,
+        coupon: {
+          id: coupon.id,
+          percent_off: coupon.percent_off,
+          amount_off: coupon.amount_off,
+          currency: coupon.currency,
+          duration: coupon.duration,
+          duration_in_months: coupon.duration_in_months,
+          name: coupon.name,
+        }
+      });
+    } catch (error: any) {
+      console.error('[PromoCode] Error validating promo code:', error);
+      res.status(500).json({ message: "Failed to validate promo code" });
+    }
+  });
+
   app.post('/api/get-or-create-subscription', isAuthenticated, async (req: any, res) => {
     try {
       console.log('[Subscription] Creating subscription for user');
       const userId = req.user.claims.sub;
-      const { tier = 'player_pro' } = req.body; // Support different tiers
+      const { tier = 'player_pro', promoCodeId } = req.body; // Support different tiers and promo codes
       console.log('[Subscription] User ID:', userId);
       console.log('[Subscription] Tier:', tier);
+      console.log('[Subscription] Promo code ID:', promoCodeId);
       const user = await storage.getUser(userId);
 
       if (!user) {
@@ -203,14 +248,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         unit_amount: config.amount,
       });
 
-      // Create subscription with the price
-      const subscription = await stripe.subscriptions.create({
+      // Create subscription with the price and optional promo code
+      const subscriptionData: any = {
         customer: customer.id,
         items: [{ price: price.id }],
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
         expand: ['latest_invoice.payment_intent'],
-      });
+      };
+
+      // Apply promotion code if provided
+      if (promoCodeId) {
+        subscriptionData.promotion_code = promoCodeId;
+        console.log('[Subscription] Applying promotion code:', promoCodeId);
+      }
+
+      const subscription = await stripe.subscriptions.create(subscriptionData);
 
       console.log('[Subscription] Subscription created:', subscription.id);
       console.log('[Subscription] Subscription status:', subscription.status);
