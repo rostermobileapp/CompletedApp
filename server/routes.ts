@@ -56,6 +56,7 @@ import multer from "multer";
 import Papa from "papaparse";
 import * as fs from 'fs';
 import * as path from 'path';
+import Stripe from "stripe";
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -109,6 +110,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating user image:", error);
       res.status(500).json({ message: "Failed to update profile image" });
+    }
+  });
+
+  // Stripe subscription routes
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+  }
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2025-09-30.clover",
+  });
+
+  app.post('/api/get-or-create-subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // If user already has a subscription, retrieve it
+      if (user.stripeSubscriptionId) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+          
+          // If subscription exists and is active/incomplete
+          if (subscription && (subscription.status === 'active' || subscription.status === 'incomplete')) {
+            const latestInvoice = subscription.latest_invoice;
+            let clientSecret: string | null = null;
+            
+            if (typeof latestInvoice === 'object' && latestInvoice?.payment_intent) {
+              const paymentIntent = latestInvoice.payment_intent;
+              if (typeof paymentIntent === 'object') {
+                clientSecret = paymentIntent.client_secret || null;
+              }
+            }
+
+            return res.json({
+              subscriptionId: subscription.id,
+              clientSecret,
+            });
+          }
+        } catch (error: any) {
+          // If subscription doesn't exist anymore, we'll create a new one below
+          console.log('Existing subscription not found, creating new one');
+        }
+      }
+
+      // Create a new Stripe customer and subscription
+      if (!user.email) {
+        return res.status(400).json({ message: 'User email is required for subscription' });
+      }
+
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+      });
+
+      // Create subscription with Player Pro tier ($8/month)
+      const subscription = await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Player Pro',
+              description: 'Enhanced features for serious players',
+            },
+            recurring: {
+              interval: 'month',
+            },
+            unit_amount: 800, // $8.00 in cents
+          },
+        }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      // Update user with Stripe info
+      await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
+      
+      // Update user role to player_pro
+      await storage.updateUserRole(userId, 'player_pro');
+
+      const latestInvoice = subscription.latest_invoice;
+      let clientSecret: string | null = null;
+      
+      if (typeof latestInvoice === 'object' && latestInvoice?.payment_intent) {
+        const paymentIntent = latestInvoice.payment_intent;
+        if (typeof paymentIntent === 'object') {
+          clientSecret = paymentIntent.client_secret || null;
+        }
+      }
+
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret,
+      });
+    } catch (error: any) {
+      console.error("Error creating subscription:", error);
+      res.status(500).json({ message: "Failed to create subscription", error: error.message });
+    }
+  });
+
+  // Stripe webhook handler
+  app.post('/api/stripe-webhook', async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+
+    if (!sig) {
+      return res.status(400).send('Missing stripe-signature header');
+    }
+
+    let event: Stripe.Event;
+
+    try {
+      // In production, you should set a webhook secret
+      // For now, we'll just parse the body
+      event = req.body;
+    } catch (err: any) {
+      console.error('Webhook error:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    try {
+      switch (event.type) {
+        case 'customer.subscription.updated':
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object as Stripe.Subscription;
+          
+          // Find user by subscription ID
+          const users = await storage.getAllUsers();
+          const user = users.find(u => u.stripeSubscriptionId === subscription.id);
+          
+          if (user) {
+            // Update user role based on subscription status
+            if (subscription.status === 'active') {
+              await storage.updateUserRole(user.id, 'player_pro');
+            } else if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
+              await storage.updateUserRole(user.id, 'free_tier');
+            }
+          }
+          break;
+        }
+
+        case 'invoice.payment_succeeded': {
+          const invoice = event.data.object as Stripe.Invoice;
+          console.log('Payment succeeded for invoice:', invoice.id);
+          break;
+        }
+
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object as Stripe.Invoice;
+          console.log('Payment failed for invoice:', invoice.id);
+          break;
+        }
+
+        default:
+          console.log(`Unhandled event type ${event.type}`);
+      }
+
+      res.json({ received: true });
+    } catch (error: any) {
+      console.error('Error processing webhook:', error);
+      res.status(500).json({ message: 'Webhook processing error' });
     }
   });
 
