@@ -6306,9 +6306,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? 'Product Improvement' 
           : 'Report an Issue';
 
-        await client.emails.send({
+        const recipientEmail = process.env.FEEDBACK_EMAIL || fromEmail;
+        
+        console.log(`📧 Sending feedback email from ${fromEmail} to ${recipientEmail}`);
+
+        const result = await client.emails.send({
           from: fromEmail,
-          to: process.env.FEEDBACK_EMAIL || fromEmail,
+          to: recipientEmail,
           subject: `Rosters Feedback: ${categoryLabel}`,
           html: `
             <h2>New Feedback Submission</h2>
@@ -6321,8 +6325,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             <p>${validatedData.message.replace(/\n/g, '<br />')}</p>
           `,
         });
+        
+        console.log(`✅ Feedback email sent successfully. Email ID: ${result.data?.id}`);
       } catch (emailError) {
-        console.error("Error sending feedback email:", emailError);
+        console.error("❌ Error sending feedback email:", emailError);
         // Don't fail the request if email fails - feedback is still saved
       }
 
