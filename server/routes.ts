@@ -113,363 +113,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe subscription routes
+  // Stripe webhook routes only - subscription management handled via Stripe billing portal
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
   }
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2025-09-30.clover" as any,
+    apiVersion: "2024-11-20.acacia",
   });
 
-  // Validate promotion code
-  app.post('/api/validate-promo-code', isAuthenticated, async (req: any, res) => {
-    try {
-      const { code } = req.body;
-      
-      if (!code || !code.trim()) {
-        return res.status(400).json({ message: "Promo code is required" });
-      }
-
-      const searchCode = code.trim().toUpperCase();
-      console.log('[PromoCode] Searching for code:', searchCode);
-
-      // Search for promotion code with expanded coupon (no filtering to avoid API issues)
-      const promoCodes = await stripe.promotionCodes.list({
-        expand: ['data.coupon'],
-      });
-
-      // Filter client-side for case-insensitive match and active status
-      const matchingPromo = promoCodes.data.find(
-        promo => promo.code.toUpperCase() === searchCode && promo.active === true
-      );
-
-      if (!matchingPromo) {
-        console.log('[PromoCode] No active promo code found for:', searchCode);
-        return res.status(404).json({ message: "Invalid promo code" });
-      }
-
-      console.log('[PromoCode] Found promo code:', matchingPromo.id);
-
-      // Extract coupon ID - it's at promotion.coupon in the Stripe API
-      const promoData = matchingPromo as any;
-      const couponId = promoData.promotion?.coupon || promoData.coupon;
-      
-      if (!couponId) {
-        console.error('[PromoCode] No coupon ID found on promo code');
-        return res.status(400).json({ message: "Invalid promo code structure - no coupon found" });
-      }
-
-      console.log('[PromoCode] Coupon ID:', couponId);
-
-      // Retrieve the full coupon details
-      const coupon = await stripe.coupons.retrieve(couponId);
-
-      if (!coupon) {
-        console.error('[PromoCode] Failed to retrieve coupon details');
-        return res.status(400).json({ message: "Invalid promo code - no coupon details" });
-      }
-
-      // Prevent caching
-      res.set('Cache-Control', 'no-store');
-      
-      res.json({
-        id: matchingPromo.id,
-        code: matchingPromo.code,
-        coupon: {
-          id: coupon.id,
-          percent_off: coupon.percent_off,
-          amount_off: coupon.amount_off,
-          currency: coupon.currency,
-          duration: coupon.duration,
-          duration_in_months: coupon.duration_in_months,
-          name: coupon.name,
-        }
-      });
-    } catch (error: any) {
-      console.error('[PromoCode] Error validating promo code:', error);
-      res.status(500).json({ message: "Failed to validate promo code" });
-    }
-  });
-
-  app.post('/api/get-or-create-subscription', isAuthenticated, async (req: any, res) => {
-    try {
-      console.log('[Subscription] Creating subscription for user');
-      const userId = req.user.claims.sub;
-      const { tier = 'player_pro', promoCodeId } = req.body; // Support different tiers and promo codes
-      console.log('[Subscription] User ID:', userId);
-      console.log('[Subscription] Tier:', tier);
-      console.log('[Subscription] Promo code ID:', promoCodeId);
-      const user = await storage.getUser(userId);
-
-      if (!user) {
-        console.log('[Subscription] User not found');
-        return res.status(404).json({ message: "User not found" });
-      }
-      console.log('[Subscription] User found:', user.email);
-
-      // If user already has a subscription, check if it's for a different tier
-      if (user.stripeSubscriptionId) {
-        try {
-          const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-          
-          // If subscription exists and is active/incomplete, cancel it if upgrading tiers
-          if (subscription && (subscription.status === 'active' || subscription.status === 'incomplete')) {
-            // Cancel existing subscription to create a new one for the requested tier
-            console.log('[Subscription] Cancelling existing subscription to upgrade tier');
-            await stripe.subscriptions.cancel(user.stripeSubscriptionId);
-          }
-        } catch (error: any) {
-          // If subscription doesn't exist anymore, we'll create a new one below
-          console.log('Existing subscription not found, creating new one');
-        }
-      }
-
-      // Create a new Stripe customer and subscription
-      if (!user.email) {
-        return res.status(400).json({ message: 'User email is required for subscription' });
-      }
-
-      // Determine product details based on tier
-      const tierConfig = {
-        player_pro: {
-          name: 'Player Pro',
-          description: 'Enhanced features for serious players',
-          amount: 800, // $8.00
-          role: 'player_pro'
-        },
-        commissioner: {
-          name: 'Commissioner',
-          description: 'Full league management capabilities',
-          amount: 1200, // $12.00
-          role: 'commissioner'
-        }
-      };
-
-      const config = tierConfig[tier as keyof typeof tierConfig] || tierConfig.player_pro;
-
-      const customer = user.stripeCustomerId 
-        ? await stripe.customers.retrieve(user.stripeCustomerId)
-        : await stripe.customers.create({
-            email: user.email,
-            name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
-          });
-
-      if (typeof customer === 'string') {
-        throw new Error('Invalid customer ID');
-      }
-
-      // Create a product
-      const product = await stripe.products.create({
-        name: config.name,
-        description: config.description,
-      });
-
-      // Create a price
-      const price = await stripe.prices.create({
-        product: product.id,
-        currency: 'usd',
-        recurring: {
-          interval: 'month',
-        },
-        unit_amount: config.amount,
-      });
-
-      // Create subscription with the price and optional promo code
-      const subscriptionData: any = {
-        customer: customer.id,
-        items: [{ price: price.id }],
-        payment_behavior: 'default_incomplete',
-        payment_settings: { 
-          save_default_payment_method: 'on_subscription',
-          payment_method_types: ['card']
-        },
-        expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
-      };
-
-      // Apply promotion code if provided
-      if (promoCodeId) {
-        subscriptionData.discounts = [{ promotion_code: promoCodeId }];
-        console.log('[Subscription] Applying promotion code:', promoCodeId);
-      }
-
-      const subscription = await stripe.subscriptions.create(subscriptionData);
-
-      console.log('[Subscription] Subscription created:', subscription.id);
-      console.log('[Subscription] Subscription status:', subscription.status);
-      
-      // Extract client secret from payment intent or setup intent
-      let latestInvoice = subscription.latest_invoice;
-      let clientSecret: string | null = null;
-      let mode: 'payment' | 'setup' = 'payment';
-      
-      // Check for payment intent first (when there's a charge)
-      if (typeof latestInvoice === 'object' && latestInvoice?.payment_intent) {
-        const paymentIntent = latestInvoice.payment_intent;
-        if (typeof paymentIntent === 'object' && paymentIntent.client_secret) {
-          clientSecret = paymentIntent.client_secret;
-          mode = 'payment';
-          console.log('[Subscription] Client secret found in payment intent');
-        }
-      }
-      
-      // If no payment intent on the invoice, manually create one
-      if (!clientSecret && typeof latestInvoice === 'object' && latestInvoice.id) {
-        const invoiceAmount = (latestInvoice as any).amount_due || 0;
-        console.log('[Subscription] No payment intent found, invoice amount:', invoiceAmount);
-        
-        // If amount is $0 (due to 100% promo), create a SetupIntent to save card without charging
-        if (invoiceAmount === 0) {
-          console.log('[Subscription] Creating SetupIntent for $0 invoice (promo code)');
-          const setupIntent = await stripe.setupIntents.create({
-            customer: customer.id,
-            payment_method_types: ['card'],
-            metadata: {
-              invoice_id: latestInvoice.id,
-              subscription_id: subscription.id,
-            },
-          });
-          
-          if (setupIntent.client_secret) {
-            clientSecret = setupIntent.client_secret;
-            mode = 'setup';
-            console.log('[Subscription] Client secret created via SetupIntent (card collection only)');
-          }
-        } else {
-          // Create a PaymentIntent for non-zero amounts
-          console.log('[Subscription] Creating PaymentIntent for invoice amount:', invoiceAmount);
-          const paymentIntent = await stripe.paymentIntents.create({
-            amount: invoiceAmount,
-            currency: (latestInvoice as any).currency,
-            customer: customer.id,
-            setup_future_usage: 'off_session',
-            payment_method_types: ['card'],
-            automatic_payment_methods: { enabled: false },
-            metadata: {
-              invoice_id: latestInvoice.id,
-              subscription_id: subscription.id,
-            },
-          });
-          
-          if (paymentIntent.client_secret) {
-            clientSecret = paymentIntent.client_secret;
-            mode = 'payment';
-            console.log('[Subscription] Client secret created via manual PaymentIntent');
-          }
-        }
-      }
-      
-      // If still no payment intent, check for setup intent (when amount is $0 due to promo)
-      if (!clientSecret && (subscription as any).pending_setup_intent) {
-        const setupIntent = (subscription as any).pending_setup_intent;
-        if (typeof setupIntent === 'object' && setupIntent.client_secret) {
-          clientSecret = setupIntent.client_secret;
-          mode = 'setup';
-          console.log('[Subscription] Client secret found in setup intent (card collection only)');
-        }
-      }
-
-      if (!clientSecret) {
-        console.error('[Subscription] ERROR: No client secret found after all attempts');
-        await stripe.subscriptions.cancel(subscription.id);
-        return res.status(500).json({ 
-          message: "Failed to create payment or setup intent",
-          error: "Could not generate client secret"
-        });
-      }
-
-      // Update user with Stripe info (but don't update role until payment/setup succeeds)
-      await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
-
-      console.log(`[Subscription] Successfully created subscription with ${mode} intent`);
-      res.json({
-        subscriptionId: subscription.id,
-        clientSecret,
-        mode,
-      });
-    } catch (error: any) {
-      console.error('[Subscription] Error creating subscription:', error);
-      console.error('[Subscription] Error stack:', error.stack);
-      res.status(500).json({ message: "Failed to create subscription", error: error.message });
-    }
-  });
-
-  // Cancel subscription (downgrade to free)
-  app.post('/api/cancel-subscription', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      if (!user.stripeSubscriptionId) {
-        return res.status(400).json({ message: "No active subscription to cancel" });
-      }
-
-      // Cancel the Stripe subscription
-      await stripe.subscriptions.cancel(user.stripeSubscriptionId);
-
-      // Update user role to free_tier
-      await storage.updateUserRole(userId, 'free_tier');
-      
-      // Clear subscription ID
-      await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
-
-      res.json({ message: "Subscription cancelled successfully" });
-    } catch (error: any) {
-      console.error('[Subscription] Error cancelling subscription:', error);
-      res.status(500).json({ message: "Failed to cancel subscription", error: error.message });
-    }
-  });
-
-  // Sync subscription status from Stripe (useful for testing when webhooks don't fire)
-  app.post('/api/sync-subscription-status', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-
-      if (!user || !user.stripeSubscriptionId) {
-        return res.status(404).json({ message: "No subscription found" });
-      }
-
-      // Retrieve subscription from Stripe
-      const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-      
-      // Determine tier from subscription price
-      let tier: 'free_tier' | 'player_pro' | 'commissioner' = 'free_tier';
-      
-      if (subscription.status === 'active' || subscription.status === 'trialing') {
-        const priceAmount = subscription.items.data[0]?.price?.unit_amount || 0;
-        
-        if (priceAmount === 800) {
-          tier = 'player_pro';
-        } else if (priceAmount === 1200) {
-          tier = 'commissioner';
-        }
-        
-        console.log('[Sync] Updating user', user.id, 'to tier:', tier, 'from subscription amount:', priceAmount);
-        await storage.updateUserRole(userId, tier);
-        
-        res.json({ 
-          message: "Subscription synced successfully", 
-          tier,
-          subscriptionStatus: subscription.status 
-        });
-      } else {
-        console.log('[Sync] Subscription not active, status:', subscription.status);
-        res.json({ 
-          message: "Subscription not active", 
-          subscriptionStatus: subscription.status 
-        });
-      }
-    } catch (error: any) {
-      console.error('[Sync] Error syncing subscription:', error);
-      res.status(500).json({ message: "Failed to sync subscription", error: error.message });
-    }
-  });
-
-  // Stripe webhook handler
+  // Stripe webhook handler - Note: This endpoint needs raw body, configured in server/index.ts
   app.post('/api/stripe-webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
 
@@ -480,11 +132,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let event: Stripe.Event;
 
     try {
-      // In production, you should set a webhook secret
-      // For now, we'll just parse the body
-      event = req.body;
+      // Verify webhook signature for security
+      if (process.env.STRIPE_WEBHOOK_SECRET) {
+        // req.body is a Buffer when using express.raw() - convert to string for signature verification
+        const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : 
+                        typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+        event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        console.log('[Webhook] Signature verified successfully');
+      } else {
+        // Development mode without signature verification (not recommended for production)
+        console.warn('[Webhook] WARNING: No STRIPE_WEBHOOK_SECRET configured - skipping signature verification');
+        console.warn('[Webhook] Set STRIPE_WEBHOOK_SECRET environment variable for production use');
+        const bodyStr = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : 
+                       typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+        event = JSON.parse(bodyStr);
+      }
     } catch (err: any) {
-      console.error('Webhook error:', err.message);
+      console.error('[Webhook] Signature verification failed:', err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
@@ -496,9 +160,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         case 'customer.subscription.created': {
           const subscription = event.data.object as Stripe.Subscription;
           
-          // Find user by subscription ID
+          // Find user by Stripe customer ID or subscription ID
           const users = await storage.getAllUsers();
-          const user = users.find(u => u.stripeSubscriptionId === subscription.id);
+          let user = users.find(u => u.stripeSubscriptionId === subscription.id);
+          
+          // If not found by subscription ID, try to find by customer ID
+          if (!user) {
+            user = users.find(u => u.stripeCustomerId === subscription.customer);
+          }
           
           if (user) {
             // Determine tier from subscription price
@@ -516,9 +185,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               console.log('[Webhook] Updating user', user.id, 'to tier:', tier, 'from subscription amount:', priceAmount);
               await storage.updateUserRole(user.id, tier);
-            } else if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
-              console.log('[Webhook] Downgrading user', user.id, 'to free_tier');
+              
+              // Update subscription ID if it changed
+              if (user.stripeSubscriptionId !== subscription.id) {
+                await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', subscription.id);
+              }
+            } else if (subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
+              console.log('[Webhook] Downgrading user', user.id, 'to free_tier due to status:', subscription.status || 'deleted');
               await storage.updateUserRole(user.id, 'free_tier');
+              
+              // Clear subscription ID when downgrading to free tier
+              await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', '');
+            }
+          } else {
+            console.log('[Webhook] User not found for subscription:', subscription.id);
+          }
+          break;
+        }
+
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          console.log('[Webhook] Checkout session completed:', session.id);
+          
+          if (session.subscription && session.customer) {
+            const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+            const users = await storage.getAllUsers();
+            let user = users.find(u => u.stripeCustomerId === session.customer);
+            
+            if (user && subscription.status === 'active') {
+              const priceAmount = subscription.items.data[0]?.price?.unit_amount || 0;
+              let tier: 'free_tier' | 'player_pro' | 'commissioner' = 'free_tier';
+              
+              if (priceAmount === 800) {
+                tier = 'player_pro';
+              } else if (priceAmount === 1200) {
+                tier = 'commissioner';
+              }
+              
+              console.log('[Webhook] Checkout complete - updating user', user.id, 'to tier:', tier);
+              await storage.updateUserRole(user.id, tier);
+              
+              // Update subscription info
+              await storage.updateUserStripeInfo(user.id, session.customer as string, subscription.id);
             }
           }
           break;
@@ -529,8 +237,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('[Webhook] Payment succeeded for invoice:', invoice.id);
           
           // If this invoice has a subscription, update the user's role
-          if (invoice.subscription) {
-            const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+          const subscriptionId = (invoice as any).subscription;
+          if (subscriptionId) {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId as string);
             const users = await storage.getAllUsers();
             const user = users.find(u => u.stripeSubscriptionId === subscription.id);
             
