@@ -704,8 +704,7 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  // 🚨 SUBSCRIPTION REMOVED - FULL ACCESS GRANTED! 🚨
-  const tier = 'commissioner'; // Everyone is commissioner now!
+  const tier = (user as any)?.subscriptionTier || 'free';
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
