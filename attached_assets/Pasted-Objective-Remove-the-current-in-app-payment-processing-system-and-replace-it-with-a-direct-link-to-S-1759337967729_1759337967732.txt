@@ -1,0 +1,183 @@
+Objective
+Remove the current in-app payment processing system and replace it with a direct link to Stripe's billing portal for subscription management.
+Changes Required
+1. Remove Existing Payment Processing
+
+Remove all in-app payment/checkout components including:
+
+Payment forms (credit card input fields, payment method selectors)
+Checkout flows and multi-step purchase processes
+Client-side payment processing logic
+Any Stripe Elements or payment widgets embedded in the app
+Payment confirmation/success pages specific to in-app purchases
+
+
+Keep the subscription tier display UI (the cards/options showing different plans)
+Remove backend payment processing endpoints such as:
+
+Routes for creating payment intents
+Routes for processing payments
+Stripe checkout session creation endpoints
+
+
+Retain webhook handlers for listening to Stripe subscription events (these are still needed)
+
+2. Update Subscription Change Buttons
+
+All "Upgrade", "Change Plan", "Manage Subscription", or similar buttons should now link to:
+
+  https://billing.stripe.com/p/login/9B68wO7cJ5ENeUqaaD2B200
+
+Make this an external link (opens in new tab with target="_blank" and rel="noopener noreferrer")
+Update button text to be clear, such as:
+
+"Manage Subscription via Stripe"
+"Upgrade Plan"
+"Change Subscription"
+
+
+
+3. Stripe Portal Configuration
+
+Ensure your Stripe billing portal is configured to:
+
+Display all available subscription tiers/products
+Allow customers to switch between plans
+Allow customers to cancel subscriptions
+Show pricing and plan details clearly
+
+
+Users will select and purchase their desired tier directly in Stripe's portal
+
+4. Webhook Setup for Subscription Updates
+Ensure these Stripe webhooks are configured and handled:
+Required webhook events:
+
+customer.subscription.created - When a new subscription starts
+customer.subscription.updated - When a subscription tier changes
+customer.subscription.deleted - When a subscription is cancelled
+checkout.session.completed - When a payment is successful (if using Checkout)
+invoice.payment_failed - When a payment fails (optional but recommended)
+
+Webhook handler should:
+
+Extract the subscription tier/product ID from the webhook payload
+Look up the customer in your database (using Stripe customer ID or email)
+Update the user's tier/permissions in your database
+Map Stripe product IDs to your app's permission levels
+
+Example mapping logic:
+Stripe Product ID → App Permission Tier
+price_abc123 → "basic"
+price_def456 → "pro"
+price_ghi789 → "enterprise"
+NO SUBSCRIPTION → "free"
+5. Cancellation Handling - Return to Free Tier
+When a user cancels their subscription:
+On customer.subscription.deleted or customer.subscription.updated (with status "canceled"):
+
+Set subscription_tier to "free"
+Set subscription_status to "cancelled"
+Clear or nullify stripe_subscription_id
+Update updated_at timestamp
+Immediately restrict user permissions to free tier level
+
+Important considerations:
+
+Determine if cancellation is immediate or end of billing period
+
+If end of billing period: Keep paid tier active until current_period_end date
+If immediate: Downgrade to free tier right away
+
+
+Display a message to the user: "Your subscription has been cancelled. You've been moved to the free tier."
+Optionally, send an email notification about the downgrade
+
+Free tier should include:
+
+Basic/limited features (define what free users can access)
+Clear indicators that they're on free tier
+Prominent upgrade options
+
+6. Frontend Tier Display Updates
+
+After a user purchases/changes/cancels subscription in Stripe, they return to your app
+On page refresh/reload, the app should:
+
+Fetch the user's current subscription status from your database
+Display the updated tier information (including "Free" tier)
+Enable/disable features based on new permissions
+Show appropriate messaging for free vs paid users
+
+
+Consider adding a "Refresh Subscription Status" button if you want real-time updates without page refresh
+Optionally, poll your backend every few seconds after return from Stripe portal to check for updates
+
+7. Database Schema Considerations
+Ensure your user/subscription table includes:
+
+stripe_customer_id - Links user to Stripe customer
+subscription_tier - Current tier (free/basic/pro/enterprise/etc.)
+stripe_subscription_id - Active subscription ID (null for free tier)
+subscription_status - Status (active/cancelled/past_due/free/etc.)
+current_period_end - Subscription end date (for grace periods)
+updated_at - Timestamp of last subscription change
+
+Default values for new users:
+
+subscription_tier: "free"
+subscription_status: "free"
+stripe_subscription_id: null
+
+8. Security Considerations
+
+Verify webhook signatures to ensure events are from Stripe
+Use environment variables for Stripe API keys
+Never expose secret keys in frontend code
+Validate that tier updates in webhooks match expected product IDs
+
+9. Permission Enforcement
+Throughout your app, ensure features are gated by tier:
+Free tier: Basic features only
+Basic tier: Mid-level features
+Pro tier: Advanced features
+Enterprise tier: All features
+When tier changes (upgrade, downgrade, or cancellation to free):
+
+Update permissions immediately
+Disable features the user no longer has access to
+Show clear messaging about what they can/cannot access
+
+Implementation Checklist
+
+ Remove all payment UI components from the app
+ Remove payment processing routes/endpoints
+ Update all subscription management buttons to link to Stripe portal
+ Configure Stripe billing portal with all product tiers and cancellation options
+ Set up webhook endpoint to receive Stripe events
+ Implement webhook handlers for subscription events (including cancellation)
+ Add logic to downgrade users to free tier on cancellation
+ Create/update database schema for storing subscription data
+ Set default tier to "free" for new users
+ Add logic to fetch and display current tier on user dashboard (including free tier)
+ Test full flow: purchase subscription in Stripe → webhook fires → database updates → user sees new tier
+ Test cancellation flow: cancel subscription → webhook fires → user downgraded to free tier
+ Add webhook signature verification
+ Test tier permission enforcement throughout the app
+ Add appropriate UI messaging for free tier users
+ Test grace period handling if using end-of-period cancellation
+
+Testing Steps
+
+Click "Manage Subscription" button → should open Stripe portal
+Select and purchase a subscription tier in Stripe
+Return to app and refresh page
+Verify new tier is displayed correctly
+Verify features/permissions match the new tier
+Check database to confirm subscription data was updated
+Go back to Stripe portal and cancel the subscription
+Return to app and refresh page
+Verify user is now on "free" tier
+Verify features are restricted to free tier level
+Check database to confirm tier is "free" and subscription_id is null
+Test webhook with Stripe CLI or test mode purchases/cancellations
