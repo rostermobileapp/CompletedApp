@@ -97,6 +97,7 @@ export default function Subscription() {
   const [promoCodeId, setPromoCodeId] = useState<string | null>(null);
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<any>(null);
+  const [refreshingPayment, setRefreshingPayment] = useState(false);
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
@@ -120,11 +121,20 @@ export default function Subscription() {
         throw new Error(data.message || "Invalid promo code");
       }
       const data = await response.json();
+      
+      // Set refreshing state before updating promo code
+      setRefreshingPayment(true);
       setPromoCodeId(data.id);
       setPromoDiscount(data.coupon);
       
-      // Reset the client secret to force a new subscription with the promo code
-      setClientSecret("");
+      // Create new subscription with promo code
+      const requestData: any = { tier: selectedTier, promoCodeId: data.id };
+      const subResponse = await apiRequest("POST", "/api/get-or-create-subscription", requestData);
+      if (!subResponse.ok) {
+        throw new Error("Failed to apply promo code");
+      }
+      const subData = await subResponse.json();
+      setClientSecret(subData.clientSecret);
       
       toast({
         title: "Promo Code Applied!",
@@ -142,24 +152,37 @@ export default function Subscription() {
       setPromoDiscount(null);
     } finally {
       setValidatingPromo(false);
+      setRefreshingPayment(false);
     }
   };
 
-  const removePromoCode = () => {
+  const removePromoCode = async () => {
     setPromoCode("");
     setPromoCodeId(null);
     setPromoDiscount(null);
-    // Reset the client secret to create a new subscription without promo code
-    setClientSecret("");
+    
+    // Create new subscription without promo code
+    setRefreshingPayment(true);
+    try {
+      const requestData: any = { tier: selectedTier };
+      const response = await apiRequest("POST", "/api/get-or-create-subscription", requestData);
+      if (!response.ok) {
+        throw new Error("Failed to remove promo code");
+      }
+      const data = await response.json();
+      setClientSecret(data.clientSecret);
+    } catch (error) {
+      console.error("Error removing promo code:", error);
+    } finally {
+      setRefreshingPayment(false);
+    }
   };
 
   useEffect(() => {
-    // Only fetch payment intent if user wants to upgrade
-    if (showPaymentForm && !clientSecret) {
+    // Only fetch payment intent if user wants to upgrade and doesn't have a client secret
+    // Don't refetch if we already have one (promo code functions handle refreshing)
+    if (showPaymentForm && !clientSecret && !refreshingPayment) {
       const requestData: any = { tier: selectedTier };
-      if (promoCodeId) {
-        requestData.promoCodeId = promoCodeId;
-      }
       apiRequest("POST", "/api/get-or-create-subscription", requestData)
         .then((res) => {
           if (!res.ok) {
@@ -181,7 +204,7 @@ export default function Subscription() {
           setShowPaymentForm(false);
         });
     }
-  }, [showPaymentForm, clientSecret, toast, selectedTier, promoCodeId]);
+  }, [showPaymentForm, clientSecret, toast, selectedTier, refreshingPayment]);
 
   const handleUpgradeSuccess = async () => {
     setShowPaymentForm(false);
@@ -338,7 +361,8 @@ export default function Subscription() {
                   </div>
                   <button
                     onClick={removePromoCode}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium"
+                    disabled={refreshingPayment}
+                    className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50"
                     data-testid="button-remove-promo"
                   >
                     Remove
@@ -351,7 +375,8 @@ export default function Subscription() {
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                     placeholder="Enter code"
-                    className="flex-1 px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={refreshingPayment}
+                    className="flex-1 px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
                     data-testid="input-promo-code"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -362,7 +387,7 @@ export default function Subscription() {
                   />
                   <button
                     onClick={validatePromoCode}
-                    disabled={validatingPromo || !promoCode.trim()}
+                    disabled={validatingPromo || !promoCode.trim() || refreshingPayment}
                     className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 disabled:opacity-50"
                     data-testid="button-validate-promo"
                   >
@@ -372,9 +397,19 @@ export default function Subscription() {
               )}
             </div>
 
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
-              <SubscribeForm onSuccess={handleUpgradeSuccess} tierName={tierInfo.name} />
-            </Elements>
+            <div className="relative">
+              {refreshingPayment && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p className="text-sm text-muted-foreground">Applying discount...</p>
+                  </div>
+                </div>
+              )}
+              <Elements stripe={stripePromise} options={{ clientSecret }}>
+                <SubscribeForm onSuccess={handleUpgradeSuccess} tierName={tierInfo.name} />
+              </Elements>
+            </div>
           </div>
         </div>
       </div>
