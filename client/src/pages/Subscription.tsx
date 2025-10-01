@@ -97,9 +97,10 @@ export default function Subscription() {
   const isFree = role === 'free_tier';
 
   useEffect(() => {
+    console.log('[useEffect] Triggered - showPaymentForm:', showPaymentForm, 'clientSecret:', !!clientSecret, 'selectedTier:', selectedTier);
     // Only fetch payment intent if user wants to upgrade
     if (showPaymentForm && !clientSecret) {
-      console.log('[Subscription Frontend] Calling /api/get-or-create-subscription');
+      console.log('[Subscription Frontend] Calling /api/get-or-create-subscription with tier:', selectedTier);
       apiRequest("POST", "/api/get-or-create-subscription", { tier: selectedTier })
         .then((res) => {
           console.log('[Subscription Frontend] Response status:', res.status);
@@ -112,8 +113,10 @@ export default function Subscription() {
           return res.json();
         })
         .then((data) => {
-          console.log('[Subscription Frontend] Got clientSecret:', !!data.clientSecret);
+          console.log('[Subscription Frontend] Got data:', data);
+          console.log('[Subscription Frontend] Got clientSecret:', !!data.clientSecret, 'value:', data.clientSecret);
           setClientSecret(data.clientSecret);
+          console.log('[Subscription Frontend] clientSecret state updated');
         })
         .catch((error) => {
           console.error('[Subscription Frontend] Error:', error);
@@ -156,9 +159,11 @@ export default function Subscription() {
   };
 
   const confirmUpgrade = () => {
+    console.log('[confirmUpgrade] Starting upgrade flow, pendingTier:', pendingTier);
     setShowUpgradeDialog(false);
     setSelectedTier(pendingTier);
     setShowPaymentForm(true);
+    console.log('[confirmUpgrade] State updates triggered');
   };
 
   const subscriptionPlans = [
@@ -221,7 +226,10 @@ export default function Subscription() {
     }
   ];
 
+  console.log('[Render] State check - showPaymentForm:', showPaymentForm, 'clientSecret:', !!clientSecret, 'clientSecret length:', clientSecret?.length);
+
   if (showPaymentForm && clientSecret) {
+    console.log('[Render] Rendering payment form for tier:', selectedTier);
     const tierInfo = selectedTier === 'commissioner' 
       ? { name: 'Commissioner', price: '$12' } 
       : { name: 'Player Pro', price: '$8' };
