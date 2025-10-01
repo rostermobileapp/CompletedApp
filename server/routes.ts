@@ -130,11 +130,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Promo code is required" });
       }
 
-      // Search for promotion code in Stripe
+      // Search for promotion code in Stripe with expanded coupon
       const promoCodes = await stripe.promotionCodes.list({
         code: code.trim(),
         active: true,
         limit: 1,
+        expand: ['data.coupon'],
       });
 
       if (promoCodes.data.length === 0) {
@@ -142,9 +143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const promoCode = promoCodes.data[0];
-      
-      // Expand the coupon details
-      const coupon = await stripe.coupons.retrieve(promoCode.coupon as string);
+      const coupon = promoCode.coupon as any; // Already expanded
 
       res.json({
         id: promoCode.id,
