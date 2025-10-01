@@ -100,7 +100,11 @@ const SubscribeForm = ({ onSuccess, tierName, mode = 'payment' }: { onSuccess: (
     <form onSubmit={handleSubmit} className="space-y-6">
       <PaymentElement options={{ 
         layout: 'tabs',
-        paymentMethodOrder: ['card']
+        paymentMethodOrder: ['card'],
+        wallets: {
+          applePay: 'never',
+          googlePay: 'never'
+        }
       }} />
       <button
         type="submit"

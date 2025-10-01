@@ -342,6 +342,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             currency: (latestInvoice as any).currency,
             customer: customer.id,
             setup_future_usage: 'off_session',
+            payment_method_types: ['card'],
+            automatic_payment_methods: { enabled: false },
             metadata: {
               invoice_id: latestInvoice.id,
               subscription_id: subscription.id,
