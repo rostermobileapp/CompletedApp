@@ -149,14 +149,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log('[PromoCode] Found promo code:', matchingPromo.id);
+      console.log('[PromoCode] Promo code object:', JSON.stringify(matchingPromo, null, 2));
 
       // Extract coupon - it's already expanded, but might be string or object
       const promoCoupon = (matchingPromo as any).coupon;
+      console.log('[PromoCode] Extracted coupon:', promoCoupon);
+      
+      if (!promoCoupon) {
+        console.error('[PromoCode] No coupon found on promo code object');
+        return res.status(400).json({ message: "Invalid promo code structure - no coupon found" });
+      }
+
       let coupon;
       if (typeof promoCoupon === 'string') {
+        console.log('[PromoCode] Coupon is string ID, retrieving:', promoCoupon);
         coupon = await stripe.coupons.retrieve(promoCoupon);
       } else {
+        console.log('[PromoCode] Coupon is expanded object');
         coupon = promoCoupon;
+      }
+
+      if (!coupon) {
+        console.error('[PromoCode] Failed to get coupon details');
+        return res.status(400).json({ message: "Invalid promo code - no coupon details" });
       }
 
       // Prevent caching
