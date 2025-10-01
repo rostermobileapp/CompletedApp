@@ -1,14 +1,17 @@
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, Star, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Crown, Star, ExternalLink, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
-
-const STRIPE_BILLING_PORTAL_URL = 'https://billing.stripe.com/p/login/9B68wO7cJ5ENeUqaaD2B200';
+import { useState } from 'react';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Subscription() {
   const { role } = usePermissions();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
@@ -74,8 +77,23 @@ export default function Subscription() {
     }
   ];
 
-  const handleManageSubscription = () => {
-    window.open(STRIPE_BILLING_PORTAL_URL, '_blank', 'noopener,noreferrer');
+  const handleManageSubscription = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiRequest('POST', '/api/stripe/create-portal-session');
+      const data = await response.json() as { url: string };
+      
+      // Open billing portal in same window
+      window.location.href = data.url;
+    } catch (error: any) {
+      console.error('Error creating portal session:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to open subscription management. Please try again.',
+        variant: 'destructive',
+      });
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -126,11 +144,21 @@ export default function Subscription() {
           {!isFree && (
             <button
               onClick={handleManageSubscription}
-              className="w-full mt-4 bg-primary text-primary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors"
+              disabled={isLoading}
+              className="w-full mt-4 bg-primary text-primary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="button-manage-subscription"
             >
-              Manage Subscription via Stripe
-              <ExternalLink className="w-4 h-4" />
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  Manage Subscription via Stripe
+                  <ExternalLink className="w-4 h-4" />
+                </>
+              )}
             </button>
           )}
         </div>
@@ -177,16 +205,25 @@ export default function Subscription() {
 
               <button
                 onClick={handleManageSubscription}
-                disabled={plan.buttonDisabled}
+                disabled={plan.buttonDisabled || isLoading}
                 className={`w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${
                   plan.current
                     ? 'bg-secondary text-secondary-foreground cursor-not-allowed'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
                 }`}
                 data-testid={`button-${plan.tier}`}
               >
-                {plan.buttonText}
-                {!plan.current && <ExternalLink className="w-4 h-4" />}
+                {isLoading && !plan.current ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    {plan.buttonText}
+                    {!plan.current && <ExternalLink className="w-4 h-4" />}
+                  </>
+                )}
               </button>
             </div>
           ))}

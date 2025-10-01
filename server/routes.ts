@@ -121,6 +121,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     apiVersion: "2024-11-20.acacia",
   });
 
+  // Create billing portal session - creates customer in Stripe if needed
+  app.post('/api/stripe/create-portal-session', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      let customerId = user.stripeCustomerId;
+
+      // Create Stripe customer if they don't have one
+      if (!customerId) {
+        console.log('[Stripe] Creating new customer for user:', userId);
+        const customer = await stripe.customers.create({
+          email: user.email || undefined,
+          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+          metadata: {
+            userId: userId,
+          },
+        });
+        
+        customerId = customer.id;
+        
+        // Save customer ID to database
+        await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
+        console.log('[Stripe] Created customer:', customerId);
+      }
+
+      // Create billing portal session
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: `${process.env.REPL_HOME || 'http://localhost:5000'}/subscription`,
+      });
+
+      res.json({ url: portalSession.url });
+    } catch (error: any) {
+      console.error('[Stripe] Error creating portal session:', error);
+      res.status(500).json({ message: 'Failed to create billing portal session' });
+    }
+  });
+
   // Stripe webhook handler - Note: This endpoint needs raw body, configured in server/index.ts
   app.post('/api/stripe-webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
