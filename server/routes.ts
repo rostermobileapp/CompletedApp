@@ -4291,26 +4291,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (scrimmage.creatorId !== userId) {
         return res.status(403).json({ message: 'Only the creator can delete this scrimmage' });
       }
-      
-      // Business invariant: Cannot delete scrimmage that has already started
-      const now = new Date();
-      if (scrimmage.dateTime <= now) {
-        return res.status(409).json({ message: 'Cannot delete scrimmage that has already started or ended' });
-      }
-      
-      // Check if there are accepted players
-      const acceptedRequests = await storage.getScrimmageRequests(scrimmageId);
-      const hasAcceptedPlayers = acceptedRequests.some(req => req.status === 'approved');
-      
-      if (hasAcceptedPlayers) {
-        // Don't allow deletion if less than 24 hours away and has accepted players
-        const hoursUntil = (scrimmage.dateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-        if (hoursUntil < 24) {
-          return res.status(409).json({ 
-            message: 'Cannot delete scrimmage with accepted players less than 24 hours before scheduled time. Consider cancelling instead.' 
-          });
-        }
-      }
 
       await storage.deleteScrimmage(scrimmageId);
       res.json({ message: 'Scrimmage deleted successfully' });
