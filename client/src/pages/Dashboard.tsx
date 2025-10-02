@@ -726,7 +726,7 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const tier = (user as any)?.subscriptionTier || 'free';
+  const tier = (user as any)?.role || 'free_tier';
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
@@ -1006,15 +1006,15 @@ export default function Dashboard() {
             
             <span 
               className={`tier-badge text-xs px-2 py-1 rounded-full font-semibold ${
-                tier === 'commissioner' 
+                tier === 'commissioner' || tier === 'secondary_commissioner'
                   ? 'bg-warning text-black' 
-                  : tier === 'player_plus' 
+                  : tier === 'player_pro' 
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-secondary text-secondary-foreground'
               }`}
               data-testid="badge-subscription-tier"
             >
-              {tier === 'commissioner' ? 'COMMISSIONER' : tier === 'player_plus' ? 'PLAYER PLUS' : 'FREE'}
+              {tier === 'commissioner' || tier === 'secondary_commissioner' ? 'COMMISSIONER' : tier === 'player_pro' ? 'PLAYER PRO' : 'FREE'}
             </span>
             
             <button 
