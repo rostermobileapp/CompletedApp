@@ -7,10 +7,21 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
+import { apiRequest } from '@/lib/queryClient';
 
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<'created' | 'received'>('created');
+
+  // Fetch unpaid count for badge
+  const { data: unpaidCount } = useQuery({
+    queryKey: ['/api/payment-requests/unpaid-count'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/payment-requests/unpaid-count');
+      return response.json();
+    },
+    refetchInterval: 30000, // Check every 30 seconds
+  });
 
   // Fetch payment requests created by the user
   const { data: createdRequests = [], isLoading: createdLoading } = useQuery({
@@ -168,9 +179,14 @@ export default function PaymentRequests() {
               <DollarSign className="w-4 h-4 mr-2" />
               Created by Me
             </TabsTrigger>
-            <TabsTrigger value="received" data-testid="tab-received">
+            <TabsTrigger value="received" data-testid="tab-received" className="relative">
               <Users className="w-4 h-4 mr-2" />
               Requests for Me
+              {unpaidCount && unpaidCount.count > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+                  {unpaidCount.count}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
