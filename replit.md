@@ -34,6 +34,40 @@ Authorization is implemented at both the API level (middleware checks) and UI le
 
 # Recent Changes
 
+## Payment Request and Tracking Feature (October 2025)
+
+Implemented a comprehensive payment request and tracking system that allows league members to create, manage, and track payment requests for team activities, scrimmages, and other league expenses:
+
+- **Payment Request Creation**: Users can create payment requests with title, description, amount per person, optional deadline, and select multiple recipients from their league members
+- **Recipient Management**: Each payment request tracks individual recipients with their payment status (paid/pending), payment method used (Venmo/CashApp/Cash/Other), and payment timestamps
+- **Payment Method Preferences**: Users can add their Venmo and CashApp usernames to their profile for easy payment collection
+- **Dashboard Views**: 
+  - "Created by Me" tab shows payment requests the user has created with progress tracking
+  - "Requests for Me" tab shows payment requests where the user is a recipient
+  - Visual progress bars and overdue indicators for better tracking
+- **Payment Status Management**: 
+  - Creators and recipients can mark payments as paid and specify the payment method
+  - Real-time progress tracking shows paid vs. pending recipients
+- **Scrimmage Integration**:
+  - Added optional "Cost Per Player" field to scrimmage creation form
+  - After finalizing a scrimmage roster, creators can automatically generate payment requests for all approved players
+  - Payment requests link back to their associated scrimmages for context
+- **Navigation**: Added "Payments" card to the Dashboard for easy access to payment request features
+- **Database Schema**: 
+  - `payment_requests` table stores request details with optional links to scrimmages/conversations
+  - `payment_request_recipients` table tracks individual payment status with unique constraint per user per request
+  - Proper foreign key relationships and cascade deletions for data integrity
+
+**API Endpoints**:
+- `POST /api/payment-requests`: Create new payment request
+- `GET /api/payment-requests/:id`: Get payment request details
+- `GET /api/payment-requests/created/by-me`: List created requests
+- `GET /api/payment-requests/received/by-me`: List received requests
+- `PATCH /api/payment-request-recipients/:id`: Update payment status
+- `DELETE /api/payment-requests/:id`: Delete payment request
+
+This feature streamlines team payment collection for ice time, equipment, tournaments, and other shared expenses, making financial management easier for captains and league organizers.
+
 ## Stripe Checkout Integration (October 2025)
 
 Replaced in-app payment processing with direct Stripe Checkout and Billing Portal integration for a secure, seamless subscription management experience:

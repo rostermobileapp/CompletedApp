@@ -308,8 +308,7 @@ export default function CreatePaymentRequest() {
                       {filteredMembers.map((member: any) => (
                         <div
                           key={member.user.id}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 cursor-pointer"
-                          onClick={() => toggleRecipientSelection(member.user.id)}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50"
                           data-testid={`recipient-item-${member.user.id}`}
                         >
                           <Checkbox
