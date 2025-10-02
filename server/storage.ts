@@ -4103,6 +4103,7 @@ export class DatabaseStorage implements IStorage {
         userPhoneNumber: users.phoneNumber,
         userCity: users.city,
         userPrimarySport: users.primarySport,
+        userPlayerType: users.playerType,
         userCreatedAt: users.createdAt,
         userUpdatedAt: users.updatedAt,
         // New permission fields
@@ -4167,6 +4168,7 @@ export class DatabaseStorage implements IStorage {
         phoneNumber: r.userPhoneNumber,
         city: r.userCity,
         primarySport: r.userPrimarySport,
+        playerType: r.userPlayerType,
         createdAt: r.userCreatedAt,
         updatedAt: r.userUpdatedAt,
         // New permission fields
@@ -4354,6 +4356,7 @@ export class DatabaseStorage implements IStorage {
         userPhoneNumber: users.phoneNumber,
         userCity: users.city,
         userPrimarySport: users.primarySport,
+        userPlayerType: users.playerType,
         userCreatedAt: users.createdAt,
         userUpdatedAt: users.updatedAt,
         // New permission fields
@@ -4412,6 +4415,7 @@ export class DatabaseStorage implements IStorage {
             phoneNumber: gameStat.userPhoneNumber,
             city: gameStat.userCity,
             primarySport: gameStat.userPrimarySport,
+            playerType: gameStat.userPlayerType,
             createdAt: gameStat.userCreatedAt,
             updatedAt: gameStat.userUpdatedAt,
             // New permission fields

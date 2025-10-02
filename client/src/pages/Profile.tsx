@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { apiRequest } from '@/lib/queryClient';
@@ -16,9 +16,9 @@ import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const profileSchema = z.object({
-  firstName: z.string().min(1, 'First name is required').optional(),
-  lastName: z.string().min(1, 'Last name is required').optional(),
-  dateOfBirth: z.string().min(1, 'Date of birth is required').optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  dateOfBirth: z.string().optional(),
   phoneNumber: z.string().optional(),
   city: z.string().optional(),
   playerType: z.enum(['Skater', 'Goalie']).optional(),
@@ -424,18 +424,24 @@ export default function Profile() {
               
               <div>
                 <label className="block text-sm font-medium mb-1">Player Type</label>
-                <Select
-                  value={form.watch('playerType') || ''}
-                  onValueChange={(value) => form.setValue('playerType', value as 'Skater' | 'Goalie')}
-                >
-                  <SelectTrigger className="w-full" data-testid="select-player-type">
-                    <SelectValue placeholder="Select player type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Skater" data-testid="option-skater">Skater</SelectItem>
-                    <SelectItem value="Goalie" data-testid="option-goalie">Goalie</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="playerType"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger className="w-full" data-testid="select-player-type">
+                        <SelectValue placeholder="Select player type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Skater" data-testid="option-skater">Skater</SelectItem>
+                        <SelectItem value="Goalie" data-testid="option-goalie">Goalie</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
               
               <button
