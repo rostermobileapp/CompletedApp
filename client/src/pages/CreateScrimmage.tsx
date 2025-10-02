@@ -10,6 +10,7 @@ import { useLocation } from 'wouter';
 import { createScrimmageRequestSchema } from '@shared/schema';
 import { z } from 'zod';
 import { usePermissions } from '@/context/SubscriptionContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,6 +41,7 @@ export default function CreateScrimmage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { canAccessPremiumFeatures } = usePermissions();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
@@ -106,9 +108,15 @@ export default function CreateScrimmage() {
         costPerPlayer: data.costPerPlayer ? data.costPerPlayer : null, // Optional cost
       };
 
+      // Filter out the creator from selectedMemberIds (they don't need to invite themselves)
+      const userId = (user as any)?.id;
+      const filteredMemberIds = userId 
+        ? data.selectedMemberIds.filter(id => id !== userId)
+        : data.selectedMemberIds;
+
       const response = await apiRequest('POST', '/api/scrimmages', {
         ...scrimmageData,
-        selectedMemberIds: data.selectedMemberIds, // Include for targeted announcements
+        selectedMemberIds: filteredMemberIds, // Include for targeted announcements
       });
       return response.json();
     },
