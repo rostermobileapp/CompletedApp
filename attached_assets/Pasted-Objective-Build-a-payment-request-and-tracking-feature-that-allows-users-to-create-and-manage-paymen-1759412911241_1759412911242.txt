@@ -1,0 +1,158 @@
+Objective
+Build a payment request and tracking feature that allows users to create and manage payment requests (invoices) from other users, with external payment method integration.
+Core Features
+1. Payment Request/Invoice Creation
+Create a standalone invoice system with the following fields:
+
+Invoice title/description (what the payment is for)
+Amount per person ($)
+Payment deadline (date picker)
+List of recipients (select multiple users)
+Payment method links (Venmo, CashApp)
+Notes/additional details (optional text area)
+
+2. Invoice Display & Management
+For the invoice creator:
+
+View all sent invoices with status overview
+For each recipient, display:
+
+Name
+Payment status (checkbox: Paid/Unpaid)
+Payment method used (dropdown: Venmo, CashApp, Cash, or blank)
+Ability to manually mark as paid and record payment method
+
+
+Show total collected vs. total expected
+Visual indicators for overdue invoices
+
+For invoice recipients:
+
+View all received payment requests
+See payment details (amount, deadline, what it's for)
+Quick access buttons to external payment links (Venmo/CashApp)
+Mark as paid on their end (optional)
+
+3. Integration with Schedule Scrimmage Feature
+Enhance the existing scrimmage scheduling with:
+
+Add optional "Cost per player" field in scrimmage creation form
+When players are approved for the scrimmage, automatically generate and send payment requests to approved players
+Link invoice to the specific scrimmage event
+Display payment status within scrimmage details (who has paid)
+
+4. Integration with Messaging Feature
+Add invoice creation capability within message threads:
+
+Add "Request Payment" button/option in message thread interface
+Quick invoice creation modal that:
+
+Auto-populates recipient(s) based on conversation participants
+Allows creator to fill in amount, deadline, and description
+Sends invoice as a special message type in the thread
+
+
+Invoice message displays as a card/component showing:
+
+Invoice summary (amount, deadline, what it's for)
+"View Invoice" button that links to full invoice detail screen
+Payment status indicator (if recipient has paid)
+
+
+Invoice remains accessible in thread history
+Both parties can click through to full invoice management screen
+
+5. User Profile Payment Integration
+Add to user profiles:
+
+Fields for Venmo username/link
+Fields for CashApp username/link
+Display payment links as clickable buttons/links on profile view
+Allow users to edit their own payment information in settings
+When viewing another user's profile, show their payment methods as actionable links
+
+Technical Requirements
+Data Structure
+Invoice/PaymentRequest:
+- id
+- creatorId
+- title/description
+- amountPerPerson
+- deadline
+- recipients: [{ userId, isPaid, paymentMethod, paidDate }]
+- relatedScrimmageId (optional)
+- relatedMessageThreadId (optional)
+- createdDate
+- notes
+
+User Profile Addition:
+- venmoUsername or venmoLink
+- cashappUsername or cashappLink
+
+Message Type Addition:
+- type: 'payment_request'
+- invoiceId: reference to invoice
+External Payment Links
+
+Venmo: https://venmo.com/[username] or venmo://paycharge?txn=pay&recipients=[username]&amount=[amount]&note=[note]
+CashApp: https://cash.app/$[username] or cashapp://cash.app/$[username]
+Links should open in new tab/window
+Important: No actual payment processing occurs in-app
+
+UI/UX Considerations
+
+Clear visual distinction between paid/unpaid recipients
+Color-coded status indicators (green for paid, red for overdue, yellow for pending)
+Easy-to-use checkboxes and dropdowns for tracking
+Mobile-responsive design
+Confirmation dialogs before creating invoices
+Notifications/alerts for new payment requests and approaching deadlines
+Invoice messages in threads should be visually distinct from regular messages (card-style layout)
+Smooth navigation from message thread to invoice detail screen
+
+User Flow Examples
+Creating a standalone invoice:
+
+User clicks "Request Payment" or "Create Invoice"
+Fills in details (what for, amount, deadline, recipients)
+Adds their Venmo/CashApp info for recipients to use
+Sends invoice
+Recipients receive notification with payment request details
+Creator tracks who has paid via checkbox system
+
+Scrimmage-integrated invoice:
+
+User creates scrimmage with "Cost: $15 per player"
+Players apply/get approved
+System auto-generates invoice for each approved player
+Players see payment request in their dashboard linked to the scrimmage
+Organizer tracks payments within scrimmage management view
+
+Message thread invoice:
+
+User is chatting with another user or group
+Clicks "Request Payment" button in message interface
+Quick modal appears with invoice form (recipient pre-filled)
+Fills in amount, deadline, and description
+Invoice is sent as special message in thread
+Recipient sees invoice card in conversation with "View Invoice" button
+Both parties can click to full invoice screen to manage/track payment
+Payment status updates reflect in both the message thread and invoice detail screen
+
+Making a payment:
+
+User receives payment request (via standalone, scrimmage, or message)
+Clicks on creator's Venmo/CashApp link in the invoice
+External app opens (or web browser)
+Completes payment outside the app
+Returns to app and optionally marks as paid
+Creator confirms payment and checks them off
+
+Key Reminders
+
+NO in-app payment processing
+All payments happen externally via Venmo, CashApp, or cash
+System is purely for tracking and request management
+Focus on simplicity and ease of use
+Ensure clear communication that payments are external
+Maintain consistency across all three invoice creation methods (standalone, scrimmage, messaging)
