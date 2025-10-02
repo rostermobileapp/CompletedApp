@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
 import { 
   Megaphone, 
@@ -47,6 +48,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { EnhancedMediaUploader } from '@/components/EnhancedMediaUploader';
+import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 
 // Types
 type AnnouncementReaction = {
@@ -1009,6 +1011,7 @@ function AnnouncementCard({
 
 export default function Announcements() {
   const { user } = useAuth();
+  const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -1092,6 +1095,7 @@ export default function Announcements() {
 
   return (
     <div className="min-h-screen bg-background">
+      <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()} className="min-h-screen">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
         <div className="max-w-2xl mx-auto px-4 py-4">
@@ -1181,6 +1185,7 @@ export default function Announcements() {
         leagueId={leagueId}
         canPost={canPost}
       />
+      </FeatureLockOverlay>
     </div>
   );
 }
