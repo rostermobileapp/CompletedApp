@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PlayerStatsUnion, GoalieStats, SkaterStats } from '@shared/schema';
+import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 
 export default function Stats() {
   const { user } = useAuth();
@@ -248,6 +249,7 @@ export default function Stats() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="stats-page">
+      <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()} className="min-h-screen flex flex-col">
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center justify-between gap-4 mb-6">
@@ -623,6 +625,7 @@ export default function Stats() {
           )}
         </Card>
       </div>
+      </FeatureLockOverlay>
     </div>
   );
 }
