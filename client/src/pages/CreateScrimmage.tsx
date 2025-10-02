@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -42,6 +42,18 @@ export default function CreateScrimmage() {
   const { canAccessPremiumFeatures } = usePermissions();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+
+  // Check permissions - free tier users cannot create scrimmages
+  useEffect(() => {
+    if (!canAccessPremiumFeatures) {
+      toast({
+        title: "Premium Feature",
+        description: "Creating scrimmages is only available for Player Pro and Commissioner users.",
+        variant: "destructive",
+      });
+      navigate('/');
+    }
+  }, [canAccessPremiumFeatures, navigate, toast]);
 
   const form = useForm<CreateScrimmageForm>({
     resolver: zodResolver(createScrimmageSchema),
