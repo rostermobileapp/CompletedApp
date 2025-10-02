@@ -141,9 +141,6 @@ export default function ScrimmageManagement() {
   const getApprovedRequests = (requests: ScrimmageRequestWithPlayer[]) => 
     requests.filter(r => r.status === 'approved');
 
-  // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
-  // All users now have player_plus access to manage scrimmages
-
   // Show error states
   if (scrimmagesError) {
     return (
@@ -242,11 +239,15 @@ export default function ScrimmageManagement() {
             <Crown className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-semibold mb-2">No Scrimmages Created</h3>
             <p className="text-muted-foreground mb-4">
-              You haven't created any scrimmages yet. Create your first scrimmage to start managing teams!
+              {canAccessPremiumFeatures() 
+                ? "You haven't created any scrimmages yet. Create your first scrimmage to start managing teams!"
+                : "Creating scrimmages requires Player Pro subscription or higher."}
             </p>
-            <Button onClick={() => navigate('/create-scrimmage')} data-testid="button-create-first-scrimmage">
-              Create Scrimmage
-            </Button>
+            {canAccessPremiumFeatures() && (
+              <Button onClick={() => navigate('/create-scrimmage')} data-testid="button-create-first-scrimmage">
+                Create Scrimmage
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
