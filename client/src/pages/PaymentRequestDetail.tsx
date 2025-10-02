@@ -43,6 +43,23 @@ export default function PaymentRequestDetail() {
     },
   });
 
+  const confirmRecipientMutation = useMutation({
+    mutationFn: async ({ recipientId, isConfirmed }: { recipientId: string; isConfirmed: boolean }) => {
+      const response = await apiRequest('PATCH', `/api/payment-request-recipients/${recipientId}/confirm`, {
+        isConfirmed,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Payment confirmation updated' });
+      queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update confirmation', variant: 'destructive' });
+    },
+  });
+
   const deletePaymentRequestMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('DELETE', `/api/payment-requests/${id}`);
@@ -238,11 +255,39 @@ export default function PaymentRequestDetail() {
 
                   <div className="flex items-center gap-3">
                     {recipient.isPaid ? (
-                      <div className="flex items-center gap-2 text-green-600">
-                        <CheckCircle2 className="w-5 h-5" />
-                        <span className="text-sm font-medium">Paid</span>
-                        {recipient.paymentMethod && (
-                          <span className="text-xs text-muted-foreground">({recipient.paymentMethod})</span>
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-2 text-green-600">
+                          <CheckCircle2 className="w-5 h-5" />
+                          <span className="text-sm font-medium">Paid</span>
+                          {recipient.paymentMethod && (
+                            <span className="text-xs text-muted-foreground">({recipient.paymentMethod})</span>
+                          )}
+                        </div>
+                        {isCreator && (
+                          recipient.isConfirmed ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-green-600 font-medium">✓ Confirmed</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => confirmRecipientMutation.mutate({ recipientId: recipient.id, isConfirmed: false })}
+                                data-testid={`button-unconfirm-${recipient.id}`}
+                              >
+                                Unconfirm
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => confirmRecipientMutation.mutate({ recipientId: recipient.id, isConfirmed: true })}
+                              data-testid={`button-confirm-${recipient.id}`}
+                            >
+                              Confirm Payment
+                            </Button>
+                          )
                         )}
                       </div>
                     ) : canUpdate ? (
