@@ -1783,8 +1783,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         submitterRole = 'commissioner';
       } else {
         // Check if user is captain of home team
-        const leagueMembers = await storage.getLeagueMembers(game.leagueId);
-        // Check if user is captain of the home team
         const homeTeam = await storage.getTeam(game.homeTeamId);
         const homeTeamCaptain = homeTeam && homeTeam.captainId === userId;
         
@@ -1792,7 +1790,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           submitterRole = 'home_captain';
         } else {
           // Check if user is captain of away team
-          // Check if user is captain of the away team
           const awayTeam = await storage.getTeam(game.awayTeamId);
           const awayTeamCaptain = awayTeam && awayTeam.captainId === userId;
           
@@ -1802,10 +1799,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // For now, allow any authenticated user to submit scores (simplified access control)
-      // Default to home_captain role if no specific role found
+      // Only captains and commissioners can submit scores
       if (!submitterRole) {
-        submitterRole = 'home_captain'; // Default role for authenticated users
+        return res.status(403).json({ 
+          message: "Access denied. Only team captains and commissioners can submit scores." 
+        });
       }
 
       // Create the score submission
@@ -1878,12 +1876,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isHomeCaptain = homeTeam && homeTeam.captainId === userId;
       const isAwayCaptain = awayTeam && awayTeam.captainId === userId;
       
-      // For now, allow any authenticated user to access (simplified access control)
-      // TODO: Implement proper team membership checking when teams have members
-      const hasAccess = true; // isCommissioner || isHomeCaptain || isAwayCaptain;
+      const hasAccess = isCommissioner || isHomeCaptain || isAwayCaptain;
 
       if (!hasAccess) {
-        return res.status(403).json({ message: "Access denied" });
+        return res.status(403).json({ 
+          message: "Access denied. Only team captains and commissioners can view score submissions." 
+        });
       }
 
       const submissions = await storage.getGameScoreSubmissions(gameId);
