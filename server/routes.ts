@@ -50,6 +50,8 @@ import {
   createLineCombinationAssignmentRequestSchema,
   updateLineCombinationRequestSchema,
   createFeedbackSubmissionSchema,
+  createPaymentRequestSchema,
+  updatePaymentRequestRecipientSchema,
 } from "@shared/schema";
 import { z, ZodError } from "zod";
 import multer from "multer";
@@ -6344,6 +6346,232 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error submitting feedback:", error);
       res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  // Payment request routes
+  // Create a new payment request
+  app.post('/api/payment-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Validate request body using Zod schema
+      const validatedData = createPaymentRequestSchema.parse(req.body);
+
+      const paymentRequest = await storage.createPaymentRequest({
+        creatorId: userId,
+        title: validatedData.title,
+        description: validatedData.description,
+        amountPerPerson: validatedData.amountPerPerson,
+        deadline: validatedData.deadline || null,
+        relatedScrimmageId: validatedData.relatedScrimmageId || null,
+        relatedConversationId: validatedData.relatedConversationId || null,
+      }, validatedData.recipientUserIds);
+
+      res.json(paymentRequest);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid payment request data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error creating payment request:", error);
+      res.status(500).json({ message: "Failed to create payment request" });
+    }
+  });
+
+  // Get a specific payment request with all details
+  app.get('/api/payment-requests/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const paymentRequest = await storage.getPaymentRequest(id);
+
+      if (!paymentRequest) {
+        return res.status(404).json({ message: "Payment request not found" });
+      }
+
+      // Check if user is creator or recipient
+      const isCreator = paymentRequest.creatorId === userId;
+      const isRecipient = paymentRequest.recipients.some(r => r.userId === userId);
+
+      if (!isCreator && !isRecipient) {
+        return res.status(403).json({ message: "You do not have access to this payment request" });
+      }
+
+      res.json(paymentRequest);
+    } catch (error) {
+      console.error("Error fetching payment request:", error);
+      res.status(500).json({ message: "Failed to fetch payment request" });
+    }
+  });
+
+  // Get payment requests created by the current user
+  app.get('/api/payment-requests/created/by-me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const paymentRequests = await storage.getPaymentRequestsByCreator(userId);
+      res.json(paymentRequests);
+    } catch (error) {
+      console.error("Error fetching created payment requests:", error);
+      res.status(500).json({ message: "Failed to fetch payment requests" });
+    }
+  });
+
+  // Get payment requests where the current user is a recipient
+  app.get('/api/payment-requests/received/by-me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const paymentRequests = await storage.getPaymentRequestsByRecipient(userId);
+      res.json(paymentRequests);
+    } catch (error) {
+      console.error("Error fetching received payment requests:", error);
+      res.status(500).json({ message: "Failed to fetch payment requests" });
+    }
+  });
+
+  // Get payment requests for a specific scrimmage
+  app.get('/api/scrimmages/:scrimmageId/payment-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { scrimmageId } = req.params;
+
+      // Verify user has access to this scrimmage
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: "Scrimmage not found" });
+      }
+
+      // Check if user is the creator or a participant in the scrimmage
+      const isCreator = scrimmage.creatorId === userId;
+      const userRequest = await db.query.scrimmageRequests.findFirst({
+        where: (requests, { eq, and }) => and(
+          eq(requests.scrimmageId, scrimmageId),
+          eq(requests.playerId, userId)
+        ),
+      });
+      const isParticipant = !!userRequest;
+
+      if (!isCreator && !isParticipant) {
+        return res.status(403).json({ message: "You do not have access to this scrimmage" });
+      }
+
+      const paymentRequests = await storage.getPaymentRequestsByScrimmage(scrimmageId);
+      res.json(paymentRequests);
+    } catch (error) {
+      console.error("Error fetching scrimmage payment requests:", error);
+      res.status(500).json({ message: "Failed to fetch payment requests" });
+    }
+  });
+
+  // Get payment requests for a specific conversation
+  app.get('/api/conversations/:conversationId/payment-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { conversationId } = req.params;
+
+      // Verify user is a participant in this conversation
+      const isParticipant = await messagingService.isUserInConversation(userId, conversationId);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant in this conversation" });
+      }
+
+      const paymentRequests = await storage.getPaymentRequestsByConversation(conversationId);
+      res.json(paymentRequests);
+    } catch (error) {
+      console.error("Error fetching conversation payment requests:", error);
+      res.status(500).json({ message: "Failed to fetch payment requests" });
+    }
+  });
+
+  // Update a payment request recipient (mark as paid/unpaid, set payment method)
+  app.patch('/api/payment-request-recipients/:recipientId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { recipientId } = req.params;
+      
+      // Validate request body using Zod schema
+      const validatedData = updatePaymentRequestRecipientSchema.parse(req.body);
+
+      // Get the payment request to verify permissions
+      const recipient = await db.query.paymentRequestRecipients.findFirst({
+        where: (recipients, { eq }) => eq(recipients.id, recipientId),
+        with: {
+          paymentRequest: true,
+        },
+      });
+
+      if (!recipient) {
+        return res.status(404).json({ message: "Payment recipient not found" });
+      }
+
+      // Only the creator or the recipient themselves can update the payment status
+      const isCreator = recipient.paymentRequest.creatorId === userId;
+      const isRecipient = recipient.userId === userId;
+
+      if (!isCreator && !isRecipient) {
+        return res.status(403).json({ message: "You do not have permission to update this payment" });
+      }
+
+      const updatedRecipient = await storage.updatePaymentRequestRecipient(recipientId, {
+        isPaid: validatedData.isPaid,
+        paymentMethod: validatedData.paymentMethod,
+      });
+
+      res.json(updatedRecipient);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid payment recipient update data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error updating payment recipient:", error);
+      res.status(500).json({ message: "Failed to update payment recipient" });
+    }
+  });
+
+  // Delete a payment request (only by creator)
+  app.delete('/api/payment-requests/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const paymentRequest = await storage.getPaymentRequest(id);
+
+      if (!paymentRequest) {
+        return res.status(404).json({ message: "Payment request not found" });
+      }
+
+      if (paymentRequest.creatorId !== userId) {
+        return res.status(403).json({ message: "Only the creator can delete this payment request" });
+      }
+
+      await storage.deletePaymentRequest(id);
+      res.json({ success: true, message: "Payment request deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting payment request:", error);
+      res.status(500).json({ message: "Failed to delete payment request" });
+    }
+  });
+
+  // Update user payment methods (Venmo/CashApp)
+  app.patch('/api/users/payment-methods', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { venmoUsername, cashappUsername } = req.body;
+
+      const paymentMethods: any = {};
+      if (venmoUsername !== undefined) paymentMethods.venmoUsername = venmoUsername;
+      if (cashappUsername !== undefined) paymentMethods.cashappUsername = cashappUsername;
+
+      const user = await storage.updateUserPaymentMethods(userId, paymentMethods);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating payment methods:", error);
+      res.status(500).json({ message: "Failed to update payment methods" });
     }
   });
 
