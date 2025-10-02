@@ -4090,30 +4090,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Must be an approved league member to create scrimmages" });
       }
 
-      const scrimmage = await storage.createScrimmage(scrimmageData);
-      
-      // Send invitation announcements to selected members
+      // Create announcement first if there are selected members
+      let announcementId = null;
       if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
         try {
-          const invitationContent = `🏒 You're Invited! "${scrimmage.title}" on ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location}. Click to RSVP!`;
+          console.log(`📬 Creating scrimmage invitations for members:`, req.body.selectedMemberIds);
+          
+          const invitationContent = `🏒 You're Invited! "${scrimmageData.title}" on ${format(scrimmageData.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmageData.location}. Click to RSVP!`;
           
           // Create announcement for the scrimmage invitation
           const announcement = await storage.createAnnouncement({
             content: invitationContent,
-            leagueId: scrimmage.leagueId,
+            leagueId: scrimmageData.leagueId,
             authorId: userId,
             isPinned: false,
           });
           
+          announcementId = announcement.id;
+          
           // Create visibility records for invited players
           await storage.createAnnouncementVisibility(announcement.id, req.body.selectedMemberIds);
           
-          console.log(`✅ Created scrimmage ${scrimmage.id} and sent invitations to ${req.body.selectedMemberIds.length} players`);
+          console.log(`✅ Created announcement ${announcement.id} and sent invitations to ${req.body.selectedMemberIds.length} players:`, req.body.selectedMemberIds);
         } catch (announcementError) {
           console.error('Error sending scrimmage invitations:', announcementError);
-          // Don't fail the scrimmage creation if announcement fails
+          // Continue with scrimmage creation even if announcement fails
         }
       }
+      
+      // Create scrimmage with the announcement ID if available
+      const scrimmage = await storage.createScrimmage({
+        ...scrimmageData,
+        announcementId,
+      });
+      
+      console.log(`✅ Created scrimmage ${scrimmage.id}${announcementId ? ` linked to announcement ${announcementId}` : ''}`);
       
       res.status(201).json(scrimmage);
     } catch (error) {
@@ -4586,6 +4597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const invites = await storage.getScrimmageInvitesForUser(userId);
+      console.log(`📩 Scrimmage invites for user ${userId}:`, invites.length > 0 ? invites.map(i => ({ id: i.id, title: i.title, announcementId: i.announcementId })) : 'none');
       res.json(invites);
     } catch (error) {
       console.error('Error fetching user scrimmage invites:', error);

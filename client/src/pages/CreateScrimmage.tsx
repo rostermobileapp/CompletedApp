@@ -118,8 +118,9 @@ export default function CreateScrimmage() {
         description: `"${scrimmage.title}" has been created. Selected members will be notified.`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
       setPageTransitionDirection('down');
-      navigate('/more');
+      navigate(`/scrimmage/${scrimmage.id}`);
     },
     onError: (error: any) => {
       toast({
