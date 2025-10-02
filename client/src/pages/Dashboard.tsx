@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 // 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
+import { usePermissions } from '@/context/SubscriptionContext';
 import { useLocation, Link } from 'wouter';
 import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, DollarSign } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -19,6 +20,7 @@ import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 import FeedbackModal from '@/components/FeedbackModal';
+import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 
 // Notification Badge Component
 function AnnouncementBadge({ leagueId }: { leagueId: string | null }) {
@@ -727,6 +729,7 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
 export default function Dashboard() {
   const { user } = useAuth();
   const tier = (user as any)?.role || 'free_tier';
+  const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
@@ -1117,6 +1120,7 @@ export default function Dashboard() {
           </div>
 
           {/* Standings Card */}
+          <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
           <div 
             className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" 
             data-testid="card-standings"
@@ -1127,6 +1131,7 @@ export default function Dashboard() {
               <p className="text-xs font-medium">Standings</p>
             </div>
           </div>
+          </FeatureLockOverlay>
         </div>
       </div>
       {/* Quick Stats */}
