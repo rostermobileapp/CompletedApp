@@ -1,4 +1,4 @@
-import { Users, MessageCircle, Bird, User } from 'lucide-react';
+import { Users, MessageCircle, DollarSign, User } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
@@ -8,7 +8,7 @@ const navItems = [
   { id: 'teams', icon: Users, label: 'My Team', path: '/teams' },
   { id: 'messages', icon: MessageCircle, label: 'Messages', path: '/messages' },
   { id: 'home', icon: null, label: 'Home', path: '/' },
-  { id: 'more', icon: Bird, label: 'Chirp', path: '/more' },
+  { id: 'payments', icon: DollarSign, label: 'Payments', path: '/payment-requests' },
   { id: 'profile', icon: User, label: 'Profile', path: '/profile' },
 ];
 
@@ -24,11 +24,19 @@ export function BottomNavigation() {
   
   const unreadCount = (unreadData as { count: number } | undefined)?.count ?? 0;
 
+  // Fetch unpaid payment request count
+  const { data: unpaidData } = useQuery({
+    queryKey: ['/api/payment-requests/unpaid-count'],
+    refetchInterval: 30000, // Poll every 30 seconds
+  });
+
+  const unpaidCount = (unpaidData as { count: number } | undefined)?.count ?? 0;
+
   const getActiveId = (pathname: string) => {
     if (pathname === '/') return 'home';
     if (pathname.startsWith('/teams')) return 'teams';
     if (pathname.startsWith('/messages')) return 'messages';
-    if (pathname.startsWith('/more') || pathname.startsWith('/roster')) return 'more';
+    if (pathname.startsWith('/payment-requests') || pathname.startsWith('/create-payment-request')) return 'payments';
     if (pathname.startsWith('/profile') || pathname.startsWith('/subscription')) return 'profile';
     return '';
   };
@@ -61,6 +69,11 @@ export function BottomNavigation() {
                 {id === 'messages' && unreadCount > 0 && (
                   <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid="message-badge">
                     {unreadCount > 99 ? '99+' : unreadCount}
+                  </div>
+                )}
+                {id === 'payments' && unpaidCount > 0 && (
+                  <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid="payment-badge">
+                    {unpaidCount > 99 ? '99+' : unpaidCount}
                   </div>
                 )}
               </div>
