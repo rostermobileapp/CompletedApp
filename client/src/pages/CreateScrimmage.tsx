@@ -26,6 +26,7 @@ const createScrimmageSchema = createScrimmageRequestSchema.extend({
   time: z.string().min(1, 'Time is required'),
   venue: z.string().min(1, 'Venue is required'), // UI field that maps to location
   maxParticipants: z.number().min(2, 'Must have at least 2 participants'), // UI field that maps to maxPlayers
+  costPerPlayer: z.string().optional(), // Optional cost field
 }).omit({
   dateTime: true, // We'll construct this from date + time
   location: true, // We'll map venue to location  
@@ -53,6 +54,7 @@ export default function CreateScrimmage() {
       selectedMemberIds: [],
       venue: '', // UI field that maps to location
       maxParticipants: 20, // UI field that maps to maxPlayers
+      costPerPlayer: '', // Optional cost field
     },
   });
 
@@ -89,6 +91,7 @@ export default function CreateScrimmage() {
         maxPlayers: data.maxParticipants, // Map maxParticipants to maxPlayers
         dateTime: new Date(`${data.date}T${data.time}`), // Combine date and time
         leagueId: selectedLeague.id, // Required by server
+        costPerPlayer: data.costPerPlayer ? data.costPerPlayer : null, // Optional cost
       };
 
       const response = await apiRequest('POST', '/api/scrimmages', {
@@ -308,6 +311,19 @@ export default function CreateScrimmage() {
                   <SelectItem value="30">30 players</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="costPerPlayer">Cost Per Player (Optional)</Label>
+              <Input
+                id="costPerPlayer"
+                {...form.register('costPerPlayer')}
+                placeholder="$20.00"
+                data-testid="input-cost-per-player"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                If there's a cost, you can create a payment request after approval
+              </p>
             </div>
           </div>
         </div>
