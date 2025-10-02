@@ -10,7 +10,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown } from 'lucide-react';
+import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const profileSchema = z.object({
@@ -23,6 +23,13 @@ const profileSchema = z.object({
 
 type ProfileForm = z.infer<typeof profileSchema>;
 
+const paymentMethodsSchema = z.object({
+  venmoUsername: z.string().optional(),
+  cashappUsername: z.string().optional(),
+});
+
+type PaymentMethodsForm = z.infer<typeof paymentMethodsSchema>;
+
 export default function Profile() {
   const { user } = useAuth();
   const { role, hasRole, canManageLeague, canAccessPremiumFeatures } = usePermissions();
@@ -30,6 +37,7 @@ export default function Profile() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingPaymentMethods, setIsEditingPaymentMethods] = useState(false);
 
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -39,6 +47,14 @@ export default function Profile() {
       dateOfBirth: (user as any)?.dateOfBirth || '',
       phoneNumber: (user as any)?.phoneNumber || '',
       city: (user as any)?.city || '',
+    },
+  });
+
+  const paymentMethodsForm = useForm<PaymentMethodsForm>({
+    resolver: zodResolver(paymentMethodsSchema),
+    defaultValues: {
+      venmoUsername: (user as any)?.venmoUsername || '',
+      cashappUsername: (user as any)?.cashappUsername || '',
     },
   });
 
@@ -115,6 +131,24 @@ export default function Profile() {
     onError: () => {
       toast({ 
         title: 'Failed to update profile photo', 
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  const updatePaymentMethodsMutation = useMutation({
+    mutationFn: async (data: PaymentMethodsForm) => {
+      const response = await apiRequest('PATCH', '/api/users/payment-methods', data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Payment methods updated successfully' });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      setIsEditingPaymentMethods(false);
+    },
+    onError: () => {
+      toast({ 
+        title: 'Failed to update payment methods', 
         variant: 'destructive' 
       });
     },
@@ -407,6 +441,76 @@ export default function Profile() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">City:</span>
                 <span>{(user as any)?.city || 'Not specified'}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Payment Methods */}
+      <div className="px-6 mb-6">
+        <div className="bg-card rounded-xl border border-border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold" data-testid="text-payment-methods-title">Payment Methods</h2>
+            </div>
+            <button
+              onClick={() => setIsEditingPaymentMethods(!isEditingPaymentMethods)}
+              className="flex items-center gap-2 text-sm text-primary"
+              data-testid="button-toggle-edit-payment-methods"
+            >
+              {isEditingPaymentMethods ? <X className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
+              {isEditingPaymentMethods ? 'Cancel' : 'Edit'}
+            </button>
+          </div>
+          
+          <p className="text-sm text-muted-foreground mb-4">
+            Add your payment handles to make it easier for others to send you money for games and events.
+          </p>
+          
+          {isEditingPaymentMethods ? (
+            <form onSubmit={paymentMethodsForm.handleSubmit((data) => updatePaymentMethodsMutation.mutate(data))} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Venmo Username</label>
+                <input
+                  {...paymentMethodsForm.register('venmoUsername')}
+                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="@username"
+                  data-testid="input-venmo-username"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Enter your Venmo username (with or without @)</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">CashApp Username</label>
+                <input
+                  {...paymentMethodsForm.register('cashappUsername')}
+                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="$username"
+                  data-testid="input-cashapp-username"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Enter your CashApp username (with or without $)</p>
+              </div>
+              
+              <button
+                type="submit"
+                disabled={updatePaymentMethodsMutation.isPending}
+                className="w-full bg-primary text-primary-foreground rounded-lg py-2 flex items-center justify-center gap-2 disabled:opacity-50"
+                data-testid="button-save-payment-methods"
+              >
+                <Save className="w-4 h-4" />
+                {updatePaymentMethodsMutation.isPending ? 'Saving...' : 'Save Payment Methods'}
+              </button>
+            </form>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Venmo:</span>
+                <span data-testid="text-venmo-username">{(user as any)?.venmoUsername || 'Not set'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">CashApp:</span>
+                <span data-testid="text-cashapp-username">{(user as any)?.cashappUsername || 'Not set'}</span>
               </div>
             </div>
           )}
