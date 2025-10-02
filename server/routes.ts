@@ -6381,33 +6381,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get a specific payment request with all details
-  app.get('/api/payment-requests/:id', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { id } = req.params;
-
-      const paymentRequest = await storage.getPaymentRequest(id);
-
-      if (!paymentRequest) {
-        return res.status(404).json({ message: "Payment request not found" });
-      }
-
-      // Check if user is creator or recipient
-      const isCreator = paymentRequest.creatorId === userId;
-      const isRecipient = paymentRequest.recipients.some(r => r.userId === userId);
-
-      if (!isCreator && !isRecipient) {
-        return res.status(403).json({ message: "You do not have access to this payment request" });
-      }
-
-      res.json(paymentRequest);
-    } catch (error) {
-      console.error("Error fetching payment request:", error);
-      res.status(500).json({ message: "Failed to fetch payment request" });
-    }
-  });
-
   // Get payment requests created by the current user
   app.get('/api/payment-requests/created/by-me', isAuthenticated, async (req: any, res) => {
     try {
@@ -6441,6 +6414,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching unpaid payment request count:", error);
       res.status(500).json({ message: "Failed to fetch unpaid count" });
+    }
+  });
+
+  // Get a specific payment request with all details
+  app.get('/api/payment-requests/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const paymentRequest = await storage.getPaymentRequest(id);
+
+      if (!paymentRequest) {
+        return res.status(404).json({ message: "Payment request not found" });
+      }
+
+      // Check if user is creator or recipient
+      const isCreator = paymentRequest.creatorId === userId;
+      const isRecipient = paymentRequest.recipients.some(r => r.userId === userId);
+
+      if (!isCreator && !isRecipient) {
+        return res.status(403).json({ message: "You do not have access to this payment request" });
+      }
+
+      res.json(paymentRequest);
+    } catch (error) {
+      console.error("Error fetching payment request:", error);
+      res.status(500).json({ message: "Failed to fetch payment request" });
     }
   });
 
