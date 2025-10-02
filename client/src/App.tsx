@@ -28,6 +28,9 @@ import Announcements from "@/pages/Announcements";
 import SubstituteConfirmations from "@/pages/SubstituteConfirmations";
 import Stats from "@/pages/Stats";
 import StatsManagement from "@/pages/StatsManagement";
+import CreatePaymentRequest from "@/pages/CreatePaymentRequest";
+import PaymentRequests from "@/pages/PaymentRequests";
+import PaymentRequestDetail from "@/pages/PaymentRequestDetail";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -78,6 +81,9 @@ function Router() {
             <Route path="/substitute-confirmations" component={SubstituteConfirmations} />
             <Route path="/stats" component={Stats} />
             <Route path="/stats-management" component={StatsManagement} />
+            <Route path="/create-payment-request" component={CreatePaymentRequest} />
+            <Route path="/payment-requests" component={PaymentRequests} />
+            <Route path="/payment-requests/:id" component={PaymentRequestDetail} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>
