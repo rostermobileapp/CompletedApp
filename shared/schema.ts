@@ -100,6 +100,14 @@ export const specialPermissionEnum = pgEnum("special_permission", [
   "stat_manager"
 ]);
 
+// Payment method enum for payment requests
+export const paymentMethodEnum = pgEnum("payment_method", [
+  "venmo",
+  "cashapp",
+  "cash",
+  "other"
+]);
+
 // Users table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -120,6 +128,9 @@ export const users = pgTable("users", {
   // Stripe subscription fields
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
+  // Payment method fields for receiving payments
+  venmoUsername: varchar("venmo_username"),
+  cashappUsername: varchar("cashapp_username"),
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -387,10 +398,11 @@ export const messages = pgTable("messages", {
   conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
   senderId: varchar("sender_id").references(() => users.id).notNull(),
   content: text("content"),
-  messageType: varchar("message_type").default("text").notNull(), // text, image, gif, file
+  messageType: varchar("message_type").default("text").notNull(), // text, image, gif, file, poll, payment_request
   status: messageStatusEnum("status").default("sent").notNull(),
   editedAt: timestamp("edited_at"), // For message editing
   replyToId: varchar("reply_to_id"), // For threaded replies - self reference added later
+  paymentRequestId: varchar("payment_request_id"), // For payment_request messages - reference added later
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -570,6 +582,7 @@ export const scrimmages = pgTable("scrimmages", {
   maxPlayers: integer("max_players").notNull(),
   skillLevel: varchar("skill_level"), // Optional skill level requirement
   notes: text("notes"), // Additional notes/requirements
+  costPerPlayer: decimal("cost_per_player", { precision: 10, scale: 2 }), // Optional cost per player
   status: scrimmageStatusEnum("status").default("open").notNull(),
   announcementId: varchar("announcement_id").references(() => announcements.id), // Link to auto-created announcement
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -587,6 +600,41 @@ export const scrimmageRequests = pgTable("scrimmage_requests", {
   dismissedAt: timestamp("dismissed_at"),
 }, (table) => [
   unique("unique_scrimmage_player_request").on(table.scrimmageId, table.playerId),
+]);
+
+// Payment requests table
+export const paymentRequests = pgTable("payment_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  amountPerPerson: decimal("amount_per_person", { precision: 10, scale: 2 }).notNull(),
+  deadline: timestamp("deadline"),
+  notes: text("notes"),
+  relatedScrimmageId: varchar("related_scrimmage_id").references(() => scrimmages.id),
+  relatedConversationId: varchar("related_conversation_id").references(() => conversations.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_payment_requests_creator").on(table.creatorId),
+  index("idx_payment_requests_scrimmage").on(table.relatedScrimmageId),
+  index("idx_payment_requests_conversation").on(table.relatedConversationId),
+]);
+
+// Payment request recipients table
+export const paymentRequestRecipients = pgTable("payment_request_recipients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  paymentRequestId: varchar("payment_request_id").references(() => paymentRequests.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  isPaid: boolean("is_paid").default(false).notNull(),
+  paymentMethod: paymentMethodEnum("payment_method"),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_payment_request_user").on(table.paymentRequestId, table.userId),
+  index("idx_payment_request_recipients_request").on(table.paymentRequestId),
+  index("idx_payment_request_recipients_user").on(table.userId),
 ]);
 
 // Line combinations enum
@@ -1111,6 +1159,34 @@ export const scrimmageRequestsRelations = relations(scrimmageRequests, ({ one })
   }),
 }));
 
+// Payment request relations
+export const paymentRequestsRelations = relations(paymentRequests, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [paymentRequests.creatorId],
+    references: [users.id],
+  }),
+  relatedScrimmage: one(scrimmages, {
+    fields: [paymentRequests.relatedScrimmageId],
+    references: [scrimmages.id],
+  }),
+  relatedConversation: one(conversations, {
+    fields: [paymentRequests.relatedConversationId],
+    references: [conversations.id],
+  }),
+  recipients: many(paymentRequestRecipients),
+}));
+
+export const paymentRequestRecipientsRelations = relations(paymentRequestRecipients, ({ one }) => ({
+  paymentRequest: one(paymentRequests, {
+    fields: [paymentRequestRecipients.paymentRequestId],
+    references: [paymentRequests.id],
+  }),
+  user: one(users, {
+    fields: [paymentRequestRecipients.userId],
+    references: [users.id],
+  }),
+}));
+
 export const playerImportsRelations = relations(playerImports, ({ one, many }) => ({
   league: one(leagues, {
     fields: [playerImports.leagueId],
@@ -1347,7 +1423,7 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-  messageType: z.enum(['text', 'image', 'gif', 'file', 'poll']).default('text'),
+  messageType: z.enum(['text', 'image', 'gif', 'file', 'poll', 'payment_request']).default('text'),
 });
 
 export const insertMessageAttachmentSchema = createInsertSchema(messageAttachments).omit({
@@ -1478,6 +1554,34 @@ export const insertScrimmageSchema = createInsertSchema(scrimmages).omit({
 export const insertScrimmageRequestSchema = createInsertSchema(scrimmageRequests).omit({
   id: true,
   requestedAt: true,
+});
+
+// Payment request schemas
+export const insertPaymentRequestSchema = createInsertSchema(paymentRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPaymentRequestRecipientSchema = createInsertSchema(paymentRequestRecipients).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createPaymentRequestSchema = createInsertSchema(paymentRequests).omit({
+  id: true,
+  creatorId: true, // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  deadline: z.string().transform((val) => new Date(val)).optional(),
+  recipientUserIds: z.array(z.string()).min(1, "At least one recipient is required"),
+});
+
+export const updatePaymentRequestRecipientSchema = z.object({
+  isPaid: z.boolean(),
+  paymentMethod: z.enum(['venmo', 'cashapp', 'cash', 'other']).optional(),
 });
 
 // Substitution request schemas
@@ -1779,6 +1883,12 @@ export type ScrimmageRequest = typeof scrimmageRequests.$inferSelect;
 export type InsertScrimmageRequest = z.infer<typeof insertScrimmageRequestSchema>;
 export type CreateScrimmageRequest = z.infer<typeof createScrimmageRequestSchema>;
 export type UpdateScrimmageRequest = z.infer<typeof updateScrimmageRequestSchema>;
+export type PaymentRequest = typeof paymentRequests.$inferSelect;
+export type InsertPaymentRequest = z.infer<typeof insertPaymentRequestSchema>;
+export type CreatePaymentRequest = z.infer<typeof createPaymentRequestSchema>;
+export type PaymentRequestRecipient = typeof paymentRequestRecipients.$inferSelect;
+export type InsertPaymentRequestRecipient = z.infer<typeof insertPaymentRequestRecipientSchema>;
+export type UpdatePaymentRequestRecipient = z.infer<typeof updatePaymentRequestRecipientSchema>;
 export type CreateScrimmageJoinRequest = z.infer<typeof createScrimmageJoinRequestSchema>;
 
 // Line combinations types

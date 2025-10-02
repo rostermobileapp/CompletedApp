@@ -42,6 +42,8 @@ import {
   chatPolls,
   chatPollVotes,
   feedbackSubmissions,
+  paymentRequests,
+  paymentRequestRecipients,
   type User,
   type UpsertUser,
   type League,
@@ -115,6 +117,10 @@ import {
   type InsertChatPollVote,
   type FeedbackSubmission,
   type InsertFeedbackSubmission,
+  type PaymentRequest,
+  type InsertPaymentRequest,
+  type PaymentRequestRecipient,
+  type InsertPaymentRequestRecipient,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, not } from "drizzle-orm";
@@ -323,6 +329,19 @@ export interface IStorage {
   
   // Feedback operations
   createFeedbackSubmission(feedbackData: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
+  
+  // Payment request operations
+  createPaymentRequest(paymentRequest: InsertPaymentRequest, recipientUserIds: string[]): Promise<PaymentRequest>;
+  getPaymentRequest(id: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] }) | undefined>;
+  getPaymentRequestsByCreator(creatorId: string): Promise<(PaymentRequest & { recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
+  getPaymentRequestsByRecipient(userId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
+  getPaymentRequestsByScrimmage(scrimmageId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
+  getPaymentRequestsByConversation(conversationId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
+  updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' }): Promise<PaymentRequestRecipient>;
+  deletePaymentRequest(id: string): Promise<void>;
+  
+  // User payment methods
+  updateUserPaymentMethods(userId: string, paymentMethods: { venmoUsername?: string; cashappUsername?: string }): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4157,6 +4176,8 @@ export class DatabaseStorage implements IStorage {
         dateOfBirth: null,
         stripeCustomerId: null,
         stripeSubscriptionId: null,
+        venmoUsername: null,
+        cashappUsername: null,
       }
     }));
   }
@@ -4400,6 +4421,8 @@ export class DatabaseStorage implements IStorage {
             dateOfBirth: null,
             stripeCustomerId: null,
             stripeSubscriptionId: null,
+            venmoUsername: null,
+            cashappUsername: null,
           }
         });
       }
@@ -5142,6 +5165,231 @@ export class DatabaseStorage implements IStorage {
       .values(feedbackData)
       .returning();
     return feedback;
+  }
+
+  // Payment request operations
+  async createPaymentRequest(paymentRequest: InsertPaymentRequest, recipientUserIds: string[]): Promise<PaymentRequest> {
+    return await db.transaction(async (tx) => {
+      const [newPaymentRequest] = await tx
+        .insert(paymentRequests)
+        .values(paymentRequest)
+        .returning();
+
+      if (recipientUserIds.length > 0) {
+        await tx.insert(paymentRequestRecipients).values(
+          recipientUserIds.map(userId => ({
+            paymentRequestId: newPaymentRequest.id,
+            userId,
+            isPaid: false,
+          }))
+        );
+      }
+
+      return newPaymentRequest;
+    });
+  }
+
+  async getPaymentRequest(id: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] }) | undefined> {
+    const [paymentRequest] = await db
+      .select()
+      .from(paymentRequests)
+      .where(eq(paymentRequests.id, id));
+
+    if (!paymentRequest) return undefined;
+
+    const [creator] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, paymentRequest.creatorId));
+
+    const recipientsResult = await db
+      .select()
+      .from(paymentRequestRecipients)
+      .innerJoin(users, eq(paymentRequestRecipients.userId, users.id))
+      .where(eq(paymentRequestRecipients.paymentRequestId, id));
+
+    const recipients = recipientsResult.map(r => ({
+      ...r.payment_request_recipients,
+      user: r.users,
+    }));
+
+    return {
+      ...paymentRequest,
+      creator,
+      recipients,
+    };
+  }
+
+  async getPaymentRequestsByCreator(creatorId: string): Promise<(PaymentRequest & { recipients: (PaymentRequestRecipient & { user: User })[] })[]> {
+    const requests = await db
+      .select()
+      .from(paymentRequests)
+      .where(eq(paymentRequests.creatorId, creatorId))
+      .orderBy(desc(paymentRequests.createdAt));
+
+    return Promise.all(
+      requests.map(async (request) => {
+        const recipientsResult = await db
+          .select()
+          .from(paymentRequestRecipients)
+          .innerJoin(users, eq(paymentRequestRecipients.userId, users.id))
+          .where(eq(paymentRequestRecipients.paymentRequestId, request.id));
+
+        const recipients = recipientsResult.map(r => ({
+          ...r.payment_request_recipients,
+          user: r.users,
+        }));
+
+        return {
+          ...request,
+          recipients,
+        };
+      })
+    );
+  }
+
+  async getPaymentRequestsByRecipient(userId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]> {
+    const recipientEntries = await db
+      .select()
+      .from(paymentRequestRecipients)
+      .where(eq(paymentRequestRecipients.userId, userId));
+
+    const requestIds = recipientEntries.map(r => r.paymentRequestId);
+    
+    if (requestIds.length === 0) return [];
+
+    const requests = await db
+      .select()
+      .from(paymentRequests)
+      .where(inArray(paymentRequests.id, requestIds))
+      .orderBy(desc(paymentRequests.createdAt));
+
+    return Promise.all(
+      requests.map(async (request) => {
+        const [creator] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, request.creatorId));
+
+        const recipientsResult = await db
+          .select()
+          .from(paymentRequestRecipients)
+          .innerJoin(users, eq(paymentRequestRecipients.userId, users.id))
+          .where(eq(paymentRequestRecipients.paymentRequestId, request.id));
+
+        const recipients = recipientsResult.map(r => ({
+          ...r.payment_request_recipients,
+          user: r.users,
+        }));
+
+        return {
+          ...request,
+          creator,
+          recipients,
+        };
+      })
+    );
+  }
+
+  async getPaymentRequestsByScrimmage(scrimmageId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]> {
+    const requests = await db
+      .select()
+      .from(paymentRequests)
+      .where(eq(paymentRequests.relatedScrimmageId, scrimmageId))
+      .orderBy(desc(paymentRequests.createdAt));
+
+    return Promise.all(
+      requests.map(async (request) => {
+        const [creator] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, request.creatorId));
+
+        const recipientsResult = await db
+          .select()
+          .from(paymentRequestRecipients)
+          .innerJoin(users, eq(paymentRequestRecipients.userId, users.id))
+          .where(eq(paymentRequestRecipients.paymentRequestId, request.id));
+
+        const recipients = recipientsResult.map(r => ({
+          ...r.payment_request_recipients,
+          user: r.users,
+        }));
+
+        return {
+          ...request,
+          creator,
+          recipients,
+        };
+      })
+    );
+  }
+
+  async getPaymentRequestsByConversation(conversationId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]> {
+    const requests = await db
+      .select()
+      .from(paymentRequests)
+      .where(eq(paymentRequests.relatedConversationId, conversationId))
+      .orderBy(desc(paymentRequests.createdAt));
+
+    return Promise.all(
+      requests.map(async (request) => {
+        const [creator] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, request.creatorId));
+
+        const recipientsResult = await db
+          .select()
+          .from(paymentRequestRecipients)
+          .innerJoin(users, eq(paymentRequestRecipients.userId, users.id))
+          .where(eq(paymentRequestRecipients.paymentRequestId, request.id));
+
+        const recipients = recipientsResult.map(r => ({
+          ...r.payment_request_recipients,
+          user: r.users,
+        }));
+
+        return {
+          ...request,
+          creator,
+          recipients,
+        };
+      })
+    );
+  }
+
+  async updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' }): Promise<PaymentRequestRecipient> {
+    const [recipient] = await db
+      .update(paymentRequestRecipients)
+      .set({
+        ...updates,
+        paidAt: updates.isPaid ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(paymentRequestRecipients.id, recipientId))
+      .returning();
+    return recipient;
+  }
+
+  async deletePaymentRequest(id: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(paymentRequestRecipients).where(eq(paymentRequestRecipients.paymentRequestId, id));
+      await tx.delete(paymentRequests).where(eq(paymentRequests.id, id));
+    });
+  }
+
+  // User payment methods
+  async updateUserPaymentMethods(userId: string, paymentMethods: { venmoUsername?: string; cashappUsername?: string }): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ...paymentMethods,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
   }
 }
 
