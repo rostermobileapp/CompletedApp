@@ -971,20 +971,32 @@ export class DatabaseStorage implements IStorage {
       await db.delete(teamMemberships).where(inArray(teamMemberships.teamId, teamIds));
     }
     
-    // 21. Delete teams
+    // 21. Clear assignedTeamId references in league memberships before deleting teams
+    if (teamIds.length > 0) {
+      await db.update(leagueMemberships)
+        .set({ assignedTeamId: null })
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, id),
+            inArray(leagueMemberships.assignedTeamId, teamIds)
+          )
+        );
+    }
+    
+    // 22. Delete teams
     if (teamIds.length > 0) {
       await db.delete(teams).where(inArray(teams.id, teamIds));
     }
     
-    // 22. Delete seasons
+    // 23. Delete seasons
     if (seasonIds.length > 0) {
       await db.delete(seasons).where(inArray(seasons.id, seasonIds));
     }
     
-    // 23. Delete league memberships
+    // 24. Delete league memberships
     await db.delete(leagueMemberships).where(eq(leagueMemberships.leagueId, id));
     
-    // 24. Finally, delete the league itself
+    // 25. Finally, delete the league itself
     await db.delete(leagues).where(eq(leagues.id, id));
   }
 
