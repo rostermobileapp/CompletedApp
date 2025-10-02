@@ -4337,11 +4337,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
       
-      // Business invariant: Cannot join own scrimmage
-      if (scrimmage.creatorId === userId) {
-        return res.status(400).json({ message: 'Cannot join your own scrimmage' });
-      }
-      
       // Business invariant: Cannot join scrimmage that has passed or is imminent
       const now = new Date();
       if (scrimmage.dateTime <= now) {
@@ -4374,12 +4369,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate request data
+      // If creator is joining their own scrimmage, auto-approve them
+      const isCreator = scrimmage.creatorId === userId;
       let requestData;
       try {
         requestData = insertScrimmageRequestSchema.parse({
           scrimmageId,
           playerId: userId,
-          status: 'pending',
+          status: isCreator ? 'approved' : 'pending',
         });
       } catch (validationError) {
         console.error('Validation error creating scrimmage request:', validationError);
