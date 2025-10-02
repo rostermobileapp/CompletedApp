@@ -44,6 +44,28 @@ function AnnouncementBadge({ leagueId }: { leagueId: string | null }) {
   );
 }
 
+// Payment Request Badge Component
+function PaymentRequestBadge() {
+  const { data: unpaidCount } = useQuery({
+    queryKey: ['/api/payment-requests/unpaid-count'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/payment-requests/unpaid-count');
+      return response.json();
+    },
+    refetchInterval: 30000, // Check every 30 seconds
+  });
+
+  if (!unpaidCount || unpaidCount.count === 0) {
+    return null;
+  }
+
+  return (
+    <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+      <span className="text-white text-xs font-bold">{unpaidCount.count}</span>
+    </div>
+  );
+}
+
 // Needs Attention Modal Component
 function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: { 
   isOpen: boolean; 
@@ -1108,11 +1130,12 @@ export default function Dashboard() {
 
           {/* Payment Requests Card */}
           <Link href="/payment-requests">
-            <div className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" data-testid="card-payment-requests">
+            <div className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" data-testid="card-payment-requests">
               <div className="h-full flex flex-col items-center justify-center">
                 <DollarSign className="w-8 h-8 text-green-500 mb-3" />
                 <p className="text-xs font-medium">Payments</p>
               </div>
+              <PaymentRequestBadge />
             </div>
           </Link>
         </div>
