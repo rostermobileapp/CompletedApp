@@ -1575,7 +1575,7 @@ export const createPaymentRequestSchema = createInsertSchema(paymentRequests).om
   createdAt: true,
   updatedAt: true,
 }).extend({
-  deadline: z.string().transform((val) => new Date(val)).optional(),
+  deadline: z.string().optional().nullable().transform((val) => val ? new Date(val) : null),
   recipientUserIds: z.array(z.string()).min(1, "At least one recipient is required"),
 });
 
