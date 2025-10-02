@@ -87,7 +87,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
           "h-4 w-4",
           currentStatus === 'attending' ? "animate-pulse" : ""
         )} />
-        {currentStatus === 'attending' ? '✓ Attending' : 'In'}
+        In
       </Button>
       
       <Button
