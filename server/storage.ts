@@ -339,6 +339,7 @@ export interface IStorage {
   getPaymentRequestsByConversation(conversationId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
   updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' }): Promise<PaymentRequestRecipient>;
   deletePaymentRequest(id: string): Promise<void>;
+  getUnpaidPaymentRequestCount(userId: string): Promise<number>;
   
   // User payment methods
   updateUserPaymentMethods(userId: string, paymentMethods: { venmoUsername?: string; cashappUsername?: string }): Promise<User>;
@@ -5377,6 +5378,20 @@ export class DatabaseStorage implements IStorage {
       await tx.delete(paymentRequestRecipients).where(eq(paymentRequestRecipients.paymentRequestId, id));
       await tx.delete(paymentRequests).where(eq(paymentRequests.id, id));
     });
+  }
+
+  async getUnpaidPaymentRequestCount(userId: string): Promise<number> {
+    const unpaidRecipients = await db
+      .select()
+      .from(paymentRequestRecipients)
+      .where(
+        and(
+          eq(paymentRequestRecipients.userId, userId),
+          eq(paymentRequestRecipients.isPaid, false)
+        )
+      );
+    
+    return unpaidRecipients.length;
   }
 
   // User payment methods

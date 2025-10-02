@@ -6432,6 +6432,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get count of unpaid payment requests for current user
+  app.get('/api/payment-requests/unpaid-count', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const count = await storage.getUnpaidPaymentRequestCount(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching unpaid payment request count:", error);
+      res.status(500).json({ message: "Failed to fetch unpaid count" });
+    }
+  });
+
   // Get payment requests for a specific scrimmage
   app.get('/api/scrimmages/:scrimmageId/payment-requests', isAuthenticated, async (req: any, res) => {
     try {
