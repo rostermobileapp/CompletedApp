@@ -1120,18 +1120,20 @@ export default function Dashboard() {
           </div>
 
           {/* Standings Card */}
-          <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
-          <div 
-            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" 
-            data-testid="card-standings"
-            onClick={() => selectedLeagueId && setShowStandingsModal(true)}
-          >
-            <div className="h-full flex flex-col items-center justify-center">
-              <Award className="w-8 h-8 text-blue-500 mb-3" />
-              <p className="text-xs font-medium">Standings</p>
+          <div className="relative overflow-hidden rounded-xl">
+            <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
+            <div 
+              className="border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" 
+              data-testid="card-standings"
+              onClick={() => selectedLeagueId && setShowStandingsModal(true)}
+            >
+              <div className="h-full flex flex-col items-center justify-center">
+                <Award className="w-8 h-8 text-blue-500 mb-3" />
+                <p className="text-xs font-medium">Standings</p>
+              </div>
             </div>
+            </FeatureLockOverlay>
           </div>
-          </FeatureLockOverlay>
         </div>
       </div>
       {/* Quick Stats */}
