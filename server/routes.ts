@@ -4042,7 +4042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create scrimmage (Player Plus+ only)
-  app.post('/api/scrimmages', isAuthenticated, async (req: any, res) => {
+  app.post('/api/scrimmages', isAuthenticated, loadUserPermissions, requirePremiumFeatures, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -4050,8 +4050,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(401).json({ message: "User not found" });
       }
-      
-      // Check Player Plus+ subscription - strict validation
 
       // Validate input data with proper schema
       let scrimmageData;
