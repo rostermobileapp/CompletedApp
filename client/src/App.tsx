@@ -13,7 +13,6 @@ import Dashboard from "@/pages/Dashboard";
 import LeagueSearch from "@/pages/LeagueSearch";
 import Teams from "@/pages/Teams";
 import Messages from "@/pages/Messages";
-import More from "@/pages/More";
 import Profile from "@/pages/Profile";
 import Subscription from "@/pages/Subscription";
 import Roster from "@/pages/Roster";
@@ -49,7 +48,6 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
-        <Route path="/more" component={More} />
         <Route component={Landing} />
       </Switch>
     );
@@ -65,7 +63,6 @@ function Router() {
             <Route path="/teams" component={Teams} />
             <Route path="/messages" component={Messages} />
             <Route path="/messages/:conversationId" component={Messages} />
-            <Route path="/more" component={More} />
             <Route path="/profile" component={Profile} />
             <Route path="/subscription" component={Subscription} />
             <Route path="/roster" component={Roster} />
