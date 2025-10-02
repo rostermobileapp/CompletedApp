@@ -762,6 +762,15 @@ export default function Dashboard() {
     }
   });
 
+  const { data: scrimmageInvites, isLoading: invitesLoading } = useQuery({
+    queryKey: ['/api/users/scrimmage-invites'],
+    select: (invites) => {
+      // Filter invites by selected league if available
+      if (!selectedLeagueId || !Array.isArray(invites)) return invites;
+      return invites.filter((invite: any) => invite.leagueId === selectedLeagueId);
+    }
+  });
+
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
     select: (teams) => {
@@ -882,6 +891,28 @@ export default function Dashboard() {
       toast({
         title: "Submission Failed",
         description: error.message || "Failed to submit score. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Scrimmage check-in mutation
+  const scrimmageCheckInMutation = useMutation({
+    mutationFn: async (scrimmageId: string) => {
+      return await apiRequest("POST", `/api/scrimmages/${scrimmageId}/requests`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      toast({
+        title: "Checked In",
+        description: "Your check-in request has been submitted and is pending approval.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Check-in Failed",
+        description: error.message || "Failed to check in. Please try again.",
         variant: "destructive",
       });
     },
@@ -1214,12 +1245,55 @@ export default function Dashboard() {
           </button>
         </div>
         
-        {gamesLoading ? (
+        {gamesLoading || invitesLoading ? (
           <div className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid="loading-upcoming-games">
             <div className="h-16 bg-muted rounded"></div>
           </div>
-        ) : Array.isArray(upcomingGames) && upcomingGames.length > 0 ? (
+        ) : (Array.isArray(upcomingGames) && upcomingGames.length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.length > 0) ? (
           <div className="space-y-3">
+            {/* First show scrimmage invites */}
+            {Array.isArray(scrimmageInvites) && scrimmageInvites.map((invite: any) => (
+              <div 
+                key={`invite-${invite.id}`}
+                className="rounded-xl border border-yellow-500/50 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#212121]"
+                data-testid={`card-scrimmage-invite-${invite.id}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
+                    <Trophy className="w-6 h-6 text-black" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold" data-testid={`text-invite-title-${invite.id}`}>
+                        {invite.title}
+                      </h3>
+                      <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded">Invite</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
+                      {format(new Date(invite.dateTime), 'MMM d • h:mm a')}
+                    </p>
+                    {invite.location && (
+                      <p className="text-xs text-muted-foreground" data-testid={`text-invite-location-${invite.id}`}>
+                        {invite.location}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      scrimmageCheckInMutation.mutate(invite.id);
+                    }}
+                    disabled={scrimmageCheckInMutation.isPending}
+                    className="bg-yellow-500 text-black px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm disabled:opacity-50"
+                    data-testid={`button-check-in-${invite.id}`}
+                  >
+                    Check In
+                  </button>
+                </div>
+              </div>
+            ))}
+            
+            {/* Then show regular games and approved scrimmages */}
             {(upcomingGames as any[])
               .filter((game: any) => {
                 // Always show scrimmages (user is already approved)
