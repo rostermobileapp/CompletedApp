@@ -13,6 +13,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required').optional(),
@@ -20,6 +21,7 @@ const profileSchema = z.object({
   dateOfBirth: z.string().min(1, 'Date of birth is required').optional(),
   phoneNumber: z.string().optional(),
   city: z.string().optional(),
+  playerType: z.enum(['Skater', 'Goalie']).optional(),
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
@@ -48,6 +50,7 @@ export default function Profile() {
       dateOfBirth: (user as any)?.dateOfBirth || '',
       phoneNumber: (user as any)?.phoneNumber || '',
       city: (user as any)?.city || '',
+      playerType: (user as any)?.playerType || undefined,
     },
   });
 
@@ -419,6 +422,22 @@ export default function Profile() {
                 />
               </div>
               
+              <div>
+                <label className="block text-sm font-medium mb-1">Player Type</label>
+                <Select
+                  value={form.watch('playerType') || ''}
+                  onValueChange={(value) => form.setValue('playerType', value as 'Skater' | 'Goalie')}
+                >
+                  <SelectTrigger className="w-full" data-testid="select-player-type">
+                    <SelectValue placeholder="Select player type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Skater" data-testid="option-skater">Skater</SelectItem>
+                    <SelectItem value="Goalie" data-testid="option-goalie">Goalie</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <button
                 type="submit"
                 disabled={updateProfileMutation.isPending}
@@ -442,6 +461,10 @@ export default function Profile() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">City:</span>
                 <span>{(user as any)?.city || 'Not specified'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Player Type:</span>
+                <span data-testid="text-player-type">{(user as any)?.playerType || 'Not specified'}</span>
               </div>
             </div>
           )}
