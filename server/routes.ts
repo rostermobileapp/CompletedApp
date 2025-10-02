@@ -6545,6 +6545,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Confirm a payment request recipient (creator only)
+  app.patch('/api/payment-request-recipients/:recipientId/confirm', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { recipientId } = req.params;
+      const { isConfirmed } = req.body;
+
+      // Get the payment request to verify permissions
+      const recipient = await db.query.paymentRequestRecipients.findFirst({
+        where: (recipients, { eq }) => eq(recipients.id, recipientId),
+        with: {
+          paymentRequest: true,
+        },
+      });
+
+      if (!recipient) {
+        return res.status(404).json({ message: "Payment recipient not found" });
+      }
+
+      // Only the creator can confirm payments
+      const isCreator = recipient.paymentRequest.creatorId === userId;
+
+      if (!isCreator) {
+        return res.status(403).json({ message: "Only the payment request creator can confirm payments" });
+      }
+
+      const updatedRecipient = await storage.confirmPaymentRequestRecipient(recipientId, isConfirmed);
+
+      res.json(updatedRecipient);
+    } catch (error) {
+      console.error("Error confirming payment recipient:", error);
+      res.status(500).json({ message: "Failed to confirm payment" });
+    }
+  });
+
   // Delete a payment request (only by creator)
   app.delete('/api/payment-requests/:id', isAuthenticated, async (req: any, res) => {
     try {

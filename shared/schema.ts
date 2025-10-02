@@ -629,6 +629,8 @@ export const paymentRequestRecipients = pgTable("payment_request_recipients", {
   isPaid: boolean("is_paid").default(false).notNull(),
   paymentMethod: paymentMethodEnum("payment_method"),
   paidAt: timestamp("paid_at"),
+  isConfirmed: boolean("is_confirmed").default(false).notNull(),
+  confirmedAt: timestamp("confirmed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

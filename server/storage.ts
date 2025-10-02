@@ -338,6 +338,7 @@ export interface IStorage {
   getPaymentRequestsByScrimmage(scrimmageId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
   getPaymentRequestsByConversation(conversationId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
   updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' }): Promise<PaymentRequestRecipient>;
+  confirmPaymentRequestRecipient(recipientId: string, isConfirmed: boolean): Promise<PaymentRequestRecipient>;
   deletePaymentRequest(id: string): Promise<void>;
   getUnpaidPaymentRequestCount(userId: string): Promise<number>;
   
@@ -5366,6 +5367,19 @@ export class DatabaseStorage implements IStorage {
       .set({
         ...updates,
         paidAt: updates.isPaid ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(paymentRequestRecipients.id, recipientId))
+      .returning();
+    return recipient;
+  }
+
+  async confirmPaymentRequestRecipient(recipientId: string, isConfirmed: boolean): Promise<PaymentRequestRecipient> {
+    const [recipient] = await db
+      .update(paymentRequestRecipients)
+      .set({
+        isConfirmed,
+        confirmedAt: isConfirmed ? new Date() : null,
         updatedAt: new Date(),
       })
       .where(eq(paymentRequestRecipients.id, recipientId))
