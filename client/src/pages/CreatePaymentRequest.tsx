@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -38,6 +38,30 @@ export default function CreatePaymentRequest() {
       relatedConversationId: null,
     },
   });
+
+  // Pre-fill form from URL query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const title = params.get('title');
+    const amount = params.get('amount');
+    const relatedScrimmageId = params.get('relatedScrimmageId');
+    const recipientIds = params.get('recipientIds');
+
+    if (title) {
+      form.setValue('title', title);
+    }
+    if (amount) {
+      form.setValue('amountPerPerson', amount);
+    }
+    if (relatedScrimmageId) {
+      form.setValue('relatedScrimmageId', relatedScrimmageId);
+    }
+    if (recipientIds) {
+      const ids = recipientIds.split(',');
+      setSelectedRecipientIds(ids);
+      form.setValue('recipientUserIds', ids);
+    }
+  }, []);
 
   // Fetch user's leagues to get league members
   const { data: userLeagues = [], isLoading: leaguesLoading } = useQuery({

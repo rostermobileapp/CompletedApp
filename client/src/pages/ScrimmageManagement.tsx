@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Clock, MapPin, Users, Check, X, Calendar, Crown, Trash2, Eye } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Users, Check, X, Calendar, Crown, Trash2, Eye, DollarSign } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
@@ -551,6 +551,37 @@ export default function ScrimmageManagement() {
                                           This will confirm the roster and send notifications to all approved players
                                         </p>
                                       </div>
+                                      
+                                      {/* Payment Request Button - Show if roster is finalized and there's a cost */}
+                                      {scrimmages.find(s => s.id === selectedScrimmage)?.status === 'roster_confirmed' && 
+                                       scrimmages.find(s => s.id === selectedScrimmage)?.costPerPlayer && (
+                                        <div className="mt-4">
+                                          <Button
+                                            onClick={() => {
+                                              const scrimmage = scrimmages.find(s => s.id === selectedScrimmage);
+                                              if (scrimmage) {
+                                                const approvedPlayerIds = getApprovedRequests(requests).map(r => r.player.id);
+                                                const params = new URLSearchParams({
+                                                  title: `Payment for ${scrimmage.title}`,
+                                                  amount: scrimmage.costPerPlayer || '',
+                                                  relatedScrimmageId: scrimmage.id,
+                                                  recipientIds: approvedPlayerIds.join(','),
+                                                });
+                                                navigate(`/create-payment-request?${params.toString()}`);
+                                              }
+                                            }}
+                                            variant="outline"
+                                            className="w-full border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                                            data-testid="button-create-payment-request"
+                                          >
+                                            <DollarSign className="w-4 h-4 mr-2" />
+                                            Create Payment Request (${scrimmages.find(s => s.id === selectedScrimmage)?.costPerPlayer})
+                                          </Button>
+                                          <p className="text-xs text-muted-foreground mt-2 text-center">
+                                            Create a payment request for all approved players
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 )}
