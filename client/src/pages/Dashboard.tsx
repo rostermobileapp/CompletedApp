@@ -540,6 +540,7 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
   onClose: () => void; 
   leagueId: string | null; 
 }) {
+  const { canAccessPremiumFeatures } = usePermissions();
   const { data: standings = [], isLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'standings'],
     queryFn: async () => {
@@ -561,6 +562,7 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
         </div>
 
         {/* Content */}
+        <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()} className="flex-1 flex flex-col">
         <div className="flex-1 overflow-auto p-6">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
@@ -632,6 +634,7 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
             </div>
           )}
         </div>
+        </FeatureLockOverlay>
 
         {/* Footer with Close Button */}
         <div className="p-6 border-t border-border">
@@ -1120,19 +1123,15 @@ export default function Dashboard() {
           </div>
 
           {/* Standings Card */}
-          <div className="relative overflow-hidden rounded-xl">
-            <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
-            <div 
-              className="border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" 
-              data-testid="card-standings"
-              onClick={() => selectedLeagueId && setShowStandingsModal(true)}
-            >
-              <div className="h-full flex flex-col items-center justify-center">
-                <Award className="w-8 h-8 text-blue-500 mb-3" />
-                <p className="text-xs font-medium">Standings</p>
-              </div>
+          <div 
+            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" 
+            data-testid="card-standings"
+            onClick={() => selectedLeagueId && setShowStandingsModal(true)}
+          >
+            <div className="h-full flex flex-col items-center justify-center">
+              <Award className="w-8 h-8 text-blue-500 mb-3" />
+              <p className="text-xs font-medium">Standings</p>
             </div>
-            </FeatureLockOverlay>
           </div>
         </div>
       </div>
