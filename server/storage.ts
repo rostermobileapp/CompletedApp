@@ -316,6 +316,7 @@ export interface IStorage {
   updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date): Promise<ScrimmageRequest>;
   deleteScrimmageRequest(requestId: string): Promise<void>;
   getScrimmageRequestsByPlayer(playerId: string): Promise<(ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[]>;
+  getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User })[]>;
   
   // Player stats operations
   getPlayerStats(leagueId: string, seasonId?: string): Promise<(PlayerStats & { user: User })[]>;
@@ -4076,6 +4077,39 @@ export class DatabaseStorage implements IStorage {
         ...r.scrimmages,
         creator: r.users
       }
+    }));
+  }
+
+  async getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User })[]> {
+    // Get scrimmages where user is invited (has announcement visibility) but hasn't responded yet
+    const results = await db
+      .select({
+        scrimmage: scrimmages,
+        creator: users,
+      })
+      .from(announcementVisibility)
+      .innerJoin(announcements, eq(announcementVisibility.announcementId, announcements.id))
+      .innerJoin(scrimmages, eq(announcements.id, scrimmages.announcementId))
+      .innerJoin(users, eq(scrimmages.creatorId, users.id))
+      .where(
+        and(
+          eq(announcementVisibility.userId, userId),
+          gte(scrimmages.dateTime, new Date()), // Only future scrimmages
+          // Only get scrimmages where user hasn't responded yet (no scrimmage request exists)
+          not(
+            sql`EXISTS (
+              SELECT 1 FROM ${scrimmageRequests} 
+              WHERE ${scrimmageRequests.scrimmageId} = ${scrimmages.id} 
+              AND ${scrimmageRequests.playerId} = ${userId}
+            )`
+          )
+        )
+      )
+      .orderBy(asc(scrimmages.dateTime));
+
+    return results.map(r => ({
+      ...r.scrimmage,
+      creator: r.creator
     }));
   }
 

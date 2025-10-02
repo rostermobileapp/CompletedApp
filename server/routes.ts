@@ -4575,6 +4575,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user's scrimmage invites (scrimmages they were invited to but haven't responded)
+  app.get('/api/users/scrimmage-invites', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const invites = await storage.getScrimmageInvitesForUser(userId);
+      res.json(invites);
+    } catch (error) {
+      console.error('Error fetching user scrimmage invites:', error);
+      res.status(500).json({ message: 'Failed to fetch scrimmage invites' });
+    }
+  });
+
   // Finalize scrimmage roster and send confirmation notifications
   app.put('/api/scrimmages/:id/finalize', isAuthenticated, async (req: any, res) => {
     try {
