@@ -17,6 +17,7 @@ import { League, ChatPoll, ChatPollVote } from '@shared/schema';
 
 import { MediaGallery } from '@/components/MediaGallery';
 import GifSearchModal from '@/components/GifSearchModal';
+import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 
 interface Message {
   id: string;
@@ -1446,6 +1447,7 @@ export default function Messages() {
       </Dialog>
 
       <div className="min-h-screen flex flex-col pb-24" data-testid="messages-page">
+        <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()} className="min-h-screen flex flex-col">
       {!selectedConversation ? (
         <>
           {/* Conversations List Header */}
@@ -1792,7 +1794,8 @@ export default function Messages() {
           </div>
         </>
       )}
-    </div>
+        </FeatureLockOverlay>
+      </div>
     
     {/* Fixed Message Input - only show when conversation is selected */}
     {selectedConversation && (
