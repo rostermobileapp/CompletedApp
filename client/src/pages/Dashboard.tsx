@@ -1090,9 +1090,9 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* 4-Card Section */}
+      {/* 3-Card Section */}
       <div className="px-6 mb-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {/* Announcements Card */}
           <Link href="/announcements">
             <div className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" data-testid="card-announcements">
@@ -1127,17 +1127,6 @@ export default function Dashboard() {
               <p className="text-xs font-medium">Standings</p>
             </div>
           </div>
-
-          {/* Payment Requests Card */}
-          <Link href="/payment-requests">
-            <div className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" data-testid="card-payment-requests">
-              <div className="h-full flex flex-col items-center justify-center">
-                <DollarSign className="w-8 h-8 text-green-500 mb-3" />
-                <p className="text-xs font-medium">Payments</p>
-              </div>
-              <PaymentRequestBadge />
-            </div>
-          </Link>
         </div>
       </div>
       {/* Quick Stats */}
