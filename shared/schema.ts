@@ -108,6 +108,12 @@ export const paymentMethodEnum = pgEnum("payment_method", [
   "other"
 ]);
 
+// Player type enum
+export const playerTypeEnum = pgEnum("player_type", [
+  "Skater",
+  "Goalie"
+]);
+
 // Users table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -120,6 +126,7 @@ export const users = pgTable("users", {
   phoneNumber: varchar("phone_number"),
   city: varchar("city"),
   primarySport: sportEnum("primary_sport"),
+  playerType: playerTypeEnum("player_type"),
   // Permission system fields
   role: userRoleEnum("role").default("free_tier").notNull(),
   specialPermissions: specialPermissionEnum("special_permissions").array(),
