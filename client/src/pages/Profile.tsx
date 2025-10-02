@@ -12,6 +12,7 @@ import { ObjectUploader } from '@/components/ObjectUploader';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 
 const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required').optional(),
@@ -448,6 +449,7 @@ export default function Profile() {
       </div>
       {/* Payment Methods */}
       <div className="px-6 mb-6">
+        <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
         <div className="bg-card rounded-xl border border-border p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -515,6 +517,7 @@ export default function Profile() {
             </div>
           )}
         </div>
+        </FeatureLockOverlay>
       </div>
       {/* League Features */}
       <div className="px-6 mb-6">
