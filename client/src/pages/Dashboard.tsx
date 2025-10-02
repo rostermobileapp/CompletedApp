@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, DollarSign } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -1068,9 +1068,9 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* 3-Card Section */}
+      {/* 4-Card Section */}
       <div className="px-6 mb-6">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {/* Announcements Card */}
           <Link href="/announcements">
             <div className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" data-testid="card-announcements">
@@ -1105,6 +1105,16 @@ export default function Dashboard() {
               <p className="text-xs font-medium">Standings</p>
             </div>
           </div>
+
+          {/* Payment Requests Card */}
+          <Link href="/payment-requests">
+            <div className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" data-testid="card-payment-requests">
+              <div className="h-full flex flex-col items-center justify-center">
+                <DollarSign className="w-8 h-8 text-green-500 mb-3" />
+                <p className="text-xs font-medium">Payments</p>
+              </div>
+            </div>
+          </Link>
         </div>
       </div>
       {/* Quick Stats */}
