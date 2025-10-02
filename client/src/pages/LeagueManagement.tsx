@@ -1583,6 +1583,12 @@ export default function LeagueManagement() {
     },
     onSuccess: () => {
       toast({ title: 'League deleted successfully' });
+      // Invalidate all league-related queries to update the UI
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues/commissioner'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/league-memberships'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId] });
       navigate('/league-list');
     },
     onError: () => {
