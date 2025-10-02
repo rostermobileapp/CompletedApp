@@ -557,8 +557,15 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-card rounded-lg border border-border w-full max-w-6xl h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b border-border">
+        <div className="p-6 border-b border-border relative">
           <h2 className="text-2xl font-semibold text-center">League Standings</h2>
+          <button
+            onClick={onClose}
+            className="absolute top-6 right-6 w-10 h-10 bg-red-600 hover:bg-red-700 rounded flex items-center justify-center transition-colors"
+            data-testid="button-close-standings"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
         </div>
 
         {/* Content */}
@@ -635,19 +642,6 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
           )}
         </div>
         </FeatureLockOverlay>
-
-        {/* Footer with Close Button */}
-        <div className="p-6 border-t border-border">
-          <div className="flex justify-center">
-            <Button 
-              onClick={onClose}
-              className="px-8 py-2"
-              data-testid="button-close-standings"
-            >
-              Close
-            </Button>
-          </div>
-        </div>
       </div>
     </div>
   );
