@@ -1489,15 +1489,23 @@ export default function LeagueManagement() {
     },
   });
 
-  // Join team mutation - for team captains to join their own team
+  // Join team mutation - for team captains/commissioners to join their own team
   const joinTeamMutation = useMutation({
     mutationFn: async (teamId: string) => {
       // Find the current user's league membership
-      const currentMembership = members.find(m => m.userId === user?.id);
+      let currentMembership = members.find(m => m.userId === user?.id);
+      
+      // If user doesn't have a membership yet, create one first (auto-approve for commissioner/captain)
       if (!currentMembership) {
-        throw new Error('You must be a league member to join a team');
+        const joinResponse = await apiRequest('POST', `/api/leagues/${leagueId}/join`, {});
+        const newMembership = await joinResponse.json();
+        
+        // Auto-approve the membership since they're commissioner/captain
+        const approveResponse = await apiRequest('POST', `/api/league-memberships/${newMembership.id}/approve`, {});
+        currentMembership = await approveResponse.json();
       }
       
+      // Now assign them to the team
       const response = await apiRequest('PATCH', `/api/leagues/${leagueId}/members/${currentMembership.id}`, {
         assignedTeamId: teamId
       });
@@ -2321,10 +2329,14 @@ export default function LeagueManagement() {
                                     const userMembership = members.find(m => m.userId === user?.id);
                                     const isCaptain = team.captainId === user?.id;
                                     const isCommissioner = league.commissionerId === user?.id;
-                                    const isNotOnTeam = userMembership && userMembership.assignedTeamId !== team.id;
                                     
-                                    // Show join button if user is captain OR commissioner, and not already on the team
-                                    if ((isCaptain || isCommissioner) && isNotOnTeam) {
+                                    // User can join if they're captain/commissioner AND either:
+                                    // 1. They have no membership yet (haven't joined league), OR
+                                    // 2. They have a membership but not assigned to this team
+                                    const canJoin = (isCaptain || isCommissioner) && 
+                                                   (!userMembership || userMembership.assignedTeamId !== team.id);
+                                    
+                                    if (canJoin) {
                                       return (
                                         <button
                                           onClick={(e) => {
