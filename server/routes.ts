@@ -2240,6 +2240,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/players/all-with-availability/:date', isAuthenticated, async (req: any, res) => {
+    try {
+      const { date } = req.params;
+      const { leagueId } = req.query;
+      const userId = req.user.claims.sub;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      if (!leagueId) {
+        return res.status(400).json({ message: 'League ID is required' });
+      }
+
+      // Check if user is captain or commissioner
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(leagueId as string);
+      const isCommissioner = league && league.commissionerId === userId;
+      
+      // For captain check, we need to verify they're captain of a team in this league
+      const userTeams = await storage.getUserTeams(userId);
+      const userTeamsInLeague = userTeams.filter(team => team.leagueId === leagueId);
+      const isTeamCaptain = userTeamsInLeague.some(team => team.captainId === userId);
+      
+      if (!isCommissioner && !isTeamCaptain) {
+        return res.status(403).json({ message: 'Captain or Commissioner access required' });
+      }
+
+      const allPlayers = await storage.getAllLeaguePlayersWithAvailability(new Date(date), leagueId as string);
+      res.json(allPlayers);
+    } catch (error) {
+      console.error('Error fetching all players with availability:', error);
+      res.status(500).json({ message: 'Failed to fetch players' });
+    }
+  });
+
   // Substitute request routes (Multi-level approval workflow)
   app.post('/api/substitute-requests', isAuthenticated, async (req: any, res) => {
     try {

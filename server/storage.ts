@@ -211,6 +211,7 @@ export interface IStorage {
   getTeamRsvpSummary(gameId: string, teamId: string): Promise<{ attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }>;
   getGameRsvpSummaryByTeams(gameId: string): Promise<{ homeTeam: { teamId: string; attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] }; awayTeam: { teamId: string; attending: (GameRsvp & { user: User })[]; notAttending: (GameRsvp & { user: User })[]; noResponse: User[] } }>;
   getAvailablePlayers(date: Date, leagueId: string): Promise<User[]>;
+  getAllLeaguePlayersWithAvailability(date: Date, leagueId: string): Promise<(User & { skillLevel?: string | null; isScheduled: boolean })[]>;
   
   // Substitute request operations (enhanced for multi-level approval)
   createSubstituteRequest(request: InsertSubstituteRequest): Promise<SubstituteRequest>;
@@ -2944,6 +2945,52 @@ export class DatabaseStorage implements IStorage {
     return availableUsers.map(user => ({
       ...user,
       skillLevel: skillMap.get(user.id) ?? null
+    }));
+  }
+
+  async getAllLeaguePlayersWithAvailability(date: Date, leagueId: string): Promise<(User & { skillLevel?: string | null; isScheduled: boolean })[]> {
+    // Get all league members
+    const leagueMembers = await this.getLeagueMembers(leagueId);
+    
+    // Get all games on the same date
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const gamesOnDate = await db
+      .select()
+      .from(games)
+      .where(
+        and(
+          eq(games.leagueId, leagueId),
+          gte(games.scheduledAt, startOfDay),
+          lte(games.scheduledAt, endOfDay)
+        )
+      );
+
+    // Get team members for all games on that date
+    const scheduledUserIds = new Set<string>();
+    for (const game of gamesOnDate) {
+      const homeMembers = await this.getTeamMembers(game.homeTeamId);
+      const awayMembers = await this.getTeamMembers(game.awayTeamId);
+      [...homeMembers, ...awayMembers].forEach(member => {
+        scheduledUserIds.add(member.userId);
+      });
+    }
+
+    // Get all users
+    const allUsers = leagueMembers.map(member => member.user);
+    
+    // Fetch skill levels for all users
+    const userIds = allUsers.map(user => user.id);
+    const skillMap = await this.fetchUserSkills(userIds, leagueId);
+    
+    // Return all users with skill level and scheduled status
+    return allUsers.map(user => ({
+      ...user,
+      skillLevel: skillMap.get(user.id) ?? null,
+      isScheduled: scheduledUserIds.has(user.id)
     }));
   }
 
