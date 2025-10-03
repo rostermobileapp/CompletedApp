@@ -2758,6 +2758,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const normalized = header.toLowerCase().trim();
           const mapping: Record<string, string> = {
             'name': 'name',
+            'player': 'name', // Accept "Player" as a name column
+            'player name': 'name', // Accept "Player Name" as a name column
             'team name': 'teamName',
             'team': 'teamName',
             // Legacy support for old format
@@ -2822,7 +2824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (!firstName) {
-          errors.push(`Row ${index + 1}: Name is required (expected 'Name' or 'First Name' column)`);
+          errors.push(`Row ${index + 1}: Name is required (expected 'Name', 'Player', or 'First Name' column)`);
           return;
         }
 
@@ -2946,7 +2948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Return helpful format information if all failed
         const formatHelp = errors.length === parseResults.data.length && errors.length > 0
           ? {
-              expectedFormat: "CSV should have a 'Name' column (or 'First Name' and 'Last Name' columns). Optional: 'Team Name', 'Email', 'Phone Number', 'Position', 'Jersey Number', 'Skill Level', 'Notes'",
+              expectedFormat: "CSV should have a 'Name' or 'Player' column (or 'First Name' and 'Last Name' columns). Optional: 'Team Name', 'Email', 'Phone Number', 'Position', 'Jersey Number', 'Skill Level', 'Notes'",
               receivedHeaders: receivedHeaders.join(', ')
             }
           : null;
