@@ -3687,6 +3687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Find and delete the placeholder user's league membership
       // Placeholder users have emails ending with @placeholder.roster
+      // Match BOTH first and last name to ensure we only delete the correct placeholder
       const placeholderMemberships = await db.select()
         .from(leagueMemberships)
         .innerJoin(users, eq(leagueMemberships.userId, users.id))
@@ -3694,10 +3695,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(leagueMemberships.leagueId, leagueId),
             ilike(users.email, '%@placeholder.roster'),
-            or(
-              ilike(users.firstName, player.firstName || ''),
-              ilike(users.lastName, player.lastName || '')
-            )
+            ilike(users.firstName, player.firstName || ''),
+            ilike(users.lastName, player.lastName || '')
           )
         );
       
