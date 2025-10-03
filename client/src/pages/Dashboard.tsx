@@ -291,7 +291,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                           <Button 
                             size="sm" 
                             className="bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => onNavigate(`/league-management?league=${leagueId}`)}
+                            onClick={() => onNavigate(`/league-management?leagueId=${leagueId}`)}
                             data-testid={`button-review-member-${member.id}`}
                           >
                             Review
@@ -502,7 +502,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                           <Button 
                             size="sm" 
                             className="bg-orange-600 hover:bg-orange-700 text-white"
-                            onClick={() => onNavigate(`/league-management?league=${leagueId}`)}
+                            onClick={() => onNavigate(`/league-management?leagueId=${leagueId}`)}
                             data-testid={`button-verify-game-${game.id}`}
                           >
                             Verify

@@ -87,7 +87,7 @@ export default function LeagueList() {
               <div
                 key={league.id}
                 className="bg-card rounded-xl border border-border p-6 cursor-pointer hover:bg-card/80 transition-colors"
-                onClick={() => navigate(`/league-management?league=${league.id}`)}
+                onClick={() => navigate(`/league-management?leagueId=${league.id}`)}
                 data-testid={`league-card-${league.id}`}
               >
                 <div className="mb-3">

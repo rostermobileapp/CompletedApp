@@ -224,7 +224,7 @@ export default function Roster() {
                     {isTeamCaptain && (
                       <button
                         onClick={() => {
-                          navigate(`/league-management?league=${primaryTeam.leagueId}&edit=true&editMember=${member.id}`);
+                          navigate(`/league-management?leagueId=${primaryTeam.leagueId}&edit=true&editMember=${member.id}`);
                         }}
                         className="p-1 hover:bg-muted rounded-md transition-colors"
                         title="Edit Player"
