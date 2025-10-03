@@ -973,7 +973,15 @@ export default function Dashboard() {
               const submissionCount = submissions.length;
               let needsVerification = false;
               
-              if (submissionCount === 0 || submissionCount === 1) {
+              // Check if there's a commissioner submission - if so, no verification needed
+              const hasCommissionerSubmission = submissions.some((sub: any) => 
+                sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
+              );
+              
+              if (hasCommissionerSubmission) {
+                // Commissioner has already submitted final score - no verification needed
+                needsVerification = false;
+              } else if (submissionCount === 0 || submissionCount === 1) {
                 needsVerification = true;
               } else if (submissionCount === 2) {
                 const [sub1, sub2] = submissions;
