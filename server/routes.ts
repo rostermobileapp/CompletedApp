@@ -3141,7 +3141,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only commissioners can delete all teams' });
       }
 
-      // Delete all teams for this league (cascade will handle related data)
+      // Delete all related data first to avoid foreign key constraint violations
+      // 1. Unassign team references in imported_players
+      await db.execute(sql`
+        UPDATE imported_players 
+        SET team_id = NULL 
+        WHERE league_id = ${leagueId}
+      `);
+
+      // 2. Unassign teams from league memberships
+      await db.execute(sql`
+        UPDATE league_memberships 
+        SET assigned_team_id = NULL 
+        WHERE league_id = ${leagueId}
+      `);
+
+      // 3. Nullify team references in imported_schedules
+      await db.execute(sql`
+        UPDATE imported_schedules 
+        SET home_team_id = NULL, away_team_id = NULL 
+        WHERE league_id = ${leagueId}
+      `);
+
+      // 4. Delete related records that require teams
+      await db.execute(sql`DELETE FROM line_combinations WHERE team_id IN (SELECT id FROM teams WHERE league_id = ${leagueId})`);
+      await db.execute(sql`DELETE FROM team_memberships WHERE team_id IN (SELECT id FROM teams WHERE league_id = ${leagueId})`);
+      await db.execute(sql`DELETE FROM draft_picks WHERE team_id IN (SELECT id FROM teams WHERE league_id = ${leagueId})`);
+      await db.execute(sql`DELETE FROM games WHERE league_id = ${leagueId}`);
+
+      // 5. Finally, delete all teams for this league
       await db.delete(teams).where(eq(teams.leagueId, leagueId));
 
       res.json({ message: 'All teams deleted successfully' });
