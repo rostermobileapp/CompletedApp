@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const profileSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
   dateOfBirth: z.string().optional(),
   phoneNumber: z.string().optional(),
   city: z.string().optional(),
@@ -47,6 +48,7 @@ export default function Profile() {
     defaultValues: {
       firstName: (user as any)?.firstName || '',
       lastName: (user as any)?.lastName || '',
+      email: (user as any)?.email || '',
       dateOfBirth: (user as any)?.dateOfBirth || '',
       phoneNumber: (user as any)?.phoneNumber || '',
       city: (user as any)?.city || '',
@@ -362,14 +364,6 @@ export default function Profile() {
             </button>
           </div>
           
-          {/* Email Display */}
-          <div className="mb-4 p-3 bg-muted/50 rounded-lg">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Email:</span>
-              <span data-testid="text-profile-email">{(user as any)?.email || 'No email provided'}</span>
-            </div>
-          </div>
-          
           {isEditing ? (
             <form onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -389,6 +383,20 @@ export default function Profile() {
                     data-testid="input-last-name"
                   />
                 </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input
+                  {...form.register('email')}
+                  type="email"
+                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="your.email@example.com"
+                  data-testid="input-email"
+                />
+                {form.formState.errors.email && (
+                  <p className="text-red-500 text-sm mt-1">{form.formState.errors.email.message}</p>
+                )}
               </div>
               
               <div>
@@ -456,6 +464,10 @@ export default function Profile() {
             </form>
           ) : (
             <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Email:</span>
+                <span data-testid="text-profile-email">{(user as any)?.email || 'Not specified'}</span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Date of Birth:</span>
                 <span>{(user as any)?.dateOfBirth || 'Not specified'}</span>
