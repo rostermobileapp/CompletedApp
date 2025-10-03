@@ -13,8 +13,8 @@ import {
   requirePremiumFeatures 
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagueMemberships, importedPlayers, teams, announcementPolls, createChatPollRequestSchema } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema } from "@shared/schema";
+import { eq, and, or, ilike, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import {
   insertLeagueSchema,
@@ -3681,10 +3681,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(leagueMemberships.id, membershipId));
       }
 
+      // Get the real user's ID from the membership
+      const realUserMembership = await db.select().from(leagueMemberships).where(eq(leagueMemberships.id, membershipId)).limit(1);
+      const realUserId = realUserMembership[0].userId;
+      
+      // Find and delete the placeholder user's league membership
+      // Placeholder users have emails ending with @placeholder.roster
+      const placeholderMemberships = await db.select()
+        .from(leagueMemberships)
+        .innerJoin(users, eq(leagueMemberships.userId, users.id))
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, leagueId),
+            ilike(users.email, '%@placeholder.roster'),
+            or(
+              ilike(users.firstName, player.firstName || ''),
+              ilike(users.lastName, player.lastName || '')
+            )
+          )
+        );
+      
+      // Delete placeholder memberships
+      for (const pm of placeholderMemberships) {
+        const placeholderUserId = pm.league_memberships.userId;
+        
+        // Only delete if it's not the real user
+        if (placeholderUserId !== realUserId) {
+          await db.delete(leagueMemberships)
+            .where(eq(leagueMemberships.id, pm.league_memberships.id));
+          
+          // Optionally delete the placeholder user if they have no other memberships
+          const otherMemberships = await db.select()
+            .from(leagueMemberships)
+            .where(eq(leagueMemberships.userId, placeholderUserId));
+          
+          if (otherMemberships.length === 0) {
+            await db.delete(users).where(eq(users.id, placeholderUserId));
+          }
+        }
+      }
+      
       // Mark the imported player as merged
       await db.update(importedPlayers)
         .set({ 
-          mergedWithUserId: (await db.select().from(leagueMemberships).where(eq(leagueMemberships.id, membershipId)).limit(1))[0].userId,
+          mergedWithUserId: realUserId,
           mergedAt: new Date()
         })
         .where(eq(importedPlayers.id, importedPlayerId));
