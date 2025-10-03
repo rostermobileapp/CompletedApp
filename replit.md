@@ -35,6 +35,8 @@ Key features include:
 - **Payment Request and Tracking**: Allows creation, management, and tracking of payment requests among league members, with integration for scrimmage-related payments.
 - **Universal Needs Attention System**: A persistent notification bar on the dashboard for all users, displaying pending tasks.
 - **Team Captain Announcements**: Extends the announcement system to allow team captains to post team-specific announcements with visibility controls.
+- **CSV Import System**: Bulk import functionality for players and schedules with flexible column header matching, automatic team creation, and detailed error reporting.
+- **Bulk Delete Operations**: Commissioner-only feature for deleting all players, teams, or games in a league with confirmation dialogs to prevent accidental data loss.
 
 # External Dependencies
 

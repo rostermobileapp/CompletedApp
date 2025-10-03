@@ -3098,6 +3098,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk delete routes for league management
+  // Delete all players/members in a league
+  app.delete('/api/leagues/:leagueId/members/all', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Check if user has commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can delete all players' });
+      }
+
+      // Delete all league memberships for this league
+      await db.delete(leagueMemberships).where(eq(leagueMemberships.leagueId, leagueId));
+
+      res.json({ message: 'All players deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting all players:', error);
+      res.status(500).json({ message: 'Failed to delete all players' });
+    }
+  });
+
+  // Delete all teams in a league
+  app.delete('/api/leagues/:leagueId/teams/all', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Check if user has commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can delete all teams' });
+      }
+
+      // Delete all teams for this league (cascade will handle related data)
+      await db.delete(teams).where(eq(teams.leagueId, leagueId));
+
+      res.json({ message: 'All teams deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting all teams:', error);
+      res.status(500).json({ message: 'Failed to delete all teams' });
+    }
+  });
+
+  // Delete all games in a league
+  app.delete('/api/leagues/:leagueId/games/all', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Check if user has commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can delete all games' });
+      }
+
+      // Delete all games for this league
+      const result = await db.execute(sql`
+        DELETE FROM games WHERE league_id = ${leagueId}
+      `);
+
+      res.json({ message: 'All games deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting all games:', error);
+      res.status(500).json({ message: 'Failed to delete all games' });
+    }
+  });
+
   // Bulk schedule upload
   app.post('/api/leagues/:leagueId/schedules/import', isAuthenticated, upload.single('scheduleFile'), async (req: any, res) => {
     try {

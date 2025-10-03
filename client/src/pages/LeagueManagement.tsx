@@ -50,6 +50,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { GoogleAddressAutocomplete } from '@/components/GoogleAddressAutocomplete';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type LeagueMember = {
   id: string;
@@ -620,6 +630,11 @@ export default function LeagueManagement() {
   const [showEditTeam, setShowEditTeam] = useState(false);
   const [selectedTeamForEdit, setSelectedTeamForEdit] = useState<Team | null>(null);
   
+  // Bulk delete confirmation states
+  const [showDeleteAllPlayersDialog, setShowDeleteAllPlayersDialog] = useState(false);
+  const [showDeleteAllTeamsDialog, setShowDeleteAllTeamsDialog] = useState(false);
+  const [showDeleteAllGamesDialog, setShowDeleteAllGamesDialog] = useState(false);
+  
   // Co-commissioner management state
   const [coCommissionerEmail, setCoCommissionerEmail] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
@@ -675,7 +690,7 @@ export default function LeagueManagement() {
   });
 
   // Get league ID and edit mode from URL params
-  const leagueId = new URLSearchParams(window.location.search).get('league') || '';
+  const leagueId = new URLSearchParams(window.location.search).get('leagueId') || '';
   const editMode = new URLSearchParams(window.location.search).get('edit') === 'true';
   const editMemberId = new URLSearchParams(window.location.search).get('editMember') || '';
   
@@ -1116,6 +1131,71 @@ export default function LeagueManagement() {
     if (!scheduleImportFile) return;
     scheduleUploadMutation.mutate(scheduleImportFile);
   };
+
+  // Bulk delete mutations
+  const deleteAllPlayersMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('DELETE', `/api/leagues/${leagueId}/members/all`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'All Players Deleted',
+        description: 'All players have been removed from the league.',
+      });
+      refetchMembers();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Delete Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteAllTeamsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('DELETE', `/api/leagues/${leagueId}/teams/all`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'All Teams Deleted',
+        description: 'All teams have been removed from the league.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+      refetchMembers();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Delete Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteAllGamesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('DELETE', `/api/leagues/${leagueId}/games/all`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'All Games Deleted',
+        description: 'All games have been removed from the league.',
+      });
+      refetchGames();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Delete Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Team logo upload mutation
   const updateTeamLogoMutation = useMutation({
@@ -1994,9 +2074,21 @@ export default function LeagueManagement() {
 
             {/* Approved Members */}
             <div className="bg-card rounded-xl border border-border p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <UserCheck className="w-5 h-5 text-green-500/50" />
-                <h3 className="text-lg font-semibold">League Members ({members.length})</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-green-500/50" />
+                  <h3 className="text-lg font-semibold">League Members ({members.length})</h3>
+                </div>
+                {members.length > 0 && (
+                  <button
+                    onClick={() => setShowDeleteAllPlayersDialog(true)}
+                    className="flex items-center gap-2 px-3 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors"
+                    data-testid="button-delete-all-players"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete All Players
+                  </button>
+                )}
               </div>
               {members.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No approved members yet.</p>
@@ -2081,14 +2173,26 @@ export default function LeagueManagement() {
                   </h3>
                 </div>
                 {!selectedTeam && (
-                  <button
-                    onClick={() => setShowCreateTeam(!showCreateTeam)}
-                    className="flex items-center gap-2 px-4 py-2 bg-warning text-black rounded-lg text-sm font-medium"
-                    data-testid="button-create-team"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Create Team
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowCreateTeam(!showCreateTeam)}
+                      className="flex items-center gap-2 px-4 py-2 bg-warning text-black rounded-lg text-sm font-medium"
+                      data-testid="button-create-team"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Create Team
+                    </button>
+                    {teams.length > 0 && (
+                      <button
+                        onClick={() => setShowDeleteAllTeamsDialog(true)}
+                        className="flex items-center gap-2 px-3 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors"
+                        data-testid="button-delete-all-teams"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete All Teams
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -2391,6 +2495,16 @@ export default function LeagueManagement() {
                       <Plus className="w-4 h-4" />
                       Schedule Game
                     </button>
+                    {games.length > 0 && (
+                      <button
+                        onClick={() => setShowDeleteAllGamesDialog(true)}
+                        className="flex items-center gap-2 px-3 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors"
+                        data-testid="button-delete-all-games"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete All Games
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2415,6 +2529,16 @@ export default function LeagueManagement() {
                       Schedule Game
                     </button>
                   </div>
+                  {games.length > 0 && (
+                    <button
+                      onClick={() => setShowDeleteAllGamesDialog(true)}
+                      className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors w-full"
+                      data-testid="button-delete-all-games-mobile"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete All Games
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -4620,6 +4744,72 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
+
+      {/* Delete All Players Confirmation Dialog */}
+      <AlertDialog open={showDeleteAllPlayersDialog} onOpenChange={setShowDeleteAllPlayersDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Players?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all {members.length} players from this league. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-all-players">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAllPlayersMutation.mutate()}
+              className="bg-red-500 hover:bg-red-600"
+              data-testid="button-confirm-delete-all-players"
+            >
+              Delete All Players
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All Teams Confirmation Dialog */}
+      <AlertDialog open={showDeleteAllTeamsDialog} onOpenChange={setShowDeleteAllTeamsDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Teams?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all {teams.length} teams from this league and unassign all players. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-all-teams">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAllTeamsMutation.mutate()}
+              className="bg-red-500 hover:bg-red-600"
+              data-testid="button-confirm-delete-all-teams"
+            >
+              Delete All Teams
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All Games Confirmation Dialog */}
+      <AlertDialog open={showDeleteAllGamesDialog} onOpenChange={setShowDeleteAllGamesDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Games?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all {games.length} games from this league. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-all-games">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAllGamesMutation.mutate()}
+              className="bg-red-500 hover:bg-red-600"
+              data-testid="button-confirm-delete-all-games"
+            >
+              Delete All Games
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
