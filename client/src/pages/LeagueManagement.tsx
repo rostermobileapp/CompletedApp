@@ -2317,12 +2317,14 @@ export default function LeagueManagement() {
                               {!team.isFreeAgents && (
                                 <div className="flex gap-2">
                                   {(() => {
-                                    // Check if user is captain and not already on the team
+                                    // Check if user can join the team
                                     const userMembership = members.find(m => m.userId === user?.id);
                                     const isCaptain = team.captainId === user?.id;
+                                    const isCommissioner = league.commissionerId === user?.id;
                                     const isNotOnTeam = userMembership && userMembership.assignedTeamId !== team.id;
                                     
-                                    if (isCaptain && isNotOnTeam) {
+                                    // Show join button if user is captain OR commissioner, and not already on the team
+                                    if ((isCaptain || isCommissioner) && isNotOnTeam) {
                                       return (
                                         <button
                                           onClick={(e) => {
