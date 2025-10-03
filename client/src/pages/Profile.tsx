@@ -16,6 +16,7 @@ import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const profileSchema = z.object({
+  email: z.string().email('Invalid email address').optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   dateOfBirth: z.string().optional(),
@@ -45,6 +46,7 @@ export default function Profile() {
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
+      email: (user as any)?.email || '',
       firstName: (user as any)?.firstName || '',
       lastName: (user as any)?.lastName || '',
       dateOfBirth: (user as any)?.dateOfBirth || '',
@@ -404,6 +406,20 @@ export default function Profile() {
                     data-testid="input-last-name"
                   />
                 </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input
+                  {...form.register('email')}
+                  type="email"
+                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="your@email.com"
+                  data-testid="input-email"
+                />
+                {form.formState.errors.email && (
+                  <p className="text-xs text-destructive mt-1">{form.formState.errors.email.message}</p>
+                )}
               </div>
               
               <div>
