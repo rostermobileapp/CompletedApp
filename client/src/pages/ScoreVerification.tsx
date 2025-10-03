@@ -153,13 +153,6 @@ export default function ScoreVerification() {
           </p>
         </div>
         
-        {/* Show reason for verification */}
-        <div className="mb-3 p-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg">
-          <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">
-            {game.reason}
-          </p>
-        </div>
-        
         {/* Show existing submissions if any */}
         {game.submissions && game.submissions.length > 0 && (
           <div className="mb-3 p-3 bg-muted rounded-lg">
