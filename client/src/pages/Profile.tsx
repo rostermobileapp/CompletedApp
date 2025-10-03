@@ -696,10 +696,16 @@ export default function Profile() {
                   <br />• Erase your game history, stats, and RSVPs
                   <br />• Remove all your messages and announcements
                   <br /><br />This action cannot be undone and you will be signed out immediately.
+                  {(user as any)?.stripeSubscriptionId && (user as any)?.role !== 'free_tier' && (
+                    <>
+                      <br /><br />
+                      <strong className="text-destructive">Note: You have an active paid subscription. Please cancel your subscription first before deleting your profile.</strong>
+                    </>
+                  )}
                   {userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === user?.id) && (
                     <>
                       <br /><br />
-                      <strong className="text-destructive">Note: You are a commissioner of one or more leagues. Please transfer or delete your leagues before deleting your profile.</strong>
+                      <strong className="text-destructive">Note: You are a commissioner of one or more leagues. Please transfer your commissioner status to another user before deleting your profile.</strong>
                     </>
                   )}
                 </AlertDialogDescription>
@@ -709,7 +715,11 @@ export default function Profile() {
                 <AlertDialogAction
                   onClick={() => deleteProfileMutation.mutate()}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  disabled={deleteProfileMutation.isPending || (userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === user?.id))}
+                  disabled={
+                    deleteProfileMutation.isPending || 
+                    ((user as any)?.stripeSubscriptionId && (user as any)?.role !== 'free_tier') ||
+                    (userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === user?.id))
+                  }
                   data-testid="button-confirm-delete"
                 >
                   {deleteProfileMutation.isPending ? 'Deleting...' : 'Delete Profile'}
