@@ -41,6 +41,16 @@ export default function ScoreVerification() {
         
         try {
           const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
+          
+          // If we get a 403, it means user doesn't have access to this game's submissions
+          // This likely means they're not a captain of this game, so skip it (don't mark as needing verification)
+          if (!submissionsResponse.ok) {
+            if (submissionsResponse.status === 403) {
+              continue; // Skip games user doesn't have access to
+            }
+            throw new Error(`Failed to fetch submissions: ${submissionsResponse.status}`);
+          }
+          
           const submissions = await submissionsResponse.json();
           
           if (!Array.isArray(submissions)) continue;

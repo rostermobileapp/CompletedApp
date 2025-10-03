@@ -113,6 +113,15 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
         
         try {
           const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
+          
+          // If we get a 403, skip this game (user doesn't have access)
+          if (!submissionsResponse.ok) {
+            if (submissionsResponse.status === 403) {
+              continue;
+            }
+            throw new Error(`Failed to fetch submissions: ${submissionsResponse.status}`);
+          }
+          
           const submissions = await submissionsResponse.json();
           
           if (!Array.isArray(submissions)) continue;
