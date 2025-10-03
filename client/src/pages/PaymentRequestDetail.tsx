@@ -245,9 +245,35 @@ export default function PaymentRequestDetail() {
                       </p>
                       {(recipient.user?.venmoUsername || recipient.user?.cashappUsername) && (
                         <p className="text-xs text-muted-foreground">
-                          {recipient.user?.venmoUsername && `Venmo: ${recipient.user?.venmoUsername}`}
+                          {recipient.user?.venmoUsername && (
+                            <>
+                              Venmo:{' '}
+                              <a
+                                href={`https://venmo.com/${recipient.user.venmoUsername.replace(/^@/, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline"
+                                data-testid={`link-venmo-${recipient.id}`}
+                              >
+                                {recipient.user.venmoUsername}
+                              </a>
+                            </>
+                          )}
                           {recipient.user?.venmoUsername && recipient.user?.cashappUsername && ' • '}
-                          {recipient.user?.cashappUsername && `CashApp: ${recipient.user?.cashappUsername}`}
+                          {recipient.user?.cashappUsername && (
+                            <>
+                              CashApp:{' '}
+                              <a
+                                href={`https://cash.app/$${recipient.user.cashappUsername.replace(/^\$/, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline"
+                                data-testid={`link-cashapp-${recipient.id}`}
+                              >
+                                {recipient.user.cashappUsername}
+                              </a>
+                            </>
+                          )}
                         </p>
                       )}
                     </div>

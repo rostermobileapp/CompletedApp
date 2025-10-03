@@ -572,11 +572,35 @@ export default function Profile() {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Venmo:</span>
-                <span data-testid="text-venmo-username">{(user as any)?.venmoUsername || 'Not set'}</span>
+                {(user as any)?.venmoUsername ? (
+                  <a
+                    href={`https://venmo.com/${(user as any).venmoUsername.replace(/^@/, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                    data-testid="link-venmo-username"
+                  >
+                    {(user as any).venmoUsername}
+                  </a>
+                ) : (
+                  <span data-testid="text-venmo-username">Not set</span>
+                )}
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">CashApp:</span>
-                <span data-testid="text-cashapp-username">{(user as any)?.cashappUsername || 'Not set'}</span>
+                {(user as any)?.cashappUsername ? (
+                  <a
+                    href={`https://cash.app/$${(user as any).cashappUsername.replace(/^\$/, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                    data-testid="link-cashapp-username"
+                  >
+                    {(user as any).cashappUsername}
+                  </a>
+                ) : (
+                  <span data-testid="text-cashapp-username">Not set</span>
+                )}
               </div>
             </div>
           )}

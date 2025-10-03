@@ -328,9 +328,35 @@ export default function CreatePaymentRequest() {
                             </p>
                             {(member.user.venmoUsername || member.user.cashappUsername) && (
                               <p className="text-xs text-muted-foreground">
-                                {member.user.venmoUsername && `Venmo: ${member.user.venmoUsername}`}
+                                {member.user.venmoUsername && (
+                                  <>
+                                    Venmo:{' '}
+                                    <a
+                                      href={`https://venmo.com/${member.user.venmoUsername.replace(/^@/, '')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:underline"
+                                      data-testid={`link-venmo-${member.user.id}`}
+                                    >
+                                      {member.user.venmoUsername}
+                                    </a>
+                                  </>
+                                )}
                                 {member.user.venmoUsername && member.user.cashappUsername && ' • '}
-                                {member.user.cashappUsername && `CashApp: ${member.user.cashappUsername}`}
+                                {member.user.cashappUsername && (
+                                  <>
+                                    CashApp:{' '}
+                                    <a
+                                      href={`https://cash.app/$${member.user.cashappUsername.replace(/^\$/, '')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:underline"
+                                      data-testid={`link-cashapp-${member.user.id}`}
+                                    >
+                                      {member.user.cashappUsername}
+                                    </a>
+                                  </>
+                                )}
                               </p>
                             )}
                           </div>
