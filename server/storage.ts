@@ -765,7 +765,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserLeagues(userId: string): Promise<League[]> {
-    const result = await db
+    // Get leagues where user is a member
+    const memberLeagues = await db
       .select({ league: leagues })
       .from(leagues)
       .innerJoin(leagueMemberships, eq(leagues.id, leagueMemberships.leagueId))
@@ -775,7 +776,21 @@ export class DatabaseStorage implements IStorage {
           eq(leagueMemberships.status, "approved")
         )
       );
-    return result.map(r => r.league);
+    
+    // Get leagues where user is the commissioner
+    const commissionerLeagues = await db
+      .select()
+      .from(leagues)
+      .where(eq(leagues.commissionerId, userId));
+    
+    // Combine and deduplicate
+    const allLeagues = [
+      ...memberLeagues.map(r => r.league),
+      ...commissionerLeagues
+    ];
+    const uniqueLeagues = Array.from(new Map(allLeagues.map(league => [league.id, league])).values());
+    
+    return uniqueLeagues;
   }
 
   async getUserLeagueMemberships(userId: string): Promise<LeagueMembership[]> {
