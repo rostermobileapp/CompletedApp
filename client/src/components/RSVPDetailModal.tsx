@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ClickableAvatar } from "@/components/ClickableAvatar";
 
 interface RSVPDetailModalProps {
   gameId: string;
@@ -49,12 +49,13 @@ export function RSVPDetailModal({
   const PlayerListItem = ({ user, status, showSubstituteButton = false }: any) => (
     <div className="flex items-center justify-between p-3 rounded-lg border" data-testid={`player-${user.id}`}>
       <div className="flex items-center gap-3">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={user.profileImageUrl} />
-          <AvatarFallback className="text-xs">
-            {user.firstName?.[0]}{user.lastName?.[0]}
-          </AvatarFallback>
-        </Avatar>
+        <ClickableAvatar
+          userId={user.id}
+          profileImageUrl={user.profileImageUrl}
+          firstName={user.firstName}
+          lastName={user.lastName}
+          size="sm"
+        />
         <div>
           <p className="text-sm font-medium">
             {user.firstName} {user.lastName}

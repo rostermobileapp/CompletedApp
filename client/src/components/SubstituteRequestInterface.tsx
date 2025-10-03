@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ClickableAvatar } from "@/components/ClickableAvatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -155,12 +155,13 @@ export function SubstituteRequestInterface({ className }: SubstituteRequestInter
       <CardContent className="space-y-3">
         {/* Player Information */}
         <div className="flex items-center gap-3">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={request.originalPlayer?.profileImageUrl} />
-            <AvatarFallback className="text-xs">
-              {request.originalPlayer?.firstName?.[0]}{request.originalPlayer?.lastName?.[0]}
-            </AvatarFallback>
-          </Avatar>
+          <ClickableAvatar
+            userId={request.originalPlayer?.id || ''}
+            profileImageUrl={request.originalPlayer?.profileImageUrl}
+            firstName={request.originalPlayer?.firstName}
+            lastName={request.originalPlayer?.lastName}
+            size="sm"
+          />
           <div className="flex-1">
             <p className="text-sm font-medium">
               {request.originalPlayer?.firstName} {request.originalPlayer?.lastName}
@@ -170,12 +171,13 @@ export function SubstituteRequestInterface({ className }: SubstituteRequestInter
           {request.substitutePlayer && (
             <>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={request.substitutePlayer?.profileImageUrl} />
-                <AvatarFallback className="text-xs">
-                  {request.substitutePlayer?.firstName?.[0]}{request.substitutePlayer?.lastName?.[0]}
-                </AvatarFallback>
-              </Avatar>
+              <ClickableAvatar
+                userId={request.substitutePlayer?.id || ''}
+                profileImageUrl={request.substitutePlayer?.profileImageUrl}
+                firstName={request.substitutePlayer?.firstName}
+                lastName={request.substitutePlayer?.lastName}
+                size="sm"
+              />
               <div>
                 <p className="text-sm font-medium">
                   {request.substitutePlayer?.firstName} {request.substitutePlayer?.lastName}
