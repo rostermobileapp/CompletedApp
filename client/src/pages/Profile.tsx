@@ -187,6 +187,29 @@ export default function Profile() {
     },
   });
 
+  // Delete profile mutation
+  const deleteProfileMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('DELETE', '/api/auth/user');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ 
+        title: 'Profile deleted',
+        description: 'Your account has been permanently deleted' 
+      });
+      // Redirect to home page
+      window.location.href = '/';
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to delete profile', 
+        description: error.message || 'Please try again.',
+        variant: 'destructive' 
+      });
+    },
+  });
+
   const handleGetUploadParameters = async () => {
     const response = await apiRequest('POST', '/api/profile-images/upload');
     const { uploadURL } = await response.json();
@@ -650,6 +673,51 @@ export default function Profile() {
             </div>
           </div>
           
+          {/* Delete Profile */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                className="w-full bg-card border border-destructive rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-destructive/10"
+                data-testid="button-delete-profile"
+              >
+                <div className="flex items-center gap-3">
+                  <Shield className="w-5 h-5" />
+                  <span>Delete Profile</span>
+                </div>
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent data-testid="dialog-delete-profile">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Profile</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to permanently delete your profile? This will:
+                  <br />• Remove all your personal information
+                  <br />• Delete all your league and team memberships
+                  <br />• Erase your game history, stats, and RSVPs
+                  <br />• Remove all your messages and announcements
+                  <br /><br />This action cannot be undone and you will be signed out immediately.
+                  {userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === user?.id) && (
+                    <>
+                      <br /><br />
+                      <strong className="text-destructive">Note: You are a commissioner of one or more leagues. Please transfer or delete your leagues before deleting your profile.</strong>
+                    </>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteProfileMutation.mutate()}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={deleteProfileMutation.isPending || (userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === user?.id))}
+                  data-testid="button-confirm-delete"
+                >
+                  {deleteProfileMutation.isPending ? 'Deleting...' : 'Delete Profile'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           {/* Sign Out */}
           <button
             onClick={() => window.location.href = '/api/logout'}
