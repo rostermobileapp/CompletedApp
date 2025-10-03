@@ -69,6 +69,9 @@ interface ConversationParticipant {
     id: string;
     displayName: string;
     email: string;
+    profileImageUrl?: string;
+    firstName?: string;
+    lastName?: string;
   };
 }
 
@@ -2030,8 +2033,6 @@ export default function Messages() {
           </DialogHeader>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {currentConversation?.participants?.map((participant) => {
-              const user = participant.user as any;
-              
               return (
                 <div
                   key={participant.id}
@@ -2040,17 +2041,17 @@ export default function Messages() {
                 >
                   <ClickableAvatar
                     userId={participant.userId}
-                    profileImageUrl={user?.profileImageUrl}
-                    firstName={user?.firstName}
-                    lastName={user?.lastName}
+                    profileImageUrl={participant.user?.profileImageUrl}
+                    firstName={participant.user?.firstName}
+                    lastName={participant.user?.lastName}
                     size="sm"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate" data-testid={`member-name-${participant.userId}`}>
-                      {user?.displayName || 'Unknown User'}
+                      {participant.user?.displayName || 'Unknown User'}
                     </p>
                     <p className="text-sm text-muted-foreground truncate">
-                      {user?.email || ''}
+                      {participant.user?.email || ''}
                     </p>
                   </div>
                   {participant.userId === currentUserId && (
