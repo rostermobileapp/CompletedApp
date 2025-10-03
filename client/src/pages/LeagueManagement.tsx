@@ -2323,7 +2323,7 @@ export default function LeagueManagement() {
                             </div>
                             <div className="flex items-center gap-3 ml-4">
                               {!team.isFreeAgents && (
-                                <div className="flex gap-2">
+                                <div className="flex flex-col gap-1">
                                   {(() => {
                                     // Check if user can join the team
                                     const userMembership = members.find(m => m.userId === user?.id);
