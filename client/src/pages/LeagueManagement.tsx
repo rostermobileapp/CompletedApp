@@ -93,6 +93,8 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
   // Fetch count of games that need score verification
   const { data: gamesNeedingVerification = [], isLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games-needing-verification-count'],
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    staleTime: 20000,
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
       const allGames = await response.json();
