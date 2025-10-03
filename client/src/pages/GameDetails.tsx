@@ -570,8 +570,8 @@ export default function GameDetails() {
                   <p className="text-sm font-medium text-muted-foreground mb-2">Team Attendance:</p>
                   <RSVPSummary 
                     gameId={game.id}
-                    teamId={isCaptain ? captainTeamId : undefined}
-                    showTeamSeparation={isCommissioner && !isCaptain}
+                    teamId={userTeam?.id}
+                    showTeamSeparation={isCommissioner && !userTeam}
                     onViewDetails={() => setShowRSVPModal(true)}
                   />
                 </div>
@@ -1062,7 +1062,7 @@ export default function GameDetails() {
           setShowSubstituteModal(true);
         }}
         showSubstituteButtons={isCaptain}
-        teamId={isCaptain ? captainTeamId : undefined}
+        teamId={userTeam?.id}
       />
       {/* Substitute Request Modal */}
       {substituteRequestData && (
