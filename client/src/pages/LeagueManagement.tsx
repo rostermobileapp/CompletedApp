@@ -86,35 +86,28 @@ type LeagueMember = {
 };
 
 
-// Commissioner To-Do Component for Score Verification
-function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+// Compact Score Verification Alert Component
+function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
+  const [, navigate] = useLocation();
 
-  // Fetch games that need score verification using correct business logic
+  // Fetch count of games that need score verification
   const { data: gamesNeedingVerification = [], isLoading } = useQuery({
-    queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
+    queryKey: ['/api/leagues', leagueId, 'games-needing-verification-count'],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
       const allGames = await response.json();
       
       if (!Array.isArray(allGames)) return [];
       
-      // Find games that need commissioner verification based on the correct business logic:
-      // 1. Today's date is AFTER the game's date (past games)
-      // 2. Game has problematic score submissions (0, 1, or 2 mismatched)
       const gamesNeedingVerification = [];
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // Start of today
+      today.setHours(0, 0, 0, 0);
       
       for (const game of allGames) {
         const gameDate = new Date(game.scheduledAt);
-        gameDate.setHours(0, 0, 0, 0); // Start of game date
+        gameDate.setHours(0, 0, 0, 0);
         
-        // Only check games from past dates
-        if (gameDate >= today) {
-          continue; // Skip future games
-        }
+        if (gameDate >= today) continue;
         
         try {
           const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
@@ -122,46 +115,30 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
           
           if (!Array.isArray(submissions)) continue;
           
-          const submissionCount = submissions.length;
-          let needsVerification = false;
-          let reason = '';
-          let submissionDetails = submissions;
-          
-          // Check if there's a commissioner submission - if so, no verification needed
           const hasCommissionerSubmission = submissions.some(sub => 
             sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
           );
           
-          if (hasCommissionerSubmission) {
-            // Commissioner has already submitted final score - no verification needed
-            needsVerification = false;
-          } else if (submissionCount === 0) {
-            // No score submissions - needs verification
+          if (hasCommissionerSubmission) continue;
+          
+          const submissionCount = submissions.length;
+          let needsVerification = false;
+          
+          if (submissionCount === 0) {
             needsVerification = true;
-            reason = 'No score submissions';
           } else if (submissionCount === 1) {
-            // Only one team submitted - needs verification
             needsVerification = true;
-            reason = 'Missing one team submission';
           } else if (submissionCount === 2) {
-            // Two submissions - check if they match
             const [sub1, sub2] = submissions;
             if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
               needsVerification = true;
-              reason = `Mismatched scores`;
             }
           }
           
           if (needsVerification) {
-            gamesNeedingVerification.push({
-              ...game,
-              submissionCount,
-              reason,
-              submissions: submissionDetails
-            });
+            gamesNeedingVerification.push(game);
           }
         } catch (error) {
-          // Skip on error
           continue;
         }
       }
@@ -171,165 +148,49 @@ function CommissionerScoreToDo({ leagueId }: { leagueId: string }) {
     enabled: !!leagueId,
   });
 
-  // Mutation to submit/update score for a game
-  const submitScoreMutation = useMutation({
-    mutationFn: async ({ gameId, homeScore, awayScore }: { gameId: string; homeScore: number; awayScore: number }) => {
-      const response = await apiRequest('POST', `/api/games/${gameId}/submit-score`, {
-        homeScore,
-        awayScore,
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Score submitted",
-        description: "Game score has been updated successfully.",
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games-needing-verification'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games'] });
-    },
-    onError: (error) => {
-      console.error('Error submitting score:', error);
-      toast({
-        title: "Error",
-        description: "Failed to submit score. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Component to handle individual score submission
-  const ScoreSubmissionCard = ({ game }: { game: any }) => {
-    const [homeScore, setHomeScore] = useState('');
-    const [awayScore, setAwayScore] = useState('');
-
-    const handleSubmitScore = () => {
-      const home = parseInt(homeScore);
-      const away = parseInt(awayScore);
-      
-      if (isNaN(home) || isNaN(away) || home < 0 || away < 0) {
-        toast({
-          title: "Invalid Score",
-          description: "Please enter valid scores (numbers only).",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      submitScoreMutation.mutate({ gameId: game.id, homeScore: home, awayScore: away });
-    };
-
-    return (
-      <div className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-700 rounded-lg p-3 pt-[1px] pb-[1px]">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="text-base font-medium text-gray-900 dark:text-white">
-            {game.homeTeam?.name} vs {game.awayTeam?.name}
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            {format(new Date(game.scheduledAt), 'MMM d, yyyy • h:mm a')}
-          </p>
-        </div>
-        {/* Show existing submissions if any */}
-        {game.submissions && game.submissions.length > 0 && (
-          <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">Current Submissions:</h4>
-            {game.submissions.map((sub: any, index: number) => (
-              <div key={index} className="text-sm text-gray-700 dark:text-gray-300">
-                Submission {index + 1}: {game.homeTeam?.name} {sub.homeScore} - {sub.awayScore} {game.awayTeam?.name}
-                {sub.submittedBy && <span className="text-xs text-gray-500 ml-2">(by Team {sub.submittedBy})</span>}
-              </div>
-            ))}
-          </div>
-        )}
-        {/* Score submission form */}
-        <div className="grid grid-cols-3 gap-2 items-center">
-          <div className="text-center">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">
-              {game.homeTeam?.name}
-            </label>
-            <Input
-              type="number"
-              min="0"
-              value={homeScore}
-              onChange={(e) => setHomeScore(e.target.value)}
-              className="text-center"
-              placeholder="0"
-              data-testid={`input-home-score-${game.id}`}
-            />
-          </div>
-          
-          <div className="text-center text-lg font-bold text-gray-500">
-            -
-          </div>
-          
-          <div className="text-center">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">
-              {game.awayTeam?.name}
-            </label>
-            <Input
-              type="number"
-              min="0"
-              value={awayScore}
-              onChange={(e) => setAwayScore(e.target.value)}
-              className="text-center"
-              placeholder="0"
-              data-testid={`input-away-score-${game.id}`}
-            />
-          </div>
-        </div>
-        <Button
-          onClick={handleSubmitScore}
-          disabled={submitScoreMutation.isPending || !homeScore || !awayScore}
-          className="w-full mt-2"
-          data-testid={`button-submit-score-${game.id}`}
-        >
-          {submitScoreMutation.isPending ? "Submitting..." : "Submit Final Score"}
-        </Button>
-      </div>
-    );
-  };
-
-  // Show loading state
   if (isLoading) {
-    return (
-      <div className="mb-4">
-        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <span className="text-sm text-blue-600 dark:text-blue-300">Checking for games needing verification...</span>
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
-  if (!Array.isArray(gamesNeedingVerification) || gamesNeedingVerification.length === 0) {
-    return (
-      <div className="mb-4">
-        <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
-            <span className="text-sm text-green-600 dark:text-green-300">All games are up to date - no verification needed!</span>
-          </div>
-        </div>
-      </div>
-    );
+  const count = gamesNeedingVerification.length;
+
+  if (count === 0) {
+    return null;
   }
 
   return (
     <div className="mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Target className="w-5 h-5 text-red-600" />
-        <h2 className="text-xl font-bold text-red-600">Score Verification Needed</h2>
-        <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-          <span className="text-white text-xs font-bold">{gamesNeedingVerification.length}</span>
+      <div 
+        className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
+        onClick={() => navigate(`/league/${leagueId}/score-verification`)}
+        data-testid="score-verification-alert"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-bold">{count}</span>
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-red-600 dark:text-red-400">
+                Score Verification Needed
+              </h3>
+              <p className="text-sm text-red-600 dark:text-red-400">
+                {count === 1 ? '1 game needs' : `${count} games need`} your attention
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/league/${leagueId}/score-verification`);
+            }}
+            data-testid="button-view-score-verification"
+          >
+            Review Scores
+          </Button>
         </div>
-      </div>
-      
-      <div className="space-y-4">
-        {gamesNeedingVerification.map((game: any) => (
-          <ScoreSubmissionCard key={game.id} game={game} />
-        ))}
       </div>
     </div>
   );
@@ -1928,8 +1789,8 @@ export default function LeagueManagement() {
           </div>
         )}
 
-        {/* Commissioner Score Verification To-Do */}
-        {league && <CommissionerScoreToDo leagueId={league.id} />}
+        {/* Score Verification Alert */}
+        {league && <ScoreVerificationAlert leagueId={league.id} />}
 
         {/* Tab Navigation */}
         <div className="flex bg-muted rounded-lg p-1">
