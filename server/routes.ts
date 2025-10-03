@@ -80,7 +80,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/auth/user/profile', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { firstName, lastName, city, age, phoneNumber, dateOfBirth, playerType, email } = req.body;
+      const { firstName, lastName, city, age, phoneNumber, dateOfBirth, playerType } = req.body;
       
       const profileData: any = {};
       if (firstName !== undefined) profileData.firstName = firstName;
@@ -90,16 +90,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (phoneNumber !== undefined) profileData.phoneNumber = phoneNumber;
       if (dateOfBirth !== undefined) profileData.dateOfBirth = dateOfBirth;
       if (playerType !== undefined) profileData.playerType = playerType;
-      if (email !== undefined) profileData.email = email;
 
       const user = await storage.updateUserProfile(userId, profileData);
       res.json(user);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating user profile:", error);
-      // Check for unique constraint violation on email
-      if (error?.code === '23505' && error?.constraint === 'users_email_unique') {
-        return res.status(400).json({ message: "This email address is already in use by another account" });
-      }
       res.status(500).json({ message: "Failed to update profile" });
     }
   });

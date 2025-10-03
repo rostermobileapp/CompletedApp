@@ -18,7 +18,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const profileSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
-  email: z.string().email('Invalid email address').optional().or(z.literal('')),
   dateOfBirth: z.string().optional(),
   phoneNumber: z.string().optional(),
   city: z.string().optional(),
@@ -48,7 +47,6 @@ export default function Profile() {
     defaultValues: {
       firstName: (user as any)?.firstName || '',
       lastName: (user as any)?.lastName || '',
-      email: (user as any)?.email || '',
       dateOfBirth: (user as any)?.dateOfBirth || '',
       phoneNumber: (user as any)?.phoneNumber || '',
       city: (user as any)?.city || '',
@@ -117,10 +115,9 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
       setIsEditing(false);
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({ 
         title: 'Failed to update profile',
-        description: error?.message || 'Please try again.',
         variant: 'destructive' 
       });
     },
@@ -384,20 +381,6 @@ export default function Profile() {
                     data-testid="input-last-name"
                   />
                 </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
-                <input
-                  {...form.register('email')}
-                  type="email"
-                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="your.email@example.com"
-                  data-testid="input-email"
-                />
-                {form.formState.errors.email && (
-                  <p className="text-red-500 text-sm mt-1">{form.formState.errors.email.message}</p>
-                )}
               </div>
               
               <div>
