@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, UserPlus, Search } from "lucide-react";
+import { Users, UserPlus, Search, Calendar } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -39,13 +40,13 @@ export function SubstituteRequestModal({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch available players for the game date
-  const { data: availablePlayers = [], isLoading } = useQuery({
-    queryKey: [`/api/players/available/${gameDate}`, leagueId],
+  // Fetch all league players with availability status
+  const { data: allPlayers = [], isLoading } = useQuery({
+    queryKey: [`/api/players/all-with-availability/${gameDate}`, leagueId],
     queryFn: async () => {
-      const response = await fetch(`/api/players/available/${gameDate}?leagueId=${leagueId}`);
+      const response = await fetch(`/api/players/all-with-availability/${gameDate}?leagueId=${leagueId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch available players');
+        throw new Error('Failed to fetch players');
       }
       return response.json();
     },
@@ -82,11 +83,20 @@ export function SubstituteRequestModal({
     },
   });
 
-  // Filter players based on search term
-  const filteredPlayers = availablePlayers.filter((player: any) => 
-    `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    player.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter players based on search term and exclude the original player
+  const filteredPlayers = allPlayers.filter((player: any) => {
+    // Don't show the original player in the list
+    if (player.id === originalPlayerId) return false;
+    
+    return `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      player.email?.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  // Sort players: available first, then scheduled
+  const sortedPlayers = [...filteredPlayers].sort((a: any, b: any) => {
+    if (a.isScheduled === b.isScheduled) return 0;
+    return a.isScheduled ? 1 : -1;
+  });
 
   const handleSubmit = () => {
     if (!selectedPlayer) {
@@ -115,7 +125,7 @@ export function SubstituteRequestModal({
             Request Substitute for {originalPlayerName}
           </DialogTitle>
           <DialogDescription>
-            Select an available player to request as a substitute
+            Search and select a player to request as a substitute
           </DialogDescription>
         </DialogHeader>
 
@@ -124,7 +134,7 @@ export function SubstituteRequestModal({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search available players..."
+              placeholder="Search for any player..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -132,7 +142,7 @@ export function SubstituteRequestModal({
             />
           </div>
 
-          {/* Available Players List */}
+          {/* Players List */}
           {isLoading ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
@@ -149,17 +159,17 @@ export function SubstituteRequestModal({
           ) : (
             <ScrollArea className="flex-1 overflow-auto" style={{ height: '50vh' }}>
               <div className="space-y-2">
-                {filteredPlayers.length === 0 ? (
+                {sortedPlayers.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
                     <p>
                       {searchTerm 
                         ? "No players found matching your search" 
-                        : "No available players for this date"}
+                        : "No players in this league"}
                     </p>
                   </div>
                 ) : (
-                  filteredPlayers.map((player: any) => (
+                  sortedPlayers.map((player: any) => (
                     <div 
                       key={player.id}
                       className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
@@ -170,17 +180,25 @@ export function SubstituteRequestModal({
                       onClick={() => setSelectedPlayer(player.id)}
                       data-testid={`player-option-${player.id}`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1">
                         <Avatar className="h-10 w-10">
                           <AvatarImage src={player.profileImageUrl} />
                           <AvatarFallback>
                             {player.firstName?.[0]}{player.lastName?.[0]}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <p className="font-medium">
-                            {player.firstName} {player.lastName}
-                          </p>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">
+                              {player.firstName} {player.lastName}
+                            </p>
+                            {player.isScheduled && (
+                              <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                Scheduled
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             Skill: {(player as any).skillLevel || '—'}
                           </p>
