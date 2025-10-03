@@ -4077,8 +4077,10 @@ export class DatabaseStorage implements IStorage {
       .from(announcementVisibility)
       .where(eq(announcementVisibility.announcementId, announcementId));
     
+    const count = Number(visibilityCount[0]?.count || 0);
+    
     // If no visibility records exist, announcement is visible to all league members (default behavior)
-    if (visibilityCount[0].count === 0) {
+    if (count === 0) {
       return true;
     }
     

@@ -196,6 +196,69 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
   );
 }
 
+// Unread Announcements Alert Component
+function UnreadAnnouncementsAlert({ leagueId }: { leagueId: string }) {
+  const [, navigate] = useLocation();
+
+  const { data: unreadData, isLoading } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'announcements', 'unread-count'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/announcements/unread-count`);
+      return response.json();
+    },
+    refetchInterval: 30000,
+    staleTime: 20000,
+    enabled: !!leagueId,
+  });
+
+  if (isLoading) {
+    return null;
+  }
+
+  const count = (unreadData as { count: number } | undefined)?.count ?? 0;
+
+  if (count === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mb-6">
+      <div 
+        className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
+        onClick={() => navigate(`/league/${leagueId}/announcements`)}
+        data-testid="unread-announcements-alert"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-bold">{count}</span>
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-blue-600 dark:text-blue-400">
+                New Announcements
+              </h3>
+              <p className="text-sm text-blue-600 dark:text-blue-400">
+                {count === 1 ? '1 unread announcement' : `${count} unread announcements`}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            className="border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/league/${leagueId}/announcements`);
+            }}
+            data-testid="button-view-announcements"
+          >
+            View Announcements
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type Season = {
   id: string;
   name: string;
@@ -1791,6 +1854,9 @@ export default function LeagueManagement() {
 
         {/* Score Verification Alert */}
         {league && <ScoreVerificationAlert leagueId={league.id} />}
+
+        {/* Unread Announcements Alert */}
+        {league && <UnreadAnnouncementsAlert leagueId={league.id} />}
 
         {/* Tab Navigation */}
         <div className="flex bg-muted rounded-lg p-1">
