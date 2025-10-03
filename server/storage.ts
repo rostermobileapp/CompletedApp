@@ -2491,7 +2491,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findPotentialMatches(leagueId: string, firstName: string, lastName: string): Promise<ImportedPlayer[]> {
-    return await db.select()
+    const allMatches = await db.select()
       .from(importedPlayers)
       .where(
         and(
@@ -2510,6 +2510,16 @@ export class DatabaseStorage implements IStorage {
           )
         )
       );
+    
+    const seen = new Map<string, ImportedPlayer>();
+    for (const match of allMatches) {
+      const key = `${(match.firstName || '').toLowerCase()}-${(match.lastName || '').toLowerCase()}-${(match.teamName || '').toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.set(key, match);
+      }
+    }
+    
+    return Array.from(seen.values());
   }
 
   // Schedule import operations
