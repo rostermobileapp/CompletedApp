@@ -2806,6 +2806,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log what headers we received to help with debugging
       const receivedHeaders = parseResults.meta?.fields || Object.keys(parseResults.data[0] || {});
       console.log(`CSV Import: Received headers: ${receivedHeaders.join(', ')}`);
+      console.log(`CSV Import: Total rows to process: ${parseResults.data.length}`);
+      
+      // Log first row for debugging
+      if (parseResults.data.length > 0) {
+        console.log(`CSV Import: First row data:`, JSON.stringify(parseResults.data[0]));
+      }
 
       parseResults.data.forEach((row: any, index: number) => {
         // Handle both new simplified format (Name, Team Name) and legacy format
