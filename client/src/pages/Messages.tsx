@@ -320,7 +320,7 @@ export default function Messages() {
   const [showContactDiscovery, setShowContactDiscovery] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
-  const [conversationType, setConversationType] = useState<'direct' | 'team_group' | 'custom_group'>('direct');
+  const [conversationType, setConversationType] = useState<'direct' | 'team_group' | 'custom_group' | 'captain_only'>('direct');
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [groupTitle, setGroupTitle] = useState('');
@@ -471,6 +471,31 @@ export default function Messages() {
       toast({
         title: 'Failed to create group chat',
         description: 'Please try again',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Create captain-only conversation mutation
+  const createCaptainChatMutation = useMutation({
+    mutationFn: async (data: { leagueId: string }) => {
+      const response = await apiRequest('POST', '/api/conversations/captain-only', data);
+      return response.json();
+    },
+    onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+      setSelectedConversation(conversation.id);
+      setShowContactDiscovery(false);
+      resetDialog();
+      toast({
+        title: 'Captain chat created',
+        description: 'Captains-only chat created successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to create captain chat',
+        description: error.message || 'Please try again',
         variant: 'destructive'
       });
     }
@@ -1202,6 +1227,13 @@ export default function Messages() {
     });
   };
 
+  const handleCreateCaptainChat = () => {
+    if (!selectedLeague) return;
+    createCaptainChatMutation.mutate({
+      leagueId: selectedLeague
+    });
+  };
+
   const toggleContactSelection = (contactId: string) => {
     setSelectedContacts(prev => 
       prev.includes(contactId) 
@@ -1265,7 +1297,7 @@ export default function Messages() {
             {(selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
               <div>
                 <label className="text-sm font-medium mb-2 block">Conversation Type</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setConversationType('direct')}
@@ -1299,6 +1331,17 @@ export default function Messages() {
                     <UserPlus className="w-4 h-4 mx-auto mb-1" />
                     <div className="text-xs">Group</div>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setConversationType('captain_only')}
+                    className={`p-3 border rounded-lg text-center transition-colors ${
+                      conversationType === 'captain_only' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
+                    }`}
+                    data-testid="button-captain-only"
+                  >
+                    <Crown className="w-4 h-4 mx-auto mb-1" />
+                    <div className="text-xs">Captains</div>
+                  </button>
                 </div>
               </div>
             )}
@@ -1330,6 +1373,28 @@ export default function Messages() {
                     {createTeamGroupMutation.isPending ? 'Creating...' : 'Create Team Chat'}
                   </Button>
                 )}
+              </div>
+            )}
+
+            {/* Captain-Only Chat Creation */}
+            {conversationType === 'captain_only' && (selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
+              <div className="space-y-3">
+                <div className="p-3 bg-muted rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    <div className="text-sm text-muted-foreground">
+                      This will create a private chat with all team captains in the league.
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCreateCaptainChat}
+                  disabled={createCaptainChatMutation.isPending}
+                  className="w-full"
+                  data-testid="button-create-captain-chat"
+                >
+                  {createCaptainChatMutation.isPending ? 'Creating...' : 'Create Captain Chat'}
+                </Button>
               </div>
             )}
 
@@ -1451,7 +1516,7 @@ export default function Messages() {
       </Dialog>
 
       <div className="min-h-screen flex flex-col pb-24" data-testid="messages-page">
-        <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()} className="min-h-screen flex flex-col">
+        <FeatureLockOverlay isLocked={false} className="min-h-screen flex flex-col">
       {!selectedConversation ? (
         <>
           {/* Conversations List Header */}
