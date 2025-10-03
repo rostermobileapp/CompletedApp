@@ -61,7 +61,7 @@ export default function UserProfile() {
           <button 
             onClick={() => {
               setPageTransitionDirection('down');
-              navigate(-1);
+              window.history.back();
             }}
             className="text-muted-foreground"
             data-testid="button-back"
