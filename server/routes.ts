@@ -2801,6 +2801,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const errors: string[] = [];
       const teamsToCreate: Set<string> = new Set();
 
+      // Log what headers we received to help with debugging
+      const receivedHeaders = parseResults.meta?.fields || Object.keys(parseResults.data[0] || {});
+      console.log(`CSV Import: Received headers: ${receivedHeaders.join(', ')}`);
+
       parseResults.data.forEach((row: any, index: number) => {
         // Handle both new simplified format (Name, Team Name) and legacy format
         let firstName = '';
@@ -2818,7 +2822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (!firstName) {
-          errors.push(`Row ${index + 1}: Name is required`);
+          errors.push(`Row ${index + 1}: Name is required (expected 'Name' or 'First Name' column)`);
           return;
         }
 
@@ -2877,18 +2881,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      // Create import record and imported players
-      const importRecord = await storage.createPlayerImport({
-        leagueId,
-        importedBy: userId,
-        fileName: file.originalname,
-        totalRecords: parseResults.data.length,
-        successfulRecords: validPlayers.length,
-        failedRecords: errors.length
-      });
+      // Track actual successes and failures during user creation
+      let actualSuccessCount = 0;
+      const createdPlayerIds: string[] = [];
 
-      // Create imported player records with team assignments
+      // Create imported player records with team assignments and user accounts
       if (validPlayers.length > 0) {
+        // First, create the imported player records
+        const importRecord = await storage.createPlayerImport({
+          leagueId,
+          importedBy: userId,
+          fileName: file.originalname,
+          totalRecords: parseResults.data.length,
+          successfulRecords: 0, // Will update after actual creation
+          failedRecords: errors.length
+        });
+
         await storage.createImportedPlayersWithTeams(importRecord.id, leagueId, validPlayers);
         
         // Create placeholder user accounts and league memberships for imported players
@@ -2916,25 +2924,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
               approvedAt: new Date(),
             });
             
+            actualSuccessCount++;
+            createdPlayerIds.push(placeholderUser.id);
+            
           } catch (error) {
             console.error(`Failed to create user and membership for ${player.firstName} ${player.lastName}:`, error);
             // Add error to response so we can debug
             errors.push(`Failed to create user for ${player.firstName} ${player.lastName}: ${(error as Error).message}`);
           }
         }
+
+        // Update the import record with actual success count
+        await storage.updatePlayerImport(importRecord.id, {
+          successfulRecords: actualSuccessCount,
+          failedRecords: parseResults.data.length - actualSuccessCount
+        });
+
+        // Clean up uploaded file
+        fs.unlinkSync(file.path);
+
+        // Return helpful format information if all failed
+        const formatHelp = errors.length === parseResults.data.length && errors.length > 0
+          ? {
+              expectedFormat: "CSV should have a 'Name' column (or 'First Name' and 'Last Name' columns). Optional: 'Team Name', 'Email', 'Phone Number', 'Position', 'Jersey Number', 'Skill Level', 'Notes'",
+              receivedHeaders: receivedHeaders.join(', ')
+            }
+          : null;
+
+        res.json({
+          importId: importRecord.id,
+          totalRecords: parseResults.data.length,
+          successfulRecords: actualSuccessCount,
+          failedRecords: parseResults.data.length - actualSuccessCount,
+          teamsCreated: createdTeams.size,
+          errors: errors.slice(0, 10), // Limit errors to first 10 to avoid huge response
+          totalErrors: errors.length,
+          formatHelp
+        });
+      } else {
+        // No valid players found - create import record with all failed
+        const importRecord = await storage.createPlayerImport({
+          leagueId,
+          importedBy: userId,
+          fileName: file.originalname,
+          totalRecords: parseResults.data.length,
+          successfulRecords: 0,
+          failedRecords: parseResults.data.length
+        });
+
+        // Clean up uploaded file
+        fs.unlinkSync(file.path);
+
+        res.json({
+          importId: importRecord.id,
+          totalRecords: parseResults.data.length,
+          successfulRecords: 0,
+          failedRecords: parseResults.data.length,
+          teamsCreated: 0,
+          errors: errors.slice(0, 10), // Limit errors to first 10
+          totalErrors: errors.length,
+          formatHelp: {
+            expectedFormat: "CSV should have a 'Name' column (or 'First Name' and 'Last Name' columns). Optional: 'Team Name', 'Email', 'Phone Number', 'Position', 'Jersey Number', 'Skill Level', 'Notes'",
+            receivedHeaders: receivedHeaders.join(', ')
+          }
+        });
       }
-
-      // Clean up uploaded file
-      fs.unlinkSync(file.path);
-
-      res.json({
-        importId: importRecord.id,
-        totalRecords: parseResults.data.length,
-        successfulRecords: validPlayers.length,
-        failedRecords: errors.length,
-        teamsCreated: createdTeams.size,
-        errors
-      });
 
     } catch (error) {
       console.error('Error importing players:', error);

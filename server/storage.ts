@@ -290,6 +290,7 @@ export interface IStorage {
   
   // Bulk import operations
   createPlayerImport(importData: InsertPlayerImport): Promise<PlayerImport>;
+  updatePlayerImport(importId: string, updates: Partial<InsertPlayerImport>): Promise<PlayerImport>;
   createImportedPlayers(importId: string, leagueId: string, players: any[]): Promise<ImportedPlayer[]>;
   createImportedPlayersWithTeams(importId: string, leagueId: string, players: any[]): Promise<ImportedPlayer[]>;
   getPlayerImports(leagueId: string): Promise<PlayerImport[]>;
@@ -2395,6 +2396,15 @@ export class DatabaseStorage implements IStorage {
       .values(importData)
       .returning();
     return playerImport;
+  }
+
+  async updatePlayerImport(importId: string, updates: Partial<InsertPlayerImport>): Promise<PlayerImport> {
+    const [updatedImport] = await db
+      .update(playerImports)
+      .set(updates)
+      .where(eq(playerImports.id, importId))
+      .returning();
+    return updatedImport;
   }
 
   async createImportedPlayers(importId: string, leagueId: string, players: any[]): Promise<ImportedPlayer[]> {

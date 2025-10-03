@@ -1004,16 +1004,45 @@ export default function LeagueManagement() {
       return response.json();
     },
     onSuccess: (data) => {
-      const successMessage = [
-        `${data.successfulRecords} players imported successfully`,
-        data.teamsCreated > 0 ? `${data.teamsCreated} teams created` : null,
-        data.failedRecords > 0 ? `${data.failedRecords} failed` : null
-      ].filter(Boolean).join(', ');
+      // If all imports failed and we have format help, show detailed error
+      if (data.successfulRecords === 0 && data.formatHelp) {
+        toast({
+          title: 'Import Failed',
+          description: (
+            <div className="space-y-2">
+              <p>{`${data.failedRecords} of ${data.totalRecords} players failed to import.`}</p>
+              {data.errors && data.errors.length > 0 && (
+                <p className="text-sm">{data.errors[0]}</p>
+              )}
+              <div className="text-sm mt-2 pt-2 border-t border-border">
+                <p className="font-semibold">Expected format:</p>
+                <p className="text-xs mt-1">{data.formatHelp.expectedFormat}</p>
+                {data.formatHelp.receivedHeaders && (
+                  <>
+                    <p className="font-semibold mt-2">Your CSV headers:</p>
+                    <p className="text-xs mt-1">{data.formatHelp.receivedHeaders}</p>
+                  </>
+                )}
+              </div>
+            </div>
+          ),
+          variant: 'destructive',
+          duration: 10000, // Show for 10 seconds
+        });
+      } else {
+        // Show success message with summary
+        const successMessage = [
+          `${data.successfulRecords} players imported successfully`,
+          data.teamsCreated > 0 ? `${data.teamsCreated} teams created` : null,
+          data.failedRecords > 0 ? `${data.failedRecords} failed` : null
+        ].filter(Boolean).join(', ');
+        
+        toast({
+          title: 'Import Successful',
+          description: successMessage,
+        });
+      }
       
-      toast({
-        title: 'Import Successful',
-        description: successMessage,
-      });
       setImportFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       setShowBulkImport(false);
