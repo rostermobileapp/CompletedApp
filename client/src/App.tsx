@@ -30,6 +30,7 @@ import StatsManagement from "@/pages/StatsManagement";
 import CreatePaymentRequest from "@/pages/CreatePaymentRequest";
 import PaymentRequests from "@/pages/PaymentRequests";
 import PaymentRequestDetail from "@/pages/PaymentRequestDetail";
+import ScoreVerification from "@/pages/ScoreVerification";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -70,6 +71,7 @@ function Router() {
             <Route path="/create-scrimmage" component={CreateScrimmage} />
             <Route path="/scrimmage-management" component={ScrimmageManagement} />
             <Route path="/league-management" component={LeagueManagement} />
+            <Route path="/league/:leagueId/score-verification" component={ScoreVerification} />
             <Route path="/league-list" component={LeagueList} />
             <Route path="/calendar" component={Calendar} />
             <Route path="/game/:id" component={GameDetails} />
