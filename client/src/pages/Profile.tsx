@@ -117,9 +117,10 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
       setIsEditing(false);
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({ 
-        title: 'Failed to update profile', 
+        title: 'Failed to update profile',
+        description: error?.message || 'Please try again.',
         variant: 'destructive' 
       });
     },

@@ -94,8 +94,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = await storage.updateUserProfile(userId, profileData);
       res.json(user);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating user profile:", error);
+      // Check for unique constraint violation on email
+      if (error?.code === '23505' && error?.constraint === 'users_email_unique') {
+        return res.status(400).json({ message: "This email address is already in use by another account" });
+      }
       res.status(500).json({ message: "Failed to update profile" });
     }
   });
