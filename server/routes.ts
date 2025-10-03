@@ -116,6 +116,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.deleteUser(userId);
+      // Destroy the session after deleting the user
+      req.logout(() => {
+        res.json({ message: "Profile deleted successfully" });
+      });
+    } catch (error: any) {
+      console.error("Error deleting user:", error);
+      res.status(400).json({ message: error.message || "Failed to delete profile" });
+    }
+  });
+
   // Stripe webhook routes only - subscription management handled via Stripe billing portal
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');

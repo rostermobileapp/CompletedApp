@@ -134,6 +134,7 @@ export interface IStorage {
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
   updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
   updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User>;
+  deleteUser(id: string): Promise<void>;
   
   // Permission management operations (global - deprecated, use league-specific instead)
   getAllUsers(): Promise<User[]>;
@@ -437,6 +438,72 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    // Check if user is a commissioner of any leagues
+    const ownedLeagues = await db.select().from(leagues).where(eq(leagues.commissionerId, id));
+    if (ownedLeagues.length > 0) {
+      throw new Error("Cannot delete profile while you are a commissioner of leagues. Please transfer or delete your leagues first.");
+    }
+
+    return await db.transaction(async (tx) => {
+      // Delete all user-related data in order of dependencies
+      
+      // Delete messaging related data
+      await tx.delete(typingIndicators).where(eq(typingIndicators.userId, id));
+      await tx.delete(userOnlineStatus).where(eq(userOnlineStatus.userId, id));
+      await tx.delete(messageReadReceipts).where(eq(messageReadReceipts.userId, id));
+      await tx.delete(messageAttachments).where(
+        sql`${messageAttachments.messageId} IN (SELECT id FROM ${messages} WHERE ${messages.senderId} = ${id})`
+      );
+      await tx.delete(messages).where(eq(messages.senderId, id));
+      await tx.delete(conversationParticipants).where(eq(conversationParticipants.userId, id));
+      
+      // Delete payment requests
+      await tx.delete(paymentRequestRecipients).where(eq(paymentRequestRecipients.userId, id));
+      await tx.delete(paymentRequests).where(eq(paymentRequests.creatorId, id));
+      
+      // Delete feedback
+      await tx.delete(feedbackSubmissions).where(eq(feedbackSubmissions.userId, id));
+      
+      // Delete announcement related data
+      await tx.delete(announcementPollVotes).where(eq(announcementPollVotes.userId, id));
+      await tx.delete(announcementReactions).where(eq(announcementReactions.userId, id));
+      await tx.delete(announcementReadStatus).where(eq(announcementReadStatus.userId, id));
+      await tx.delete(announcementVisibility).where(eq(announcementVisibility.userId, id));
+      await tx.delete(announcements).where(eq(announcements.authorId, id));
+      
+      // Delete scrimmage related data
+      await tx.delete(scrimmageRequests).where(eq(scrimmageRequests.playerId, id));
+      await tx.delete(scrimmages).where(eq(scrimmages.creatorId, id));
+      
+      // Delete player stats
+      await tx.delete(playerStats).where(eq(playerStats.userId, id));
+      
+      // Delete substitute requests and approvals
+      await tx.delete(substitutionApprovals).where(eq(substitutionApprovals.approverId, id));
+      await tx.delete(substituteRequests).where(eq(substituteRequests.originalPlayerId, id));
+      await tx.delete(substituteRequests).where(eq(substituteRequests.substitutePlayerId, id));
+      await tx.delete(substituteRequests).where(eq(substituteRequests.requestedBy, id));
+      
+      // Clear beverage duty assignments
+      await tx.update(games).set({ homeBeverageDutyUserId: null }).where(eq(games.homeBeverageDutyUserId, id));
+      await tx.update(games).set({ awayBeverageDutyUserId: null }).where(eq(games.awayBeverageDutyUserId, id));
+      
+      // Delete RSVPs
+      await tx.delete(gameRsvps).where(eq(gameRsvps.userId, id));
+      
+      // Delete team and league memberships
+      await tx.delete(teamMemberships).where(eq(teamMemberships.userId, id));
+      await tx.delete(leagueMemberships).where(eq(leagueMemberships.userId, id));
+      
+      // Clear team captain assignments
+      await tx.update(teams).set({ captainId: null }).where(eq(teams.captainId, id));
+      
+      // Finally, delete the user
+      await tx.delete(users).where(eq(users.id, id));
+    });
   }
 
   // Permission management operations
