@@ -130,7 +130,15 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
           let needsVerification = false;
           let reason = '';
           
-          if (submissionCount === 0) {
+          // Check if there's a commissioner submission - if so, no verification needed
+          const hasCommissionerSubmission = submissions.some((sub: any) => 
+            sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
+          );
+          
+          if (hasCommissionerSubmission) {
+            // Commissioner has already submitted final score - no verification needed
+            needsVerification = false;
+          } else if (submissionCount === 0) {
             needsVerification = true;
             reason = 'No score submissions';
           } else if (submissionCount === 1) {
