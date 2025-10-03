@@ -1489,6 +1489,33 @@ export default function LeagueManagement() {
     },
   });
 
+  // Join team mutation - for team captains to join their own team
+  const joinTeamMutation = useMutation({
+    mutationFn: async (teamId: string) => {
+      // Find the current user's league membership
+      const currentMembership = members.find(m => m.userId === user?.id);
+      if (!currentMembership) {
+        throw new Error('You must be a league member to join a team');
+      }
+      
+      const response = await apiRequest('PATCH', `/api/leagues/${leagueId}/members/${currentMembership.id}`, {
+        assignedTeamId: teamId
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Successfully joined team' });
+      refetchMembers();
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to join team',
+        description: error.message || 'Please try again',
+        variant: 'destructive'
+      });
+    },
+  });
+
   // Game scheduling mutation
   const createGameMutation = useMutation({
     mutationFn: async (data: CreateGameForm) => {
@@ -2289,6 +2316,30 @@ export default function LeagueManagement() {
                             <div className="flex items-center gap-3 ml-4">
                               {!team.isFreeAgents && (
                                 <div className="flex gap-2">
+                                  {(() => {
+                                    // Check if user is captain and not already on the team
+                                    const userMembership = members.find(m => m.userId === user?.id);
+                                    const isCaptain = team.captainId === user?.id;
+                                    const isNotOnTeam = userMembership && userMembership.assignedTeamId !== team.id;
+                                    
+                                    if (isCaptain && isNotOnTeam) {
+                                      return (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            joinTeamMutation.mutate(team.id);
+                                          }}
+                                          disabled={joinTeamMutation.isPending}
+                                          className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs hover:bg-green-500/30 flex items-center gap-1 transition-colors disabled:opacity-50"
+                                          data-testid={`button-join-team-${team.id}`}
+                                        >
+                                          <UserPlus className="w-3 h-3" />
+                                          Join Team
+                                        </button>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
