@@ -80,7 +80,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/auth/user/profile', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { firstName, lastName, city, age, phoneNumber, dateOfBirth, playerType } = req.body;
+      const { firstName, lastName, city, age, phoneNumber, dateOfBirth, playerType, email } = req.body;
       
       const profileData: any = {};
       if (firstName !== undefined) profileData.firstName = firstName;
@@ -90,6 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (phoneNumber !== undefined) profileData.phoneNumber = phoneNumber;
       if (dateOfBirth !== undefined) profileData.dateOfBirth = dateOfBirth;
       if (playerType !== undefined) profileData.playerType = playerType;
+      if (email !== undefined) profileData.email = email;
 
       const user = await storage.updateUserProfile(userId, profileData);
       res.json(user);
