@@ -18,6 +18,7 @@ import { League, ChatPoll, ChatPollVote } from '@shared/schema';
 import { MediaGallery } from '@/components/MediaGallery';
 import GifSearchModal from '@/components/GifSearchModal';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
+import { ClickableAvatar } from '@/components/ClickableAvatar';
 
 interface Message {
   id: string;
@@ -1629,6 +1630,17 @@ export default function Messages() {
                     className={`flex gap-3 ${isCurrentUser ? 'justify-end' : 'justify-start'}`} 
                     data-testid={`message-${message.id}`}
                   >
+                    {!isCurrentUser && message.sender && (
+                      <div className="order-1">
+                        <ClickableAvatar
+                          userId={message.senderId}
+                          profileImageUrl={message.sender.profileImageUrl}
+                          firstName={message.sender.firstName}
+                          lastName={message.sender.lastName}
+                          size="sm"
+                        />
+                      </div>
+                    )}
                     
                     <div className={`max-w-[70%] ${isCurrentUser ? 'order-1' : 'order-2'}`}>
                       <div className={`rounded-lg p-3 ${
@@ -2023,11 +2035,13 @@ export default function Messages() {
                 className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors"
                 data-testid={`member-${participant.userId}`}
               >
-                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-medium text-primary">
-                    {participant.user?.displayName?.charAt(0)?.toUpperCase() || '?'}
-                  </span>
-                </div>
+                <ClickableAvatar
+                  userId={participant.userId}
+                  profileImageUrl={participant.user?.profileImageUrl}
+                  firstName={participant.user?.firstName}
+                  lastName={participant.user?.lastName}
+                  size="sm"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate" data-testid={`member-name-${participant.userId}`}>
                     {participant.user?.displayName || 'Unknown User'}
@@ -2080,11 +2094,13 @@ export default function Messages() {
                       onClick={() => setSelectedUserToAdd(contact.id)}
                       data-testid={`add-user-option-${contact.id}`}
                     >
-                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-medium text-primary">
-                          {contact.firstName?.charAt(0)?.toUpperCase() || contact.displayFirstName?.charAt(0)?.toUpperCase() || '?'}
-                        </span>
-                      </div>
+                      <ClickableAvatar
+                        userId={contact.id}
+                        profileImageUrl={contact.profileImageUrl}
+                        firstName={contact.displayFirstName || contact.firstName}
+                        lastName={contact.displayLastName || contact.lastName}
+                        size="sm"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate" data-testid={`add-user-name-${contact.id}`}>
                           {contact.displayFirstName || contact.firstName} {contact.displayLastName || contact.lastName}
