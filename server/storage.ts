@@ -441,10 +441,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
+    // Get user details to check subscription status
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Check if user has an active paid subscription
+    if (user.stripeSubscriptionId && user.role !== 'free_tier') {
+      throw new Error("Cannot delete profile with an active subscription. Please cancel your subscription first.");
+    }
+
     // Check if user is a commissioner of any leagues
     const ownedLeagues = await db.select().from(leagues).where(eq(leagues.commissionerId, id));
     if (ownedLeagues.length > 0) {
-      throw new Error("Cannot delete profile while you are a commissioner of leagues. Please transfer or delete your leagues first.");
+      throw new Error("Cannot delete profile while you are a commissioner of leagues. Please transfer your commissioner status to another user first.");
     }
 
     return await db.transaction(async (tx) => {
