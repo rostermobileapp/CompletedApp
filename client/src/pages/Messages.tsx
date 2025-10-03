@@ -2029,34 +2029,38 @@ export default function Messages() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {currentConversation?.participants?.map((participant) => (
-              <div
-                key={participant.id}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors"
-                data-testid={`member-${participant.userId}`}
-              >
-                <ClickableAvatar
-                  userId={participant.userId}
-                  profileImageUrl={participant.user?.profileImageUrl}
-                  firstName={participant.user?.firstName}
-                  lastName={participant.user?.lastName}
-                  size="sm"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate" data-testid={`member-name-${participant.userId}`}>
-                    {participant.user?.displayName || 'Unknown User'}
-                  </p>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {participant.user?.email || ''}
-                  </p>
+            {currentConversation?.participants?.map((participant) => {
+              const user = participant.user as any;
+              
+              return (
+                <div
+                  key={participant.id}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors"
+                  data-testid={`member-${participant.userId}`}
+                >
+                  <ClickableAvatar
+                    userId={participant.userId}
+                    profileImageUrl={user?.profileImageUrl}
+                    firstName={user?.firstName}
+                    lastName={user?.lastName}
+                    size="sm"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate" data-testid={`member-name-${participant.userId}`}>
+                      {user?.displayName || 'Unknown User'}
+                    </p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {user?.email || ''}
+                    </p>
+                  </div>
+                  {participant.userId === currentUserId && (
+                    <span className="text-xs text-muted-foreground bg-accent px-2 py-1 rounded">
+                      You
+                    </span>
+                  )}
                 </div>
-                {participant.userId === currentUserId && (
-                  <span className="text-xs text-muted-foreground bg-accent px-2 py-1 rounded">
-                    You
-                  </span>
-                )}
-              </div>
-            ))}
+              );
+            })}
             {(!currentConversation?.participants || currentConversation.participants.length === 0) && (
               <div className="text-center py-8 text-muted-foreground">
                 <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />

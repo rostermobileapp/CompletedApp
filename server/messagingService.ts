@@ -66,6 +66,7 @@ export class MessagingService {
           email: users.email,
           firstName: users.firstName,
           lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
           displayName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
         }
       })
