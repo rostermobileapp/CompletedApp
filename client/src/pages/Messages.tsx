@@ -298,14 +298,14 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
   );
 }
 
-// Payment Request Card Component  
-function PaymentRequestCard({ conversationId, currentUserId }: { conversationId: string; currentUserId: string }) {
+// Payment Request Card Component - Message-scoped like PollCard
+function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentRequestId: string; currentUserId: string }) {
   const { toast } = useToast();
 
-  // Fetch payment requests for this conversation
-  const { data: paymentRequests = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/conversations', conversationId, 'payment-requests'],
-    enabled: !!conversationId
+  // Fetch specific payment request data
+  const { data: paymentRequest, isLoading } = useQuery<any>({
+    queryKey: ['/api/payment-requests', paymentRequestId],
+    enabled: !!paymentRequestId
   });
 
   const markAsPaidMutation = useMutation({
@@ -317,7 +317,7 @@ function PaymentRequestCard({ conversationId, currentUserId }: { conversationId:
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/conversations', conversationId, 'payment-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests', paymentRequestId] });
       queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/unpaid-count'] });
       toast({
         title: 'Payment confirmed',
@@ -334,140 +334,134 @@ function PaymentRequestCard({ conversationId, currentUserId }: { conversationId:
     }
   });
 
-  if (isLoading || paymentRequests.length === 0) {
+  if (isLoading || !paymentRequest) {
     return null;
   }
 
+  const currentUserRecipient = paymentRequest.recipients.find((r: any) => r.userId === currentUserId);
+  const isCreator = paymentRequest.creatorId === currentUserId;
+  const totalRecipients = paymentRequest.recipients.length;
+  const paidCount = paymentRequest.recipients.filter((r: any) => r.isPaid).length;
+
   return (
-    <>
-      {paymentRequests.map((request) => {
-        const currentUserRecipient = request.recipients.find((r: any) => r.userId === currentUserId);
-        const isCreator = request.creatorId === currentUserId;
-        const totalRecipients = request.recipients.length;
-        const paidCount = request.recipients.filter((r: any) => r.isPaid).length;
-        
-        return (
-          <div key={request.id} className="my-4 p-4 border border-green-500/20 rounded-lg bg-green-50/50 dark:bg-green-950/20" data-testid={`payment-request-card-${request.id}`}>
-            <div className="flex items-center justify-between mb-3">
+    <div className="mt-3 p-4 border border-green-500/20 rounded-lg bg-green-50/50 dark:bg-green-950/20" data-testid={`payment-request-card-${paymentRequest.id}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="bg-green-600 text-white text-xs px-2 py-1 rounded font-medium">
+            💰 PAYMENT REQUEST
+          </div>
+        </div>
+        <div className="text-xs text-muted-foreground" data-testid="payment-progress">
+          {paidCount}/{totalRecipients} paid
+        </div>
+      </div>
+
+      <h4 className="font-semibold text-base mb-2" data-testid="payment-title">
+        {paymentRequest.title}
+      </h4>
+
+      {paymentRequest.description && (
+        <p className="text-sm text-muted-foreground mb-3" data-testid="payment-description">
+          {paymentRequest.description}
+        </p>
+      )}
+
+      <div className="mb-3">
+        <p className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="payment-amount">
+          ${parseFloat(paymentRequest.amountPerPerson).toFixed(2)}
+          <span className="text-sm font-normal text-muted-foreground ml-1">per person</span>
+        </p>
+      </div>
+
+      {isCreator && (
+        <div className="space-y-2 mb-3">
+          <p className="text-xs font-medium text-muted-foreground mb-2">Recipients:</p>
+          {paymentRequest.recipients.map((recipient: any) => (
+            <div
+              key={recipient.id}
+              className="flex items-center justify-between p-2 bg-background rounded border"
+              data-testid={`recipient-${recipient.id}`}
+            >
               <div className="flex items-center gap-2">
-                <div className="bg-green-600 text-white text-xs px-2 py-1 rounded font-medium">
-                  💰 PAYMENT REQUEST
+                <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+                  <span className="text-xs font-semibold">
+                    {recipient.user.firstName?.[0]}{recipient.user.lastName?.[0]}
+                  </span>
                 </div>
-              </div>
-              <div className="text-xs text-muted-foreground" data-testid="payment-progress">
-                {paidCount}/{totalRecipients} paid
-              </div>
-            </div>
-
-            <h4 className="font-semibold text-base mb-2" data-testid="payment-title">
-              {request.title}
-            </h4>
-
-            {request.description && (
-              <p className="text-sm text-muted-foreground mb-3" data-testid="payment-description">
-                {request.description}
-              </p>
-            )}
-
-            <div className="mb-3">
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="payment-amount">
-                ${parseFloat(request.amountPerPerson).toFixed(2)}
-                <span className="text-sm font-normal text-muted-foreground ml-1">per person</span>
-              </p>
-            </div>
-
-            {isCreator && (
-              <div className="space-y-2 mb-3">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Recipients:</p>
-                {request.recipients.map((recipient: any) => (
-                  <div
-                    key={recipient.id}
-                    className="flex items-center justify-between p-2 bg-background rounded border"
-                    data-testid={`recipient-${recipient.id}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
-                        <span className="text-xs font-semibold">
-                          {recipient.user.firstName?.[0]}{recipient.user.lastName?.[0]}
-                        </span>
-                      </div>
-                      <span className="text-sm">
-                        {recipient.user.firstName} {recipient.user.lastName}
-                      </span>
-                    </div>
-                    {recipient.isPaid ? (
-                      <div className="flex items-center gap-1 text-green-600">
-                        <CheckCircle className="w-4 h-4" />
-                        <span className="text-xs font-medium">Paid</span>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">Pending</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {currentUserRecipient && !currentUserRecipient.isPaid && (
-              <div className="pt-3 border-t border-border">
-                <p className="text-xs text-muted-foreground mb-2">Mark as paid:</p>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => markAsPaidMutation.mutate({ recipientId: currentUserRecipient.id, paymentMethod: 'venmo' })}
-                    disabled={markAsPaidMutation.isPending}
-                    data-testid="button-pay-venmo"
-                  >
-                    Venmo
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => markAsPaidMutation.mutate({ recipientId: currentUserRecipient.id, paymentMethod: 'cashapp' })}
-                    disabled={markAsPaidMutation.isPending}
-                    data-testid="button-pay-cashapp"
-                  >
-                    Cash App
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => markAsPaidMutation.mutate({ recipientId: currentUserRecipient.id, paymentMethod: 'cash' })}
-                    disabled={markAsPaidMutation.isPending}
-                    data-testid="button-pay-cash"
-                  >
-                    Cash
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => markAsPaidMutation.mutate({ recipientId: currentUserRecipient.id, paymentMethod: 'other' })}
-                    disabled={markAsPaidMutation.isPending}
-                    data-testid="button-pay-other"
-                  >
-                    Other
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {currentUserRecipient && currentUserRecipient.isPaid && (
-              <div className="pt-3 border-t border-border flex items-center gap-2 text-green-600">
-                <CheckCircle className="w-4 h-4" />
-                <span className="text-sm font-medium" data-testid="payment-confirmed">
-                  You marked this as paid via {currentUserRecipient.paymentMethod}
+                <span className="text-sm">
+                  {recipient.user.firstName} {recipient.user.lastName}
                 </span>
               </div>
-            )}
-
-            <div className="mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
-              <p>Requested by {request.creator.firstName} {request.creator.lastName}</p>
+              {recipient.isPaid ? (
+                <div className="flex items-center gap-1 text-green-600">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="text-xs font-medium">Paid</span>
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground">Pending</div>
+              )}
             </div>
+          ))}
+        </div>
+      )}
+
+      {currentUserRecipient && !currentUserRecipient.isPaid && (
+        <div className="pt-3 border-t border-border">
+          <p className="text-xs text-muted-foreground mb-2">Mark as paid:</p>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => markAsPaidMutation.mutate({ recipientId: currentUserRecipient.id, paymentMethod: 'venmo' })}
+              disabled={markAsPaidMutation.isPending}
+              data-testid="button-pay-venmo"
+            >
+              Venmo
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => markAsPaidMutation.mutate({ recipientId: currentUserRecipient.id, paymentMethod: 'cashapp' })}
+              disabled={markAsPaidMutation.isPending}
+              data-testid="button-pay-cashapp"
+            >
+              Cash App
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => markAsPaidMutation.mutate({ recipientId: currentUserRecipient.id, paymentMethod: 'cash' })}
+              disabled={markAsPaidMutation.isPending}
+              data-testid="button-pay-cash"
+            >
+              Cash
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => markAsPaidMutation.mutate({ recipientId: currentUserRecipient.id, paymentMethod: 'other' })}
+              disabled={markAsPaidMutation.isPending}
+              data-testid="button-pay-other"
+            >
+              Other
+            </Button>
           </div>
-        );
-      })}
-    </>
+        </div>
+      )}
+
+      {currentUserRecipient && currentUserRecipient.isPaid && (
+        <div className="pt-3 border-t border-border flex items-center gap-2 text-green-600">
+          <CheckCircle className="w-4 h-4" />
+          <span className="text-sm font-medium" data-testid="payment-confirmed">
+            You marked this as paid via {currentUserRecipient.paymentMethod}
+          </span>
+        </div>
+      )}
+
+      <div className="mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
+        <p>Requested by {paymentRequest.creator.firstName} {paymentRequest.creator.lastName}</p>
+      </div>
+    </div>
   );
 }
 
@@ -570,6 +564,12 @@ export default function Messages() {
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ['/api/conversations', selectedConversation, 'messages'],
     enabled: !!selectedConversation // 🚨 FREE ACCESS - NO GATES! 🚨
+  });
+
+  // Fetch payment requests for selected conversation
+  const { data: conversationPaymentRequests = [] } = useQuery<any[]>({
+    queryKey: ['/api/conversations', selectedConversation, 'payment-requests'],
+    enabled: !!selectedConversation
   });
 
   // Reset dialog function
@@ -2121,9 +2121,13 @@ export default function Messages() {
             )}
             
             {/* Payment Request Cards */}
-            {selectedConversation && (
-              <PaymentRequestCard conversationId={selectedConversation} currentUserId={currentUserId} />
-            )}
+            {conversationPaymentRequests.map((request: any) => (
+              <PaymentRequestCard 
+                key={request.id}
+                paymentRequestId={request.id}
+                currentUserId={currentUserId}
+              />
+            ))}
             
             {/* Typing indicators */}
             {typingUsers.length > 0 && (
