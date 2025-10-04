@@ -648,10 +648,12 @@ export default function Messages() {
   const createPaymentRequestMutation = useMutation({
     mutationFn: async (paymentData: { 
       title: string; 
-      description: string; 
-      amountPerPerson: number;
+      description?: string; 
+      amountPerPerson: string;
       recipientUserIds: string[];
       relatedConversationId: string;
+      relatedScrimmageId: null;
+      deadline: null;
     }) => {
       const response = await apiRequest('POST', '/api/payment-requests', paymentData);
       return response.json();
@@ -754,10 +756,12 @@ export default function Messages() {
 
     createPaymentRequestMutation.mutate({
       title: paymentRequestTitle.trim(),
-      description: paymentRequestDescription.trim(),
-      amountPerPerson: amount,
+      description: paymentRequestDescription.trim() || undefined,
+      amountPerPerson: paymentRequestAmount,
       recipientUserIds: selectedRecipients,
-      relatedConversationId: selectedConversation
+      relatedConversationId: selectedConversation,
+      relatedScrimmageId: null,
+      deadline: null
     });
   };
 

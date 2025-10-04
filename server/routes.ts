@@ -6654,6 +6654,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(paymentRequest);
     } catch (error) {
       if (error instanceof ZodError) {
+        console.error("Payment request validation error:", JSON.stringify(error.errors, null, 2));
+        console.error("Received data:", JSON.stringify(req.body, null, 2));
         return res.status(400).json({ 
           message: "Invalid payment request data", 
           errors: error.errors 
