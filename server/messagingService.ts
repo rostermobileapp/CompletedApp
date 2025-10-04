@@ -596,8 +596,19 @@ export class MessagingService {
 
   // Group conversation operations
   async createTeamGroupChat(teamId: string, leagueId: string, createdBy: string): Promise<Conversation> {
-    // Get all approved team members first (needed for both existing and new chats)
-    const teamMembers = await db
+    // Get the team to access the captain
+    const [team] = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    if (!team) {
+      throw new Error(`Team ${teamId} not found`);
+    }
+
+    // Get all approved team members from team_memberships
+    const teamMembershipsData = await db
       .select({ userId: teamMemberships.userId })
       .from(teamMemberships)
       .where(and(
@@ -605,7 +616,18 @@ export class MessagingService {
         eq(teamMemberships.status, 'approved')
       ));
 
-    console.log(`[DEBUG] Team group chat: Found ${teamMembers.length} team members for team ${teamId}:`, teamMembers.map(m => m.userId));
+    // Create a set of all unique team participants (members + captain)
+    const participantIds = new Set<string>(teamMembershipsData.map(m => m.userId));
+    
+    // Always add the captain if they exist
+    if (team.captainId) {
+      participantIds.add(team.captainId);
+    }
+
+    // Convert set back to array of objects for consistency with rest of code
+    const teamMembers = Array.from(participantIds).map(userId => ({ userId }));
+
+    console.log(`[DEBUG] Team group chat: Found ${teamMembers.length} team participants for team ${teamId} (${teamMembershipsData.length} members + captain):`, teamMembers.map(m => m.userId));
 
     // Helper function to ensure participants are added (idempotent with conflict resolution)
     const ensureParticipants = async (conversationId: string) => {
@@ -662,14 +684,7 @@ export class MessagingService {
       return existingChat;
     }
 
-    // Get team name for the conversation title
-    const [team] = await db
-      .select({ name: teams.name })
-      .from(teams)
-      .where(eq(teams.id, teamId))
-      .limit(1);
-
-    const teamName = team?.name || 'Team';
+    const teamName = team.name || 'Team';
 
     // Create team group conversation
     const conversation = await this.createConversation({

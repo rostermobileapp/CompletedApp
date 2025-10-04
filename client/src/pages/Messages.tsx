@@ -2,7 +2,7 @@
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
@@ -348,6 +348,13 @@ export default function Messages() {
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
 
+  // Payment request state
+  const [showPaymentRequestCreator, setShowPaymentRequestCreator] = useState(false);
+  const [paymentRequestTitle, setPaymentRequestTitle] = useState('');
+  const [paymentRequestDescription, setPaymentRequestDescription] = useState('');
+  const [paymentRequestAmount, setPaymentRequestAmount] = useState('');
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+
   // Fetch user's leagues for contact discovery
   const { data: userLeagues = [], isLoading: userLeaguesLoading } = useQuery<League[]>({
     queryKey: ['/api/user/leagues'],
@@ -637,6 +644,41 @@ export default function Messages() {
   });
 
 
+  // Payment request mutation
+  const createPaymentRequestMutation = useMutation({
+    mutationFn: async (paymentData: { 
+      title: string; 
+      description: string; 
+      amountPerPerson: number;
+      recipientUserIds: string[];
+      relatedConversationId: string;
+    }) => {
+      const response = await apiRequest('POST', '/api/payment-requests', paymentData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'payment-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
+      setShowPaymentRequestCreator(false);
+      setPaymentRequestTitle('');
+      setPaymentRequestDescription('');
+      setPaymentRequestAmount('');
+      setSelectedRecipients([]);
+      toast({
+        title: 'Payment request sent',
+        description: 'Your payment request has been sent successfully'
+      });
+    },
+    onError: (error) => {
+      console.error('Error creating payment request:', error);
+      toast({
+        title: 'Failed to send payment request',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
+    }
+  });
+
   // Poll helper functions
   const addPollOption = () => {
     if (pollOptions.length < 6) {
@@ -669,6 +711,53 @@ export default function Messages() {
     createPollMutation.mutate({
       question: pollQuestion.trim(),
       options: pollOptions.filter(option => option.trim())
+    });
+  };
+
+  const handleCreatePaymentRequest = () => {
+    if (!paymentRequestTitle.trim()) {
+      toast({
+        title: 'Title required',
+        description: 'Please enter a title for the payment request',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const amount = parseFloat(paymentRequestAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Please enter a valid amount greater than 0',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (selectedRecipients.length === 0) {
+      toast({
+        title: 'No recipients selected',
+        description: 'Please select at least one person to request payment from',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!selectedConversation) {
+      toast({
+        title: 'No conversation selected',
+        description: 'Please select a conversation first',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    createPaymentRequestMutation.mutate({
+      title: paymentRequestTitle.trim(),
+      description: paymentRequestDescription.trim(),
+      amountPerPerson: amount,
+      recipientUserIds: selectedRecipients,
+      relatedConversationId: selectedConversation
     });
   };
 
@@ -1986,6 +2075,111 @@ export default function Messages() {
             </div>
           </div>
         )}
+
+        {/* Payment Request Creator */}
+        {showPaymentRequestCreator && (
+          <div className="mb-3 p-4 bg-muted rounded-lg border" data-testid="payment-request-creator">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium">Request Payment</h4>
+              <button
+                onClick={() => setShowPaymentRequestCreator(false)}
+                className="p-1 hover:bg-accent rounded"
+                data-testid="button-close-payment-request"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Title *</label>
+                <Input
+                  value={paymentRequestTitle}
+                  onChange={(e) => setPaymentRequestTitle(e.target.value)}
+                  placeholder="e.g., Ice rink fee, Team dinner"
+                  data-testid="input-payment-title"
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-1 block">Amount per person ($) *</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={paymentRequestAmount}
+                  onChange={(e) => setPaymentRequestAmount(e.target.value)}
+                  placeholder="25.00"
+                  data-testid="input-payment-amount"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1 block">Description (optional)</label>
+                <Input
+                  value={paymentRequestDescription}
+                  onChange={(e) => setPaymentRequestDescription(e.target.value)}
+                  placeholder="Additional details..."
+                  data-testid="input-payment-description"
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-1 block">Request from *</label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-2">
+                  {currentConversation?.participants
+                    ?.filter(p => p.userId !== user?.id)
+                    .map(participant => (
+                      <label 
+                        key={participant.userId} 
+                        className="flex items-center gap-2 cursor-pointer hover:bg-accent p-1 rounded"
+                        data-testid={`checkbox-recipient-${participant.userId}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedRecipients.includes(participant.userId)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRecipients([...selectedRecipients, participant.userId]);
+                            } else {
+                              setSelectedRecipients(selectedRecipients.filter(id => id !== participant.userId));
+                            }
+                          }}
+                          className="cursor-pointer"
+                        />
+                        <span className="text-sm">
+                          {participant.user?.displayName || participant.user?.email || 'Unknown'}
+                        </span>
+                      </label>
+                    ))}
+                </div>
+                {selectedRecipients.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {selectedRecipients.length} person{selectedRecipients.length !== 1 ? 's' : ''} selected
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleCreatePaymentRequest}
+                  disabled={createPaymentRequestMutation.isPending}
+                  className="flex-1"
+                  data-testid="button-send-payment-request"
+                >
+                  {createPaymentRequestMutation.isPending ? 'Sending...' : 'Send Request'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPaymentRequestCreator(false)}
+                  data-testid="button-cancel-payment-request"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         
         <div className="flex items-center gap-2">
           <button 
@@ -2011,6 +2205,14 @@ export default function Messages() {
             title="Create Poll"
           >
             <BarChart3 className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => setShowPaymentRequestCreator(!showPaymentRequestCreator)}
+            className="p-2 hover:bg-accent rounded transition-colors"
+            data-testid="button-request-payment"
+            title="Request Payment"
+          >
+            <DollarSign className="w-4 h-4" />
           </button>
           <Input
             placeholder="Type a message..."
