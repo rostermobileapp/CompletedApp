@@ -565,6 +565,15 @@ export default function Messages() {
     enabled: !!selectedConversation
   });
 
+  // Merge messages and payment requests chronologically
+  const timelineItems = useMemo(() => {
+    const items: Array<{ type: 'message' | 'payment', data: any, createdAt: Date }> = [
+      ...messages.map(msg => ({ type: 'message' as const, data: msg, createdAt: new Date(msg.sentAt) })),
+      ...conversationPaymentRequests.map(pr => ({ type: 'payment' as const, data: pr, createdAt: new Date(pr.createdAt) }))
+    ];
+    return items.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }, [messages, conversationPaymentRequests]);
+
   // Reset dialog function
   const resetDialog = () => {
     setConversationType('direct');
@@ -1947,7 +1956,18 @@ export default function Messages() {
                 ))}
               </div>
             ) : (
-              messages.map((message: any) => {
+              timelineItems.map((item) => {
+                if (item.type === 'payment') {
+                  return (
+                    <PaymentRequestCard 
+                      key={item.data.id}
+                      paymentRequestId={item.data.id}
+                      currentUserId={currentUserId}
+                    />
+                  );
+                }
+                
+                const message = item.data;
                 const isCurrentUser = message.senderId === currentUserId;
                 
                 return (
@@ -2111,15 +2131,6 @@ export default function Messages() {
                 );
               })
             )}
-            
-            {/* Payment Request Cards */}
-            {conversationPaymentRequests.map((request: any) => (
-              <PaymentRequestCard 
-                key={request.id}
-                paymentRequestId={request.id}
-                currentUserId={currentUserId}
-              />
-            ))}
             
             {/* Typing indicators */}
             {typingUsers.length > 0 && (
