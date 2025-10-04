@@ -344,7 +344,7 @@ function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentReques
   const paidCount = paymentRequest.recipients.filter((r: any) => r.isPaid).length;
 
   return (
-    <div className="mt-3 p-4 border border-green-500/20 rounded-lg bg-green-50/50 dark:bg-green-950/20" data-testid={`payment-request-card-${paymentRequest.id}`}>
+    <div className="p-4 border border-green-500/20 rounded-lg dark:bg-green-950/20 bg-[#00000080] pt-[2px] pb-[2px] pl-[5px] pr-[5px] mt-[8px] mb-[8px]" data-testid={`payment-request-card-${paymentRequest.id}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="bg-green-600 text-white text-xs px-2 py-1 rounded font-medium">
@@ -355,24 +355,20 @@ function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentReques
           {paidCount}/{totalRecipients} paid
         </div>
       </div>
-
       <h4 className="font-semibold text-base mb-2" data-testid="payment-title">
         {paymentRequest.title}
       </h4>
-
       {paymentRequest.description && (
         <p className="text-sm text-muted-foreground mb-3" data-testid="payment-description">
           {paymentRequest.description}
         </p>
       )}
-
       <div className="mb-3">
         <p className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="payment-amount">
           ${parseFloat(paymentRequest.amountPerPerson).toFixed(2)}
           <span className="text-sm font-normal text-muted-foreground ml-1">per person</span>
         </p>
       </div>
-
       {isCreator && (
         <div className="space-y-2 mb-3">
           <p className="text-xs font-medium text-muted-foreground mb-2">Recipients:</p>
@@ -404,7 +400,6 @@ function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentReques
           ))}
         </div>
       )}
-
       {currentUserRecipient && !currentUserRecipient.isPaid && (
         <div className="pt-3 border-t border-border">
           <p className="text-xs text-muted-foreground mb-2">Mark as paid:</p>
@@ -448,7 +443,6 @@ function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentReques
           </div>
         </div>
       )}
-
       {currentUserRecipient && currentUserRecipient.isPaid && (
         <div className="pt-3 border-t border-border flex items-center gap-2 text-green-600">
           <CheckCircle className="w-4 h-4" />
@@ -457,7 +451,6 @@ function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentReques
           </span>
         </div>
       )}
-
       <div className="mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
         <p>Requested by {paymentRequest.creator.firstName} {paymentRequest.creator.lastName}</p>
       </div>
@@ -1780,7 +1773,6 @@ export default function Messages() {
           </div>
         </DialogContent>
       </Dialog>
-
       <div className="min-h-screen flex flex-col pb-24" data-testid="messages-page">
         <FeatureLockOverlay isLocked={false} className="min-h-screen flex flex-col">
       {!selectedConversation ? (
@@ -1834,16 +1826,16 @@ export default function Messages() {
                       <div className="relative">
                         {conversation.type === 'team_group' || conversation.type === 'custom_group' ? (
                           // Group chat avatar
-                          <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                          (<div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
                             <Users className="w-5 h-5 text-muted-foreground" />
-                          </div>
+                          </div>)
                         ) : (
                           // Direct message avatar
-                          <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                          (<div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
                             <span className="text-muted-foreground text-sm font-semibold">
                               {getInitials(getParticipantName(conversation))}
                             </span>
-                          </div>
+                          </div>)
                         )}
                       </div>
                       
@@ -1888,14 +1880,14 @@ export default function Messages() {
                         </button>
                       ) : (
                         // Show Leave button for conversations user can't delete (now includes direct and captain chats)
-                        <button
+                        (<button
                           onClick={(e) => handleLeaveConversation(conversation.id, e)}
                           className="p-2 hover:bg-orange-500/20 rounded-lg transition-colors"
                           title="Leave conversation"
                           data-testid={`button-leave-conversation-${conversation.id}`}
                         >
                           <LogOut className="w-4 h-4 text-orange-600" />
-                        </button>
+                        </button>)
                       )}
                     </div>
                   </div>
@@ -2151,295 +2143,293 @@ export default function Messages() {
       )}
         </FeatureLockOverlay>
       </div>
-    
-    {/* Fixed Message Input - only show when conversation is selected */}
-    {selectedConversation && (
-      <div className="fixed bottom-20 left-0 right-0 bg-background border-t border-border p-4 z-40" data-testid="message-input-container">
-        {/* File previews */}
-        {selectedFiles.length > 0 && (
-          <div className="mb-3 space-y-2" data-testid="selected-files">
-            {selectedFiles.map((file, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded border">
-                {getFileIcon(file.type)}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {(file.size / 1024).toFixed(1)} KB
-                  </p>
+      {/* Fixed Message Input - only show when conversation is selected */}
+      {selectedConversation && (
+        <div className="fixed bottom-20 left-0 right-0 bg-background border-t border-border p-4 z-40" data-testid="message-input-container">
+          {/* File previews */}
+          {selectedFiles.length > 0 && (
+            <div className="mb-3 space-y-2" data-testid="selected-files">
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded border">
+                  {getFileIcon(file.type)}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => removeFile(index)}
+                    className="p-1 hover:bg-accent rounded"
+                    data-testid={`remove-file-${index}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => removeFile(index)}
+              ))}
+            </div>
+          )}
+          
+          {/* Poll Creator */}
+          {showPollCreator && (
+            <div className="mb-3 p-4 bg-muted rounded-lg border" data-testid="poll-creator">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium">Create Poll</h4>
+                <button
+                  onClick={() => setShowPollCreator(false)}
                   className="p-1 hover:bg-accent rounded"
-                  data-testid={`remove-file-${index}`}
+                  data-testid="button-close-poll-creator"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-        
-        {/* Poll Creator */}
-        {showPollCreator && (
-          <div className="mb-3 p-4 bg-muted rounded-lg border" data-testid="poll-creator">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium">Create Poll</h4>
-              <button
-                onClick={() => setShowPollCreator(false)}
-                className="p-1 hover:bg-accent rounded"
-                data-testid="button-close-poll-creator"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Poll Question</label>
-                <Input
-                  value={pollQuestion}
-                  onChange={(e) => setPollQuestion(e.target.value)}
-                  placeholder="Ask a question..."
-                  data-testid="input-poll-question"
-                />
-              </div>
               
-              <div>
-                <label className="text-sm font-medium mb-1 block">Options</label>
-                <div className="space-y-2">
-                  {pollOptions.map((option, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        value={option}
-                        onChange={(e) => updatePollOption(index, e.target.value)}
-                        placeholder={`Option ${index + 1}`}
-                        data-testid={`input-poll-option-${index}`}
-                      />
-                      {pollOptions.length > 2 && (
-                        <button
-                          onClick={() => removePollOption(index)}
-                          className="p-2 hover:bg-accent rounded"
-                          data-testid={`button-remove-option-${index}`}
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Poll Question</label>
+                  <Input
+                    value={pollQuestion}
+                    onChange={(e) => setPollQuestion(e.target.value)}
+                    placeholder="Ask a question..."
+                    data-testid="input-poll-question"
+                  />
                 </div>
                 
-                {pollOptions.length < 6 && (
-                  <button
-                    onClick={addPollOption}
-                    className="mt-2 flex items-center gap-1 text-sm text-primary hover:underline"
-                    data-testid="button-add-poll-option"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Add option
-                  </button>
-                )}
-              </div>
-              
-              
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleCreatePoll}
-                  disabled={createPollMutation.isPending}
-                  className="flex-1"
-                  data-testid="button-post-poll"
-                >
-                  {createPollMutation.isPending ? 'Creating...' : 'Post Poll'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowPollCreator(false)}
-                  data-testid="button-cancel-poll"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Payment Request Creator */}
-        {showPaymentRequestCreator && (
-          <div className="mb-3 p-4 bg-muted rounded-lg border" data-testid="payment-request-creator">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium">Request Payment</h4>
-              <button
-                onClick={() => setShowPaymentRequestCreator(false)}
-                className="p-1 hover:bg-accent rounded"
-                data-testid="button-close-payment-request"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Title *</label>
-                <Input
-                  value={paymentRequestTitle}
-                  onChange={(e) => setPaymentRequestTitle(e.target.value)}
-                  placeholder="e.g., Ice rink fee, Team dinner"
-                  data-testid="input-payment-title"
-                />
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium mb-1 block">Amount per person ($) *</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={paymentRequestAmount}
-                  onChange={(e) => setPaymentRequestAmount(e.target.value)}
-                  placeholder="25.00"
-                  data-testid="input-payment-amount"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1 block">Description (optional)</label>
-                <Input
-                  value={paymentRequestDescription}
-                  onChange={(e) => setPaymentRequestDescription(e.target.value)}
-                  placeholder="Additional details..."
-                  data-testid="input-payment-description"
-                />
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium mb-1 block">Request from *</label>
-                <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-2">
-                  {currentConversation?.participants
-                    ?.filter(p => p.userId !== user?.id)
-                    .map(participant => (
-                      <label 
-                        key={participant.userId} 
-                        className="flex items-center gap-2 cursor-pointer hover:bg-accent p-1 rounded"
-                        data-testid={`checkbox-recipient-${participant.userId}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedRecipients.includes(participant.userId)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedRecipients([...selectedRecipients, participant.userId]);
-                            } else {
-                              setSelectedRecipients(selectedRecipients.filter(id => id !== participant.userId));
-                            }
-                          }}
-                          className="cursor-pointer"
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Options</label>
+                  <div className="space-y-2">
+                    {pollOptions.map((option, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={option}
+                          onChange={(e) => updatePollOption(index, e.target.value)}
+                          placeholder={`Option ${index + 1}`}
+                          data-testid={`input-poll-option-${index}`}
                         />
-                        <span className="text-sm">
-                          {participant.user?.displayName || participant.user?.email || 'Unknown'}
-                        </span>
-                      </label>
+                        {pollOptions.length > 2 && (
+                          <button
+                            onClick={() => removePollOption(index)}
+                            className="p-2 hover:bg-accent rounded"
+                            data-testid={`button-remove-option-${index}`}
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     ))}
+                  </div>
+                  
+                  {pollOptions.length < 6 && (
+                    <button
+                      onClick={addPollOption}
+                      className="mt-2 flex items-center gap-1 text-sm text-primary hover:underline"
+                      data-testid="button-add-poll-option"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add option
+                    </button>
+                  )}
                 </div>
-                {selectedRecipients.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {selectedRecipients.length} person{selectedRecipients.length !== 1 ? 's' : ''} selected
-                  </p>
-                )}
-              </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleCreatePaymentRequest}
-                  disabled={createPaymentRequestMutation.isPending}
-                  className="flex-1"
-                  data-testid="button-send-payment-request"
-                >
-                  {createPaymentRequestMutation.isPending ? 'Sending...' : 'Send Request'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowPaymentRequestCreator(false)}
-                  data-testid="button-cancel-payment-request"
-                >
-                  Cancel
-                </Button>
+                
+                
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleCreatePoll}
+                    disabled={createPollMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-post-poll"
+                  >
+                    {createPollMutation.isPending ? 'Creating...' : 'Post Poll'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowPollCreator(false)}
+                    data-testid="button-cancel-poll"
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-        
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 hover:bg-accent rounded transition-colors"
-            data-testid="button-attach-file-basic"
-            title="Attach file"
-          >
-            <Paperclip className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={() => setGifModalOpen(true)}
-            className="p-2 hover:bg-accent rounded transition-colors"
-            data-testid="button-gif-search"
-            title="Send GIF"
-          >
-            <Smile className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={() => setShowPollCreator(!showPollCreator)}
-            className="p-2 hover:bg-accent rounded transition-colors"
-            data-testid="button-create-poll"
-            title="Create Poll"
-          >
-            <BarChart3 className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={() => setShowPaymentRequestCreator(!showPaymentRequestCreator)}
-            className="p-2 hover:bg-accent rounded transition-colors"
-            data-testid="button-request-payment"
-            title="Request Payment"
-          >
-            <DollarSign className="w-4 h-4" />
-          </button>
-          <Input
-            placeholder="Type a message..."
-            value={newMessage}
-            onChange={handleInputChange}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-            onBlur={handleTypingStop}
-            className="flex-1"
-            data-testid="input-message"
-          />
-          <Button 
-            onClick={handleSendMessage}
-            disabled={(!newMessage.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending || isUploadingFiles}
-            data-testid="button-send-message"
-          >
-            {isUploadingFiles ? (
-              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-          </Button>
-          
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
-            accept="*/*"
-            data-testid="file-input"
-          />
-        </div>
-      </div>
-    )}
+          )}
 
+          {/* Payment Request Creator */}
+          {showPaymentRequestCreator && (
+            <div className="mb-3 p-4 bg-muted rounded-lg border" data-testid="payment-request-creator">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium">Request Payment</h4>
+                <button
+                  onClick={() => setShowPaymentRequestCreator(false)}
+                  className="p-1 hover:bg-accent rounded"
+                  data-testid="button-close-payment-request"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Title *</label>
+                  <Input
+                    value={paymentRequestTitle}
+                    onChange={(e) => setPaymentRequestTitle(e.target.value)}
+                    placeholder="e.g., Ice rink fee, Team dinner"
+                    data-testid="input-payment-title"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Amount per person ($) *</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={paymentRequestAmount}
+                    onChange={(e) => setPaymentRequestAmount(e.target.value)}
+                    placeholder="25.00"
+                    data-testid="input-payment-amount"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Description (optional)</label>
+                  <Input
+                    value={paymentRequestDescription}
+                    onChange={(e) => setPaymentRequestDescription(e.target.value)}
+                    placeholder="Additional details..."
+                    data-testid="input-payment-description"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Request from *</label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-2">
+                    {currentConversation?.participants
+                      ?.filter(p => p.userId !== user?.id)
+                      .map(participant => (
+                        <label 
+                          key={participant.userId} 
+                          className="flex items-center gap-2 cursor-pointer hover:bg-accent p-1 rounded"
+                          data-testid={`checkbox-recipient-${participant.userId}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedRecipients.includes(participant.userId)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRecipients([...selectedRecipients, participant.userId]);
+                              } else {
+                                setSelectedRecipients(selectedRecipients.filter(id => id !== participant.userId));
+                              }
+                            }}
+                            className="cursor-pointer"
+                          />
+                          <span className="text-sm">
+                            {participant.user?.displayName || participant.user?.email || 'Unknown'}
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                  {selectedRecipients.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedRecipients.length} person{selectedRecipients.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleCreatePaymentRequest}
+                    disabled={createPaymentRequestMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-send-payment-request"
+                  >
+                    {createPaymentRequestMutation.isPending ? 'Sending...' : 'Send Request'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowPaymentRequestCreator(false)}
+                    data-testid="button-cancel-payment-request"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 hover:bg-accent rounded transition-colors"
+              data-testid="button-attach-file-basic"
+              title="Attach file"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setGifModalOpen(true)}
+              className="p-2 hover:bg-accent rounded transition-colors"
+              data-testid="button-gif-search"
+              title="Send GIF"
+            >
+              <Smile className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setShowPollCreator(!showPollCreator)}
+              className="p-2 hover:bg-accent rounded transition-colors"
+              data-testid="button-create-poll"
+              title="Create Poll"
+            >
+              <BarChart3 className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setShowPaymentRequestCreator(!showPaymentRequestCreator)}
+              className="p-2 hover:bg-accent rounded transition-colors"
+              data-testid="button-request-payment"
+              title="Request Payment"
+            >
+              <DollarSign className="w-4 h-4" />
+            </button>
+            <Input
+              placeholder="Type a message..."
+              value={newMessage}
+              onChange={handleInputChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              onBlur={handleTypingStop}
+              className="flex-1"
+              data-testid="input-message"
+            />
+            <Button 
+              onClick={handleSendMessage}
+              disabled={(!newMessage.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending || isUploadingFiles}
+              data-testid="button-send-message"
+            >
+              {isUploadingFiles ? (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </Button>
+            
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              accept="*/*"
+              data-testid="file-input"
+            />
+          </div>
+        </div>
+      )}
       {/* Media Gallery */}
       <MediaGallery
         items={galleryItems}
@@ -2448,14 +2438,12 @@ export default function Messages() {
         onClose={() => setGalleryOpen(false)}
         onIndexChange={setGalleryIndex}
       />
-
       {/* GIF Search Modal */}
       <GifSearchModal
         open={gifModalOpen}
         onOpenChange={setGifModalOpen}
         onSelectGif={handleGifSelect}
       />
-
       {/* Group Members Modal */}
       <Dialog open={showMembersModal} onOpenChange={setShowMembersModal}>
         <DialogContent className="sm:max-w-md">
@@ -2524,7 +2512,6 @@ export default function Messages() {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Add User Modal */}
       <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}>
         <DialogContent className="sm:max-w-md">
