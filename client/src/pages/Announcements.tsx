@@ -1103,7 +1103,7 @@ export default function Announcements() {
             <div className="flex items-center gap-3">
               <Megaphone className="w-6 h-6 text-primary" />
               <div>
-                <h1 className="text-xl font-semibold">Announcements</h1>
+                <h1 className="text-xl font-semibold">News</h1>
                 <p className="text-sm text-muted-foreground">{currentLeague.name}</p>
               </div>
             </div>
