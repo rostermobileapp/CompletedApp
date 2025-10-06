@@ -286,7 +286,7 @@ export default function Stats() {
       </div>
       {/* Filters */}
       <div className="px-6 mb-3">
-        <Card className="p-2" data-testid="card-filters">
+        <Card className="rounded-lg border bg-card text-card-foreground shadow-sm p-2 pl-[0px] pr-[0px]" data-testid="card-filters">
           <div className="flex items-center gap-4">
             {/* Season Filter */}
             <div className="flex items-center gap-2">
