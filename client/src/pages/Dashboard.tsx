@@ -1163,7 +1163,7 @@ export default function Dashboard() {
             <div className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" data-testid="card-announcements">
               <div className="h-full flex flex-col items-center justify-center">
                 <Megaphone className="w-8 h-8 text-orange-500 mb-3" />
-                <p className="text-xs font-medium">Announcements</p>
+                <p className="text-xs font-medium">News</p>
               </div>
               <AnnouncementBadge leagueId={selectedLeagueId} />
             </div>
