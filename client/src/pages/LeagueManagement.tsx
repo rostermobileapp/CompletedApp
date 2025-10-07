@@ -41,7 +41,8 @@ import {
   List,
   Target,
   Shield,
-  AlertCircle as AlertIcon
+  AlertCircle as AlertIcon,
+  Search
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
 import { format } from 'date-fns';
@@ -591,6 +592,8 @@ export default function LeagueManagement() {
   
   // Facility management state
   const [showCreateFacility, setShowCreateFacility] = useState(false);
+  const [facilitySearch, setFacilitySearch] = useState('');
+  const [selectedFacility, setSelectedFacility] = useState<any>(null);
   
   // Close date picker when clicking outside
   React.useEffect(() => {
@@ -671,9 +674,12 @@ export default function LeagueManagement() {
 
   // Fetch all facilities for facility selector
   const { data: facilities = [], refetch: refetchFacilities } = useQuery({
-    queryKey: ['/api/facilities'],
+    queryKey: ['/api/facilities', facilitySearch],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/facilities');
+      const url = facilitySearch 
+        ? `/api/facilities?search=${encodeURIComponent(facilitySearch)}`
+        : '/api/facilities';
+      const response = await apiRequest('GET', url);
       return response.json();
     },
   });
@@ -868,9 +874,20 @@ export default function LeagueManagement() {
         location: league.location || '',
         season: league.season || '',
         isActive: league.isActive ?? true,
+        facilityId: league.facilityId || '',
       });
+      
+      // Set selected facility if league has one
+      if (league.facilityId && facilities.length > 0) {
+        const facility = facilities.find((f: any) => f.id === league.facilityId);
+        if (facility) {
+          setSelectedFacility(facility);
+        }
+      } else {
+        setSelectedFacility(null);
+      }
     }
-  }, [league, editLeagueForm]);
+  }, [league, editLeagueForm, facilities]);
 
   // Set initial selected season to the first active season or first season
   React.useEffect(() => {
@@ -1708,6 +1725,7 @@ export default function LeagueManagement() {
       createFacilityForm.reset();
       refetchFacilities();
       // Automatically select the newly created facility
+      setSelectedFacility(newFacility);
       editLeagueForm.setValue('facilityId', newFacility.id);
     },
     onError: () => {
@@ -3229,18 +3247,67 @@ export default function LeagueManagement() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Facility</label>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <select
-                      {...editLeagueForm.register('facilityId')}
-                      className="flex-1 p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      data-testid="select-facility"
-                    >
-                      <option value="">No facility selected</option>
-                      {facilities.map((facility: any) => (
-                        <option key={facility.id} value={facility.id}>
-                          {facility.name} {facility.city && `- ${facility.city}`}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex-1">
+                      {!selectedFacility ? (
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <input
+                            type="text"
+                            value={facilitySearch}
+                            onChange={(e) => setFacilitySearch(e.target.value)}
+                            placeholder="Search for a facility..."
+                            className="w-full pl-10 p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                            data-testid="input-facility-search"
+                          />
+                          {facilitySearch && facilities.length > 0 && (
+                            <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto" data-testid="facility-search-results">
+                              {facilities.map((facility: any) => (
+                                <button
+                                  key={facility.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedFacility(facility);
+                                    editLeagueForm.setValue('facilityId', facility.id);
+                                    setFacilitySearch('');
+                                  }}
+                                  className="w-full text-left px-4 py-3 hover:bg-muted transition-colors border-b border-border last:border-0"
+                                  data-testid={`facility-result-${facility.id}`}
+                                >
+                                  <div className="font-medium">{facility.name}</div>
+                                  {(facility.city || facility.state) && (
+                                    <div className="text-sm text-muted-foreground">
+                                      {facility.city}{facility.city && facility.state ? ', ' : ''}{facility.state}
+                                    </div>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between p-3 bg-muted rounded-lg" data-testid="selected-facility">
+                          <div>
+                            <div className="font-medium" data-testid="text-facility-name">{selectedFacility.name}</div>
+                            {(selectedFacility.city || selectedFacility.state) && (
+                              <div className="text-sm text-muted-foreground" data-testid="text-facility-location">
+                                {selectedFacility.city}{selectedFacility.city && selectedFacility.state ? ', ' : ''}{selectedFacility.state}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedFacility(null);
+                              editLeagueForm.setValue('facilityId', '');
+                            }}
+                            className="text-muted-foreground hover:text-foreground"
+                            data-testid="button-clear-facility"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => setShowCreateFacility(true)}
