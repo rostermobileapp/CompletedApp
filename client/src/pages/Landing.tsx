@@ -445,24 +445,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-      {/* CTA Section */}
-      <section className="py-24 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl md:text-6xl font-bold mb-10" data-testid="text-cta-heading">
-            Download Roster.
-            <br />
-            Enough chaos—play hockey.
-          </h2>
-          <button 
-            onClick={() => window.location.href = '/api/login'}
-            className="group bg-primary text-primary-foreground rounded-full py-4 px-10 font-semibold text-lg hover:bg-primary/90 transition-all hover:scale-105 inline-flex items-center gap-2"
-            data-testid="button-cta-get-started"
-          >
-            Download Roster
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
-      </section>
       {/* Footer */}
       <footer className="border-t border-border/50 py-12 px-6">
         <div className="max-w-7xl mx-auto text-center text-muted-foreground">
