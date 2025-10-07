@@ -863,9 +863,9 @@ export default function LeagueManagement() {
         lockerRoom: selectedGame.lockerRoom || '',
       });
     }
-  }, [selectedGame, editGameForm]);
+  }, [selectedGame]);
 
-  // Update form when league data loads
+  // Update form when league data loads (only when league changes, not facilities)
   React.useEffect(() => {
     if (league) {
       editLeagueForm.reset({
@@ -876,18 +876,23 @@ export default function LeagueManagement() {
         isActive: league.isActive ?? true,
         facilityId: league.facilityId || '',
       });
-      
-      // Set selected facility if league has one
-      if (league.facilityId && facilities.length > 0) {
+    }
+  }, [league]);
+  
+  // Set selected facility based on league's facilityId and available facilities
+  React.useEffect(() => {
+    if (league && facilities.length > 0) {
+      if (league.facilityId) {
         const facility = facilities.find((f: any) => f.id === league.facilityId);
         if (facility) {
           setSelectedFacility(facility);
         }
-      } else {
+      } else if (!league.facilityId && selectedFacility === null) {
+        // Only clear if not already cleared
         setSelectedFacility(null);
       }
     }
-  }, [league, editLeagueForm, facilities]);
+  }, [league?.facilityId, facilities]);
 
   // Set initial selected season to the first active season or first season
   React.useEffect(() => {
@@ -1727,6 +1732,8 @@ export default function LeagueManagement() {
       // Automatically select the newly created facility
       setSelectedFacility(newFacility);
       editLeagueForm.setValue('facilityId', newFacility.id);
+      // Clear the facility search to prevent dropdown issues
+      setFacilitySearch('');
     },
     onError: () => {
       toast({
@@ -3246,6 +3253,11 @@ export default function LeagueManagement() {
                 {/* Facility Link */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Facility</label>
+                  {/* Hidden input to register facilityId with the form */}
+                  <input
+                    type="hidden"
+                    {...editLeagueForm.register('facilityId')}
+                  />
                   <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex-1">
                       {!selectedFacility ? (
