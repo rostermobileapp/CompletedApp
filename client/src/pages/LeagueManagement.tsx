@@ -3228,7 +3228,7 @@ export default function LeagueManagement() {
                 {/* Facility Link */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Facility</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <select
                       {...editLeagueForm.register('facilityId')}
                       className="flex-1 p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -3244,7 +3244,7 @@ export default function LeagueManagement() {
                     <button
                       type="button"
                       onClick={() => setShowCreateFacility(true)}
-                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium whitespace-nowrap"
+                      className="w-full sm:w-auto px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium whitespace-nowrap"
                       data-testid="button-add-facility"
                     >
                       <Plus className="w-4 h-4 inline mr-1" />
