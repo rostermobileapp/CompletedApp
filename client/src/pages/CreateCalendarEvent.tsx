@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -9,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Calendar, ArrowLeft, Plus } from "lucide-react";
+import { Calendar, ArrowLeft, Plus, Search, MapPin, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { createCalendarEventRequestSchema } from "@shared/schema";
@@ -44,14 +45,20 @@ type FormValues = z.infer<typeof formSchema>;
 export default function CreateCalendarEvent() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [search, setSearch] = useState('');
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
 
   const { data: facilities, isLoading: facilitiesLoading } = useQuery<Facility[]>({
-    queryKey: ['/api/facilities'],
+    queryKey: ['/api/facilities', { search }],
     queryFn: async () => {
-      const response = await fetch('/api/facilities');
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      
+      const response = await fetch(`/api/facilities?${params}`);
       if (!response.ok) throw new Error('Failed to fetch facilities');
       return response.json();
     },
+    enabled: search.trim().length > 0,
   });
 
   const form = useForm<FormValues>({
@@ -152,30 +159,85 @@ export default function CreateCalendarEvent() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Facility *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-facility">
-                            <SelectValue placeholder="Select a facility" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {facilitiesLoading ? (
-                            <SelectItem value="loading" disabled data-testid="option-loading">
-                              Loading facilities...
-                            </SelectItem>
-                          ) : facilities && facilities.length > 0 ? (
-                            facilities.map((facility) => (
-                              <SelectItem key={facility.id} value={facility.id} data-testid={`option-facility-${facility.id}`}>
-                                {facility.name} - {facility.city}, {facility.state}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="none" disabled data-testid="option-no-facilities">
-                              No facilities available
-                            </SelectItem>
+                      {selectedFacility ? (
+                        <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted" data-testid="selected-facility">
+                          <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate" data-testid="text-facility-name">
+                              {selectedFacility.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground truncate" data-testid="text-facility-location">
+                              {selectedFacility.city}, {selectedFacility.state}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedFacility(null);
+                              field.onChange('');
+                              setSearch('');
+                            }}
+                            data-testid="button-clear-facility"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search facilities by name or location..."
+                              value={search}
+                              onChange={(e) => setSearch(e.target.value)}
+                              className="pl-9"
+                              data-testid="input-facility-search"
+                            />
+                          </div>
+                          {search.trim().length > 0 && (
+                            <div className="mt-2 border rounded-lg max-h-64 overflow-y-auto" data-testid="facility-search-results">
+                              {facilitiesLoading ? (
+                                <div className="p-4 text-center text-muted-foreground" data-testid="loading-facilities">
+                                  <Search className="w-6 h-6 mx-auto mb-2 animate-pulse" />
+                                  <p>Searching facilities...</p>
+                                </div>
+                              ) : facilities && facilities.length > 0 ? (
+                                <div className="divide-y">
+                                  {facilities.map((facility) => (
+                                    <button
+                                      key={facility.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedFacility(facility);
+                                        field.onChange(facility.id);
+                                        setSearch('');
+                                      }}
+                                      className="w-full p-3 text-left hover:bg-muted transition-colors flex items-center gap-3"
+                                      data-testid={`button-facility-${facility.id}`}
+                                    >
+                                      <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium truncate">{facility.name}</p>
+                                        <p className="text-sm text-muted-foreground truncate">
+                                          {facility.city}, {facility.state}
+                                        </p>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="p-4 text-center text-muted-foreground" data-testid="no-facilities">
+                                  <Search className="w-6 h-6 mx-auto mb-2" />
+                                  <p>No facilities found</p>
+                                  <p className="text-sm mt-1">Try a different search term</p>
+                                </div>
+                              )}
+                            </div>
                           )}
-                        </SelectContent>
-                      </Select>
+                        </>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
