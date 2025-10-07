@@ -70,7 +70,7 @@ export default function Landing() {
             <br />
             <span className="text-primary">Organized</span>
           </h1>
-          <div className="flex flex-col md:flex-row gap-8 items-center justify-center mb-12">
+          <div className="flex flex-col md:flex-row gap-8 items-start justify-center mb-12">
             <video 
               src={heroVideo}
               autoPlay
