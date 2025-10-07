@@ -34,6 +34,7 @@ import PaymentRequestDetail from "@/pages/PaymentRequestDetail";
 import ScoreVerification from "@/pages/ScoreVerification";
 import FacilityBrowse from "@/pages/FacilityBrowse";
 import FacilityDetail from "@/pages/FacilityDetail";
+import FacilityMemberships from "@/pages/FacilityMemberships";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -91,6 +92,7 @@ function Router() {
             <Route path="/payment-requests/:id" component={PaymentRequestDetail} />
             <Route path="/facilities" component={FacilityBrowse} />
             <Route path="/facilities/:id" component={FacilityDetail} />
+            <Route path="/facility-memberships" component={FacilityMemberships} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>
