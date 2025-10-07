@@ -70,11 +70,6 @@ export default function Landing() {
             <br />
             <span className="text-primary">Organized</span>
           </h1>
-          <p 
-            className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed font-medium"
-            data-testid="text-hero-subtitle"
-          >Make Rec League Great Again</p>
-          
           <div className="flex flex-col md:flex-row gap-8 items-center justify-center mb-12">
             <video 
               src={heroVideo}
