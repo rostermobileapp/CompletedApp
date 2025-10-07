@@ -93,10 +93,6 @@ export default function Landing() {
               Your schedule, your lineup, your team—organized. Finally.</p>
             </div>
           </div>
-          
-          <p className="text-sm text-muted-foreground mt-6" data-testid="text-pricing-info">
-            Enough chaos—play hockey.
-          </p>
         </div>
       </section>
       {/* Highlights Bar */}
