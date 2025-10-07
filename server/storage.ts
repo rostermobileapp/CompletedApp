@@ -366,7 +366,7 @@ export interface IStorage {
   // Facility operations
   createFacility(facility: InsertFacility): Promise<Facility>;
   getFacility(id: string): Promise<Facility | undefined>;
-  getAllFacilities(options?: { sport?: string; city?: string; state?: string }): Promise<Facility[]>;
+  getAllFacilities(options?: { sport?: string; city?: string; state?: string; search?: string }): Promise<Facility[]>;
   updateFacility(id: string, updates: Partial<InsertFacility>): Promise<Facility>;
   deleteFacility(id: string): Promise<void>;
   
@@ -5696,7 +5696,7 @@ export class DatabaseStorage implements IStorage {
     return facility;
   }
 
-  async getAllFacilities(options?: { sport?: string; city?: string; state?: string }): Promise<Facility[]> {
+  async getAllFacilities(options?: { sport?: string; city?: string; state?: string; search?: string }): Promise<Facility[]> {
     const conditions = [];
     if (options?.sport) {
       conditions.push(sql`${facilities.sports} @> ARRAY[${options.sport}]::sport[]`);
@@ -5706,6 +5706,15 @@ export class DatabaseStorage implements IStorage {
     }
     if (options?.state) {
       conditions.push(eq(facilities.state, options.state));
+    }
+    if (options?.search) {
+      conditions.push(
+        or(
+          ilike(facilities.name, `%${options.search}%`),
+          ilike(facilities.city, `%${options.search}%`),
+          ilike(facilities.state, `%${options.search}%`)
+        )!
+      );
     }
     
     if (conditions.length > 0) {
