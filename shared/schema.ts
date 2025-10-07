@@ -153,6 +153,7 @@ export const leagues = pgTable("leagues", {
   location: varchar("location"),
   rinkName: varchar("rink_name"), // Added for commissioner feature
   rinkAddress: text("rink_address"), // Added for commissioner feature
+  facilityId: varchar("facility_id"), // Link to facility - will add reference after facilities table is defined
   season: varchar("season"),
   commissionerId: varchar("commissioner_id").references(() => users.id).notNull(),
   maxTeams: integer("max_teams").default(16),
@@ -991,6 +992,10 @@ export const leaguesRelations = relations(leagues, ({ one, many }) => ({
   commissioner: one(users, {
     fields: [leagues.commissionerId],
     references: [users.id],
+  }),
+  facility: one(facilities, {
+    fields: [leagues.facilityId],
+    references: [facilities.id],
   }),
   seasons: many(seasons),
   teams: many(teams),

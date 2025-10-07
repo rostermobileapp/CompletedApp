@@ -363,10 +363,24 @@ const editLeagueSchema = z.object({
   description: z.string().optional(),
   location: z.string().optional(),
   season: z.string().optional(),
+  facilityId: z.string().optional(),
   isActive: z.boolean(),
 });
 
 type EditLeagueForm = z.infer<typeof editLeagueSchema>;
+
+const createFacilitySchema = z.object({
+  name: z.string().min(1, 'Facility name is required'),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  website: z.string().optional(),
+});
+
+type CreateFacilityForm = z.infer<typeof createFacilitySchema>;
 
 const createSeasonSchema = z.object({
   name: z.string().min(1, 'Season name is required'),
@@ -575,6 +589,9 @@ export default function LeagueManagement() {
   const [adminEmail, setAdminEmail] = useState('');
   const [statManagerEmail, setStatManagerEmail] = useState('');
   
+  // Facility management state
+  const [showCreateFacility, setShowCreateFacility] = useState(false);
+  
   // Close date picker when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -650,6 +667,15 @@ export default function LeagueManagement() {
       return response.json();
     },
     enabled: !!leagueId,
+  });
+
+  // Fetch all facilities for facility selector
+  const { data: facilities = [], refetch: refetchFacilities } = useQuery({
+    queryKey: ['/api/facilities'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/facilities');
+      return response.json();
+    },
   });
 
   // Fetch seasons for this league
@@ -775,7 +801,23 @@ export default function LeagueManagement() {
       description: league?.description || '',
       location: league?.location || '',
       season: league?.season || '',
+      facilityId: league?.facilityId || '',
       isActive: league?.isActive ?? true,
+    },
+  });
+
+  // Form for creating facility
+  const createFacilityForm = useForm<CreateFacilityForm>({
+    resolver: zodResolver(createFacilitySchema),
+    defaultValues: {
+      name: '',
+      address: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      phoneNumber: '',
+      email: '',
+      website: '',
     },
   });
 
@@ -1649,6 +1691,29 @@ export default function LeagueManagement() {
       toast({
         title: 'Update Failed',
         description: 'Failed to update league details.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Create facility mutation
+  const createFacilityMutation = useMutation({
+    mutationFn: async (data: CreateFacilityForm) => {
+      const response = await apiRequest('POST', '/api/facilities', data);
+      return response.json();
+    },
+    onSuccess: (newFacility) => {
+      toast({ title: 'Facility created successfully' });
+      setShowCreateFacility(false);
+      createFacilityForm.reset();
+      refetchFacilities();
+      // Automatically select the newly created facility
+      editLeagueForm.setValue('facilityId', newFacility.id);
+    },
+    onError: () => {
+      toast({
+        title: 'Create Failed',
+        description: 'Failed to create facility.',
         variant: 'destructive',
       });
     },
@@ -3160,22 +3225,35 @@ export default function LeagueManagement() {
                   />
                 </div>
 
-                {/* Location */}
+                {/* Facility Link */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">League Address</label>
-                  <Controller
-                    name="location"
-                    control={editLeagueForm.control}
-                    render={({ field }) => (
-                      <GoogleAddressAutocomplete
-                        value={field.value || ''}
-                        onChange={field.onChange}
-                        placeholder="Enter league address"
-                        className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                        dataTestId="input-league-location"
-                      />
-                    )}
-                  />
+                  <label className="block text-sm font-medium mb-2">Facility</label>
+                  <div className="flex gap-2">
+                    <select
+                      {...editLeagueForm.register('facilityId')}
+                      className="flex-1 p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      data-testid="select-facility"
+                    >
+                      <option value="">No facility selected</option>
+                      {facilities.map((facility: any) => (
+                        <option key={facility.id} value={facility.id}>
+                          {facility.name} {facility.city && `- ${facility.city}`}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateFacility(true)}
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium whitespace-nowrap"
+                      data-testid="button-add-facility"
+                    >
+                      <Plus className="w-4 h-4 inline mr-1" />
+                      Add New
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Link this league to a facility where games are played
+                  </p>
                 </div>
 
                 {/* Season */}
@@ -3573,6 +3651,162 @@ export default function LeagueManagement() {
                     data-testid="button-create-season-submit"
                   >
                     {createSeasonMutation.isPending ? 'Creating...' : 'Create Season'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Create Facility Modal */}
+      {showCreateFacility && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Create New Facility</h2>
+                <button
+                  onClick={() => {
+                    setShowCreateFacility(false);
+                    createFacilityForm.reset();
+                  }}
+                  className="text-muted-foreground hover:text-foreground p-1"
+                  data-testid="button-close-create-facility"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={createFacilityForm.handleSubmit((data) => {
+                  createFacilityMutation.mutate(data);
+                })}
+                className="space-y-4"
+              >
+                {/* Facility Name */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Facility Name *</label>
+                  <input
+                    {...createFacilityForm.register('name')}
+                    type="text"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="e.g., Downtown Ice Arena"
+                    data-testid="input-facility-name"
+                  />
+                  {createFacilityForm.formState.errors.name && (
+                    <p className="text-red-500/50 text-sm mt-1">
+                      {createFacilityForm.formState.errors.name.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Address */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Address</label>
+                  <input
+                    {...createFacilityForm.register('address')}
+                    type="text"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="e.g., 123 Main Street"
+                    data-testid="input-facility-address"
+                  />
+                </div>
+
+                {/* City, State, Zip Code */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">City</label>
+                    <input
+                      {...createFacilityForm.register('city')}
+                      type="text"
+                      className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="City"
+                      data-testid="input-facility-city"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">State</label>
+                    <input
+                      {...createFacilityForm.register('state')}
+                      type="text"
+                      className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="State"
+                      data-testid="input-facility-state"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Zip Code</label>
+                  <input
+                    {...createFacilityForm.register('zipCode')}
+                    type="text"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Zip Code"
+                    data-testid="input-facility-zip"
+                  />
+                </div>
+
+                {/* Phone and Email */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Phone Number</label>
+                  <input
+                    {...createFacilityForm.register('phoneNumber')}
+                    type="tel"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="(555) 123-4567"
+                    data-testid="input-facility-phone"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Email</label>
+                  <input
+                    {...createFacilityForm.register('email')}
+                    type="email"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="facility@example.com"
+                    data-testid="input-facility-email"
+                  />
+                  {createFacilityForm.formState.errors.email && (
+                    <p className="text-red-500/50 text-sm mt-1">
+                      {createFacilityForm.formState.errors.email.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Website */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Website</label>
+                  <input
+                    {...createFacilityForm.register('website')}
+                    type="url"
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="https://facility.com"
+                    data-testid="input-facility-website"
+                  />
+                </div>
+
+                {/* Submit Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateFacility(false);
+                      createFacilityForm.reset();
+                    }}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                    data-testid="button-cancel-create-facility"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createFacilityMutation.isPending}
+                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                    data-testid="button-submit-create-facility"
+                  >
+                    {createFacilityMutation.isPending ? 'Creating...' : 'Create Facility'}
                   </button>
                 </div>
               </form>
