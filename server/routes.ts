@@ -52,6 +52,12 @@ import {
   createFeedbackSubmissionSchema,
   createPaymentRequestSchema,
   updatePaymentRequestRecipientSchema,
+  createFacilityRequestSchema,
+  updateFacilityRequestSchema,
+  createFacilityMembershipRequestSchema,
+  createCalendarEventRequestSchema,
+  updateCalendarEventRequestSchema,
+  createEventParticipantRequestSchema,
 } from "@shared/schema";
 import { z, ZodError } from "zod";
 import multer from "multer";
@@ -6904,6 +6910,429 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating payment methods:", error);
       res.status(500).json({ message: "Failed to update payment methods" });
+    }
+  });
+
+  // Facility routes
+  // List all facilities (public - no auth required)
+  app.get('/api/facilities', async (req: any, res) => {
+    try {
+      const { sport, city, state } = req.query;
+      const facilities = await storage.getAllFacilities({ sport, city, state });
+      res.json(facilities);
+    } catch (error) {
+      console.error("Error fetching facilities:", error);
+      res.status(500).json({ message: "Failed to fetch facilities" });
+    }
+  });
+
+  // Get facility details (public - no auth required)
+  app.get('/api/facilities/:id', async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const facility = await storage.getFacility(id);
+      
+      if (!facility) {
+        return res.status(404).json({ message: "Facility not found" });
+      }
+      
+      res.json(facility);
+    } catch (error) {
+      console.error("Error fetching facility:", error);
+      res.status(500).json({ message: "Failed to fetch facility" });
+    }
+  });
+
+  // Create facility (authenticated users only)
+  app.post('/api/facilities', isAuthenticated, async (req: any, res) => {
+    try {
+      const validatedData = createFacilityRequestSchema.parse(req.body);
+      const facility = await storage.createFacility(validatedData);
+      res.status(201).json(facility);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid facility data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error creating facility:", error);
+      res.status(500).json({ message: "Failed to create facility" });
+    }
+  });
+
+  // Update facility (authenticated users only)
+  app.patch('/api/facilities/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = updateFacilityRequestSchema.parse(req.body);
+      
+      const existingFacility = await storage.getFacility(id);
+      if (!existingFacility) {
+        return res.status(404).json({ message: "Facility not found" });
+      }
+      
+      const facility = await storage.updateFacility(id, validatedData);
+      res.json(facility);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid facility data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error updating facility:", error);
+      res.status(500).json({ message: "Failed to update facility" });
+    }
+  });
+
+  // Delete facility (authenticated users only)
+  app.delete('/api/facilities/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      const existingFacility = await storage.getFacility(id);
+      if (!existingFacility) {
+        return res.status(404).json({ message: "Facility not found" });
+      }
+      
+      await storage.deleteFacility(id);
+      res.json({ success: true, message: "Facility deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting facility:", error);
+      res.status(500).json({ message: "Failed to delete facility" });
+    }
+  });
+
+  // Get facility members (public - no auth required)
+  app.get('/api/facilities/:id/members', async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const members = await storage.getFacilityMembers(id);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching facility members:", error);
+      res.status(500).json({ message: "Failed to fetch members" });
+    }
+  });
+
+  // Join facility (create membership)
+  app.post('/api/facilities/:id/memberships', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: facilityId } = req.params;
+      
+      const facility = await storage.getFacility(facilityId);
+      if (!facility) {
+        return res.status(404).json({ message: "Facility not found" });
+      }
+      
+      const existingMembership = await storage.getUserFacilityMembership(userId, facilityId);
+      if (existingMembership) {
+        return res.status(400).json({ message: "You are already a member of this facility" });
+      }
+      
+      const validatedData = createFacilityMembershipRequestSchema.parse(req.body);
+      
+      const membership = await storage.createFacilityMembership({
+        ...validatedData,
+        userId,
+        facilityId,
+        startDate: new Date(),
+      });
+      
+      res.status(201).json(membership);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid membership data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error creating facility membership:", error);
+      res.status(500).json({ message: "Failed to join facility" });
+    }
+  });
+
+  // Get user's facility memberships
+  app.get('/api/users/me/facility-memberships', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const memberships = await storage.getUserFacilityMemberships(userId);
+      res.json(memberships);
+    } catch (error) {
+      console.error("Error fetching user facility memberships:", error);
+      res.status(500).json({ message: "Failed to fetch memberships" });
+    }
+  });
+
+  // Check user's membership at a facility
+  app.get('/api/facilities/:id/memberships/check', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: facilityId } = req.params;
+      
+      const hasActiveMembership = await storage.checkUserActiveFacilityMembership(userId, facilityId);
+      res.json({ hasActiveMembership });
+    } catch (error) {
+      console.error("Error checking facility membership:", error);
+      res.status(500).json({ message: "Failed to check membership" });
+    }
+  });
+
+  // Delete facility membership (leave facility)
+  app.delete('/api/facility-memberships/:membershipId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { membershipId } = req.params;
+      
+      const membership = await storage.getFacilityMembership(membershipId);
+      if (!membership) {
+        return res.status(404).json({ message: "Membership not found" });
+      }
+      
+      if (membership.userId !== userId) {
+        return res.status(403).json({ message: "You can only delete your own membership" });
+      }
+      
+      await storage.deleteFacilityMembership(membershipId);
+      res.json({ success: true, message: "Membership deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting facility membership:", error);
+      res.status(500).json({ message: "Failed to delete membership" });
+    }
+  });
+
+  // Calendar event routes
+  // Get facility calendar events (public - no auth required)
+  app.get('/api/facilities/:id/calendar', async (req: any, res) => {
+    try {
+      const { id: facilityId } = req.params;
+      const { sportId, startDate, endDate } = req.query;
+      
+      const options: any = {};
+      if (sportId) options.sportId = sportId;
+      if (startDate) options.startDate = new Date(startDate as string);
+      if (endDate) options.endDate = new Date(endDate as string);
+      
+      const events = await storage.getFacilityCalendarEvents(facilityId, options);
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching facility calendar:", error);
+      res.status(500).json({ message: "Failed to fetch calendar" });
+    }
+  });
+
+  // Get calendar event details (public - no auth required)
+  app.get('/api/calendar-events/:id', async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const event = await storage.getCalendarEvent(id);
+      
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      res.json(event);
+    } catch (error) {
+      console.error("Error fetching calendar event:", error);
+      res.status(500).json({ message: "Failed to fetch event" });
+    }
+  });
+
+  // Create calendar event (members only if requiresMembership is true)
+  app.post('/api/calendar-events', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = createCalendarEventRequestSchema.parse(req.body);
+      
+      const facility = await storage.getFacility(validatedData.facilityId);
+      if (!facility) {
+        return res.status(404).json({ message: "Facility not found" });
+      }
+      
+      const event = await storage.createCalendarEvent({
+        ...validatedData,
+        createdBy: userId,
+      });
+      
+      res.status(201).json(event);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid event data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error creating calendar event:", error);
+      res.status(500).json({ message: "Failed to create event" });
+    }
+  });
+
+  // Update calendar event (creator or facility admin only)
+  app.patch('/api/calendar-events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const validatedData = updateCalendarEventRequestSchema.parse(req.body);
+      
+      const event = await storage.getCalendarEvent(id);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      if (event.createdBy !== userId) {
+        return res.status(403).json({ message: "Only the event creator can update this event" });
+      }
+      
+      const updatedEvent = await storage.updateCalendarEvent(id, validatedData);
+      res.json(updatedEvent);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid event data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error updating calendar event:", error);
+      res.status(500).json({ message: "Failed to update event" });
+    }
+  });
+
+  // Delete calendar event (creator or facility admin only)
+  app.delete('/api/calendar-events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      const event = await storage.getCalendarEvent(id);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      if (event.createdBy !== userId) {
+        return res.status(403).json({ message: "Only the event creator can delete this event" });
+      }
+      
+      await storage.deleteCalendarEvent(id);
+      res.json({ success: true, message: "Event deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting calendar event:", error);
+      res.status(500).json({ message: "Failed to delete event" });
+    }
+  });
+
+  // Get event participants (public for public events, members for members-only events)
+  app.get('/api/calendar-events/:id/participants', async (req: any, res) => {
+    try {
+      const { id: eventId } = req.params;
+      
+      const event = await storage.getCalendarEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      const participants = await storage.getEventParticipants(eventId);
+      res.json(participants);
+    } catch (error) {
+      console.error("Error fetching event participants:", error);
+      res.status(500).json({ message: "Failed to fetch participants" });
+    }
+  });
+
+  // Join event (members only)
+  app.post('/api/calendar-events/:id/participants', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: eventId } = req.params;
+      
+      const event = await storage.getCalendarEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      if (event.requiresMembership) {
+        const hasActiveMembership = await storage.checkUserActiveFacilityMembership(userId, event.facilityId);
+        if (!hasActiveMembership) {
+          return res.status(403).json({ message: "You must be a facility member to join this event" });
+        }
+      }
+      
+      const existingParticipation = await storage.getUserEventParticipation(userId, eventId);
+      if (existingParticipation) {
+        return res.status(400).json({ message: "You are already participating in this event" });
+      }
+      
+      if (event.maxParticipants && event.currentParticipantsCount >= event.maxParticipants) {
+        return res.status(400).json({ message: "This event is full" });
+      }
+      
+      const membership = await storage.getUserFacilityMembership(userId, event.facilityId);
+      if (!membership) {
+        return res.status(400).json({ message: "You must be a facility member to participate" });
+      }
+      
+      const validatedData = createEventParticipantRequestSchema.parse(req.body);
+      
+      const participant = await storage.createEventParticipant({
+        ...validatedData,
+        eventId,
+        userId,
+        facilityMembershipId: membership.id,
+      });
+      
+      res.status(201).json(participant);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid participant data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error joining event:", error);
+      res.status(500).json({ message: "Failed to join event" });
+    }
+  });
+
+  // Leave event (delete participation)
+  app.delete('/api/event-participants/:participantId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { participantId } = req.params;
+      
+      const participant = await storage.getUserEventParticipation(userId, participantId);
+      if (!participant) {
+        return res.status(404).json({ message: "Participation not found" });
+      }
+      
+      if (participant.userId !== userId) {
+        return res.status(403).json({ message: "You can only delete your own participation" });
+      }
+      
+      await storage.deleteEventParticipant(participantId);
+      res.json({ success: true, message: "Left event successfully" });
+    } catch (error) {
+      console.error("Error leaving event:", error);
+      res.status(500).json({ message: "Failed to leave event" });
+    }
+  });
+
+  // Check in participant (event creator or facility admin only)
+  app.patch('/api/event-participants/:participantId/check-in', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { participantId } = req.params;
+      
+      const participant = await storage.updateEventParticipant(participantId, {});
+      if (!participant) {
+        return res.status(404).json({ message: "Participant not found" });
+      }
+      
+      const checkedInParticipant = await storage.checkInEventParticipant(participantId);
+      res.json(checkedInParticipant);
+    } catch (error) {
+      console.error("Error checking in participant:", error);
+      res.status(500).json({ message: "Failed to check in participant" });
     }
   });
 
