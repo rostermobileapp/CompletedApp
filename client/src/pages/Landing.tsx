@@ -128,30 +128,173 @@ export default function Landing() {
             </h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-            {features.map((feature, index) => (
-              <div 
-                key={index}
-                className="group relative bg-card/50 backdrop-blur-sm rounded-3xl p-8 lg:p-10 border border-border/50 hover:border-primary/50 transition-all hover:bg-card/80"
-                data-testid={`card-feature-${index}`}
-              >
-                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
-                  <feature.icon className="w-7 h-7 text-primary" />
-                </div>
-                <h3 
-                  className="text-2xl font-semibold mb-3"
-                  data-testid={`text-feature-title-${index}`}
-                >
-                  {feature.title}
-                </h3>
-                <p 
-                  className="text-muted-foreground text-lg leading-relaxed"
-                  data-testid={`text-feature-description-${index}`}
-                >
-                  {feature.description}
-                </p>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse bg-card/50 backdrop-blur-sm rounded-xl" data-testid="comparison-table">
+              <thead>
+                <tr className="border-b border-border/50">
+                  <th className="text-left p-4 font-bold">Feature</th>
+                  <th className="text-center p-4 font-bold bg-primary/10">Roster</th>
+                  <th className="text-center p-4 font-bold">BenchApp</th>
+                  <th className="text-center p-4 font-bold">TeamSnap</th>
+                  <th className="text-center p-4 font-bold">SportsEngine HQ</th>
+                  <th className="text-center p-4 font-bold">Crossbar</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-border/50">
+                  <td className="p-4 font-medium">Price</td>
+                  <td className="text-center p-4 bg-primary/10 font-bold">$8 / Month</td>
+                  <td className="text-center p-4">$9 / Month</td>
+                  <td className="text-center p-4">$16 / Month</td>
+                  <td className="text-center p-4">$1,299 / Year</td>
+                  <td className="text-center p-4">$995 / Year</td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Team Scheduling</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Roster Management</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Player/Attendance Tracking</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">In App Messaging</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">RSVP Alerts</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Player Substitution System</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Polls/Bulletins</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Facility Event Calendar</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Fee & Payment Tracking</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Links to Venmo/CashApp</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Team Expense Tracking</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Mobile App</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Website Portal</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Multi-Team/Org Management</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Registration System</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Volunteer/Role Assignment</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="p-4">Custom Awards</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                </tr>
+                <tr>
+                  <td className="p-4">Tournaments Mode</td>
+                  <td className="text-center p-4 bg-primary/10"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                  <td className="text-center p-4"><Check className="w-5 h-5 text-primary inline" /></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
