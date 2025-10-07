@@ -86,7 +86,7 @@ export default function Landing() {
               <p className="mb-1 text-[24px] pt-[20px] pb-[20px]">Every rec league team falls apart the exact same way.</p>
               <p className="mb-6 text-[24px] pt-[20px] pb-[20px]">Nobody knows who’s playing, nobody knows when the game is—and half the team just doesn’t show up.</p>
               
-              <p className="text-xl md:text-2xl font-semibold mb-6">Amateur Hour</p>
+              <p className="text-xl md:text-2xl mb-6 font-normal">Group texts, half-baked spreadsheets, email chains...</p>
               
               <p className="mb-1">Roster fixes all of it. One app, built by players, for players.</p>
               <p>Your schedule, your lineup, your team—organized. Finally.</p>
