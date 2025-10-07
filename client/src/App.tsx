@@ -32,6 +32,8 @@ import CreatePaymentRequest from "@/pages/CreatePaymentRequest";
 import PaymentRequests from "@/pages/PaymentRequests";
 import PaymentRequestDetail from "@/pages/PaymentRequestDetail";
 import ScoreVerification from "@/pages/ScoreVerification";
+import FacilityBrowse from "@/pages/FacilityBrowse";
+import FacilityDetail from "@/pages/FacilityDetail";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -50,6 +52,8 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/facilities" component={FacilityBrowse} />
+        <Route path="/facilities/:id" component={FacilityDetail} />
         <Route component={Landing} />
       </Switch>
     );
@@ -85,6 +89,8 @@ function Router() {
             <Route path="/create-payment-request" component={CreatePaymentRequest} />
             <Route path="/payment-requests" component={PaymentRequests} />
             <Route path="/payment-requests/:id" component={PaymentRequestDetail} />
+            <Route path="/facilities" component={FacilityBrowse} />
+            <Route path="/facilities/:id" component={FacilityDetail} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>
