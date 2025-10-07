@@ -84,7 +84,7 @@ export default function Landing() {
               data-testid="text-hero-body"
             >
               <p className="mb-1 text-[24px] pt-[20px] pb-[20px]">Rec league hockey shouldn't feel like herding cats.</p>
-              <p className="mb-6">A league of grown men relying on group emails and spreadsheets leads to a short roster.</p>
+              <p className="mb-6 text-[24px] pt-[20px] pb-[20px]">A league of grown men relying on group emails and spreadsheets leads to a short roster.</p>
               
               <p className="text-xl md:text-2xl font-semibold mb-6">Amateur Hour</p>
               
