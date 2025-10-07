@@ -1,0 +1,225 @@
+Updated Requirement: Facility Calendar Visibility & Membership Rules
+Core Rules
+
+Anyone can VIEW the facility's full calendar (all sports, all events)
+Only facility MEMBERS can participate/get invites (for any sport at that facility)
+This applies across ALL sports - membership grants access to everything at the facility
+
+Why This Matters
+
+Discovery: Non-members can see what's happening to decide if they want to join
+Transparency: Shows facility activity levels and variety of offerings
+Conversion: Seeing active leagues/scrimmages encourages facility membership
+Cross-sport participation: Members can explore different sports offered
+
+
+Updated Calendar Visibility & Access Rules
+1. Public View (No Login/Membership Required)
+CAN:
+
+Browse facility calendar (all sports, all events)
+See league schedules across all sports
+View scrimmage listings
+See time slots and availability
+View facility information and contact details
+See "Join this facility" call-to-action
+
+CANNOT:
+
+Join scrimmages
+RSVP to events
+Receive invites
+See participant lists
+Access contact info of other members
+
+2. Facility Member View (Facility Membership Required)
+CAN:
+
+Everything public users can see PLUS:
+Join scrimmages for ANY sport at the facility
+RSVP to open play sessions
+Receive invites to facility events
+See participant counts/lists
+Contact other members
+Create/host scrimmages
+Access member-only events
+
+CANNOT:
+
+Join league games (requires team roster spot)
+Access league-specific team communications (requires team membership)
+
+3. League Participant View (League Team Membership Required)
+CAN:
+
+Everything facility members can see PLUS:
+Access team-specific game details
+Team chat/communications
+Score entry (if authorized)
+Opponent roster information
+League standings
+
+Note: League participation REQUIRES facility membership as a prerequisite
+
+Implementation Updates
+Access Control Logic
+Add to Phase 5 (Access Control):
+javascript// Pseudo-code for event participation check
+
+function canUserJoinEvent(user, event, facility) {
+  // Check 1: Is user a member of this facility?
+  if (!isFacilityMember(user, facility)) {
+    return {
+      canJoin: false,
+      reason: "MEMBERSHIP_REQUIRED",
+      message: "Join this facility to participate in events"
+    };
+  }
+  
+  // Check 2: What type of event?
+  if (event.type === 'SCRIMMAGE' || event.type === 'OPEN_PLAY') {
+    // Facility membership is sufficient
+    return {
+      canJoin: true,
+      accessLevel: "FACILITY_MEMBER"
+    };
+  }
+  
+  if (event.type === 'LEAGUE_GAME') {
+    // Requires team roster spot
+    if (!isOnTeamRoster(user, event.team_id)) {
+      return {
+        canJoin: false,
+        reason: "TEAM_ROSTER_REQUIRED",
+        message: "League games require team membership"
+      };
+    }
+    return {
+      canJoin: true,
+      accessLevel: "LEAGUE_PARTICIPANT"
+    };
+  }
+}
+
+function canUserViewEvent(user, event) {
+  // Everyone can VIEW all events
+  return true;
+}
+Updated API Endpoints
+Calendar Viewing (Public):
+GET /api/facilities/{id}/calendar
+- No auth required
+- Returns all events across all sports
+- Include CTAs for non-members
+- Show "Members only" badges on actionable items
+Event Participation (Members Only):
+POST /api/facilities/{facilityId}/scrimmages/{scrimmageId}/join
+- Requires auth
+- Checks facility membership
+- Returns 403 if not a member with message about joining facility
+
+POST /api/facilities/{facilityId}/events/{eventId}/rsvp
+- Requires auth
+- Checks facility membership
+- Returns appropriate error with join facility CTA
+Updated UI Components
+Calendar Event Card (for non-members):
+┌─────────────────────────────────────┐
+│ ⚽ Soccer - Open Scrimmage          │
+│ Monday, Oct 7 • 8:00 PM - 9:30 PM   │
+│ Field 2 • 8/16 players              │
+│                                      │
+│ 🔒 Members Only                     │
+│ [Join Facility to Participate]      │
+└─────────────────────────────────────┘
+Calendar Event Card (for members):
+┌─────────────────────────────────────┐
+│ ⚽ Soccer - Open Scrimmage          │
+│ Monday, Oct 7 • 8:00 PM - 9:30 PM   │
+│ Field 2 • 8/16 players              │
+│                                      │
+│ ✅ You're a member                  │
+│ [Join Scrimmage] [View Details]     │
+└─────────────────────────────────────┘
+Calendar Event Card (member viewing different sport):
+┌─────────────────────────────────────┐
+│ 🏀 Basketball - Open Scrimmage      │
+│ Tuesday, Oct 8 • 7:00 PM - 8:30 PM  │
+│ Court 1 • 10/12 players             │
+│                                      │
+│ ✅ Try something new!               │
+│ [Join Scrimmage]                     │
+└─────────────────────────────────────┘
+Database Schema Updates
+Add to facility_memberships table:
+sqlfacility_memberships:
+  - id
+  - user_id (foreign key)
+  - facility_id (foreign key)
+  - membership_type (basic, premium, etc.)
+  - start_date
+  - end_date (nullable for ongoing)
+  - status (active, expired, suspended)
+  - created_at
+  - updated_at
+  
+  UNIQUE constraint on (user_id, facility_id) for active memberships
+Add to calendar_events table:
+sqlcalendar_events:
+  - id
+  - facility_id (foreign key) -- REQUIRED
+  - sport_id (foreign key)
+  - event_type (league_game, scrimmage, tournament, open_play)
+  - requires_membership (boolean, default TRUE)
+  - requires_team_roster (boolean, for league games)
+  - visibility (public, members_only, participants_only)
+  - start_time
+  - end_time
+  - location_detail
+  - max_participants
+  - current_participants_count
+Add event_participants junction table:
+sqlevent_participants:
+  - id
+  - event_id (foreign key)
+  - user_id (foreign key)
+  - facility_membership_id (foreign key) -- Verify membership at time of join
+  - rsvp_status (joined, maybe, declined)
+  - joined_at
+  - checked_in (boolean, for attendance tracking)
+Updated Testing Checklist
+Replace previous calendar tests with:
+
+ Non-logged-in users can view full facility calendar (all sports)
+ Non-members see "Join facility" CTA on events
+ Non-members CANNOT join scrimmages or RSVP
+ Non-members clicking join/RSVP get clear membership requirement message
+ Facility members can join scrimmages for ANY sport at their facility
+ Basketball members can join soccer scrimmages at same facility
+ Non-facility-members can't join even if they're members at different facility
+ League games require both facility membership AND team roster spot
+ Expired facility memberships block participation
+ Calendar shows correct CTAs based on user membership status
+
+User Flow Examples
+Non-Member Journey:
+
+Browse facility → See calendar with all sports
+Click on interesting scrimmage → See details
+Click "Join" → Prompted to become facility member first
+Complete membership signup → Now can join events
+
+Member Journey:
+
+Member of Facility A
+Browse Facility A calendar → See basketball, soccer, volleyball
+Usually plays basketball
+See interesting soccer scrimmage → Click join (no extra signup!)
+Now participating in soccer scrimmage
+
+Multi-Facility User:
+
+Member at Facility A and Facility B
+Browse Facility C calendar → Can view all events
+Try to join Facility C event → Must join Facility C first
+Membership at A and B doesn't grant access to C
