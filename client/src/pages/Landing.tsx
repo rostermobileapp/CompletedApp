@@ -66,14 +66,14 @@ export default function Landing() {
             className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight"
             data-testid="text-hero-title"
           >
-            Your Beer League Team,
+            Your Rec League Team,
             <br />
             <span className="text-primary">Organized</span>
           </h1>
           <p 
             className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed font-medium"
             data-testid="text-hero-subtitle"
-          >Make Beer League Great Again</p>
+          >Make Rec League Great Again</p>
           
           <div className="flex flex-col md:flex-row gap-8 items-center justify-center mb-12">
             <video 
@@ -88,7 +88,7 @@ export default function Landing() {
               className="text-base md:text-lg leading-relaxed text-[#ffffff] md:w-1/2 max-w-md"
               data-testid="text-hero-body"
             >
-              <p className="mb-1">Beer league hockey shouldn't feel like herding cats.</p>
+              <p className="mb-1">Rec league hockey shouldn't feel like herding cats.</p>
               <p className="mb-6">A league of grown men relying on group emails and spreadsheets leads to a short roster.</p>
               
               <p className="text-xl md:text-2xl font-semibold mb-6">Amateur Hour</p>
