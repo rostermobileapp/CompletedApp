@@ -87,7 +87,20 @@ export default function Landing() {
             </div>
           </div>
           
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <button 
+              onClick={() => window.location.href = '/api/login'}
+              className="group bg-primary text-primary-foreground rounded-full py-4 px-10 font-semibold text-lg hover:bg-primary/90 transition-all hover:scale-105 flex items-center gap-2"
+              data-testid="button-get-started"
+            >
+              Download Roster
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
+          <p className="text-sm text-muted-foreground mt-6" data-testid="text-pricing-info">
+            Enough chaos—play hockey.
+          </p>
+        </div>
       </section>
       {/* Highlights Bar */}
       <section className="py-16 px-6 border-y border-border/50 bg-card/30">
