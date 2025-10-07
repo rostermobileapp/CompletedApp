@@ -124,7 +124,7 @@ export default function Landing() {
             <h2 className="text-4xl md:text-6xl font-bold mb-4" data-testid="text-features-heading">
               Everything you need.
               <br />
-              <span className="text-muted-foreground">All in one place.</span>
+              <span className="text-[#3c82f4]">All in one place.</span>
             </h2>
           </div>
           
