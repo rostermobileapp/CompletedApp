@@ -89,7 +89,8 @@ export default function Landing() {
               <p className="text-xl md:text-2xl mb-6 font-normal">Group texts, half-baked spreadsheets, email chains...</p>
               
               <p className="mb-1">Roster fixes all of it. One app, built by players, for players.</p>
-              <p>Your schedule, your lineup, your team—organized. Finally.</p>
+              <p className="text-[24px]">Roster fixes all of it.  One app, built by frustrated players, for players.   
+              Your schedule, your lineup, your team—organized. Finally.</p>
             </div>
           </div>
           
