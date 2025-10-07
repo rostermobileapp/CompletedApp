@@ -81,7 +81,7 @@ export default function Landing() {
               autoPlay
               muted
               playsInline
-              className="w-full md:w-1/2 max-w-md rounded-lg shadow-2xl"
+              className="w-full md:w-1/2 max-w-[336px] rounded-lg shadow-2xl"
               data-testid="video-hero"
             />
             <div 
