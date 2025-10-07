@@ -1,6 +1,7 @@
 import { Users, Calendar, Trophy, MessageCircle, ArrowRight, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import logoWhite from '@assets/Roster Logo White_1759233840726.png';
+import heroVideo from '@assets/out (online-video-cutter.com)_1759852289677.mp4';
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
@@ -73,18 +74,30 @@ export default function Landing() {
             className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed font-medium"
             data-testid="text-hero-subtitle"
           >Make Beer League Great Again</p>
-          <div 
-            className="text-base md:text-lg mb-12 max-w-3xl mx-auto leading-relaxed text-[#ffffff]"
-            data-testid="text-hero-body"
-          >
-            <p className="mb-1">Beer league hockey shouldn't feel like herding cats.</p>
-            <p className="mb-6">A league of grown men relying on group emails and spreadsheets leads to a short roster.</p>
-            
-            <p className="text-xl md:text-2xl font-semibold mb-6">Amateur Hour</p>
-            
-            <p className="mb-1">Roster fixes all of it. One app, built by players, for players.</p>
-            <p>Your schedule, your lineup, your team—organized. Finally.</p>
+          
+          <div className="flex flex-col md:flex-row gap-8 items-center justify-center mb-12">
+            <video 
+              src={heroVideo}
+              autoPlay
+              muted
+              playsInline
+              className="w-full md:w-1/2 max-w-md rounded-lg shadow-2xl"
+              data-testid="video-hero"
+            />
+            <div 
+              className="text-base md:text-lg leading-relaxed text-[#ffffff] md:w-1/2 max-w-md"
+              data-testid="text-hero-body"
+            >
+              <p className="mb-1">Beer league hockey shouldn't feel like herding cats.</p>
+              <p className="mb-6">A league of grown men relying on group emails and spreadsheets leads to a short roster.</p>
+              
+              <p className="text-xl md:text-2xl font-semibold mb-6">Amateur Hour</p>
+              
+              <p className="mb-1">Roster fixes all of it. One app, built by players, for players.</p>
+              <p>Your schedule, your lineup, your team—organized. Finally.</p>
+            </div>
           </div>
+          
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <button 
               onClick={() => window.location.href = '/api/login'}
