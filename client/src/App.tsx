@@ -35,6 +35,7 @@ import ScoreVerification from "@/pages/ScoreVerification";
 import FacilityBrowse from "@/pages/FacilityBrowse";
 import FacilityDetail from "@/pages/FacilityDetail";
 import FacilityMemberships from "@/pages/FacilityMemberships";
+import CreateCalendarEvent from "@/pages/CreateCalendarEvent";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -93,6 +94,7 @@ function Router() {
             <Route path="/facilities" component={FacilityBrowse} />
             <Route path="/facilities/:id" component={FacilityDetail} />
             <Route path="/facility-memberships" component={FacilityMemberships} />
+            <Route path="/calendar-events/create" component={CreateCalendarEvent} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>
