@@ -37,6 +37,7 @@ Key features include:
 - **Team Captain Announcements**: Extends the announcement system to allow team captains to post team-specific announcements with visibility controls.
 - **CSV Import System**: Bulk import functionality for players and schedules with flexible column header matching, automatic team creation, and detailed error reporting.
 - **Bulk Delete Operations**: Commissioner-only feature for deleting all players, teams, or games in a league with confirmation dialogs to prevent accidental data loss.
+- **Facility Linking**: Commissioners can link leagues to facilities within the league management edit screen. Replaced the legacy "League Address" field with a facility selector dropdown that allows selecting existing facilities or creating new ones inline through a modal form.
 
 # External Dependencies
 
