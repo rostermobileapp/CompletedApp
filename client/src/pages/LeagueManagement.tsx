@@ -1232,35 +1232,11 @@ export default function LeagueManagement() {
     }
   };
 
-  const createTeamLogoUploadComplete = (teamId: string) => async (files: File[]) => {
-    if (files.length === 0) return;
-    
-    try {
-      // Get upload parameters for this file
-      const uploadParams = await handleGetTeamLogoUploadParameters();
-      const file = files[0]; // Only handle the first file since maxNumberOfFiles is 1
-      
-      // Upload the file to object storage using the pre-signed URL
-      const uploadResponse = await fetch(uploadParams.url, {
-        method: uploadParams.method,
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-      });
-      
-      if (!uploadResponse.ok) {
-        throw new Error(`Upload failed with status: ${uploadResponse.status}`);
-      }
-      
-      // Extract the public URL from the upload URL (remove query parameters)
-      const logoUrl = uploadParams.url.split('?')[0];
-      
-      // Update the team logo in the database
+  const createTeamLogoUploadComplete = (teamId: string) => (result: { successful?: Array<{ uploadURL: string }>; failed?: Array<any> }) => {
+    if (result.successful && result.successful.length > 0) {
+      const logoUrl = result.successful[0].uploadURL;
       updateTeamLogoMutation.mutate({ teamId, logoUrl });
-      
-    } catch (error) {
-      console.error('Upload failed:', error);
+    } else if (result.failed && result.failed.length > 0) {
       toast({
         title: "Error",
         description: "Failed to upload team logo. Please try again.",

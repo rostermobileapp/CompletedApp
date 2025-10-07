@@ -1263,7 +1263,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only team captains and commissioners can update team logos" });
       }
 
-      const updatedTeam = await storage.updateTeamLogo(teamId, logoUrl);
+      // Normalize the logo URL to use a relative path that can be served through the backend
+      const { ObjectStorageService } = await import('./objectStorage');
+      const objectStorageService = new ObjectStorageService();
+      const normalizedLogoUrl = objectStorageService.normalizeTeamLogoPath(logoUrl);
+
+      const updatedTeam = await storage.updateTeamLogo(teamId, normalizedLogoUrl);
       res.json(updatedTeam);
     } catch (error) {
       console.error("Error updating team logo:", error);
