@@ -44,6 +44,11 @@ import {
   feedbackSubmissions,
   paymentRequests,
   paymentRequestRecipients,
+  // Facility tables
+  facilities,
+  facilityMemberships,
+  calendarEvents,
+  eventParticipants,
   type User,
   type UpsertUser,
   type League,
@@ -121,6 +126,15 @@ import {
   type InsertPaymentRequest,
   type PaymentRequestRecipient,
   type InsertPaymentRequestRecipient,
+  // Facility types
+  type Facility,
+  type InsertFacility,
+  type FacilityMembership,
+  type InsertFacilityMembership,
+  type CalendarEvent,
+  type InsertCalendarEvent,
+  type EventParticipant,
+  type InsertEventParticipant,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, not } from "drizzle-orm";
@@ -348,6 +362,38 @@ export interface IStorage {
   
   // User payment methods
   updateUserPaymentMethods(userId: string, paymentMethods: { venmoUsername?: string; cashappUsername?: string }): Promise<User>;
+  
+  // Facility operations
+  createFacility(facility: InsertFacility): Promise<Facility>;
+  getFacility(id: string): Promise<Facility | undefined>;
+  getAllFacilities(options?: { sport?: string; city?: string; state?: string }): Promise<Facility[]>;
+  updateFacility(id: string, updates: Partial<InsertFacility>): Promise<Facility>;
+  deleteFacility(id: string): Promise<void>;
+  
+  // Facility membership operations
+  createFacilityMembership(membership: InsertFacilityMembership): Promise<FacilityMembership>;
+  getFacilityMembership(id: string): Promise<FacilityMembership | undefined>;
+  getUserFacilityMembership(userId: string, facilityId: string): Promise<FacilityMembership | undefined>;
+  getUserFacilityMemberships(userId: string): Promise<(FacilityMembership & { facility: Facility })[]>;
+  getFacilityMembers(facilityId: string): Promise<(FacilityMembership & { user: User })[]>;
+  updateFacilityMembership(id: string, updates: Partial<InsertFacilityMembership>): Promise<FacilityMembership>;
+  deleteFacilityMembership(id: string): Promise<void>;
+  checkUserActiveFacilityMembership(userId: string, facilityId: string): Promise<boolean>;
+  
+  // Calendar event operations
+  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
+  getCalendarEvent(id: string): Promise<(CalendarEvent & { facility: Facility; creator: User }) | undefined>;
+  getFacilityCalendarEvents(facilityId: string, options?: { sportId?: string; startDate?: Date; endDate?: Date }): Promise<(CalendarEvent & { creator: User; participantsCount: number })[]>;
+  updateCalendarEvent(id: string, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
+  deleteCalendarEvent(id: string): Promise<void>;
+  
+  // Event participant operations
+  createEventParticipant(participant: InsertEventParticipant): Promise<EventParticipant>;
+  getEventParticipants(eventId: string): Promise<(EventParticipant & { user: User; facilityMembership: FacilityMembership })[]>;
+  getUserEventParticipation(userId: string, eventId: string): Promise<EventParticipant | undefined>;
+  updateEventParticipant(id: string, updates: Partial<InsertEventParticipant>): Promise<EventParticipant>;
+  deleteEventParticipant(id: string): Promise<void>;
+  checkInEventParticipant(id: string): Promise<EventParticipant>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5631,6 +5677,303 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user;
+  }
+
+  // Facility operations
+  async createFacility(facilityData: InsertFacility): Promise<Facility> {
+    const [facility] = await db
+      .insert(facilities)
+      .values(facilityData)
+      .returning();
+    return facility;
+  }
+
+  async getFacility(id: string): Promise<Facility | undefined> {
+    const [facility] = await db
+      .select()
+      .from(facilities)
+      .where(eq(facilities.id, id));
+    return facility;
+  }
+
+  async getAllFacilities(options?: { sport?: string; city?: string; state?: string }): Promise<Facility[]> {
+    const conditions = [];
+    if (options?.sport) {
+      conditions.push(sql`${facilities.sports} @> ARRAY[${options.sport}]::sport[]`);
+    }
+    if (options?.city) {
+      conditions.push(ilike(facilities.city, `%${options.city}%`));
+    }
+    if (options?.state) {
+      conditions.push(eq(facilities.state, options.state));
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(facilities).where(and(...conditions));
+    }
+    
+    return await db.select().from(facilities);
+  }
+
+  async updateFacility(id: string, updates: Partial<InsertFacility>): Promise<Facility> {
+    const [facility] = await db
+      .update(facilities)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(facilities.id, id))
+      .returning();
+    return facility;
+  }
+
+  async deleteFacility(id: string): Promise<void> {
+    await db.delete(facilities).where(eq(facilities.id, id));
+  }
+
+  // Facility membership operations
+  async createFacilityMembership(membershipData: InsertFacilityMembership): Promise<FacilityMembership> {
+    const [membership] = await db
+      .insert(facilityMemberships)
+      .values(membershipData)
+      .returning();
+    return membership;
+  }
+
+  async getFacilityMembership(id: string): Promise<FacilityMembership | undefined> {
+    const [membership] = await db
+      .select()
+      .from(facilityMemberships)
+      .where(eq(facilityMemberships.id, id));
+    return membership;
+  }
+
+  async getUserFacilityMembership(userId: string, facilityId: string): Promise<FacilityMembership | undefined> {
+    const [membership] = await db
+      .select()
+      .from(facilityMemberships)
+      .where(
+        and(
+          eq(facilityMemberships.userId, userId),
+          eq(facilityMemberships.facilityId, facilityId)
+        )
+      );
+    return membership;
+  }
+
+  async getUserFacilityMemberships(userId: string): Promise<(FacilityMembership & { facility: Facility })[]> {
+    const memberships = await db
+      .select()
+      .from(facilityMemberships)
+      .innerJoin(facilities, eq(facilityMemberships.facilityId, facilities.id))
+      .where(eq(facilityMemberships.userId, userId));
+    
+    return memberships.map(m => ({
+      ...m.facility_memberships,
+      facility: m.facilities,
+    }));
+  }
+
+  async getFacilityMembers(facilityId: string): Promise<(FacilityMembership & { user: User })[]> {
+    const members = await db
+      .select()
+      .from(facilityMemberships)
+      .innerJoin(users, eq(facilityMemberships.userId, users.id))
+      .where(eq(facilityMemberships.facilityId, facilityId));
+    
+    return members.map(m => ({
+      ...m.facility_memberships,
+      user: m.users,
+    }));
+  }
+
+  async updateFacilityMembership(id: string, updates: Partial<InsertFacilityMembership>): Promise<FacilityMembership> {
+    const [membership] = await db
+      .update(facilityMemberships)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(facilityMemberships.id, id))
+      .returning();
+    return membership;
+  }
+
+  async deleteFacilityMembership(id: string): Promise<void> {
+    await db.delete(facilityMemberships).where(eq(facilityMemberships.id, id));
+  }
+
+  async checkUserActiveFacilityMembership(userId: string, facilityId: string): Promise<boolean> {
+    const [membership] = await db
+      .select()
+      .from(facilityMemberships)
+      .where(
+        and(
+          eq(facilityMemberships.userId, userId),
+          eq(facilityMemberships.facilityId, facilityId),
+          eq(facilityMemberships.status, 'active')
+        )
+      );
+    return !!membership;
+  }
+
+  // Calendar event operations
+  async createCalendarEvent(eventData: InsertCalendarEvent): Promise<CalendarEvent> {
+    const [event] = await db
+      .insert(calendarEvents)
+      .values(eventData)
+      .returning();
+    return event;
+  }
+
+  async getCalendarEvent(id: string): Promise<(CalendarEvent & { facility: Facility; creator: User }) | undefined> {
+    const [result] = await db
+      .select()
+      .from(calendarEvents)
+      .innerJoin(facilities, eq(calendarEvents.facilityId, facilities.id))
+      .innerJoin(users, eq(calendarEvents.createdBy, users.id))
+      .where(eq(calendarEvents.id, id));
+    
+    if (!result) return undefined;
+    
+    return {
+      ...result.calendar_events,
+      facility: result.facilities,
+      creator: result.users,
+    };
+  }
+
+  async getFacilityCalendarEvents(
+    facilityId: string, 
+    options?: { sportId?: string; startDate?: Date; endDate?: Date }
+  ): Promise<(CalendarEvent & { creator: User; participantsCount: number })[]> {
+    const conditions = [eq(calendarEvents.facilityId, facilityId)];
+    
+    if (options?.sportId) {
+      conditions.push(sql`${calendarEvents.sportId}::text = ${options.sportId}`);
+    }
+    if (options?.startDate) {
+      conditions.push(gte(calendarEvents.startTime, options.startDate));
+    }
+    if (options?.endDate) {
+      conditions.push(lte(calendarEvents.endTime, options.endDate));
+    }
+    
+    const results = await db
+      .select({
+        event: calendarEvents,
+        creator: users,
+        participantsCount: sql<number>`CAST(COUNT(${eventParticipants.id}) AS INTEGER)`,
+      })
+      .from(calendarEvents)
+      .innerJoin(users, eq(calendarEvents.createdBy, users.id))
+      .leftJoin(eventParticipants, eq(calendarEvents.id, eventParticipants.eventId))
+      .where(and(...conditions))
+      .groupBy(calendarEvents.id, users.id)
+      .orderBy(asc(calendarEvents.startTime));
+    
+    return results.map(r => ({
+      ...r.event,
+      creator: r.creator,
+      participantsCount: r.participantsCount,
+    }));
+  }
+
+  async updateCalendarEvent(id: string, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent> {
+    const [event] = await db
+      .update(calendarEvents)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(calendarEvents.id, id))
+      .returning();
+    return event;
+  }
+
+  async deleteCalendarEvent(id: string): Promise<void> {
+    await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
+  }
+
+  // Event participant operations
+  async createEventParticipant(participantData: InsertEventParticipant): Promise<EventParticipant> {
+    const [participant] = await db
+      .insert(eventParticipants)
+      .values(participantData)
+      .returning();
+    
+    await db
+      .update(calendarEvents)
+      .set({
+        currentParticipantsCount: sql`${calendarEvents.currentParticipantsCount} + 1`,
+      })
+      .where(eq(calendarEvents.id, participantData.eventId));
+    
+    return participant;
+  }
+
+  async getEventParticipants(eventId: string): Promise<(EventParticipant & { user: User; facilityMembership: FacilityMembership })[]> {
+    const participants = await db
+      .select()
+      .from(eventParticipants)
+      .innerJoin(users, eq(eventParticipants.userId, users.id))
+      .innerJoin(facilityMemberships, eq(eventParticipants.facilityMembershipId, facilityMemberships.id))
+      .where(eq(eventParticipants.eventId, eventId));
+    
+    return participants.map(p => ({
+      ...p.event_participants,
+      user: p.users,
+      facilityMembership: p.facility_memberships,
+    }));
+  }
+
+  async getUserEventParticipation(userId: string, eventId: string): Promise<EventParticipant | undefined> {
+    const [participant] = await db
+      .select()
+      .from(eventParticipants)
+      .where(
+        and(
+          eq(eventParticipants.userId, userId),
+          eq(eventParticipants.eventId, eventId)
+        )
+      );
+    return participant;
+  }
+
+  async updateEventParticipant(id: string, updates: Partial<InsertEventParticipant>): Promise<EventParticipant> {
+    const [participant] = await db
+      .update(eventParticipants)
+      .set(updates)
+      .where(eq(eventParticipants.id, id))
+      .returning();
+    return participant;
+  }
+
+  async deleteEventParticipant(id: string): Promise<void> {
+    const [participant] = await db
+      .select()
+      .from(eventParticipants)
+      .where(eq(eventParticipants.id, id));
+    
+    if (participant) {
+      await db.delete(eventParticipants).where(eq(eventParticipants.id, id));
+      
+      await db
+        .update(calendarEvents)
+        .set({
+          currentParticipantsCount: sql`${calendarEvents.currentParticipantsCount} - 1`,
+        })
+        .where(eq(calendarEvents.id, participant.eventId));
+    }
+  }
+
+  async checkInEventParticipant(id: string): Promise<EventParticipant> {
+    const [participant] = await db
+      .update(eventParticipants)
+      .set({ checkedIn: true })
+      .where(eq(eventParticipants.id, id))
+      .returning();
+    return participant;
   }
 }
 
