@@ -609,6 +609,121 @@ export const scrimmageRequests = pgTable("scrimmage_requests", {
   unique("unique_scrimmage_player_request").on(table.scrimmageId, table.playerId),
 ]);
 
+// Facility membership status enum
+export const facilityMembershipStatusEnum = pgEnum("facility_membership_status", [
+  "active",
+  "expired",
+  "suspended"
+]);
+
+// Calendar event type enum
+export const calendarEventTypeEnum = pgEnum("calendar_event_type", [
+  "league_game",
+  "scrimmage",
+  "tournament",
+  "open_play"
+]);
+
+// Calendar event visibility enum
+export const eventVisibilityEnum = pgEnum("event_visibility", [
+  "public",
+  "members_only",
+  "participants_only"
+]);
+
+// Event RSVP status enum
+export const eventRsvpStatusEnum = pgEnum("event_rsvp_status", [
+  "joined",
+  "maybe",
+  "declined"
+]);
+
+// Facilities table
+export const facilities = pgTable("facilities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  address: text("address"),
+  city: varchar("city"),
+  state: varchar("state"),
+  zipCode: varchar("zip_code"),
+  phoneNumber: varchar("phone_number"),
+  email: varchar("email"),
+  website: varchar("website"),
+  imageUrl: varchar("image_url"),
+  sports: sportEnum("sports").array(), // Array of sports offered
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_facilities_city").on(table.city),
+  index("idx_facilities_state").on(table.state),
+]);
+
+// Facility memberships table
+export const facilityMemberships = pgTable("facility_memberships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  facilityId: varchar("facility_id").references(() => facilities.id).notNull(),
+  membershipType: varchar("membership_type").default("basic").notNull(), // basic, premium, etc.
+  status: facilityMembershipStatusEnum("status").default("active").notNull(),
+  startDate: timestamp("start_date").defaultNow().notNull(),
+  endDate: timestamp("end_date"), // Nullable for ongoing memberships
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_user_facility_membership").on(table.userId, table.facilityId),
+  index("idx_facility_memberships_user").on(table.userId),
+  index("idx_facility_memberships_facility").on(table.facilityId),
+  index("idx_facility_memberships_status").on(table.status),
+]);
+
+// Calendar events table
+export const calendarEvents = pgTable("calendar_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  facilityId: varchar("facility_id").references(() => facilities.id).notNull(),
+  sportId: sportEnum("sport_id").notNull(),
+  eventType: calendarEventTypeEnum("event_type").notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  locationDetail: varchar("location_detail"), // e.g., "Court 1", "Field 2"
+  maxParticipants: integer("max_participants"),
+  currentParticipantsCount: integer("current_participants_count").default(0).notNull(),
+  requiresMembership: boolean("requires_membership").default(true).notNull(),
+  requiresTeamRoster: boolean("requires_team_roster").default(false).notNull(),
+  visibility: eventVisibilityEnum("visibility").default("public").notNull(),
+  costPerParticipant: decimal("cost_per_participant", { precision: 10, scale: 2 }),
+  // Link to existing entities
+  leagueId: varchar("league_id").references(() => leagues.id), // For league games
+  gameId: varchar("game_id").references(() => games.id), // For league games
+  scrimmageId: varchar("scrimmage_id").references(() => scrimmages.id), // For scrimmages
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_calendar_events_facility").on(table.facilityId),
+  index("idx_calendar_events_sport").on(table.sportId),
+  index("idx_calendar_events_start_time").on(table.startTime),
+  index("idx_calendar_events_event_type").on(table.eventType),
+]);
+
+// Event participants table
+export const eventParticipants = pgTable("event_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => calendarEvents.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  facilityMembershipId: varchar("facility_membership_id").references(() => facilityMemberships.id).notNull(),
+  rsvpStatus: eventRsvpStatusEnum("rsvp_status").default("joined").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  checkedIn: boolean("checked_in").default(false).notNull(),
+}, (table) => [
+  unique("unique_event_user_participant").on(table.eventId, table.userId),
+  index("idx_event_participants_event").on(table.eventId),
+  index("idx_event_participants_user").on(table.userId),
+  index("idx_event_participants_membership").on(table.facilityMembershipId),
+]);
+
 // Payment requests table
 export const paymentRequests = pgTable("payment_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1155,6 +1270,7 @@ export const scrimmagesRelations = relations(scrimmages, ({ one, many }) => ({
     references: [announcements.id],
   }),
   requests: many(scrimmageRequests),
+  calendarEvents: many(calendarEvents),
 }));
 
 export const scrimmageRequestsRelations = relations(scrimmageRequests, ({ one }) => ({
@@ -1165,6 +1281,63 @@ export const scrimmageRequestsRelations = relations(scrimmageRequests, ({ one })
   player: one(users, {
     fields: [scrimmageRequests.playerId],
     references: [users.id],
+  }),
+}));
+
+// Facility relations
+export const facilitiesRelations = relations(facilities, ({ many }) => ({
+  memberships: many(facilityMemberships),
+  calendarEvents: many(calendarEvents),
+}));
+
+export const facilityMembershipsRelations = relations(facilityMemberships, ({ one, many }) => ({
+  user: one(users, {
+    fields: [facilityMemberships.userId],
+    references: [users.id],
+  }),
+  facility: one(facilities, {
+    fields: [facilityMemberships.facilityId],
+    references: [facilities.id],
+  }),
+  eventParticipations: many(eventParticipants),
+}));
+
+export const calendarEventsRelations = relations(calendarEvents, ({ one, many }) => ({
+  facility: one(facilities, {
+    fields: [calendarEvents.facilityId],
+    references: [facilities.id],
+  }),
+  league: one(leagues, {
+    fields: [calendarEvents.leagueId],
+    references: [leagues.id],
+  }),
+  game: one(games, {
+    fields: [calendarEvents.gameId],
+    references: [games.id],
+  }),
+  scrimmage: one(scrimmages, {
+    fields: [calendarEvents.scrimmageId],
+    references: [scrimmages.id],
+  }),
+  creator: one(users, {
+    fields: [calendarEvents.createdBy],
+    references: [users.id],
+  }),
+  participants: many(eventParticipants),
+}));
+
+export const eventParticipantsRelations = relations(eventParticipants, ({ one }) => ({
+  event: one(calendarEvents, {
+    fields: [eventParticipants.eventId],
+    references: [calendarEvents.id],
+  }),
+  user: one(users, {
+    fields: [eventParticipants.userId],
+    references: [users.id],
+  }),
+  facilityMembership: one(facilityMemberships, {
+    fields: [eventParticipants.facilityMembershipId],
+    references: [facilityMemberships.id],
   }),
 }));
 
@@ -1775,6 +1948,85 @@ export const createFeedbackSubmissionSchema = z.object({
   message: z.string().min(1, "Message is required").max(5000, "Message is too long"),
 });
 
+// Facility schemas
+export const insertFacilitySchema = createInsertSchema(facilities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createFacilityRequestSchema = createInsertSchema(facilities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateFacilityRequestSchema = createInsertSchema(facilities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).partial();
+
+export const insertFacilityMembershipSchema = createInsertSchema(facilityMemberships).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createFacilityMembershipRequestSchema = createInsertSchema(facilityMemberships).omit({
+  id: true,
+  userId: true,     // Server-controlled
+  startDate: true,  // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
+  id: true,
+  currentParticipantsCount: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  startTime: z.string().transform((val) => new Date(val)),
+  endTime: z.string().transform((val) => new Date(val)),
+});
+
+export const createCalendarEventRequestSchema = createInsertSchema(calendarEvents).omit({
+  id: true,
+  currentParticipantsCount: true,
+  createdBy: true,  // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  startTime: z.string().transform((val) => new Date(val)),
+  endTime: z.string().transform((val) => new Date(val)),
+});
+
+export const updateCalendarEventRequestSchema = createInsertSchema(calendarEvents).omit({
+  id: true,
+  facilityId: true, // Cannot change facility
+  currentParticipantsCount: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+}).partial().extend({
+  startTime: z.string().transform((val) => new Date(val)).optional(),
+  endTime: z.string().transform((val) => new Date(val)).optional(),
+});
+
+export const insertEventParticipantSchema = createInsertSchema(eventParticipants).omit({
+  id: true,
+  joinedAt: true,
+});
+
+export const createEventParticipantRequestSchema = createInsertSchema(eventParticipants).omit({
+  id: true,
+  eventId: true,            // Server-controlled
+  userId: true,             // Server-controlled
+  facilityMembershipId: true, // Server-controlled
+  joinedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1936,3 +2188,34 @@ export type UserTeam = Team;
 export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
 export type InsertFeedbackSubmission = z.infer<typeof insertFeedbackSubmissionSchema>;
 export type CreateFeedbackSubmissionRequest = z.infer<typeof createFeedbackSubmissionSchema>;
+
+// Facility types
+export type Facility = typeof facilities.$inferSelect;
+export type InsertFacility = z.infer<typeof insertFacilitySchema>;
+export type CreateFacilityRequest = z.infer<typeof createFacilityRequestSchema>;
+export type UpdateFacilityRequest = z.infer<typeof updateFacilityRequestSchema>;
+export type FacilityMembership = typeof facilityMemberships.$inferSelect;
+export type InsertFacilityMembership = z.infer<typeof insertFacilityMembershipSchema>;
+export type CreateFacilityMembershipRequest = z.infer<typeof createFacilityMembershipRequestSchema>;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
+export type CreateCalendarEventRequest = z.infer<typeof createCalendarEventRequestSchema>;
+export type UpdateCalendarEventRequest = z.infer<typeof updateCalendarEventRequestSchema>;
+export type EventParticipant = typeof eventParticipants.$inferSelect;
+export type InsertEventParticipant = z.infer<typeof insertEventParticipantSchema>;
+export type CreateEventParticipantRequest = z.infer<typeof createEventParticipantRequestSchema>;
+
+// Extended facility types with relationships
+export type FacilityWithMemberships = Facility & {
+  memberships: (FacilityMembership & { user: User })[];
+};
+
+export type CalendarEventWithDetails = CalendarEvent & {
+  facility: Facility;
+  creator: User;
+  participants: (EventParticipant & { user: User })[];
+};
+
+export type EventParticipantWithUser = EventParticipant & {
+  user: User;
+};
