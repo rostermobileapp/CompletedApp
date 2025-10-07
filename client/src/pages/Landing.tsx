@@ -46,13 +46,6 @@ export default function Landing() {
             className="h-8"
             data-testid="logo-image"
           />
-          <button 
-            onClick={() => window.location.href = '/api/login'}
-            className="text-sm font-medium hover:text-primary transition-colors"
-            data-testid="button-sign-in"
-          >
-            Sign In
-          </button>
         </div>
       </header>
       {/* Hero Section */}
