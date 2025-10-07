@@ -80,7 +80,7 @@ export default function Landing() {
               data-testid="video-hero"
             />
             <div 
-              className="text-base md:text-lg leading-relaxed text-[#ffffff] md:w-1/2 max-w-md"
+              className="text-base md:text-lg leading-relaxed text-[#ffffff] md:w-1/2 max-w-md md:mt-16"
               data-testid="text-hero-body"
             >
               <p className="mb-1 text-[24px] pt-[20px] pb-[20px]">Every rec league team falls apart the exact same way.</p>
