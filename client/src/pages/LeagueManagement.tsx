@@ -645,9 +645,17 @@ export default function LeagueManagement() {
   });
 
   // Get league ID and edit mode from URL params
-  const leagueId = new URLSearchParams(window.location.search).get('leagueId') || '';
-  const editMode = new URLSearchParams(window.location.search).get('edit') === 'true';
-  const editMemberId = new URLSearchParams(window.location.search).get('editMember') || '';
+  // Use location from wouter to make this reactive to URL changes
+  const [locationPath] = useLocation();
+  
+  // Parse query params reactively based on location changes
+  const searchParams = React.useMemo(() => {
+    return new URLSearchParams(window.location.search);
+  }, [locationPath]);
+  
+  const leagueId = searchParams.get('leagueId') || '';
+  const editMode = searchParams.get('edit') === 'true';
+  const editMemberId = searchParams.get('editMember') || '';
   
   // Fetch current user for commissioner checks
   const { user } = useAuth();
@@ -1478,6 +1486,11 @@ export default function LeagueManagement() {
         // Auto-approve the membership since they're commissioner/captain
         const approveResponse = await apiRequest('POST', `/api/league-memberships/${newMembership.id}/approve`, {});
         currentMembership = await approveResponse.json();
+      }
+      
+      // Ensure we have a membership before proceeding
+      if (!currentMembership) {
+        throw new Error('Failed to get or create league membership');
       }
       
       // Now assign them to the team
