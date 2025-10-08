@@ -492,24 +492,24 @@ function PollCard({
   isPending: boolean;
 }) {
   return (
-    <Card className="bg-[#212121]">
-      <CardHeader className="flex flex-col space-y-1.5 p-6 pb-3 bg-[#212121]">
+    <Card className="bg-muted/30 border-muted/40 shadow-sm">
+      <CardHeader className="flex flex-col space-y-2 p-5 pb-4">
         <div className="flex items-center justify-between">
-          <h4 className="font-semibold flex items-center gap-2 text-blue-800 dark:text-blue-200">
-            <BarChart3 className="w-5 h-5" />
+          <h4 className="text-base font-medium flex items-center gap-2.5 text-foreground/90">
+            <BarChart3 className="w-4 h-4 text-primary/70" />
             {poll.question}
           </h4>
           <div className="flex items-center gap-2">
             {!poll.allowMultiple && (
-              <Badge variant="outline" className="text-xs">Single Choice</Badge>
+              <Badge variant="outline" className="text-xs border-muted-foreground/20 bg-muted/40 text-muted-foreground">Single Choice</Badge>
             )}
             {poll.allowMultiple && (
-              <Badge variant="outline" className="text-xs">Multiple Choice</Badge>
+              <Badge variant="outline" className="text-xs border-muted-foreground/20 bg-muted/40 text-muted-foreground">Multiple Choice</Badge>
             )}
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-6 pt-0 space-y-3 bg-[#212121]">
+      <CardContent className="p-5 pt-0 space-y-2.5">
         {poll.options.map((option, index) => {
           const votes = poll.votes.filter(v => v.optionIndex === index).length;
           const totalVotes = poll.votes.length;
@@ -522,39 +522,39 @@ function PollCard({
           return (
             <div key={index} className="relative">
               <Button
-                variant={userVoted ? "default" : "outline"}
-                className={`w-full justify-between h-auto p-4 relative overflow-hidden transition-all duration-200 ${
+                variant={userVoted ? "default" : "ghost"}
+                className={`w-full justify-between h-auto py-3.5 px-4 relative overflow-hidden transition-all duration-300 rounded-xl ${
                   userVoted 
-                    ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20' 
-                    : 'hover:bg-muted/50 border-dashed'
-                } ${isTopChoice && totalVotes > 0 ? 'ring-2 ring-green-400/30' : ''}`}
+                    ? 'bg-primary/15 text-foreground hover:bg-primary/20 border border-primary/25' 
+                    : 'hover:bg-muted/60 bg-muted/20 border border-transparent'
+                }`}
                 onClick={() => onVote(poll.id, index, poll.allowMultiple)}
                 disabled={isPending}
                 data-testid={`button-poll-option-${index}`}
               >
                 <div 
-                  className="absolute inset-0 transition-all duration-500 from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 bg-[#3883f6]"
-                  style={{ width: `${Math.max(percentage, 8)}%` }}
+                  className="absolute inset-0 transition-all duration-500 bg-primary/10 rounded-xl"
+                  style={{ width: `${Math.max(percentage, 0)}%` }}
                 />
                 
-                <div className="relative flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
+                <div className="relative flex items-center justify-between w-full gap-3">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
                     {userVoted && (
-                      <div className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
                     )}
-                    <span className="font-medium text-left">{option}</span>
+                    <span className="font-normal text-sm text-left truncate">{option}</span>
                     {isTopChoice && totalVotes > 0 && (
-                      <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full font-medium flex-shrink-0">
                         Leading
                       </span>
                     )}
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold">
-                      {percentage.toFixed(1)}%
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-sm font-semibold text-foreground/90">
+                      {percentage.toFixed(0)}%
                     </div>
-                    <div className="text-xs opacity-75">
-                      {votes} vote{votes !== 1 ? 's' : ''}
+                    <div className="text-[10px] text-muted-foreground">
+                      {votes} {votes !== 1 ? 'votes' : 'vote'}
                     </div>
                   </div>
                 </div>
@@ -563,15 +563,15 @@ function PollCard({
           );
         })}
         
-        <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground border-t">
+        <div className="flex items-center justify-between pt-3 text-xs text-muted-foreground border-t border-muted/30">
           <div className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
+            <Users className="w-3.5 h-3.5" />
             <span>{poll.votes.length} total votes</span>
           </div>
           {isPending && (
-            <div className="flex items-center gap-2 text-blue-600">
+            <div className="flex items-center gap-2 text-primary/80">
               <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs">Recording vote...</span>
+              <span className="text-[10px]">Recording vote...</span>
             </div>
           )}
         </div>
