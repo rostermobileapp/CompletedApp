@@ -540,6 +540,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual subscription sync utility - for fixing users with subscriptions in Stripe but not synced to app
+  app.post('/api/stripe/sync-subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.stripeCustomerId) {
+        return res.status(400).json({ message: 'User does not have a Stripe customer ID' });
+      }
+
+      // Map Stripe price IDs to user roles
+      const PRICE_TO_ROLE: Record<string, 'player_pro' | 'commissioner'> = {
+        [process.env.STRIPE_PRICE_PLAYER_PRO_MONTHLY || '']: 'player_pro',
+        [process.env.STRIPE_PRICE_COMMISSIONER_MONTHLY || '']: 'commissioner',
+        [process.env.STRIPE_PRICE_PLAYER_PRO_YEARLY || '']: 'player_pro',
+        [process.env.STRIPE_PRICE_COMMISSIONER_YEARLY || '']: 'commissioner',
+      };
+
+      // Get all subscriptions for this customer from Stripe
+      const subscriptions = await stripe.subscriptions.list({
+        customer: user.stripeCustomerId,
+        status: 'active',
+        limit: 1,
+      });
+
+      if (subscriptions.data.length === 0) {
+        return res.status(404).json({ message: 'No active subscription found in Stripe' });
+      }
+
+      const subscription = subscriptions.data[0];
+      const priceId = subscription.items.data[0]?.price?.id;
+      const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
+
+      if (!tier) {
+        console.warn('[Sync] Unknown price ID:', priceId);
+        return res.status(400).json({ 
+          message: 'Unknown subscription price ID', 
+          priceId,
+          subscriptionId: subscription.id 
+        });
+      }
+
+      // Update user's subscription info and role
+      await storage.updateUserStripeInfo(userId, user.stripeCustomerId, subscription.id);
+      await storage.updateUserRole(userId, tier);
+
+      console.log('[Sync] Successfully synced subscription for user:', userId, 'to tier:', tier);
+      
+      res.json({ 
+        message: 'Subscription synced successfully', 
+        tier,
+        subscriptionId: subscription.id 
+      });
+    } catch (error: any) {
+      console.error('[Sync] Error syncing subscription:', error);
+      res.status(500).json({ message: 'Failed to sync subscription', error: error.message });
+    }
+  });
+
   // Object storage routes for profile images  
   app.post("/api/profile-images/upload", isAuthenticated, async (req: any, res) => {
     try {
