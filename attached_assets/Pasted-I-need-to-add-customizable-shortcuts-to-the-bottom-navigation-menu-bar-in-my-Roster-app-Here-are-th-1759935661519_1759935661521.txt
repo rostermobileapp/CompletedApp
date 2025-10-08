@@ -1,0 +1,69 @@
+I need to add customizable shortcuts to the bottom navigation menu bar in my Roster app. Here are the requirements:
+Current State
+
+Bottom menu bar exists with fixed icons
+
+Required Features
+1. Default Configuration
+Set up 4 default shortcuts plus a customization button:
+
+My Team
+Messages
+Home
+Profile
+Plus (+) button for adding a 5th shortcut
+
+2. Available Shortcut Options
+When clicking the plus button, show these options:
+
+Scrimmages - Opens a quick menu with two sub-options:
+
+Schedule Scrimmages
+Manage Scrimmages
+
+
+League Management
+Profile
+Messages
+Schedule
+My Team
+
+3. Customization Features
+
+Clicking the (+) button opens a modal/menu to select from available shortcuts
+User can add ONE additional shortcut (5th position)
+Once a 5th shortcut is added, the (+) button is replaced by that shortcut
+
+4. Drag-to-Reorder Functionality
+
+Long press (click and hold) on any icon to enter "edit mode"
+In edit mode, icons can be dragged to reposition them
+Other icons should automatically rearrange to accommodate the dragged icon
+Visual feedback during dragging (icon follows cursor/touch)
+Save the new order when drag is released
+
+5. Delete Shortcut Option
+
+When a 5th shortcut exists, long press on any icon should show options to:
+
+Reorder (drag to new position)
+Delete (remove the shortcut)
+
+
+Deleting a shortcut brings back the (+) button
+The 4 default shortcuts (My Team, Messages, Home, Profile) cannot be deleted, only reordered
+
+6. Persistence
+
+Save the user's customized menu configuration (selected shortcuts and their order)
+Load saved configuration when app reopens
+Store this in the user's profile/settings
+
+Technical Notes
+
+Maintain mobile-responsive design
+Smooth animations for drag-and-drop and menu transitions
+Clear visual indicators for interactive states (long-press, dragging, delete option, etc.)
+Ensure the Scrimmages quick menu is easily accessible and intuitive
+
+Please implement this feature maintaining the current app's design language and ensuring smooth UX interactions.
