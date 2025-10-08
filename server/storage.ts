@@ -4443,6 +4443,7 @@ export class DatabaseStorage implements IStorage {
         stripeSubscriptionId: null,
         venmoUsername: null,
         cashappUsername: null,
+        navigationPreferences: null,
       }
     }));
   }
@@ -4690,6 +4691,7 @@ export class DatabaseStorage implements IStorage {
             stripeSubscriptionId: null,
             venmoUsername: null,
             cashappUsername: null,
+            navigationPreferences: null,
           }
         });
       }

@@ -138,6 +138,8 @@ export const users = pgTable("users", {
   // Payment method fields for receiving payments
   venmoUsername: varchar("venmo_username"),
   cashappUsername: varchar("cashapp_username"),
+  // Navigation preferences
+  navigationPreferences: jsonb("navigation_preferences"),
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
