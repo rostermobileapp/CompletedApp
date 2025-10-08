@@ -213,22 +213,22 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
   const canClosePoll = message.senderId === currentUserId && poll.status === 'active';
 
   return (
-    <div className="mt-3 p-4 border border-primary/20 rounded-lg bg-primary/5" data-testid={`poll-card-${poll.id}`}>
+    <div className="mt-3 p-5 border border-muted/40 rounded-xl bg-muted/30 shadow-sm" data-testid={`poll-card-${poll.id}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded font-medium">
-            POLL
+          <div className="bg-primary/15 text-foreground text-xs px-2.5 py-1 rounded-md font-medium border border-primary/25">
+            Poll
           </div>
           {poll.status === 'closed' && (
-            <div className="bg-muted text-muted-foreground text-xs px-2 py-1 rounded">
-              CLOSED
+            <div className="bg-muted/60 text-muted-foreground text-xs px-2.5 py-1 rounded-md border border-muted-foreground/20">
+              Closed
             </div>
           )}
         </div>
         {canClosePoll && (
           <button
             onClick={handleClosePoll}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             data-testid="button-close-poll"
           >
             Close Poll
@@ -236,11 +236,11 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
         )}
       </div>
 
-      <h4 className="font-medium text-base mb-4" data-testid="poll-question">
+      <h4 className="font-medium text-base mb-4 text-foreground/90" data-testid="poll-question">
         {poll.question}
       </h4>
 
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {(poll.options as string[]).map((option: string, index: number) => {
           const voteCount = getVoteCount(index);
           const percentage = getVotePercentage(index);
@@ -251,33 +251,36 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
               <button
                 onClick={() => handleVote(index)}
                 disabled={!canVote}
-                className={`w-full p-3 rounded-lg border text-left transition-colors bg-white text-black ${
+                className={`w-full py-3.5 px-4 rounded-xl border text-left transition-all duration-300 ${
                   canVote
-                    ? 'hover:bg-gray-50 border-border'
-                    : 'cursor-default border-border'
+                    ? 'hover:bg-muted/60 border-transparent bg-muted/20'
+                    : 'cursor-default border-transparent bg-muted/20'
                 } ${
                   isUserChoice
-                    ? 'border-primary'
-                    : 'border-border'
+                    ? 'bg-primary/15 hover:bg-primary/20 border-primary/25'
+                    : ''
                 }`}
                 data-testid={`poll-option-${index}`}
               >
                 <div className="flex items-center justify-between relative z-10">
-                  <span className="text-sm font-medium">{option}</span>
+                  <span className="text-sm font-normal text-foreground">{option}</span>
                   {showResults && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {voteCount}
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xs font-semibold text-foreground/90">
+                        {percentage}%
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {voteCount} {voteCount !== 1 ? 'votes' : 'vote'}
                       </span>
                       {isUserChoice && (
-                        <div className="w-2 h-2 bg-primary rounded-full" data-testid="user-vote-indicator" />
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full" data-testid="user-vote-indicator" />
                       )}
                     </div>
                   )}
                 </div>
                 {showResults && percentage > 0 && (
                   <div
-                    className="absolute inset-0 bg-primary/10 rounded-lg transition-all duration-300"
+                    className="absolute inset-0 bg-primary/10 rounded-xl transition-all duration-500"
                     style={{ width: `${percentage}%` }}
                   />
                 )}
@@ -288,9 +291,9 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
       </div>
 
       {showResults && (
-        <div className="mt-3 pt-3 border-t border-border">
+        <div className="mt-3 pt-3 border-t border-muted/30">
           <p className="text-xs text-muted-foreground" data-testid="poll-total-votes">
-            Total votes: {getTotalVotes()}
+            {getTotalVotes()} total votes
           </p>
         </div>
       )}
