@@ -211,7 +211,9 @@ export function BottomNavigation() {
     s => !shortcuts.includes(s.id) && s.id !== 'home' // Home should always be in default set
   );
   
-  const gridCols = shortcuts.length === 5 ? 'grid-cols-5' : 'grid-cols-4';
+  // Use 5 columns if we have 5 shortcuts OR if we're showing the Add button (4 shortcuts + Add = 5 items)
+  const showAddButton = shortcuts.length < 5 && !isEditMode;
+  const gridCols = (shortcuts.length === 5 || showAddButton) ? 'grid-cols-5' : 'grid-cols-4';
   
   return (
     <>
