@@ -1790,18 +1790,34 @@ export default function Messages() {
           <div className="p-6 pt-12">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold" data-testid="text-page-title">Messages</h1>
-              <button 
-                className="text-primary" 
-                data-testid="button-new-message"
-                onClick={() => {
-                  setShowContactDiscovery(true);
-                  if (userLeagues.length === 1) {
-                    setSelectedLeague(userLeagues[0].id);
-                  }
-                }}
-              >
-                <Edit className="w-5 h-5" />
-              </button>
+{canAccessPremiumFeatures() ? (
+                <button 
+                  className="text-primary" 
+                  data-testid="button-new-message"
+                  onClick={() => {
+                    setShowContactDiscovery(true);
+                    if (userLeagues.length === 1) {
+                      setSelectedLeague(userLeagues[0].id);
+                    }
+                  }}
+                >
+                  <Edit className="w-5 h-5" />
+                </button>
+              ) : (
+                <button 
+                  className="text-muted-foreground cursor-not-allowed relative group" 
+                  data-testid="button-new-message-locked"
+                  onClick={() => {
+                    toast({
+                      title: "Premium Feature",
+                      description: "Upgrade to Player Pro or Commissioner to start new conversations",
+                      variant: "destructive"
+                    });
+                  }}
+                >
+                  <Edit className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
           
@@ -2155,7 +2171,29 @@ export default function Messages() {
         </FeatureLockOverlay>
       </div>
       {/* Fixed Message Input - only show when conversation is selected */}
-      {selectedConversation && (
+      {selectedConversation && !canAccessPremiumFeatures() && (
+        <div className="fixed bottom-20 left-0 right-0 bg-background border-t border-border p-4 z-40" data-testid="message-input-locked">
+          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Upgrade to send messages</p>
+                <p className="text-xs text-muted-foreground">Player Pro or Commissioner required</p>
+              </div>
+            </div>
+            <Button 
+              onClick={() => window.location.href = '/subscription'}
+              size="sm"
+              data-testid="button-upgrade-to-reply"
+            >
+              Upgrade
+            </Button>
+          </div>
+        </div>
+      )}
+      {selectedConversation && canAccessPremiumFeatures() && (
         <div className="fixed bottom-20 left-0 right-0 bg-background border-t border-border p-4 z-40" data-testid="message-input-container">
           {/* File previews */}
           {selectedFiles.length > 0 && (

@@ -409,17 +409,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    const updateSet: any = {
+      email: userData.email,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      updatedAt: new Date(),
+    };
+    
+    // Include role in update if provided (for OIDC testing)
+    if (userData.role !== undefined) {
+      updateSet.role = userData.role;
+    }
+    
     const [user] = await db
       .insert(users)
       .values(userData)
       .onConflictDoUpdate({
         target: users.id,
-        set: {
-          email: userData.email,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          updatedAt: new Date(),
-        },
+        set: updateSet,
       })
       .returning();
     return user;
