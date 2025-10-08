@@ -2004,7 +2004,7 @@ export default function Messages() {
                       </div>
                     )}
                     
-                    <div className={`w-3/4 lg:max-w-[20%] ${isCurrentUser ? 'order-1' : 'order-2'}`}>
+                    <div className={`${message.messageType === 'poll' ? 'w-3/4 lg:max-w-[20%]' : 'max-w-[70%]'} ${isCurrentUser ? 'order-1' : 'order-2'}`}>
                       <div className={`rounded-lg p-3 ${
                         isCurrentUser 
                           ? 'bg-primary text-primary-foreground ml-auto' 
