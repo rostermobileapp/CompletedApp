@@ -67,6 +67,26 @@ import * as path from 'path';
 import Stripe from "stripe";
 
 
+// Utility function to format game scheduledAt as timezone-agnostic string
+function formatGameForResponse(game: any) {
+  if (game && game.scheduledAt) {
+    const date = new Date(game.scheduledAt);
+    // Format as YYYY-MM-DDTHH:mm without timezone to prevent client-side conversion
+    // Use local accessors (not UTC) to preserve the time as-is
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return {
+      ...game,
+      scheduledAt: `${year}-${month}-${day}T${hours}:${minutes}`
+    };
+  }
+  return game;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -1287,7 +1307,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = req.params.id;
       const games = await storage.getGamesByLeague(leagueId);
-      res.json(games);
+      const formattedGames = games.map(formatGameForResponse);
+      res.json(formattedGames);
     } catch (error) {
       console.error("Error fetching league games:", error);
       res.status(500).json({ message: "Failed to fetch league games" });
@@ -1466,7 +1487,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const games = await storage.getUpcomingGames(userId);
-      res.json(games);
+      const formattedGames = games.map(formatGameForResponse);
+      res.json(formattedGames);
     } catch (error) {
       console.error("Error fetching upcoming games:", error);
       res.status(500).json({ message: "Failed to fetch upcoming games" });
@@ -1478,7 +1500,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const games = await storage.getAllUserGames(userId);
-      res.json(games);
+      const formattedGames = games.map(formatGameForResponse);
+      res.json(formattedGames);
     } catch (error) {
       console.error("Error fetching all user games:", error);
       res.status(500).json({ message: "Failed to fetch all user games" });
@@ -1843,7 +1866,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const gameData = insertGameSchema.parse(req.body);
       const game = await storage.createGame(gameData);
-      res.json(game);
+      const formattedGame = formatGameForResponse(game);
+      res.json(formattedGame);
     } catch (error) {
       console.error("Error creating game:", error);
       res.status(500).json({ message: "Failed to create game" });
@@ -1868,13 +1892,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updates = req.body;
       
-      // Convert scheduledAt string to Date object if present
-      if (updates.scheduledAt) {
-        updates.scheduledAt = new Date(updates.scheduledAt);
-      }
+      // No need to convert scheduledAt - PostgreSQL handles the datetime string directly
+      // Converting to Date object causes timezone conversion issues
       
       const updatedGame = await storage.updateGame(gameId, updates);
-      res.json(updatedGame);
+      const formattedGame = formatGameForResponse(updatedGame);
+      res.json(formattedGame);
     } catch (error) {
       console.error("Error updating game:", error);
       res.status(500).json({ message: "Failed to update game" });
@@ -2107,7 +2130,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!game) {
         return res.status(404).json({ message: 'Game not found' });
       }
-      res.json(game);
+      const formattedGame = formatGameForResponse(game);
+      res.json(formattedGame);
     } catch (error) {
       console.error('Error fetching game details:', error);
       res.status(500).json({ message: 'Failed to fetch game details' });

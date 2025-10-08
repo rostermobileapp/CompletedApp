@@ -1518,7 +1518,7 @@ export default function LeagueManagement() {
       const gameData = {
         ...data,
         leagueId: leagueId,
-        scheduledAt: new Date(data.scheduledAt).toISOString(),
+        scheduledAt: data.scheduledAt,
       };
       const response = await apiRequest('POST', '/api/games', gameData);
       return response.json();
@@ -1573,7 +1573,9 @@ export default function LeagueManagement() {
       };
       
       if (shouldUpdateScheduledAt) {
-        updatePayload.scheduledAt = combinedDateTime.toISOString();
+        // Format as YYYY-MM-DDTHH:MM to preserve local time without timezone conversion
+        const formattedDateTime = `${data.gameDate}T${data.gameTime}`;
+        updatePayload.scheduledAt = formattedDateTime;
       }
       
       const response = await apiRequest('PATCH', `/api/games/${gameId}`, updatePayload);
