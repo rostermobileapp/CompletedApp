@@ -492,7 +492,7 @@ function PollCard({
   isPending: boolean;
 }) {
   return (
-    <Card className="bg-card border-border shadow-sm w-3/4 lg:max-w-[20%]">
+    <Card className="bg-card border-border shadow-sm">
       <CardHeader className="flex flex-col space-y-2 p-5 pb-4">
         <div className="flex items-center justify-between">
           <h4 className="text-base font-semibold flex items-center gap-2.5 text-foreground">

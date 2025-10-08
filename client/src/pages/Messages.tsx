@@ -213,7 +213,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
   const canClosePoll = message.senderId === currentUserId && poll.status === 'active';
 
   return (
-    <div className="mt-3 p-5 border border-border rounded-xl bg-card shadow-sm w-3/4 lg:max-w-[20%]" data-testid={`poll-card-${poll.id}`}>
+    <div className="mt-3 p-5 border border-border rounded-xl bg-card shadow-sm" data-testid={`poll-card-${poll.id}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="bg-primary text-primary-foreground text-xs px-2.5 py-1 rounded-md font-medium">
@@ -2004,7 +2004,7 @@ export default function Messages() {
                       </div>
                     )}
                     
-                    <div className={`max-w-[70%] ${isCurrentUser ? 'order-1' : 'order-2'}`}>
+                    <div className={`w-3/4 lg:max-w-[20%] ${isCurrentUser ? 'order-1' : 'order-2'}`}>
                       <div className={`rounded-lg p-3 ${
                         isCurrentUser 
                           ? 'bg-primary text-primary-foreground ml-auto' 
