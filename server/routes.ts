@@ -137,6 +137,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user's navigation preferences
+  app.get('/api/user/navigation-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({ preferences: user.navigationPreferences || null });
+    } catch (error) {
+      console.error("Error fetching navigation preferences:", error);
+      res.status(500).json({ message: "Failed to fetch navigation preferences" });
+    }
+  });
+
+  // Update user's navigation preferences
+  app.patch('/api/user/navigation-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { preferences } = req.body;
+      
+      const user = await storage.updateUserNavigationPreferences(userId, preferences);
+      res.json({ preferences: user.navigationPreferences });
+    } catch (error) {
+      console.error("Error updating navigation preferences:", error);
+      res.status(500).json({ message: "Failed to update navigation preferences" });
+    }
+  });
+
   // Get any user's public profile by ID
   app.get('/api/users/:userId', isAuthenticated, async (req: any, res) => {
     try {

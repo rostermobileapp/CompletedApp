@@ -149,6 +149,7 @@ export interface IStorage {
   updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
   updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User>;
   deleteUser(id: string): Promise<void>;
+  updateUserNavigationPreferences(id: string, preferences: any): Promise<User>;
   
   // Permission management operations (global - deprecated, use league-specific instead)
   getAllUsers(): Promise<User[]>;
@@ -488,6 +489,18 @@ export class DatabaseStorage implements IStorage {
       .set({
         role,
         lastUpdated: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserNavigationPreferences(id: string, preferences: any): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        navigationPreferences: preferences,
         updatedAt: new Date(),
       })
       .where(eq(users.id, id))
