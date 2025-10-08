@@ -266,10 +266,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
                   <span className="text-sm font-medium">{option}</span>
                   {showResults && (
                     <div className="flex items-center gap-2.5">
-                      <span className="text-xs font-semibold">
-                        {percentage}%
-                      </span>
-                      <span className="text-[10px] opacity-75">
+                      <span className="text-xs opacity-75">
                         {voteCount} {voteCount !== 1 ? 'votes' : 'vote'}
                       </span>
                       {isUserChoice && (

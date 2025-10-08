@@ -550,10 +550,7 @@ function PollCard({
                     )}
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-semibold">
-                      {percentage.toFixed(0)}%
-                    </div>
-                    <div className="text-[10px] opacity-75">
+                    <div className="text-xs opacity-75">
                       {votes} {votes !== 1 ? 'votes' : 'vote'}
                     </div>
                   </div>
