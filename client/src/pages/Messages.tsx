@@ -213,14 +213,14 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
   const canClosePoll = message.senderId === currentUserId && poll.status === 'active';
 
   return (
-    <div className="mt-3 p-5 border border-muted/40 rounded-xl bg-muted/30 shadow-sm" data-testid={`poll-card-${poll.id}`}>
+    <div className="mt-3 p-5 border border-border rounded-xl bg-card shadow-sm" data-testid={`poll-card-${poll.id}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="bg-primary/15 text-foreground text-xs px-2.5 py-1 rounded-md font-medium border border-primary/25">
+          <div className="bg-primary text-primary-foreground text-xs px-2.5 py-1 rounded-md font-medium">
             Poll
           </div>
           {poll.status === 'closed' && (
-            <div className="bg-muted/60 text-muted-foreground text-xs px-2.5 py-1 rounded-md border border-muted-foreground/20">
+            <div className="bg-muted text-muted-foreground text-xs px-2.5 py-1 rounded-md">
               Closed
             </div>
           )}
@@ -236,7 +236,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
         )}
       </div>
 
-      <h4 className="font-medium text-base mb-4 text-foreground/90" data-testid="poll-question">
+      <h4 className="font-semibold text-base mb-4 text-foreground" data-testid="poll-question">
         {poll.question}
       </h4>
 
@@ -253,34 +253,34 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
                 disabled={!canVote}
                 className={`w-full py-3.5 px-4 rounded-xl border text-left transition-all duration-300 ${
                   canVote
-                    ? 'hover:bg-muted/60 border-transparent bg-muted/20'
-                    : 'cursor-default border-transparent bg-muted/20'
+                    ? 'hover:bg-accent/50 border-border bg-background'
+                    : 'cursor-default border-border bg-background'
                 } ${
                   isUserChoice
-                    ? 'bg-primary/15 hover:bg-primary/20 border-primary/25'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 border-primary'
                     : ''
                 }`}
                 data-testid={`poll-option-${index}`}
               >
                 <div className="flex items-center justify-between relative z-10">
-                  <span className="text-sm font-normal text-foreground">{option}</span>
+                  <span className="text-sm font-medium">{option}</span>
                   {showResults && (
                     <div className="flex items-center gap-2.5">
-                      <span className="text-xs font-semibold text-foreground/90">
+                      <span className="text-xs font-semibold">
                         {percentage}%
                       </span>
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-[10px] opacity-75">
                         {voteCount} {voteCount !== 1 ? 'votes' : 'vote'}
                       </span>
                       {isUserChoice && (
-                        <div className="w-1.5 h-1.5 bg-primary rounded-full" data-testid="user-vote-indicator" />
+                        <div className="w-2 h-2 bg-white rounded-full" data-testid="user-vote-indicator" />
                       )}
                     </div>
                   )}
                 </div>
                 {showResults && percentage > 0 && (
                   <div
-                    className="absolute inset-0 bg-primary/10 rounded-xl transition-all duration-500"
+                    className="absolute inset-0 bg-primary/20 rounded-xl transition-all duration-500"
                     style={{ width: `${percentage}%` }}
                   />
                 )}
@@ -291,7 +291,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
       </div>
 
       {showResults && (
-        <div className="mt-3 pt-3 border-t border-muted/30">
+        <div className="mt-3 pt-3 border-t border-border">
           <p className="text-xs text-muted-foreground" data-testid="poll-total-votes">
             {getTotalVotes()} total votes
           </p>

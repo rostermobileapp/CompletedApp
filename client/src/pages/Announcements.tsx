@@ -492,19 +492,19 @@ function PollCard({
   isPending: boolean;
 }) {
   return (
-    <Card className="bg-muted/30 border-muted/40 shadow-sm">
+    <Card className="bg-card border-border shadow-sm">
       <CardHeader className="flex flex-col space-y-2 p-5 pb-4">
         <div className="flex items-center justify-between">
-          <h4 className="text-base font-medium flex items-center gap-2.5 text-foreground/90">
-            <BarChart3 className="w-4 h-4 text-primary/70" />
+          <h4 className="text-base font-semibold flex items-center gap-2.5 text-foreground">
+            <BarChart3 className="w-4 h-4 text-primary" />
             {poll.question}
           </h4>
           <div className="flex items-center gap-2">
             {!poll.allowMultiple && (
-              <Badge variant="outline" className="text-xs border-muted-foreground/20 bg-muted/40 text-muted-foreground">Single Choice</Badge>
+              <Badge variant="outline" className="text-xs">Single Choice</Badge>
             )}
             {poll.allowMultiple && (
-              <Badge variant="outline" className="text-xs border-muted-foreground/20 bg-muted/40 text-muted-foreground">Multiple Choice</Badge>
+              <Badge variant="outline" className="text-xs">Multiple Choice</Badge>
             )}
           </div>
         </div>
@@ -522,38 +522,38 @@ function PollCard({
           return (
             <div key={index} className="relative">
               <Button
-                variant={userVoted ? "default" : "ghost"}
+                variant={userVoted ? "default" : "outline"}
                 className={`w-full justify-between h-auto py-3.5 px-4 relative overflow-hidden transition-all duration-300 rounded-xl ${
                   userVoted 
-                    ? 'bg-primary/15 text-foreground hover:bg-primary/20 border border-primary/25' 
-                    : 'hover:bg-muted/60 bg-muted/20 border border-transparent'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 border-primary' 
+                    : 'hover:bg-accent/50 border-border'
                 }`}
                 onClick={() => onVote(poll.id, index, poll.allowMultiple)}
                 disabled={isPending}
                 data-testid={`button-poll-option-${index}`}
               >
                 <div 
-                  className="absolute inset-0 transition-all duration-500 bg-primary/10 rounded-xl"
+                  className="absolute inset-0 transition-all duration-500 bg-primary/20 rounded-xl"
                   style={{ width: `${Math.max(percentage, 0)}%` }}
                 />
                 
                 <div className="relative flex items-center justify-between w-full gap-3">
                   <div className="flex items-center gap-2.5 flex-1 min-w-0">
                     {userVoted && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                      <div className="w-2 h-2 rounded-full bg-white flex-shrink-0" />
                     )}
-                    <span className="font-normal text-sm text-left truncate">{option}</span>
+                    <span className="font-medium text-sm text-left truncate">{option}</span>
                     {isTopChoice && totalVotes > 0 && (
-                      <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                      <span className="text-[10px] bg-accent text-accent-foreground px-2 py-0.5 rounded-full font-medium flex-shrink-0">
                         Leading
                       </span>
                     )}
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-semibold text-foreground/90">
+                    <div className="text-sm font-semibold">
                       {percentage.toFixed(0)}%
                     </div>
-                    <div className="text-[10px] text-muted-foreground">
+                    <div className="text-[10px] opacity-75">
                       {votes} {votes !== 1 ? 'votes' : 'vote'}
                     </div>
                   </div>
@@ -563,13 +563,13 @@ function PollCard({
           );
         })}
         
-        <div className="flex items-center justify-between pt-3 text-xs text-muted-foreground border-t border-muted/30">
+        <div className="flex items-center justify-between pt-3 text-xs text-muted-foreground border-t border-border">
           <div className="flex items-center gap-2">
             <Users className="w-3.5 h-3.5" />
             <span>{poll.votes.length} total votes</span>
           </div>
           {isPending && (
-            <div className="flex items-center gap-2 text-primary/80">
+            <div className="flex items-center gap-2 text-primary">
               <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
               <span className="text-[10px]">Recording vote...</span>
             </div>
