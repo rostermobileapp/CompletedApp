@@ -1,7 +1,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, Star, ExternalLink, Loader2 } from 'lucide-react';
+import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useState } from 'react';
 import { apiRequest } from '@/lib/queryClient';
@@ -125,6 +125,31 @@ export default function Subscription() {
     }
   };
 
+  const handleSyncSubscription = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiRequest('POST', '/api/stripe/sync-subscription');
+      const data = await response.json() as { message: string; tier: string };
+      
+      toast({
+        title: 'Success',
+        description: `Your subscription has been synced! You are now on the ${data.tier === 'commissioner' ? 'Commissioner' : 'Player Pro'} tier.`,
+      });
+      
+      // Reload the page to update the UI
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error syncing subscription:', error);
+      const errorMessage = error.message || 'Failed to sync subscription. Please try again or contact support.';
+      toast({
+        title: 'Sync Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
       {/* Header */}
@@ -186,6 +211,28 @@ export default function Subscription() {
                 <>
                   Manage Subscription via Stripe
                   <ExternalLink className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Sync Subscription Button for Free Users who might have paid in Stripe */}
+          {isFree && (
+            <button
+              onClick={handleSyncSubscription}
+              disabled={isLoading}
+              className="w-full mt-4 bg-secondary text-secondary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-secondary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="button-sync-subscription"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Sync Subscription from Stripe
                 </>
               )}
             </button>
