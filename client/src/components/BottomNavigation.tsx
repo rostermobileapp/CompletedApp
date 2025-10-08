@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Users, MessageCircle, User, Calendar, Settings, Plus, X, GripVertical, Swords } from 'lucide-react';
+import { Users, MessageCircle, User, Calendar, Settings, Plus, X, GripVertical, Swords, Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
@@ -41,6 +41,7 @@ export function BottomNavigation() {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const isDragging = useRef(false);
   
   // Fetch user navigation preferences
   const { data: preferencesData } = useQuery({
@@ -124,15 +125,26 @@ export function BottomNavigation() {
     });
   };
   
+  const getHomeIndex = () => shortcuts.indexOf('home');
+  
   const handleDragStart = (index: number, e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
+    // Don't allow dragging the Home shortcut
+    if (shortcuts[index] === 'home') return;
+    
+    // Prevent default to avoid text selection and scrolling
+    if ('touches' in e) {
+      e.preventDefault();
+    }
+    
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     
     dragStartPos.current = { x: clientX, y: clientY };
+    isDragging.current = false;
     
     longPressTimer.current = setTimeout(() => {
       setIsEditMode(true);
+      isDragging.current = true;
       setDraggedIndex(index);
     }, 500); // 500ms long press
   };
@@ -146,16 +158,21 @@ export function BottomNavigation() {
     const deltaX = Math.abs(clientX - dragStartPos.current.x);
     const deltaY = Math.abs(clientY - dragStartPos.current.y);
     
-    // Cancel long press if user moves too much
-    if (deltaX > 10 || deltaY > 10) {
+    // Cancel long press if user moves too much before edit mode
+    if (!isDragging.current && (deltaX > 10 || deltaY > 10)) {
       if (longPressTimer.current) {
         clearTimeout(longPressTimer.current);
         longPressTimer.current = null;
       }
+      return;
     }
     
-    if (draggedIndex !== null && isEditMode) {
-      setDragOverIndex(index);
+    // If already dragging in edit mode, update drag over index
+    if (draggedIndex !== null && isEditMode && isDragging.current) {
+      // Don't allow dragging over the Home position
+      if (shortcuts[index] !== 'home') {
+        setDragOverIndex(index);
+      }
     }
   };
   
@@ -166,9 +183,19 @@ export function BottomNavigation() {
     }
     
     if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+      const homeIndex = getHomeIndex();
       const newShortcuts = [...shortcuts];
       const [removed] = newShortcuts.splice(draggedIndex, 1);
       newShortcuts.splice(dragOverIndex, 0, removed);
+      
+      // Ensure Home stays in its original position
+      const newHomeIndex = newShortcuts.indexOf('home');
+      if (newHomeIndex !== homeIndex) {
+        // Swap back to keep Home in place
+        const temp = newShortcuts[homeIndex];
+        newShortcuts[homeIndex] = 'home';
+        newShortcuts[newHomeIndex] = temp;
+      }
       
       setShortcuts(newShortcuts);
       savePreferences.mutate(newShortcuts);
@@ -182,6 +209,7 @@ export function BottomNavigation() {
     setDraggedIndex(null);
     setDragOverIndex(null);
     dragStartPos.current = null;
+    isDragging.current = false;
   };
   
   const getActiveId = (pathname: string) => {
@@ -254,14 +282,18 @@ export function BottomNavigation() {
                   data-testid={`nav-${shortcut.id}`}
                 >
                   {isEditMode && (
-                    <GripVertical className="absolute top-0 w-4 h-4 text-muted-foreground" />
+                    shortcut.id === 'home' ? (
+                      <Lock className="absolute top-0 w-4 h-4 text-muted-foreground opacity-50" />
+                    ) : (
+                      <GripVertical className="absolute top-0 w-4 h-4 text-muted-foreground" />
+                    )
                   )}
                   
                   {shortcut.id === 'home' ? (
                     <img 
                       src={rostersLogoUrl}
                       alt="Home"
-                      className="mb-1 object-contain"
+                      className={cn("mb-1 object-contain", isEditMode && "opacity-50")}
                       style={{ width: '30px', height: '30px' }}
                     />
                   ) : Icon && (
@@ -274,7 +306,7 @@ export function BottomNavigation() {
                       )}
                     </div>
                   )}
-                  <span className="text-xs">{shortcut.label}</span>
+                  <span className={cn("text-xs", isEditMode && shortcut.id === 'home' && "opacity-50")}>{shortcut.label}</span>
                 </button>
                 
                 {isEditMode && index >= 4 && (
