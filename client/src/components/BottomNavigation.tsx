@@ -16,7 +16,7 @@ const AVAILABLE_SHORTCUTS = [
   { id: 'home', icon: null, label: 'Home', path: '/' },
   { id: 'profile', icon: User, label: 'Profile', path: '/profile' },
   { id: 'schedule', icon: Calendar, label: 'Schedule', path: '/calendar' },
-  { id: 'league-management', icon: Settings, label: 'League Management', path: '/league-management' },
+  { id: 'league-management', icon: Settings, label: 'League Management', path: '/league-list' },
   { id: 'scrimmages', icon: Swords, label: 'Scrimmages', path: null, submenu: [
     { id: 'schedule-scrimmages', label: 'Schedule Scrimmages', path: '/create-scrimmage' },
     { id: 'manage-scrimmages', label: 'Manage Scrimmages', path: '/scrimmage-management' },
