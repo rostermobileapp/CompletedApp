@@ -160,6 +160,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { preferences } = req.body;
       
+      // Validate preferences structure
+      if (!preferences || typeof preferences !== 'object') {
+        return res.status(400).json({ message: "Invalid preferences format" });
+      }
+      
+      // Validate shortcuts array
+      if (preferences.shortcuts) {
+        if (!Array.isArray(preferences.shortcuts)) {
+          return res.status(400).json({ message: "Shortcuts must be an array" });
+        }
+        
+        if (preferences.shortcuts.length > 5) {
+          return res.status(400).json({ message: "Maximum 5 shortcuts allowed" });
+        }
+        
+        // Validate all shortcuts are valid IDs
+        const validShortcutIds = ['teams', 'messages', 'home', 'profile', 'schedule', 'league-management', 'scrimmages'];
+        const invalidShortcuts = preferences.shortcuts.filter((id: string) => !validShortcutIds.includes(id));
+        
+        if (invalidShortcuts.length > 0) {
+          return res.status(400).json({ message: `Invalid shortcut IDs: ${invalidShortcuts.join(', ')}` });
+        }
+      }
+      
       const user = await storage.updateUserNavigationPreferences(userId, preferences);
       res.json({ preferences: user.navigationPreferences });
     } catch (error) {
