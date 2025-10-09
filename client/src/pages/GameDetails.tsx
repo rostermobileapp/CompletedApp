@@ -600,7 +600,6 @@ export default function GameDetails() {
                     </div>
                     <div>
                       <p className="font-medium text-primary" data-testid="text-beverage-assigned">{(user as User)?.firstName} {(user as User)?.lastName} has beverage duty</p>
-                      <p className="text-sm text-muted-foreground">You're responsible for bringing beverages</p>
                     </div>
                   </div>
                   <Button
@@ -688,7 +687,6 @@ export default function GameDetails() {
                     </div>
                     <div>
                       <p className="font-medium text-primary" data-testid="text-beverage-assigned">{(user as User)?.firstName} {(user as User)?.lastName} has beverage duty</p>
-                      <p className="text-sm text-muted-foreground">You're responsible for bringing beverages</p>
                     </div>
                   </div>
                   <Button
