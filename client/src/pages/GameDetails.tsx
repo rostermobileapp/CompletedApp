@@ -599,7 +599,7 @@ export default function GameDetails() {
                       />
                     </div>
                     <div>
-                      <p className="font-medium text-primary" data-testid="text-beverage-assigned">You Have Beverage Duty</p>
+                      <p className="font-medium text-primary" data-testid="text-beverage-assigned">{(user as User)?.firstName} {(user as User)?.lastName} has beverage duty</p>
                       <p className="text-sm text-muted-foreground">You're responsible for bringing beverages</p>
                     </div>
                   </div>
@@ -627,7 +627,7 @@ export default function GameDetails() {
                     />
                   </div>
                   <div>
-                    <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">Beverage Duty Claimed by Teammate</p>
+                    <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">{homeTeamClaimantName} has beverage duty</p>
                     <p className="text-sm text-muted-foreground">{homeTeamClaimantName} is bringing beverages</p>
                   </div>
                 </div>
@@ -687,7 +687,7 @@ export default function GameDetails() {
                       />
                     </div>
                     <div>
-                      <p className="font-medium text-primary" data-testid="text-beverage-assigned">You Have Beverage Duty</p>
+                      <p className="font-medium text-primary" data-testid="text-beverage-assigned">{(user as User)?.firstName} {(user as User)?.lastName} has beverage duty</p>
                       <p className="text-sm text-muted-foreground">You're responsible for bringing beverages</p>
                     </div>
                   </div>
@@ -715,7 +715,7 @@ export default function GameDetails() {
                     />
                   </div>
                   <div>
-                    <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">Beverage Duty Claimed by Teammate</p>
+                    <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">{awayTeamClaimantName} has beverage duty</p>
                     <p className="text-sm text-muted-foreground">{awayTeamClaimantName} is bringing beverages</p>
                   </div>
                 </div>
