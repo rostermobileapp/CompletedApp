@@ -686,7 +686,7 @@ export default function GameDetails() {
                       />
                     </div>
                     <div>
-                      <p className="font-medium text-primary" data-testid="text-beverage-assigned">{(user as User)?.firstName} {(user as User)?.lastName} has beverage duty</p>
+                      <p className="font-medium text-primary text-[16px]" data-testid="text-beverage-assigned">{(user as User)?.firstName} {(user as User)?.lastName} has beverage duty</p>
                     </div>
                   </div>
                   <Button
