@@ -1082,7 +1082,7 @@ export default function Dashboard() {
             <div className="flex flex-col items-center gap-1">
               <button 
                 onClick={() => navigate('/profile')}
-                className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden bg-primary"
+                className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-primary"
                 data-testid="button-profile"
               >
                 {(user as any)?.profileImageUrl ? (
@@ -1092,7 +1092,7 @@ export default function Dashboard() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-primary-foreground text-sm font-semibold">
+                  <span className="text-primary-foreground text-lg font-semibold">
                     {(user as any)?.firstName?.[0] || 'U'}
                   </span>
                 )}
