@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PermissionProvider } from "@/context/SubscriptionContext";
 import { BottomNavigation } from "@/components/BottomNavigation";
+import { AdSenseBanner } from "@/components/AdSenseBanner";
 import { PageTransition } from "@/components/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
@@ -98,6 +99,7 @@ function Router() {
             <Route component={NotFound} />
           </Switch>
         </PageTransition>
+        <AdSenseBanner />
         <BottomNavigation />
       </div>
     </PermissionProvider>
