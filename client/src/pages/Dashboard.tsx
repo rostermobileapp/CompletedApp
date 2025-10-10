@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, DollarSign } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, DollarSign, Crown, Star } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -1079,9 +1079,9 @@ export default function Dashboard() {
                 data-testid="badge-subscription-tier"
               >
                 {tier === 'commissioner' || tier === 'secondary_commissioner' ? (
-                  <Shield className="w-5 h-5" />
+                  <Crown className="w-5 h-5 text-yellow-500" />
                 ) : (
-                  <Trophy className="w-5 h-5" />
+                  <Star className="w-5 h-5 fill-current" />
                 )}
               </span>
             )}
