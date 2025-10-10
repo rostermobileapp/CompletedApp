@@ -1074,12 +1074,7 @@ export default function Dashboard() {
                 {tier === 'commissioner' || tier === 'secondary_commissioner' ? (
                   <Crown className="w-6 h-6 text-yellow-500" data-testid="badge-subscription-tier" />
                 ) : (
-                  <span 
-                    className="tier-badge w-8 h-8 rounded-full flex items-center justify-center bg-primary text-primary-foreground"
-                    data-testid="badge-subscription-tier"
-                  >
-                    <Star className="w-5 h-5 fill-current" />
-                  </span>
+                  <Star className="w-6 h-6 text-primary fill-current" data-testid="badge-subscription-tier" />
                 )}
               </>
             )}
