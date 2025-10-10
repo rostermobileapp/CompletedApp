@@ -54,6 +54,12 @@ export default function CreateScrimmage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
+  // Fetch user's facility memberships
+  const { data: facilityMemberships, isLoading: facilitiesLoading } = useQuery<Array<{ facility: { id: string; name: string; address: string; city: string; state: string } }>>({
+    queryKey: ['/api/users/me/facility-memberships'],
+    enabled: !!user,
+  });
+
   // Check permissions - free tier users cannot create scrimmages
   useEffect(() => {
     if (!canAccessPremiumFeatures) {
@@ -420,12 +426,33 @@ export default function CreateScrimmage() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="venue">Venue</Label>
-              <Input
-                id="venue"
-                {...form.register('venue')}
-                placeholder="Ice Arena, Basketball Court, etc."
-                data-testid="input-venue"
-              />
+              {facilitiesLoading ? (
+                <div className="h-10 bg-muted rounded-md animate-pulse" />
+              ) : facilityMemberships && facilityMemberships.length > 0 ? (
+                <Select
+                  value={form.watch('venue')}
+                  onValueChange={(value) => form.setValue('venue', value)}
+                >
+                  <SelectTrigger data-testid="select-venue">
+                    <SelectValue placeholder="Select a facility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {facilityMemberships.map((membership) => (
+                      <SelectItem 
+                        key={membership.facility.id} 
+                        value={membership.facility.name}
+                      >
+                        {membership.facility.name}
+                        {membership.facility.city && ` - ${membership.facility.city}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
+                  No facilities available. You can still enter a location manually below.
+                </div>
+              )}
               {form.formState.errors.venue && (
                 <p className="text-sm text-destructive mt-1">{form.formState.errors.venue.message}</p>
               )}
