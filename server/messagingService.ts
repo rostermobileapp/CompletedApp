@@ -627,17 +627,13 @@ export class MessagingService {
     // Convert set back to array of objects for consistency with rest of code
     const teamMembers = Array.from(participantIds).map(userId => ({ userId }));
 
-    console.log(`[DEBUG] Team group chat: Found ${teamMembers.length} team participants for team ${teamId} (${teamMembershipsData.length} members + captain):`, teamMembers.map(m => m.userId));
-
     // Helper function to ensure participants are added (idempotent with conflict resolution)
     const ensureParticipants = async (conversationId: string) => {
       if (teamMembers.length === 0) {
-        console.log(`[DEBUG] No team members to add for conversation ${conversationId}`);
         return;
       }
       
       try {
-        console.log(`[DEBUG] Adding ${teamMembers.length} participants to conversation ${conversationId}`);
         await db.insert(conversationParticipants)
           .values(teamMembers.map(member => ({
             conversationId,
@@ -646,9 +642,7 @@ export class MessagingService {
           .onConflictDoNothing({
             target: [conversationParticipants.conversationId, conversationParticipants.userId]
           });
-        console.log(`[DEBUG] Successfully added participants to conversation ${conversationId}`);
       } catch (error) {
-        console.error(`[DEBUG] Failed to add participants to conversation ${conversationId}:`, error);
         throw error;
       }
     };
@@ -666,18 +660,13 @@ export class MessagingService {
       .limit(1);
 
     if (existingChat) {
-      console.log(`[DEBUG] Found existing team group conversation ${existingChat.id}, checking participants`);
-      
       // Check if existing conversation has participants
       const [{ count }] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(conversationParticipants)
         .where(eq(conversationParticipants.conversationId, existingChat.id));
       
-      console.log(`[DEBUG] Existing conversation ${existingChat.id} has ${count} participants`);
-      
       if (count === 0) {
-        console.log(`[DEBUG] Repairing existing conversation ${existingChat.id} by adding missing participants`);
         await ensureParticipants(existingChat.id);
       }
       
@@ -694,8 +683,6 @@ export class MessagingService {
       teamId,
       createdBy,
     });
-
-    console.log(`[DEBUG] Created new team group conversation ${conversation.id}, adding participants`);
 
     // Add all team members as participants using bulk insert
     await ensureParticipants(conversation.id);

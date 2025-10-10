@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { X, Upload, Image as ImageIcon, Video, FileText, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { errorTracker } from "@/lib/errorTracking";
 
 interface MediaFile {
   file: File;
@@ -98,7 +99,11 @@ export function EnhancedMediaUploader({
       const file = files[i];
       
       if (file.size > maxFileSize) {
-        console.warn(`File ${file.name} is too large`);
+        errorTracker.captureWarning('File size exceeds maximum limit', {
+          filename: file.name,
+          size: file.size,
+          maxSize: maxFileSize
+        });
         continue;
       }
 

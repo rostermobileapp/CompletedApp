@@ -12,6 +12,7 @@ import {
   Maximize2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { errorTracker } from "@/lib/errorTracking";
 
 interface MediaItem {
   id: string;
@@ -95,7 +96,10 @@ export function MediaGallery({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Failed to download file:', error);
+      errorTracker.captureError(
+        error instanceof Error ? error : new Error('Failed to download file'),
+        { filename: currentItem.filename, url: currentItem.url }
+      );
     }
   };
 
