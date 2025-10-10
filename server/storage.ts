@@ -411,7 +411,6 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     const updateSet: any = {
-      email: userData.email,
       firstName: userData.firstName,
       lastName: userData.lastName,
       updatedAt: new Date(),
@@ -422,11 +421,16 @@ export class DatabaseStorage implements IStorage {
       updateSet.role = userData.role;
     }
     
+    // Include profile image if provided
+    if (userData.profileImageUrl !== undefined) {
+      updateSet.profileImageUrl = userData.profileImageUrl;
+    }
+    
     const [user] = await db
       .insert(users)
       .values(userData)
       .onConflictDoUpdate({
-        target: users.id,
+        target: users.email,
         set: updateSet,
       })
       .returning();
