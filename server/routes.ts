@@ -4560,7 +4560,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Daily recurrence: simple iteration
           let currentDate = new Date(startDate);
           while (dates.length < maxOccurrences) {
-            if (endDate && currentDate > endDate) break;
+            // Compare dates only (ignore time) for end date check
+            if (endDate) {
+              const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+              const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+              if (currentDateOnly > endDateOnly) break;
+            }
             dates.push(new Date(currentDate));
             currentDate = addDays(currentDate, 1);
           }
@@ -4585,19 +4590,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // Only include dates that are >= start date
                 if (occurrenceDate >= startDate) {
-                  if (endDate && occurrenceDate > endDate) break;
+                  // Compare dates only (ignore time) for end date check
+                  if (endDate) {
+                    const occurrenceDateOnly = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), occurrenceDate.getDate());
+                    const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+                    if (occurrenceDateOnly > endDateOnly) break;
+                  }
                   dates.push(new Date(occurrenceDate));
                   if (dates.length >= maxOccurrences) break;
                 }
               }
               weekOffset++;
-              if (endDate && addWeeks(startDate, weekOffset) > endDate) break;
+              // Check if we should continue to next week
+              if (endDate) {
+                const nextWeekStart = addWeeks(startDate, weekOffset);
+                const nextWeekStartOnly = new Date(nextWeekStart.getFullYear(), nextWeekStart.getMonth(), nextWeekStart.getDate());
+                const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+                if (nextWeekStartOnly > endDateOnly) break;
+              }
             }
           } else {
             // No specific days, just repeat weekly
             let currentDate = new Date(startDate);
             while (dates.length < maxOccurrences) {
-              if (endDate && currentDate > endDate) break;
+              // Compare dates only (ignore time) for end date check
+              if (endDate) {
+                const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+                const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+                if (currentDateOnly > endDateOnly) break;
+              }
               dates.push(new Date(currentDate));
               currentDate = addWeeks(currentDate, 1);
             }
@@ -4606,7 +4627,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Monthly recurrence
           let currentDate = new Date(startDate);
           while (dates.length < maxOccurrences) {
-            if (endDate && currentDate > endDate) break;
+            // Compare dates only (ignore time) for end date check
+            if (endDate) {
+              const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+              const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+              if (currentDateOnly > endDateOnly) break;
+            }
             dates.push(new Date(currentDate));
             currentDate = addMonths(currentDate, 1);
           }
