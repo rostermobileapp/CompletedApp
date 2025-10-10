@@ -1079,23 +1079,30 @@ export default function Dashboard() {
               </>
             )}
             
-            <button 
-              onClick={() => navigate('/profile')}
-              className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden bg-primary"
-              data-testid="button-profile"
-            >
-              {(user as any)?.profileImageUrl ? (
-                <img 
-                  src={(user as any).profileImageUrl} 
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-primary-foreground text-sm font-semibold">
-                  {(user as any)?.firstName?.[0] || 'U'}
+            <div className="flex flex-col items-center gap-1">
+              <button 
+                onClick={() => navigate('/profile')}
+                className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden bg-primary"
+                data-testid="button-profile"
+              >
+                {(user as any)?.profileImageUrl ? (
+                  <img 
+                    src={(user as any).profileImageUrl} 
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-primary-foreground text-sm font-semibold">
+                    {(user as any)?.firstName?.[0] || 'U'}
+                  </span>
+                )}
+              </button>
+              {teamRecord && (
+                <span className="text-[10px] text-muted-foreground" data-testid="text-team-record">
+                  {`${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}`}
                 </span>
               )}
-            </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1207,40 +1214,25 @@ export default function Dashboard() {
       {/* Quick Stats */}
       {primaryTeam && (
         <div className="px-6 mb-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-xl border border-border p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#212121]" data-testid="card-games-stat">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                  {primaryTeam?.logoUrl ? (
-                    <img 
-                      src={primaryTeam.logoUrl} 
-                      alt={`${primaryTeam.name} logo`}
-                      className="w-full h-full rounded-lg object-cover"
-                      data-testid="img-team-logo"
-                    />
-                  ) : (
-                    <Trophy className="w-5 h-5 text-primary-foreground" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-2xl font-bold" data-testid="text-games-remaining">
-                    {(teamRecord as any)?.gamesRemaining ?? 0}
-                  </p>
-                  <p className="text-muted-foreground text-[14px]">Games Left</p>
-                </div>
+          <div className="rounded-xl border border-border p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#212121]" data-testid="card-games-stat">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                {primaryTeam?.logoUrl ? (
+                  <img 
+                    src={primaryTeam.logoUrl} 
+                    alt={`${primaryTeam.name} logo`}
+                    className="w-full h-full rounded-lg object-cover"
+                    data-testid="img-team-logo"
+                  />
+                ) : (
+                  <Trophy className="w-5 h-5 text-primary-foreground" />
+                )}
               </div>
-            </div>
-            <div className="rounded-xl border border-border p-4 pl-[10px] pr-[10px] pt-[2px] pb-[2px] bg-[#212121]" data-testid="card-record-stat">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#16a2497d]">
-                  <TrendingUp className="w-5 h-5 text-accent-foreground" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold" data-testid="text-team-record">
-                    {teamRecord ? `${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}` : '0-0-0'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Team Record</p>
-                </div>
+              <div>
+                <p className="text-2xl font-bold" data-testid="text-games-remaining">
+                  {(teamRecord as any)?.gamesRemaining ?? 0}
+                </p>
+                <p className="text-muted-foreground text-[14px]">Games Left</p>
               </div>
             </div>
           </div>
