@@ -1069,18 +1069,22 @@ export default function Dashboard() {
               </span>
             )}
             
-            <span 
-              className={`tier-badge text-xs px-2 py-1 rounded-full font-semibold ${
-                tier === 'commissioner' || tier === 'secondary_commissioner'
-                  ? 'bg-warning text-black' 
-                  : tier === 'player_pro' 
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground'
-              }`}
-              data-testid="badge-subscription-tier"
-            >
-              {tier === 'commissioner' || tier === 'secondary_commissioner' ? 'COMMISSIONER' : tier === 'player_pro' ? 'PLAYER PRO' : 'FREE'}
-            </span>
+            {tier !== 'free' && (
+              <span 
+                className={`tier-badge w-8 h-8 rounded-full flex items-center justify-center ${
+                  tier === 'commissioner' || tier === 'secondary_commissioner'
+                    ? 'bg-warning text-black' 
+                    : 'bg-primary text-primary-foreground'
+                }`}
+                data-testid="badge-subscription-tier"
+              >
+                {tier === 'commissioner' || tier === 'secondary_commissioner' ? (
+                  <Shield className="w-5 h-5" />
+                ) : (
+                  <Trophy className="w-5 h-5" />
+                )}
+              </span>
+            )}
             
             <button 
               onClick={() => navigate('/profile')}
