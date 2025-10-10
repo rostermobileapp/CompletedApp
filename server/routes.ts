@@ -15,7 +15,7 @@ import {
 import { db } from "./db";
 import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema } from "@shared/schema";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
-import { format } from "date-fns";
+import { format, addDays, addWeeks, addMonths } from "date-fns";
 import {
   insertLeagueSchema,
   insertTeamSchema,
@@ -4464,7 +4464,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return new Date(val);
       }
       return val;
-    }, z.date())
+    }, z.date()),
+    recurrenceEndDate: z.preprocess((val) => {
+      if (typeof val === 'string' && val !== '') {
+        return new Date(val);
+      }
+      return null;
+    }, z.date().nullable().optional()),
   });
 
   // Create scrimmage (Player Plus+ only)
@@ -4542,15 +4548,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Create scrimmage with the announcement ID if available
-      const scrimmage = await storage.createScrimmage({
-        ...scrimmageData,
-        announcementId,
-      });
-      
-      console.log(`✅ Created scrimmage ${scrimmage.id}${announcementId ? ` linked to announcement ${announcementId}` : ''}`);
-      
-      res.status(201).json(scrimmage);
+      // Handle recurring events
+      if (scrimmageData.isRecurring && scrimmageData.recurrenceType !== 'none') {
+        // Generate all recurring dates
+        const dates: Date[] = [];
+        const startDate = new Date(scrimmageData.dateTime);
+        const maxOccurrences = scrimmageData.recurrenceCount || 52; // Default max to prevent infinite loops
+        const endDate = scrimmageData.recurrenceEndDate ? new Date(scrimmageData.recurrenceEndDate) : null;
+        
+        if (scrimmageData.recurrenceType === 'daily') {
+          // Daily recurrence: simple iteration
+          let currentDate = new Date(startDate);
+          while (dates.length < maxOccurrences) {
+            if (endDate && currentDate > endDate) break;
+            dates.push(new Date(currentDate));
+            currentDate = addDays(currentDate, 1);
+          }
+        } else if (scrimmageData.recurrenceType === 'weekly') {
+          // Weekly recurrence: iterate through weeks and selected days
+          if (scrimmageData.recurrenceDays && scrimmageData.recurrenceDays.length > 0) {
+            const sortedDays = [...scrimmageData.recurrenceDays].sort((a, b) => a - b);
+            const startDay = startDate.getDay();
+            const startHour = startDate.getHours();
+            const startMinute = startDate.getMinutes();
+            
+            let weekOffset = 0;
+            while (dates.length < maxOccurrences) {
+              // For each selected day of the week
+              for (const day of sortedDays) {
+                // Calculate the date for this day in this week
+                // Start from the beginning of the start week, then add week offset
+                const daysFromStart = (day - startDay + (weekOffset * 7));
+                const occurrenceDate = new Date(startDate);
+                occurrenceDate.setDate(startDate.getDate() + daysFromStart);
+                occurrenceDate.setHours(startHour, startMinute, 0, 0);
+                
+                // Only include dates that are >= start date
+                if (occurrenceDate >= startDate) {
+                  if (endDate && occurrenceDate > endDate) break;
+                  dates.push(new Date(occurrenceDate));
+                  if (dates.length >= maxOccurrences) break;
+                }
+              }
+              weekOffset++;
+              if (endDate && addWeeks(startDate, weekOffset) > endDate) break;
+            }
+          } else {
+            // No specific days, just repeat weekly
+            let currentDate = new Date(startDate);
+            while (dates.length < maxOccurrences) {
+              if (endDate && currentDate > endDate) break;
+              dates.push(new Date(currentDate));
+              currentDate = addWeeks(currentDate, 1);
+            }
+          }
+        } else if (scrimmageData.recurrenceType === 'monthly') {
+          // Monthly recurrence
+          let currentDate = new Date(startDate);
+          while (dates.length < maxOccurrences) {
+            if (endDate && currentDate > endDate) break;
+            dates.push(new Date(currentDate));
+            currentDate = addMonths(currentDate, 1);
+          }
+        }
+        
+        console.log(`📅 Generating ${dates.length} recurring scrimmages`);
+        
+        // Create parent scrimmage (first occurrence)
+        const parentScrimmage = await storage.createScrimmage({
+          ...scrimmageData,
+          announcementId,
+          dateTime: dates[0],
+        });
+        
+        console.log(`✅ Created parent scrimmage ${parentScrimmage.id}`);
+        
+        // Create child scrimmages for remaining dates
+        for (let i = 1; i < dates.length; i++) {
+          await storage.createScrimmage({
+            ...scrimmageData,
+            dateTime: dates[i],
+            parentScrimmageId: parentScrimmage.id,
+            announcementId: null, // Only first scrimmage has announcement
+          });
+        }
+        
+        console.log(`✅ Created ${dates.length - 1} recurring scrimmages linked to parent ${parentScrimmage.id}`);
+        
+        res.status(201).json(parentScrimmage);
+      } else {
+        // Create single scrimmage (non-recurring)
+        const scrimmage = await storage.createScrimmage({
+          ...scrimmageData,
+          announcementId,
+        });
+        
+        console.log(`✅ Created scrimmage ${scrimmage.id}${announcementId ? ` linked to announcement ${announcementId}` : ''}`);
+        
+        res.status(201).json(scrimmage);
+      }
     } catch (error) {
       console.error('Error creating scrimmage:', error);
       res.status(500).json({ message: 'Failed to create scrimmage' });

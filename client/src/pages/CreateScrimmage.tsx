@@ -19,6 +19,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // Create form schema - includes UI fields that map to database fields
 const createScrimmageSchema = createScrimmageRequestSchema.extend({
@@ -28,6 +30,13 @@ const createScrimmageSchema = createScrimmageRequestSchema.extend({
   venue: z.string().min(1, 'Venue is required'), // UI field that maps to location
   maxParticipants: z.number().min(2, 'Must have at least 2 participants'), // UI field that maps to maxPlayers
   costPerPlayer: z.string().optional(), // Optional cost field
+  // Recurring event fields
+  isRecurring: z.boolean().default(false),
+  recurrenceType: z.enum(['none', 'daily', 'weekly', 'monthly']).default('none'),
+  recurrenceDays: z.array(z.number()).optional(), // Array of day numbers (0=Sunday, 1=Monday, etc.)
+  recurrenceEndType: z.enum(['date', 'count']).optional(), // Either end by date or count
+  recurrenceEndDate: z.string().optional(),
+  recurrenceCount: z.number().optional(),
 }).omit({
   dateTime: true, // We'll construct this from date + time
   location: true, // We'll map venue to location  
@@ -69,6 +78,13 @@ export default function CreateScrimmage() {
       venue: '', // UI field that maps to location
       maxParticipants: 20, // UI field that maps to maxPlayers
       costPerPlayer: '', // Optional cost field
+      // Recurring event defaults
+      isRecurring: false,
+      recurrenceType: 'none',
+      recurrenceDays: [],
+      recurrenceEndType: 'date',
+      recurrenceEndDate: '',
+      recurrenceCount: 1,
     },
   });
 
@@ -106,6 +122,14 @@ export default function CreateScrimmage() {
         dateTime: new Date(`${data.date}T${data.time}`), // Combine date and time
         leagueId: selectedLeague.id, // Required by server
         costPerPlayer: data.costPerPlayer ? data.costPerPlayer : null, // Optional cost
+        // Recurring event data
+        isRecurring: data.isRecurring,
+        recurrenceType: data.isRecurring ? data.recurrenceType : 'none',
+        recurrenceDays: data.isRecurring && data.recurrenceType === 'weekly' ? data.recurrenceDays : null,
+        recurrenceEndDate: data.isRecurring && data.recurrenceEndType === 'date' && data.recurrenceEndDate 
+          ? new Date(data.recurrenceEndDate) 
+          : null,
+        recurrenceCount: data.isRecurring && data.recurrenceEndType === 'count' ? data.recurrenceCount : null,
       };
 
       // Filter out the creator from selectedMemberIds (they don't need to invite themselves)
@@ -241,26 +265,118 @@ export default function CreateScrimmage() {
               />
             </div>
 
-            <div>
-              <Label htmlFor="skillLevel">Skill Level (Optional)</Label>
-              <Select
-                value={form.watch('skillLevel') || 'none'}
-                onValueChange={(value) => form.setValue('skillLevel', value === 'none' ? '' : value)}
-              >
-                <SelectTrigger data-testid="select-skill-level">
-                  <SelectValue placeholder="Select skill level (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No preference</SelectItem>
-                  <SelectItem value="Beginner">Beginner</SelectItem>
-                  <SelectItem value="Intermediate">Intermediate</SelectItem>
-                  <SelectItem value="Advanced">Advanced</SelectItem>
-                  <SelectItem value="A">A Level</SelectItem>
-                  <SelectItem value="B">B Level</SelectItem>
-                  <SelectItem value="C">C Level</SelectItem>
-                  <SelectItem value="D">D Level</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Recurring Event Settings */}
+            <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="isRecurring" className="text-base">Make this recurring</Label>
+                  <p className="text-sm text-muted-foreground">Schedule multiple events at regular intervals</p>
+                </div>
+                <Switch
+                  id="isRecurring"
+                  checked={form.watch('isRecurring')}
+                  onCheckedChange={(checked) => {
+                    form.setValue('isRecurring', checked);
+                    form.setValue('recurrenceType', checked ? 'weekly' : 'none');
+                  }}
+                  data-testid="switch-recurring"
+                />
+              </div>
+
+              {form.watch('isRecurring') && (
+                <div className="space-y-4 pt-2">
+                  {/* Recurrence Type */}
+                  <div>
+                    <Label>Repeat</Label>
+                    <RadioGroup
+                      value={form.watch('recurrenceType')}
+                      onValueChange={(value: any) => form.setValue('recurrenceType', value)}
+                      className="flex gap-4 mt-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="daily" id="daily" data-testid="radio-daily" />
+                        <Label htmlFor="daily" className="font-normal cursor-pointer">Daily</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="weekly" id="weekly" data-testid="radio-weekly" />
+                        <Label htmlFor="weekly" className="font-normal cursor-pointer">Weekly</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="monthly" id="monthly" data-testid="radio-monthly" />
+                        <Label htmlFor="monthly" className="font-normal cursor-pointer">Monthly</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {/* Days of Week (only for weekly) */}
+                  {form.watch('recurrenceType') === 'weekly' && (
+                    <div>
+                      <Label>Repeat on</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                          <div key={day} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`day-${index}`}
+                              checked={form.watch('recurrenceDays')?.includes(index)}
+                              onCheckedChange={(checked) => {
+                                const currentDays = form.watch('recurrenceDays') || [];
+                                if (checked) {
+                                  form.setValue('recurrenceDays', [...currentDays, index].sort());
+                                } else {
+                                  form.setValue('recurrenceDays', currentDays.filter(d => d !== index));
+                                }
+                              }}
+                              data-testid={`checkbox-day-${index}`}
+                            />
+                            <Label htmlFor={`day-${index}`} className="font-normal cursor-pointer text-sm">{day}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* End Type */}
+                  <div>
+                    <Label>End</Label>
+                    <RadioGroup
+                      value={form.watch('recurrenceEndType')}
+                      onValueChange={(value: any) => form.setValue('recurrenceEndType', value)}
+                      className="space-y-2 mt-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="date" id="endDate" data-testid="radio-end-date" />
+                        <Label htmlFor="endDate" className="font-normal cursor-pointer">On date</Label>
+                        {form.watch('recurrenceEndType') === 'date' && (
+                          <Input
+                            type="date"
+                            {...form.register('recurrenceEndDate')}
+                            className="ml-2 w-40"
+                            min={new Date().toISOString().split('T')[0]}
+                            data-testid="input-recurrence-end-date"
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="count" id="endCount" data-testid="radio-end-count" />
+                        <Label htmlFor="endCount" className="font-normal cursor-pointer">After</Label>
+                        {form.watch('recurrenceEndType') === 'count' && (
+                          <>
+                            <Input
+                              type="number"
+                              {...form.register('recurrenceCount', { valueAsNumber: true })}
+                              className="ml-2 w-20"
+                              min={1}
+                              max={52}
+                              data-testid="input-recurrence-count"
+                            />
+                            <span className="text-sm text-muted-foreground">occurrences</span>
+                          </>
+                        )}
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -79,6 +79,14 @@ export const scrimmageRequestStatusEnum = pgEnum("scrimmage_request_status", [
   "dismissed"
 ]);
 
+// Recurrence type enum for recurring events
+export const recurrenceTypeEnum = pgEnum("recurrence_type", [
+  "none",
+  "daily",
+  "weekly",
+  "monthly"
+]);
+
 // Game result type enum
 export const gameResultTypeEnum = pgEnum("game_result_type", [
   "regulation",
@@ -595,6 +603,13 @@ export const scrimmages = pgTable("scrimmages", {
   costPerPlayer: decimal("cost_per_player", { precision: 10, scale: 2 }), // Optional cost per player
   status: scrimmageStatusEnum("status").default("open").notNull(),
   announcementId: varchar("announcement_id").references(() => announcements.id), // Link to auto-created announcement
+  // Recurring event fields
+  isRecurring: boolean("is_recurring").default(false).notNull(),
+  recurrenceType: recurrenceTypeEnum("recurrence_type").default("none").notNull(),
+  recurrenceDays: integer("recurrence_days").array(), // Array of day numbers (0=Sunday, 1=Monday, etc.)
+  recurrenceEndDate: timestamp("recurrence_end_date"), // When to stop creating recurring events
+  recurrenceCount: integer("recurrence_count"), // Number of times to repeat (alternative to end date)
+  parentScrimmageId: varchar("parent_scrimmage_id"), // Link to parent scrimmage if this is part of a recurring series
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
