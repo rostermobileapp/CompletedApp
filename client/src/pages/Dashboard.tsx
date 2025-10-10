@@ -1097,11 +1097,11 @@ export default function Dashboard() {
                   </span>
                 )}
               </button>
-              {teamRecord && (
+              {teamRecord ? (
                 <span className="text-[10px] text-muted-foreground" data-testid="text-team-record">
                   {`${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}`}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -1214,50 +1214,50 @@ export default function Dashboard() {
       {/* Quick Stats */}
       {primaryTeam && (
         <div className="px-6 mb-6">
-          <div className="rounded-xl border border-border p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#212121]" data-testid="card-games-stat">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                {primaryTeam?.logoUrl ? (
-                  <img 
-                    src={primaryTeam.logoUrl} 
-                    alt={`${primaryTeam.name} logo`}
-                    className="w-full h-full rounded-lg object-cover"
-                    data-testid="img-team-logo"
-                  />
-                ) : (
-                  <Trophy className="w-5 h-5 text-primary-foreground" />
-                )}
-              </div>
-              <div>
-                <p className="text-2xl font-bold" data-testid="text-games-remaining">
-                  {(teamRecord as any)?.gamesRemaining ?? 0}
-                </p>
-                <p className="text-muted-foreground text-[14px]">Games Left</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-xl border border-border p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#212121]" data-testid="card-games-stat">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                  {primaryTeam?.logoUrl ? (
+                    <img 
+                      src={primaryTeam.logoUrl} 
+                      alt={`${primaryTeam.name} logo`}
+                      className="w-full h-full rounded-lg object-cover"
+                      data-testid="img-team-logo"
+                    />
+                  ) : (
+                    <Trophy className="w-5 h-5 text-primary-foreground" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-2xl font-bold" data-testid="text-games-remaining">
+                    {(teamRecord as any)?.gamesRemaining ?? 0}
+                  </p>
+                  <p className="text-muted-foreground text-[14px]">Games Left</p>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-      {/* Permanent Needs Attention Bar */}
-      {selectedLeagueId && needsAttentionData && (
-        <div className="px-6 mb-4">
-          <div className="bg-black dark:bg-black border border-gray-600 rounded-lg">
-            <button
-              onClick={() => setShowNeedsAttentionModal(true)}
-              className="w-full flex items-center justify-between hover:bg-gray-800 transition-colors rounded-lg px-3 py-2 bg-[#212121]"
-              data-testid="button-needs-attention-permanent"
-            >
-              <div className="flex items-center gap-3">
-                <Settings className="w-4 h-4 text-white" />
-                <span className="text-white font-medium text-sm">Needs Attention</span>
+            
+            {selectedLeagueId && needsAttentionData && (
+              <div className="rounded-xl border border-border bg-[#212121]">
+                <button
+                  onClick={() => setShowNeedsAttentionModal(true)}
+                  className="w-full h-full flex items-center justify-between hover:bg-gray-800 transition-colors rounded-xl px-3 py-2"
+                  data-testid="button-needs-attention-permanent"
+                >
+                  <div className="flex items-center gap-3">
+                    <Settings className="w-4 h-4 text-white" />
+                    <span className="text-white font-medium text-sm">To-Do</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-white" />
+                  </div>
+                </button>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
-                </div>
-                <ChevronDown className="w-4 h-4 text-white" />
-              </div>
-            </button>
+            )}
           </div>
         </div>
       )}
