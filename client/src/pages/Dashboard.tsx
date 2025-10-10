@@ -1098,7 +1098,7 @@ export default function Dashboard() {
                 )}
               </button>
               {teamRecord ? (
-                <span className="text-[10px] text-muted-foreground" data-testid="text-team-record">
+                <span className="text-muted-foreground text-[14px] text-center font-bold" data-testid="text-team-record">
                   {`${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}`}
                 </span>
               ) : null}
