@@ -313,8 +313,8 @@ export default function CreateScrimmage() {
                     <div>
                       <Label>Repeat on</Label>
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
-                          <div key={day} className="flex items-center space-x-2">
+                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+                          <div key={day + index} className="flex items-center space-x-2">
                             <Checkbox
                               id={`day-${index}`}
                               checked={form.watch('recurrenceDays')?.includes(index)}
