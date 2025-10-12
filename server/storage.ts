@@ -411,6 +411,7 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     const updateSet: any = {
+      email: userData.email,
       firstName: userData.firstName,
       lastName: userData.lastName,
       updatedAt: new Date(),
@@ -430,7 +431,7 @@ export class DatabaseStorage implements IStorage {
       .insert(users)
       .values(userData)
       .onConflictDoUpdate({
-        target: users.email,
+        target: users.id,
         set: updateSet,
       })
       .returning();
