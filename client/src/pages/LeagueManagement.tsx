@@ -2631,7 +2631,7 @@ export default function LeagueManagement() {
                   {games.length > 0 && (
                     <button
                       onClick={() => setShowDeleteAllGamesDialog(true)}
-                      className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors w-full"
+                      className="flex items-center justify-center gap-2 px-3 py-2 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors w-full text-[#ffffff] bg-[#860405]"
                       data-testid="button-delete-all-games-mobile"
                     >
                       <Trash2 className="w-4 h-4" />
