@@ -183,7 +183,7 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
               <span className="text-white text-sm font-bold">{count}</span>
             </div>
             <div>
-              <h3 className="text-base font-semibold text-red-600 dark:text-red-400">Record Scores</h3>
+              <h3 className="text-base font-semibold dark:text-red-400 text-[#ffffff]">Record Scores</h3>
             </div>
           </div>
           <Button
