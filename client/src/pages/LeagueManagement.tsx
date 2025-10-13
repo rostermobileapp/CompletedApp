@@ -1858,7 +1858,7 @@ export default function LeagueManagement() {
   return (
     <div className="min-h-screen flex flex-col pb-6" data-testid="league-management-page">
       {/* Header */}
-      <div className="p-6 pt-12">
+      <div className="p-6 pt-[12px] pb-[12px] pl-[24px] pr-[24px]">
         <div className="flex items-center gap-4 mb-4">
           <button 
             onClick={() => {
