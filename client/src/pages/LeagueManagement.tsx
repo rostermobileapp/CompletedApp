@@ -1894,7 +1894,6 @@ export default function LeagueManagement() {
         {seasons.length > 0 && (
           <div className="flex items-center gap-4 mb-4">
             <div className="flex-1">
-              <label className="block text-sm font-medium mb-2">Season</label>
               <select
                 value={selectedSeasonId}
                 onChange={(e) => setSelectedSeasonId(e.target.value)}
