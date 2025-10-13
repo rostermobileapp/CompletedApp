@@ -1051,7 +1051,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="p-3 pt-[0px] pb-[0px] flex items-center mt-[12px] mb-[12px] pl-[16px] pr-[16px]">
         <div className="flex items-center justify-between mb-3 w-full">
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2">
             <img 
               src={logoUrl}
               alt="Roster Logo" 
