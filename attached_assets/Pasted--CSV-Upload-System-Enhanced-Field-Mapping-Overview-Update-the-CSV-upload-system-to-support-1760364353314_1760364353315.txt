@@ -1,0 +1,137 @@
+# CSV Upload System - Enhanced Field Mapping
+
+## Overview
+Update the CSV upload system to support multiple player fields beyond the original name and team columns. The system should intelligently parse, match, and update player records with data from the new CSV format.
+
+## CSV Field Mapping
+
+| CSV Column Header | App Field | Data Type | Required | Notes |
+|------------------|-----------|-----------|----------|-------|
+| Player Full Name | First Name + Last Name | String | ✅ Yes | Must be parsed into separate first/last name fields |
+| Team | Assigned Team | String | ❌ Optional | Team name or identifier |
+| Skill Level | Skill Level | String/Number | ❌ Optional | Player's skill rating |
+| Email | Email | String | ❌ Optional | Valid email format |
+| Jersey # | Jersey Number | Number/String | ❌ Optional | Player's jersey number |
+| Player Type | Player Role | String | ❌ Optional | Role classification (e.g., "Forward", "Defense", etc.) |
+
+## Functional Requirements
+
+### 1. CSV Validation
+- **Required Field Check**: Verify that "Player Full Name" column exists and contains data for each row
+- **Column Recognition**: Support flexible column header matching (case-insensitive, handle variations like "Player Name", "Full Name", etc.)
+- **Data Type Validation**: Validate email format, numeric jersey numbers where applicable
+- **Error Handling**: Provide clear error messages for missing required fields or invalid data
+
+### 2. Name Parsing Logic
+- **Full Name Parsing**: Split "Player Full Name" into First Name and Last Name
+  - Handle common formats: "First Last", "Last, First", "First Middle Last"
+  - Default behavior: Last word = Last Name, everything else = First Name
+  - Handle edge cases: single names, multiple middle names, suffixes (Jr., Sr., III)
+- **Preserve Original**: Store original full name if parsing fails
+
+### 3. Player Matching Strategy
+- **Primary Match**: Match existing players by exact name match (First + Last)
+- **Fallback Options**: 
+  - Case-insensitive name matching
+  - Email matching if email is provided and exists in system
+  - Jersey number matching as tertiary option (if unique)
+- **Conflict Resolution**: Prompt user when multiple potential matches are found
+
+### 4. Update Logic
+- **Selective Updates**: Only update fields that have values in the CSV
+- **Empty Cell Handling**: Leave existing app data unchanged if CSV cell is empty
+- **Overwrite Policy**: CSV data overwrites existing app data for populated fields
+- **New Player Creation**: If no match is found, create new player record with provided data
+
+### 5. Field-Specific Handling
+
+#### Assigned Team
+- Match team name to existing teams in the app
+- Handle team name variations (abbreviations, case differences)
+- Flag unrecognized team names for review
+
+#### Skill Level
+- Accept common formats (numeric: 1-10, letters: A-D, descriptive: "Beginner", "Advanced")
+- Normalize to app's skill level format
+- Validate against allowed values
+
+#### Email
+- Validate email format (basic regex check)
+- Check for duplicate emails in the system
+- Flag invalid or duplicate emails
+
+#### Jersey Number
+- Accept numeric values or strings
+- Check for duplicate jersey numbers within the same team
+- Flag conflicts for user resolution
+
+#### Player Role
+- Map common role variations to app's role taxonomy
+- Accept custom roles if app allows
+- Normalize capitalization and formatting
+
+## User Experience Requirements
+
+### Before Upload
+- **Preview Mode**: Show first 5 rows with detected field mappings
+- **Column Mapping UI**: Allow users to manually map CSV columns to app fields if auto-detection fails
+- **Validation Summary**: Display count of valid rows, errors, and warnings
+
+### During Upload
+- **Progress Indicator**: Show upload progress with current row being processed
+- **Real-time Validation**: Display errors as they're encountered
+- **Pause/Cancel Option**: Allow users to stop the upload process
+
+### After Upload
+- **Success Summary**: 
+  - Number of players created
+  - Number of players updated
+  - Fields updated per player
+- **Error Report**: Detailed list of rows that failed with specific error messages
+- **Download Error Log**: Option to download CSV of failed rows for correction
+- **Conflict Resolution**: Interactive interface to resolve matching conflicts or data issues
+
+## Technical Specifications
+
+### CSV Processing
+- **Parser**: Use robust CSV parsing library (e.g., PapaParse, csv-parse)
+- **Encoding Support**: Handle UTF-8, UTF-16, and common encodings
+- **Large File Handling**: Process files in chunks for files >1000 rows
+- **Transaction Safety**: Use database transactions to rollback on critical errors
+
+### Data Integrity
+- **Backup**: Create backup before bulk updates
+- **Audit Trail**: Log all changes with timestamp, user, and old/new values
+- **Validation Rules**: Apply same validation as manual entry forms
+- **Duplicate Prevention**: Check for duplicates before creating new records
+
+### Performance
+- **Batch Processing**: Process multiple rows in batches (recommended: 50-100 rows/batch)
+- **Optimization**: Use bulk insert/update operations where possible
+- **Timeout Handling**: Implement reasonable timeouts for large files
+
+## Error Messages Examples
+
+### Clear, Actionable Error Messages
+- ✅ "Row 5: Player Full Name is required but missing"
+- ✅ "Row 12: Invalid email format 'john.example.com' - missing '@'"
+- ✅ "Row 23: Team 'Eagles' not found in system - please check team name"
+- ✅ "Row 45: Jersey number '7' already assigned to 'Mike Smith' on team 'Hawks'"
+
+### Warning Messages
+- ⚠️ "Row 8: 'Player Full Name' contains only first name - last name will be empty"
+- ⚠️ "Row 15: Skill level 'Intermediate' mapped to level '5'"
+- ⚠️ "Row 30: Empty team field - existing team assignment will be preserved"
+
+## Testing Checklist
+- [ ] Upload CSV with only required field (Player Full Name)
+- [ ] Upload CSV with all fields populated
+- [ ] Upload CSV with mixed empty/populated optional fields
+- [ ] Test name parsing with various formats
+- [ ] Test matching existing players by name
+- [ ] Test updating existing players vs creating new ones
+- [ ] Verify empty cells don't overwrite existing data
+- [ ] Test error handling for invalid data
+- [ ] Test large file performance (1000+ rows)
+- [ ] Verify audit trail captures all changes
+- [ ] Test rollback on error scenarios
