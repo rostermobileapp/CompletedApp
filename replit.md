@@ -24,11 +24,15 @@ PostgreSQL is the primary database, utilizing Drizzle ORM for type-safe operatio
 
 User authentication relies on Replit's OpenID Connect provider with session-based authentication. Role-based access control is implemented through subscription tiers (free, player_plus, commissioner) with hierarchical permissions. Authorization is enforced at both the API and UI levels to ensure security and manage feature access.
 
+### Recent Fixes
+- **User Upsert Email Conflict Handling** (October 2025): Updated the `upsertUser` function in the storage layer to gracefully handle email unique constraint violations. The function now checks for existing users by email before inserting, preventing server crashes when OIDC authentication attempts to create users with duplicate emails but different IDs. This ensures robust handling of authentication scenarios during both production use and testing.
+
 ## UI/UX Decisions
 
 The UI/UX focuses on a mobile-first responsive design, leveraging `shadcn/ui` components for a consistent and accessible user experience. Recent design updates include:
 - Landing page redesign with an Apple Fitness+ inspired aesthetic, large typography, parallax scrolling, and rounded cards with backdrop-blur, specifically targeting sports enthusiasts with relevant messaging.
 - Game Schedule section buttons (Import Schedules, Schedule Game, Delete All Games) display horizontally on mobile devices instead of vertically, improving space efficiency and user experience.
+- **Player Substitution Components Redesign** (October 2025): All player substitution request components redesigned with a consistent red/black color theme matching the "Record Scores" card on league management screen. Updated components include SubstituteRequestModal, SubstituteRequestsDashboard, SubstitutePlayerConfirmationInterface, and CommissionerApprovalInterface. Color palette uses red backgrounds (bg-red-50/dark:bg-red-950), black badges (bg-[#000000]), red borders (border-red-200/dark:border-red-700), and neutral gray for success/approved states instead of green. All previous blue, green, yellow, orange, and purple colors replaced with red/black/gray variants for consistent theming across light and dark modes.
 
 ## Feature Specifications
 
