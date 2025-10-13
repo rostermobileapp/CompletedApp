@@ -174,7 +174,7 @@ export default function ScoreVerification() {
           </div>
         )}
         {/* Score submission form */}
-        <div className="grid grid-cols-3 gap-4 items-center mb-3">
+        <div className="grid grid-cols-3 gap-4 items-center mt-[4px] mb-[4px]">
           <div className="text-center">
             <label className="block text-sm font-medium mb-1">
               {game.homeTeam?.name}
