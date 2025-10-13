@@ -173,7 +173,7 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
   return (
     <div className="mb-6">
       <div 
-        className="dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900 transition-colors pt-[4px] pb-[4px] pl-[12px] pr-[12px] bg-[#ff000082]"
+        className="dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4 cursor-pointer pt-[4px] pb-[4px] pl-[12px] pr-[12px] bg-[#ff000082]"
         onClick={() => navigate(`/league/${leagueId}/score-verification`)}
         data-testid="score-verification-alert"
       >
@@ -188,7 +188,7 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
           </div>
           <Button
             variant="outline"
-            className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900"
+            className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/league/${leagueId}/score-verification`);
