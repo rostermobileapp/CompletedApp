@@ -2621,7 +2621,7 @@ export default function LeagueManagement() {
                     <button
                       onClick={() => setShowScheduleGame(!showScheduleGame)}
                       disabled={teams.length < 2}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-warning text-black rounded-lg text-sm font-medium disabled:opacity-50 flex-1"
+                      className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex-1 bg-[#289d14] text-[#ffffff]"
                       data-testid="button-schedule-game"
                     >
                       <Plus className="w-4 h-4" />
