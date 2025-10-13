@@ -2921,28 +2921,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         header: true,
         skipEmptyLines: true,
         transformHeader: (header: string) => {
-          // Normalize header names for simplified format
+          // Normalize header names for enhanced template format
           const normalized = header.toLowerCase().trim();
           const mapping: Record<string, string> = {
-            'name': 'name',
-            'player': 'name', // Accept "Player" as a name column
-            'player name': 'name', // Accept "Player Name" as a name column
-            'team name': 'teamName',
+            // New template format
+            'player full name': 'fullName',
+            'full name': 'fullName',
+            'name': 'fullName',
+            'player': 'fullName',
+            'player name': 'fullName',
             'team': 'teamName',
+            'team name': 'teamName',
+            'skill level': 'skillLevel',
+            'skill rating': 'skillLevel',
+            'rating': 'skillLevel',
+            'email': 'email',
+            'jersey #': 'jerseyNumber',
+            'jersey number': 'jerseyNumber',
+            'jersey': 'jerseyNumber',
+            'player type': 'playerType',
+            'type': 'playerType',
+            'role': 'playerType',
             // Legacy support for old format
             'first name': 'firstName',
             'firstname': 'firstName',
             'last name': 'lastName', 
             'lastname': 'lastName',
-            'email': 'email',
             'phone': 'phoneNumber',
             'phone number': 'phoneNumber',
             'position': 'position',
-            'jersey number': 'jerseyNumber',
-            'jersey': 'jerseyNumber',
-            'skill rating': 'skillLevel',
-            'skill level': 'skillLevel',
-            'rating': 'skillLevel',
             'notes': 'notes'
           };
           return mapping[normalized] || header;
@@ -2980,16 +2987,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`CSV Import: First row data:`, JSON.stringify(parseResults.data[0]));
       }
 
+      // Helper function for email validation
+      const isValidEmail = (email: string): boolean => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+      };
+
+      // Helper function for enhanced name parsing
+      const parseFullName = (fullName: string): { firstName: string; lastName: string } => {
+        const trimmed = fullName.trim();
+        
+        // Handle "Last, First" format
+        if (trimmed.includes(',')) {
+          const parts = trimmed.split(',').map(p => p.trim());
+          return {
+            lastName: parts[0] || '',
+            firstName: parts.slice(1).join(' ') || ''
+          };
+        }
+        
+        // Handle "First Middle Last" format
+        const nameParts = trimmed.split(/\s+/);
+        if (nameParts.length === 0) {
+          return { firstName: '', lastName: '' };
+        } else if (nameParts.length === 1) {
+          return { firstName: nameParts[0], lastName: '' };
+        } else {
+          // Last word is last name, everything else is first name
+          const lastName = nameParts[nameParts.length - 1];
+          const firstName = nameParts.slice(0, -1).join(' ');
+          return { firstName, lastName };
+        }
+      };
+
+      // Helper function to normalize player type
+      const normalizePlayerType = (type: string | null | undefined): boolean => {
+        if (!type) return false;
+        const normalized = type.toLowerCase().trim();
+        return normalized === 'goalie' || normalized === 'g';
+      };
+
       parseResults.data.forEach((row: any, index: number) => {
-        // Handle both new simplified format (Name, Team Name) and legacy format
+        // Skip header rows or rows that look like instructions
+        if (row.fullName?.toLowerCase().includes('required') || 
+            row.fullName?.toLowerCase().includes('optional') ||
+            !row.fullName?.trim()) {
+          return;
+        }
+
+        // Enhanced name parsing
         let firstName = '';
         let lastName = '';
         
-        if (row.name) {
-          // New simplified format: split "Name" field
-          const nameParts = row.name.trim().split(' ');
-          firstName = nameParts[0] || '';
-          lastName = nameParts.slice(1).join(' ') || '';
+        if (row.fullName) {
+          // New template format: "Player Full Name"
+          const parsed = parseFullName(row.fullName);
+          firstName = parsed.firstName;
+          lastName = parsed.lastName;
         } else if (row.firstName && row.lastName) {
           // Legacy format
           firstName = row.firstName.trim();
@@ -2997,24 +3051,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (!firstName) {
-          errors.push(`Row ${index + 1}: Name is required (expected 'Name', 'Player', or 'First Name' column)`);
+          errors.push(`Row ${index + 1}: Player Full Name is required but missing`);
           return;
         }
+
+        // Email validation
+        const email = row.email?.trim() || null;
+        if (email && !isValidEmail(email)) {
+          errors.push(`Row ${index + 1}: Invalid email format '${email}' - must be a valid email address`);
+          return;
+        }
+
+        // Parse jersey number
+        let jerseyNumber = null;
+        if (row.jerseyNumber) {
+          const parsed = parseInt(row.jerseyNumber.toString().trim());
+          if (!isNaN(parsed)) {
+            jerseyNumber = parsed;
+          }
+        }
+
+        // Normalize player type (Skater or Goalie)
+        const isGoalie = normalizePlayerType(row.playerType);
 
         const player = {
           firstName: firstName,
           lastName: lastName,
-          email: row.email?.trim() || null,
+          email: email,
           phoneNumber: row.phoneNumber?.trim() || null,
           position: row.position?.trim() || null,
-          jerseyNumber: row.jerseyNumber ? parseInt(row.jerseyNumber) : null,
+          jerseyNumber: jerseyNumber,
           skillLevel: row.skillLevel?.trim() || null,
           teamName: row.teamName?.trim() || null,
           teamId: null as string | null,
-          notes: row.notes?.trim() || null
+          notes: row.notes?.trim() || null,
+          isGoalie: isGoalie
         };
-
-        // Keep skill level as provided (no validation since it can be text)
 
         // Try to match team name to existing team
         if (player.teamName) {
@@ -3074,38 +3146,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await storage.createImportedPlayersWithTeams(importRecord.id, leagueId, validPlayers);
         
+        // Get all existing league memberships to check for duplicates and potential matches
+        const existingMemberships = await db.query.leagueMemberships.findMany({
+          where: eq(leagueMemberships.leagueId, leagueId),
+          with: {
+            user: true
+          }
+        });
+
         // Create placeholder user accounts and league memberships for imported players
         for (const player of validPlayers) {
           try {
-            // Create a placeholder user account - let DB generate ID
-            const uniqueEmail = player.email || `${player.firstName.toLowerCase()}.${player.lastName.toLowerCase()}.${Date.now()}@placeholder.roster`;
-            const placeholderUser = await storage.upsertUser({
-              email: uniqueEmail,
-              firstName: player.firstName,
-              lastName: player.lastName,
-              profileImageUrl: null,
+            // Check if player already exists in the league (by name or email)
+            const existingMember = existingMemberships.find(m => {
+              const nameMatch = m.user.firstName?.toLowerCase() === player.firstName.toLowerCase() &&
+                                m.user.lastName?.toLowerCase() === player.lastName.toLowerCase();
+              const emailMatch = player.email && m.user.email?.toLowerCase() === player.email.toLowerCase();
+              return nameMatch || emailMatch;
             });
-            
-            // Create league membership for this user
-            await db.insert(leagueMemberships).values({
-              userId: placeholderUser.id,
-              leagueId: leagueId,
-              assignedTeamId: player.teamId,
-              status: 'approved',
-              skillLevel: player.skillLevel,
-              position: player.position,
-              jerseyNumber: player.jerseyNumber,
-              notes: player.notes,
-              approvedAt: new Date(),
-            });
-            
-            actualSuccessCount++;
-            createdPlayerIds.push(placeholderUser.id);
+
+            if (existingMember) {
+              // Update existing player with new data (only if CSV has values)
+              const updateData: any = {};
+              if (player.teamId) updateData.assignedTeamId = player.teamId;
+              if (player.skillLevel) updateData.skillLevel = player.skillLevel;
+              if (player.position) updateData.position = player.position;
+              if (player.jerseyNumber !== null) updateData.jerseyNumber = player.jerseyNumber;
+              if (player.notes) updateData.notes = player.notes;
+              updateData.isGoalie = player.isGoalie;
+
+              if (Object.keys(updateData).length > 0) {
+                await db.update(leagueMemberships)
+                  .set(updateData)
+                  .where(eq(leagueMemberships.id, existingMember.id));
+              }
+              
+              actualSuccessCount++;
+            } else {
+              // Create new user and membership
+              const uniqueEmail = player.email || `${player.firstName.toLowerCase()}.${player.lastName.toLowerCase()}.${Date.now()}@placeholder.roster`;
+              const placeholderUser = await storage.upsertUser({
+                email: uniqueEmail,
+                firstName: player.firstName,
+                lastName: player.lastName,
+                profileImageUrl: null,
+              });
+              
+              // Create league membership for this user
+              await db.insert(leagueMemberships).values({
+                userId: placeholderUser.id,
+                leagueId: leagueId,
+                assignedTeamId: player.teamId,
+                status: 'approved',
+                skillLevel: player.skillLevel,
+                position: player.position,
+                jerseyNumber: player.jerseyNumber,
+                notes: player.notes,
+                isGoalie: player.isGoalie,
+                approvedAt: new Date(),
+              });
+              
+              actualSuccessCount++;
+              createdPlayerIds.push(placeholderUser.id);
+            }
             
           } catch (error) {
-            console.error(`Failed to create user and membership for ${player.firstName} ${player.lastName}:`, error);
+            console.error(`Failed to create/update user and membership for ${player.firstName} ${player.lastName}:`, error);
             // Add error to response so we can debug
-            errors.push(`Failed to create user for ${player.firstName} ${player.lastName}: ${(error as Error).message}`);
+            errors.push(`Failed to create/update user for ${player.firstName} ${player.lastName}: ${(error as Error).message}`);
           }
         }
 
