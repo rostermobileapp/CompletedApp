@@ -66,7 +66,6 @@ type LeagueMember = {
   id: string;
   userId: string;
   skillLevel: string | null;
-  skillRating?: number; // Added missing property
   status: string;
   assignedTeamId?: string;
   position?: string;
@@ -635,7 +634,6 @@ export default function LeagueManagement() {
     assignedTeamId: '',
     position: '',
     skillLevel: '',
-    skillRating: 1,
     jerseyNumber: '',
     notes: '',
     isCaptain: false,
@@ -921,7 +919,6 @@ export default function LeagueManagement() {
           assignedTeamId: memberToEdit.assignedTeamId || '',
           position: memberToEdit.position || '',
           skillLevel: memberToEdit.skillLevel || '',
-          skillRating: memberToEdit.skillRating || 1,
           jerseyNumber: memberToEdit.jerseyNumber?.toString() || '',
           notes: memberToEdit.notes || '',
           isCaptain: assignedTeam?.captainId === memberToEdit.userId,
@@ -2164,7 +2161,6 @@ export default function LeagueManagement() {
                           assignedTeamId: member.assignedTeamId || '',
                           position: member.position || '',
                           skillLevel: member.skillLevel || '',
-                          skillRating: member.skillRating || 1,
                           jerseyNumber: member.jerseyNumber?.toString() || '',
                           notes: member.notes || '',
                           isCaptain: assignedTeam?.captainId === member.userId,
@@ -2449,7 +2445,6 @@ export default function LeagueManagement() {
                                 assignedTeamId: member.assignedTeamId || '',
                                 position: member.position || '',
                                 skillLevel: member.skillLevel || '',
-                                skillRating: member.skillRating || 1,
                                 jerseyNumber: member.jerseyNumber?.toString() || '',
                                 notes: member.notes || '',
                                 isCaptain: assignedTeam?.captainId === member.userId,
@@ -2511,9 +2506,9 @@ export default function LeagueManagement() {
                               <span className="tier-badge bg-success text-accent-foreground text-xs px-2 py-1 rounded-full">
                                 {member.status?.toUpperCase() || 'ACTIVE'}
                               </span>
-                              {member.skillRating && (
+                              {member.skillLevel && (
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  Skill: {member.skillRating}/10
+                                  Skill: {member.skillLevel}
                                 </p>
                               )}
                             </div>
@@ -3033,16 +3028,15 @@ export default function LeagueManagement() {
                   />
                 </div>
 
-                {/* Skill Rating */}
+                {/* Skill Level */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Skill Rating (1-10)</label>
+                  <label className="block text-sm font-medium mb-2">Skill Level (Optional)</label>
                   <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={playerEditForm.skillRating}
-                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, skillRating: parseInt(e.target.value) || 1 }))}
+                    type="text"
+                    value={playerEditForm.skillLevel}
+                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, skillLevel: e.target.value }))}
                     className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="e.g., 1-10, A-E, Beginner"
                   />
                 </div>
 
@@ -3090,7 +3084,7 @@ export default function LeagueManagement() {
                       const updates = {
                         assignedTeamId: playerEditForm.assignedTeamId || null,
                         position: playerEditForm.position,
-                        skillRating: playerEditForm.skillRating,
+                        skillLevel: playerEditForm.skillLevel?.trim() || null,
                         jerseyNumber: playerEditForm.jerseyNumber ? parseInt(playerEditForm.jerseyNumber) : null,
                         notes: playerEditForm.notes,
                         isGoalie: playerEditForm.isGoalie,
