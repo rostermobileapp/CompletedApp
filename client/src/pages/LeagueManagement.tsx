@@ -2020,6 +2020,22 @@ export default function LeagueManagement() {
             {showBulkImport && (
               <div className="mt-4 p-4 bg-card rounded-lg border border-border">
                 <div className="flex flex-col gap-3">
+                  {/* Download Template Button */}
+                  <div className="flex items-center justify-between pb-2 border-b border-border">
+                    <p className="text-sm text-muted-foreground">
+                      Download the CSV template to import players
+                    </p>
+                    <a
+                      href="/player-import-template.csv"
+                      download="player-import-template.csv"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+                      data-testid="button-download-template"
+                    >
+                      <Download className="w-3 h-3" />
+                      Download Template
+                    </a>
+                  </div>
+                  
                   <div
                     className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => fileInputRef.current?.click()}
@@ -2037,7 +2053,7 @@ export default function LeagueManagement() {
                       <div>
                         <p className="font-medium text-sm mb-1">Select CSV file</p>
                         <p className="text-xs text-muted-foreground">
-                          Format: Name,Team Name
+                          Format: Player Full Name, Team, Skill Level, Email, Jersey #, Player Type
                         </p>
                       </div>
                     )}
