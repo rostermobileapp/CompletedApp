@@ -2883,55 +2883,61 @@ export default function LeagueManagement() {
                         return (
                           <div 
                             key={game.id} 
-                            className="flex items-center justify-between p-4 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
+                            className="p-4 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
                             onClick={() => {
                               setSelectedGame(game);
                               setShowEditGame(true);
                             }}
                             data-testid={`game-${game.id}`}
                           >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-4 mb-2">
-                                <div className="flex flex-col items-center">
-                                  <div className="w-10 h-10 bg-primary rounded flex items-center justify-center mb-1">
-                                    {homeTeam?.logoUrl ? (
-                                      <img 
-                                        src={homeTeam.logoUrl} 
-                                        alt={`${homeTeam.name} logo`}
-                                        className="w-full h-full rounded object-cover"
-                                        data-testid={`img-home-team-logo-${game.id}`}
-                                      />
-                                    ) : (
-                                      <Trophy className="w-5 h-5 text-primary-foreground" />
-                                    )}
-                                  </div>
-                                  <p className="font-medium text-center">{homeTeam?.name || 'Unknown'}</p>
-                                  <p className="text-xs text-muted-foreground">HOME</p>
+                            {/* Team Matchup */}
+                            <div className="flex items-center justify-between mb-3">
+                              {/* Home Team */}
+                              <div className="flex flex-col items-center flex-1">
+                                <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mb-2">
+                                  {homeTeam?.logoUrl ? (
+                                    <img 
+                                      src={homeTeam.logoUrl} 
+                                      alt={`${homeTeam.name} logo`}
+                                      className="w-full h-full rounded-lg object-cover"
+                                      data-testid={`img-home-team-logo-${game.id}`}
+                                    />
+                                  ) : (
+                                    <Trophy className="w-8 h-8 text-primary-foreground" />
+                                  )}
                                 </div>
-                                <div className="text-muted-foreground font-bold">VS</div>
-                                <div className="flex flex-col items-center">
-                                  <div className="w-10 h-10 bg-primary rounded flex items-center justify-center mb-1">
-                                    {awayTeam?.logoUrl ? (
-                                      <img 
-                                        src={awayTeam.logoUrl} 
-                                        alt={`${awayTeam.name} logo`}
-                                        className="w-full h-full rounded object-cover"
-                                        data-testid={`img-away-team-logo-${game.id}`}
-                                      />
-                                    ) : (
-                                      <Trophy className="w-5 h-5 text-primary-foreground" />
-                                    )}
-                                  </div>
-                                  <p className="font-medium text-center">{awayTeam?.name || 'Unknown'}</p>
-                                  <p className="text-xs text-muted-foreground">AWAY</p>
-                                </div>
+                                <p className="font-semibold text-center text-sm">{homeTeam?.name || 'Unknown'}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">HOME</p>
                               </div>
-                              <div className="text-sm text-muted-foreground">
-                                <p>📅 {gameDate.toLocaleDateString()} at {gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                {game.venue && <p>📍 {game.venue}</p>}
+
+                              {/* VS Divider */}
+                              <div className="px-4 flex items-center justify-center">
+                                <span className="text-muted-foreground font-bold text-lg">VS</span>
+                              </div>
+
+                              {/* Away Team */}
+                              <div className="flex flex-col items-center flex-1">
+                                <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mb-2">
+                                  {awayTeam?.logoUrl ? (
+                                    <img 
+                                      src={awayTeam.logoUrl} 
+                                      alt={`${awayTeam.name} logo`}
+                                      className="w-full h-full rounded-lg object-cover"
+                                      data-testid={`img-away-team-logo-${game.id}`}
+                                    />
+                                  ) : (
+                                    <Trophy className="w-8 h-8 text-primary-foreground" />
+                                  )}
+                                </div>
+                                <p className="font-semibold text-center text-sm">{awayTeam?.name || 'Unknown'}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">AWAY</p>
                               </div>
                             </div>
-                            <div className="text-right">
+
+                            {/* Game Details */}
+                            <div className="text-center text-sm text-muted-foreground space-y-1 pt-3 border-t">
+                              <p>📅 {gameDate.toLocaleDateString()} at {gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                              {game.venue && <p>📍 {game.venue}</p>}
                             </div>
                           </div>
                         );
