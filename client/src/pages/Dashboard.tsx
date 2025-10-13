@@ -1055,7 +1055,7 @@ export default function Dashboard() {
             <img 
               src={logoUrl}
               alt="Roster Logo" 
-              className="h-6 w-auto pt-[0px] pb-[0px] pl-[12px] pr-[12px]"
+              className="h-[30px] w-auto pt-[0px] pb-[0px] pl-[12px] pr-[12px]"
               data-testid="img-roster-logo"
             />
             {tier !== 'free' && (
