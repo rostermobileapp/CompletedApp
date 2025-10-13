@@ -167,11 +167,11 @@
   /* Mobile optimizations */
   @media (max-width: 640px) {
     body {
-      font-size: 14px;
+      font-size: 16px;
     }
     
     .tier-badge {
-      font-size: 0.625rem;
+      font-size: 0.75rem;
       padding: 0.125rem 0.375rem;
     }
   }
@@ -298,7 +298,7 @@
 
   body .uppy-Dashboard-browse,
   html body .uppy-Dashboard-browse {
-    font-size: 14px !important;
+    font-size: 16px !important;
   }
 
   body .uppy-Dashboard-dropFilesTitle,
@@ -310,7 +310,7 @@
   /* Compact header */
   body .uppy-Dashboard-title,
   html body .uppy-Dashboard-title {
-    font-size: 18px !important;
+    font-size: 20px !important;
     margin-bottom: 10px !important;
   }
 }

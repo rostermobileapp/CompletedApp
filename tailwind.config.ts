@@ -128,7 +128,10 @@ export default {
         "128": "32rem",
       },
       fontSize: {
-        "2xs": ["0.625rem", { lineHeight: "0.75rem" }],
+        "2xs": ["0.75rem", { lineHeight: "1rem" }],
+        "sm": ["0.75rem", { lineHeight: "1rem" }],
+        "lg": ["1.25rem", { lineHeight: "1.75rem" }],
+        "3xl": ["2rem", { lineHeight: "2.25rem" }],
       },
       screens: {
         "xs": "375px",

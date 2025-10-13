@@ -544,7 +544,7 @@ function PollCard({
                     )}
                     <span className="font-medium text-sm text-left truncate">{option}</span>
                     {isTopChoice && totalVotes > 0 && (
-                      <span className="text-[10px] bg-accent text-accent-foreground px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                      <span className="text-[12px] bg-accent text-accent-foreground px-2 py-0.5 rounded-full font-medium flex-shrink-0">
                         Leading
                       </span>
                     )}
@@ -568,7 +568,7 @@ function PollCard({
           {isPending && (
             <div className="flex items-center gap-2 text-primary">
               <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              <span className="text-[10px]">Recording vote...</span>
+              <span className="text-[12px]">Recording vote...</span>
             </div>
           )}
         </div>

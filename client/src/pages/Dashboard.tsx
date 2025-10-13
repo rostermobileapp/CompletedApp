@@ -1070,7 +1070,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3">
             {teamRecord ? (
-              <span className="text-[14px] text-center font-bold bg-[#3c83f685] text-[#ffffff] ml-[4px] mr-[4px] mt-[0px] mb-[0px] pl-[4px] pr-[4px] pt-[4px] pb-[4px]" data-testid="text-team-record">
+              <span className="text-[16px] text-center font-bold bg-[#3c83f685] text-[#ffffff] ml-[4px] mr-[4px] mt-[0px] mb-[0px] pl-[4px] pr-[4px] pt-[4px] pb-[4px]" data-testid="text-team-record">
                 {`${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}`}
               </span>
             ) : null}
@@ -1229,7 +1229,7 @@ export default function Dashboard() {
                   <p className="text-2xl font-bold" data-testid="text-games-remaining">
                     {(teamRecord as any)?.gamesRemaining ?? 0}
                   </p>
-                  <p className="text-muted-foreground text-[14px]">Games Left</p>
+                  <p className="text-muted-foreground text-[16px]">Games Left</p>
                 </div>
               </div>
             </div>
