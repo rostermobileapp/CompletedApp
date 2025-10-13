@@ -173,7 +173,7 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
   return (
     <div className="mb-6">
       <div 
-        className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
+        className="dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900 transition-colors pt-[4px] pb-[4px] pl-[12px] pr-[12px] bg-[#ff000082]"
         onClick={() => navigate(`/league/${leagueId}/score-verification`)}
         data-testid="score-verification-alert"
       >
