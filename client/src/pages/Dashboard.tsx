@@ -1049,8 +1049,8 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="dashboard-page">
       {/* Header */}
-      <div className="p-6 pl-[32px] pr-[32px] pt-[0px] pb-[0px] mt-[12px] mb-[12px] flex items-center">
-        <div className="flex items-center justify-between mb-6 w-full">
+      <div className="p-3 pl-[32px] pr-[32px] pt-[0px] pb-[0px] mt-[6px] mb-[6px] flex items-center">
+        <div className="flex items-center justify-between mb-3 w-full">
           <div className="flex items-center gap-4">
             <img 
               src={logoUrl}
@@ -1058,9 +1058,22 @@ export default function Dashboard() {
               className="h-6 w-auto pt-[0px] pb-[0px] pl-[12px] pr-[12px]"
               data-testid="img-roster-logo"
             />
+            {tier !== 'free' && (
+              <>
+                {tier === 'commissioner' || tier === 'secondary_commissioner' ? (
+                  <Crown className="w-12 h-12 text-yellow-500" data-testid="badge-subscription-tier" />
+                ) : (
+                  <Star className="w-12 h-12 text-primary fill-current" data-testid="badge-subscription-tier" />
+                )}
+              </>
+            )}
           </div>
           <div className="flex items-center gap-3">
-            
+            {teamRecord ? (
+              <span className="text-[14px] text-center font-bold bg-[#3c83f685] text-[#ffffff] ml-[4px] mr-[4px] mt-[0px] mb-[0px] pl-[4px] pr-[4px] pt-[4px] pb-[4px]" data-testid="text-team-record">
+                {`${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}`}
+              </span>
+            ) : null}
             
             {/* Captain Badge */}
             {isTeamCaptainInSelectedLeague && (
@@ -1069,40 +1082,23 @@ export default function Dashboard() {
               </span>
             )}
             
-            {tier !== 'free' && (
-              <>
-                {tier === 'commissioner' || tier === 'secondary_commissioner' ? (
-                  <Crown className="w-6 h-6 text-yellow-500" data-testid="badge-subscription-tier" />
-                ) : (
-                  <Star className="w-6 h-6 text-primary fill-current" data-testid="badge-subscription-tier" />
-                )}
-              </>
-            )}
-            
-            <div className="flex flex-col items-center gap-1">
-              <button 
-                onClick={() => navigate('/profile')}
-                className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-primary"
-                data-testid="button-profile"
-              >
-                {(user as any)?.profileImageUrl ? (
-                  <img 
-                    src={(user as any).profileImageUrl} 
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-primary-foreground text-lg font-semibold">
-                    {(user as any)?.firstName?.[0] || 'U'}
-                  </span>
-                )}
-              </button>
-              {teamRecord ? (
-                <span className="text-[14px] text-center font-bold bg-[#3c83f685] text-[#ffffff] ml-[4px] mr-[4px] mt-[0px] mb-[0px] pl-[4px] pr-[4px] pt-[4px] pb-[4px]" data-testid="text-team-record">
-                  {`${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}`}
+            <button 
+              onClick={() => navigate('/profile')}
+              className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-primary"
+              data-testid="button-profile"
+            >
+              {(user as any)?.profileImageUrl ? (
+                <img 
+                  src={(user as any).profileImageUrl} 
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-primary-foreground text-lg font-semibold">
+                  {(user as any)?.firstName?.[0] || 'U'}
                 </span>
-              ) : null}
-            </div>
+              )}
+            </button>
           </div>
         </div>
       </div>
