@@ -2725,6 +2725,22 @@ export default function LeagueManagement() {
               {showScheduleImport && (
                 <div className="mb-6 p-4 bg-card rounded-lg border border-border">
                   <div className="flex flex-col gap-3">
+                    {/* Download Template Button */}
+                    <div className="flex items-center justify-between pb-2 border-b border-border">
+                      <p className="text-sm text-muted-foreground">
+                        Download the CSV template to import schedules
+                      </p>
+                      <a
+                        href="/schedule-import-template.csv"
+                        download="schedule-import-template.csv"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+                        data-testid="button-download-schedule-template"
+                      >
+                        <Download className="w-3 h-3" />
+                        Download Template
+                      </a>
+                    </div>
+                    
                     <div
                       className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => scheduleFileInputRef.current?.click()}
