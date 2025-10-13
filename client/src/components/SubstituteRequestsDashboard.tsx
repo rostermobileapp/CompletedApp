@@ -86,7 +86,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
 
   const RequestCard = ({ request, isPending = true }: { request: any; isPending?: boolean }) => (
     <Card 
-      className={`transition-all ${selectedRequest === request.id ? 'ring-2 ring-primary' : ''}`}
+      className={`transition-all bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 ${selectedRequest === request.id ? 'ring-2 ring-red-500' : ''}`}
       data-testid={`request-card-${request.id}`}
     >
       <CardHeader className="pb-3">
@@ -95,9 +95,9 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
             <Badge 
               variant={request.status === 'pending' ? 'secondary' : request.status === 'approved' ? 'default' : 'destructive'}
               className={
-                request.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                request.status === 'approved' ? 'bg-green-100 text-green-700' :
-                'bg-red-100 text-red-700'
+                request.status === 'pending' ? 'bg-[#000000] text-[#ffffff]' :
+                request.status === 'approved' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
+                'bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-300'
               }
             >
               {request.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
@@ -111,7 +111,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
           </div>
         </div>
         
-        <CardTitle className="text-base flex items-center gap-2">
+        <CardTitle className="text-base flex items-center gap-2 text-red-700 dark:text-red-400">
           <Users className="h-4 w-4" />
           Substitute Request
         </CardTitle>
@@ -128,7 +128,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {/* Original Player */}
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-2">Player Unable to Attend:</p>
-          <div className="flex items-center gap-3 p-2 bg-red-50 rounded-lg border border-red-200">
+          <div className="flex items-center gap-3 p-2 bg-red-100 dark:bg-red-900 rounded-lg border border-red-200 dark:border-red-700">
             <ClickableAvatar
               userId={request.originalPlayer.id}
               profileImageUrl={request.originalPlayer.profileImageUrl}
@@ -149,7 +149,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {request.substitutePlayer && (
           <div>
             <p className="text-sm font-medium text-muted-foreground mb-2">Requested Substitute:</p>
-            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+            <div className="flex items-center gap-3 p-2 bg-white dark:bg-red-900 rounded-lg border border-red-200 dark:border-red-700">
               <ClickableAvatar
                 userId={request.substitutePlayer.id}
                 profileImageUrl={request.substitutePlayer.profileImageUrl}
@@ -216,17 +216,18 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
                 size="sm"
                 onClick={() => handleApprove(request.id)}
                 disabled={updateRequestMutation.isPending}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-[#000000] text-[#fcfcfc] hover:bg-[#000000] hover:opacity-90"
                 data-testid={`button-approve-${request.id}`}
               >
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Approve
               </Button>
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
                 onClick={() => handleDeny(request.id)}
                 disabled={updateRequestMutation.isPending}
+                className="border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900"
                 data-testid={`button-deny-${request.id}`}
               >
                 <XCircle className="h-4 w-4 mr-1" />
@@ -269,7 +270,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {pendingRequests.length > 0 && (
           <div>
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-yellow-600" />
+              <Clock className="h-5 w-5 text-red-600 dark:text-red-400" />
               Pending Requests ({pendingRequests.length})
             </h2>
             <ScrollArea className="max-h-[60vh]">
@@ -287,7 +288,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
           <div>
             {pendingRequests.length > 0 && <Separator />}
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+              <CheckCircle className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               Processed Requests ({processedRequests.length})
             </h2>
             <ScrollArea className="max-h-[40vh]">

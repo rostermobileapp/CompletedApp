@@ -118,13 +118,13 @@ export function SubstituteRequestModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl h-[85vh] flex flex-col" data-testid="substitute-request-modal">
+      <DialogContent className="max-w-2xl h-[85vh] flex flex-col bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800" data-testid="substitute-request-modal">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
             <UserPlus className="h-5 w-5" />
             Request Substitute for {originalPlayerName}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-red-600 dark:text-red-400">
             Search and select a player to request as a substitute
           </DialogDescription>
         </DialogHeader>
@@ -174,8 +174,8 @@ export function SubstituteRequestModal({
                       key={player.id}
                       className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
                         selectedPlayer === player.id 
-                          ? 'border-primary bg-primary/5' 
-                          : 'hover:bg-muted/50'
+                          ? 'border-red-400 dark:border-red-600 bg-red-100 dark:bg-red-900/50' 
+                          : 'hover:bg-red-50 dark:hover:bg-red-950/30'
                       }`}
                       onClick={() => setSelectedPlayer(player.id)}
                       data-testid={`player-option-${player.id}`}
@@ -207,7 +207,7 @@ export function SubstituteRequestModal({
                       
                       <div className="flex items-center">
                         {selectedPlayer === player.id && (
-                          <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+                          <div className="h-4 w-4 rounded-full bg-red-600 flex items-center justify-center">
                             <div className="h-2 w-2 rounded-full bg-white"></div>
                           </div>
                         )}
@@ -220,10 +220,11 @@ export function SubstituteRequestModal({
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex justify-end gap-2 pt-4 border-t border-red-200 dark:border-red-800">
             <Button
               variant="outline"
               onClick={handleClose}
+              className="border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
               data-testid="button-cancel"
             >
               Cancel
@@ -231,6 +232,7 @@ export function SubstituteRequestModal({
             <Button
               onClick={handleSubmit}
               disabled={!selectedPlayer || createRequestMutation.isPending}
+              className="bg-[#000000] text-[#fcfcfc] hover:bg-[#000000] hover:opacity-90"
               data-testid="button-send-request"
             >
               {createRequestMutation.isPending ? "Sending..." : "Send Request"}

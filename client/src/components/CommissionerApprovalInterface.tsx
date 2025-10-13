@@ -105,18 +105,18 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
 
   const RequestCard = ({ request }: { request: any }) => (
     <Card 
-      className={`transition-all hover:shadow-md ${selectedRequest === request.id ? 'ring-2 ring-primary' : ''}`}
+      className={`transition-all hover:shadow-md bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 ${selectedRequest === request.id ? 'ring-2 ring-red-500' : ''}`}
       data-testid={`commissioner-approval-card-${request.id}`}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
-            <Badge className="bg-purple-100 text-purple-700">
+            <Badge className="bg-[#000000] text-[#ffffff]">
               <Clock className="h-3 w-3 mr-1" />
               Final Approval Required
             </Badge>
             {request.opposingCaptainApproved && (
-              <Badge className="bg-green-100 text-green-700">
+              <Badge className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Captain Approved
               </Badge>
@@ -127,8 +127,8 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
           </div>
         </div>
         
-        <CardTitle className="text-base flex items-center gap-2">
-          <Crown className="h-4 w-4 text-purple-600" />
+        <CardTitle className="text-base flex items-center gap-2 text-red-700 dark:text-red-400">
+          <Crown className="h-4 w-4" />
           Commissioner Final Review
         </CardTitle>
         
@@ -142,44 +142,44 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
       
       <CardContent className="space-y-4">
         {/* Approval Progress */}
-        <div className="p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-          <p className="text-xs font-medium text-purple-800 mb-3">APPROVAL PROGRESS:</p>
+        <div className="p-3 bg-white dark:bg-red-900 rounded-lg border border-red-200 dark:border-red-700">
+          <p className="text-xs font-medium text-red-800 dark:text-red-300 mb-3">APPROVAL PROGRESS:</p>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-700">Team Captain Approved</span>
+              <CheckCircle className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Team Captain Approved</span>
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-700">Opposing Captain Approved</span>
+              <CheckCircle className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Opposing Captain Approved</span>
             </div>
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-purple-600" />
-              <span className="text-sm text-purple-700 font-medium">Commissioner Approval (FINAL)</span>
+              <Clock className="h-4 w-4 text-red-600" />
+              <span className="text-sm text-red-700 dark:text-red-400 font-medium">Commissioner Approval (FINAL)</span>
             </div>
           </div>
         </div>
 
         {/* Teams Information */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-xs font-medium text-blue-800 mb-2">REQUESTING TEAM:</p>
+          <div className="p-3 bg-white dark:bg-red-900 rounded-lg border border-red-200 dark:border-red-700">
+            <p className="text-xs font-medium text-red-800 dark:text-red-300 mb-2">REQUESTING TEAM:</p>
             <div className="flex items-center gap-2">
-              <div className="h-6 w-6 bg-blue-600 rounded-full flex items-center justify-center">
+              <div className="h-6 w-6 bg-[#000000] rounded-full flex items-center justify-center">
                 <Users className="h-3 w-3 text-white" />
               </div>
-              <span className="text-sm font-medium text-blue-900">
+              <span className="text-sm font-medium text-red-900 dark:text-red-200">
                 {request.requestingTeam?.name || 'Unknown Team'}
               </span>
             </div>
           </div>
-          <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-            <p className="text-xs font-medium text-orange-800 mb-2">OPPOSING TEAM:</p>
+          <div className="p-3 bg-white dark:bg-red-900 rounded-lg border border-red-200 dark:border-red-700">
+            <p className="text-xs font-medium text-red-800 dark:text-red-300 mb-2">OPPOSING TEAM:</p>
             <div className="flex items-center gap-2">
-              <div className="h-6 w-6 bg-orange-600 rounded-full flex items-center justify-center">
+              <div className="h-6 w-6 bg-[#000000] rounded-full flex items-center justify-center">
                 <Shield className="h-3 w-3 text-white" />
               </div>
-              <span className="text-sm font-medium text-orange-900">
+              <span className="text-sm font-medium text-red-900 dark:text-red-200">
                 {request.opposingTeam?.name || 'Unknown Team'}
               </span>
             </div>
@@ -190,10 +190,10 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-2">Player Substitution:</p>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 p-2 bg-red-50 rounded-lg flex-1">
+            <div className="flex items-center gap-2 p-2 bg-red-100 dark:bg-red-900 rounded-lg flex-1 border border-red-200 dark:border-red-700">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={request.originalPlayer?.profileImageUrl} />
-                <AvatarFallback className="text-xs bg-red-200 text-red-800">
+                <AvatarFallback className="text-xs bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200">
                   {request.originalPlayer?.firstName?.[0]}{request.originalPlayer?.lastName?.[0]}
                 </AvatarFallback>
               </Avatar>
@@ -201,17 +201,17 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
                 <p className="text-sm font-medium">
                   {request.originalPlayer?.firstName} {request.originalPlayer?.lastName}
                 </p>
-                <p className="text-xs text-red-600">Unable to attend</p>
+                <p className="text-xs text-red-600 dark:text-red-400">Unable to attend</p>
               </div>
             </div>
             
             {request.substitutePlayer && (
               <>
                 <div className="text-muted-foreground">→</div>
-                <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg flex-1">
+                <div className="flex items-center gap-2 p-2 bg-white dark:bg-red-900 rounded-lg flex-1 border border-red-200 dark:border-red-700">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={request.substitutePlayer?.profileImageUrl} />
-                    <AvatarFallback className="text-xs bg-green-200 text-green-800">
+                    <AvatarFallback className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
                       {request.substitutePlayer?.firstName?.[0]}{request.substitutePlayer?.lastName?.[0]}
                     </AvatarFallback>
                   </Avatar>
@@ -219,7 +219,7 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
                     <p className="text-sm font-medium">
                       {request.substitutePlayer?.firstName} {request.substitutePlayer?.lastName}
                     </p>
-                    <p className="text-xs text-green-600">Substitute player</p>
+                    <p className="text-xs text-muted-foreground">Substitute player</p>
                   </div>
                 </div>
               </>
@@ -233,15 +233,15 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
             <p className="text-sm font-medium text-muted-foreground mb-2">Previous Comments:</p>
             <div className="space-y-2">
               {request.captainComments && (
-                <div className="p-2 bg-blue-50 rounded border-l-4 border-blue-400">
-                  <p className="text-xs font-medium text-blue-700">Team Captain:</p>
-                  <p className="text-sm text-blue-900">{request.captainComments}</p>
+                <div className="p-2 bg-red-50 dark:bg-red-900 rounded border-l-4 border-red-400 dark:border-red-600">
+                  <p className="text-xs font-medium text-red-700 dark:text-red-300">Team Captain:</p>
+                  <p className="text-sm text-red-900 dark:text-red-200">{request.captainComments}</p>
                 </div>
               )}
               {request.opposingCaptainComments && (
-                <div className="p-2 bg-orange-50 rounded border-l-4 border-orange-400">
-                  <p className="text-xs font-medium text-orange-700">Opposing Captain:</p>
-                  <p className="text-sm text-orange-900">{request.opposingCaptainComments}</p>
+                <div className="p-2 bg-red-50 dark:bg-red-900 rounded border-l-4 border-red-400 dark:border-red-600">
+                  <p className="text-xs font-medium text-red-700 dark:text-red-300">Opposing Captain:</p>
+                  <p className="text-sm text-red-900 dark:text-red-200">{request.opposingCaptainComments}</p>
                 </div>
               )}
             </div>
@@ -249,8 +249,8 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
         )}
 
         {/* Commissioner Decision Section */}
-        <div className="space-y-3 pt-4 border-t border-purple-200">
-          <div className="flex items-center gap-2 text-purple-700">
+        <div className="space-y-3 pt-4 border-t border-red-200 dark:border-red-700">
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
             <Crown className="h-4 w-4" />
             <span className="text-sm font-medium">Final Commissioner Decision</span>
           </div>
@@ -274,7 +274,7 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
           <div className="flex gap-2">
             <Button
               size="sm"
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              className="flex-1 bg-[#000000] hover:bg-[#000000] hover:opacity-90 text-[#fcfcfc]"
               onClick={() => handleApprove(request.id)}
               disabled={commissionerApprovalMutation.isPending || !isCommissioner}
               data-testid={`button-commissioner-approve-${request.id}`}
@@ -284,8 +284,8 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
             </Button>
             <Button
               size="sm"
-              variant="destructive"
-              className="flex-1"
+              variant="outline"
+              className="flex-1 border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900"
               onClick={() => handleDeny(request.id)}
               disabled={commissionerApprovalMutation.isPending || !isCommissioner}
               data-testid={`button-commissioner-deny-${request.id}`}
@@ -328,23 +328,23 @@ export function CommissionerApprovalInterface({ className }: CommissionerApprova
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Crown className="h-6 w-6 text-purple-600" />
+          <Crown className="h-6 w-6 text-red-600 dark:text-red-400" />
           <div>
-            <h1 className="text-2xl font-bold">Commissioner Approvals</h1>
+            <h1 className="text-2xl font-bold text-red-800 dark:text-red-400">Commissioner Approvals</h1>
             <p className="text-muted-foreground">
               Final review and approval of substitute requests
             </p>
           </div>
         </div>
-        <Badge variant="secondary" className="text-lg px-3 py-1">
+        <Badge className="text-lg px-3 py-1 bg-[#000000] text-[#ffffff]">
           {pendingRequests.length} Pending
         </Badge>
       </div>
 
       {/* Pending Requests */}
-      <Card>
+      <Card className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
             <Crown className="h-5 w-5" />
             Requests Awaiting Commissioner Approval
           </CardTitle>

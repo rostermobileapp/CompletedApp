@@ -31,13 +31,13 @@ function ApprovalWorkflowStatus({ request }: { request: any }) {
         
         if (status === stage.status && stage.key === 'substitute_player') {
           // Current stage - awaiting substitute player confirmation
-          icon = <Clock className="h-4 w-4 text-blue-600" />;
-          textClass = "text-sm text-blue-700 font-medium";
+          icon = <Clock className="h-4 w-4 text-red-600" />;
+          textClass = "text-sm text-red-700 font-medium";
           text = "Your Confirmation Required";
         } else if (status === stage.status) {
           // Current stage - awaiting other approver
-          icon = <Clock className="h-4 w-4 text-orange-600" />;
-          textClass = "text-sm text-orange-700";
+          icon = <Clock className="h-4 w-4 text-red-600" />;
+          textClass = "text-sm text-red-700";
           text = `Awaiting ${stage.label} Approval`;
         } else {
           // Check if this stage has been completed based on status progression
@@ -47,8 +47,8 @@ function ApprovalWorkflowStatus({ request }: { request: any }) {
           
           if (currentIndex > stageIndex || status === 'approved') {
             // Stage completed
-            icon = <CheckCircle className="h-4 w-4 text-green-600" />;
-            textClass = "text-sm text-green-700";
+            icon = <CheckCircle className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+            textClass = "text-sm text-gray-700 dark:text-gray-300";
             text = `Approved by ${stage.label}`;
           } else {
             // Stage pending
@@ -68,8 +68,8 @@ function ApprovalWorkflowStatus({ request }: { request: any }) {
       
       {status === 'approved' && (
         <div className="flex items-center gap-2">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <span className="text-sm text-green-700 font-medium">Fully Approved</span>
+          <CheckCircle className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+          <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">Fully Approved</span>
         </div>
       )}
       
@@ -198,13 +198,13 @@ export function SubstitutePlayerConfirmationInterface({ className }: SubstituteP
 
   const ConfirmationCard = ({ request }: { request: any }) => (
     <Card 
-      className={`transition-all hover:shadow-lg ${selectedRequest === request.id ? 'ring-2 ring-green-500' : ''} bg-gradient-to-r from-green-50 to-blue-50`}
+      className={`transition-all hover:shadow-lg ${selectedRequest === request.id ? 'ring-2 ring-red-500' : ''} bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800`}
       data-testid={`substitute-confirmation-card-${request.id}`}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
-            <Badge className="bg-green-100 text-green-700">
+            <Badge className="bg-[#000000] text-[#ffffff]">
               <Users className="h-3 w-3 mr-1" />
               Substitute Assignment
             </Badge>
@@ -214,8 +214,8 @@ export function SubstitutePlayerConfirmationInterface({ className }: SubstituteP
           </div>
         </div>
         
-        <CardTitle className="text-lg flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-green-600" />
+        <CardTitle className="text-lg flex items-center gap-2 text-red-700 dark:text-red-400">
+          <MapPin className="h-5 w-5" />
           You've Been Requested as a Substitute!
         </CardTitle>
         
@@ -229,8 +229,8 @@ export function SubstitutePlayerConfirmationInterface({ className }: SubstituteP
       
       <CardContent className="space-y-5">
         {/* Game Information */}
-        <div className="p-4 bg-white rounded-lg border border-green-200 shadow-sm">
-          <h4 className="text-sm font-semibold text-green-800 mb-3">GAME DETAILS</h4>
+        <div className="p-4 bg-white dark:bg-red-900 rounded-lg border border-red-200 dark:border-red-700 shadow-sm">
+          <h4 className="text-sm font-semibold text-red-800 dark:text-red-300 mb-3">GAME DETAILS</h4>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground">Home Team</p>
@@ -318,7 +318,7 @@ export function SubstitutePlayerConfirmationInterface({ className }: SubstituteP
         {/* Confirmation Section */}
         <Separator />
         <div className="space-y-4 pt-2">
-          <div className="flex items-center gap-2 text-green-700">
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
             <AlertCircle className="h-5 w-5" />
             <span className="font-semibold">Your Response Required</span>
           </div>
@@ -342,7 +342,7 @@ export function SubstitutePlayerConfirmationInterface({ className }: SubstituteP
           <div className="flex gap-3">
             <Button
               size="lg"
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3"
+              className="flex-1 bg-[#000000] hover:bg-[#000000] hover:opacity-90 text-[#fcfcfc] font-semibold py-3"
               onClick={() => handleAccept(request.id)}
               disabled={confirmationMutation.isPending || !isAuthenticated}
               data-testid={`button-accept-${request.id}`}
@@ -352,8 +352,8 @@ export function SubstitutePlayerConfirmationInterface({ className }: SubstituteP
             </Button>
             <Button
               size="lg"
-              variant="destructive"
-              className="flex-1 font-semibold py-3"
+              variant="outline"
+              className="flex-1 font-semibold py-3 border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900"
               onClick={() => handleDecline(request.id)}
               disabled={confirmationMutation.isPending || !isAuthenticated}
               data-testid={`button-decline-${request.id}`}
@@ -382,21 +382,21 @@ export function SubstitutePlayerConfirmationInterface({ className }: SubstituteP
       {/* Header */}
       <div className="text-center space-y-2">
         <div className="flex items-center justify-center gap-3 mb-4">
-          <Users className="h-8 w-8 text-green-600" />
-          <h1 className="text-3xl font-bold text-green-800">Substitute Confirmations</h1>
+          <Users className="h-8 w-8 text-red-600 dark:text-red-400" />
+          <h1 className="text-3xl font-bold text-red-800 dark:text-red-400">Substitute Confirmations</h1>
         </div>
         <p className="text-muted-foreground text-lg">
           Review and confirm your substitute player assignments
         </p>
-        <Badge variant="secondary" className="text-lg px-4 py-2">
+        <Badge className="text-lg px-4 py-2 bg-[#000000] text-[#ffffff]">
           {pendingConfirmations.length} Pending Confirmation{pendingConfirmations.length !== 1 ? 's' : ''}
         </Badge>
       </div>
 
       {/* Pending Confirmations */}
-      <Card>
+      <Card className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-green-700">
+          <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
             <Clock className="h-5 w-5" />
             Assignments Awaiting Your Confirmation
           </CardTitle>
