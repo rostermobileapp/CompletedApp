@@ -188,7 +188,7 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
           </div>
           <Button
             variant="outline"
-            className="border-red-300 dark:border-red-700 dark:text-red-400 hover:border-red-300 dark:hover:border-red-700 hover:text-red-600 dark:hover:text-red-400 hover:bg-transparent text-[#fcfcfc] bg-[#000000]"
+            className="border-red-300 dark:border-red-700 dark:text-red-400 text-[#fcfcfc] bg-[#000000] hover:border-red-300 dark:hover:border-red-700 hover:text-[#fcfcfc] dark:hover:text-red-400 hover:bg-[#000000]"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/league/${leagueId}/score-verification`);
