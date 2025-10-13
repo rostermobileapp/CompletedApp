@@ -1909,7 +1909,7 @@ export default function LeagueManagement() {
             </div>
             <button
               onClick={() => setShowCreateSeason(true)}
-              className="mt-6 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium"
               data-testid="button-create-season"
             >
               <Plus className="w-4 h-4 mr-2 inline" />
