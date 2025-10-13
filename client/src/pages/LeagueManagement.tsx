@@ -2883,7 +2883,7 @@ export default function LeagueManagement() {
                         return (
                           <div 
                             key={game.id} 
-                            className="p-4 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
+                            className="p-3 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
                             onClick={() => {
                               setSelectedGame(game);
                               setShowEditGame(true);
@@ -2891,10 +2891,10 @@ export default function LeagueManagement() {
                             data-testid={`game-${game.id}`}
                           >
                             {/* Team Matchup */}
-                            <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center justify-between">
                               {/* Home Team */}
                               <div className="flex flex-col items-center flex-1">
-                                <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mb-2">
+                                <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
                                   {homeTeam?.logoUrl ? (
                                     <img 
                                       src={homeTeam.logoUrl} 
@@ -2903,21 +2903,22 @@ export default function LeagueManagement() {
                                       data-testid={`img-home-team-logo-${game.id}`}
                                     />
                                   ) : (
-                                    <Trophy className="w-8 h-8 text-primary-foreground" />
+                                    <Trophy className="w-7 h-7 text-primary-foreground" />
                                   )}
                                 </div>
-                                <p className="font-semibold text-center text-sm">{homeTeam?.name || 'Unknown'}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">HOME</p>
+                                <p className="font-semibold text-center text-xs">{homeTeam?.name || 'Unknown'}</p>
+                                <p className="text-xs text-muted-foreground">HOME</p>
                               </div>
 
-                              {/* VS Divider */}
-                              <div className="px-4 flex items-center justify-center">
-                                <span className="text-muted-foreground font-bold text-lg">VS</span>
+                              {/* Date & Time */}
+                              <div className="px-3 flex flex-col items-center justify-center">
+                                <p className="text-xs font-semibold text-center">{gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                                <p className="text-xs text-muted-foreground">{gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                               </div>
 
                               {/* Away Team */}
                               <div className="flex flex-col items-center flex-1">
-                                <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mb-2">
+                                <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
                                   {awayTeam?.logoUrl ? (
                                     <img 
                                       src={awayTeam.logoUrl} 
@@ -2926,19 +2927,20 @@ export default function LeagueManagement() {
                                       data-testid={`img-away-team-logo-${game.id}`}
                                     />
                                   ) : (
-                                    <Trophy className="w-8 h-8 text-primary-foreground" />
+                                    <Trophy className="w-7 h-7 text-primary-foreground" />
                                   )}
                                 </div>
-                                <p className="font-semibold text-center text-sm">{awayTeam?.name || 'Unknown'}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">AWAY</p>
+                                <p className="font-semibold text-center text-xs">{awayTeam?.name || 'Unknown'}</p>
+                                <p className="text-xs text-muted-foreground">AWAY</p>
                               </div>
                             </div>
 
-                            {/* Game Details */}
-                            <div className="text-center text-sm text-muted-foreground space-y-1 pt-3 border-t">
-                              <p>📅 {gameDate.toLocaleDateString()} at {gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                              {game.venue && <p>📍 {game.venue}</p>}
-                            </div>
+                            {/* Venue (if present) */}
+                            {game.venue && (
+                              <div className="text-center text-xs text-muted-foreground mt-2 pt-2 border-t">
+                                📍 {game.venue}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
