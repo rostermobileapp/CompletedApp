@@ -2883,7 +2883,7 @@ export default function LeagueManagement() {
                         return (
                           <div 
                             key={game.id} 
-                            className="p-3 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
+                            className="p-3 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[4px] mb-[4px]"
                             onClick={() => {
                               setSelectedGame(game);
                               setShowEditGame(true);
@@ -2934,7 +2934,6 @@ export default function LeagueManagement() {
                                 <p className="text-xs text-muted-foreground">AWAY</p>
                               </div>
                             </div>
-
                             {/* Venue (if present) */}
                             {game.venue && (
                               <div className="text-center text-xs text-muted-foreground mt-2 pt-2 border-t">
@@ -5107,7 +5106,6 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-
       {/* Delete All Players Confirmation Dialog */}
       <AlertDialog open={showDeleteAllPlayersDialog} onOpenChange={setShowDeleteAllPlayersDialog}>
         <AlertDialogContent>
@@ -5129,7 +5127,6 @@ export default function LeagueManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       {/* Delete All Teams Confirmation Dialog */}
       <AlertDialog open={showDeleteAllTeamsDialog} onOpenChange={setShowDeleteAllTeamsDialog}>
         <AlertDialogContent>
@@ -5151,7 +5148,6 @@ export default function LeagueManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       {/* Delete All Games Confirmation Dialog */}
       <AlertDialog open={showDeleteAllGamesDialog} onOpenChange={setShowDeleteAllGamesDialog}>
         <AlertDialogContent>
