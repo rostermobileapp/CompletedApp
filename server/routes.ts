@@ -2916,13 +2916,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Read and parse the CSV file
-      const fileContent = fs.readFileSync(file.path, 'utf8');
+      let fileContent = fs.readFileSync(file.path, 'utf8');
+      
+      // Skip the first 3 instruction lines if they exist
+      // Lines 1-3: Instructions, Line 4: Headers, Line 5+: Data
+      const lines = fileContent.split('\n');
+      if (lines.length > 3 && lines[0].toUpperCase().includes('INSTRUCTION')) {
+        // Skip first 3 instruction lines
+        fileContent = lines.slice(3).join('\n');
+      }
+      
       const parseResults = Papa.parse(fileContent, {
         header: true,
         skipEmptyLines: true,
         transformHeader: (header: string) => {
           // Normalize header names for enhanced template format
-          const normalized = header.toLowerCase().trim();
+          const normalized = header.toLowerCase().trim().replace('*', ''); // Remove asterisks from required field markers
           const mapping: Record<string, string> = {
             // New template format
             'player full name': 'fullName',
@@ -3028,10 +3037,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       parseResults.data.forEach((row: any, index: number) => {
-        // Skip header rows or rows that look like instructions
-        if (row.fullName?.toLowerCase().includes('required') || 
-            row.fullName?.toLowerCase().includes('optional') ||
-            !row.fullName?.trim()) {
+        // Skip rows that look like instructions or are empty
+        if (!row.fullName?.trim()) {
           return;
         }
 

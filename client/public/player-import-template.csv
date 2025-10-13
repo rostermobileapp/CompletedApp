@@ -1,2 +1,6 @@
-Player Full Name,Team,Skill Level,Email,Jersey #,Player Type
-First Name Last Name,Rink Rats,"1-10, A-F, Beginner, Intermediate, Advanced, Expert",jdoe@gmail.com,19,Skater or Goalie
+INSTRUCTIONS: Fill in player information below. Required fields are marked with *.
+Delete these instruction lines (1-3) before uploading OR leave them - the system will skip them automatically.
+Example data is provided in row 5. You can modify it or add new rows below.
+Player Full Name*,Team,Skill Level,Email,Jersey #,Player Type
+John Doe,Rink Rats,Advanced,jdoe@example.com,19,Skater
+Jane Smith,Ice Breakers,Beginner,jsmith@example.com,1,Goalie
