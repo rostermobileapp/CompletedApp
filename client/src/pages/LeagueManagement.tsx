@@ -2541,7 +2541,7 @@ export default function LeagueManagement() {
         {/* Game Scheduling Tab */}
         {activeTab === 'games' && (
           <div className="space-y-6">
-            <div className="bg-card rounded-xl border border-border p-6">
+            <div className="bg-card rounded-xl border border-border p-6 pl-[4px] pr-[4px] pt-[4px] pb-[4px]">
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Calendar className="w-5 h-5 text-primary" />
