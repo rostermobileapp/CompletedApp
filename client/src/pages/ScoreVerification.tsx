@@ -153,7 +153,7 @@ export default function ScoreVerification() {
     };
 
     return (
-      <div className="bg-card border border-border rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4 pt-[4px] pb-[4px]">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-medium">
             {game.homeTeam?.name} vs {game.awayTeam?.name}
@@ -162,7 +162,6 @@ export default function ScoreVerification() {
             {format(new Date(game.scheduledAt), 'MMM d, yyyy • h:mm a')}
           </p>
         </div>
-        
         {/* Show existing submissions if any */}
         {game.submissions && game.submissions.length > 0 && (
           <div className="mb-3 p-3 bg-muted rounded-lg">
@@ -174,7 +173,6 @@ export default function ScoreVerification() {
             ))}
           </div>
         )}
-        
         {/* Score submission form */}
         <div className="grid grid-cols-3 gap-4 items-center mb-3">
           <div className="text-center">
@@ -211,7 +209,6 @@ export default function ScoreVerification() {
             />
           </div>
         </div>
-        
         <Button
           onClick={handleSubmitScore}
           disabled={submitScoreMutation.isPending || !homeScore || !awayScore}
