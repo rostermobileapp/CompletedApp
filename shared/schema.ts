@@ -223,6 +223,7 @@ export const leagueMemberships = pgTable("league_memberships", {
   displayLastName: varchar("display_last_name"),
   // Player role fields
   isGoalie: boolean("is_goalie").default(false).notNull(),
+  isSkater: boolean("is_skater").default(true).notNull(), // Default to skater
   // League-specific permissions
   leagueRole: userRoleEnum("league_role").default("free_tier"), // Role within this specific league
   leagueSpecialPermissions: specialPermissionEnum("league_special_permissions").array(), // Special permissions within this league

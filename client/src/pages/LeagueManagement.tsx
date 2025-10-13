@@ -71,6 +71,7 @@ type LeagueMember = {
   position?: string;
   notes?: string;
   jerseyNumber?: number;
+  isSkater?: boolean;
   displayFirstName?: string; // For merged players - overrides user.firstName for league display
   displayLastName?: string; // For merged players - overrides user.lastName for league display
   isGoalie?: boolean; // Added for goalie status
@@ -638,6 +639,7 @@ export default function LeagueManagement() {
     notes: '',
     isCaptain: false,
     isGoalie: false,
+    isSkater: true, // Default to skater
     displayFirstName: '',
     displayLastName: ''
   });
@@ -923,6 +925,7 @@ export default function LeagueManagement() {
           notes: memberToEdit.notes || '',
           isCaptain: assignedTeam?.captainId === memberToEdit.userId,
           isGoalie: memberToEdit.isGoalie || false,
+          isSkater: memberToEdit.isSkater ?? true, // Default to true if not set
           displayFirstName: memberToEdit.displayFirstName || memberToEdit.user.firstName || '',
           displayLastName: memberToEdit.displayLastName || memberToEdit.user.lastName || ''
         });
@@ -2165,6 +2168,7 @@ export default function LeagueManagement() {
                           notes: member.notes || '',
                           isCaptain: assignedTeam?.captainId === member.userId,
                           isGoalie: member.isGoalie || false,
+                          isSkater: member.isSkater ?? true, // Default to true if not set
                           displayFirstName: member.displayFirstName || member.user.firstName || '',
                           displayLastName: member.displayLastName || member.user.lastName || ''
                         });
@@ -2449,6 +2453,7 @@ export default function LeagueManagement() {
                                 notes: member.notes || '',
                                 isCaptain: assignedTeam?.captainId === member.userId,
                                 isGoalie: member.isGoalie || false,
+                                isSkater: member.isSkater ?? true, // Default to true if not set
                                 displayFirstName: member.displayFirstName || member.user.firstName || '',
                                 displayLastName: member.displayLastName || member.user.lastName || ''
                               });
@@ -2986,34 +2991,64 @@ export default function LeagueManagement() {
                   </div>
                 </div>
 
-                {/* Captain Status */}
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="captain-checkbox"
-                    checked={playerEditForm.isCaptain}
-                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, isCaptain: e.target.checked }))}
-                    className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
-                    data-testid="checkbox-captain"
-                  />
-                  <label htmlFor="captain-checkbox" className="text-sm font-medium">
-                    Captain
-                  </label>
-                </div>
+                {/* Player Role Selection */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium mb-2">Player Role</label>
+                  
+                  {/* Skater */}
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="skater-checkbox"
+                      checked={playerEditForm.isSkater}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          // When selecting Skater, deselect Goalie
+                          setPlayerEditForm(prev => ({ ...prev, isSkater: true, isGoalie: false }));
+                        }
+                      }}
+                      className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
+                      data-testid="checkbox-skater"
+                    />
+                    <label htmlFor="skater-checkbox" className="text-sm font-medium">
+                      Skater
+                    </label>
+                  </div>
 
-                {/* Goalie Status */}
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="goalie-checkbox"
-                    checked={playerEditForm.isGoalie}
-                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, isGoalie: e.target.checked }))}
-                    className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
-                    data-testid="checkbox-goalie"
-                  />
-                  <label htmlFor="goalie-checkbox" className="text-sm font-medium">
-                    Goalie
-                  </label>
+                  {/* Goalie */}
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="goalie-checkbox"
+                      checked={playerEditForm.isGoalie}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          // When selecting Goalie, deselect Skater
+                          setPlayerEditForm(prev => ({ ...prev, isGoalie: true, isSkater: false }));
+                        }
+                      }}
+                      className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
+                      data-testid="checkbox-goalie"
+                    />
+                    <label htmlFor="goalie-checkbox" className="text-sm font-medium">
+                      Goalie
+                    </label>
+                  </div>
+
+                  {/* Captain Status (can be combined with Skater or Goalie) */}
+                  <div className="flex items-center space-x-3 pt-2 border-t border-border">
+                    <input
+                      type="checkbox"
+                      id="captain-checkbox"
+                      checked={playerEditForm.isCaptain}
+                      onChange={(e) => setPlayerEditForm(prev => ({ ...prev, isCaptain: e.target.checked }))}
+                      className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
+                      data-testid="checkbox-captain"
+                    />
+                    <label htmlFor="captain-checkbox" className="text-sm font-medium">
+                      Captain
+                    </label>
+                  </div>
                 </div>
 
                 {/* Position */}
@@ -3088,6 +3123,7 @@ export default function LeagueManagement() {
                         jerseyNumber: playerEditForm.jerseyNumber ? parseInt(playerEditForm.jerseyNumber) : null,
                         notes: playerEditForm.notes,
                         isGoalie: playerEditForm.isGoalie,
+                        isSkater: playerEditForm.isSkater,
                         displayFirstName: playerEditForm.displayFirstName?.trim() || null,
                         displayLastName: playerEditForm.displayLastName?.trim() || null
                       };
