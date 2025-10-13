@@ -410,6 +410,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // First, try to find existing user by email
+    const existingUser = userData.email ? await this.getUserByEmail(userData.email) : undefined;
+    
+    if (existingUser) {
+      // Update existing user
+      const updateSet: any = {
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        updatedAt: new Date(),
+      };
+      
+      // Include role in update if provided (for OIDC testing)
+      if (userData.role !== undefined) {
+        updateSet.role = userData.role;
+      }
+      
+      // Include profile image if provided
+      if (userData.profileImageUrl !== undefined) {
+        updateSet.profileImageUrl = userData.profileImageUrl;
+      }
+      
+      const [user] = await db
+        .update(users)
+        .set(updateSet)
+        .where(eq(users.id, existingUser.id))
+        .returning();
+      return user;
+    }
+    
+    // No existing user, insert new one
     const updateSet: any = {
       email: userData.email,
       firstName: userData.firstName,
