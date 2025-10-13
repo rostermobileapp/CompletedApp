@@ -2932,9 +2932,6 @@ export default function LeagueManagement() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <span className="text-xs bg-blue-100/50 text-blue-800/50 px-2 py-1 rounded-full">
-                                {game.status || 'SCHEDULED'}
-                              </span>
                             </div>
                           </div>
                         );
