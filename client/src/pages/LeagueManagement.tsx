@@ -2607,31 +2607,29 @@ export default function LeagueManagement() {
                   </div>
                 </div>
 
-                {/* Mobile layout: stacked buttons, no calendar toggle (list view only) */}
-                <div className="md:hidden space-y-3">
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <button
-                      onClick={() => setShowScheduleImport(!showScheduleImport)}
-                      className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm flex-1"
-                      data-testid="button-import-schedules"
-                    >
-                      <Upload className="w-3 h-3" />
-                      Import Schedules
-                    </button>
-                    <button
-                      onClick={() => setShowScheduleGame(!showScheduleGame)}
-                      disabled={teams.length < 2}
-                      className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex-1 bg-[#289d14] text-[#ffffff]"
-                      data-testid="button-schedule-game"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Schedule Game
-                    </button>
-                  </div>
+                {/* Mobile layout: horizontal buttons, no calendar toggle (list view only) */}
+                <div className="md:hidden flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setShowScheduleImport(!showScheduleImport)}
+                    className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm flex-1"
+                    data-testid="button-import-schedules"
+                  >
+                    <Upload className="w-3 h-3" />
+                    Import Schedules
+                  </button>
+                  <button
+                    onClick={() => setShowScheduleGame(!showScheduleGame)}
+                    disabled={teams.length < 2}
+                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex-1 bg-[#289d14] text-[#ffffff]"
+                    data-testid="button-schedule-game"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Schedule Game
+                  </button>
                   {games.length > 0 && (
                     <button
                       onClick={() => setShowDeleteAllGamesDialog(true)}
-                      className="flex items-center justify-center gap-2 px-3 py-2 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors w-full text-[#ffffff] bg-[#860405]"
+                      className="flex items-center justify-center gap-2 px-3 py-2 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors flex-1 text-[#ffffff] bg-[#860405]"
                       data-testid="button-delete-all-games-mobile"
                     >
                       <Trash2 className="w-4 h-4" />

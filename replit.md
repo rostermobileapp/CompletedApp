@@ -26,7 +26,9 @@ User authentication relies on Replit's OpenID Connect provider with session-base
 
 ## UI/UX Decisions
 
-The UI/UX focuses on a mobile-first responsive design, leveraging `shadcn/ui` components for a consistent and accessible user experience. Recent design updates include a landing page redesign with an Apple Fitness+ inspired aesthetic, large typography, parallax scrolling, and rounded cards with backdrop-blur, specifically targeting sports enthusiasts with relevant messaging.
+The UI/UX focuses on a mobile-first responsive design, leveraging `shadcn/ui` components for a consistent and accessible user experience. Recent design updates include:
+- Landing page redesign with an Apple Fitness+ inspired aesthetic, large typography, parallax scrolling, and rounded cards with backdrop-blur, specifically targeting sports enthusiasts with relevant messaging.
+- Game Schedule section buttons (Import Schedules, Schedule Game, Delete All Games) display horizontally on mobile devices instead of vertically, improving space efficiency and user experience.
 
 ## Feature Specifications
 
