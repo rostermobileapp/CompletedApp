@@ -179,7 +179,7 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#000000] text-[#ffffff]">
               <span className="text-white text-sm font-bold">{count}</span>
             </div>
             <div>
