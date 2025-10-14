@@ -112,15 +112,6 @@ export function SlideOutMenu() {
                 <span className={`text-lg font-semibold ${item.locked ? 'text-muted-foreground' : 'text-foreground'}`}>
                   {item.label}
                 </span>
-                {item.requiredTier && (
-                  <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                    item.requiredTier === 'COMMISSIONER' 
-                      ? 'bg-warning text-black' 
-                      : 'bg-primary text-primary-foreground'
-                  }`}>
-                    {item.requiredTier}
-                  </span>
-                )}
               </div>
               {item.locked ? (
                 <div className="text-muted-foreground text-lg">🔒</div>
