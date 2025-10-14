@@ -103,26 +103,18 @@ export function SlideOutMenu() {
               <button
                 key={item.path}
                 onClick={() => handleNavigate(item.path, item.locked)}
-                className={`w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between transition-all ${
-                  item.locked 
-                    ? 'opacity-50 cursor-pointer hover:opacity-60' 
-                    : 'hover:bg-card/80 hover:border-primary/50'
-                }`}
+                className="w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50"
                 data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-xl ${item.locked ? 'bg-muted' : item.bgColor}`}>
-                    <item.icon className={`w-6 h-6 ${item.locked ? 'text-muted-foreground' : item.iconColor}`} />
+                  <div className={`p-3 rounded-xl ${item.bgColor}`}>
+                    <item.icon className={`w-6 h-6 ${item.iconColor}`} />
                   </div>
-                  <span className={`text-lg font-semibold text-left ${item.locked ? 'text-muted-foreground' : 'text-foreground'}`}>
+                  <span className="text-lg font-semibold text-left text-foreground">
                     {item.label}
                   </span>
                 </div>
-                {item.locked ? (
-                  <div className="text-muted-foreground text-lg">🔒</div>
-                ) : (
-                  <div className="text-muted-foreground text-lg">→</div>
-                )}
+                <div className="text-muted-foreground text-lg">→</div>
               </button>
             ))}
           </div>

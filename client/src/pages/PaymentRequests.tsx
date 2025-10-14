@@ -8,13 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { apiRequest } from '@/lib/queryClient';
-import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
-import { usePermissions } from '@/context/SubscriptionContext';
 
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<'created' | 'received'>('created');
-  const { canAccessPremiumFeatures } = usePermissions();
 
   // Fetch unpaid count for badge
   const { data: unpaidCount } = useQuery({
@@ -142,7 +139,6 @@ export default function PaymentRequests() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="payment-requests-page">
-      <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()} className="min-h-screen flex flex-col">
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center justify-between mb-6">
@@ -239,7 +235,6 @@ export default function PaymentRequests() {
           </TabsContent>
         </Tabs>
       </div>
-      </FeatureLockOverlay>
     </div>
   );
 }
