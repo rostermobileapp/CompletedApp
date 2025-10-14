@@ -34,6 +34,7 @@ User authentication relies on Replit's OpenID Connect provider with session-base
 This dual-layer system ensures users lose premium access immediately upon cancellation without any manual intervention required.
 
 ### Recent Fixes
+- **User Name Persistence Fix** (October 2025): Fixed critical bug where user-customized names (set via Profile page) were being reset to OIDC default values on every login. The `upsertUser` function now checks for existing users by ID (the primary OIDC identifier) instead of by email. When updating existing users, the function only fills in firstName/lastName if they are empty, preserving user-set custom names across all login/logout cycles. Email updates are still synced from OIDC provider to handle email changes.
 - **User Upsert Email Conflict Handling** (October 2025): Updated the `upsertUser` function in the storage layer to gracefully handle email unique constraint violations. The function now checks for existing users by email before inserting, preventing server crashes when OIDC authentication attempts to create users with duplicate emails but different IDs. This ensures robust handling of authentication scenarios during both production use and testing.
 
 ## UI/UX Decisions
