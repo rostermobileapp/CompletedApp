@@ -1,10 +1,92 @@
 import type { RequestHandler } from "express";
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
+import Stripe from "stripe";
 
 // Types matching the frontend permission system
 export type UserRole = 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier';
 export type SpecialPermission = 'admin' | 'stat_manager';
+
+// Initialize Stripe if available
+const stripe = process.env.STRIPE_SECRET_KEY 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-09-30.clover" })
+  : null;
+
+// Cache for subscription checks to avoid hitting Stripe API too frequently
+// Format: { userId: { lastChecked: timestamp, shouldDowngrade: boolean } }
+const subscriptionCheckCache = new Map<string, { lastChecked: number; shouldDowngrade: boolean }>();
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
+// Map Stripe price IDs to user roles
+const PRICE_TO_ROLE: Record<string, 'player_pro' | 'commissioner'> = {
+  [process.env.STRIPE_PRICE_PLAYER_PRO_MONTHLY || '']: 'player_pro',
+  [process.env.STRIPE_PRICE_COMMISSIONER_MONTHLY || '']: 'commissioner',
+  [process.env.STRIPE_PRICE_PLAYER_PRO_YEARLY || '']: 'player_pro',
+  [process.env.STRIPE_PRICE_COMMISSIONER_YEARLY || '']: 'commissioner',
+};
+
+/**
+ * Verify subscription status with Stripe and downgrade user if cancelled
+ * This ensures cancellations are enforced even if webhooks are delayed
+ */
+async function verifyAndEnforceSubscriptionStatus(user: User): Promise<boolean> {
+  // Only check premium users with subscriptions
+  const isPremiumRole = user.role && ['player_pro', 'commissioner', 'secondary_commissioner'].includes(user.role);
+  if (!isPremiumRole || !user.stripeSubscriptionId || !stripe) {
+    return false; // No action needed
+  }
+
+  const userId = user.id;
+  const now = Date.now();
+  
+  // Check cache first to avoid excessive API calls
+  const cached = subscriptionCheckCache.get(userId);
+  if (cached && (now - cached.lastChecked) < CACHE_DURATION_MS) {
+    if (cached.shouldDowngrade) {
+      await storage.updateUserRole(userId, 'free_tier');
+      await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
+      console.log('[Subscription Verify] Downgraded cached user to free_tier:', userId);
+      return true;
+    }
+    return false;
+  }
+
+  try {
+    // Fetch current subscription status from Stripe
+    const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+    
+    // Check if subscription should be downgraded
+    const shouldDowngrade = subscription.cancel_at_period_end 
+      || subscription.status === 'canceled' 
+      || subscription.status === 'unpaid';
+
+    // Update cache
+    subscriptionCheckCache.set(userId, { lastChecked: now, shouldDowngrade });
+
+    if (shouldDowngrade) {
+      await storage.updateUserRole(userId, 'free_tier');
+      await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
+      console.log('[Subscription Verify] Downgraded user to free_tier:', userId, 'Reason:', 
+        subscription.cancel_at_period_end ? 'cancel_at_period_end' : `status=${subscription.status}`);
+      return true;
+    }
+
+    // Verify role matches subscription
+    const priceId = subscription.items.data[0]?.price?.id;
+    const expectedRole = priceId ? PRICE_TO_ROLE[priceId] : null;
+    if (expectedRole && expectedRole !== user.role) {
+      await storage.updateUserRole(userId, expectedRole);
+      console.log('[Subscription Verify] Updated user role to match subscription:', userId, 'New role:', expectedRole);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('[Subscription Verify] Error checking subscription for user:', userId, error);
+    // Don't downgrade on error - could be temporary API issue
+    return false;
+  }
+}
 
 // Extended User type with permission fields (temporary workaround for TypeScript cache issue)
 interface UserWithPermissions extends User {
@@ -33,6 +115,7 @@ declare global {
 /**
  * Base permission middleware that fetches user role and permission data
  * Should be used after isAuthenticated middleware
+ * Also verifies subscription status to enforce cancellations in real-time
  */
 export const loadUserPermissions: RequestHandler = async (req, res, next) => {
   try {
@@ -41,9 +124,20 @@ export const loadUserPermissions: RequestHandler = async (req, res, next) => {
       return res.status(401).json({ message: "User ID not found in session" });
     }
 
-    const user = await storage.getUser(userId);
+    let user = await storage.getUser(userId);
     if (!user) {
       return res.status(401).json({ message: "User not found" });
+    }
+
+    // Automatically verify and enforce subscription status
+    // This catches cancelled subscriptions even if webhooks are delayed
+    const wasDowngraded = await verifyAndEnforceSubscriptionStatus(user);
+    if (wasDowngraded) {
+      // Refetch user to get updated role
+      user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found after downgrade" });
+      }
     }
 
     // Type cast to work around TypeScript cache issue - fields exist at runtime
