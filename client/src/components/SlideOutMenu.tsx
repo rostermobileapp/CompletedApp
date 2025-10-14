@@ -7,8 +7,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 
 export function SlideOutMenu() {
   const [open, setOpen] = useState(false);
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { canAccessPremiumFeatures, canManageLeague, hasRole } = usePermissions();
+
+  // Only show hamburger menu on home and profile screens
+  const shouldShowHamburger = location === '/' || location === '/profile';
 
   const menuItems = [
     {
@@ -55,6 +58,11 @@ export function SlideOutMenu() {
     navigate(path);
     setOpen(false);
   };
+
+  // Don't render if not on allowed screens
+  if (!shouldShowHamburger) {
+    return null;
+  }
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
