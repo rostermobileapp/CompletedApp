@@ -2774,16 +2774,97 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateGameScore(gameId: string, homeScore: number, awayScore: number): Promise<Game> {
-    const [updatedGame] = await db
-      .update(games)
-      .set({ 
-        homeScore, 
-        awayScore, 
-        isCompleted: true 
-      })
-      .where(eq(games.id, gameId))
-      .returning();
-    return updatedGame;
+    return await db.transaction(async (tx) => {
+      // Update the game score
+      const [updatedGame] = await tx
+        .update(games)
+        .set({ 
+          homeScore, 
+          awayScore, 
+          isCompleted: true 
+        })
+        .where(eq(games.id, gameId))
+        .returning();
+
+      // Get the game with league info
+      const [game] = await tx
+        .select({
+          id: games.id,
+          leagueId: games.leagueId,
+          homeTeamId: games.homeTeamId,
+          awayTeamId: games.awayTeamId,
+          homeScore: games.homeScore,
+          awayScore: games.awayScore,
+        })
+        .from(games)
+        .where(eq(games.id, gameId));
+
+      if (game) {
+        // Find the goalies for both teams via league memberships
+        const goalies = await tx
+          .select({
+            userId: leagueMemberships.userId,
+            teamId: leagueMemberships.assignedTeamId,
+          })
+          .from(leagueMemberships)
+          .where(
+            and(
+              eq(leagueMemberships.leagueId, game.leagueId),
+              eq(leagueMemberships.isGoalie, true),
+              or(
+                eq(leagueMemberships.assignedTeamId, game.homeTeamId),
+                eq(leagueMemberships.assignedTeamId, game.awayTeamId)
+              )
+            )
+          );
+
+        // Create or update game_goalies records for each goalie
+        for (const goalie of goalies) {
+          if (goalie.teamId) {
+            const isHomeTeam = goalie.teamId === game.homeTeamId;
+            const goalsAgainst = isHomeTeam ? (game.awayScore || 0) : (game.homeScore || 0);
+
+            // Check if record already exists
+            const [existingRecord] = await tx
+              .select()
+              .from(gameGoalies)
+              .where(
+                and(
+                  eq(gameGoalies.gameId, gameId),
+                  eq(gameGoalies.goalieUserId, goalie.userId)
+                )
+              );
+
+            if (existingRecord) {
+              // Update existing record with new goals against
+              await tx
+                .update(gameGoalies)
+                .set({
+                  goalsAgainst,
+                  minutesPlayed: 60,
+                })
+                .where(
+                  and(
+                    eq(gameGoalies.gameId, gameId),
+                    eq(gameGoalies.goalieUserId, goalie.userId)
+                  )
+                );
+            } else {
+              // Insert new record
+              await tx.insert(gameGoalies).values({
+                gameId,
+                goalieUserId: goalie.userId,
+                teamId: goalie.teamId,
+                goalsAgainst,
+                minutesPlayed: 60,
+              });
+            }
+          }
+        }
+      }
+
+      return updatedGame;
+    });
   }
 
   async checkForMatchingCaptainScores(gameId: string): Promise<{
@@ -2818,6 +2899,99 @@ export class DatabaseStorage implements IStorage {
       homeScore: isMatch ? homeSubmission.homeScore : undefined,
       awayScore: isMatch ? homeSubmission.awayScore : undefined,
     };
+  }
+
+  async backfillGoalieStats(leagueId: string): Promise<{ gamesProcessed: number; goaliesCreated: number }> {
+    let gamesProcessed = 0;
+    let goaliesCreated = 0;
+
+    return await db.transaction(async (tx) => {
+      // Get all completed games for this league that don't have goalie records
+      const completedGames = await tx
+        .select({
+          id: games.id,
+          leagueId: games.leagueId,
+          homeTeamId: games.homeTeamId,
+          awayTeamId: games.awayTeamId,
+          homeScore: games.homeScore,
+          awayScore: games.awayScore,
+        })
+        .from(games)
+        .where(
+          and(
+            eq(games.leagueId, leagueId),
+            eq(games.isCompleted, true)
+          )
+        );
+
+      for (const game of completedGames) {
+        // Find the goalies for both teams via league memberships
+        const goalies = await tx
+          .select({
+            userId: leagueMemberships.userId,
+            teamId: leagueMemberships.assignedTeamId,
+          })
+          .from(leagueMemberships)
+          .where(
+            and(
+              eq(leagueMemberships.leagueId, game.leagueId),
+              eq(leagueMemberships.isGoalie, true),
+              or(
+                eq(leagueMemberships.assignedTeamId, game.homeTeamId),
+                eq(leagueMemberships.assignedTeamId, game.awayTeamId)
+              )
+            )
+          );
+
+        // Create or update game_goalies records for each goalie
+        for (const goalie of goalies) {
+          if (goalie.teamId) {
+            const isHomeTeam = goalie.teamId === game.homeTeamId;
+            const goalsAgainst = isHomeTeam ? (game.awayScore || 0) : (game.homeScore || 0);
+
+            // Check if record already exists
+            const [existingRecord] = await tx
+              .select()
+              .from(gameGoalies)
+              .where(
+                and(
+                  eq(gameGoalies.gameId, game.id),
+                  eq(gameGoalies.goalieUserId, goalie.userId)
+                )
+              );
+
+            if (existingRecord) {
+              // Update existing record
+              await tx
+                .update(gameGoalies)
+                .set({
+                  goalsAgainst,
+                  minutesPlayed: 60,
+                })
+                .where(
+                  and(
+                    eq(gameGoalies.gameId, game.id),
+                    eq(gameGoalies.goalieUserId, goalie.userId)
+                  )
+                );
+            } else {
+              // Insert new record
+              await tx.insert(gameGoalies).values({
+                gameId: game.id,
+                goalieUserId: goalie.userId,
+                teamId: goalie.teamId,
+                goalsAgainst,
+                minutesPlayed: 60,
+              });
+              goaliesCreated++;
+            }
+          }
+        }
+        gamesProcessed++;
+      }
+
+      return { gamesProcessed, goaliesCreated };
+    });
   }
 
   // RSVP operations
@@ -4788,9 +4962,9 @@ export class DatabaseStorage implements IStorage {
       shootoutLosses: stats.shootoutLosses,
       goalsAgainst: stats.goalsAgainst,
       shutouts: stats.shutouts,
-      // GAA = (goals against * 60) / minutes played (standard hockey GAA calculation)
-      goalsAgainstAverage: stats.totalMinutes > 0 ? 
-        parseFloat(((stats.goalsAgainst * 60) / stats.totalMinutes).toFixed(2)) : 0.00,
+      // GAA = total goals allowed / games played
+      goalsAgainstAverage: stats.gamesPlayed > 0 ? 
+        parseFloat((stats.goalsAgainst / stats.gamesPlayed).toFixed(2)) : 0.00,
       teamId: stats.teamId,
       user: stats.user
     }));

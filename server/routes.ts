@@ -5554,6 +5554,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to update player stats' });
     }
   });
+
+  // Backfill goalie stats for all completed games (Commissioner only)
+  app.post('/api/leagues/:leagueId/stats/backfill-goalies', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const league = await storage.getLeague(leagueId);
+      
+      // Verify user is commissioner of this league
+      if (!league || !user || (league.commissionerId !== userId && !(user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin')))) {
+        return res.status(403).json({ message: "Access denied - commissioner access required" });
+      }
+      
+      const result = await storage.backfillGoalieStats(leagueId);
+      res.json(result);
+    } catch (error) {
+      console.error('Error backfilling goalie stats:', error);
+      res.status(500).json({ message: 'Failed to backfill goalie stats' });
+    }
+  });
   
   // Bulk update player stats (Commissioner only) - useful for "by game" updates
   app.post('/api/leagues/:leagueId/stats/bulk', isAuthenticated, async (req: any, res) => {
