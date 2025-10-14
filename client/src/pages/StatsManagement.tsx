@@ -872,29 +872,29 @@ export default function StatsManagement() {
                       </div>
                       
                       <div className="overflow-auto border rounded-lg mt-[2px] mb-[2px]" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-                        <Table data-testid="table-bulk-stats">
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-32 pl-2 sticky top-0 bg-background z-20 border-b">Player</TableHead>
-                              <TableHead className="text-center flex-1 px-0 sticky top-0 bg-background z-20 border-b">Goals</TableHead>
-                              <TableHead className="text-center flex-1 px-0 sticky top-0 bg-background z-20 border-b">Assists</TableHead>
-                              <TableHead className="text-center flex-1 px-0 sticky top-0 bg-background z-20 border-b">PIM</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
+                        <table className="w-full caption-bottom text-sm" data-testid="table-bulk-stats">
+                          <thead className="[&_tr]:border-b">
+                            <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                              <th className="h-12 px-4 align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 w-32 pl-2 sticky top-0 bg-background z-20 border-b">Player</th>
+                              <th className="h-12 px-4 align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 text-center flex-1 px-0 sticky top-0 bg-background z-20 border-b">Goals</th>
+                              <th className="h-12 px-4 align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 text-center flex-1 px-0 sticky top-0 bg-background z-20 border-b">Assists</th>
+                              <th className="h-12 px-4 align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 text-center flex-1 px-0 sticky top-0 bg-background z-20 border-b">PIM</th>
+                            </tr>
+                          </thead>
+                          <tbody className="[&_tr:last-child]:border-0">
                             {getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
-                              <TableRow key={player.id} data-testid={`row-bulk-player-${player.id}`}>
+                              <tr key={player.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-testid={`row-bulk-player-${player.id}`}>
                                 {/* Player Name */}
-                                <TableCell className="font-medium pl-2 pr-1">
+                                <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0 font-medium pl-2 pr-1">
                                   <div>
                                     <div className="font-medium text-sm">{player.firstName} {player.lastName}</div>
                                     {player.teamName && (
                                       <div className="text-xs text-muted-foreground">{player.teamName}</div>
                                     )}
                                   </div>
-                                </TableCell>
+                                </td>
                                 {/* Goals */}
-                                <TableCell className="text-center pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
+                                <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-center pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
                                   <div className="flex items-center justify-center space-x-0.5">
                                     <Button
                                       variant="outline"
@@ -923,9 +923,9 @@ export default function StatsManagement() {
                                       +
                                     </Button>
                                   </div>
-                                </TableCell>
+                                </td>
                                 {/* Assists */}
-                                <TableCell className="text-center pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
+                                <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-center pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
                                   <div className="flex items-center justify-center space-x-0.5">
                                     <Button
                                       variant="outline"
@@ -954,9 +954,9 @@ export default function StatsManagement() {
                                       +
                                     </Button>
                                   </div>
-                                </TableCell>
+                                </td>
                                 {/* Penalty Minutes */}
-                                <TableCell className="text-center pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
+                                <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-center pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
                                   <div className="flex items-center justify-center space-x-0.5">
                                     <Button
                                       variant="outline"
@@ -985,11 +985,11 @@ export default function StatsManagement() {
                                       +
                                     </Button>
                                   </div>
-                                </TableCell>
-                              </TableRow>
+                                </td>
+                              </tr>
                             ))}
-                          </TableBody>
-                        </Table>
+                          </tbody>
+                        </table>
                       </div>
                       
                       <Button 
