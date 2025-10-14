@@ -60,10 +60,10 @@ export function SlideOutMenu() {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <button
-          className="fixed top-6 right-6 z-50 p-2 hover:bg-card/50 rounded-lg transition-colors"
+          className="fixed top-6 right-6 z-50 w-16 h-16 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
           data-testid="button-hamburger-menu"
         >
-          <Menu className="w-6 h-6 text-foreground" />
+          <Menu className="w-8 h-8 text-foreground" />
         </button>
       </SheetTrigger>
       <SheetContent 
