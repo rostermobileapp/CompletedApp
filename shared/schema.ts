@@ -2105,6 +2105,7 @@ export type GoalieStats = {
   ties: number;
   shootoutLosses: number;
   goalsAgainst: number;
+  shutouts: number;
   goalsAgainstAverage: number;
   user: User;
 };

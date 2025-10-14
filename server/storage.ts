@@ -4633,6 +4633,7 @@ export class DatabaseStorage implements IStorage {
     ties: number;
     shootoutLosses: number;
     goalsAgainst: number;
+    shutouts: number;
     goalsAgainstAverage: number;
     user: User;
     teamId?: string;
@@ -4696,6 +4697,7 @@ export class DatabaseStorage implements IStorage {
       ties: number;
       shootoutLosses: number;
       goalsAgainst: number;
+      shutouts: number;
       totalMinutes: number;
       teamId?: string;
       user: User;
@@ -4713,6 +4715,7 @@ export class DatabaseStorage implements IStorage {
           ties: 0,
           shootoutLosses: 0,
           goalsAgainst: 0,
+          shutouts: 0,
           totalMinutes: 0,
           teamId: gameStat.teamId,
           user: {
@@ -4748,8 +4751,14 @@ export class DatabaseStorage implements IStorage {
       
       // Update games played and minutes
       goalieStats.gamesPlayed++;
-      goalieStats.goalsAgainst += gameStat.goalsAgainst || 0;
+      const goalsAgainstInGame = gameStat.goalsAgainst || 0;
+      goalieStats.goalsAgainst += goalsAgainstInGame;
       goalieStats.totalMinutes += gameStat.minutesPlayed || 0;
+      
+      // Track shutouts (games with 0 goals against)
+      if (goalsAgainstInGame === 0) {
+        goalieStats.shutouts++;
+      }
       
       // Determine game result for this goalie's team
       const isHomeTeam = gameStat.homeTeamId === gameStat.teamId;
@@ -4778,6 +4787,7 @@ export class DatabaseStorage implements IStorage {
       ties: stats.ties,
       shootoutLosses: stats.shootoutLosses,
       goalsAgainst: stats.goalsAgainst,
+      shutouts: stats.shutouts,
       // GAA = (goals against * 60) / minutes played (standard hockey GAA calculation)
       goalsAgainstAverage: stats.totalMinutes > 0 ? 
         parseFloat(((stats.goalsAgainst * 60) / stats.totalMinutes).toFixed(2)) : 0.00,

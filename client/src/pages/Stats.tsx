@@ -91,12 +91,22 @@ export default function Stats() {
   });
 
   // Get top players by category
-  const getTopPlayers = (category: 'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'wins', limit: number = 3) => {
+  const getTopPlayers = (category: 'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'wins' | 'goalsAgainstAverage' | 'shutouts', limit: number = 3) => {
     if (activeTab === 'goalies') {
       const goalieStats = filteredStats.filter((stat): stat is GoalieStats => stat.type === 'goalie');
       if (category === 'wins') {
         return goalieStats
           .sort((a, b) => (b.wins || 0) - (a.wins || 0))
+          .slice(0, limit);
+      } else if (category === 'goalsAgainstAverage') {
+        // Filter out goalies with no games played, then sort by GAA (lower is better)
+        return goalieStats
+          .filter(g => g.gamesPlayed > 0)
+          .sort((a, b) => (a.goalsAgainstAverage || 999) - (b.goalsAgainstAverage || 999))
+          .slice(0, limit);
+      } else if (category === 'shutouts') {
+        return goalieStats
+          .sort((a, b) => (b.shutouts || 0) - (a.shutouts || 0))
           .slice(0, limit);
       }
       return [];
@@ -326,6 +336,32 @@ export default function Stats() {
                   title="Wins"
                   players={getTopPlayers('wins', 1)}
                   renderStat={(stat) => (stat.type === 'goalie' ? stat.wins || 0 : 0)}
+                  formatPlayerName={formatPlayerName}
+                  getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                />
+              )}
+
+              {/* Goals Against Average Section (Goalies) */}
+              {activeTab === 'goalies' && (
+                <StatSection
+                  title="Goals Against Average"
+                  players={getTopPlayers('goalsAgainstAverage', 1)}
+                  renderStat={(stat) => (stat.type === 'goalie' ? stat.goalsAgainstAverage?.toFixed(2) || '0.00' : '0.00')}
+                  formatPlayerName={formatPlayerName}
+                  getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                />
+              )}
+
+              {/* Shutouts Section (Goalies) */}
+              {activeTab === 'goalies' && (
+                <StatSection
+                  title="Shutouts"
+                  players={getTopPlayers('shutouts', 1)}
+                  renderStat={(stat) => (stat.type === 'goalie' ? stat.shutouts || 0 : 0)}
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
                   showPosition={true}

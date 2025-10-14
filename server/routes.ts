@@ -5439,6 +5439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ties: stat.ties,
           shootoutLosses: stat.shootoutLosses,
           goalsAgainst: stat.goalsAgainst,
+          shutouts: stat.shutouts,
           goalsAgainstAverage: stat.goalsAgainstAverage,
           user: stat.user
         }));
