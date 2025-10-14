@@ -1058,7 +1058,7 @@ export default function Dashboard() {
               className="h-[30px] w-auto pt-[0px] pb-[0px] pl-[12px] pr-[12px]"
               data-testid="img-roster-logo"
             />
-            {tier !== 'free' && (
+            {tier !== 'free_tier' && (
               <>
                 {tier === 'commissioner' || tier === 'secondary_commissioner' ? (
                   <Crown className="w-[30px] h-[30px] text-yellow-500" data-testid="badge-subscription-tier" />
