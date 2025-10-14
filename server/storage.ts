@@ -410,8 +410,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    // First, try to find existing user by email
-    const existingUser = userData.email ? await this.getUserByEmail(userData.email) : undefined;
+    // First, try to find existing user by ID (primary OIDC identifier)
+    const existingUser = userData.id ? await this.getUser(userData.id) : undefined;
     
     if (existingUser) {
       // Update existing user - only update fields if they have values
@@ -428,6 +428,11 @@ export class DatabaseStorage implements IStorage {
       // Only update lastName if user doesn't have one yet
       if (userData.lastName !== undefined && !existingUser.lastName) {
         updateSet.lastName = userData.lastName;
+      }
+      
+      // Update email if provided (user might change email in OIDC provider)
+      if (userData.email !== undefined) {
+        updateSet.email = userData.email;
       }
       
       // Include role in update if provided (for OIDC testing)
@@ -449,30 +454,9 @@ export class DatabaseStorage implements IStorage {
     }
     
     // No existing user, insert new one
-    const updateSet: any = {
-      email: userData.email,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      updatedAt: new Date(),
-    };
-    
-    // Include role in update if provided (for OIDC testing)
-    if (userData.role !== undefined) {
-      updateSet.role = userData.role;
-    }
-    
-    // Include profile image if provided
-    if (userData.profileImageUrl !== undefined) {
-      updateSet.profileImageUrl = userData.profileImageUrl;
-    }
-    
     const [user] = await db
       .insert(users)
       .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: updateSet,
-      })
       .returning();
     return user;
   }
