@@ -64,48 +64,6 @@ export default function Profile() {
     },
   });
 
-  const leagueFeatures = [
-    {
-      icon: Calendar,
-      label: 'Schedule Scrimmage',
-      locked: !canAccessPremiumFeatures(),
-      requiredTier: 'PRO',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/create-scrimmage');
-      },
-    },
-    {
-      icon: Settings,
-      label: 'Manage Scrimmages',
-      locked: !canAccessPremiumFeatures(),
-      requiredTier: 'PRO',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/scrimmage-management');
-      },
-    },
-    {
-      icon: Plus,
-      label: 'Create League',
-      locked: !canManageLeague(),
-      requiredTier: 'COMMISSIONER',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/create-league');
-      },
-    },
-    {
-      icon: Crown,
-      label: 'League Management',
-      locked: !hasRole('secondary_commissioner'),
-      requiredTier: 'COMMISSIONER',
-      action: () => {
-        setPageTransitionDirection('up');
-        navigate('/league-list');
-      },
-    },
-  ];
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileForm) => {
@@ -257,37 +215,6 @@ export default function Profile() {
     },
   ];
 
-  const FeatureButton = ({ feature, testId }: { feature: any, testId: string }) => (
-    <button
-      onClick={feature.locked ? undefined : feature.action}
-      className={`w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between transition-opacity ${
-        feature.locked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card/80'
-      } ${feature.highlight ? 'border-warning' : ''}`}
-      disabled={feature.locked}
-      data-testid={testId}
-    >
-      <div className="flex items-center gap-3">
-        <feature.icon className={`w-5 h-5 ${feature.locked ? 'text-muted-foreground' : feature.highlight ? 'text-warning' : 'text-muted-foreground'}`} />
-        <span className={feature.locked ? 'text-muted-foreground' : ''}>{feature.label}</span>
-        {feature.requiredTier && (
-          <span className={`tier-badge text-xs px-2 py-1 rounded-full font-semibold ml-2 ${
-            feature.requiredTier === 'COMMISSIONER' ? 'bg-warning text-black' : 'bg-primary text-primary-foreground'
-          }`}>
-            {feature.requiredTier}
-          </span>
-        )}
-      </div>
-      {feature.locked ? (
-        <div className="w-4 h-4 text-muted-foreground">
-          🔒
-        </div>
-      ) : (
-        <div className="w-4 h-4 text-muted-foreground">
-          →
-        </div>
-      )}
-    </button>
-  );
 
   const getTierDisplay = () => {
     switch (role) {
@@ -607,19 +534,6 @@ export default function Profile() {
         </div>
         </FeatureLockOverlay>
       </div>
-      {/* League Features */}
-      <div className="px-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4" data-testid="text-league-features-title">League Features</h2>
-        <div className="space-y-2">
-          {leagueFeatures.map((feature, index) => (
-            <FeatureButton 
-              key={index} 
-              feature={feature} 
-              testId={`button-league-feature-${index}`}
-            />
-          ))}
-        </div>
-      </div>
       {/* League Management */}
       {userLeagues && Array.isArray(userLeagues) && userLeagues.length > 0 && (
         <div className="px-6 mb-6">
@@ -680,26 +594,20 @@ export default function Profile() {
         <h2 className="text-lg font-semibold mb-4" data-testid="text-settings-title">Settings</h2>
         <div className="space-y-2">
           {settingsItems.map((item, index) => (
-            item.requiredTier !== undefined ? (
-              <FeatureButton 
-                key={index}
-                feature={item} 
-                testId={`button-setting-${index}`}
-              />
-            ) : (
-              <button
-                key={index}
-                onClick={item.action}
-                className="w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:bg-card/80"
-                data-testid={`button-setting-${index}`}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon className="w-5 h-5 text-muted-foreground" />
-                  <span>{item.label}</span>
-                </div>
-                <div className="w-4 h-4 text-muted-foreground">→</div>
-              </button>
-            )
+            <button
+              key={index}
+              onClick={item.action}
+              className={`w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:bg-card/80 ${
+                item.highlight ? 'border-warning' : ''
+              }`}
+              data-testid={`button-setting-${index}`}
+            >
+              <div className="flex items-center gap-3">
+                <item.icon className={`w-5 h-5 ${item.highlight ? 'text-warning' : 'text-muted-foreground'}`} />
+                <span>{item.label}</span>
+              </div>
+              <div className="w-4 h-4 text-muted-foreground">→</div>
+            </button>
           ))}
           
           {/* Dark Mode Toggle */}
