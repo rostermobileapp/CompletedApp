@@ -487,7 +487,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           if (user) {
-            if (subscription.status === 'active' || subscription.status === 'trialing') {
+            // IMMEDIATE ACCESS RESTRICTION: Check if subscription is cancelled or will be cancelled
+            // This ensures users lose access immediately upon cancellation, not at period end
+            if (subscription.cancel_at_period_end || subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
+              console.log('[Webhook] Downgrading user', user.id, 'to free_tier due to:', 
+                subscription.cancel_at_period_end ? 'cancel_at_period_end=true' : `status=${subscription.status || 'deleted'}`);
+              await storage.updateUserRole(user.id, 'free_tier');
+              
+              // Clear subscription ID when downgrading to free tier
+              await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', '');
+            } else if (subscription.status === 'active' || subscription.status === 'trialing') {
               // Get the price ID to determine tier
               const priceId = subscription.items.data[0]?.price?.id;
               const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
@@ -503,12 +512,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } else {
                 console.warn('[Webhook] Unknown price ID in subscription:', priceId);
               }
-            } else if (subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
-              console.log('[Webhook] Downgrading user', user.id, 'to free_tier due to status:', subscription.status || 'deleted');
-              await storage.updateUserRole(user.id, 'free_tier');
-              
-              // Clear subscription ID when downgrading to free tier
-              await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', '');
             }
           } else {
             console.log('[Webhook] User not found for subscription:', subscription.id);
