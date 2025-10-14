@@ -20,6 +20,8 @@ export function SlideOutMenu() {
       path: '/create-scrimmage',
       locked: !canAccessPremiumFeatures(),
       requiredTier: 'PRO',
+      bgColor: 'bg-blue-500/20',
+      iconColor: 'text-blue-500',
     },
     {
       icon: Settings,
@@ -27,6 +29,8 @@ export function SlideOutMenu() {
       path: '/scrimmage-management',
       locked: !canAccessPremiumFeatures(),
       requiredTier: 'PRO',
+      bgColor: 'bg-purple-500/20',
+      iconColor: 'text-purple-500',
     },
     {
       icon: Plus,
@@ -34,6 +38,8 @@ export function SlideOutMenu() {
       path: '/create-league',
       locked: !canManageLeague(),
       requiredTier: 'COMMISSIONER',
+      bgColor: 'bg-green-500/20',
+      iconColor: 'text-green-500',
     },
     {
       icon: Crown,
@@ -41,6 +47,8 @@ export function SlideOutMenu() {
       path: '/league-list',
       locked: !hasRole('secondary_commissioner'),
       requiredTier: 'COMMISSIONER',
+      bgColor: 'bg-amber-500/20',
+      iconColor: 'text-amber-500',
     },
     {
       icon: DollarSign,
@@ -48,6 +56,8 @@ export function SlideOutMenu() {
       path: '/payment-requests',
       locked: false,
       requiredTier: null,
+      bgColor: 'bg-emerald-500/20',
+      iconColor: 'text-emerald-500',
     },
   ];
 
@@ -95,9 +105,11 @@ export function SlideOutMenu() {
               }`}
               data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
             >
-              <div className="flex items-center gap-3">
-                <item.icon className={`w-5 h-5 ${item.locked ? 'text-muted-foreground' : 'text-primary'}`} />
-                <span className={`font-medium ${item.locked ? 'text-muted-foreground' : 'text-foreground'}`}>
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-xl ${item.locked ? 'bg-muted' : item.bgColor}`}>
+                  <item.icon className={`w-6 h-6 ${item.locked ? 'text-muted-foreground' : item.iconColor}`} />
+                </div>
+                <span className={`text-lg font-semibold ${item.locked ? 'text-muted-foreground' : 'text-foreground'}`}>
                   {item.label}
                 </span>
                 {item.requiredTier && (
@@ -111,9 +123,9 @@ export function SlideOutMenu() {
                 )}
               </div>
               {item.locked ? (
-                <div className="text-muted-foreground text-sm">🔒</div>
+                <div className="text-muted-foreground text-lg">🔒</div>
               ) : (
-                <div className="text-muted-foreground">→</div>
+                <div className="text-muted-foreground text-lg">→</div>
               )}
             </button>
           ))}
