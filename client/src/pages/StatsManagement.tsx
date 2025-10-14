@@ -565,7 +565,7 @@ export default function StatsManagement() {
   // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
   return (
     // <SubscriptionGate requiredTier="commissioner"> // DELETED - ALL ACCESS GRANTED
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-6 pl-[4px] pr-[4px]">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
