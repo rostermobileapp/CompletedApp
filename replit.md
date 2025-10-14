@@ -24,6 +24,9 @@ PostgreSQL is the primary database, utilizing Drizzle ORM for type-safe operatio
 
 User authentication relies on Replit's OpenID Connect provider with session-based authentication. Role-based access control is implemented through subscription tiers (free, player_plus, commissioner) with hierarchical permissions. Authorization is enforced at both the API and UI levels to ensure security and manage feature access.
 
+### Subscription Access Control
+**Immediate Access Restriction on Cancellation** (October 2025): The Stripe webhook handler now checks the `cancel_at_period_end` flag to immediately downgrade users to free tier when they cancel or downgrade their subscription, regardless of when their billing period ends. This ensures users lose premium access the moment they cancel, rather than retaining access until the billing period expires. The webhook handles `customer.subscription.updated`, `customer.subscription.deleted`, and `customer.subscription.created` events with proper priority given to cancellation flags over subscription status.
+
 ### Recent Fixes
 - **User Upsert Email Conflict Handling** (October 2025): Updated the `upsertUser` function in the storage layer to gracefully handle email unique constraint violations. The function now checks for existing users by email before inserting, preventing server crashes when OIDC authentication attempts to create users with duplicate emails but different IDs. This ensures robust handling of authentication scenarios during both production use and testing.
 
