@@ -571,18 +571,18 @@ export default function StatsManagement() {
 
         {/* League and Season Selection */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="w-5 h-5" />
-              League & Season Selection
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Trophy className="w-4 h-4" />
+              League & Season
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6 space-y-4 pt-[4px] pb-[4px] pl-[4px] pr-[4px]">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>League</Label>
+          <CardContent className="p-4 pt-0 space-y-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">League</Label>
                 <Select value={selectedLeague} onValueChange={setSelectedLeague} data-testid="select-league">
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8">
                     <SelectValue placeholder="Select a league" />
                   </SelectTrigger>
                   <SelectContent>
@@ -594,10 +594,10 @@ export default function StatsManagement() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Season</Label>
+              <div className="space-y-1">
+                <Label className="text-xs">Season</Label>
                 <Select value={selectedSeason} onValueChange={setSelectedSeason} data-testid="select-season">
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8">
                     <SelectValue placeholder="Select a season" />
                   </SelectTrigger>
                   <SelectContent>
