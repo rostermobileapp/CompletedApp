@@ -414,20 +414,29 @@ export class DatabaseStorage implements IStorage {
     const existingUser = userData.email ? await this.getUserByEmail(userData.email) : undefined;
     
     if (existingUser) {
-      // Update existing user
+      // Update existing user - only update fields if they have values
+      // Do NOT overwrite existing firstName/lastName with auth claims to preserve user-set names
       const updateSet: any = {
-        firstName: userData.firstName,
-        lastName: userData.lastName,
         updatedAt: new Date(),
       };
+      
+      // Only update firstName if user doesn't have one yet
+      if (userData.firstName !== undefined && !existingUser.firstName) {
+        updateSet.firstName = userData.firstName;
+      }
+      
+      // Only update lastName if user doesn't have one yet
+      if (userData.lastName !== undefined && !existingUser.lastName) {
+        updateSet.lastName = userData.lastName;
+      }
       
       // Include role in update if provided (for OIDC testing)
       if (userData.role !== undefined) {
         updateSet.role = userData.role;
       }
       
-      // Include profile image if provided
-      if (userData.profileImageUrl !== undefined) {
+      // Include profile image if provided and user doesn't have one
+      if (userData.profileImageUrl !== undefined && !existingUser.profileImageUrl) {
         updateSet.profileImageUrl = userData.profileImageUrl;
       }
       
