@@ -876,10 +876,9 @@ export default function StatsManagement() {
                           <TableHeader className="sticky top-0 bg-background z-10">
                             <TableRow>
                               <TableHead className="w-32 pl-2">Player</TableHead>
-                              <TableHead className="text-center w-16 px-0">Goals</TableHead>
-                              <TableHead className="text-center w-16 px-0">Assists</TableHead>
-                              <TableHead className="text-center w-16 px-0">Points</TableHead>
-                              <TableHead className="text-center w-16 px-0">PIM</TableHead>
+                              <TableHead className="text-center flex-1 px-0">Goals</TableHead>
+                              <TableHead className="text-center flex-1 px-0">Assists</TableHead>
+                              <TableHead className="text-center flex-1 px-0">PIM</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -954,12 +953,6 @@ export default function StatsManagement() {
                                     >
                                       +
                                     </Button>
-                                  </div>
-                                </TableCell>
-                                {/* Points (calculated) */}
-                                <TableCell className="text-center font-bold text-primary pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
-                                  <div className="text-sm font-bold" data-testid={`display-bulk-points-${player.id}`}>
-                                    {(parseInt(bulkPlayerStats[player.id]?.goals || '0') + parseInt(bulkPlayerStats[player.id]?.assists || '0'))}
                                   </div>
                                 </TableCell>
                                 {/* Penalty Minutes */}
