@@ -1084,7 +1084,7 @@ export default function Dashboard() {
             
             <button 
               onClick={() => navigate('/profile')}
-              className="w-[38px] h-[38px] rounded-full flex items-center justify-center overflow-hidden bg-primary"
+              className="w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden bg-primary"
               data-testid="button-profile"
             >
               {(user as any)?.profileImageUrl ? (
@@ -1094,7 +1094,7 @@ export default function Dashboard() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <span className="text-primary-foreground text-base font-semibold">
+                <span className="text-primary-foreground text-lg font-semibold">
                   {(user as any)?.firstName?.[0] || 'U'}
                 </span>
               )}
