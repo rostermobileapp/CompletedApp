@@ -876,7 +876,6 @@ export default function StatsManagement() {
                           <TableHeader className="sticky top-0 bg-background z-10">
                             <TableRow>
                               <TableHead className="w-48">Player</TableHead>
-                              <TableHead className="text-center w-20">GP</TableHead>
                               <TableHead className="text-center w-20">Goals</TableHead>
                               <TableHead className="text-center w-20">Assists</TableHead>
                               <TableHead className="text-center w-20">Points</TableHead>
@@ -893,37 +892,6 @@ export default function StatsManagement() {
                                     {player.teamName && (
                                       <div className="text-sm text-muted-foreground">{player.teamName}</div>
                                     )}
-                                  </div>
-                                </TableCell>
-                                {/* Games Played */}
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center space-x-1">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => decrementBulkPlayerStat(player.id, 'gamesPlayed')}
-                                      className="h-8 w-8 p-0"
-                                      data-testid={`button-decrease-bulk-games-${player.id}`}
-                                    >
-                                      -
-                                    </Button>
-                                    <Input
-                                      type="number"
-                                      value={bulkPlayerStats[player.id]?.gamesPlayed || '1'}
-                                      onChange={(e) => updateBulkPlayerStat(player.id, 'gamesPlayed', e.target.value)}
-                                      min="1"
-                                      className="w-12 text-center p-1"
-                                      data-testid={`input-bulk-games-${player.id}`}
-                                    />
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => incrementBulkPlayerStat(player.id, 'gamesPlayed')}
-                                      className="h-8 w-8 p-0"
-                                      data-testid={`button-increase-bulk-games-${player.id}`}
-                                    >
-                                      +
-                                    </Button>
                                   </div>
                                 </TableCell>
                                 {/* Goals */}
@@ -1067,7 +1035,7 @@ export default function StatsManagement() {
                             Editing stats for: {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.firstName} {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.lastName}
                           </div>
                           
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                               <Label htmlFor="player-goals">Goals</Label>
                               <div className="flex items-center space-x-2">
@@ -1164,44 +1132,12 @@ export default function StatsManagement() {
                                 </Button>
                               </div>
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="player-games">Games Played</Label>
-                              <div className="flex items-center space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => decrementIndividualPlayerStat('gamesPlayed')}
-                                  className="h-9 w-9 p-0"
-                                  data-testid="button-decrease-player-games"
-                                >
-                                  -
-                                </Button>
-                                <Input
-                                  id="player-games"
-                                  type="number"
-                                  value={individualPlayerStats.gamesPlayed}
-                                  onChange={(e) => updateIndividualPlayerStat('gamesPlayed', e.target.value)}
-                                  min="0"
-                                  className="text-center"
-                                  data-testid="input-player-games"
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => incrementIndividualPlayerStat('gamesPlayed')}
-                                  className="h-9 w-9 p-0"
-                                  data-testid="button-increase-player-games"
-                                >
-                                  +
-                                </Button>
-                              </div>
-                            </div>
                           </div>
 
                           {currentPlayerStats && (
                             <div className="bg-muted/50 p-4 rounded-lg">
                               <h4 className="font-medium mb-2">Current Season Stats</h4>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                                 <div>
                                   <span className="text-muted-foreground">Goals:</span>
                                   <span className="ml-2 font-medium" data-testid="display-current-goals">{currentPlayerStats.goals || 0}</span>
@@ -1213,10 +1149,6 @@ export default function StatsManagement() {
                                 <div>
                                   <span className="text-muted-foreground">PIM:</span>
                                   <span className="ml-2 font-medium" data-testid="display-current-penalty">{currentPlayerStats.penaltyMinutes || 0}</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">GP:</span>
-                                  <span className="ml-2 font-medium" data-testid="display-current-games">{currentPlayerStats.gamesPlayed || 0}</span>
                                 </div>
                               </div>
                             </div>
