@@ -207,7 +207,10 @@ export default function Stats() {
                 <Button 
                   onClick={() => {
                     setPageTransitionDirection('up');
-                    navigate(leagueId ? `/stats-management?league=${leagueId}` : '/stats-management');
+                    const params = new URLSearchParams();
+                    if (leagueId) params.append('league', leagueId);
+                    if (selectedSeason && selectedSeason !== 'all') params.append('season', selectedSeason);
+                    navigate(`/stats-management${params.toString() ? `?${params.toString()}` : ''}`);
                   }}
                   size="sm"
                   variant="ghost"

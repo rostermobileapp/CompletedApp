@@ -57,12 +57,13 @@ export default function StatsManagement() {
   const { user } = useAuth();
   const [location, navigate] = useLocation();
   
-  // Get league ID from URL parameter if provided
+  // Get league ID and season from URL parameters if provided
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const urlLeagueId = urlParams.get('league');
+  const urlSeasonId = urlParams.get('season');
   
   const [selectedLeague, setSelectedLeague] = useState<string>(urlLeagueId || '');
-  const [selectedSeason, setSelectedSeason] = useState<string>('');
+  const [selectedSeason, setSelectedSeason] = useState<string>(urlSeasonId || '');
   const [selectedGame, setSelectedGame] = useState<string>('');
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [playerGameStats, setPlayerGameStats] = useState<Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>>({});
@@ -191,6 +192,13 @@ export default function StatsManagement() {
       }
     }
   }, [allPlayerStats, players, selectedSeason]);
+
+  // Auto-select first commissioner league if not provided in URL
+  useEffect(() => {
+    if (Array.isArray(commissionerLeagues) && commissionerLeagues.length > 0 && !selectedLeague) {
+      setSelectedLeague(commissionerLeagues[0].id);
+    }
+  }, [commissionerLeagues, selectedLeague]);
 
   // Auto-select first season when seasons are loaded
   useEffect(() => {
@@ -402,10 +410,7 @@ export default function StatsManagement() {
     setBulkPlayerStats(prev => ({
       ...prev,
       [userId]: {
-        goals: '0',
-        assists: '0',
-        penaltyMinutes: '0',
-        gamesPlayed: '1',
+        ...{ goals: '0', assists: '0', penaltyMinutes: '0', gamesPlayed: '1' },
         ...prev[userId],
         [field]: value
       }
@@ -568,50 +573,6 @@ export default function StatsManagement() {
             <h1 className="text-3xl font-bold">Stats Management</h1>
           </div>
         </div>
-
-        {/* League and Season Selection */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Trophy className="w-4 h-4" />
-              League & Season
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0 space-y-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">League</Label>
-                <Select value={selectedLeague} onValueChange={setSelectedLeague} data-testid="select-league">
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Select a league" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.isArray(commissionerLeagues) && commissionerLeagues.map((league: any) => (
-                      <SelectItem key={league.id} value={league.id}>
-                        {league.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Season</Label>
-                <Select value={selectedSeason} onValueChange={setSelectedSeason} data-testid="select-season">
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Select a season" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.isArray(seasons) && seasons.map((season: any) => (
-                      <SelectItem key={season.id} value={season.id}>
-                        {season.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Stats Management Tabs */}
         {selectedLeague && selectedSeason && (
