@@ -86,7 +86,7 @@ export function SlideOutMenu() {
       </SheetTrigger>
       <SheetContent 
         side="right" 
-        className="w-[85%] sm:w-[400px] bg-background border-l border-border"
+        className="w-[85%] sm:w-[400px] border-l border-border bg-[#000000] pt-[40px] pb-[40px] pl-[0px] pr-[0px]"
       >
         <SheetHeader className="mb-8">
           <SheetTitle className="text-2xl font-bold">Menu</SheetTitle>
