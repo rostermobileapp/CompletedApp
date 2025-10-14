@@ -574,6 +574,22 @@ export default function StatsManagement() {
           </div>
         </div>
 
+        {/* No Leagues Empty State */}
+        {Array.isArray(commissionerLeagues) && commissionerLeagues.length === 0 && (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Trophy className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+              <h2 className="text-xl font-semibold mb-2">No Commissioner Leagues Found</h2>
+              <p className="text-muted-foreground mb-6">
+                You need to be a commissioner of a league to manage player statistics.
+              </p>
+              <Button onClick={() => navigate('/league-search')} data-testid="button-find-league">
+                Find a League
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Management Tabs */}
         {selectedLeague && selectedSeason && (
           <Tabs defaultValue="by-game" className="space-y-4">
