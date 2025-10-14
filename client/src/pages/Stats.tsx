@@ -3,25 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Trophy, Target, Clock, Medal, TrendingUp, Filter, Settings, Apple, Hand, Flag } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Settings, Trophy } from 'lucide-react';
 import { useLocation } from 'wouter';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { PlayerStatsUnion, GoalieStats, SkaterStats } from '@shared/schema';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 
@@ -30,18 +16,7 @@ export default function Stats() {
   const { canAccessPremiumFeatures, canEditStats } = usePermissions();
   const [location, navigate] = useLocation();
   const [selectedSeason, setSelectedSeason] = useState<string>('');
-  const [sortField, setSortField] = useState<string>('points');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [playerType, setPlayerType] = useState<'goalies' | 'non-goalies'>('non-goalies');
-
-  // Set default sort field based on player type
-  useEffect(() => {
-    if (playerType === 'goalies') {
-      setSortField('wins');
-    } else {
-      setSortField('points');
-    }
-  }, [playerType]);
+  const [activeTab, setActiveTab] = useState<'skaters' | 'defense' | 'goalies'>('skaters');
 
   // Get league ID from URL parameter if provided, otherwise use user's primary league
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
@@ -68,6 +43,9 @@ export default function Stats() {
     }
   }, [seasons, selectedSeason]);
 
+  // Determine player type based on active tab
+  const playerType = activeTab === 'goalies' ? 'goalies' : 'non-goalies';
+
   // Fetch player stats for the league
   const { data: playerStats, isLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'stats', { seasonId: selectedSeason, playerType }],
@@ -88,153 +66,104 @@ export default function Stats() {
   // Ensure playerStats is an array
   const statsArray = Array.isArray(playerStats) ? playerStats : [];
 
-  // Sort the stats based on player type
-  const sortedStats = statsArray.length > 0 ? [...statsArray].sort((a: PlayerStatsUnion, b: PlayerStatsUnion) => {
-    let aVal, bVal;
-    
-    if (playerType === 'goalies' && a.type === 'goalie' && b.type === 'goalie') {
-      // Handle goalie stats sorting
-      switch (sortField) {
-        case 'wins':
-          aVal = a.wins || 0;
-          bVal = b.wins || 0;
-          break;
-        case 'losses':
-          aVal = a.losses || 0;
-          bVal = b.losses || 0;
-          break;
-        case 'goalsAgainstAverage':
-        case 'gaa':
-          aVal = a.goalsAgainstAverage || 0;
-          bVal = b.goalsAgainstAverage || 0;
-          break;
-        case 'name':
-          aVal = `${a.user?.firstName || ''} ${a.user?.lastName || ''}`.trim();
-          bVal = `${b.user?.firstName || ''} ${b.user?.lastName || ''}`.trim();
-          break;
-        default:
-          aVal = a.gamesPlayed || 0;
-          bVal = b.gamesPlayed || 0;
+  // Fetch league memberships to get position and jersey number data
+  const { data: leagueMemberships } = useQuery({
+    queryKey: [`/api/leagues/${leagueId}/members`],
+    enabled: !!leagueId,
+  });
+
+  // Create a map of userId to membership data
+  const membershipMap = new Map();
+  if (Array.isArray(leagueMemberships)) {
+    leagueMemberships.forEach((membership: any) => {
+      membershipMap.set(membership.userId, membership);
+    });
+  }
+
+  // Filter stats based on active tab
+  const filteredStats = statsArray.filter((stat: PlayerStatsUnion) => {
+    if (activeTab === 'goalies') {
+      return stat.type === 'goalie';
+    } else if (activeTab === 'defense') {
+      // Filter for defense positions (D, LD, RD)
+      const membership = membershipMap.get(stat.userId);
+      return stat.type === 'skater' && membership?.position?.toUpperCase().includes('D');
+    } else {
+      // Skaters - all non-goalies
+      return stat.type === 'skater';
+    }
+  });
+
+  // Get top players by category
+  const getTopPlayers = (category: 'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'wins', limit: number = 3) => {
+    if (activeTab === 'goalies') {
+      const goalieStats = filteredStats.filter((stat): stat is GoalieStats => stat.type === 'goalie');
+      if (category === 'wins') {
+        return goalieStats
+          .sort((a, b) => (b.wins || 0) - (a.wins || 0))
+          .slice(0, limit);
       }
-    } else if (a.type === 'skater' && b.type === 'skater') {
-      // Handle skater stats sorting
-      switch (sortField) {
+      return [];
+    } else {
+      const skaterStats = filteredStats.filter((stat): stat is SkaterStats => stat.type === 'skater');
+      
+      switch (category) {
         case 'points':
-          aVal = a.points || 0;
-          bVal = b.points || 0;
-          break;
+          return skaterStats
+            .sort((a, b) => (b.points || 0) - (a.points || 0))
+            .slice(0, limit);
         case 'goals':
-          aVal = a.goals || 0;
-          bVal = b.goals || 0;
-          break;
+          return skaterStats
+            .sort((a, b) => (b.goals || 0) - (a.goals || 0))
+            .slice(0, limit);
         case 'assists':
-          aVal = a.assists || 0;
-          bVal = b.assists || 0;
-          break;
+          return skaterStats
+            .sort((a, b) => (b.assists || 0) - (a.assists || 0))
+            .slice(0, limit);
         case 'penaltyMinutes':
-          aVal = a.penaltyMinutes || 0;
-          bVal = b.penaltyMinutes || 0;
-          break;
-        case 'name':
-          aVal = `${a.user?.firstName || ''} ${a.user?.lastName || ''}`.trim();
-          bVal = `${b.user?.firstName || ''} ${b.user?.lastName || ''}`.trim();
-          break;
+          return skaterStats
+            .sort((a, b) => (b.penaltyMinutes || 0) - (a.penaltyMinutes || 0))
+            .slice(0, limit);
         default:
-          aVal = a.gamesPlayed || 0;
-          bVal = b.gamesPlayed || 0;
+          return [];
       }
-    } else {
-      // Fallback for mixed types or unknown types
-      aVal = 0;
-      bVal = 0;
-    }
-    
-    if (sortOrder === 'desc') {
-      return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
-    } else {
-      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-    }
-  }) : [];
-
-  // Calculate leaders based on player type
-  const getLeaders = () => {
-    if (statsArray.length === 0) return null;
-    
-    if (playerType === 'goalies') {
-      // Goalie leaders
-      const goalieStats = statsArray.filter((stat): stat is GoalieStats => stat.type === 'goalie');
-      if (goalieStats.length === 0) return null;
-
-      const mostWins = goalieStats.reduce((top, current) => {
-        return (current.wins || 0) > (top.wins || 0) ? current : top;
-      });
-      
-      const bestGAA = goalieStats.reduce((top, current) => {
-        const topGAA = top.goalsAgainstAverage || 999;
-        const currentGAA = current.goalsAgainstAverage || 999;
-        return (currentGAA < topGAA && current.gamesPlayed > 0) ? current : top;
-      });
-      
-      const mostGames = goalieStats.reduce((top, current) => {
-        return (current.gamesPlayed || 0) > (top.gamesPlayed || 0) ? current : top;
-      });
-      
-      const fewestLosses = goalieStats.reduce((top, current) => {
-        return (current.losses || 0) < (top.losses || 0) ? current : top;
-      });
-      
-      return { mostWins, bestGAA, mostGames, fewestLosses };
-    } else {
-      // Skater leaders
-      const skaterStats = statsArray.filter((stat): stat is SkaterStats => stat.type === 'skater');
-      if (skaterStats.length === 0) return null;
-
-      const topScorer = skaterStats.reduce((top, current) => {
-        const topPoints = top.points || 0;
-        const currentPoints = current.points || 0;
-        return currentPoints > topPoints ? current : top;
-      });
-      
-      const topGoalScorer = skaterStats.reduce((top, current) => {
-        return (current.goals || 0) > (top.goals || 0) ? current : top;
-      });
-      
-      const topAssistProvider = skaterStats.reduce((top, current) => {
-        return (current.assists || 0) > (top.assists || 0) ? current : top;
-      });
-      
-      const mostActivePlayer = skaterStats.reduce((top, current) => {
-        return (current.gamesPlayed || 0) > (top.gamesPlayed || 0) ? current : top;
-      });
-      
-      const mostPenaltyMinutes = skaterStats.reduce((top, current) => {
-        return (current.penaltyMinutes || 0) > (top.penaltyMinutes || 0) ? current : top;
-      });
-      
-      return { topScorer, topGoalScorer, topAssistProvider, mostActivePlayer, mostPenaltyMinutes };
     }
   };
 
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
-    } else {
-      setSortField(field);
-      setSortOrder('desc');
+  // Get initials for avatar fallback
+  const getInitials = (firstName?: string | null, lastName?: string | null) => {
+    if (firstName && lastName) {
+      return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    } else if (firstName) {
+      return firstName[0].toUpperCase();
+    } else if (lastName) {
+      return lastName[0].toUpperCase();
     }
+    return 'P';
   };
 
-  const getSortIcon = (field: string) => {
-    if (sortField !== field) return null;
-    return sortOrder === 'desc' ? '↓' : '↑';
+  // Format player name
+  const formatPlayerName = (stat: PlayerStatsUnion) => {
+    const membership = membershipMap.get(stat.userId);
+    const firstName = membership?.displayFirstName || stat.user?.firstName;
+    const lastName = membership?.displayLastName || stat.user?.lastName;
+    
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    } else if (firstName) {
+      return firstName;
+    } else if (lastName) {
+      return lastName;
+    }
+    return 'Unknown Player';
   };
 
   if (!leagueId) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6" data-testid="no-league-state">
-        <Trophy className="w-16 h-16 text-muted-foreground mb-4" />
-        <h2 className="text-xl font-bold mb-2">No League Found</h2>
-        <p className="text-muted-foreground text-center mb-6">
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6" data-testid="no-league-state">
+        <Trophy className="w-16 h-16 text-gray-500 mb-4" />
+        <h2 className="text-xl font-bold text-white mb-2">No League Found</h2>
+        <p className="text-gray-400 text-center mb-6">
           You need to join a league to view player stats
         </p>
         <Button 
@@ -248,384 +177,288 @@ export default function Stats() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col pb-24" data-testid="stats-page">
+    <div className="min-h-screen bg-black text-white pb-24" data-testid="stats-page">
       <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()} className="min-h-screen flex flex-col">
-      {/* Header */}
-      <div className="p-6 pt-12">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => {
-                setPageTransitionDirection('down');
-                navigate('/');
-              }}
-              className="text-muted-foreground"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Player Stats</h1>
-          </div>
-          
-          {/* Stats Update Button */}
-          {canEditStats() && (
-            <Button 
-              onClick={() => {
-                setPageTransitionDirection('up');
-                navigate(leagueId ? `/stats-management?league=${leagueId}` : '/stats-management');
-              }}
-              size="sm"
-              data-testid="button-update-stats"
-              className="flex items-center gap-2"
-            >
-              <Settings className="w-4 h-4" />
-              Update Stats
-            </Button>
-          )}
-        </div>
-      </div>
-      {/* Filters */}
-      <div className="px-6 mb-3">
-        <Card className="rounded-lg border bg-card text-card-foreground shadow-sm p-2 pl-[0px] pr-[0px]" data-testid="card-filters">
-          <div className="flex items-center gap-4">
-            {/* Season Filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-[#3c83f6]">Season:</label>
-              <Select value={selectedSeason} onValueChange={setSelectedSeason} data-testid="select-season">
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Seasons</SelectItem>
-                  {Array.isArray(seasons) ? seasons.map((season: any) => (
-                    <SelectItem key={season.id} value={String(season.id)}>
+        {/* Header */}
+        <div className="sticky top-0 z-50 bg-black/95 backdrop-blur-sm border-b border-gray-800">
+          <div className="px-4 pt-8 pb-3">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => {
+                    setPageTransitionDirection('down');
+                    navigate('/');
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  data-testid="button-back"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <h1 className="text-2xl font-bold" data-testid="text-page-title">Stats</h1>
+              </div>
+              
+              {canEditStats() && (
+                <Button 
+                  onClick={() => {
+                    setPageTransitionDirection('up');
+                    navigate(leagueId ? `/stats-management?league=${leagueId}` : '/stats-management');
+                  }}
+                  size="sm"
+                  variant="ghost"
+                  data-testid="button-update-stats"
+                  className="text-gray-400 hover:text-white"
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+            
+            {/* Season Selector */}
+            {Array.isArray(seasons) && seasons.length > 0 && (
+              <div className="mt-3">
+                <select
+                  value={selectedSeason}
+                  onChange={(e) => setSelectedSeason(e.target.value)}
+                  className="bg-gray-900 text-gray-300 border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00A9FF] focus:border-transparent"
+                  data-testid="select-season"
+                >
+                  <option value="all">All Seasons</option>
+                  {seasons.map((season: any) => (
+                    <option key={season.id} value={season.id}>
                       {season.name}
-                    </SelectItem>
-                  )) : []}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Player Type Toggle */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-[#3c83f6]">Type:</label>
-              <Button 
-                variant="outline" 
-                onClick={() => setPlayerType(playerType === 'goalies' ? 'non-goalies' : 'goalies')}
-                className="justify-start"
-                data-testid="button-toggle-player-type"
-              >
-                {playerType === 'goalies' ? 'Switch to Skaters' : 'Switch to Goalies'}
-              </Button>
-            </div>
-          </div>
-        </Card>
-      </div>
-      {/* Stats Overview Cards */}
-      {statsArray.length > 0 && (
-        <div className="px-6 pl-[0px] pr-[0px] mt-[0px] mb-[0px]">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pl-[12px] pr-[12px] pt-[2px] pb-[2px]">
-            {playerType === 'goalies' ? (
-              // Goalie overview cards
-              ((() => {
-                const leaders = getLeaders();
-                return (
-                  <>
-                    {/* Most Wins */}
-                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-wins">
-                      <div className="flex items-center gap-3">
-                        <Trophy className="w-5 h-5 text-primary" />
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold">{leaders?.mostWins?.wins || 0}</span>
-                          <span className="text-sm text-muted-foreground">Wins</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium truncate">{leaders?.mostWins?.user?.lastName || 'N/A'}</span>
-                    </Card>
-
-                    {/* Best GAA */}
-                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-best-gaa">
-                      <div className="flex items-center gap-3">
-                        <Target className="w-5 h-5 text-success" />
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold">{leaders?.bestGAA?.goalsAgainstAverage?.toFixed(2) || '0.00'}</span>
-                          <span className="text-sm text-muted-foreground">GAA</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium truncate">{leaders?.bestGAA?.user?.lastName || 'N/A'}</span>
-                    </Card>
-
-                    {/* Most Games */}
-                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-games-goalie">
-                      <div className="flex items-center gap-3">
-                        <Clock className="w-5 h-5 text-info" />
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold">{leaders?.mostGames?.gamesPlayed || 0}</span>
-                          <span className="text-sm text-muted-foreground">Games</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium truncate">{leaders?.mostGames?.user?.lastName || 'N/A'}</span>
-                    </Card>
-
-                    {/* Fewest Losses */}
-                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-fewest-losses">
-                      <div className="flex items-center gap-3">
-                        <Medal className="w-5 h-5 text-warning" />
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold">{leaders?.fewestLosses?.losses || 0}</span>
-                          <span className="text-sm text-muted-foreground">Losses</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium truncate">{leaders?.fewestLosses?.user?.lastName || 'N/A'}</span>
-                    </Card>
-                  </>
-                );
-              })())
-            ) : (
-              // Skater overview cards
-              ((() => {
-                const leaders = getLeaders();
-                return (
-                  <>
-                    {/* Top Scorer */}
-                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-top-scorer">
-                      <div className="flex items-center gap-3">
-                        <TrendingUp className="w-5 h-5 text-primary" />
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold">
-                            {leaders?.topScorer ? (leaders.topScorer.goals || 0) + (leaders.topScorer.assists || 0) : 0}
-                          </span>
-                          <span className="text-sm text-muted-foreground">Points</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium truncate">{leaders?.topScorer?.user?.lastName || 'N/A'}</span>
-                    </Card>
-
-                    {/* Most Goals */}
-                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-goals">
-                      <div className="flex items-center gap-3">
-                        <Target className="w-5 h-5 text-success" />
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold">{leaders?.topGoalScorer?.goals || 0}</span>
-                          <span className="text-sm text-muted-foreground">Goals</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium truncate">{leaders?.topGoalScorer?.user?.lastName || 'N/A'}</span>
-                    </Card>
-
-                    {/* Most Assists */}
-                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-assists">
-                      <div className="flex items-center gap-3">
-                        <Apple className="w-5 h-5 text-info" />
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold">{leaders?.topAssistProvider?.assists || 0}</span>
-                          <span className="text-sm text-muted-foreground">Assists</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium truncate">{leaders?.topAssistProvider?.user?.lastName || 'N/A'}</span>
-                    </Card>
-
-                    {/* Most Penalty Minutes */}
-                    <Card className="p-3 h-10 flex items-center justify-between" data-testid="card-most-penalty-minutes">
-                      <div className="flex items-center gap-3">
-                        <Flag className="w-5 h-5 text-red-500" />
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold">{leaders?.mostPenaltyMinutes?.penaltyMinutes || 0}</span>
-                          <span className="text-sm text-muted-foreground">PIM</span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium truncate">{leaders?.mostPenaltyMinutes?.user?.lastName || 'N/A'}</span>
-                    </Card>
-                  </>
-                );
-              })())
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
-        </div>
-      )}
-      {/* Stats Table */}
-      <div className="px-6 pl-[5px] pr-[5px]">
-        <Card data-testid="card-stats-table">
-          <div className="p-4 border-b">
-            <h2 className="text-lg font-semibold" data-testid="text-stats-title">
-              Player Statistics ({sortedStats.length} players)
-            </h2>
-          </div>
 
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full">
+            <TabsList className="w-full bg-transparent border-b border-gray-800 rounded-none h-auto p-0 gap-8 px-4">
+              <TabsTrigger 
+                value="skaters" 
+                className="bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A9FF] data-[state=active]:bg-transparent px-0 pb-3 text-gray-400 data-[state=active]:text-white font-medium"
+                data-testid="tab-skaters"
+              >
+                Skaters
+              </TabsTrigger>
+              <TabsTrigger 
+                value="defense" 
+                className="bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A9FF] data-[state=active]:bg-transparent px-0 pb-3 text-gray-400 data-[state=active]:text-white font-medium"
+                data-testid="tab-defense"
+              >
+                Defense
+              </TabsTrigger>
+              <TabsTrigger 
+                value="goalies" 
+                className="bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A9FF] data-[state=active]:bg-transparent px-0 pb-3 text-gray-400 data-[state=active]:text-white font-medium"
+                data-testid="tab-goalies"
+              >
+                Goalies
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        {/* Content */}
+        <div className="px-4 py-6">
           {isLoading ? (
-            <div className="p-8 text-center" data-testid="loading-stats">
-              <div className="animate-pulse">
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-12 bg-muted rounded" />
-                  ))}
+            <div className="space-y-6" data-testid="loading-stats">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-4 bg-gray-800 rounded w-20 mb-4" />
+                  <div className="h-20 bg-gray-800 rounded" />
                 </div>
-              </div>
+              ))}
             </div>
-          ) : sortedStats.length === 0 ? (
-            <div className="p-8 text-center" data-testid="no-stats-state">
-              <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No player statistics available</p>
+          ) : filteredStats.length === 0 ? (
+            <div className="text-center py-12" data-testid="no-stats-state">
+              <Trophy className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400">No player statistics available</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table data-testid="table-stats">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead 
-                      className="cursor-pointer select-none" 
-                      onClick={() => handleSort('name')}
-                      data-testid="header-player-name"
-                    >
-                      Player {getSortIcon('name')}
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer select-none text-center" 
-                      onClick={() => handleSort('gamesPlayed')}
-                      data-testid="header-games-played"
-                    >
-                      GP {getSortIcon('gamesPlayed')}
-                    </TableHead>
-                    {playerType === 'goalies' ? (
-                      // Goalie table headers
-                      (<>
-                        <TableHead 
-                          className="cursor-pointer select-none text-center" 
-                          onClick={() => handleSort('wins')}
-                          data-testid="header-wins"
-                        >
-                          W {getSortIcon('wins')}
-                        </TableHead>
-                        <TableHead 
-                          className="cursor-pointer select-none text-center" 
-                          onClick={() => handleSort('losses')}
-                          data-testid="header-losses"
-                        >
-                          L {getSortIcon('losses')}
-                        </TableHead>
-                        <TableHead 
-                          className="cursor-pointer select-none text-center" 
-                          onClick={() => handleSort('ties')}
-                          data-testid="header-ties"
-                        >
-                          T {getSortIcon('ties')}
-                        </TableHead>
-                        <TableHead 
-                          className="cursor-pointer select-none text-center" 
-                          onClick={() => handleSort('shootoutLosses')}
-                          data-testid="header-shootout-losses"
-                        >
-                          SOL {getSortIcon('shootoutLosses')}
-                        </TableHead>
-                        <TableHead 
-                          className="cursor-pointer select-none text-center" 
-                          onClick={() => handleSort('goalsAgainstAverage')}
-                          data-testid="header-gaa"
-                        >
-                          GAA {getSortIcon('goalsAgainstAverage')}
-                        </TableHead>
-                      </>)
-                    ) : (
-                      // Skater table headers
-                      (<>
-                        <TableHead 
-                          className="cursor-pointer select-none text-center" 
-                          onClick={() => handleSort('goals')}
-                          data-testid="header-goals"
-                        >
-                          G {getSortIcon('goals')}
-                        </TableHead>
-                        <TableHead 
-                          className="cursor-pointer select-none text-center" 
-                          onClick={() => handleSort('assists')}
-                          data-testid="header-assists"
-                        >
-                          A {getSortIcon('assists')}
-                        </TableHead>
-                        <TableHead 
-                          className="cursor-pointer select-none text-center" 
-                          onClick={() => handleSort('points')}
-                          data-testid="header-points"
-                        >
-                          PTS {getSortIcon('points')}
-                        </TableHead>
-                        <TableHead 
-                          className="cursor-pointer select-none text-center" 
-                          onClick={() => handleSort('penaltyMinutes')}
-                          data-testid="header-penalty-minutes"
-                        >
-                          PIM {getSortIcon('penaltyMinutes')}
-                        </TableHead>
-                      </>)
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedStats.map((stat: any, index: number) => (
-                    <TableRow key={stat.userId} data-testid={`row-player-${stat.userId}`}>
-                      <TableCell className="font-medium" data-testid={`cell-name-${stat.userId}`}>
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
-                            {index + 1}
-                          </div>
-                          <div>
-                            <p className="font-medium">
-                              {stat.user.firstName} {stat.user.lastName}
-                            </p>
-                            {stat.user.city && (
-                              <p className="text-xs text-muted-foreground">{stat.user.city}</p>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center" data-testid={`cell-gp-${stat.userId}`}>
-                        {stat.gamesPlayed || 0}
-                      </TableCell>
-                      {playerType === 'goalies' ? (
-                        // Goalie table cells
-                        (<>
-                          <TableCell className="text-center font-semibold" data-testid={`cell-wins-${stat.userId}`}>
-                            {stat.wins || 0}
-                          </TableCell>
-                          <TableCell className="text-center font-semibold" data-testid={`cell-losses-${stat.userId}`}>
-                            {stat.losses || 0}
-                          </TableCell>
-                          <TableCell className="text-center font-semibold" data-testid={`cell-ties-${stat.userId}`}>
-                            {stat.ties || 0}
-                          </TableCell>
-                          <TableCell className="text-center font-semibold" data-testid={`cell-sol-${stat.userId}`}>
-                            {stat.shootoutLosses || 0}
-                          </TableCell>
-                          <TableCell className="text-center font-bold text-primary" data-testid={`cell-gaa-${stat.userId}`}>
-                            {stat.goalsAgainstAverage?.toFixed(2) || '0.00'}
-                          </TableCell>
-                        </>)
-                      ) : (
-                        // Skater table cells
-                        (<>
-                          <TableCell className="text-center font-semibold" data-testid={`cell-goals-${stat.userId}`}>
-                            {stat.goals || 0}
-                          </TableCell>
-                          <TableCell className="text-center font-semibold" data-testid={`cell-assists-${stat.userId}`}>
-                            {stat.assists || 0}
-                          </TableCell>
-                          <TableCell className="text-center font-bold text-primary" data-testid={`cell-points-${stat.userId}`}>
-                            {(stat.goals || 0) + (stat.assists || 0)}
-                          </TableCell>
-                          <TableCell className="text-center text-warning font-medium" data-testid={`cell-pim-${stat.userId}`}>
-                            {stat.penaltyMinutes || 0}
-                          </TableCell>
-                        </>)
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-8">
+              {/* Points Section */}
+              {activeTab !== 'goalies' && (
+                <StatSection
+                  title="Points"
+                  players={getTopPlayers('points', 3)}
+                  renderStat={(stat) => (stat.type === 'skater' ? stat.points || 0 : 0)}
+                  formatPlayerName={formatPlayerName}
+                  getInitials={getInitials}
+                  membershipMap={membershipMap}
+                />
+              )}
+
+              {/* Goals Section */}
+              {activeTab !== 'goalies' && (
+                <StatSection
+                  title="Goals"
+                  players={getTopPlayers('goals', 1)}
+                  renderStat={(stat) => (stat.type === 'skater' ? stat.goals || 0 : 0)}
+                  formatPlayerName={formatPlayerName}
+                  getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                />
+              )}
+
+              {/* Assists Section */}
+              {activeTab !== 'goalies' && (
+                <StatSection
+                  title="Assists"
+                  players={getTopPlayers('assists', 5)}
+                  renderStat={(stat) => (stat.type === 'skater' ? stat.assists || 0 : 0)}
+                  formatPlayerName={formatPlayerName}
+                  getInitials={getInitials}
+                  showPosition={true}
+                  showMoreIndicator={true}
+                  membershipMap={membershipMap}
+                />
+              )}
+
+              {/* Penalty Minutes Section */}
+              {activeTab !== 'goalies' && (
+                <StatSection
+                  title="Penalty Minutes"
+                  players={getTopPlayers('penaltyMinutes', 1)}
+                  renderStat={(stat) => (stat.type === 'skater' ? stat.penaltyMinutes || 0 : 0)}
+                  formatPlayerName={formatPlayerName}
+                  getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                />
+              )}
+
+              {/* Wins Section (Goalies) */}
+              {activeTab === 'goalies' && (
+                <StatSection
+                  title="Wins"
+                  players={getTopPlayers('wins', 1)}
+                  renderStat={(stat) => (stat.type === 'goalie' ? stat.wins || 0 : 0)}
+                  formatPlayerName={formatPlayerName}
+                  getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                />
+              )}
             </div>
           )}
-        </Card>
-      </div>
+
+          {/* All Categories & Filters Button */}
+          {filteredStats.length > 0 && (
+            <button
+              onClick={() => {
+                // Navigate to a detailed stats view or open filters
+                // For now, we'll just show a placeholder
+              }}
+              className="w-full mt-8 py-4 border border-gray-700 rounded-lg text-[#00A9FF] font-medium hover:bg-gray-900 transition-colors"
+              data-testid="button-all-categories"
+            >
+              All Categories & Filters
+            </button>
+          )}
+        </div>
       </FeatureLockOverlay>
+    </div>
+  );
+}
+
+// Stat Section Component
+interface StatSectionProps {
+  title: string;
+  players: PlayerStatsUnion[];
+  renderStat: (stat: PlayerStatsUnion) => number | string;
+  formatPlayerName: (stat: PlayerStatsUnion) => string;
+  getInitials: (firstName?: string | null, lastName?: string | null) => string;
+  showPosition?: boolean;
+  showMoreIndicator?: boolean;
+  membershipMap: Map<any, any>;
+}
+
+function StatSection({ 
+  title, 
+  players, 
+  renderStat, 
+  formatPlayerName, 
+  getInitials, 
+  showPosition = false,
+  showMoreIndicator = false,
+  membershipMap
+}: StatSectionProps) {
+  if (players.length === 0) return null;
+
+  // Check if there are tied players
+  const topStat = renderStat(players[0]);
+  const tiedPlayers = players.filter(p => renderStat(p) === topStat);
+  const isTied = tiedPlayers.length > 1;
+
+  return (
+    <div data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <h2 className="text-[#00A9FF] text-sm font-semibold mb-3 uppercase tracking-wide" data-testid={`header-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+        {title}
+      </h2>
+      
+      <button
+        className="w-full bg-[#0a0a0a] rounded-lg p-4 flex items-center justify-between hover:bg-gray-900 transition-colors group"
+        data-testid={`button-${title.toLowerCase().replace(/\s+/g, '-')}`}
+      >
+        <div className="flex items-center gap-4 flex-1">
+          {/* Player Avatars */}
+          <div className="flex -space-x-2">
+            {isTied ? (
+              // Show multiple avatars for tied players
+              <>
+                {tiedPlayers.slice(0, 3).map((player, idx) => (
+                  <Avatar key={idx} className="w-12 h-12 border-2 border-black" data-testid={`avatar-player-${idx}`}>
+                    <AvatarImage src={player.user?.profileImageUrl || undefined} />
+                    <AvatarFallback className="bg-gray-700 text-white text-sm">
+                      {getInitials(player.user?.firstName, player.user?.lastName)}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+                {tiedPlayers.length > 3 && (
+                  <div className="w-12 h-12 rounded-full bg-gray-700 border-2 border-black flex items-center justify-center text-sm font-medium" data-testid="avatar-more">
+                    +{tiedPlayers.length - 3}
+                  </div>
+                )}
+              </>
+            ) : (
+              // Show single avatar
+              <Avatar className="w-12 h-12" data-testid="avatar-player-single">
+                <AvatarImage src={players[0].user?.profileImageUrl || undefined} />
+                <AvatarFallback className="bg-gray-700 text-white text-sm">
+                  {getInitials(players[0].user?.firstName, players[0].user?.lastName)}
+                </AvatarFallback>
+              </Avatar>
+            )}
+          </div>
+
+          {/* Player Info */}
+          <div className="flex-1 text-left">
+            <div className="text-white font-medium" data-testid="text-player-name">
+              {isTied ? `${tiedPlayers.length} Tied` : formatPlayerName(players[0])}
+            </div>
+            {showPosition && !isTied && (() => {
+              const membership = membershipMap.get(players[0].userId);
+              return (
+                <div className="text-gray-400 text-sm" data-testid="text-player-position">
+                  {membership?.position?.toUpperCase() || 'N/A'} • #{membership?.jerseyNumber || 'N/A'}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Stat Value */}
+        <div className="flex items-center gap-3">
+          <span className="text-3xl font-bold text-white" data-testid="text-stat-value">
+            {renderStat(players[0])}
+          </span>
+          <ChevronRight className="w-5 h-5 text-[#00A9FF] group-hover:translate-x-1 transition-transform" data-testid="icon-chevron" />
+        </div>
+      </button>
     </div>
   );
 }
