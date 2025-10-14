@@ -16,7 +16,7 @@ export default function Stats() {
   const { canAccessPremiumFeatures, canEditStats } = usePermissions();
   const [location, navigate] = useLocation();
   const [selectedSeason, setSelectedSeason] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'skaters' | 'defense' | 'goalies'>('skaters');
+  const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
 
   // Get league ID from URL parameter if provided, otherwise use user's primary league
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
@@ -84,10 +84,6 @@ export default function Stats() {
   const filteredStats = statsArray.filter((stat: PlayerStatsUnion) => {
     if (activeTab === 'goalies') {
       return stat.type === 'goalie';
-    } else if (activeTab === 'defense') {
-      // Filter for defense positions (D, LD, RD)
-      const membership = membershipMap.get(stat.userId);
-      return stat.type === 'skater' && membership?.position?.toUpperCase().includes('D');
     } else {
       // Skaters - all non-goalies
       return stat.type === 'skater';
@@ -242,13 +238,6 @@ export default function Stats() {
                 data-testid="tab-skaters"
               >
                 Skaters
-              </TabsTrigger>
-              <TabsTrigger 
-                value="defense" 
-                className="bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A9FF] data-[state=active]:bg-transparent px-0 pb-3 text-gray-400 data-[state=active]:text-white font-medium"
-                data-testid="tab-defense"
-              >
-                Defense
               </TabsTrigger>
               <TabsTrigger 
                 value="goalies" 
