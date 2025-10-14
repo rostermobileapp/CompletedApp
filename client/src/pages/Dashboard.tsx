@@ -1049,57 +1049,53 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="dashboard-page">
       {/* Header */}
-      <div className="p-3 pt-[0px] pb-[0px] flex items-center mt-[12px] mb-[12px] pl-[16px] pr-[16px]">
-        <div className="flex items-center justify-between mb-3 w-full">
-          <div className="flex items-end gap-2">
-            <img 
-              src={logoUrl}
-              alt="Roster Logo" 
-              className="h-[30px] w-auto pt-[0px] pb-[0px] pl-[12px] pr-[12px]"
-              data-testid="img-roster-logo"
-            />
-            {tier !== 'free' && (
-              <>
-                {tier === 'commissioner' || tier === 'secondary_commissioner' ? (
-                  <Crown className="w-6 h-6 text-yellow-500" data-testid="badge-subscription-tier" />
-                ) : (
-                  <Star className="w-6 h-6 text-primary fill-current" data-testid="badge-subscription-tier" />
-                )}
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-3 pr-16">
-            {teamRecord ? (
-              <span className="text-[16px] text-center font-bold bg-[#3c83f685] text-[#ffffff] ml-[4px] mr-[4px] mt-[0px] mb-[0px] pl-[4px] pr-[4px] pt-[4px] pb-[4px]" data-testid="text-team-record">
-                {`${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}`}
-              </span>
-            ) : null}
-            
-            {/* Captain Badge */}
-            {isTeamCaptainInSelectedLeague && (
-              <span className="w-6 h-6 bg-warning text-black font-bold text-sm flex items-center justify-center rounded">
-                C
-              </span>
-            )}
-            
-            <button 
-              onClick={() => navigate('/profile')}
-              className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-primary"
-              data-testid="button-profile"
-            >
-              {(user as any)?.profileImageUrl ? (
-                <img 
-                  src={(user as any).profileImageUrl} 
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                />
+      <div className="p-3 pt-[0px] pb-[0px] flex items-center justify-center mt-[12px] mb-[12px] pl-[16px] pr-[16px]">
+        <div className="flex items-center gap-3 mb-3">
+          <img 
+            src={logoUrl}
+            alt="Roster Logo" 
+            className="h-[30px] w-auto pt-[0px] pb-[0px] pl-[12px] pr-[12px]"
+            data-testid="img-roster-logo"
+          />
+          {tier !== 'free' && (
+            <>
+              {tier === 'commissioner' || tier === 'secondary_commissioner' ? (
+                <Crown className="w-6 h-6 text-yellow-500" data-testid="badge-subscription-tier" />
               ) : (
-                <span className="text-primary-foreground text-lg font-semibold">
-                  {(user as any)?.firstName?.[0] || 'U'}
-                </span>
+                <Star className="w-6 h-6 text-primary fill-current" data-testid="badge-subscription-tier" />
               )}
-            </button>
-          </div>
+            </>
+          )}
+          {teamRecord ? (
+            <span className="text-[16px] text-center font-bold bg-[#3c83f685] text-[#ffffff] ml-[4px] mr-[4px] mt-[0px] mb-[0px] pl-[4px] pr-[4px] pt-[4px] pb-[4px]" data-testid="text-team-record">
+              {`${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}`}
+            </span>
+          ) : null}
+          
+          {/* Captain Badge */}
+          {isTeamCaptainInSelectedLeague && (
+            <span className="w-6 h-6 bg-warning text-black font-bold text-sm flex items-center justify-center rounded">
+              C
+            </span>
+          )}
+          
+          <button 
+            onClick={() => navigate('/profile')}
+            className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-primary"
+            data-testid="button-profile"
+          >
+            {(user as any)?.profileImageUrl ? (
+              <img 
+                src={(user as any).profileImageUrl} 
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-primary-foreground text-lg font-semibold">
+                {(user as any)?.firstName?.[0] || 'U'}
+              </span>
+            )}
+          </button>
         </div>
       </div>
       {/* League Selection Dropdown */}
