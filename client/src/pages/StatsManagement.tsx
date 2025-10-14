@@ -607,12 +607,6 @@ export default function StatsManagement() {
             {/* By Game Tab */}
             <TabsContent value="by-game" className="space-y-4">
               <Card>
-                <CardHeader className="flex flex-col space-y-1.5 p-6 pt-[0px] pb-[0px]">
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="w-5 h-5" />
-                    Select Game
-                  </CardTitle>
-                </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label>Game</Label>
