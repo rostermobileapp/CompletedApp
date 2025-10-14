@@ -695,7 +695,7 @@ export default function StatsManagement() {
                                     </div>
                                   </div>
                                 </TableCell>
-                                <TableCell className="text-center w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px] text-[16px]" data-testid={`cell-gamesplayed-${participant.userId}`}>
+                                <TableCell className="text-center pl-[0px] pr-[0px] pt-[0px] pb-[0px] w-16 pl-[2px] pr-[2px] pt-[5px] pb-[5px] text-[16px]" data-testid={`cell-gamesplayed-${participant.userId}`}>
                                   <div className="flex items-center justify-center gap-1">
                                     <Button
                                       variant="outline"
