@@ -10,7 +10,8 @@ import {
   requireLeagueManagement, 
   requireStatsManagement, 
   requireUserManagement,
-  requirePremiumFeatures 
+  requirePremiumFeatures,
+  requireSpecialPermission
 } from "./permissionMiddleware";
 import { db } from "./db";
 import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema } from "@shared/schema";
@@ -395,6 +396,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('[Stripe] Error creating portal session:', error);
       res.status(500).json({ message: 'Failed to create billing portal session' });
+    }
+  });
+
+  // Manual subscription sync endpoint - checks Stripe and updates user role
+  app.post('/api/stripe/sync-subscription/:userId', isAuthenticated, requireSpecialPermission('admin'), async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      if (!user.stripeSubscriptionId) {
+        return res.status(400).json({ message: 'User has no subscription to sync' });
+      }
+
+      // Fetch subscription from Stripe
+      const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+      
+      console.log('[Stripe Sync] Checking subscription for user:', userId);
+      console.log('[Stripe Sync] Subscription status:', subscription.status);
+      console.log('[Stripe Sync] Cancel at period end:', subscription.cancel_at_period_end);
+
+      // Map Stripe price IDs to user roles
+      const PRICE_TO_ROLE: Record<string, 'player_pro' | 'commissioner'> = {
+        [process.env.STRIPE_PRICE_PLAYER_PRO_MONTHLY || '']: 'player_pro',
+        [process.env.STRIPE_PRICE_COMMISSIONER_MONTHLY || '']: 'commissioner',
+        [process.env.STRIPE_PRICE_PLAYER_PRO_YEARLY || '']: 'player_pro',
+        [process.env.STRIPE_PRICE_COMMISSIONER_YEARLY || '']: 'commissioner',
+      };
+
+      // Check if subscription should be downgraded
+      if (subscription.cancel_at_period_end || subscription.status === 'canceled' || subscription.status === 'unpaid') {
+        console.log('[Stripe Sync] Downgrading user to free_tier');
+        await storage.updateUserRole(userId, 'free_tier');
+        await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
+        
+        return res.json({ 
+          message: 'User downgraded to free_tier', 
+          previousRole: user.role,
+          newRole: 'free_tier',
+          reason: subscription.cancel_at_period_end ? 'cancel_at_period_end' : `status=${subscription.status}`
+        });
+      } else if (subscription.status === 'active' || subscription.status === 'trialing') {
+        // Get the price ID to determine tier
+        const priceId = subscription.items.data[0]?.price?.id;
+        const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
+        
+        if (tier && tier !== user.role) {
+          console.log('[Stripe Sync] Updating user to tier:', tier);
+          await storage.updateUserRole(userId, tier);
+          
+          return res.json({ 
+            message: 'User role updated', 
+            previousRole: user.role,
+            newRole: tier
+          });
+        } else {
+          return res.json({ 
+            message: 'User role is already correct', 
+            currentRole: user.role,
+            subscriptionStatus: subscription.status
+          });
+        }
+      } else {
+        return res.json({ 
+          message: 'Subscription status not handled', 
+          subscriptionStatus: subscription.status 
+        });
+      }
+    } catch (error: any) {
+      console.error('[Stripe Sync] Error syncing subscription:', error);
+      res.status(500).json({ message: 'Failed to sync subscription', error: error.message });
     }
   });
 
