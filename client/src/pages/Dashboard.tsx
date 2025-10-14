@@ -1051,7 +1051,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="p-3 pt-[0px] pb-[0px] flex items-center mt-[12px] mb-[12px] pl-[16px] pr-[16px]">
         <div className="flex items-center justify-between mb-3 w-full">
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2">
             <img 
               src={logoUrl}
               alt="Roster Logo" 
@@ -1077,14 +1077,14 @@ export default function Dashboard() {
             
             {/* Captain Badge */}
             {isTeamCaptainInSelectedLeague && (
-              <span className="w-8 h-8 bg-warning text-black font-bold text-base flex items-center justify-center rounded">
+              <span className="w-6 h-6 bg-warning text-black font-bold text-sm flex items-center justify-center rounded">
                 C
               </span>
             )}
             
             <button 
               onClick={() => navigate('/profile')}
-              className="w-16 h-16 rounded-full flex items-center justify-center overflow-hidden bg-primary"
+              className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-primary"
               data-testid="button-profile"
             >
               {(user as any)?.profileImageUrl ? (
@@ -1094,7 +1094,7 @@ export default function Dashboard() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <span className="text-primary-foreground text-2xl font-semibold">
+                <span className="text-primary-foreground text-lg font-semibold">
                   {(user as any)?.firstName?.[0] || 'U'}
                 </span>
               )}
