@@ -608,7 +608,7 @@ export default function StatsManagement() {
             <TabsContent value="by-game" className="space-y-4">
               <Card>
                 <CardContent className="p-6 space-y-4 pt-[0px] pb-[0px]">
-                  <div className="space-y-2">
+                  <div className="flex items-center gap-3">
                     <Label>Game</Label>
                     <Select value={selectedGame} onValueChange={setSelectedGame} data-testid="select-game">
                       <SelectTrigger>
