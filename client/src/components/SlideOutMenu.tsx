@@ -109,7 +109,7 @@ export function SlideOutMenu() {
                 <div className={`p-3 rounded-xl ${item.locked ? 'bg-muted' : item.bgColor}`}>
                   <item.icon className={`w-6 h-6 ${item.locked ? 'text-muted-foreground' : item.iconColor}`} />
                 </div>
-                <span className={`text-lg font-semibold ${item.locked ? 'text-muted-foreground' : 'text-foreground'}`}>
+                <span className={`text-lg font-semibold text-left ${item.locked ? 'text-muted-foreground' : 'text-foreground'}`}>
                   {item.label}
                 </span>
               </div>
