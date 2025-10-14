@@ -200,7 +200,10 @@ export default function Profile() {
     {
       icon: Shield,
       label: 'Privacy',
-      action: () => {/* TODO: Navigate to privacy */},
+      action: () => {
+        setPageTransitionDirection('up');
+        navigate('/privacy');
+      },
     },
     {
       icon: Crown,

@@ -38,6 +38,7 @@ import FacilityBrowse from "@/pages/FacilityBrowse";
 import FacilityDetail from "@/pages/FacilityDetail";
 import FacilityMemberships from "@/pages/FacilityMemberships";
 import CreateCalendarEvent from "@/pages/CreateCalendarEvent";
+import Privacy from "@/pages/Privacy";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -98,6 +99,7 @@ function Router() {
             <Route path="/facilities/:id" component={FacilityDetail} />
             <Route path="/facility-memberships" component={FacilityMemberships} />
             <Route path="/calendar-events/create" component={CreateCalendarEvent} />
+            <Route path="/privacy" component={Privacy} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>
