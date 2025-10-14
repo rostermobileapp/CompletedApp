@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Sparkles } from "lucide-react";
+import { setPageTransitionDirection } from "@/components/PageTransition";
 
 interface PremiumFeatureAlertProps {
   open: boolean;
@@ -19,7 +20,8 @@ export function PremiumFeatureAlert({ open, onOpenChange }: PremiumFeatureAlertP
 
   const handleManageSubscription = () => {
     onOpenChange(false);
-    navigate('/pricing');
+    setPageTransitionDirection('up');
+    navigate('/subscription');
   };
 
   return (
