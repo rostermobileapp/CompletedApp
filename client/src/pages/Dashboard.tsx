@@ -1050,7 +1050,7 @@ export default function Dashboard() {
     <div className="min-h-screen flex flex-col pb-24" data-testid="dashboard-page">
       {/* Header */}
       <div className="p-3 pt-[0px] pb-[0px] flex items-center mt-[12px] mb-[12px] pl-[16px] pr-[16px]">
-        <div className="flex items-center justify-between mb-3 w-full">
+        <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
             <img 
               src={logoUrl}
@@ -1061,9 +1061,9 @@ export default function Dashboard() {
             {tier !== 'free' && (
               <>
                 {tier === 'commissioner' || tier === 'secondary_commissioner' ? (
-                  <Crown className="w-6 h-6 text-yellow-500" data-testid="badge-subscription-tier" />
+                  <Crown className="w-[30px] h-[30px] text-yellow-500" data-testid="badge-subscription-tier" />
                 ) : (
-                  <Star className="w-6 h-6 text-primary fill-current" data-testid="badge-subscription-tier" />
+                  <Star className="w-[30px] h-[30px] text-primary fill-current" data-testid="badge-subscription-tier" />
                 )}
               </>
             )}
@@ -1077,7 +1077,7 @@ export default function Dashboard() {
             
             {/* Captain Badge */}
             {isTeamCaptainInSelectedLeague && (
-              <span className="w-8 h-8 bg-warning text-black font-bold text-base flex items-center justify-center rounded">
+              <span className="w-[30px] h-[30px] bg-warning text-black font-bold text-base flex items-center justify-center rounded">
                 C
               </span>
             )}
