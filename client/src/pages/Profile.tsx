@@ -193,11 +193,6 @@ export default function Profile() {
       action: () => {/* TODO: Navigate to notifications */},
     },
     {
-      icon: Settings,
-      label: 'General Settings',
-      action: () => {/* TODO: Navigate to settings */},
-    },
-    {
       icon: Shield,
       label: 'Privacy',
       action: () => {
