@@ -4816,9 +4816,8 @@ export class DatabaseStorage implements IStorage {
     let gameSeasonConditions = [];
     if (seasonId) {
       gameSeasonConditions.push(eq(games.seasonId, seasonId));
-    } else {
-      gameSeasonConditions.push(isNull(games.seasonId));
     }
+    // If no seasonId provided, return stats for all seasons (no filter)
 
     // Get individual goalie stats from gameGoalies table with game result information
     const goalieGameStats = await db
