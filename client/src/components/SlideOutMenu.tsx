@@ -4,9 +4,11 @@ import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Menu, Calendar, Settings, Plus, Crown, DollarSign, X } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 
 export function SlideOutMenu() {
   const [open, setOpen] = useState(false);
+  const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [location, navigate] = useLocation();
   const { canAccessPremiumFeatures, canManageLeague, hasRole } = usePermissions();
 
@@ -62,7 +64,10 @@ export function SlideOutMenu() {
   ];
 
   const handleNavigate = (path: string, locked: boolean) => {
-    if (locked) return;
+    if (locked) {
+      setShowPremiumAlert(true);
+      return;
+    }
     
     setPageTransitionDirection('up');
     navigate(path);
@@ -75,53 +80,59 @@ export function SlideOutMenu() {
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <button
-          className="fixed top-[32px] right-6 z-50 w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
-          data-testid="button-hamburger-menu"
+    <>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <button
+            className="fixed top-[32px] right-6 z-50 w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
+            data-testid="button-hamburger-menu"
+          >
+            <Menu className="w-8 h-8 text-foreground" />
+          </button>
+        </SheetTrigger>
+        <SheetContent 
+          side="right" 
+          className="w-[85%] sm:w-[400px] border-l border-border bg-[#000000] pt-[40px] pb-[40px] pl-[0px] pr-[0px]"
         >
-          <Menu className="w-8 h-8 text-foreground" />
-        </button>
-      </SheetTrigger>
-      <SheetContent 
-        side="right" 
-        className="w-[85%] sm:w-[400px] border-l border-border bg-[#000000] pt-[40px] pb-[40px] pl-[0px] pr-[0px]"
-      >
-        <SheetHeader className="mb-8">
-          <SheetTitle className="text-2xl font-bold">Menu</SheetTitle>
-        </SheetHeader>
-        
-        <div className="space-y-3">
-          {menuItems.map((item) => (
-            <button
-              key={item.path}
-              onClick={() => handleNavigate(item.path, item.locked)}
-              disabled={item.locked}
-              className={`w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between transition-all ${
-                item.locked 
-                  ? 'opacity-50 cursor-not-allowed' 
-                  : 'hover:bg-card/80 hover:border-primary/50'
-              }`}
-              data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
-            >
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl ${item.locked ? 'bg-muted' : item.bgColor}`}>
-                  <item.icon className={`w-6 h-6 ${item.locked ? 'text-muted-foreground' : item.iconColor}`} />
+          <SheetHeader className="mb-8">
+            <SheetTitle className="text-2xl font-bold">Menu</SheetTitle>
+          </SheetHeader>
+          
+          <div className="space-y-3">
+            {menuItems.map((item) => (
+              <button
+                key={item.path}
+                onClick={() => handleNavigate(item.path, item.locked)}
+                className={`w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between transition-all ${
+                  item.locked 
+                    ? 'opacity-50 cursor-pointer hover:opacity-60' 
+                    : 'hover:bg-card/80 hover:border-primary/50'
+                }`}
+                data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-xl ${item.locked ? 'bg-muted' : item.bgColor}`}>
+                    <item.icon className={`w-6 h-6 ${item.locked ? 'text-muted-foreground' : item.iconColor}`} />
+                  </div>
+                  <span className={`text-lg font-semibold text-left ${item.locked ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    {item.label}
+                  </span>
                 </div>
-                <span className={`text-lg font-semibold text-left ${item.locked ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {item.label}
-                </span>
-              </div>
-              {item.locked ? (
-                <div className="text-muted-foreground text-lg">🔒</div>
-              ) : (
-                <div className="text-muted-foreground text-lg">→</div>
-              )}
-            </button>
-          ))}
-        </div>
-      </SheetContent>
-    </Sheet>
+                {item.locked ? (
+                  <div className="text-muted-foreground text-lg">🔒</div>
+                ) : (
+                  <div className="text-muted-foreground text-lg">→</div>
+                )}
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+      
+      <PremiumFeatureAlert 
+        open={showPremiumAlert} 
+        onOpenChange={setShowPremiumAlert} 
+      />
+    </>
   );
 }
