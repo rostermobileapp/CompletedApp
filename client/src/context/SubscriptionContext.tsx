@@ -86,7 +86,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
   };
 
   const canEditStats = (): boolean => {
-    return hasSpecialPermission('stat_manager') || hasRole('commissioner') || isPrimaryCommissioner;
+    return hasSpecialPermission('stat_manager') || hasSpecialPermission('admin') || hasRole('commissioner') || isPrimaryCommissioner;
   };
 
   const canAccessPremiumFeatures = (): boolean => {

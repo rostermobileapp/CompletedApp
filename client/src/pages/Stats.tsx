@@ -214,7 +214,7 @@ export default function Stats() {
                   data-testid="button-update-stats"
                   className="text-gray-400 hover:text-white"
                 >
-                  <Settings className="w-4 h-4" />
+                  Update Stats
                 </Button>
               )}
             </div>
