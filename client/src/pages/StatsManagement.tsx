@@ -838,12 +838,6 @@ export default function StatsManagement() {
             {/* By Player Tab */}
             <TabsContent value="by-player" className="space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="w-5 h-5" />
-                    Player Stats Management
-                  </CardTitle>
-                </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Mode Selection */}
                   <div className="flex items-center space-x-4">
