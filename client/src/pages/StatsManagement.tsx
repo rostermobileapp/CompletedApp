@@ -871,7 +871,7 @@ export default function StatsManagement() {
                         {players.length} players found - Edit stats for multiple players simultaneously
                       </div>
                       
-                      <div className="max-h-96 overflow-auto border rounded-lg mt-[2px] mb-[2px]">
+                      <div className="overflow-auto border rounded-lg mt-[2px] mb-[2px]" style={{ maxHeight: 'calc(100vh - 280px)' }}>
                         <Table data-testid="table-bulk-stats">
                           <TableHeader className="sticky top-0 bg-background z-10">
                             <TableRow>
