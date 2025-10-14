@@ -838,7 +838,7 @@ export default function StatsManagement() {
             {/* By Player Tab */}
             <TabsContent value="by-player" className="space-y-4">
               <Card>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 pl-[4px] pr-[4px]">
                   {/* Mode Selection */}
                   <div className="flex items-center space-x-4">
                     <Label>Update Mode:</Label>
@@ -875,33 +875,33 @@ export default function StatsManagement() {
                         <Table data-testid="table-bulk-stats">
                           <TableHeader className="sticky top-0 bg-background z-10">
                             <TableRow>
-                              <TableHead className="w-48">Player</TableHead>
-                              <TableHead className="text-center w-20">Goals</TableHead>
-                              <TableHead className="text-center w-20">Assists</TableHead>
-                              <TableHead className="text-center w-20">Points</TableHead>
-                              <TableHead className="text-center w-20">PIM</TableHead>
+                              <TableHead className="w-32 pl-2">Player</TableHead>
+                              <TableHead className="text-center w-16 px-0">Goals</TableHead>
+                              <TableHead className="text-center w-16 px-0">Assists</TableHead>
+                              <TableHead className="text-center w-16 px-0">Points</TableHead>
+                              <TableHead className="text-center w-16 px-0">PIM</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
                               <TableRow key={player.id} data-testid={`row-bulk-player-${player.id}`}>
                                 {/* Player Name */}
-                                <TableCell className="font-medium">
+                                <TableCell className="font-medium pl-2 pr-1">
                                   <div>
-                                    <div className="font-medium">{player.firstName} {player.lastName}</div>
+                                    <div className="font-medium text-sm">{player.firstName} {player.lastName}</div>
                                     {player.teamName && (
-                                      <div className="text-sm text-muted-foreground">{player.teamName}</div>
+                                      <div className="text-xs text-muted-foreground">{player.teamName}</div>
                                     )}
                                   </div>
                                 </TableCell>
                                 {/* Goals */}
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center space-x-1">
+                                <TableCell className="text-center pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
+                                  <div className="flex items-center justify-center space-x-0.5">
                                     <Button
                                       variant="outline"
                                       size="sm"
                                       onClick={() => decrementBulkPlayerStat(player.id, 'goals')}
-                                      className="h-8 w-8 p-0"
+                                      className="h-7 w-6 p-0 text-xs"
                                       data-testid={`button-decrease-bulk-goals-${player.id}`}
                                     >
                                       -
@@ -911,14 +911,14 @@ export default function StatsManagement() {
                                       value={bulkPlayerStats[player.id]?.goals || '0'}
                                       onChange={(e) => updateBulkPlayerStat(player.id, 'goals', e.target.value)}
                                       min="0"
-                                      className="w-12 text-center p-1"
+                                      className="w-8 text-center p-0 text-xs h-7"
                                       data-testid={`input-bulk-goals-${player.id}`}
                                     />
                                     <Button
                                       variant="outline"
                                       size="sm"
                                       onClick={() => incrementBulkPlayerStat(player.id, 'goals')}
-                                      className="h-8 w-8 p-0"
+                                      className="h-7 w-6 p-0 text-xs"
                                       data-testid={`button-increase-bulk-goals-${player.id}`}
                                     >
                                       +
@@ -926,13 +926,13 @@ export default function StatsManagement() {
                                   </div>
                                 </TableCell>
                                 {/* Assists */}
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center space-x-1">
+                                <TableCell className="text-center pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
+                                  <div className="flex items-center justify-center space-x-0.5">
                                     <Button
                                       variant="outline"
                                       size="sm"
                                       onClick={() => decrementBulkPlayerStat(player.id, 'assists')}
-                                      className="h-8 w-8 p-0"
+                                      className="h-7 w-6 p-0 text-xs"
                                       data-testid={`button-decrease-bulk-assists-${player.id}`}
                                     >
                                       -
@@ -942,14 +942,14 @@ export default function StatsManagement() {
                                       value={bulkPlayerStats[player.id]?.assists || '0'}
                                       onChange={(e) => updateBulkPlayerStat(player.id, 'assists', e.target.value)}
                                       min="0"
-                                      className="w-12 text-center p-1"
+                                      className="w-8 text-center p-0 text-xs h-7"
                                       data-testid={`input-bulk-assists-${player.id}`}
                                     />
                                     <Button
                                       variant="outline"
                                       size="sm"
                                       onClick={() => incrementBulkPlayerStat(player.id, 'assists')}
-                                      className="h-8 w-8 p-0"
+                                      className="h-7 w-6 p-0 text-xs"
                                       data-testid={`button-increase-bulk-assists-${player.id}`}
                                     >
                                       +
@@ -957,19 +957,19 @@ export default function StatsManagement() {
                                   </div>
                                 </TableCell>
                                 {/* Points (calculated) */}
-                                <TableCell className="text-center font-bold text-primary">
-                                  <div className="text-lg" data-testid={`display-bulk-points-${player.id}`}>
+                                <TableCell className="text-center font-bold text-primary pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
+                                  <div className="text-sm font-bold" data-testid={`display-bulk-points-${player.id}`}>
                                     {(parseInt(bulkPlayerStats[player.id]?.goals || '0') + parseInt(bulkPlayerStats[player.id]?.assists || '0'))}
                                   </div>
                                 </TableCell>
                                 {/* Penalty Minutes */}
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center space-x-1">
+                                <TableCell className="text-center pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
+                                  <div className="flex items-center justify-center space-x-0.5">
                                     <Button
                                       variant="outline"
                                       size="sm"
                                       onClick={() => decrementBulkPlayerStat(player.id, 'penaltyMinutes')}
-                                      className="h-8 w-8 p-0"
+                                      className="h-7 w-6 p-0 text-xs"
                                       data-testid={`button-decrease-bulk-penalty-${player.id}`}
                                     >
                                       -
@@ -979,14 +979,14 @@ export default function StatsManagement() {
                                       value={bulkPlayerStats[player.id]?.penaltyMinutes || '0'}
                                       onChange={(e) => updateBulkPlayerStat(player.id, 'penaltyMinutes', e.target.value)}
                                       min="0"
-                                      className="w-12 text-center p-1"
+                                      className="w-8 text-center p-0 text-xs h-7"
                                       data-testid={`input-bulk-penalty-${player.id}`}
                                     />
                                     <Button
                                       variant="outline"
                                       size="sm"
                                       onClick={() => incrementBulkPlayerStat(player.id, 'penaltyMinutes')}
-                                      className="h-8 w-8 p-0"
+                                      className="h-7 w-6 p-0 text-xs"
                                       data-testid={`button-increase-bulk-penalty-${player.id}`}
                                     >
                                       +
