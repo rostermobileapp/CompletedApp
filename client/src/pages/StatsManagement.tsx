@@ -873,12 +873,12 @@ export default function StatsManagement() {
                       
                       <div className="overflow-auto border rounded-lg mt-[2px] mb-[2px]" style={{ maxHeight: 'calc(100vh - 280px)' }}>
                         <Table data-testid="table-bulk-stats">
-                          <TableHeader className="sticky top-0 bg-background z-10">
-                            <TableRow>
-                              <TableHead className="w-32 pl-2">Player</TableHead>
-                              <TableHead className="text-center flex-1 px-0">Goals</TableHead>
-                              <TableHead className="text-center flex-1 px-0">Assists</TableHead>
-                              <TableHead className="text-center flex-1 px-0">PIM</TableHead>
+                          <TableHeader className="sticky top-0 bg-background z-20 border-b">
+                            <TableRow className="border-b bg-background">
+                              <TableHead className="w-32 pl-2 bg-background">Player</TableHead>
+                              <TableHead className="text-center flex-1 px-0 bg-background">Goals</TableHead>
+                              <TableHead className="text-center flex-1 px-0 bg-background">Assists</TableHead>
+                              <TableHead className="text-center flex-1 px-0 bg-background">PIM</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
