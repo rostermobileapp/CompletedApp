@@ -607,7 +607,7 @@ export default function StatsManagement() {
             {/* By Game Tab */}
             <TabsContent value="by-game" className="space-y-4">
               <Card>
-                <CardContent className="space-y-4">
+                <CardContent className="p-6 space-y-4 pt-[0px] pb-[0px]">
                   <div className="space-y-2">
                     <Label>Game</Label>
                     <Select value={selectedGame} onValueChange={setSelectedGame} data-testid="select-game">
