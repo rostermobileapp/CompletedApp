@@ -213,6 +213,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user's created scrimmages - MUST be before /api/users/:userId
+  app.get('/api/users/scrimmages', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const scrimmages = await storage.getUserScrimmages(userId);
+      res.json(scrimmages);
+    } catch (error) {
+      console.error('Error fetching user scrimmages:', error);
+      res.status(500).json({ message: 'Failed to fetch user scrimmages' });
+    }
+  });
+
+  // Get player's scrimmage requests - MUST be before /api/users/:userId
+  app.get('/api/users/scrimmage-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const requests = await storage.getScrimmageRequestsByPlayer(userId);
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching player requests:', error);
+      res.status(500).json({ message: 'Failed to fetch player requests' });
+    }
+  });
+
+  // Get user's scrimmage invites - MUST be before /api/users/:userId
+  app.get('/api/users/scrimmage-invites', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const invites = await storage.getScrimmageInvitesForUser(userId);
+      console.log(`📩 Scrimmage invites for user ${userId}:`, invites.length > 0 ? invites.map(i => ({ id: i.id, title: i.title, announcementId: i.announcementId })) : 'none');
+      res.json(invites);
+    } catch (error) {
+      console.error('Error fetching user scrimmage invites:', error);
+      res.status(500).json({ message: 'Failed to fetch scrimmage invites' });
+    }
+  });
+
   // Get any user's public profile by ID
   app.get('/api/users/:userId', isAuthenticated, async (req: any, res) => {
     try {
@@ -4951,24 +5006,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get user's created scrimmages
-  app.get('/api/users/scrimmages', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(401).json({ message: "User not found" });
-      }
-      
-      const scrimmages = await storage.getUserScrimmages(userId);
-      res.json(scrimmages);
-    } catch (error) {
-      console.error('Error fetching user scrimmages:', error);
-      res.status(500).json({ message: 'Failed to fetch user scrimmages' });
-    }
-  });
-
   // Get single scrimmage details
   app.get('/api/scrimmages/:id', isAuthenticated, async (req: any, res) => {
     try {
@@ -5333,44 +5370,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting request:', error);
       res.status(500).json({ message: 'Failed to delete request' });
-    }
-  });
-
-
-  // Get player's scrimmage requests
-  app.get('/api/users/scrimmage-requests', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(401).json({ message: "User not found" });
-      }
-      
-      const requests = await storage.getScrimmageRequestsByPlayer(userId);
-      res.json(requests);
-    } catch (error) {
-      console.error('Error fetching player requests:', error);
-      res.status(500).json({ message: 'Failed to fetch player requests' });
-    }
-  });
-
-  // Get user's scrimmage invites (scrimmages they were invited to but haven't responded)
-  app.get('/api/users/scrimmage-invites', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(401).json({ message: "User not found" });
-      }
-      
-      const invites = await storage.getScrimmageInvitesForUser(userId);
-      console.log(`📩 Scrimmage invites for user ${userId}:`, invites.length > 0 ? invites.map(i => ({ id: i.id, title: i.title, announcementId: i.announcementId })) : 'none');
-      res.json(invites);
-    } catch (error) {
-      console.error('Error fetching user scrimmage invites:', error);
-      res.status(500).json({ message: 'Failed to fetch scrimmage invites' });
     }
   });
 

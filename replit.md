@@ -2,6 +2,11 @@
 
 Rosters is a free, comprehensive sports team management platform designed for various sports. It offers league and team organization, game scheduling, and messaging functionalities, aiming to streamline sports team management.
 
+# Recent Changes
+
+## October 15, 2025 - Scrimmage Management Screen Fix
+Fixed a critical route ordering bug in Express that caused the Scrimmage Management Screen to display "User not found" errors. The issue was resolved by moving specific `/api/users/scrimmages`, `/api/users/scrimmage-requests`, and `/api/users/scrimmage-invites` routes before the generic `/api/users/:userId` route. Express was incorrectly matching "scrimmages" as a userId parameter, resulting in 404 errors.
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
