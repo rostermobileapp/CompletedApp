@@ -140,7 +140,7 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
           </Badge>
           <Badge 
             variant="secondary" 
-            className="bg-red-100 text-red-700 hover:bg-red-200 flex items-center gap-1"
+            className="hover:bg-red-200 flex items-center gap-1 text-[#ffffff] bg-[#dc2626]"
             data-testid="badge-not-attending"
           >
             <UserX className="h-3 w-3" />
