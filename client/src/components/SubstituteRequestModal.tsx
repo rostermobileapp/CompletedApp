@@ -114,7 +114,8 @@ export function SubstituteRequestModal({
     // Exclude the original player
     if (player.id === originalPlayerId) return false;
     
-    // Exclude players on the opposing team
+    // Exclude players on BOTH teams in this game (same team AND opposing team)
+    if (player.teamId === originalPlayerTeamId) return false;
     if (player.teamId === opposingTeamId) return false;
     
     // Filter by position type: if goalie needs substitute, only show goalies; if skater, only show skaters
@@ -253,7 +254,17 @@ export function SubstituteRequestModal({
                             ) : (
                               <Badge variant="secondary" className="text-xs flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                {player.gameTime ? format(new Date(player.gameTime), 'h:mm a') : 'Scheduled'}
+                                {player.gameTime ? (() => {
+                                  // Extract time from ISO string and display in local timezone
+                                  const date = new Date(player.gameTime);
+                                  // Format using the UTC time to avoid double conversion
+                                  const hours = date.getUTCHours();
+                                  const minutes = date.getUTCMinutes();
+                                  const ampm = hours >= 12 ? 'PM' : 'AM';
+                                  const displayHours = hours % 12 || 12;
+                                  const displayMinutes = minutes.toString().padStart(2, '0');
+                                  return `${displayHours}:${displayMinutes} ${ampm}`;
+                                })() : 'Scheduled'}
                               </Badge>
                             )}
                           </div>
