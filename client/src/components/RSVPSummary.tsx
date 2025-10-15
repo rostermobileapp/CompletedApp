@@ -160,10 +160,8 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
         
         {onViewDetails && (
           <Button 
-            variant="ghost" 
-            size="sm" 
             onClick={onViewDetails}
-            className="w-full text-xs"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary"
             data-testid="button-view-details"
           >
             View Details
