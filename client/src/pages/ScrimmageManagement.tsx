@@ -86,10 +86,11 @@ export default function ScrimmageManagement() {
       const response = await apiRequest('PUT', `/api/scrimmages/${scrimmageId}/finalize`, {});
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, scrimmageId) => {
+      const scrimmage = scrimmages.find(s => s.id === scrimmageId);
       toast({
         title: 'Roster Finalized!',
-        description: 'Confirmation notifications have been sent to all approved players.',
+        description: `Confirmation notifications have been sent for "${scrimmage?.title || 'the scrimmage'}".`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] });
@@ -290,47 +291,83 @@ export default function ScrimmageManagement() {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="flex gap-2">
-                      <Button
-                        variant={isSelected ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedScrimmage(isSelected ? null : scrimmage.id)}
-                        data-testid={`button-manage-${scrimmage.id}`}
-                      >
-                        {isSelected ? 'Hide Details' : 'Manage Requests'}
-                      </Button>
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <Button
+                          variant={isSelected ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSelectedScrimmage(isSelected ? null : scrimmage.id)}
+                          data-testid={`button-manage-${scrimmage.id}`}
+                        >
+                          {isSelected ? 'Hide Details' : 'Manage Requests'}
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (viewRosterScrimmage === scrimmage.id) {
+                              setViewRosterScrimmage(null);
+                            } else {
+                              setSelectedScrimmage(null); // Close management view
+                              setViewRosterScrimmage(scrimmage.id); // Open roster view
+                            }
+                          }}
+                          data-testid={`button-view-roster-${scrimmage.id}`}
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          {viewRosterScrimmage === scrimmage.id ? 'Hide Roster' : 'View Roster'}
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm('Are you sure you want to cancel this scrimmage? All confirmed players will be notified.')) {
+                              deleteMutation.mutate(scrimmage.id);
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                          className="text-destructive hover:text-destructive border-destructive/20 hover:border-destructive"
+                          data-testid={`button-delete-${scrimmage.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                       
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (viewRosterScrimmage === scrimmage.id) {
-                            setViewRosterScrimmage(null);
-                          } else {
-                            setSelectedScrimmage(null); // Close management view
-                            setViewRosterScrimmage(scrimmage.id); // Open roster view
+                      {/* Finalize & Invoice Button */}
+                      <div className="border-t border-border pt-3">
+                        <Button
+                          onClick={() => finalizeMutation.mutate(scrimmage.id)}
+                          disabled={(finalizeMutation.isPending && finalizeMutation.variables === scrimmage.id) || scrimmage.status === 'roster_confirmed'}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                          size="sm"
+                          data-testid={`button-finalize-roster-${scrimmage.id}`}
+                        >
+                          {(finalizeMutation.isPending && finalizeMutation.variables === scrimmage.id) ? (
+                            <>
+                              <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                              Finalizing...
+                            </>
+                          ) : scrimmage.status === 'roster_confirmed' ? (
+                            <>
+                              <Check className="w-4 h-4 mr-2" />
+                              Roster Finalized
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-4 h-4 mr-2" />
+                              Finalize & Invoice
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-1 text-center">
+                          {scrimmage.costPerPlayer ? 
+                            'Confirm roster, send notifications & create payment requests' :
+                            'Confirm roster and send notifications to approved players'
                           }
-                        }}
-                        data-testid={`button-view-roster-${scrimmage.id}`}
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                        {viewRosterScrimmage === scrimmage.id ? 'Hide Roster' : 'View Roster'}
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm('Are you sure you want to cancel this scrimmage? All confirmed players will be notified.')) {
-                            deleteMutation.mutate(scrimmage.id);
-                          }
-                        }}
-                        disabled={deleteMutation.isPending}
-                        className="text-destructive hover:text-destructive border-destructive/20 hover:border-destructive"
-                        data-testid={`button-delete-${scrimmage.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                        </p>
+                      </div>
                     </div>
                     
                     {/* Simple Roster View */}
@@ -521,41 +558,6 @@ export default function ScrimmageManagement() {
                                         </Badge>
                                       </div>
                                     ))}
-                                    
-                                    {/* Finalize Roster Button */}
-                                    <div className="border-t border-border pt-4 mt-4">
-                                      <div className="text-center">
-                                        <Button
-                                          onClick={() => finalizeMutation.mutate(selectedScrimmage!)}
-                                          disabled={finalizeMutation.isPending || scrimmages.find(s => s.id === selectedScrimmage)?.status === 'roster_confirmed'}
-                                          className="bg-blue-600 hover:bg-blue-700 text-white"
-                                          data-testid="button-finalize-roster"
-                                        >
-                                          {finalizeMutation.isPending ? (
-                                            <>
-                                              <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                                              Finalizing...
-                                            </>
-                                          ) : scrimmages.find(s => s.id === selectedScrimmage)?.status === 'roster_confirmed' ? (
-                                            <>
-                                              <Check className="w-4 h-4 mr-2" />
-                                              Roster Finalized
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Check className="w-4 h-4 mr-2" />
-                                              Finalize & Invoice
-                                            </>
-                                          )}
-                                        </Button>
-                                        <p className="text-xs text-muted-foreground mt-2">
-                                          {scrimmages.find(s => s.id === selectedScrimmage)?.costPerPlayer ? 
-                                            'This will confirm the roster, send notifications, and create payment requests automatically' :
-                                            'This will confirm the roster and send notifications to all approved players'
-                                          }
-                                        </p>
-                                      </div>
-                                    </div>
                                   </div>
                                 )}
                               </ScrollArea>

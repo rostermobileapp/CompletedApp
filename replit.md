@@ -4,6 +4,12 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 # Recent Changes
 
+## October 15, 2025 - Dashboard Scrimmage Display & Button Relocation
+- **Dashboard Fix**: Dashboard now correctly displays approved scrimmages by fetching both scrimmage invites AND scrimmage requests (filtered by status='approved')
+- **Button Relocation**: Moved "Finalize & Invoice" button from scrimmage details view to main scrimmage card for immediate access without expanding details
+- **Loading State Fix**: Implemented per-scrimmage loading state isolation using mutation.variables check, ensuring only the active scrimmage button shows loading state when multiple scrimmages are present
+- **Enhanced Feedback**: Success toast now includes the specific scrimmage title: "Confirmation notifications have been sent for '{scrimmageTitle}'"
+
 ## October 15, 2025 - Finalize & Invoice Feature for Scrimmages
 Implemented an automated "Finalize & Invoice" feature for scrimmages that streamlines the roster confirmation and payment process:
 - **Automatic Notifications**: Sends confirmation notifications to approved players with scrimmage details, and "scrimmage full" notices to non-approved players
