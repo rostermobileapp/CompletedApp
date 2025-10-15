@@ -2,14 +2,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Check, X, ArrowLeft, MapPin, Clock, MessageSquare, Target, Users } from "lucide-react";
+import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users } from "lucide-react";
 import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPSummary } from "@/components/RSVPSummary";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
 import { SubstituteRequestsDashboard } from "@/components/SubstituteRequestsDashboard";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -30,7 +29,6 @@ export default function GameDetails() {
   const gameId = params?.id || scrimmageParams?.id;
   const isScrimmage = location.includes('/scrimmage/');
 
-  const [notes, setNotes] = useState("");
   const [homeScore, setHomeScore] = useState("");
   const [awayScore, setAwayScore] = useState("");
   const [isEditingScore, setIsEditingScore] = useState(false);
@@ -127,28 +125,6 @@ export default function GameDetails() {
       toast({
         title: "Error",
         description: "Failed to release beverage duty. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Save notes mutation
-  const saveNotesMutation = useMutation({
-    mutationFn: async ({ gameId, teamId, notes }: { gameId: string; teamId: string; notes: string }) => {
-      await apiRequest("POST", `/api/games/${gameId}/notes`, { teamId, notes });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      toast({
-        title: "Notes Saved",
-        description: "Your notes have been saved for the captain to see.",
-      });
-      // Don't clear notes after saving - keep them visible
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to save notes. Please try again.",
         variant: "destructive",
       });
     },
@@ -759,34 +735,6 @@ export default function GameDetails() {
             <SubstituteRequestsDashboard gameId={game.id} />
           </div>
         )}
-
-        {/* Notes for Captain */}
-        <div className="bg-card rounded-xl border border-border p-6">
-          <h3 className="text-lg font-semibold mb-4" data-testid="text-notes-title">
-            <MessageSquare className="w-5 h-5 inline mr-2" />
-            Notes for Captain
-          </h3>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="Add any notes or messages for your team captain (injuries, late arrival, equipment needs, etc.)"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="min-h-[100px]"
-              data-testid="textarea-notes"
-            />
-            <Button
-              onClick={() => {
-                if (userTeam && primaryTeam) {
-                  saveNotesMutation.mutate({ gameId: game.id, teamId: userTeam.id, notes });
-                }
-              }}
-              disabled={saveNotesMutation.isPending || !notes.trim()}
-              data-testid="button-save-notes"
-            >
-              Save Notes
-            </Button>
-          </div>
-        </div>
 
         {/* Score Submission */}
         {(canSubmitScore || isGameCompleted) && (
