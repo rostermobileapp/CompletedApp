@@ -30,6 +30,15 @@ export default function CreatePaymentRequest() {
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const { canAccessPremiumFeatures } = usePermissions();
 
+  const handlePremiumAlertClose = (open: boolean) => {
+    setShowPremiumAlert(open);
+    if (!open && !canAccessPremiumFeatures()) {
+      // If dialog is being closed and user still doesn't have premium access, redirect back
+      setPageTransitionDirection('down');
+      navigate('/payment-requests');
+    }
+  };
+
   const form = useForm<CreatePaymentRequestForm>({
     resolver: zodResolver(createPaymentRequestSchema),
     defaultValues: {
@@ -399,7 +408,7 @@ export default function CreatePaymentRequest() {
       {/* Premium Feature Alert */}
       <PremiumFeatureAlert 
         open={showPremiumAlert} 
-        onOpenChange={setShowPremiumAlert} 
+        onOpenChange={handlePremiumAlertClose} 
       />
     </div>
   );
