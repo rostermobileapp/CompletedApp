@@ -22,6 +22,9 @@ interface SubstituteRequestModalProps {
   leagueId: string;
   originalPlayerId: string;
   originalPlayerName: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  userTeamId: string;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -32,6 +35,9 @@ export function SubstituteRequestModal({
   leagueId,
   originalPlayerId,
   originalPlayerName,
+  homeTeamId,
+  awayTeamId,
+  userTeamId,
   isOpen, 
   onClose 
 }: SubstituteRequestModalProps) {
@@ -39,6 +45,9 @@ export function SubstituteRequestModal({
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Determine opposing team ID
+  const opposingTeamId = userTeamId === homeTeamId ? awayTeamId : homeTeamId;
 
   // Fetch all league players with availability status
   const { data: allPlayers = [], isLoading } = useQuery({
@@ -52,6 +61,22 @@ export function SubstituteRequestModal({
     },
     enabled: isOpen && !!gameDate && !!leagueId,
   });
+
+  // Fetch original player's league membership to get their position
+  const { data: originalPlayerMembership } = useQuery({
+    queryKey: [`/api/leagues/${leagueId}/members`, originalPlayerId],
+    queryFn: async () => {
+      const response = await fetch(`/api/leagues/${leagueId}/members`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch league members');
+      }
+      const members = await response.json();
+      return members.find((m: any) => m.userId === originalPlayerId);
+    },
+    enabled: isOpen && !!leagueId && !!originalPlayerId,
+  });
+
+  const originalPlayerIsGoalie = originalPlayerMembership?.isGoalie || false;
 
   // Create substitute request mutation
   const createRequestMutation = useMutation({
@@ -83,19 +108,45 @@ export function SubstituteRequestModal({
     },
   });
 
-  // Filter players based on search term and exclude the original player
+  // Filter players based on requirements
   const filteredPlayers = allPlayers.filter((player: any) => {
-    // Don't show the original player in the list
+    // Exclude the original player
     if (player.id === originalPlayerId) return false;
     
-    return `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      player.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    // Exclude players on the opposing team
+    if (player.teamId === opposingTeamId) return false;
+    
+    // Filter by position type: if goalie needs substitute, only show goalies; if skater, only show skaters
+    if (originalPlayerIsGoalie && !player.isGoalie) return false;
+    if (!originalPlayerIsGoalie && player.isGoalie) return false;
+    
+    // Filter by search term
+    const searchLower = searchTerm.toLowerCase();
+    if (searchTerm && !(
+      `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchLower) ||
+      player.email?.toLowerCase().includes(searchLower)
+    )) {
+      return false;
+    }
+    
+    return true;
   });
 
-  // Sort players: available first, then scheduled
+  // Sort players by the specified logic:
+  // 1. Bye week players (not scheduled) at the top
+  // 2. Then scheduled players sorted by game time
   const sortedPlayers = [...filteredPlayers].sort((a: any, b: any) => {
-    if (a.isScheduled === b.isScheduled) return 0;
-    return a.isScheduled ? 1 : -1;
+    // Bye week players (no game) first
+    if (!a.isScheduled && b.isScheduled) return -1;
+    if (a.isScheduled && !b.isScheduled) return 1;
+    
+    // Both have bye week or both are scheduled
+    if (a.isScheduled && b.isScheduled && a.gameTime && b.gameTime) {
+      // Sort by game time
+      return new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime();
+    }
+    
+    return 0;
   });
 
   const handleSubmit = () => {
@@ -118,13 +169,13 @@ export function SubstituteRequestModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl h-[85vh] flex flex-col bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800" data-testid="substitute-request-modal">
+      <DialogContent className="max-w-2xl h-[85vh] flex flex-col bg-[#212121] border-border" data-testid="substitute-request-modal">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
+          <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
             Request Substitute for {originalPlayerName}
           </DialogTitle>
-          <DialogDescription className="text-red-600 dark:text-red-400">
+          <DialogDescription>
             Search and select a player to request as a substitute
           </DialogDescription>
         </DialogHeader>
@@ -137,7 +188,7 @@ export function SubstituteRequestModal({
               placeholder="Search for any player..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-[#1a1a1a]"
               data-testid="input-search-players"
             />
           </div>
@@ -146,7 +197,7 @@ export function SubstituteRequestModal({
           {isLoading ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-lg border animate-pulse">
+                <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-[#1a1a1a] animate-pulse">
                   <div className="h-10 w-10 bg-muted rounded-full"></div>
                   <div className="flex-1">
                     <div className="h-4 bg-muted rounded w-32 mb-1"></div>
@@ -165,7 +216,9 @@ export function SubstituteRequestModal({
                     <p>
                       {searchTerm 
                         ? "No players found matching your search" 
-                        : "No players in this league"}
+                        : originalPlayerIsGoalie 
+                          ? "No goalies available for substitution"
+                          : "No skaters available for substitution"}
                     </p>
                   </div>
                 ) : (
@@ -174,8 +227,8 @@ export function SubstituteRequestModal({
                       key={player.id}
                       className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
                         selectedPlayer === player.id 
-                          ? 'border-red-400 dark:border-red-600 bg-red-100 dark:bg-red-900/50' 
-                          : 'hover:bg-red-50 dark:hover:bg-red-950/30'
+                          ? 'border-primary bg-primary/10' 
+                          : 'border-border bg-[#1a1a1a] hover:bg-[#252525]'
                       }`}
                       onClick={() => setSelectedPlayer(player.id)}
                       data-testid={`player-option-${player.id}`}
@@ -192,10 +245,14 @@ export function SubstituteRequestModal({
                             <p className="font-medium">
                               {player.firstName} {player.lastName}
                             </p>
-                            {player.isScheduled && (
+                            {!player.isScheduled ? (
+                              <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-500 border-green-500/30">
+                                Bye Week
+                              </Badge>
+                            ) : (
                               <Badge variant="secondary" className="text-xs flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                Scheduled
+                                {player.gameTime ? new Date(player.gameTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Scheduled'}
                               </Badge>
                             )}
                           </div>
@@ -207,7 +264,7 @@ export function SubstituteRequestModal({
                       
                       <div className="flex items-center">
                         {selectedPlayer === player.id && (
-                          <div className="h-4 w-4 rounded-full bg-red-600 flex items-center justify-center">
+                          <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center">
                             <div className="h-2 w-2 rounded-full bg-white"></div>
                           </div>
                         )}
@@ -220,11 +277,10 @@ export function SubstituteRequestModal({
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-2 pt-4 border-t border-red-200 dark:border-red-800">
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button
               variant="outline"
               onClick={handleClose}
-              className="border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
               data-testid="button-cancel"
             >
               Cancel
@@ -232,7 +288,7 @@ export function SubstituteRequestModal({
             <Button
               onClick={handleSubmit}
               disabled={!selectedPlayer || createRequestMutation.isPending}
-              className="bg-[#000000] text-[#fcfcfc] hover:bg-[#000000] hover:opacity-90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
               data-testid="button-send-request"
             >
               {createRequestMutation.isPending ? "Sending..." : "Send Request"}

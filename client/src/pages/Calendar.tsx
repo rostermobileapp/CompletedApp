@@ -402,13 +402,21 @@ export default function Calendar() {
       )}
 
       {/* Substitute Request Modal */}
-      {showSubstituteModal && selectedGameData && substituteRequestData && (
+      {showSubstituteModal && selectedGameData && substituteRequestData && userTeams && (
         <SubstituteRequestModal
           gameId={selectedGameId}
           gameDate={selectedGameData.scheduledAt}
           leagueId={selectedGameData.leagueId || selectedGameData.homeTeam?.leagueId || selectedGameData.awayTeam?.leagueId}
           originalPlayerId={substituteRequestData.playerId}
           originalPlayerName={substituteRequestData.playerName}
+          homeTeamId={selectedGameData.homeTeamId || selectedGameData.homeTeam?.id}
+          awayTeamId={selectedGameData.awayTeamId || selectedGameData.awayTeam?.id}
+          userTeamId={(() => {
+            const userTeamIds = (userTeams as any[]).map((team: any) => team.id);
+            const homeId = selectedGameData.homeTeamId || selectedGameData.homeTeam?.id;
+            const awayId = selectedGameData.awayTeamId || selectedGameData.awayTeam?.id;
+            return userTeamIds.includes(homeId) ? homeId : awayId;
+          })()}
           isOpen={showSubstituteModal}
           onClose={handleCloseSubstituteModal}
         />

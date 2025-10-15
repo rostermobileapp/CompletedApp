@@ -1063,13 +1063,16 @@ export default function GameDetails() {
         teamId={userTeam?.id}
       />
       {/* Substitute Request Modal */}
-      {substituteRequestData && (
+      {substituteRequestData && game && userTeam && (
         <SubstituteRequestModal
           gameId={game.id}
           gameDate={format(new Date(game.scheduledAt), 'yyyy-MM-dd')}
           leagueId={game.leagueId}
           originalPlayerId={substituteRequestData.playerId}
           originalPlayerName={substituteRequestData.playerName}
+          homeTeamId={game.homeTeamId}
+          awayTeamId={game.awayTeamId}
+          userTeamId={userTeam.id}
           isOpen={showSubstituteModal}
           onClose={() => {
             setShowSubstituteModal(false);
