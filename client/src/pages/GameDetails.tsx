@@ -545,7 +545,7 @@ export default function GameDetails() {
 
         {/* Beverage Responsibility - Away Team */}
         {isUserOnAwayTeam && (
-          <div className="bg-card rounded-xl border border-border p-6 pl-[8px] pr-[8px] pt-[8px] pb-[8px] mt-[8px] mb-[8px] ml-[0px] mr-[0px]">
+          <div className="rounded-xl border border-border p-6 pl-[8px] pr-[8px] pt-[8px] pb-[8px] mt-[8px] mb-[8px] ml-[0px] mr-[0px] bg-[#212121] text-[#ffffff]">
               {awayTeamHasBeverageDuty ? (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
