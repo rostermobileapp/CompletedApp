@@ -1075,13 +1075,6 @@ export default function Dashboard() {
               </span>
             ) : null}
             
-            {/* Captain Badge */}
-            {isTeamCaptainInSelectedLeague && (
-              <span className="w-[30px] h-[30px] bg-warning text-black font-bold text-base flex items-center justify-center rounded">
-                C
-              </span>
-            )}
-            
             <button 
               onClick={() => navigate('/profile')}
               className="w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden bg-primary"
@@ -1141,11 +1134,6 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2">
                         <Trophy className="w-4 h-4" />
                         <span className="font-medium text-sm">{league.name}</span>
-                        {isCaptainInLeague(league.id) && (
-                          <span className="ml-auto w-4 h-4 bg-warning text-black font-bold text-xs flex items-center justify-center rounded">
-                            C
-                          </span>
-                        )}
                       </div>
                     </button>
                   );
