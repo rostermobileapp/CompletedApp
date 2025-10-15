@@ -228,22 +228,6 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="profile-page">
-      {/* Header */}
-      <div className="p-6 pt-12">
-        <div className="flex items-center gap-4 mb-6">
-          <button 
-            onClick={() => {
-              setPageTransitionDirection('down');
-              navigate('/');
-            }}
-            className="text-muted-foreground"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Profile</h1>
-        </div>
-      </div>
       {/* Profile Info */}
       <div className="px-6 mb-6">
         <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
