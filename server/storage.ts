@@ -411,7 +411,12 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     // First, try to find existing user by ID (primary OIDC identifier)
-    const existingUser = userData.id ? await this.getUser(userData.id) : undefined;
+    let existingUser = userData.id ? await this.getUser(userData.id) : undefined;
+    
+    // If no user found by ID, check by email to handle ID changes
+    if (!existingUser && userData.email) {
+      existingUser = await this.getUserByEmail(userData.email);
+    }
     
     if (existingUser) {
       // Update existing user - only update fields if they have values
@@ -419,6 +424,11 @@ export class DatabaseStorage implements IStorage {
       const updateSet: any = {
         updatedAt: new Date(),
       };
+      
+      // Update ID if it's different (OIDC sub might have changed)
+      if (userData.id && userData.id !== existingUser.id) {
+        updateSet.id = userData.id;
+      }
       
       // Only update firstName if user doesn't have one yet
       if (userData.firstName !== undefined && !existingUser.firstName) {
