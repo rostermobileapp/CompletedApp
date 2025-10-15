@@ -61,18 +61,18 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-700">
-                <UserCheck className="h-3 w-3 mr-1" />
-                {rsvpSummary.homeTeam.attending?.length || 0} attending
+            <div className="flex gap-2">
+              <Badge variant="secondary" className="hover:bg-green-200 flex items-center gap-1 text-[#ffffff] bg-[#16a34a]">
+                <UserCheck className="h-3 w-3" />
+                {rsvpSummary.homeTeam.attending?.length || 0} In
               </Badge>
-              <Badge variant="secondary" className="bg-red-100 text-red-700">
-                <UserX className="h-3 w-3 mr-1" />
-                {rsvpSummary.homeTeam.notAttending?.length || 0} not attending
+              <Badge variant="secondary" className="hover:bg-red-200 flex items-center gap-1 text-[#ffffff] bg-[#dc2626]">
+                <UserX className="h-3 w-3" />
+                {rsvpSummary.homeTeam.notAttending?.length || 0} Out
               </Badge>
               {(rsvpSummary.homeTeam.noResponse?.length || 0) > 0 && (
-                <Badge variant="outline">
-                  <Users className="h-3 w-3 mr-1" />
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Users className="h-3 w-3" />
                   {rsvpSummary.homeTeam.noResponse?.length || 0} no response
                 </Badge>
               )}
@@ -89,18 +89,18 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-700">
-                <UserCheck className="h-3 w-3 mr-1" />
-                {rsvpSummary.awayTeam.attending?.length || 0} attending
+            <div className="flex gap-2">
+              <Badge variant="secondary" className="hover:bg-green-200 flex items-center gap-1 text-[#ffffff] bg-[#16a34a]">
+                <UserCheck className="h-3 w-3" />
+                {rsvpSummary.awayTeam.attending?.length || 0} In
               </Badge>
-              <Badge variant="secondary" className="bg-red-100 text-red-700">
-                <UserX className="h-3 w-3 mr-1" />
-                {rsvpSummary.awayTeam.notAttending?.length || 0} not attending
+              <Badge variant="secondary" className="hover:bg-red-200 flex items-center gap-1 text-[#ffffff] bg-[#dc2626]">
+                <UserX className="h-3 w-3" />
+                {rsvpSummary.awayTeam.notAttending?.length || 0} Out
               </Badge>
               {(rsvpSummary.awayTeam.noResponse?.length || 0) > 0 && (
-                <Badge variant="outline">
-                  <Users className="h-3 w-3 mr-1" />
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Users className="h-3 w-3" />
                   {rsvpSummary.awayTeam.noResponse?.length || 0} no response
                 </Badge>
               )}
@@ -129,14 +129,14 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex gap-2 mb-3">
           <Badge 
             variant="secondary" 
             className="hover:bg-green-200 flex items-center gap-1 text-[#ffffff] bg-[#16a34a]"
             data-testid="badge-attending"
           >
             <UserCheck className="h-3 w-3" />
-            {attendingCount} attending
+            {attendingCount} In
           </Badge>
           <Badge 
             variant="secondary" 
@@ -144,7 +144,7 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
             data-testid="badge-not-attending"
           >
             <UserX className="h-3 w-3" />
-            {notAttendingCount} not attending
+            {notAttendingCount} Out
           </Badge>
           {noResponseCount > 0 && (
             <Badge 
