@@ -42,7 +42,8 @@ import {
   Target,
   Shield,
   AlertCircle as AlertIcon,
-  Search
+  Search,
+  User
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
 import { format } from 'date-fns';
@@ -2452,7 +2453,7 @@ export default function LeagueManagement() {
                           data-testid={`team-player-${member.user.id}`}
                         >
                           <div 
-                            className="flex-1 cursor-pointer"
+                            className="flex items-center gap-3 flex-1 cursor-pointer"
                             onClick={() => {
                               setSelectedPlayer(member);
                               const assignedTeam = teams.find((team: Team) => team.id === member.assignedTeamId);
@@ -2470,41 +2471,42 @@ export default function LeagueManagement() {
                               });
                             }}
                           >
-                            <div className="flex items-center gap-3">
-                              {/* Profile Picture */}
-                              <div className="w-10 h-10 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                {member.user.profileImageUrl ? (
-                                  <img 
-                                    src={member.user.profileImageUrl} 
-                                    alt={formatUserName(member.user, member)}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="text-lg font-semibold text-primary">
-                                    {(member.displayFirstName || member.user.firstName || 'U')[0].toUpperCase()}
-                                  </span>
+                            {/* Profile Picture */}
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
+                              {member.user.profileImageUrl ? (
+                                <img 
+                                  src={member.user.profileImageUrl} 
+                                  alt={formatUserName(member.user, member)}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <User className="w-6 h-6 text-muted-foreground" />
+                              )}
+                            </div>
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{formatUserName(member.user, member)}</p>
+                                {!selectedTeam.isFreeAgents && member.userId === selectedTeam.captainId && (
+                                  <span className="px-1.5 py-0.5 bg-warning/20 text-warning rounded text-xs font-bold">C</span>
+                                )}
+                                {member.isGoalie && (
+                                  <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-500 rounded text-xs font-bold">G</span>
                                 )}
                               </div>
-                              
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-medium">{formatUserName(member.user, member)}</p>
-                                  {!selectedTeam.isFreeAgents && member.userId === selectedTeam.captainId && (
-                                    <span className="px-1.5 py-0.5 bg-warning/20 text-warning rounded text-xs font-bold">C</span>
-                                  )}
-                                  {member.isGoalie && (
-                                    <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-500 rounded text-xs font-bold">G</span>
-                                  )}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  <p>Position: {member.position || 'null'}</p>
-                                  <p>Jersey: {member.jerseyNumber ? `#${member.jerseyNumber}` : 'null'}</p>
-                                  <p>Skill: {member.skillLevel || 'null'}</p>
-                                </div>
+                              <div className="text-sm text-muted-foreground">
+                                <p>Skill: {member.skillLevel || 'null'}</p>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          
+                          <div className="flex items-center gap-3">
+                            {/* Position and Jersey on right side */}
+                            <div className="text-sm text-muted-foreground text-right">
+                              <p>Position: {member.position || 'null'}</p>
+                              <p>Jersey: {member.jerseyNumber ? `#${member.jerseyNumber}` : 'null'}</p>
+                            </div>
+                            
                             {/* Captain Assignment Controls */}
                             {!selectedTeam.isFreeAgents && !selectedTeam.captainId && (
                               <button
