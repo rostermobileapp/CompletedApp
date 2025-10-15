@@ -119,7 +119,7 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
 
   return (
     <Card className={cn("cursor-pointer transition-all hover:shadow-md", className)} data-testid="rsvp-summary">
-      <CardHeader className="pb-2">
+      <CardHeader className="pt-[4px] pb-[4px]">
         <CardTitle className="text-sm flex items-center gap-2">
           <Users className="h-4 w-4" />
           {teamId ? "Team RSVP Status" : "RSVP Status"}
