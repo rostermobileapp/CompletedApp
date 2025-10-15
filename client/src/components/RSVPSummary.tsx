@@ -118,7 +118,7 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
   const totalPlayers = attendingCount + notAttendingCount + noResponseCount;
 
   return (
-    <Card className={cn("cursor-pointer transition-all hover:shadow-md", className)} data-testid="rsvp-summary">
+    <Card className="rounded-lg border shadow-sm cursor-pointer transition-all hover:shadow-md bg-[212121] text-[#ffffff]" data-testid="rsvp-summary">
       <CardHeader className="pt-[4px] pb-[4px]">
         <CardTitle className="text-sm flex items-center gap-2">
           <Users className="h-4 w-4" />
