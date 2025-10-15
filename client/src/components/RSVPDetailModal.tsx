@@ -68,15 +68,15 @@ export function RSVPDetailModal({
       
       <div className="flex items-center gap-2">
         {status === 'attending' && (
-          <Badge variant="secondary" className="bg-green-100 text-green-700">
-            <UserCheck className="h-3 w-3 mr-1" />
-            Going
+          <Badge variant="secondary" className="hover:bg-green-200 flex items-center gap-1 text-[#ffffff] bg-[#16a34a]">
+            <UserCheck className="h-3 w-3" />
+            In
           </Badge>
         )}
         {status === 'not_attending' && (
-          <Badge variant="secondary" className="bg-red-100 text-red-700">
-            <UserX className="h-3 w-3 mr-1" />
-            Not Going
+          <Badge variant="secondary" className="hover:bg-red-200 flex items-center gap-1 text-[#ffffff] bg-[#dc2626]">
+            <UserX className="h-3 w-3" />
+            Out
           </Badge>
         )}
         {status === 'no_response' && (

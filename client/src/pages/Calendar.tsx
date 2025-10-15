@@ -391,15 +391,26 @@ export default function Calendar() {
       </div>
 
       {/* RSVP Detail Modal */}
-      {showRSVPModal && selectedGameData && (
-        <RSVPDetailModal
-          gameId={selectedGameId}
-          isOpen={showRSVPModal}
-          onClose={handleCloseRSVPModal}
-          onRequestSubstitute={handleRequestSubstitute}
-          showSubstituteButtons={true}
-        />
-      )}
+      {showRSVPModal && selectedGameData && (() => {
+        // Determine which team the user is on for this game
+        const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+        const userTeamId = userTeamIds.includes(selectedGameData.homeTeamId || selectedGameData.homeTeam?.id) 
+          ? (selectedGameData.homeTeamId || selectedGameData.homeTeam?.id)
+          : userTeamIds.includes(selectedGameData.awayTeamId || selectedGameData.awayTeam?.id)
+            ? (selectedGameData.awayTeamId || selectedGameData.awayTeam?.id)
+            : undefined;
+        
+        return (
+          <RSVPDetailModal
+            gameId={selectedGameId}
+            isOpen={showRSVPModal}
+            onClose={handleCloseRSVPModal}
+            onRequestSubstitute={handleRequestSubstitute}
+            showSubstituteButtons={true}
+            teamId={userTeamId}
+          />
+        );
+      })()}
 
       {/* Substitute Request Modal */}
       {showSubstituteModal && selectedGameData && substituteRequestData && substituteRequestData.teamId && (

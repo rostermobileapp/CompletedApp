@@ -32,10 +32,10 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
   if (isLoading) {
     return (
       <Card className={cn("animate-pulse", className)}>
-        <CardHeader className="pb-2">
+        <CardHeader className="pt-[4px] pb-[4px]">
           <div className="h-4 bg-muted rounded w-24"></div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-[4px] pb-[4px]">
           <div className="h-3 bg-muted rounded w-32"></div>
         </CardContent>
       </Card>
@@ -54,13 +54,13 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
         
         {/* Home Team */}
         <Card className="">
-          <CardHeader className="pb-2">
+          <CardHeader className="pt-[4px] pb-[4px]">
             <CardTitle className="text-sm flex items-center gap-2">
               <Users className="h-4 w-4" />
               Home Team
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-[4px] pb-[4px]">
             <div className="flex gap-2">
               <Badge variant="secondary" className="hover:bg-green-200 flex items-center gap-1 text-[#ffffff] bg-[#16a34a]">
                 <UserCheck className="h-3 w-3" />
@@ -82,13 +82,13 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
 
         {/* Away Team */}
         <Card className="">
-          <CardHeader className="pb-2">
+          <CardHeader className="pt-[4px] pb-[4px]">
             <CardTitle className="text-sm flex items-center gap-2">
               <Users className="h-4 w-4" />
               Away Team
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-[4px] pb-[4px]">
             <div className="flex gap-2">
               <Badge variant="secondary" className="hover:bg-green-200 flex items-center gap-1 text-[#ffffff] bg-[#16a34a]">
                 <UserCheck className="h-3 w-3" />
