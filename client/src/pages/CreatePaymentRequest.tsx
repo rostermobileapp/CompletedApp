@@ -16,6 +16,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { usePermissions } from '@/context/SubscriptionContext';
+import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 
 type CreatePaymentRequestForm = z.infer<typeof createPaymentRequestSchema>;
 
@@ -25,6 +27,8 @@ export default function CreatePaymentRequest() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
+  const [showPremiumAlert, setShowPremiumAlert] = useState(false);
+  const { canAccessPremiumFeatures } = usePermissions();
 
   const form = useForm<CreatePaymentRequestForm>({
     resolver: zodResolver(createPaymentRequestSchema),
@@ -38,6 +42,13 @@ export default function CreatePaymentRequest() {
       relatedConversationId: null,
     },
   });
+
+  // Check if user has premium access, show paywall if not
+  useEffect(() => {
+    if (!canAccessPremiumFeatures()) {
+      setShowPremiumAlert(true);
+    }
+  }, [canAccessPremiumFeatures]);
 
   // Pre-fill form from URL query parameters
   useEffect(() => {
@@ -384,6 +395,12 @@ export default function CreatePaymentRequest() {
           </Button>
         </form>
       </div>
+
+      {/* Premium Feature Alert */}
+      <PremiumFeatureAlert 
+        open={showPremiumAlert} 
+        onOpenChange={setShowPremiumAlert} 
+      />
     </div>
   );
 }
