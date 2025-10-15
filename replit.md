@@ -4,6 +4,14 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 # Recent Changes
 
+## October 15, 2025 - Finalize & Invoice Feature for Scrimmages
+Implemented an automated "Finalize & Invoice" feature for scrimmages that streamlines the roster confirmation and payment process:
+- **Automatic Notifications**: Sends confirmation notifications to approved players with scrimmage details, and "scrimmage full" notices to non-approved players
+- **Automated Payment Requests**: Automatically creates payment requests from the organizer to all approved players when a scrimmage has a cost
+- **Schedule Integration**: Scrimmages automatically appear on approved players' schedules via existing calendar filtering
+- **UI Updates**: Changed button from "Finalize Roster & Send Notifications" to "Finalize & Invoice" with contextual descriptions
+- Backend endpoint `/api/scrimmages/:id/finalize` now handles all three operations atomically
+
 ## October 15, 2025 - Scrimmage Management Screen Fix
 Fixed a critical route ordering bug in Express that caused the Scrimmage Management Screen to display "User not found" errors. The issue was resolved by moving specific `/api/users/scrimmages`, `/api/users/scrimmage-requests`, and `/api/users/scrimmage-invites` routes before the generic `/api/users/:userId` route. Express was incorrectly matching "scrimmages" as a userId parameter, resulting in 404 errors.
 
@@ -47,6 +55,7 @@ Key features include:
 - **Slide-Out Navigation Menu**: A global hamburger menu in the top-right corner providing permission-gated access to features like Schedule Scrimmage, Scrimmage Management, Create a League, League Management, and Payments.
 - **Recurring Scrimmages**: Scheduling scrimmages with daily, weekly, or monthly recurrence patterns, including end conditions by date or occurrence count.
 - **Substitute Game Display on Schedule**: Approved substitute games appear on a player's calendar with special formatting (orange "Substitute" badge, "Subbing for [Team Name]").
+- **Finalize & Invoice for Scrimmages**: One-click automation that finalizes scrimmage rosters, sends targeted notifications (confirmations to approved players, "full" notices to others), and automatically creates payment requests when scrimmages have a cost. Integrates seamlessly with player schedules.
 
 # External Dependencies
 
