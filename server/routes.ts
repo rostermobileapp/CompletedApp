@@ -5464,6 +5464,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Don't fail the finalization if announcement fails
         }
       }
+
+      // Automatically create payment request if there's a cost
+      if (scrimmage.costPerPlayer && parseFloat(scrimmage.costPerPlayer) > 0) {
+        try {
+          const paymentRequest = await storage.createPaymentRequest(
+            {
+              creatorId: userId,
+              title: `Payment for ${scrimmage.title}`,
+              description: `Payment for scrimmage on ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location}`,
+              amountPerPerson: scrimmage.costPerPlayer,
+              relatedScrimmageId: scrimmageId,
+              deadline: null,
+              notes: null,
+              relatedConversationId: null,
+            },
+            approvedUserIds
+          );
+          
+          console.log(`💰 Created payment request ${paymentRequest.id} for ${approvedUserIds.length} approved players`);
+        } catch (paymentError) {
+          console.error('Error creating payment request:', paymentError);
+          // Don't fail the finalization if payment request creation fails
+        }
+      }
       
       res.json(updatedScrimmage);
     } catch (error) {
