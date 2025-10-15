@@ -60,17 +60,7 @@ export default function CreateScrimmage() {
     enabled: !!user,
   });
 
-  // Check permissions - free tier users cannot create scrimmages
-  useEffect(() => {
-    if (!canAccessPremiumFeatures) {
-      toast({
-        title: "Premium Feature",
-        description: "Creating scrimmages is only available for Player Pro and Commissioner users.",
-        variant: "destructive",
-      });
-      navigate('/');
-    }
-  }, [canAccessPremiumFeatures, navigate, toast]);
+  // 🚨 SUBSCRIPTION GATE REMOVED - ALL USERS CAN CREATE SCRIMMAGES 🚨
 
   const form = useForm<CreateScrimmageForm>({
     resolver: zodResolver(createScrimmageSchema),
@@ -101,6 +91,9 @@ export default function CreateScrimmage() {
 
   // Fetch league members for the selected league
   const selectedLeague = (userLeagues as any[])?.[0]; // Use first league for now
+  
+  // Get the league's facility if it exists
+  const leagueFacility = selectedLeague?.facility;
   const { data: leagueMembers = [], isLoading: membersLoading } = useQuery({
     queryKey: [`/api/leagues/${selectedLeague?.id}/members-for-scrimmage`],
     enabled: !!selectedLeague?.id,
@@ -110,6 +103,45 @@ export default function CreateScrimmage() {
   const filteredMembers = (leagueMembers as any[]).filter((member: any) => 
     `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Combine league facility with user facility memberships
+  const allFacilities = (() => {
+    const facilities: Array<{ id: string; name: string; city?: string; isLeagueFacility: boolean }> = [];
+    
+    // Add league's facility first (if it exists)
+    if (leagueFacility) {
+      facilities.push({
+        id: leagueFacility.id,
+        name: leagueFacility.name,
+        city: leagueFacility.city,
+        isLeagueFacility: true
+      });
+    }
+    
+    // Add user's facility memberships (if they exist and not already included)
+    if (facilityMemberships && facilityMemberships.length > 0) {
+      facilityMemberships.forEach((membership: any) => {
+        // Don't add duplicates (league facility might also be in user's memberships)
+        if (!facilities.some(f => f.id === membership.facility.id)) {
+          facilities.push({
+            id: membership.facility.id,
+            name: membership.facility.name,
+            city: membership.facility.city,
+            isLeagueFacility: false
+          });
+        }
+      });
+    }
+    
+    return facilities;
+  })();
+
+  // Set default venue to league facility when it loads
+  useEffect(() => {
+    if (leagueFacility && !form.watch('venue')) {
+      form.setValue('venue', leagueFacility.name);
+    }
+  }, [leagueFacility, form]);
 
   const createScrimmageRequest = useMutation({
     mutationFn: async (data: CreateScrimmageForm) => {
@@ -427,7 +459,7 @@ export default function CreateScrimmage() {
               <Label htmlFor="venue">Venue</Label>
               {facilitiesLoading ? (
                 <div className="h-10 bg-muted rounded-md animate-pulse" />
-              ) : facilityMemberships && facilityMemberships.length > 0 ? (
+              ) : allFacilities.length > 0 ? (
                 <Select
                   value={form.watch('venue')}
                   onValueChange={(value) => form.setValue('venue', value)}
@@ -436,13 +468,14 @@ export default function CreateScrimmage() {
                     <SelectValue placeholder="Select a facility" />
                   </SelectTrigger>
                   <SelectContent>
-                    {facilityMemberships.map((membership) => (
+                    {allFacilities.map((facility) => (
                       <SelectItem 
-                        key={membership.facility.id} 
-                        value={membership.facility.name}
+                        key={facility.id} 
+                        value={facility.name}
                       >
-                        {membership.facility.name}
-                        {membership.facility.city && ` - ${membership.facility.city}`}
+                        {facility.name}
+                        {facility.city && ` - ${facility.city}`}
+                        {facility.isLeagueFacility && " (League Facility)"}
                       </SelectItem>
                     ))}
                   </SelectContent>
