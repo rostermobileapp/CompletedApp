@@ -601,7 +601,7 @@ export default function GameDetails() {
                       />
                     </div>
                     <div>
-                      <p className="font-medium text-muted-foreground" data-testid="text-beverage-available">Beverage Duty Available</p>
+                      <p className="font-medium text-[#ffffff]" data-testid="text-beverage-available">Beverage Duty Available</p>
                     </div>
                   </div>
                   <Button
