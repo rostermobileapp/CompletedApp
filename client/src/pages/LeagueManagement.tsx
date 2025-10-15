@@ -2499,7 +2499,7 @@ export default function LeagueManagement() {
                                   >
                                     Remove Captain
                                   </button>
-                                ) : (
+                                ) : !selectedTeam.captainId ? (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -2514,7 +2514,7 @@ export default function LeagueManagement() {
                                   >
                                     Set Captain
                                   </button>
-                                )}
+                                ) : null}
                               </div>
                             )}
                             <div className="text-right">
