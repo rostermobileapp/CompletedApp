@@ -236,11 +236,10 @@ export default function CreateScrimmage() {
           Create a scrimmage request and invite league members to join
         </p>
       </div>
-
       {/* Form */}
       <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 space-y-6">
         {/* Scrimmage Details */}
-        <div className="bg-card rounded-xl border border-border p-6">
+        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] pl-[4px] pr-[4px] bg-[#212121] text-[#ffffff]">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Calendar className="w-5 h-5" />
             Scrimmage Details
