@@ -2518,9 +2518,6 @@ export default function LeagueManagement() {
                               </div>
                             )}
                             <div className="text-right">
-                              <span className="tier-badge bg-success text-accent-foreground text-xs px-2 py-1 rounded-full">
-                                {member.status?.toUpperCase() || 'ACTIVE'}
-                              </span>
                               {member.skillLevel && (
                                 <p className="text-xs text-muted-foreground mt-1">
                                   Skill: {member.skillLevel}
