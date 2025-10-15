@@ -767,6 +767,19 @@ export default function Dashboard() {
     }
   });
 
+  // Fetch user's scrimmage requests (to find approved ones they're participating in)
+  const { data: scrimmageRequests = [], isLoading: requestsLoading } = useQuery({
+    queryKey: ['/api/users/scrimmage-requests'],
+    select: (requests) => {
+      if (!Array.isArray(requests)) return [];
+      // Filter by selected league if available
+      if (selectedLeagueId) {
+        return requests.filter((request: any) => request.scrimmage?.leagueId === selectedLeagueId);
+      }
+      return requests;
+    }
+  });
+
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
     select: (teams) => {
@@ -1231,11 +1244,11 @@ export default function Dashboard() {
           </button>
         </div>
         
-        {gamesLoading || invitesLoading ? (
+        {gamesLoading || invitesLoading || requestsLoading ? (
           <div className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid="loading-upcoming-games">
             <div className="h-16 bg-muted rounded"></div>
           </div>
-        ) : (Array.isArray(upcomingGames) && upcomingGames.length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.length > 0) ? (
+        ) : (Array.isArray(upcomingGames) && upcomingGames.length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.length > 0) || (Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved').length > 0) ? (
           <div className="space-y-3">
             {/* First show scrimmage invites */}
             {Array.isArray(scrimmageInvites) && scrimmageInvites.map((invite: any) => (
@@ -1279,7 +1292,42 @@ export default function Dashboard() {
               </div>
             ))}
             
-            {/* Then show regular games and approved scrimmages */}
+            {/* Show approved scrimmages */}
+            {Array.isArray(scrimmageRequests) && scrimmageRequests
+              .filter((request: any) => request.status === 'approved' && request.scrimmage)
+              .slice(0, 4)
+              .map((request: any) => {
+                const scrimmage = request.scrimmage;
+                return (
+                  <div 
+                    key={`scrimmage-${scrimmage.id}`}
+                    className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#212121]" 
+                    onClick={() => navigate(`/scrimmage/${scrimmage.id}`)}
+                    data-testid={`card-scrimmage-${scrimmage.id}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                        <Trophy className="w-6 h-6 text-primary-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold" data-testid={`text-scrimmage-title-${scrimmage.id}`}>
+                          {scrimmage.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${scrimmage.id}`}>
+                          {format(new Date(scrimmage.dateTime), 'MMM d • h:mm a')}
+                        </p>
+                        {scrimmage.location && (
+                          <p className="text-xs text-muted-foreground" data-testid={`text-scrimmage-location-${scrimmage.id}`}>
+                            {scrimmage.location}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            
+            {/* Then show regular games */}
             {(upcomingGames as any[])
               .filter((game: any) => {
                 // Always show scrimmages (user is already approved)
