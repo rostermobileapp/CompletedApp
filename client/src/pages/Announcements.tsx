@@ -48,7 +48,6 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { EnhancedMediaUploader } from '@/components/EnhancedMediaUploader';
-import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 
 // Types
 type AnnouncementReaction = {
@@ -1041,8 +1040,8 @@ export default function Announcements() {
   // Check if user is a team captain in this league
   const isTeamCaptain = (teams as any[]).some((team: any) => team.captainId === user?.id);
   
-  // User can post if they're a commissioner or team captain
-  const canPost = isCommissioner || isTeamCaptain;
+  // User can post if they're a commissioner or team captain AND have Player Pro tier or higher
+  const canPost = (isCommissioner || isTeamCaptain) && canAccessPremiumFeatures();
 
   // Fetch announcements
   const { data, isLoading } = useQuery<{ announcements: Announcement[]; pagination?: { page: number; pageSize: number; total: number } }>({
@@ -1092,7 +1091,6 @@ export default function Announcements() {
 
   return (
     <div className="min-h-screen bg-background">
-      <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()} className="min-h-screen">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
         <div className="max-w-2xl mx-auto px-4 py-4">
@@ -1182,7 +1180,6 @@ export default function Announcements() {
         leagueId={leagueId}
         canPost={canPost}
       />
-      </FeatureLockOverlay>
     </div>
   );
 }
