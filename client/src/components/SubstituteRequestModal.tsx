@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, UserPlus, Search, Calendar } from "lucide-react";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -252,7 +253,7 @@ export function SubstituteRequestModal({
                             ) : (
                               <Badge variant="secondary" className="text-xs flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                {player.gameTime ? new Date(player.gameTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Scheduled'}
+                                {player.gameTime ? format(new Date(player.gameTime), 'h:mm a') : 'Scheduled'}
                               </Badge>
                             )}
                           </div>
