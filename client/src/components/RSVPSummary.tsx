@@ -128,7 +128,7 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
           {totalPlayers} total player{totalPlayers !== 1 ? 's' : ''}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-[4px] pb-[4px]">
         <div className="flex gap-2 mb-3">
           <Badge 
             variant="secondary" 
