@@ -536,7 +536,7 @@ export default function ScrimmageManagement() {
                                     {getApprovedRequests(requests).map((request) => (
                                       <div
                                         key={request.id}
-                                        className="flex items-center gap-3 p-3 rounded-lg border bg-green-50 dark:bg-green-950/20"
+                                        className="flex items-center gap-3 p-3 rounded-lg border dark:bg-green-950/20 bg-[#212121] text-[#ffffff]"
                                         data-testid={`approved-${request.id}`}
                                       >
                                         <Avatar className="h-10 w-10">
