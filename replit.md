@@ -4,6 +4,13 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 # Recent Changes
 
+## October 15, 2025 - Fixed Bottom Navigation Bar
+Removed the customizable navigation feature and replaced it with a fixed 5-item bottom navigation bar for consistency and simplicity:
+- **Fixed Navigation Items**: Teams, Messages, Home (center with logo), Profile, and Payments (far right)
+- **Removed Features**: Edit mode, drag-and-drop reordering, add/delete shortcuts, and navigation preference storage
+- **Payments Shortcut**: New fixed shortcut to /payment-requests for quick access to payment management
+- **Preserved Functionality**: Unread message badge and active state highlighting remain functional
+
 ## October 15, 2025 - Dashboard Scrimmage Display & Button Relocation
 - **Dashboard Fix**: Dashboard now correctly displays approved scrimmages by fetching both scrimmage invites AND scrimmage requests (filtered by status='approved')
 - **Button Relocation**: Moved "Finalize & Invoice" button from scrimmage details view to main scrimmage card for immediate access without expanding details
@@ -57,7 +64,7 @@ Key features include:
 - **CSV Import System**: Bulk import for players and schedules with flexible column matching, automatic team creation, and detailed error reporting. Downloadable templates are provided.
 - **Bulk Delete Operations**: Commissioner-only feature for deleting players, teams, or games with confirmation.
 - **Facility Linking**: Commissioners can link leagues to facilities via a selector dropdown or inline creation.
-- **Customizable Navigation**: A bottom navigation bar with default and customizable slots, persistent preferences, and specific handling for "League Management" and "Scrimmages" shortcuts.
+- **Fixed Bottom Navigation**: A bottom navigation bar with 5 fixed shortcuts (Teams, Messages, Home, Profile, Payments) providing quick access to core features. Includes unread message badge and active state highlighting.
 - **Slide-Out Navigation Menu**: A global hamburger menu in the top-right corner providing permission-gated access to features like Schedule Scrimmage, Scrimmage Management, Create a League, League Management, and Payments.
 - **Recurring Scrimmages**: Scheduling scrimmages with daily, weekly, or monthly recurrence patterns, including end conditions by date or occurrence count.
 - **Substitute Game Display on Schedule**: Approved substitute games appear on a player's calendar with special formatting (orange "Substitute" badge, "Subbing for [Team Name]").
