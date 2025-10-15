@@ -416,7 +416,7 @@ export default function CreateScrimmage() {
         </div>
 
         {/* Venue Information */}
-        <div className="bg-card rounded-xl border border-border p-6">
+        <div className="rounded-xl border border-border p-6 bg-[#212121] text-[#ffffff] pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[12px] mb-[12px]">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5" />
             Venue Information
