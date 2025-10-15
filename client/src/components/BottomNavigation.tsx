@@ -84,7 +84,7 @@ export function BottomNavigation() {
                     </div>
                   )}
                   {shortcut.id === 'payments' && unpaidPaymentCount > 0 && (
-                    <div className="absolute -top-1 -right-3 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid="payment-badge">
+                    <div className="absolute -top-1 -right-4 bg-red-500 text-white text-[10px] rounded-full w-[17px] h-[17px] flex items-center justify-center font-bold" data-testid="payment-badge">
                       {unpaidPaymentCount > 99 ? '99+' : unpaidPaymentCount}
                     </div>
                   )}
