@@ -2388,20 +2388,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For team-specific access
       if (teamId) {
-        // Verify user is captain of the requested team or commissioner
+        // Verify user is on the requested team, captain, or commissioner
         const requestedTeam = await storage.getTeam(teamId as string);
         const isCaptainOfRequestedTeam = requestedTeam && requestedTeam.captainId === userId;
         
-        if (!isCommissioner && !isCaptainOfRequestedTeam) {
-          return res.status(403).json({ message: 'Captain or Commissioner access required for this team' });
+        // Check if user is a member of this team
+        const teamMembers = await storage.getTeamMembers(teamId as string);
+        const isMemberOfTeam = teamMembers.some(member => member.userId === userId);
+        
+        // Also check league membership assignment
+        const leagueMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
+        const hasLeagueTeamAssignment = leagueMembership && leagueMembership.assignedTeamId === teamId;
+        
+        if (!isCommissioner && !isCaptainOfRequestedTeam && !isMemberOfTeam && !hasLeagueTeamAssignment) {
+          return res.status(403).json({ message: 'You must be on this team, a captain, or commissioner to view attendance' });
         }
         
         const summary = await storage.getTeamRsvpSummary(gameId, teamId as string);
         res.json(summary);
       } else {
-        // General access - require captain of either team or commissioner
-        if (!isCommissioner && !isHomeCaptain && !isAwayCaptain) {
-          return res.status(403).json({ message: 'Captain or Commissioner access required' });
+        // General access - require being on either team, captain, or commissioner
+        const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
+        const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+        const isOnHomeTeam = homeTeamMembers.some(member => member.userId === userId);
+        const isOnAwayTeam = awayTeamMembers.some(member => member.userId === userId);
+        
+        // Check league membership assignments
+        const leagueMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
+        const hasHomeTeamAssignment = leagueMembership && leagueMembership.assignedTeamId === game.homeTeamId;
+        const hasAwayTeamAssignment = leagueMembership && leagueMembership.assignedTeamId === game.awayTeamId;
+        
+        if (!isCommissioner && !isHomeCaptain && !isAwayCaptain && !isOnHomeTeam && !isOnAwayTeam && !hasHomeTeamAssignment && !hasAwayTeamAssignment) {
+          return res.status(403).json({ message: 'You must be on a team, captain, or commissioner to view attendance' });
         }
 
         const summary = await storage.getGameRsvpSummaryByTeams(gameId);
