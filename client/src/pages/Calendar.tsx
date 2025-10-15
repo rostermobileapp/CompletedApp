@@ -29,7 +29,7 @@ export default function Calendar() {
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState<string>("");
   const [selectedGameData, setSelectedGameData] = useState<any>(null);
-  const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string } | null>(null);
+  const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string; teamId?: string } | null>(null);
 
   // Handler functions for modal interactions
   const handleViewDetails = (game: any) => {
@@ -38,8 +38,8 @@ export default function Calendar() {
     setShowRSVPModal(true);
   };
 
-  const handleRequestSubstitute = (playerId: string, playerName: string) => {
-    setSubstituteRequestData({ playerId, playerName });
+  const handleRequestSubstitute = (playerId: string, playerName: string, teamId?: string) => {
+    setSubstituteRequestData({ playerId, playerName, teamId });
     setShowRSVPModal(false);
     setShowSubstituteModal(true);
   };
@@ -402,7 +402,7 @@ export default function Calendar() {
       )}
 
       {/* Substitute Request Modal */}
-      {showSubstituteModal && selectedGameData && substituteRequestData && userTeams && (
+      {showSubstituteModal && selectedGameData && substituteRequestData && substituteRequestData.teamId && (
         <SubstituteRequestModal
           gameId={selectedGameId}
           gameDate={selectedGameData.scheduledAt}
@@ -411,12 +411,7 @@ export default function Calendar() {
           originalPlayerName={substituteRequestData.playerName}
           homeTeamId={selectedGameData.homeTeamId || selectedGameData.homeTeam?.id}
           awayTeamId={selectedGameData.awayTeamId || selectedGameData.awayTeam?.id}
-          userTeamId={(() => {
-            const userTeamIds = (userTeams as any[]).map((team: any) => team.id);
-            const homeId = selectedGameData.homeTeamId || selectedGameData.homeTeam?.id;
-            const awayId = selectedGameData.awayTeamId || selectedGameData.awayTeam?.id;
-            return userTeamIds.includes(homeId) ? homeId : awayId;
-          })()}
+          originalPlayerTeamId={substituteRequestData.teamId}
           isOpen={showSubstituteModal}
           onClose={handleCloseSubstituteModal}
         />

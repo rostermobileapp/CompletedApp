@@ -17,7 +17,7 @@ interface RSVPDetailModalProps {
   gameId: string;
   isOpen: boolean;
   onClose: () => void;
-  onRequestSubstitute?: (playerId: string, playerName: string) => void;
+  onRequestSubstitute?: (playerId: string, playerName: string, teamId?: string) => void;
   showSubstituteButtons?: boolean;
   teamId?: string;
 }
@@ -90,7 +90,7 @@ export function RSVPDetailModal({
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => onRequestSubstitute(user.id, `${user.firstName} ${user.lastName}`)}
+            onClick={() => onRequestSubstitute(user.id, `${user.firstName} ${user.lastName}`, teamId)}
             data-testid={`button-request-substitute-${user.id}`}
           >
             Request Substitute

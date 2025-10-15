@@ -24,7 +24,7 @@ interface SubstituteRequestModalProps {
   originalPlayerName: string;
   homeTeamId: string;
   awayTeamId: string;
-  userTeamId: string;
+  originalPlayerTeamId: string;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -37,7 +37,7 @@ export function SubstituteRequestModal({
   originalPlayerName,
   homeTeamId,
   awayTeamId,
-  userTeamId,
+  originalPlayerTeamId,
   isOpen, 
   onClose 
 }: SubstituteRequestModalProps) {
@@ -46,8 +46,8 @@ export function SubstituteRequestModal({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Determine opposing team ID
-  const opposingTeamId = userTeamId === homeTeamId ? awayTeamId : homeTeamId;
+  // Determine opposing team ID based on the original player's team
+  const opposingTeamId = originalPlayerTeamId === homeTeamId ? awayTeamId : homeTeamId;
 
   // Fetch all league players with availability status
   const { data: allPlayers = [], isLoading } = useQuery({

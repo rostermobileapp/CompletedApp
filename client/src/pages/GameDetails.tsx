@@ -38,7 +38,7 @@ export default function GameDetails() {
   const [editAwayScore, setEditAwayScore] = useState("");
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
-  const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string } | null>(null);
+  const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string; teamId?: string } | null>(null);
 
   // Fetch user's teams
   const { data: userTeams } = useQuery<UserTeam[]>({
@@ -1054,8 +1054,8 @@ export default function GameDetails() {
         gameId={game.id}
         isOpen={showRSVPModal}
         onClose={() => setShowRSVPModal(false)}
-        onRequestSubstitute={(playerId, playerName) => {
-          setSubstituteRequestData({ playerId, playerName });
+        onRequestSubstitute={(playerId, playerName, teamId) => {
+          setSubstituteRequestData({ playerId, playerName, teamId });
           setShowRSVPModal(false);
           setShowSubstituteModal(true);
         }}
@@ -1063,7 +1063,7 @@ export default function GameDetails() {
         teamId={userTeam?.id}
       />
       {/* Substitute Request Modal */}
-      {substituteRequestData && game && userTeam && (
+      {substituteRequestData && game && substituteRequestData.teamId && (
         <SubstituteRequestModal
           gameId={game.id}
           gameDate={format(new Date(game.scheduledAt), 'yyyy-MM-dd')}
@@ -1072,7 +1072,7 @@ export default function GameDetails() {
           originalPlayerName={substituteRequestData.playerName}
           homeTeamId={game.homeTeamId}
           awayTeamId={game.awayTeamId}
-          userTeamId={userTeam.id}
+          originalPlayerTeamId={substituteRequestData.teamId}
           isOpen={showSubstituteModal}
           onClose={() => {
             setShowSubstituteModal(false);
