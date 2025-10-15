@@ -629,7 +629,7 @@ export default function GameDetails() {
 
         {/* RSVP Section */}
         {!isGameCompleted && (
-          <div className="bg-card rounded-xl border border-border p-6 mt-[0px] mb-[0px] pt-[2px] pb-[2px]">
+          <div className="rounded-xl border border-border p-6 mt-[0px] mb-[0px] pt-[2px] pb-[2px] bg-[#212121] text-[#ffffff]">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Users className="w-5 h-5" />
               RSVP & Attendance
