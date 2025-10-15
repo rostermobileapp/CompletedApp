@@ -3246,7 +3246,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getAllLeaguePlayersWithAvailability(date: Date, leagueId: string): Promise<(User & { skillLevel?: string | null; isScheduled: boolean })[]> {
+  async getAllLeaguePlayersWithAvailability(date: Date, leagueId: string): Promise<(User & { skillLevel?: string | null; isScheduled: boolean; gameTime?: Date | null; teamId?: string | null; isGoalie?: boolean; isSkater?: boolean })[]> {
     // Get all league members
     const leagueMembers = await this.getLeagueMembers(leagueId);
     
@@ -3267,13 +3267,19 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // Get team members for all games on that date
-    const scheduledUserIds = new Set<string>();
+    // Build a map of user -> game info (game time and team)
+    const userGameInfo = new Map<string, { gameTime: Date; teamId: string }>();
+    
     for (const game of gamesOnDate) {
       const homeMembers = await this.getTeamMembers(game.homeTeamId);
       const awayMembers = await this.getTeamMembers(game.awayTeamId);
-      [...homeMembers, ...awayMembers].forEach(member => {
-        scheduledUserIds.add(member.userId);
+      
+      homeMembers.forEach(member => {
+        userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.homeTeamId });
+      });
+      
+      awayMembers.forEach(member => {
+        userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.awayTeamId });
       });
     }
 
@@ -3284,12 +3290,24 @@ export class DatabaseStorage implements IStorage {
     const userIds = allUsers.map(user => user.id);
     const skillMap = await this.fetchUserSkills(userIds, leagueId);
     
-    // Return all users with skill level and scheduled status
-    return allUsers.map(user => ({
-      ...user,
-      skillLevel: skillMap.get(user.id) ?? null,
-      isScheduled: scheduledUserIds.has(user.id)
-    }));
+    // Create a map of user ID to league membership for position info
+    const membershipMap = new Map(leagueMembers.map(m => [m.userId, m]));
+    
+    // Return all users with skill level, scheduled status, game time, team, and position info
+    return allUsers.map(user => {
+      const gameInfo = userGameInfo.get(user.id);
+      const membership = membershipMap.get(user.id);
+      
+      return {
+        ...user,
+        skillLevel: skillMap.get(user.id) ?? null,
+        isScheduled: !!gameInfo,
+        gameTime: gameInfo?.gameTime ?? null,
+        teamId: gameInfo?.teamId ?? null,
+        isGoalie: membership?.isGoalie ?? false,
+        isSkater: membership?.isSkater ?? true
+      };
+    });
   }
 
   // Substitute request operations
