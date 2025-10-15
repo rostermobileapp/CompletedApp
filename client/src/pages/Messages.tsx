@@ -485,6 +485,7 @@ export default function Messages() {
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [groupTitle, setGroupTitle] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const firstUnreadMessageRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1103,10 +1104,24 @@ export default function Messages() {
     }
   }, [selectedConversation]);
 
-  // Scroll to bottom when new messages arrive
+  // Find first unread message
+  const firstUnreadMessage = useMemo(() => {
+    return messages.find(msg => 
+      msg.senderId !== currentUserId && 
+      !msg.readReceipts.some(receipt => receipt.userId === currentUserId)
+    );
+  }, [messages, currentUserId]);
+
+  // Scroll to first unread message or bottom when messages change or conversation changes
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (firstUnreadMessage && firstUnreadMessageRef.current) {
+      // Scroll to first unread message
+      firstUnreadMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      // If no unread messages, scroll to bottom
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, selectedConversation, firstUnreadMessage]);
 
   // Typing indicator functions
   const handleTypingStart = () => {
@@ -1985,10 +2000,12 @@ export default function Messages() {
                 
                 const message = item.data;
                 const isCurrentUser = message.senderId === currentUserId;
+                const isFirstUnread = firstUnreadMessage?.id === message.id;
                 
                 return (
                   <div 
                     key={message.id} 
+                    ref={isFirstUnread ? firstUnreadMessageRef : null}
                     className={`flex gap-3 ${isCurrentUser ? 'justify-end' : 'justify-start'}`} 
                     data-testid={`message-${message.id}`}
                   >
