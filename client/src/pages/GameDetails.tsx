@@ -389,6 +389,9 @@ export default function GameDetails() {
   
   // Debug logging for team detection (temporary)
   console.log('GameDetails Team Debug:', {
+    userTeams,
+    userTeamsIsArray: Array.isArray(userTeams),
+    userTeamsLength: userTeams?.length,
     userTeamIds,
     homeTeamId: game.homeTeam?.id,
     awayTeamId: game.awayTeam?.id,
@@ -430,6 +433,16 @@ export default function GameDetails() {
   
   // Check if user is commissioner
   const isCommissioner = league?.commissionerId === (user as User)?.id;
+  
+  // Debug logging (temporary)
+  console.log('UserTeam Assignment Debug:', {
+    userTeam,
+    userTeamId: userTeam?.id,
+    gameHomeTeam: game.homeTeam,
+    gameAwayTeam: game.awayTeam,
+    isCommissioner,
+    shouldShowRSVP: !!(userTeam || isCommissioner)
+  });
   
   // Check if game is in the future for RSVP purposes
   const isUpcomingGame = new Date(game.scheduledAt) > new Date();
