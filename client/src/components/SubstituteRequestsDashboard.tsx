@@ -89,7 +89,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
       className={`transition-all bg-[#1a1a1a] border-border ${selectedRequest === request.id ? 'ring-2 ring-red-500' : ''}`}
       data-testid={`request-card-${request.id}`}
     >
-      <CardHeader className="pb-3">
+      <CardHeader className="pt-[8px] pb-[8px] pl-[8px] pr-[8px]">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <Badge 
