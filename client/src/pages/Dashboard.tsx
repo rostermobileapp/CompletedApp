@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, DollarSign, Crown, Star } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -46,27 +46,6 @@ function AnnouncementBadge({ leagueId }: { leagueId: string | null }) {
   );
 }
 
-// Payment Request Badge Component
-function PaymentRequestBadge() {
-  const { data: unpaidCount } = useQuery({
-    queryKey: ['/api/payment-requests/unpaid-count'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/payment-requests/unpaid-count');
-      return response.json();
-    },
-    refetchInterval: 30000, // Check every 30 seconds
-  });
-
-  if (!unpaidCount || unpaidCount.count === 0) {
-    return null;
-  }
-
-  return (
-    <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-      <span className="text-white text-xs font-bold">{unpaidCount.count}</span>
-    </div>
-  );
-}
 
 // Needs Attention Modal Component
 function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: { 
@@ -1143,9 +1122,9 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* 4-Card Section */}
+      {/* 3-Card Section */}
       <div className="px-6 mb-6">
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {/* Announcements Card */}
           <Link href="/announcements">
             <div className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" data-testid="card-announcements">
@@ -1179,19 +1158,6 @@ export default function Dashboard() {
               <Award className="w-8 h-8 text-blue-500 mb-3" />
               <p className="text-xs font-medium">Standings</p>
             </div>
-          </div>
-
-          {/* Payments Card */}
-          <div 
-            className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" 
-            data-testid="card-payments"
-            onClick={() => navigate('/payment-requests')}
-          >
-            <div className="h-full flex flex-col items-center justify-center">
-              <DollarSign className="w-8 h-8 text-green-500 mb-3" />
-              <p className="text-xs font-medium">Payments</p>
-            </div>
-            <PaymentRequestBadge />
           </div>
         </div>
       </div>
