@@ -86,7 +86,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
 
   const RequestCard = ({ request, isPending = true }: { request: any; isPending?: boolean }) => (
     <Card 
-      className={`transition-all bg-[#1a1a1a] border-border ${selectedRequest === request.id ? 'ring-2 ring-red-500' : ''}`}
+      className="rounded-lg border shadow-sm transition-all border-border bg-[#212121] text-[#ffffff]"
       data-testid={`request-card-${request.id}`}
     >
       <CardHeader className="pt-[8px] pb-[8px] pl-[8px] pr-[8px]">
