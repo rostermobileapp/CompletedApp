@@ -2400,6 +2400,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const leagueMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
         const hasLeagueTeamAssignment = leagueMembership && leagueMembership.assignedTeamId === teamId;
         
+        console.log('RSVP Summary Auth Debug:', {
+          userId,
+          teamId,
+          gameLeagueId: game.leagueId,
+          isCommissioner,
+          isCaptainOfRequestedTeam,
+          isMemberOfTeam,
+          hasLeagueMembership: !!leagueMembership,
+          leagueMembershipAssignedTeam: leagueMembership?.assignedTeamId,
+          hasLeagueTeamAssignment
+        });
+        
         if (!isCommissioner && !isCaptainOfRequestedTeam && !isMemberOfTeam && !hasLeagueTeamAssignment) {
           return res.status(403).json({ message: 'You must be on this team, a captain, or commissioner to view attendance' });
         }
