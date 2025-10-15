@@ -4,6 +4,12 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 # Recent Changes
 
+## October 15, 2025 - Messages Scroll to First Unread
+Updated the messages thread view to automatically scroll to the newest unread message instead of the newest message overall when opening a conversation:
+- **Smart Scroll Positioning**: When opening a conversation, the view now scrolls to the first unread message (messages not from the current user without read receipts)
+- **Fallback Behavior**: If no unread messages exist, the view scrolls to the bottom to show the newest messages (preserving previous behavior)
+- **Smooth UX**: Uses smooth scrolling animation and positions the first unread message at the top of the viewport for easy visibility
+
 ## October 15, 2025 - Fixed Bottom Navigation Bar
 Removed the customizable navigation feature and replaced it with a fixed 5-item bottom navigation bar for consistency and simplicity:
 - **Fixed Navigation Items**: Teams, Messages, Home (center with logo), Profile, and Payments (far right)
