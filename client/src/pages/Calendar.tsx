@@ -258,6 +258,44 @@ export default function Calendar() {
                 );
               }
 
+              // Handle substitute games
+              if (event.type === 'substitute') {
+                const game = event;
+                const isCompleted = game.isCompleted || (game.homeScore !== null && game.awayScore !== null);
+                const isPastGame = isBefore(addHours(new Date(game.scheduledAt), 2), new Date());
+                return (
+                  <div 
+                    key={game.id} 
+                    className="bg-card rounded-xl border border-border p-4 relative hover:bg-muted/50 transition-colors" 
+                    data-testid={`card-substitute-game-${game.id}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
+                        <Trophy className="w-6 h-6 text-primary-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold" data-testid={`text-substitute-team-${game.id}`}>
+                          Subbing for {event.substituteForTeam?.name || 'Team'}
+                        </h3>
+                        <p className="text-sm text-muted-foreground" data-testid={`text-substitute-time-${game.id}`}>
+                          {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
+                        </p>
+                        {game.venue && (
+                          <p className="text-xs text-muted-foreground" data-testid={`text-substitute-venue-${game.id}`}>
+                            {game.venue}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-full">
+                            Substitute
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               // Handle game events (existing logic)
               const game = event;
               const isCompleted = game.isCompleted || (game.homeScore !== null && game.awayScore !== null);
