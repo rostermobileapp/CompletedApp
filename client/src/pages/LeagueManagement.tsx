@@ -83,6 +83,7 @@ type LeagueMember = {
     lastName?: string;
     displayName?: string;
     email: string;
+    profileImageUrl?: string;
   };
 };
 
@@ -2469,61 +2470,58 @@ export default function LeagueManagement() {
                               });
                             }}
                           >
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{formatUserName(member.user, member)}</p>
-                              {!selectedTeam.isFreeAgents && member.userId === selectedTeam.captainId && (
-                                <Crown className="w-4 h-4 text-warning" />
-                              )}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {member.position && <p>Position: {member.position}</p>}
-                              {member.jerseyNumber && <p>Jersey: #{member.jerseyNumber}</p>}
+                            <div className="flex items-center gap-3">
+                              {/* Profile Picture */}
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                {member.user.profileImageUrl ? (
+                                  <img 
+                                    src={member.user.profileImageUrl} 
+                                    alt={formatUserName(member.user, member)}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-lg font-semibold text-primary">
+                                    {(member.displayFirstName || member.user.firstName || 'U')[0].toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{formatUserName(member.user, member)}</p>
+                                  {!selectedTeam.isFreeAgents && member.userId === selectedTeam.captainId && (
+                                    <span className="px-1.5 py-0.5 bg-warning/20 text-warning rounded text-xs font-bold">C</span>
+                                  )}
+                                  {member.isGoalie && (
+                                    <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-500 rounded text-xs font-bold">G</span>
+                                  )}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  <p>Position: {member.position || 'null'}</p>
+                                  <p>Jersey: {member.jerseyNumber ? `#${member.jerseyNumber}` : 'null'}</p>
+                                  <p>Skill: {member.skillLevel || 'null'}</p>
+                                </div>
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             {/* Captain Assignment Controls */}
-                            {!selectedTeam.isFreeAgents && (
-                              <div className="flex flex-col gap-1">
-                                {member.userId === selectedTeam.captainId ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setTeamCaptainMutation.mutate({
-                                        teamId: selectedTeam.id,
-                                        captainId: null
-                                      });
-                                    }}
-                                    disabled={setTeamCaptainMutation.isPending}
-                                    className="px-2 py-1 bg-warning/20 text-warning rounded text-xs font-medium hover:bg-warning/30 disabled:opacity-50"
-                                    data-testid={`button-remove-captain-${member.user.id}`}
-                                  >
-                                    Remove Captain
-                                  </button>
-                                ) : !selectedTeam.captainId ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setTeamCaptainMutation.mutate({
-                                        teamId: selectedTeam.id,
-                                        captainId: member.userId
-                                      });
-                                    }}
-                                    disabled={setTeamCaptainMutation.isPending}
-                                    className="px-2 py-1 bg-primary/20 text-primary rounded text-xs font-medium hover:bg-primary/30 disabled:opacity-50"
-                                    data-testid={`button-set-captain-${member.user.id}`}
-                                  >
-                                    Set Captain
-                                  </button>
-                                ) : null}
-                              </div>
+                            {!selectedTeam.isFreeAgents && !selectedTeam.captainId && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTeamCaptainMutation.mutate({
+                                    teamId: selectedTeam.id,
+                                    captainId: member.userId
+                                  });
+                                }}
+                                disabled={setTeamCaptainMutation.isPending}
+                                className="px-2 py-1 bg-primary/20 text-primary rounded text-xs font-medium hover:bg-primary/30 disabled:opacity-50"
+                                data-testid={`button-set-captain-${member.user.id}`}
+                              >
+                                Set Captain
+                              </button>
                             )}
-                            <div className="text-right">
-                              {member.skillLevel && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Skill: {member.skillLevel}
-                                </p>
-                              )}
-                            </div>
                           </div>
                         </div>
                       ))}
