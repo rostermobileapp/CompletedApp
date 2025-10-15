@@ -3381,11 +3381,24 @@ export class DatabaseStorage implements IStorage {
       const approvals = await this.getSubstitutionApprovals(request.id);
 
       if (game && originalPlayer && requestedByUser) {
+        // Fetch skill levels for players
+        const userIds = [originalPlayer.id];
+        if (substitutePlayer) {
+          userIds.push(substitutePlayer.id);
+        }
+        const skillMap = await this.fetchUserSkills(userIds, game.leagueId);
+
         result.push({
           ...request,
           game,
-          originalPlayer,
-          substitutePlayer,
+          originalPlayer: {
+            ...originalPlayer,
+            skillLevel: skillMap.get(originalPlayer.id) ?? null,
+          } as any,
+          substitutePlayer: substitutePlayer ? {
+            ...substitutePlayer,
+            skillLevel: skillMap.get(substitutePlayer.id) ?? null,
+          } as any : undefined,
           requestedByUser,
           requestingTeam,
           approvals: approvals.map(a => ({
