@@ -78,8 +78,10 @@ export default function Calendar() {
     queryKey: ["/api/users", "scrimmage-requests"],
   }) as { data: (ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[] };
 
-
-
+  // Fetch user's approved substitute requests (games they're subbing for)
+  const { data: mySubstitutions = [] } = useQuery({
+    queryKey: ["/api/substitute-requests/my-substitutions"],
+  });
 
   // Claim beverage duty mutation
   const claimBeverageDutyMutation = useMutation({
@@ -130,10 +132,21 @@ export default function Calendar() {
       }))
   ];
 
-  // Combine games and scrimmages, then sort chronologically
+  // Get user's substitute games (games they're subbing for)
+  const substituteGames = Array.isArray(mySubstitutions) 
+    ? mySubstitutions.map((sub: any) => ({
+        ...sub.game,
+        type: 'substitute' as const,
+        substituteForTeam: sub.requestingTeam,
+        scheduledAt: sub.game.scheduledAt,
+      }))
+    : [];
+
+  // Combine games, scrimmages, and substitute games, then sort chronologically
   const allEvents = [
     ...userGames.map((game: any) => ({ ...game, type: 'game' as const })),
-    ...userScrimmages
+    ...userScrimmages,
+    ...substituteGames
   ].sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
   // Find the index to scroll to (between last event and next event)
