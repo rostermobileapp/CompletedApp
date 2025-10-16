@@ -178,6 +178,29 @@ export default function Profile() {
     },
   });
 
+  // Delete team mutation (for team captains)
+  const deleteTeamMutation = useMutation({
+    mutationFn: async (teamId: string) => {
+      const response = await apiRequest('DELETE', `/api/teams/${teamId}`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: 'Team deleted',
+        description: data.message || 'Team has been permanently deleted'
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to delete team', 
+        description: error.message || 'Please try again.',
+        variant: 'destructive' 
+      });
+    },
+  });
+
   // Query for available leagues
   const { data: availableLeagues } = useQuery<any[]>({
     queryKey: ['/api/leagues'],
@@ -641,7 +664,9 @@ export default function Profile() {
             {userTeams.map((team: any) => {
               const isStandalone = !team.leagueId;
               const isTeamCreator = team.creatorId === user?.id;
+              const isCaptain = team.captainId === user?.id;
               const showJoinLeagueButton = isStandalone && isTeamCreator;
+              const showDeleteButton = isCaptain; // Captains can delete teams they manage
               
               return (
                 <div key={team.id} className="bg-card rounded-lg border border-border p-4" data-testid={`card-team-${team.id}`}>
@@ -664,31 +689,49 @@ export default function Profile() {
                       <AlertDialogTrigger asChild>
                         <button
                           className="px-3 py-1 text-sm text-destructive border border-destructive rounded-md hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
-                          disabled={leaveTeamMutation.isPending}
-                          data-testid={`button-leave-team-${team.id}`}
+                          disabled={showDeleteButton ? deleteTeamMutation.isPending : leaveTeamMutation.isPending}
+                          data-testid={showDeleteButton ? `button-delete-team-${team.id}` : `button-leave-team-${team.id}`}
                         >
-                          {leaveTeamMutation.isPending ? 'Leaving...' : 'Leave'}
+                          {showDeleteButton 
+                            ? (deleteTeamMutation.isPending ? 'Deleting...' : 'Delete') 
+                            : (leaveTeamMutation.isPending ? 'Leaving...' : 'Leave')
+                          }
                         </button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent data-testid={`dialog-leave-team-${team.id}`}>
+                      <AlertDialogContent data-testid={showDeleteButton ? `dialog-delete-team-${team.id}` : `dialog-leave-team-${team.id}`}>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Leave Team</AlertDialogTitle>
+                          <AlertDialogTitle>{showDeleteButton ? 'Delete Team' : 'Leave Team'}</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to leave "{team.name}"? This will:
-                            <br />• Remove you from the team roster
-                            <br />• Clear your game RSVPs for this team
-                            <br />• Remove your beverage duty assignments
-                            <br /><br />This action cannot be undone.
+                            {showDeleteButton ? (
+                              <>
+                                Are you sure you want to delete "{team.name}"? This will:
+                                <br />• Remove all team members
+                                <br />• Delete all team games and schedules
+                                <br />• Remove all team conversations and messages
+                                <br />• Delete all team-related data
+                                <br /><br />This action cannot be undone and will affect all team members.
+                              </>
+                            ) : (
+                              <>
+                                Are you sure you want to leave "{team.name}"? This will:
+                                <br />• Remove you from the team roster
+                                <br />• Clear your game RSVPs for this team
+                                <br />• Remove your beverage duty assignments
+                                <br /><br />This action cannot be undone.
+                              </>
+                            )}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel data-testid={`button-cancel-leave-team-${team.id}`}>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel data-testid={showDeleteButton ? `button-cancel-delete-team-${team.id}` : `button-cancel-leave-team-${team.id}`}>
+                            Cancel
+                          </AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => leaveTeamMutation.mutate(team.id)}
+                            onClick={() => showDeleteButton ? deleteTeamMutation.mutate(team.id) : leaveTeamMutation.mutate(team.id)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            data-testid={`button-confirm-leave-team-${team.id}`}
+                            data-testid={showDeleteButton ? `button-confirm-delete-team-${team.id}` : `button-confirm-leave-team-${team.id}`}
                           >
-                            Leave Team
+                            {showDeleteButton ? 'Delete Team' : 'Leave Team'}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

@@ -2234,6 +2234,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Team not found" });
       }
 
+      // Only team captains can delete the team
+      if (team.captainId !== userId) {
+        return res.status(403).json({ message: "Only team captains can delete the team" });
+      }
+
       await storage.deleteTeam(teamId);
       res.json({ message: "Team deleted successfully" });
     } catch (error) {
