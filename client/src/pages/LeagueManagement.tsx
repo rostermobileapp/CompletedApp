@@ -722,6 +722,16 @@ export default function LeagueManagement() {
     enabled: !!leagueId,
   });
 
+  // Fetch pending team join requests
+  const { data: teamJoinRequests = [], refetch: refetchTeamJoinRequests } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'team-join-requests'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/team-join-requests`);
+      return response.json();
+    },
+    enabled: !!leagueId,
+  });
+
   // Fetch teams
   const { data: teams = [], refetch: refetchTeams } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'teams'],
@@ -955,6 +965,37 @@ export default function LeagueManagement() {
     onSuccess: () => {
       toast({ title: 'Member rejected successfully' });
       refetchPending();
+    },
+  });
+
+  // Mutations for team join requests
+  const approveTeamJoinMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      const response = await apiRequest('POST', `/api/league-requests/${requestId}/approve`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ 
+        title: 'Team Approved', 
+        description: 'The team and all its members have been added to your league.' 
+      });
+      refetchTeamJoinRequests();
+      refetchTeams();
+      refetchMembers();
+    },
+  });
+
+  const rejectTeamJoinMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      const response = await apiRequest('POST', `/api/league-requests/${requestId}/reject`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ 
+        title: 'Request Rejected', 
+        description: 'The team join request has been rejected.' 
+      });
+      refetchTeamJoinRequests();
     },
   });
 
@@ -2136,6 +2177,62 @@ export default function LeagueManagement() {
                           <X className="w-3 h-3" />
                           Reject
                         </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Team Join Requests */}
+            {teamJoinRequests.length > 0 && (
+              <div className="bg-card rounded-xl border border-border p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Users className="w-5 h-5 text-warning" />
+                  <h3 className="text-lg font-semibold">Team Join Requests ({teamJoinRequests.length})</h3>
+                </div>
+                <div className="space-y-3">
+                  {teamJoinRequests.map((request: any) => (
+                    <div key={request.id} className="p-4 bg-background rounded-lg border" data-testid={`team-request-${request.id}`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="font-semibold text-lg" data-testid={`team-name-${request.id}`}>{request.team.name}</p>
+                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-500 text-xs rounded-full">
+                              {request.team.uniqueTeamId}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Users className="w-4 h-4" />
+                              <span>{request.team.memberCount || 0} players</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Crown className="w-4 h-4" />
+                              <span>Created by {request.requester.firstName} {request.requester.lastName}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => approveTeamJoinMutation.mutate(request.id)}
+                            disabled={approveTeamJoinMutation.isPending}
+                            className="flex items-center gap-1 px-3 py-1 bg-green-500/50 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                            data-testid={`button-approve-team-${request.id}`}
+                          >
+                            <Check className="w-3 h-3" />
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => rejectTeamJoinMutation.mutate(request.id)}
+                            disabled={rejectTeamJoinMutation.isPending}
+                            className="flex items-center gap-1 px-3 py-1 bg-red-500/50 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                            data-testid={`button-reject-team-${request.id}`}
+                          >
+                            <X className="w-3 h-3" />
+                            Reject
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

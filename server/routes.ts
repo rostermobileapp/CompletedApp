@@ -2400,6 +2400,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Alias route for frontend compatibility
+  app.get('/api/leagues/:leagueId/team-join-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify user is a commissioner of the league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      const user = await storage.getUser(userId);
+      const isCommissioner = user && (
+        user.role === 'commissioner' || 
+        user.role === 'secondary_commissioner' || 
+        user.specialPermissions?.includes('admin')
+      );
+
+      if (!isCommissioner && league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only league commissioners can view team requests' });
+      }
+
+      // Get pending team join requests
+      const requests = await storage.getTeamLeagueRequests({ 
+        leagueId, 
+        status: 'pending'
+      });
+      
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching league team join requests:', error);
+      res.status(500).json({ message: 'Failed to fetch league team join requests' });
+    }
+  });
+
   app.post('/api/team-league-requests/:requestId/approve', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -2444,6 +2480,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/team-league-requests/:requestId/reject', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { requestId } = req.params;
+
+      // Get the request to verify the league
+      const allRequests = await storage.getTeamLeagueRequests({});
+      const theRequest = allRequests.find((r: any) => r.id === requestId);
+      
+      if (!theRequest) {
+        return res.status(404).json({ message: 'Request not found' });
+      }
+
+      // Verify user is a commissioner of the league
+      const league = await storage.getLeague(theRequest.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      const user = await storage.getUser(userId);
+      const isCommissioner = user && (
+        user.role === 'commissioner' || 
+        user.role === 'secondary_commissioner' || 
+        user.specialPermissions?.includes('admin')
+      );
+
+      if (!isCommissioner && league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only league commissioners can reject team requests' });
+      }
+
+      const rejectedRequest = await storage.rejectTeamJoinLeague(requestId, userId);
+      res.json(rejectedRequest);
+    } catch (error) {
+      console.error('Error rejecting team league request:', error);
+      res.status(500).json({ message: 'Failed to reject team league request' });
+    }
+  });
+
+  // Alias routes for frontend compatibility
+  app.post('/api/league-requests/:requestId/approve', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { requestId } = req.params;
+
+      // Get the request to verify the league
+      const allRequests = await storage.getTeamLeagueRequests({});
+      const theRequest = allRequests.find((r: any) => r.id === requestId);
+      
+      if (!theRequest) {
+        return res.status(404).json({ message: 'Request not found' });
+      }
+
+      // Verify user is a commissioner of the league
+      const league = await storage.getLeague(theRequest.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      const user = await storage.getUser(userId);
+      const isCommissioner = user && (
+        user.role === 'commissioner' || 
+        user.role === 'secondary_commissioner' || 
+        user.specialPermissions?.includes('admin')
+      );
+
+      if (!isCommissioner && league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only league commissioners can approve team requests' });
+      }
+
+      const approvedRequest = await storage.approveTeamJoinLeague(requestId, userId);
+      res.json(approvedRequest);
+    } catch (error) {
+      console.error('Error approving team league request:', error);
+      res.status(500).json({ message: 'Failed to approve team league request' });
+    }
+  });
+
+  app.post('/api/league-requests/:requestId/reject', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { requestId } = req.params;
