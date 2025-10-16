@@ -737,11 +737,28 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
-  // Unified selection state - can be team or league
-  const [selectedType, setSelectedType] = useState<'team' | 'league'>('league');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Unified selection state - can be team or league (with localStorage persistence)
+  const [selectedType, setSelectedType] = useState<'team' | 'league'>(() => {
+    const saved = localStorage.getItem('dashboardSelectedType');
+    return (saved === 'team' || saved === 'league') ? saved : 'league';
+  });
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    return localStorage.getItem('dashboardSelectedId') || null;
+  });
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  
+  // Save selection to localStorage whenever it changes
+  React.useEffect(() => {
+    if (selectedType) {
+      localStorage.setItem('dashboardSelectedType', selectedType);
+    }
+    if (selectedId) {
+      localStorage.setItem('dashboardSelectedId', selectedId);
+    } else {
+      localStorage.removeItem('dashboardSelectedId');
+    }
+  }, [selectedType, selectedId]);
   
   // Backward compatibility
   const selectedLeagueId = selectedType === 'league' ? selectedId : null;
@@ -862,7 +879,33 @@ export default function Dashboard() {
   });
   
   // Set default selection - prefer team first, then league
+  // Also validate that saved selection still exists
   React.useEffect(() => {
+    // Wait for data to load before validating or setting defaults
+    if (userTeamsAll === undefined || userLeagues === undefined) {
+      return;
+    }
+    
+    // Validate saved selection
+    if (selectedId && selectedType === 'team') {
+      const teamExists = Array.isArray(userTeamsAll) && userTeamsAll.some(team => team.id === selectedId);
+      if (!teamExists) {
+        // Saved team no longer exists, reset
+        setSelectedId(null);
+        return;
+      }
+    }
+    
+    if (selectedId && selectedType === 'league') {
+      const leagueExists = Array.isArray(userLeagues) && userLeagues.some(league => league.id === selectedId);
+      if (!leagueExists) {
+        // Saved league no longer exists, reset
+        setSelectedId(null);
+        return;
+      }
+    }
+    
+    // Set default selection if none exists
     if (!selectedId) {
       // First try to select a team
       if (Array.isArray(userTeamsAll) && userTeamsAll.length > 0) {
@@ -875,7 +918,7 @@ export default function Dashboard() {
         setSelectedId(userLeagues[0].id);
       }
     }
-  }, [userTeamsAll, userLeagues, selectedId]);
+  }, [userTeamsAll, userLeagues, selectedId, selectedType]);
   
   // Close dropdown when clicking outside
   React.useEffect(() => {
