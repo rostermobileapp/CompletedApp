@@ -768,21 +768,44 @@ export default function Dashboard() {
   const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
     select: (games) => {
-      // Filter games by selected league if available
-      if (!selectedLeagueId || !Array.isArray(games)) return games;
-      return games.filter(game => 
-        game.homeTeam?.leagueId === selectedLeagueId || 
-        game.awayTeam?.leagueId === selectedLeagueId
-      );
+      if (!Array.isArray(games)) return games;
+      
+      // Filter by team if team is selected
+      if (selectedType === 'team' && selectedId) {
+        return games.filter(game => 
+          game.homeTeamId === selectedId || 
+          game.awayTeamId === selectedId
+        );
+      }
+      
+      // Filter by league if league is selected
+      if (selectedType === 'league' && selectedLeagueId) {
+        return games.filter(game => 
+          game.homeTeam?.leagueId === selectedLeagueId || 
+          game.awayTeam?.leagueId === selectedLeagueId
+        );
+      }
+      
+      return games;
     }
   });
 
   const { data: scrimmageInvites, isLoading: invitesLoading } = useQuery({
     queryKey: ['/api/users/scrimmage-invites'],
     select: (invites) => {
-      // Filter invites by selected league if available
-      if (!selectedLeagueId || !Array.isArray(invites)) return invites;
-      return invites.filter((invite: any) => invite.leagueId === selectedLeagueId);
+      if (!Array.isArray(invites)) return invites;
+      
+      // Filter by team if team is selected
+      if (selectedType === 'team' && selectedId) {
+        return invites.filter((invite: any) => invite.teamId === selectedId);
+      }
+      
+      // Filter by league if league is selected
+      if (selectedType === 'league' && selectedLeagueId) {
+        return invites.filter((invite: any) => invite.leagueId === selectedLeagueId);
+      }
+      
+      return invites;
     }
   });
 
@@ -791,10 +814,17 @@ export default function Dashboard() {
     queryKey: ['/api/users/scrimmage-requests'],
     select: (requests) => {
       if (!Array.isArray(requests)) return [];
-      // Filter by selected league if available
-      if (selectedLeagueId) {
+      
+      // Filter by team if team is selected
+      if (selectedType === 'team' && selectedId) {
+        return requests.filter((request: any) => request.teamId === selectedId);
+      }
+      
+      // Filter by league if league is selected
+      if (selectedType === 'league' && selectedLeagueId) {
         return requests.filter((request: any) => request.scrimmage?.leagueId === selectedLeagueId);
       }
+      
       return requests;
     }
   });
@@ -802,9 +832,19 @@ export default function Dashboard() {
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
     select: (teams) => {
-      // Filter teams by selected league if available
-      if (!selectedLeagueId || !Array.isArray(teams)) return teams;
-      return teams.filter(team => team.leagueId === selectedLeagueId);
+      if (!Array.isArray(teams)) return teams;
+      
+      // Filter by team if team is selected (show only selected team)
+      if (selectedType === 'team' && selectedId) {
+        return teams.filter(team => team.id === selectedId);
+      }
+      
+      // Filter by league if league is selected
+      if (selectedType === 'league' && selectedLeagueId) {
+        return teams.filter(team => team.leagueId === selectedLeagueId);
+      }
+      
+      return teams;
     }
   });
   
@@ -1253,22 +1293,36 @@ export default function Dashboard() {
       {/* 3-Card Section */}
       <div className="px-6 mb-6">
         <div className="grid grid-cols-3 gap-3">
-          {/* Announcements Card */}
-          <Link href="/announcements">
-            <div className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" data-testid="card-announcements">
-              <div className="h-full flex flex-col items-center justify-center">
-                <Megaphone className="w-8 h-8 text-orange-500 mb-3" />
-                <p className="text-xs font-medium">News</p>
-              </div>
-              <AnnouncementBadge leagueId={selectedLeagueId} />
+          {/* Announcements Card - Only active for leagues */}
+          <div 
+            className={`rounded-xl border border-border p-5 min-h-[72px] relative transition-colors bg-[#212121] ${
+              selectedType === 'league' && selectedLeagueId 
+                ? 'cursor-pointer hover:bg-muted/50' 
+                : 'opacity-50 cursor-not-allowed'
+            }`}
+            data-testid="card-announcements"
+            onClick={() => selectedType === 'league' && selectedLeagueId && navigate('/announcements')}
+          >
+            <div className="h-full flex flex-col items-center justify-center">
+              <Megaphone className="w-8 h-8 text-orange-500 mb-3" />
+              <p className="text-xs font-medium">News</p>
             </div>
-          </Link>
+            {selectedType === 'league' && <AnnouncementBadge leagueId={selectedLeagueId} />}
+          </div>
 
           {/* Stats Card */}
           <div 
             className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" 
             data-testid="card-stats"
-            onClick={() => navigate(selectedLeagueId ? `/stats?league=${selectedLeagueId}` : '/stats')}
+            onClick={() => {
+              if (selectedType === 'team' && selectedId) {
+                navigate(`/stats?team=${selectedId}`);
+              } else if (selectedType === 'league' && selectedLeagueId) {
+                navigate(`/stats?league=${selectedLeagueId}`);
+              } else {
+                navigate('/stats');
+              }
+            }}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <BarChart3 className="w-8 h-8 text-purple-500 mb-3" />
@@ -1276,11 +1330,15 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Standings Card */}
+          {/* Standings Card - Only active for leagues */}
           <div 
-            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" 
+            className={`rounded-xl border border-border p-5 min-h-[72px] transition-colors bg-[#212121] ${
+              selectedType === 'league' && selectedLeagueId 
+                ? 'cursor-pointer hover:bg-muted/50' 
+                : 'opacity-50 cursor-not-allowed'
+            }`}
             data-testid="card-standings"
-            onClick={() => selectedLeagueId && setShowStandingsModal(true)}
+            onClick={() => selectedType === 'league' && selectedLeagueId && setShowStandingsModal(true)}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <Award className="w-8 h-8 text-blue-500 mb-3" />
@@ -1316,7 +1374,7 @@ export default function Dashboard() {
               </div>
             </div>
             
-            {selectedLeagueId && needsAttentionData && (
+            {selectedType === 'league' && selectedLeagueId && needsAttentionData && (
               <div className="rounded-xl border border-border bg-[#212121]">
                 <button
                   onClick={() => setShowNeedsAttentionModal(true)}
@@ -1339,8 +1397,8 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* Needs Attention Section */}
-      {selectedLeagueId && (
+      {/* Needs Attention Section - Only show for leagues */}
+      {selectedType === 'league' && selectedLeagueId && (
         <NeedsAttentionTasks 
           leagueId={selectedLeagueId} 
           onNavigate={navigate}
