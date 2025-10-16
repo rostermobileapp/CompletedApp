@@ -4,6 +4,17 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 # Recent Changes
 
+## October 16, 2025 - Standalone Team Creation with League Migration
+Implemented a complete standalone team system that allows users to create and manage teams independently of leagues, with the ability to migrate entire teams into leagues:
+- **Standalone Team Creation**: Users can create teams without being part of a league via "Create a Team" menu option
+- **Unique Team IDs**: Each team gets a unique 6-character alphanumeric ID in ABC123 format (3 letters + 3 numbers) for easy identification and sharing
+- **CSV Player Import**: Team creators can bulk import players using CSV format (Name, Email) directly on the team creation page
+- **Team-to-League Requests**: Team creators can request to join their entire team to a league with all members
+- **Commissioner Approval Flow**: League commissioners see pending team join requests in League Management and can approve/reject them
+- **Automatic Member Migration**: When approved, the team's leagueId is updated and all team members automatically become league members
+- **Profile Integration**: Teams display in Profile page "Your Teams" section with status indicators (Standalone/Part of a league) and request-to-join functionality
+- Backend includes: `generateUniqueTeamId` helper, storage methods (`createStandaloneTeam`, `importTeamPlayers`, `requestTeamJoinLeague`, `approveTeamJoinLeague`, `rejectTeamJoinLeague`), and API routes for complete team lifecycle management
+
 ## October 16, 2025 - Profile "Your Teams" Section with Leave Functionality
 Added a "Your Teams" section to the Profile page that allows users to view and leave their team memberships:
 - **Teams Display**: Shows all teams the user is a member of (both direct team memberships and league-assigned teams)
