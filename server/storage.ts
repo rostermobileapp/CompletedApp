@@ -226,12 +226,21 @@ export interface IStorage {
   
   // Team operations
   createTeam(team: InsertTeam): Promise<Team>;
+  createStandaloneTeam(teamName: string, creatorId: string): Promise<Team>;
   getTeamsByLeague(leagueId: string): Promise<Team[]>;
   getTeam(id: string): Promise<Team | undefined>;
+  getTeamByUniqueId(uniqueTeamId: string): Promise<Team | undefined>;
   getUserTeams(userId: string): Promise<Team[]>;
   updateTeam(id: string, data: Partial<Pick<Team, 'name'>>): Promise<Team>;
   updateTeamLogo(id: string, logoUrl: string): Promise<Team>;
   setTeamCaptain(teamId: string, captainId: string | null): Promise<Team>;
+  importTeamPlayers(teamId: string, csvData: any[]): Promise<{ successCount: number; failedCount: number; createdMemberships: TeamMembership[] }>;
+  
+  // Team-to-league join requests
+  requestTeamJoinLeague(teamId: string, leagueId: string, requestedBy: string): Promise<TeamLeagueRequest>;
+  getTeamLeagueRequests(options: { teamId?: string; leagueId?: string; status?: string }): Promise<(TeamLeagueRequest & { team: Team; league: League; requester: User })[]>;
+  approveTeamJoinLeague(requestId: string, approverId: string): Promise<TeamLeagueRequest>;
+  rejectTeamJoinLeague(requestId: string, approverId: string): Promise<TeamLeagueRequest>;
   
   // Membership operations
   requestLeagueMembership(membership: InsertLeagueMembership): Promise<LeagueMembership>;
@@ -1388,6 +1397,231 @@ export class DatabaseStorage implements IStorage {
       .where(eq(teams.id, id))
       .returning();
     return team;
+  }
+
+  async createStandaloneTeam(teamName: string, creatorId: string): Promise<Team> {
+    const uniqueTeamId = await generateUniqueTeamId();
+    
+    const [newTeam] = await db
+      .insert(teams)
+      .values({
+        name: teamName,
+        uniqueTeamId,
+        creatorId,
+        leagueId: null, // Standalone team has no league
+        captainId: creatorId, // Creator is also the captain
+      })
+      .returning();
+    
+    // Automatically add creator as approved team member
+    await db.insert(teamMemberships).values({
+      userId: creatorId,
+      teamId: newTeam.id,
+      status: 'approved',
+      approvedBy: creatorId,
+    });
+    
+    return newTeam;
+  }
+
+  async getTeamByUniqueId(uniqueTeamId: string): Promise<Team | undefined> {
+    const [team] = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.uniqueTeamId, uniqueTeamId));
+    return team;
+  }
+
+  async importTeamPlayers(
+    teamId: string,
+    csvData: any[]
+  ): Promise<{ successCount: number; failedCount: number; createdMemberships: TeamMembership[] }> {
+    let successCount = 0;
+    let failedCount = 0;
+    const createdMemberships: TeamMembership[] = [];
+
+    for (const row of csvData) {
+      try {
+        const firstName = row.firstName || row['First Name'] || row.first_name;
+        const lastName = row.lastName || row['Last Name'] || row.last_name;
+        const email = row.email || row.Email;
+        const jerseyNumber = row.jerseyNumber || row['Jersey Number'] || row.jersey_number;
+        const position = row.position || row.Position;
+
+        if (!firstName || !lastName) {
+          failedCount++;
+          continue;
+        }
+
+        // Check if user exists by email
+        let user = email ? await this.getUserByEmail(email) : null;
+        
+        if (user) {
+          // User exists, create team membership
+          const [membership] = await db
+            .insert(teamMemberships)
+            .values({
+              userId: user.id,
+              teamId,
+              position: position || null,
+              jerseyNumber: jerseyNumber ? parseInt(jerseyNumber) : null,
+              status: 'pending', // Requires team captain approval
+            })
+            .returning();
+          createdMemberships.push(membership);
+          successCount++;
+        } else {
+          // User doesn't exist - skip for now (could create placeholder in future)
+          failedCount++;
+        }
+      } catch (error) {
+        console.error('Error importing player:', error);
+        failedCount++;
+      }
+    }
+
+    return { successCount, failedCount, createdMemberships };
+  }
+
+  async requestTeamJoinLeague(
+    teamId: string,
+    leagueId: string,
+    requestedBy: string
+  ): Promise<TeamLeagueRequest> {
+    const [request] = await db
+      .insert(teamLeagueRequests)
+      .values({
+        teamId,
+        leagueId,
+        requestedBy,
+        status: 'pending',
+      })
+      .returning();
+    return request;
+  }
+
+  async getTeamLeagueRequests(options: {
+    teamId?: string;
+    leagueId?: string;
+    status?: string;
+  }): Promise<(TeamLeagueRequest & { team: Team; league: League; requester: User })[]> {
+    const conditions = [];
+    
+    if (options.teamId) {
+      conditions.push(eq(teamLeagueRequests.teamId, options.teamId));
+    }
+    if (options.leagueId) {
+      conditions.push(eq(teamLeagueRequests.leagueId, options.leagueId));
+    }
+    if (options.status) {
+      conditions.push(eq(teamLeagueRequests.status, options.status as any));
+    }
+
+    const results = await db
+      .select({
+        request: teamLeagueRequests,
+        team: teams,
+        league: leagues,
+        requester: users,
+      })
+      .from(teamLeagueRequests)
+      .innerJoin(teams, eq(teamLeagueRequests.teamId, teams.id))
+      .innerJoin(leagues, eq(teamLeagueRequests.leagueId, leagues.id))
+      .innerJoin(users, eq(teamLeagueRequests.requestedBy, users.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    return results.map(r => ({
+      ...r.request,
+      team: r.team,
+      league: r.league,
+      requester: r.requester,
+    }));
+  }
+
+  async approveTeamJoinLeague(requestId: string, approverId: string): Promise<TeamLeagueRequest> {
+    return await db.transaction(async (tx) => {
+      // Get the request details
+      const [request] = await tx
+        .select()
+        .from(teamLeagueRequests)
+        .where(eq(teamLeagueRequests.id, requestId));
+
+      if (!request) {
+        throw new Error('Team league request not found');
+      }
+
+      // Update the request to approved
+      const [approvedRequest] = await tx
+        .update(teamLeagueRequests)
+        .set({
+          status: 'approved',
+          approvedAt: new Date(),
+          approvedBy: approverId,
+        })
+        .where(eq(teamLeagueRequests.id, requestId))
+        .returning();
+
+      // Update the team to be part of the league
+      await tx
+        .update(teams)
+        .set({
+          leagueId: request.leagueId,
+          updatedAt: new Date(),
+        })
+        .where(eq(teams.id, request.teamId));
+
+      // Get all approved team members
+      const teamMembers = await tx
+        .select()
+        .from(teamMemberships)
+        .where(
+          and(
+            eq(teamMemberships.teamId, request.teamId),
+            eq(teamMemberships.status, 'approved')
+          )
+        );
+
+      // Create league memberships for all team members
+      for (const member of teamMembers) {
+        // Check if league membership already exists
+        const [existingMembership] = await tx
+          .select()
+          .from(leagueMemberships)
+          .where(
+            and(
+              eq(leagueMemberships.userId, member.userId),
+              eq(leagueMemberships.leagueId, request.leagueId)
+            )
+          );
+
+        if (!existingMembership) {
+          await tx.insert(leagueMemberships).values({
+            userId: member.userId,
+            leagueId: request.leagueId,
+            assignedTeamId: request.teamId,
+            status: 'approved',
+            approvedBy: approverId,
+            approvedAt: new Date(),
+          });
+        }
+      }
+
+      return approvedRequest;
+    });
+  }
+
+  async rejectTeamJoinLeague(requestId: string, approverId: string): Promise<TeamLeagueRequest> {
+    const [rejectedRequest] = await db
+      .update(teamLeagueRequests)
+      .set({
+        status: 'rejected',
+        rejectedAt: new Date(),
+        approvedBy: approverId, // Track who rejected it
+      })
+      .where(eq(teamLeagueRequests.id, requestId))
+      .returning();
+
+    return rejectedRequest;
   }
 
   // Membership operations
