@@ -190,9 +190,11 @@ export const seasons = pgTable("seasons", {
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
-  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  uniqueTeamId: varchar("unique_team_id").unique(), // ABC123 format for standalone teams to be searchable
+  leagueId: varchar("league_id").references(() => leagues.id), // Made nullable for standalone teams
   seasonId: varchar("season_id").references(() => seasons.id), // Made nullable for safe migration
   captainId: varchar("captain_id").references(() => users.id),
+  creatorId: varchar("creator_id").references(() => users.id), // Track who created the team
   logoUrl: varchar("logo_url"),
   wins: integer("wins").default(0).notNull(),
   losses: integer("losses").default(0).notNull(),
@@ -241,6 +243,24 @@ export const teamMemberships = pgTable("team_memberships", {
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   approvedBy: varchar("approved_by").references(() => users.id),
 });
+
+// Team-to-league join requests table
+export const teamLeagueRequests = pgTable("team_league_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  requestedBy: varchar("requested_by").references(() => users.id).notNull(), // Team creator who made the request
+  status: membershipStatusEnum("status").default("pending").notNull(),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  approvedAt: timestamp("approved_at"),
+  approvedBy: varchar("approved_by").references(() => users.id), // League commissioner who approved
+  rejectedAt: timestamp("rejected_at"),
+}, (table) => [
+  unique("unique_team_league_request").on(table.teamId, table.leagueId),
+  index("idx_team_league_requests_team").on(table.teamId),
+  index("idx_team_league_requests_league").on(table.leagueId),
+  index("idx_team_league_requests_status").on(table.status),
+]);
 
 // Games table
 export const games = pgTable("games", {
@@ -1593,6 +1613,14 @@ export const insertTeamMembershipSchema = createInsertSchema(teamMemberships).om
   approvedBy: true,
 });
 
+export const insertTeamLeagueRequestSchema = createInsertSchema(teamLeagueRequests).omit({
+  id: true,
+  requestedAt: true,
+  approvedAt: true,
+  approvedBy: true,
+  rejectedAt: true,
+});
+
 export const insertGameSchema = createInsertSchema(games).omit({
   id: true,
   createdAt: true,
@@ -2064,6 +2092,8 @@ export type LeagueMembership = typeof leagueMemberships.$inferSelect;
 export type InsertLeagueMembership = z.infer<typeof insertLeagueMembershipSchema>;
 export type TeamMembership = typeof teamMemberships.$inferSelect;
 export type InsertTeamMembership = z.infer<typeof insertTeamMembershipSchema>;
+export type TeamLeagueRequest = typeof teamLeagueRequests.$inferSelect;
+export type InsertTeamLeagueRequest = z.infer<typeof insertTeamLeagueRequestSchema>;
 export type Game = typeof games.$inferSelect;
 export type InsertGame = z.infer<typeof insertGameSchema>;
 export type GameScoreSubmission = typeof gameScoreSubmissions.$inferSelect;
