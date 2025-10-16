@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Menu, Calendar, Settings, Plus, Crown, DollarSign, X } from 'lucide-react';
+import { Menu, Calendar, Settings, Plus, Crown, DollarSign, Users, X } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 
@@ -33,6 +33,15 @@ export function SlideOutMenu() {
       requiredTier: 'PRO',
       bgColor: 'bg-purple-500/20',
       iconColor: 'text-purple-500',
+    },
+    {
+      icon: Users,
+      label: 'Create a Team',
+      path: '/create-team',
+      locked: false,
+      requiredTier: null,
+      bgColor: 'bg-cyan-500/20',
+      iconColor: 'text-cyan-500',
     },
     {
       icon: Plus,
