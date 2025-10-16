@@ -2,13 +2,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format, isBefore, isAfter, addHours } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, ArrowLeft, Check, X, Clock, Users } from "lucide-react";
+import { Trophy, ArrowLeft, Check, X, Clock, Users, Plus } from "lucide-react";
 import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPStatusIcon } from "@/components/RSVPStatusIcon";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
@@ -17,6 +25,20 @@ import { ScrimmageRSVPButtons } from "@/components/ScrimmageRSVPButtons";
 import { ScrimmageRSVPStatusIcon } from "@/components/ScrimmageRSVPStatusIcon";
 import { useDashboardSelection } from "@/hooks/useDashboardSelection";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
+
+const personalReminderSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  scheduledAt: z.string().min(1, "Date and time are required"),
+});
+
+const teamGameSchema = z.object({
+  teamId: z.string().min(1, "Team is required"),
+  opponentName: z.string().min(1, "Opponent name is required"),
+  scheduledAt: z.string().min(1, "Date and time are required"),
+  venue: z.string().optional(),
+  notes: z.string().optional(),
+});
 
 export default function Calendar() {
   const { user } = useAuth();
@@ -32,6 +54,10 @@ export default function Calendar() {
   const [selectedGameId, setSelectedGameId] = useState<string>("");
   const [selectedGameData, setSelectedGameData] = useState<any>(null);
   const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string; teamId?: string } | null>(null);
+  
+  // Add event dialog state
+  const [showAddEventDialog, setShowAddEventDialog] = useState(false);
+  const [eventType, setEventType] = useState<'reminder' | 'game' | null>(null);
 
   // Handler functions for modal interactions
   const handleViewDetails = (game: any) => {
@@ -95,6 +121,11 @@ export default function Calendar() {
     queryKey: ["/api/substitute-requests/my-substitutions"],
   });
 
+  // Fetch user's personal reminders
+  const { data: personalReminders = [] } = useQuery({
+    queryKey: ["/api/personal-reminders"],
+  });
+
   // Claim beverage duty mutation
   const claimBeverageDutyMutation = useMutation({
     mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
@@ -111,6 +142,84 @@ export default function Calendar() {
       toast({
         title: "Error",
         description: "Failed to claim beverage duty. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Personal reminder form
+  const reminderForm = useForm<z.infer<typeof personalReminderSchema>>({
+    resolver: zodResolver(personalReminderSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      scheduledAt: "",
+    },
+  });
+
+  // Team game form
+  const gameForm = useForm<z.infer<typeof teamGameSchema>>({
+    resolver: zodResolver(teamGameSchema),
+    defaultValues: {
+      teamId: "",
+      opponentName: "",
+      scheduledAt: "",
+      venue: "",
+      notes: "",
+    },
+  });
+
+  // Create personal reminder mutation
+  const createReminderMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof personalReminderSchema>) => {
+      await apiRequest("POST", "/api/personal-reminders", {
+        ...data,
+        scheduledAt: new Date(data.scheduledAt).toISOString(),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/personal-reminders"] });
+      toast({
+        title: "Reminder Created",
+        description: "Your personal reminder has been added to your calendar.",
+      });
+      setEventType(null);
+      reminderForm.reset();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create reminder. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create team game mutation
+  const createGameMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof teamGameSchema>) => {
+      await apiRequest("POST", "/api/games", {
+        homeTeamId: data.teamId,
+        awayTeamId: null, // Create placeholder for opponent
+        scheduledAt: new Date(data.scheduledAt).toISOString(),
+        venue: data.venue || null,
+        notes: data.notes || null,
+        opponentName: data.opponentName,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/games/all"] });
+      toast({
+        title: "Game Created",
+        description: "Your team game has been added to your calendar.",
+      });
+      setEventType(null);
+      gameForm.reset();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create game. Please try again.",
         variant: "destructive",
       });
     },
@@ -177,11 +286,12 @@ export default function Calendar() {
         })
     : [];
 
-  // Combine games, scrimmages, and substitute games, then sort chronologically
+  // Combine games, scrimmages, personal reminders, and substitute games, then sort chronologically
   const allEvents = [
     ...userGames.map((game: any) => ({ ...game, type: 'game' as const })),
     ...userScrimmages,
-    ...substituteGames
+    ...substituteGames,
+    ...(Array.isArray(personalReminders) ? personalReminders.map((reminder: any) => ({ ...reminder, type: 'reminder' as const })) : [])
   ].sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
   // Find the index to scroll to (between last event and next event)
@@ -208,22 +318,31 @@ export default function Calendar() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate("/");
+              }}
+              className="p-2"
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-xl font-semibold" data-testid="text-calendar-title">
+              Schedule & Results
+            </h1>
+          </div>
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setPageTransitionDirection('down');
-              navigate("/");
-            }}
-            className="p-2"
-            data-testid="button-back-to-dashboard"
+            onClick={() => setShowAddEventDialog(true)}
+            className="w-10 h-10 p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
+            data-testid="button-add-event"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <Plus className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl font-semibold" data-testid="text-calendar-title">
-            Schedule & Results
-          </h1>
         </div>
       </div>
 
@@ -287,6 +406,41 @@ export default function Calendar() {
                             className="mb-1"
                           />
                         )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Handle personal reminders
+              if (event.type === 'reminder') {
+                return (
+                  <div 
+                    key={`reminder-${event.id}`}
+                    className="bg-card rounded-xl border border-green-200 dark:border-green-800 p-4 relative" 
+                    data-testid={`card-reminder-${event.id}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center relative">
+                        <Clock className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold" data-testid={`text-reminder-title-${event.id}`}>
+                          {event.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground" data-testid={`text-reminder-time-${event.id}`}>
+                          {format(new Date(event.scheduledAt), 'MMM d • h:mm a')}
+                        </p>
+                        {event.description && (
+                          <p className="text-xs text-muted-foreground mt-1" data-testid={`text-reminder-description-${event.id}`}>
+                            {event.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-1 rounded-full">
+                            Reminder
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -513,6 +667,220 @@ export default function Calendar() {
           onClose={handleCloseSubstituteModal}
         />
       )}
+
+      {/* Add Event Dialog */}
+      <Dialog open={showAddEventDialog} onOpenChange={setShowAddEventDialog}>
+        <DialogContent className="sm:max-w-[425px]" data-testid="dialog-add-event">
+          <DialogHeader>
+            <DialogTitle data-testid="text-add-event-title">Add Event</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <Button
+              onClick={() => {
+                setEventType('reminder');
+                setShowAddEventDialog(false);
+              }}
+              variant="outline"
+              className="w-full h-auto py-4 px-6 justify-start text-left"
+              data-testid="button-select-reminder"
+            >
+              <div>
+                <div className="font-semibold">Personal Reminder</div>
+                <div className="text-sm text-muted-foreground">Add a personal note or reminder to your calendar</div>
+              </div>
+            </Button>
+            <Button
+              onClick={() => {
+                setEventType('game');
+                setShowAddEventDialog(false);
+              }}
+              variant="outline"
+              className="w-full h-auto py-4 px-6 justify-start text-left"
+              data-testid="button-select-game"
+            >
+              <div>
+                <div className="font-semibold">Team Game</div>
+                <div className="text-sm text-muted-foreground">Schedule a game for your team</div>
+              </div>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Personal Reminder Form Dialog */}
+      <Dialog open={eventType === 'reminder'} onOpenChange={(open) => !open && setEventType(null)}>
+        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-reminder">
+          <DialogHeader>
+            <DialogTitle data-testid="text-create-reminder-title">Create Personal Reminder</DialogTitle>
+          </DialogHeader>
+          <Form {...reminderForm}>
+            <form onSubmit={reminderForm.handleSubmit((data) => createReminderMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={reminderForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Reminder title" {...field} data-testid="input-reminder-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={reminderForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Add more details..." {...field} data-testid="input-reminder-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={reminderForm.control}
+                name="scheduledAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date & Time</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} data-testid="input-reminder-datetime" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEventType(null)}
+                  data-testid="button-cancel-reminder"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createReminderMutation.isPending}
+                  data-testid="button-submit-reminder"
+                >
+                  {createReminderMutation.isPending ? "Creating..." : "Create Reminder"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Team Game Form Dialog */}
+      <Dialog open={eventType === 'game'} onOpenChange={(open) => !open && setEventType(null)}>
+        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-game">
+          <DialogHeader>
+            <DialogTitle data-testid="text-create-game-title">Create Team Game</DialogTitle>
+          </DialogHeader>
+          <Form {...gameForm}>
+            <form onSubmit={gameForm.handleSubmit((data) => createGameMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={gameForm.control}
+                name="teamId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Team</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-game-team">
+                          <SelectValue placeholder="Select your team" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Array.isArray(userTeams) && userTeams.map((team: any) => (
+                          <SelectItem key={team.id} value={team.id} data-testid={`option-team-${team.id}`}>
+                            {team.leagueId && team.league ? `${team.league.name}: ${team.name}` : team.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={gameForm.control}
+                name="opponentName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Opponent Team</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Opponent team name" {...field} data-testid="input-game-opponent" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={gameForm.control}
+                name="scheduledAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date & Time</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} data-testid="input-game-datetime" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={gameForm.control}
+                name="venue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Venue (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Game location" {...field} data-testid="input-game-venue" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={gameForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Additional notes..." {...field} data-testid="input-game-notes" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEventType(null)}
+                  data-testid="button-cancel-game"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createGameMutation.isPending}
+                  data-testid="button-submit-game"
+                >
+                  {createGameMutation.isPending ? "Creating..." : "Create Game"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

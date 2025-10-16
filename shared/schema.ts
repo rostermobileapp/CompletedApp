@@ -282,7 +282,8 @@ export const games = pgTable("games", {
   leagueId: varchar("league_id").references(() => leagues.id), // Made nullable for standalone team games
   seasonId: varchar("season_id").references(() => seasons.id), // Made nullable for safe migration
   homeTeamId: varchar("home_team_id").references(() => teams.id).notNull(),
-  awayTeamId: varchar("away_team_id").references(() => teams.id).notNull(),
+  awayTeamId: varchar("away_team_id").references(() => teams.id), // Made nullable for standalone team games
+  opponentName: varchar("opponent_name"), // Name of opponent when awayTeamId is null
   scheduledAt: timestamp("scheduled_at").notNull(),
   venue: varchar("venue"),
   lockerRoom: varchar("locker_room"),
