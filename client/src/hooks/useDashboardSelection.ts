@@ -51,10 +51,29 @@ export function useDashboardSelection() {
   const selectedTeamId = selectedType === 'team' ? selectedId : null;
   const selectedLeagueId = selectedType === 'league' ? selectedId : null;
 
+  // Setter functions to update the selection
+  const setTeamSelection = (teamId: string) => {
+    localStorage.setItem('dashboardSelectedType', 'team');
+    localStorage.setItem('dashboardSelectedId', teamId);
+    setSelectedType('team');
+    setSelectedId(teamId);
+    notifyDashboardSelectionChange();
+  };
+
+  const setLeagueSelection = (leagueId: string) => {
+    localStorage.setItem('dashboardSelectedType', 'league');
+    localStorage.setItem('dashboardSelectedId', leagueId);
+    setSelectedType('league');
+    setSelectedId(leagueId);
+    notifyDashboardSelectionChange();
+  };
+
   return {
     selectedType,
     selectedId,
     selectedTeamId,
     selectedLeagueId,
+    setTeamSelection,
+    setLeagueSelection,
   };
 }

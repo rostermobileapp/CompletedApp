@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +19,7 @@ export default function Teams() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { hasRole } = usePermissions();
   const { toast } = useToast();
-  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const { selectedTeamId, setTeamSelection } = useDashboardSelection();
   const [isEditingTeamName, setIsEditingTeamName] = useState(false);
   const [editedTeamName, setEditedTeamName] = useState('');
 
@@ -30,7 +31,7 @@ export default function Teams() {
 
   // Define current team early so it can be used in subsequent queries
   const primaryTeam = (userTeams as any[])[0];
-  const currentTeam = selectedTeam ? (userTeams as any[]).find((t: any) => t.id === selectedTeam) : primaryTeam;
+  const currentTeam = selectedTeamId ? (userTeams as any[]).find((t: any) => t.id === selectedTeamId) : primaryTeam;
 
   // Get selected team members
   const { data: teamMembers = [] } = useQuery({
@@ -344,7 +345,7 @@ export default function Teams() {
               </div>
             )}
             
-            <Tabs value={selectedTeam || primaryTeam?.id || ''} onValueChange={setSelectedTeam}>
+            <Tabs value={selectedTeamId || primaryTeam?.id || ''} onValueChange={setTeamSelection}>
             {(userTeams as any[]).map((team: any) => (
               <TabsContent key={team.id} value={team.id} className="space-y-6">
                 {/* Team Header Card */}
@@ -378,7 +379,7 @@ export default function Teams() {
                         )}
                       </div>
                       <div className="flex-1">
-                        {isEditingTeamName && selectedTeam === team.id ? (
+                        {isEditingTeamName && selectedTeamId === team.id ? (
                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <input
                               type="text"
@@ -425,7 +426,7 @@ export default function Teams() {
                                 onClick={() => {
                                   setIsEditingTeamName(true);
                                   setEditedTeamName(team.name);
-                                  setSelectedTeam(team.id);
+                                  setTeamSelection(team.id);
                                 }}
                                 className="p-1 text-muted-foreground hover:text-foreground rounded"
                                 data-testid={`button-edit-team-name-${team.id}`}
