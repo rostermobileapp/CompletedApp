@@ -345,17 +345,6 @@ export default function Teams() {
             )}
             
             <Tabs value={selectedTeam || primaryTeam?.id || ''} onValueChange={setSelectedTeam}>
-              {/* Team Selection */}
-            {(userTeams as any[]).length > 1 && (
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                {(userTeams as any[]).slice(0, 2).map((team: any) => (
-                  <TabsTrigger key={team.id} value={team.id} data-testid={`tab-team-${team.id}`}>
-                    {team.name}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            )}
-
             {(userTeams as any[]).map((team: any) => (
               <TabsContent key={team.id} value={team.id} className="space-y-6">
                 {/* Team Header Card */}
