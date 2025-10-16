@@ -726,10 +726,18 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
-  // League selection state
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
-  const [showLeagueDropdown, setShowLeagueDropdown] = useState(false);
+  // Unified selection state - can be team or league
+  const [selectedType, setSelectedType] = useState<'team' | 'league'>('league');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  
+  // Backward compatibility
+  const selectedLeagueId = selectedType === 'league' ? selectedId : null;
+  const setSelectedLeagueId = (id: string | null) => {
+    setSelectedType('league');
+    setSelectedId(id);
+  };
   
   // Score submission modal state
   const [showScoreModal, setShowScoreModal] = useState(false);
@@ -802,29 +810,38 @@ export default function Dashboard() {
     queryKey: ['/api/user/leagues'],
   });
   
-  // Set default selected league when leagues load
+  // Set default selection - prefer team first, then league
   React.useEffect(() => {
-    if (Array.isArray(userLeagues) && userLeagues.length > 0 && !selectedLeagueId) {
-      setSelectedLeagueId(userLeagues[0].id);
+    if (!selectedId) {
+      // First try to select a team
+      if (Array.isArray(userTeams) && userTeams.length > 0) {
+        setSelectedType('team');
+        setSelectedId(userTeams[0].id);
+      }
+      // Otherwise select a league
+      else if (Array.isArray(userLeagues) && userLeagues.length > 0) {
+        setSelectedType('league');
+        setSelectedId(userLeagues[0].id);
+      }
     }
-  }, [userLeagues, selectedLeagueId]);
+  }, [userTeams, userLeagues, selectedId]);
   
   // Close dropdown when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowLeagueDropdown(false);
+        setShowDropdown(false);
       }
     };
 
-    if (showLeagueDropdown) {
+    if (showDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showLeagueDropdown]);
+  }, [showDropdown]);
   
   // Get currently selected league and membership
   const selectedLeague = Array.isArray(userLeagues) && selectedLeagueId
@@ -1087,49 +1104,112 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      {/* League Selection Dropdown */}
-      {Array.isArray(userLeagues) && userLeagues.length > 0 && (
+      {/* Team/League Selection Dropdown */}
+      {((Array.isArray(userTeams) && userTeams.length > 0) || (Array.isArray(userLeagues) && userLeagues.length > 0)) && (
         <div className="px-6 mb-4">
           <div className="relative" ref={dropdownRef}>
             <button
-              onClick={() => setShowLeagueDropdown(!showLeagueDropdown)}
+              onClick={() => setShowDropdown(!showDropdown)}
               className="w-full border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#212121]"
-              data-testid="button-league-selector"
+              data-testid="button-selector"
             >
               <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-primary" />
+                {selectedType === 'team' ? (
+                  <Users className="w-4 h-4 text-primary" />
+                ) : (
+                  <Trophy className="w-4 h-4 text-primary" />
+                )}
                 <span className="font-medium text-sm">
-                  {selectedLeague?.name || 'Select League'}
+                  {selectedType === 'team' 
+                    ? (userTeams as any[]).find((t: any) => t.id === selectedId)?.name || 'Select Team'
+                    : selectedLeague?.name || 'Select League'}
                 </span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showLeagueDropdown ? 'rotate-180' : ''}`} />
+              <div className="flex items-center gap-2">
+                {/* Notification badges will go here */}
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+              </div>
             </button>
             
-            {showLeagueDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50">
-                {userLeagues.map((league: any) => {
+            {showDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-[400px] overflow-y-auto">
+                {/* Teams Section */}
+                {Array.isArray(userTeams) && userTeams.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30">
+                      MY TEAMS
+                    </div>
+                    {userTeams.map((team: any) => (
+                      <button
+                        key={`team-${team.id}`}
+                        onClick={() => {
+                          setSelectedType('team');
+                          setSelectedId(team.id);
+                          setShowDropdown(false);
+                        }}
+                        className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
+                          selectedType === 'team' && selectedId === team.id ? 'bg-primary/10 text-primary' : ''
+                        }`}
+                        data-testid={`option-team-${team.id}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            <span className="font-medium text-sm">{team.name}</span>
+                          </div>
+                          {/* Team notification badge placeholder */}
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
+                
+                {/* Leagues Section - Only show for commissioners/admins */}
+                {Array.isArray(userLeagues) && userLeagues.length > 0 && userLeagues.some((league: any) => {
                   const membership = Array.isArray(userLeagueMemberships) 
-                    ? userLeagueMemberships.find(m => m.leagueId === league.id)
+                    ? userLeagueMemberships.find((m: any) => m.leagueId === league.id)
                     : null;
-                  return (
-                    <button
-                      key={league.id}
-                      onClick={() => {
-                        setSelectedLeagueId(league.id);
-                        setShowLeagueDropdown(false);
-                      }}
-                      className={`w-full p-3 text-left hover:bg-muted/50 transition-colors first:rounded-t-lg last:rounded-b-lg ${
-                        selectedLeagueId === league.id ? 'bg-primary/10 text-primary' : ''
-                      }`}
-                      data-testid={`option-league-${league.id}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Trophy className="w-4 h-4" />
-                        <span className="font-medium text-sm">{league.name}</span>
-                      </div>
-                    </button>
-                  );
-                })}
+                  return membership?.leagueRole === 'commissioner' || 
+                         membership?.leagueRole === 'secondary_commissioner' ||
+                         membership?.leagueSpecialPermissions?.includes('admin') ||
+                         membership?.leagueSpecialPermissions?.includes('stat_manager');
+                }) && (
+                  <>
+                    <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 border-t border-border">
+                      LEAGUES I MANAGE
+                    </div>
+                    {userLeagues.filter((league: any) => {
+                      const membership = Array.isArray(userLeagueMemberships) 
+                        ? userLeagueMemberships.find((m: any) => m.leagueId === league.id)
+                        : null;
+                      return membership?.leagueRole === 'commissioner' || 
+                             membership?.leagueRole === 'secondary_commissioner' ||
+                             membership?.leagueSpecialPermissions?.includes('admin') ||
+                             membership?.leagueSpecialPermissions?.includes('stat_manager');
+                    }).map((league: any) => (
+                      <button
+                        key={`league-${league.id}`}
+                        onClick={() => {
+                          setSelectedType('league');
+                          setSelectedId(league.id);
+                          setShowDropdown(false);
+                        }}
+                        className={`w-full p-3 text-left hover:bg-muted/50 transition-colors last:rounded-b-lg ${
+                          selectedType === 'league' && selectedId === league.id ? 'bg-primary/10 text-primary' : ''
+                        }`}
+                        data-testid={`option-league-${league.id}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Trophy className="w-4 h-4" />
+                            <span className="font-medium text-sm">{league.name}</span>
+                          </div>
+                          {/* League notification badge placeholder */}
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>
