@@ -14,7 +14,11 @@ Significantly enhanced the team creation experience with multiple new options fo
 - **Facility Assignment**: Select existing facilities or create new ones inline during team setup with facility dropdown and creation dialog
 
 **Player Management Options:**
-- **Manual Player Addition**: Add players one-by-one with firstName, lastName, email, jerseyNumber, and position fields after team creation
+- **Manual Player Addition**: Add players one-by-one with firstName, lastName, email (optional), jerseyNumber, and position fields after team creation
+  - Email is optional - players can be added without an account
+  - If email matches existing user: creates team membership
+  - If no email or user doesn't exist: creates placeholder player
+  - Placeholder players stored separately until they create accounts
 - **CSV Player Import**: Bulk import players using CSV format (firstName, lastName, email, jerseyNumber, position) directly on the team creation page
 - Both methods auto-approve manually added players as team members
 
