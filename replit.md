@@ -47,6 +47,7 @@ Key features include:
 - **Profile "Your Teams" Section**: Allows users to view and leave teams, with captain protection and comprehensive cleanup.
 - **Messages Scroll to First Unread**: Automatically scrolls to the newest unread message when opening a conversation, falling back to the bottom if no unread messages.
 - **Dashboard Enhancements**: Includes localStorage persistence for team/league selection, unified team/league selector mirroring the Profile page, and correct display of approved scrimmages with a relocated "Finalize & Invoice" button.
+- **Team-Scoped Messages and Payments**: Messages and Payments pages now filter by the currently selected team on the Dashboard. Uses a custom event system (`useDashboardSelection` hook with `notifyDashboardSelectionChange()`) to sync selection changes in real-time within the same browser tab, ensuring conversations and payment requests only show data relevant to the selected team.
 
 # External Dependencies
 
