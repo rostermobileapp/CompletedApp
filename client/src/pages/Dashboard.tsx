@@ -900,9 +900,9 @@ export default function Dashboard() {
     }
     
     if (selectedId && selectedType === 'league') {
-      const leagueExists = Array.isArray(userLeagues) && userLeagues.some(league => league.id === selectedId);
+      const leagueExists = Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.some(league => league.id === selectedId);
       if (!leagueExists) {
-        // Saved league no longer exists, reset
+        // Saved league no longer valid (either doesn't exist or user now has a team in it), reset
         setSelectedId(null);
         return;
       }
@@ -915,13 +915,13 @@ export default function Dashboard() {
         setSelectedType('team');
         setSelectedId(userTeamsAll[0].id);
       }
-      // Otherwise select a league
-      else if (Array.isArray(userLeagues) && userLeagues.length > 0) {
+      // Otherwise select a league (only those without teams)
+      else if (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) {
         setSelectedType('league');
-        setSelectedId(userLeagues[0].id);
+        setSelectedId(leaguesWithoutTeams[0].id);
       }
     }
-  }, [userTeamsAll, userLeagues, selectedId, selectedType]);
+  }, [userTeamsAll, leaguesWithoutTeams, selectedId, selectedType]);
   
   // Close dropdown when clicking outside
   React.useEffect(() => {
@@ -962,6 +962,47 @@ export default function Dashboard() {
     }
     return null;
   }, [selectedType, selectedId, userTeamsAll]);
+  
+  // Helper function to get team display name
+  const getTeamDisplayName = React.useCallback((team: any) => {
+    if (!team) return 'Select Team';
+    
+    // If team is not in a league, just show team name
+    if (!team.leagueId) {
+      return team.name;
+    }
+    
+    // If team is in a league, show "LeagueName: TeamName"
+    const league = Array.isArray(userLeagues) 
+      ? userLeagues.find(l => l.id === team.leagueId) 
+      : null;
+    
+    if (league) {
+      return `${league.name}: ${team.name}`;
+    }
+    
+    // Fallback if league not found (shouldn't happen)
+    return team.name;
+  }, [userLeagues]);
+  
+  // Helper function to get league display name
+  const getLeagueDisplayName = React.useCallback((league: any) => {
+    if (!league) return 'Select League';
+    return league.name;
+  }, []);
+  
+  // Filter leagues to only show those where user has no team
+  const leaguesWithoutTeams = React.useMemo(() => {
+    if (!Array.isArray(userLeagues) || !Array.isArray(userTeamsAll)) {
+      return [];
+    }
+    
+    return userLeagues.filter(league => {
+      // Check if user has any team in this league
+      const hasTeamInLeague = userTeamsAll.some(team => team.leagueId === league.id);
+      return !hasTeamInLeague;
+    });
+  }, [userLeagues, userTeamsAll]);
   
   // Determine the effective league ID for feature access
   // If a team is selected and it's part of a league, use that league ID
@@ -1223,7 +1264,7 @@ export default function Dashboard() {
         </div>
       </div>
       {/* Team/League Selection Dropdown */}
-      {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(userLeagues) && userLeagues.length > 0)) && (
+      {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0)) && (
         <div className="px-6 mb-4">
           <div className="relative" ref={dropdownRef}>
             <button
@@ -1239,8 +1280,8 @@ export default function Dashboard() {
                 )}
                 <span className="font-medium text-sm">
                   {selectedType === 'team' 
-                    ? (userTeamsAll as any[])?.find((t: any) => t.id === selectedId)?.name || 'Select Team'
-                    : selectedLeague?.name || 'Select League'}
+                    ? getTeamDisplayName((userTeamsAll as any[])?.find((t: any) => t.id === selectedId))
+                    : getLeagueDisplayName(selectedLeague)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -1297,7 +1338,7 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Users className="w-4 h-4" />
-                            <span className="font-medium text-sm">{team.name}</span>
+                            <span className="font-medium text-sm">{getTeamDisplayName(team)}</span>
                           </div>
                           {/* Team notification badge placeholder */}
                         </div>
@@ -1306,13 +1347,13 @@ export default function Dashboard() {
                   </>
                 )}
                 
-                {/* Leagues Section - Show all leagues from Profile page */}
-                {Array.isArray(userLeagues) && userLeagues.length > 0 && (
+                {/* Leagues Section - Only show leagues where user has no team */}
+                {Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0 && (
                   <>
                     <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 border-t border-border">
                       MY LEAGUES
                     </div>
-                    {userLeagues.map((league: any) => (
+                    {leaguesWithoutTeams.map((league: any) => (
                       <button
                         key={`league-${league.id}`}
                         onClick={() => {
@@ -1328,7 +1369,7 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Trophy className="w-4 h-4" />
-                            <span className="font-medium text-sm">{league.name}</span>
+                            <span className="font-medium text-sm">{getLeagueDisplayName(league)}</span>
                           </div>
                           {/* League notification badge placeholder */}
                         </div>
