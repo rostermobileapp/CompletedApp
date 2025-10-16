@@ -20,6 +20,7 @@ import UserProfile from "@/pages/UserProfile";
 import Subscription from "@/pages/Subscription";
 import Roster from "@/pages/Roster";
 import CreateLeague from "@/pages/CreateLeague";
+import CreateTeam from "@/pages/CreateTeam";
 import CreateScrimmage from "@/pages/CreateScrimmage";
 import ScrimmageManagement from "@/pages/ScrimmageManagement";
 import LeagueManagement from "@/pages/LeagueManagement";
@@ -80,6 +81,7 @@ function Router() {
             <Route path="/subscription" component={Subscription} />
             <Route path="/roster" component={Roster} />
             <Route path="/create-league" component={CreateLeague} />
+            <Route path="/create-team" component={CreateTeam} />
             <Route path="/create-scrimmage" component={CreateScrimmage} />
             <Route path="/scrimmage-management" component={ScrimmageManagement} />
             <Route path="/league-management" component={LeagueManagement} />
