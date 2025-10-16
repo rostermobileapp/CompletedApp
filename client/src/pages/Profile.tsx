@@ -123,6 +123,11 @@ export default function Profile() {
     queryKey: ['/api/user/leagues'],
   });
 
+  // Fetch user teams
+  const { data: userTeams } = useQuery({
+    queryKey: ['/api/user/teams'],
+  });
+
   // Leave league mutation
   const leaveLeagueMutation = useMutation({
     mutationFn: async (leagueId: string) => {
@@ -141,6 +146,29 @@ export default function Profile() {
     onError: (error: any) => {
       toast({ 
         title: 'Failed to leave league', 
+        description: error.message || 'Please try again.',
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  // Leave team mutation
+  const leaveTeamMutation = useMutation({
+    mutationFn: async (teamId: string) => {
+      const response = await apiRequest('POST', `/api/teams/${teamId}/leave`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: 'Successfully left team',
+        description: data.message 
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Failed to leave team', 
         description: error.message || 'Please try again.',
         variant: 'destructive' 
       });
@@ -561,6 +589,60 @@ export default function Profile() {
                           data-testid={`button-confirm-leave-${league.id}`}
                         >
                           Leave League
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Team Management */}
+      {userTeams && Array.isArray(userTeams) && userTeams.length > 0 && (
+        <div className="px-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4" data-testid="text-teams-title">Your Teams</h2>
+          <div className="space-y-3">
+            {userTeams.map((team: any) => (
+              <div key={team.id} className="bg-card rounded-lg border border-border p-4" data-testid={`card-team-${team.id}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Users className="w-5 h-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium" data-testid={`text-team-name-${team.id}`}>{team.name}</p>
+                    </div>
+                  </div>
+                  
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        className="px-3 py-1 text-sm text-destructive border border-destructive rounded-md hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+                        disabled={leaveTeamMutation.isPending}
+                        data-testid={`button-leave-team-${team.id}`}
+                      >
+                        {leaveTeamMutation.isPending ? 'Leaving...' : 'Leave'}
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent data-testid={`dialog-leave-team-${team.id}`}>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Leave Team</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to leave "{team.name}"? This will:
+                          <br />• Remove you from the team roster
+                          <br />• Clear your game RSVPs for this team
+                          <br />• Remove your beverage duty assignments
+                          <br /><br />This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel data-testid={`button-cancel-leave-team-${team.id}`}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => leaveTeamMutation.mutate(team.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          data-testid={`button-confirm-leave-team-${team.id}`}
+                        >
+                          Leave Team
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>

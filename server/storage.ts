@@ -204,6 +204,7 @@ export interface IStorage {
   requestTeamMembership(membership: InsertTeamMembership): Promise<TeamMembership>;
   approveTeamMembership(membershipId: string, approverId: string): Promise<TeamMembership>;
   getTeamMembers(teamId: string): Promise<(TeamMembership & { user: User })[]>;
+  leaveTeam(userId: string, teamId: string): Promise<void>;
   
   // Game operations
   createGame(game: InsertGame): Promise<Game>;
@@ -1836,6 +1837,119 @@ export class DatabaseStorage implements IStorage {
     );
 
     return uniqueMembers;
+  }
+
+  async leaveTeam(userId: string, teamId: string): Promise<void> {
+    return await db.transaction(async (tx) => {
+      // Get team information to find the league
+      const [team] = await tx
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId));
+
+      if (!team) {
+        throw new Error('TEAM_NOT_FOUND');
+      }
+
+      // Check if user has direct team membership BEFORE any updates
+      const [directMembership] = await tx
+        .select()
+        .from(teamMemberships)
+        .where(
+          and(
+            eq(teamMemberships.userId, userId),
+            eq(teamMemberships.teamId, teamId)
+          )
+        );
+
+      // Check if user is assigned to this team via league membership BEFORE any updates
+      const [leagueMembership] = await tx
+        .select()
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.leagueId, team.leagueId),
+            eq(leagueMemberships.assignedTeamId, teamId)
+          )
+        );
+
+      // If user has no membership at all, throw error
+      if (!directMembership && !leagueMembership) {
+        throw new Error('TEAM_MEMBERSHIP_NOT_FOUND');
+      }
+
+      // Now perform the cleanup operations
+      // If there's a direct membership, delete it
+      if (directMembership) {
+        await tx
+          .delete(teamMemberships)
+          .where(eq(teamMemberships.id, directMembership.id));
+      }
+
+      // If there's a league membership with this team assignment, unassign the team
+      if (leagueMembership) {
+        await tx
+          .update(leagueMemberships)
+          .set({ assignedTeamId: null })
+          .where(eq(leagueMemberships.id, leagueMembership.id));
+      }
+
+      // Get all future games for this team
+      const teamGames = await tx
+        .select({ id: games.id })
+        .from(games)
+        .where(
+          and(
+            or(
+              eq(games.homeTeamId, teamId),
+              eq(games.awayTeamId, teamId)
+            ),
+            gte(games.scheduledAt, new Date())
+          )
+        );
+
+      const gameIds = teamGames.map(g => g.id);
+
+      if (gameIds.length > 0) {
+        // Remove RSVP records for these games
+        await tx
+          .delete(gameRsvps)
+          .where(
+            and(
+              eq(gameRsvps.userId, userId),
+              inArray(gameRsvps.gameId, gameIds)
+            )
+          );
+
+        // Remove beverage duty assignments for this user in these games
+        await tx
+          .update(games)
+          .set({
+            homeBeverageDutyUserId: null,
+            homeBeverageDutyClaimedAt: null
+          })
+          .where(
+            and(
+              inArray(games.id, gameIds),
+              eq(games.homeBeverageDutyUserId, userId)
+            )
+          );
+
+        await tx
+          .update(games)
+          .set({
+            awayBeverageDutyUserId: null,
+            awayBeverageDutyClaimedAt: null
+          })
+          .where(
+            and(
+              inArray(games.id, gameIds),
+              eq(games.awayBeverageDutyUserId, userId)
+            )
+          );
+      }
+    });
   }
 
   // Game operations

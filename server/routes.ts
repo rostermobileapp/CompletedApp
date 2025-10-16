@@ -2231,6 +2231,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Leave team
+  app.post('/api/teams/:teamId/leave', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Verify team exists
+      const team = await storage.getTeam(teamId);
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+
+      // Check if user is the team captain - prevent them from leaving their own team
+      if (team.captainId === userId) {
+        return res.status(403).json({ message: 'Team captains cannot leave their team. Please transfer captain role first.' });
+      }
+
+      // Leave the team (this will clean up memberships, RSVPs, and beverage duty)
+      await storage.leaveTeam(userId, teamId);
+
+      res.json({ success: true, message: 'Successfully left the team' });
+    } catch (error: any) {
+      console.error('Error leaving team:', error);
+      if (error.message === 'TEAM_NOT_FOUND') {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+      if (error.message === 'TEAM_MEMBERSHIP_NOT_FOUND') {
+        return res.status(404).json({ message: 'You are not a member of this team' });
+      }
+      res.status(500).json({ message: 'Failed to leave team' });
+    }
+  });
+
   // Beverage duty routes
   app.post('/api/games/:gameId/beverage-duty', isAuthenticated, async (req: any, res) => {
     try {
