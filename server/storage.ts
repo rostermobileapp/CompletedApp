@@ -5,6 +5,7 @@ import {
   teams,
   leagueMemberships,
   teamMemberships,
+  placeholderPlayers,
   teamLeagueRequests,
   games,
   gameScoreSubmissions,
@@ -62,6 +63,8 @@ import {
   type InsertLeagueMembership,
   type TeamMembership,
   type InsertTeamMembership,
+  type PlaceholderPlayer,
+  type InsertPlaceholderPlayer,
   type TeamLeagueRequest,
   type InsertTeamLeagueRequest,
   type Game,
@@ -227,7 +230,7 @@ export interface IStorage {
   // Team operations
   createTeam(team: InsertTeam): Promise<Team>;
   createStandaloneTeam(teamName: string, creatorId: string, photoUrl?: string | null, facilityId?: string | null): Promise<Team>;
-  addManualPlayer(teamId: string, firstName: string, lastName: string, email?: string | null, jerseyNumber?: string | null, position?: string | null): Promise<TeamMembership>;
+  addManualPlayer(teamId: string, firstName: string, lastName: string, email?: string | null, jerseyNumber?: string | null, position?: string | null): Promise<TeamMembership | PlaceholderPlayer>;
   getTeamsByLeague(leagueId: string): Promise<Team[]>;
   getTeam(id: string): Promise<Team | undefined>;
   getTeamByUniqueId(uniqueTeamId: string): Promise<Team | undefined>;
@@ -1498,8 +1501,8 @@ export class DatabaseStorage implements IStorage {
     email?: string | null,
     jerseyNumber?: string | null,
     position?: string | null
-  ): Promise<TeamMembership> {
-    // Check if user exists by email
+  ): Promise<TeamMembership | PlaceholderPlayer> {
+    // Check if user exists by email (only if email provided)
     let user = email ? await this.getUserByEmail(email) : null;
     
     if (user) {
@@ -1516,9 +1519,19 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return membership;
     } else {
-      // User doesn't exist - store as placeholder player name for now
-      // We'll just create a membership without a userId (will need to handle this in queries)
-      throw new Error('Player email not found. Please invite them to create an account first.');
+      // User doesn't exist or no email provided - create placeholder player
+      const [placeholderPlayer] = await db
+        .insert(placeholderPlayers)
+        .values({
+          teamId,
+          firstName,
+          lastName,
+          email: email || null,
+          position: position || null,
+          jerseyNumber: jerseyNumber ? parseInt(jerseyNumber) : null,
+        })
+        .returning();
+      return placeholderPlayer;
     }
   }
 

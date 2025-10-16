@@ -245,6 +245,19 @@ export const teamMemberships = pgTable("team_memberships", {
   approvedBy: varchar("approved_by").references(() => users.id),
 });
 
+// Placeholder players table - for players added before they have accounts
+export const placeholderPlayers = pgTable("placeholder_players", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name").notNull(),
+  email: varchar("email"), // Optional - may not have email yet
+  position: varchar("position"),
+  jerseyNumber: integer("jersey_number"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  addedBy: varchar("added_by").references(() => users.id), // Who added this placeholder
+});
+
 // Team-to-league join requests table
 export const teamLeagueRequests = pgTable("team_league_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1614,6 +1627,11 @@ export const insertTeamMembershipSchema = createInsertSchema(teamMemberships).om
   approvedBy: true,
 });
 
+export const insertPlaceholderPlayerSchema = createInsertSchema(placeholderPlayers).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertTeamLeagueRequestSchema = createInsertSchema(teamLeagueRequests).omit({
   id: true,
   requestedAt: true,
@@ -2093,6 +2111,8 @@ export type LeagueMembership = typeof leagueMemberships.$inferSelect;
 export type InsertLeagueMembership = z.infer<typeof insertLeagueMembershipSchema>;
 export type TeamMembership = typeof teamMemberships.$inferSelect;
 export type InsertTeamMembership = z.infer<typeof insertTeamMembershipSchema>;
+export type PlaceholderPlayer = typeof placeholderPlayers.$inferSelect;
+export type InsertPlaceholderPlayer = z.infer<typeof insertPlaceholderPlayerSchema>;
 export type TeamLeagueRequest = typeof teamLeagueRequests.$inferSelect;
 export type InsertTeamLeagueRequest = z.infer<typeof insertTeamLeagueRequestSchema>;
 export type Game = typeof games.$inferSelect;
