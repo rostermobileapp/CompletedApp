@@ -955,6 +955,27 @@ export default function Dashboard() {
 
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
   
+  // Get the currently selected team (for checking its league association)
+  const selectedTeam = React.useMemo(() => {
+    if (selectedType === 'team' && selectedId && Array.isArray(userTeamsAll)) {
+      return userTeamsAll.find(t => t.id === selectedId);
+    }
+    return null;
+  }, [selectedType, selectedId, userTeamsAll]);
+  
+  // Determine the effective league ID for feature access
+  // If a team is selected and it's part of a league, use that league ID
+  // If a league is selected, use the selected league ID
+  const effectiveLeagueId = React.useMemo(() => {
+    if (selectedType === 'team' && selectedTeam?.leagueId) {
+      return selectedTeam.leagueId;
+    }
+    if (selectedType === 'league' && selectedLeagueId) {
+      return selectedLeagueId;
+    }
+    return null;
+  }, [selectedType, selectedTeam, selectedLeagueId]);
+  
   // Compute captain status for the selected league using team.captainId
   const isTeamCaptainInSelectedLeague = React.useMemo(() => {
     if (!selectedLeagueId || !Array.isArray(userTeams) || !(user as any)?.id) return false;
@@ -1055,17 +1076,17 @@ export default function Dashboard() {
 
   // Fetch needs attention data for the permanent bar
   const { data: needsAttentionData } = useQuery({
-    queryKey: ['/api/needs-attention-summary', selectedLeagueId],
+    queryKey: ['/api/needs-attention-summary', effectiveLeagueId],
     queryFn: async () => {
-      if (!selectedLeagueId) return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
+      if (!effectiveLeagueId) return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
       
       try {
         // Fetch pending members
-        const pendingMembersResponse = await apiRequest('GET', `/api/leagues/${selectedLeagueId}/pending-members`);
+        const pendingMembersResponse = await apiRequest('GET', `/api/leagues/${effectiveLeagueId}/pending-members`);
         const pendingMembers = await pendingMembersResponse.json();
         
         // Fetch games needing verification
-        const gamesResponse = await apiRequest('GET', `/api/leagues/${selectedLeagueId}/games`);
+        const gamesResponse = await apiRequest('GET', `/api/leagues/${effectiveLeagueId}/games`);
         const allGames = await gamesResponse.json();
         
         let gamesNeedingVerification = 0;
@@ -1126,7 +1147,7 @@ export default function Dashboard() {
         // Fetch pending substitute approvals
         let pendingSubstituteApprovals = 0;
         try {
-          const substituteApprovalsResponse = await apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${selectedLeagueId}`);
+          const substituteApprovalsResponse = await apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${effectiveLeagueId}`);
           const substituteData = await substituteApprovalsResponse.json();
           pendingSubstituteApprovals = substituteData.total || 0;
         } catch (error) {
@@ -1148,7 +1169,7 @@ export default function Dashboard() {
         return { pendingMembers: 0, gamesNeedingVerification: 0, pendingSubstituteApprovals: 0, total: 0 };
       }
     },
-    enabled: !!selectedLeagueId,
+    enabled: !!effectiveLeagueId,
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
@@ -1323,21 +1344,21 @@ export default function Dashboard() {
       {/* 3-Card Section */}
       <div className="px-6 mb-6">
         <div className="grid grid-cols-3 gap-3">
-          {/* Announcements Card - Only active for leagues */}
+          {/* Announcements Card - Active when a league or league team is selected */}
           <div 
             className={`rounded-xl border border-border p-5 min-h-[72px] relative transition-colors bg-[#212121] ${
-              selectedType === 'league' && selectedLeagueId 
+              effectiveLeagueId 
                 ? 'cursor-pointer hover:bg-muted/50' 
                 : 'opacity-50 cursor-not-allowed'
             }`}
             data-testid="card-announcements"
-            onClick={() => selectedType === 'league' && selectedLeagueId && navigate('/announcements')}
+            onClick={() => effectiveLeagueId && navigate('/announcements')}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <Megaphone className="w-8 h-8 text-orange-500 mb-3" />
               <p className="text-xs font-medium">News</p>
             </div>
-            {selectedType === 'league' && <AnnouncementBadge leagueId={selectedLeagueId} />}
+            {effectiveLeagueId && <AnnouncementBadge leagueId={effectiveLeagueId} />}
           </div>
 
           {/* Stats Card */}
@@ -1360,15 +1381,15 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Standings Card - Only active for leagues */}
+          {/* Standings Card - Active when a league or league team is selected */}
           <div 
             className={`rounded-xl border border-border p-5 min-h-[72px] transition-colors bg-[#212121] ${
-              selectedType === 'league' && selectedLeagueId 
+              effectiveLeagueId 
                 ? 'cursor-pointer hover:bg-muted/50' 
                 : 'opacity-50 cursor-not-allowed'
             }`}
             data-testid="card-standings"
-            onClick={() => selectedType === 'league' && selectedLeagueId && setShowStandingsModal(true)}
+            onClick={() => effectiveLeagueId && setShowStandingsModal(true)}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <Award className="w-8 h-8 text-blue-500 mb-3" />
@@ -1404,7 +1425,7 @@ export default function Dashboard() {
               </div>
             </div>
             
-            {selectedType === 'league' && selectedLeagueId && needsAttentionData && (
+            {effectiveLeagueId && needsAttentionData && (
               <div className="rounded-xl border border-border bg-[#212121]">
                 <button
                   onClick={() => setShowNeedsAttentionModal(true)}
@@ -1427,10 +1448,10 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* Needs Attention Section - Only show for leagues */}
-      {selectedType === 'league' && selectedLeagueId && (
+      {/* Needs Attention Section - Show for leagues and league teams */}
+      {effectiveLeagueId && (
         <NeedsAttentionTasks 
-          leagueId={selectedLeagueId} 
+          leagueId={effectiveLeagueId} 
           onNavigate={navigate}
         />
       )}
@@ -1698,13 +1719,13 @@ export default function Dashboard() {
       <StandingsModal
         isOpen={showStandingsModal}
         onClose={() => setShowStandingsModal(false)}
-        leagueId={selectedLeagueId}
+        leagueId={effectiveLeagueId}
       />
       {/* Needs Attention Modal */}
       <NeedsAttentionModal 
         isOpen={showNeedsAttentionModal}
         onClose={() => setShowNeedsAttentionModal(false)}
-        leagueId={selectedLeagueId}
+        leagueId={effectiveLeagueId}
         onNavigate={navigate}
       />
       {/* Feedback Modal */}
