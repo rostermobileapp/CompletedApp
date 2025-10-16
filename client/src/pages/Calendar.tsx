@@ -123,7 +123,7 @@ export default function Calendar() {
 
   // Fetch user's personal reminders
   const { data: personalReminders = [] } = useQuery({
-    queryKey: ["/api/personal-reminders"],
+    queryKey: ["/api/user/personal-reminders"],
   });
 
   // Claim beverage duty mutation
@@ -178,7 +178,7 @@ export default function Calendar() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/personal-reminders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/personal-reminders"] });
       toast({
         title: "Reminder Created",
         description: "Your personal reminder has been added to your calendar.",

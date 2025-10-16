@@ -488,10 +488,8 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       };
       
-      // Update ID if it's different (OIDC sub might have changed)
-      if (userData.id && userData.id !== existingUser.id) {
-        updateSet.id = userData.id;
-      }
+      // DO NOT update ID - it's a primary key referenced by foreign keys
+      // Once a user is created, their ID should never change
       
       // Only update firstName if user doesn't have one yet
       if (userData.firstName !== undefined && !existingUser.firstName) {
