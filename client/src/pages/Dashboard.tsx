@@ -1239,29 +1239,13 @@ export default function Dashboard() {
                   </>
                 )}
                 
-                {/* Leagues Section - Only show for commissioners/admins */}
-                {Array.isArray(userLeagues) && userLeagues.length > 0 && userLeagues.some((league: any) => {
-                  const membership = Array.isArray(userLeagueMemberships) 
-                    ? userLeagueMemberships.find((m: any) => m.leagueId === league.id)
-                    : null;
-                  return membership?.leagueRole === 'commissioner' || 
-                         membership?.leagueRole === 'secondary_commissioner' ||
-                         membership?.leagueSpecialPermissions?.includes('admin') ||
-                         membership?.leagueSpecialPermissions?.includes('stat_manager');
-                }) && (
+                {/* Leagues Section - Show all leagues from Profile page */}
+                {Array.isArray(userLeagues) && userLeagues.length > 0 && (
                   <>
                     <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 border-t border-border">
-                      LEAGUES I MANAGE
+                      MY LEAGUES
                     </div>
-                    {userLeagues.filter((league: any) => {
-                      const membership = Array.isArray(userLeagueMemberships) 
-                        ? userLeagueMemberships.find((m: any) => m.leagueId === league.id)
-                        : null;
-                      return membership?.leagueRole === 'commissioner' || 
-                             membership?.leagueRole === 'secondary_commissioner' ||
-                             membership?.leagueSpecialPermissions?.includes('admin') ||
-                             membership?.leagueSpecialPermissions?.includes('stat_manager');
-                    }).map((league: any) => (
+                    {userLeagues.map((league: any) => (
                       <button
                         key={`league-${league.id}`}
                         onClick={() => {

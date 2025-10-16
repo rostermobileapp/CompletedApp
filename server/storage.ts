@@ -1336,7 +1336,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserTeams(userId: string): Promise<Team[]> {
-    // Get teams from direct team memberships (these take priority)
+    // Get teams from direct team memberships
     const teamMembershipResult = await db
       .select({ team: teams })
       .from(teams)
@@ -1348,12 +1348,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // If user has direct team memberships, use those exclusively
-    if (teamMembershipResult.length > 0) {
-      return teamMembershipResult.map(r => r.team);
-    }
-
-    // Fallback to teams from league memberships with assigned teams (only if no direct memberships)
+    // Get teams from league memberships with assigned teams
     const leagueMembershipResult = await db
       .select({ team: teams })
       .from(teams)
@@ -1365,7 +1360,16 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    return leagueMembershipResult.map(r => r.team);
+    // Combine both and deduplicate by team ID
+    const allTeams = [
+      ...teamMembershipResult.map(r => r.team),
+      ...leagueMembershipResult.map(r => r.team)
+    ];
+    
+    // Deduplicate teams by ID
+    const uniqueTeams = Array.from(new Map(allTeams.map(team => [team.id, team])).values());
+    
+    return uniqueTeams;
   }
 
   async updateTeam(id: string, data: Partial<Pick<Team, 'name'>>): Promise<Team> {

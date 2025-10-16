@@ -4,30 +4,30 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 # Recent Changes
 
-## October 16, 2025 - Unified Team/League Selector for Dashboard
-Implemented a comprehensive dropdown selector that allows users to toggle between viewing their teams and leagues they manage:
+## October 16, 2025 - Unified Team/League Selector - Fixed to Match Profile Page
+Fixed critical bugs where the Dashboard dropdown selector wasn't matching the Profile page's team and league listings:
+
+**Issues Fixed:**
+1. **League Filter Bug**: Dashboard was only showing "LEAGUES I MANAGE" by filtering for specific membership roles (commissioner, admin, stat keeper), but this excluded commissioners without membership records. Changed to show "MY LEAGUES" - ALL leagues from `/api/user/leagues` to match Profile page
+2. **Team Membership Bug**: Backend `getUserTeams()` was using OR logic - returning EITHER direct team memberships OR league-assigned teams, not both. Users with standalone teams couldn't see their league teams. Fixed to return BOTH types and deduplicate
 
 **Core Selector Features:**
-- **Unified Dropdown**: Single selector shows both teams (MY TEAMS section) and leagues (LEAGUES I MANAGE section) with clear section headers
-- **Smart Default Selection**: Automatically selects user's first team if available, otherwise defaults to first league they manage
+- **Unified Dropdown**: Single selector shows both teams (MY TEAMS section) and leagues (MY LEAGUES section) with clear section headers
+- **Smart Default Selection**: Automatically selects user's first team if available, otherwise defaults to first league
 - **Notification Badges**: Shows unread message count badges next to items in the dropdown
 - **Dynamic UI Updates**: Dashboard data and features adapt based on whether a team or league is selected
+- **Profile Parity**: Dropdown perfectly reflects the teams and leagues shown on the Profile page
 
 **Team vs League Display:**
 - **Team Selection**: Shows Users icon, displays team-specific data (games, scrimmages), and disables league-only features (News/Announcements and Standings cards are grayed out)
 - **League Selection**: Shows Trophy icon, displays league-wide data, and enables all dashboard features
 - **Stats Card**: Remains functional for both team and league selections
 
-**Data Filtering:**
-- **Team Mode**: Filters games, scrimmage invites/requests, and players by selected teamId
-- **League Mode**: Filters by leagueId as before, showing league-wide data
-
 **Technical Implementation:**
-- Frontend: Enhanced Dashboard.tsx with unified selector using shadcn DropdownMenu component
+- Frontend: Changed dropdown from filtering leagues by membership roles to showing ALL leagues from `/api/user/leagues`
+- Backend: Fixed `getUserTeams()` to combine direct team memberships AND league-assigned teams with deduplication
+- Cache Fix: Added `queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] })` in CreateTeam.tsx
 - State Management: `selectedType` ('team' | 'league') and `selectedId` control data filtering
-- Cache Fix: Added `queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] })` in CreateTeam.tsx to ensure new standalone teams immediately appear in selector
-- Query Structure: `userTeamsAll` (unfiltered) for dropdown visibility, `userTeams` (filtered) for dashboard display
-- Both queries share the same cache key for efficient invalidation
 
 ## October 16, 2025 - Enhanced Standalone Team Creation  
 Significantly enhanced the team creation experience with multiple new options for customization and player management:
