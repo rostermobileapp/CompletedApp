@@ -549,8 +549,13 @@ export default function Messages() {
       // No team selected, show all conversations
       return allConversations;
     }
-    // Filter conversations that belong to the selected team
-    return allConversations.filter(conv => conv.teamId === selectedTeamId);
+    // When a team is selected, show:
+    // 1. Team group conversations that match the selected team
+    // 2. All non-team conversations (direct, captain_only, custom_group)
+    return allConversations.filter(conv => 
+      (conv.type === 'team_group' && conv.teamId === selectedTeamId) ||
+      (conv.type !== 'team_group')
+    );
   }, [allConversations, selectedTeamId]);
 
   // Fetch unread message counts per conversation
