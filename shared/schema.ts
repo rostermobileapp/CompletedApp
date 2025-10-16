@@ -195,6 +195,7 @@ export const teams = pgTable("teams", {
   seasonId: varchar("season_id").references(() => seasons.id), // Made nullable for safe migration
   captainId: varchar("captain_id").references(() => users.id),
   creatorId: varchar("creator_id").references(() => users.id), // Track who created the team
+  facilityId: varchar("facility_id").references(() => facilities.id), // Optional facility for standalone teams
   logoUrl: varchar("logo_url"),
   wins: integer("wins").default(0).notNull(),
   losses: integer("losses").default(0).notNull(),

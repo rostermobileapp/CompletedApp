@@ -4,16 +4,31 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 # Recent Changes
 
-## October 16, 2025 - Standalone Team Creation with League Migration
-Implemented a complete standalone team system that allows users to create and manage teams independently of leagues, with the ability to migrate entire teams into leagues:
+## October 16, 2025 - Enhanced Standalone Team Creation  
+Significantly enhanced the team creation experience with multiple new options for customization and player management:
+
+**Core Team Creation Features:**
 - **Standalone Team Creation**: Users can create teams without being part of a league via "Create a Team" menu option
 - **Unique Team IDs**: Each team gets a unique 6-character alphanumeric ID in ABC123 format (3 letters + 3 numbers) for easy identification and sharing
-- **CSV Player Import**: Team creators can bulk import players using CSV format (Name, Email) directly on the team creation page
+- **Team Photo Upload**: Integrated object storage for uploading team logos/photos during creation
+- **Facility Assignment**: Select existing facilities or create new ones inline during team setup with facility dropdown and creation dialog
+
+**Player Management Options:**
+- **Manual Player Addition**: Add players one-by-one with firstName, lastName, email, jerseyNumber, and position fields after team creation
+- **CSV Player Import**: Bulk import players using CSV format (firstName, lastName, email, jerseyNumber, position) directly on the team creation page
+- Both methods auto-approve manually added players as team members
+
+**League Migration:**
 - **Team-to-League Requests**: Team creators can request to join their entire team to a league with all members
 - **Commissioner Approval Flow**: League commissioners see pending team join requests in League Management and can approve/reject them
 - **Automatic Member Migration**: When approved, the team's leagueId is updated and all team members automatically become league members
 - **Profile Integration**: Teams display in Profile page "Your Teams" section with status indicators (Standalone/Part of a league) and request-to-join functionality
-- Backend includes: `generateUniqueTeamId` helper, storage methods (`createStandaloneTeam`, `importTeamPlayers`, `requestTeamJoinLeague`, `approveTeamJoinLeague`, `rejectTeamJoinLeague`), and API routes for complete team lifecycle management
+
+**Technical Implementation:**
+- Schema: Added `facilityId` to teams table, maintained `logoUrl` for photos
+- Backend: Enhanced `createStandaloneTeam` to accept photoUrl and facilityId, added `addManualPlayer` storage method
+- API Routes: POST `/api/teams/:teamId/players/manual` for manual player addition
+- Fixed "View Team" button to navigate to `/teams` page
 
 ## October 16, 2025 - Profile "Your Teams" Section with Leave Functionality
 Added a "Your Teams" section to the Profile page that allows users to view and leave their team memberships:

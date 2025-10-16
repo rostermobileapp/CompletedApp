@@ -1,13 +1,16 @@
 import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
-import { Upload, Copy, CheckCircle2, Users } from 'lucide-react';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { Upload, Copy, CheckCircle2, Users, UserPlus, Image as ImageIcon, Building2, Plus } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 interface TeamResponse {
   id: string;
@@ -15,27 +18,91 @@ interface TeamResponse {
   uniqueTeamId: string;
   creatorId: string;
   captainId: string;
+  logoUrl?: string | null;
+  facilityId?: string | null;
+}
+
+interface Facility {
+  id: string;
+  name: string;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
 }
 
 export default function CreateTeam() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [teamName, setTeamName] = useState('');
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string>('');
+  const [photoUrl, setPhotoUrl] = useState<string>('');
   const [createdTeam, setCreatedTeam] = useState<TeamResponse | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [copiedTeamId, setCopiedTeamId] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [showCreateFacility, setShowCreateFacility] = useState(false);
+  const [newFacilityName, setNewFacilityName] = useState('');
+  const [newFacilityAddress, setNewFacilityAddress] = useState('');
+  const [newFacilityCity, setNewFacilityCity] = useState('');
+  const [newFacilityState, setNewFacilityState] = useState('');
+
+  // Manual player addition state
+  const [manualFirstName, setManualFirstName] = useState('');
+  const [manualLastName, setManualLastName] = useState('');
+  const [manualEmail, setManualEmail] = useState('');
+  const [manualJerseyNumber, setManualJerseyNumber] = useState('');
+  const [manualPosition, setManualPosition] = useState('');
+
+  // Fetch facilities
+  const { data: facilities = [] } = useQuery<Facility[]>({
+    queryKey: ['/api/facilities'],
+    enabled: !createdTeam, // Only fetch when creating team
+  });
 
   // Create team mutation
   const createTeamMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const response = await apiRequest('POST', '/api/teams/standalone', { teamName: name });
+    mutationFn: async (data: { name: string; photoUrl?: string; facilityId?: string }) => {
+      const response = await apiRequest('POST', '/api/teams/standalone', { 
+        teamName: data.name,
+        photoUrl: data.photoUrl || null,
+        facilityId: data.facilityId || null,
+      });
       return response.json();
     },
     onSuccess: (data: TeamResponse) => {
       setCreatedTeam(data);
       toast({
         title: 'Team Created',
+        description: `${data.name} has been created successfully!`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Create facility mutation
+  const createFacilityMutation = useMutation({
+    mutationFn: async (facilityData: { name: string; address?: string; city?: string; state?: string }) => {
+      const response = await apiRequest('POST', '/api/facilities', facilityData);
+      return response.json();
+    },
+    onSuccess: (data: Facility) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/facilities'] });
+      setSelectedFacilityId(data.id);
+      setShowCreateFacility(false);
+      setNewFacilityName('');
+      setNewFacilityAddress('');
+      setNewFacilityCity('');
+      setNewFacilityState('');
+      toast({
+        title: 'Facility Created',
         description: `${data.name} has been created successfully!`,
       });
     },
@@ -76,6 +143,39 @@ export default function CreateTeam() {
     },
   });
 
+  // Manual player addition mutation
+  const addManualPlayerMutation = useMutation({
+    mutationFn: async (playerData: { 
+      teamId: string; 
+      firstName: string; 
+      lastName: string; 
+      email?: string; 
+      jerseyNumber?: string; 
+      position?: string;
+    }) => {
+      const response = await apiRequest('POST', `/api/teams/${playerData.teamId}/players/manual`, playerData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Player Added',
+        description: 'Player has been added to the team successfully!',
+      });
+      setManualFirstName('');
+      setManualLastName('');
+      setManualEmail('');
+      setManualJerseyNumber('');
+      setManualPosition('');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleCreateTeam = (e: React.FormEvent) => {
     e.preventDefault();
     if (!teamName.trim()) {
@@ -86,7 +186,65 @@ export default function CreateTeam() {
       });
       return;
     }
-    createTeamMutation.mutate(teamName.trim());
+    createTeamMutation.mutate({
+      name: teamName.trim(),
+      photoUrl: photoUrl || undefined,
+      facilityId: selectedFacilityId || undefined,
+    });
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid File',
+        description: 'Please upload an image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsUploadingPhoto(true);
+
+      // Get upload URL
+      const urlResponse = await apiRequest('POST', '/api/team-logos/upload', {});
+      const { uploadURL } = await urlResponse.json();
+
+      // Upload to object storage
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload photo');
+      }
+
+      // Extract the path from the upload URL
+      const url = new URL(uploadURL);
+      const photoPath = url.pathname;
+      setPhotoUrl(photoPath);
+
+      toast({
+        title: 'Photo Uploaded',
+        description: 'Team photo uploaded successfully!',
+      });
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      toast({
+        title: 'Upload Failed',
+        description: error instanceof Error ? error.message : 'Failed to upload photo',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,6 +292,48 @@ export default function CreateTeam() {
     });
   };
 
+  const handleAddManualPlayer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createdTeam) return;
+
+    if (!manualFirstName.trim() || !manualLastName.trim()) {
+      toast({
+        title: 'Error',
+        description: 'First name and last name are required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    addManualPlayerMutation.mutate({
+      teamId: createdTeam.id,
+      firstName: manualFirstName.trim(),
+      lastName: manualLastName.trim(),
+      email: manualEmail.trim() || undefined,
+      jerseyNumber: manualJerseyNumber.trim() || undefined,
+      position: manualPosition.trim() || undefined,
+    });
+  };
+
+  const handleCreateFacility = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFacilityName.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Facility name is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    createFacilityMutation.mutate({
+      name: newFacilityName.trim(),
+      address: newFacilityAddress.trim() || undefined,
+      city: newFacilityCity.trim() || undefined,
+      state: newFacilityState.trim() || undefined,
+    });
+  };
+
   const copyTeamIdToClipboard = () => {
     if (createdTeam?.uniqueTeamId) {
       navigator.clipboard.writeText(createdTeam.uniqueTeamId);
@@ -162,7 +362,7 @@ export default function CreateTeam() {
             <form onSubmit={handleCreateTeam} className="space-y-4">
               <div>
                 <label htmlFor="teamName" className="block text-sm font-medium mb-2">
-                  Team Name
+                  Team Name *
                 </label>
                 <Input
                   id="teamName"
@@ -174,6 +374,67 @@ export default function CreateTeam() {
                   disabled={createTeamMutation.isPending}
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Team Photo (Optional)
+                </label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    data-testid="input-team-photo"
+                    onChange={handlePhotoUpload}
+                    disabled={isUploadingPhoto}
+                    className="flex-1"
+                  />
+                  {photoUrl && (
+                    <div className="flex items-center gap-2 text-sm text-green-600">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Uploaded</span>
+                    </div>
+                  )}
+                  {isUploadingPhoto && (
+                    <span className="text-sm text-muted-foreground">Uploading...</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="facility" className="block text-sm font-medium mb-2">
+                  Facility (Optional)
+                </label>
+                <div className="flex gap-2">
+                  <Select 
+                    value={selectedFacilityId || "none"} 
+                    onValueChange={(value) => setSelectedFacilityId(value === "none" ? "" : value)}
+                  >
+                    <SelectTrigger data-testid="select-facility" className="flex-1">
+                      <SelectValue placeholder="Select a facility" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No facility</SelectItem>
+                      {facilities.map((facility) => (
+                        <SelectItem key={facility.id} value={facility.id}>
+                          {facility.name}
+                          {facility.city && ` - ${facility.city}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    data-testid="button-create-facility"
+                    onClick={() => setShowCreateFacility(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    New
+                  </Button>
+                </div>
+              </div>
+
               <Button
                 type="submit"
                 data-testid="button-create-team"
@@ -228,8 +489,93 @@ export default function CreateTeam() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
+                <UserPlus className="h-5 w-5" />
+                Add Players Manually
+              </CardTitle>
+              <CardDescription>
+                Add players one at a time by entering their details
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleAddManualPlayer} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="firstName">First Name *</Label>
+                    <Input
+                      id="firstName"
+                      data-testid="input-manual-first-name"
+                      value={manualFirstName}
+                      onChange={(e) => setManualFirstName(e.target.value)}
+                      placeholder="John"
+                      disabled={addManualPlayerMutation.isPending}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Last Name *</Label>
+                    <Input
+                      id="lastName"
+                      data-testid="input-manual-last-name"
+                      value={manualLastName}
+                      onChange={(e) => setManualLastName(e.target.value)}
+                      placeholder="Doe"
+                      disabled={addManualPlayerMutation.isPending}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    data-testid="input-manual-email"
+                    value={manualEmail}
+                    onChange={(e) => setManualEmail(e.target.value)}
+                    placeholder="john.doe@example.com"
+                    disabled={addManualPlayerMutation.isPending}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="jerseyNumber">Jersey Number</Label>
+                    <Input
+                      id="jerseyNumber"
+                      data-testid="input-manual-jersey-number"
+                      value={manualJerseyNumber}
+                      onChange={(e) => setManualJerseyNumber(e.target.value)}
+                      placeholder="23"
+                      disabled={addManualPlayerMutation.isPending}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="position">Position</Label>
+                    <Input
+                      id="position"
+                      data-testid="input-manual-position"
+                      value={manualPosition}
+                      onChange={(e) => setManualPosition(e.target.value)}
+                      placeholder="Forward"
+                      disabled={addManualPlayerMutation.isPending}
+                    />
+                  </div>
+                </div>
+                <Button
+                  type="submit"
+                  data-testid="button-add-manual-player"
+                  disabled={addManualPlayerMutation.isPending || !manualFirstName.trim() || !manualLastName.trim()}
+                  className="w-full"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  {addManualPlayerMutation.isPending ? 'Adding...' : 'Add Player'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Import Players (Optional)
+                Import Players (CSV)
               </CardTitle>
               <CardDescription>
                 Upload a CSV file to bulk import players to your team
@@ -282,7 +628,7 @@ export default function CreateTeam() {
             <Button
               variant="outline"
               data-testid="button-view-team"
-              onClick={() => setLocation(`/teams/${createdTeam.id}`)}
+              onClick={() => setLocation('/teams')}
               className="flex-1"
             >
               View Team
@@ -294,6 +640,8 @@ export default function CreateTeam() {
                 setCreatedTeam(null);
                 setTeamName('');
                 setCsvFile(null);
+                setPhotoUrl('');
+                setSelectedFacilityId('');
               }}
               className="flex-1"
             >
@@ -302,6 +650,83 @@ export default function CreateTeam() {
           </div>
         </div>
       )}
+
+      {/* Create Facility Dialog */}
+      <Dialog open={showCreateFacility} onOpenChange={setShowCreateFacility}>
+        <DialogContent data-testid="dialog-create-facility">
+          <DialogHeader>
+            <DialogTitle>Create New Facility</DialogTitle>
+            <DialogDescription>
+              Add a new facility to the system
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateFacility} className="space-y-4">
+            <div>
+              <Label htmlFor="facilityName">Facility Name *</Label>
+              <Input
+                id="facilityName"
+                data-testid="input-facility-name"
+                value={newFacilityName}
+                onChange={(e) => setNewFacilityName(e.target.value)}
+                placeholder="Enter facility name"
+                disabled={createFacilityMutation.isPending}
+              />
+            </div>
+            <div>
+              <Label htmlFor="facilityAddress">Address</Label>
+              <Input
+                id="facilityAddress"
+                data-testid="input-facility-address"
+                value={newFacilityAddress}
+                onChange={(e) => setNewFacilityAddress(e.target.value)}
+                placeholder="123 Main St"
+                disabled={createFacilityMutation.isPending}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="facilityCity">City</Label>
+                <Input
+                  id="facilityCity"
+                  data-testid="input-facility-city"
+                  value={newFacilityCity}
+                  onChange={(e) => setNewFacilityCity(e.target.value)}
+                  placeholder="New York"
+                  disabled={createFacilityMutation.isPending}
+                />
+              </div>
+              <div>
+                <Label htmlFor="facilityState">State</Label>
+                <Input
+                  id="facilityState"
+                  data-testid="input-facility-state"
+                  value={newFacilityState}
+                  onChange={(e) => setNewFacilityState(e.target.value)}
+                  placeholder="NY"
+                  disabled={createFacilityMutation.isPending}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreateFacility(false)}
+                disabled={createFacilityMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                data-testid="button-submit-facility"
+                disabled={createFacilityMutation.isPending || !newFacilityName.trim()}
+              >
+                {createFacilityMutation.isPending ? 'Creating...' : 'Create Facility'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

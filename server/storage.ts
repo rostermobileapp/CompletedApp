@@ -226,7 +226,8 @@ export interface IStorage {
   
   // Team operations
   createTeam(team: InsertTeam): Promise<Team>;
-  createStandaloneTeam(teamName: string, creatorId: string): Promise<Team>;
+  createStandaloneTeam(teamName: string, creatorId: string, photoUrl?: string | null, facilityId?: string | null): Promise<Team>;
+  addManualPlayer(teamId: string, firstName: string, lastName: string, email?: string | null, jerseyNumber?: string | null, position?: string | null): Promise<TeamMembership>;
   getTeamsByLeague(leagueId: string): Promise<Team[]>;
   getTeam(id: string): Promise<Team | undefined>;
   getTeamByUniqueId(uniqueTeamId: string): Promise<Team | undefined>;
@@ -1399,7 +1400,12 @@ export class DatabaseStorage implements IStorage {
     return team;
   }
 
-  async createStandaloneTeam(teamName: string, creatorId: string): Promise<Team> {
+  async createStandaloneTeam(
+    teamName: string, 
+    creatorId: string, 
+    photoUrl?: string | null, 
+    facilityId?: string | null
+  ): Promise<Team> {
     const uniqueTeamId = await generateUniqueTeamId();
     
     const [newTeam] = await db
@@ -1410,6 +1416,8 @@ export class DatabaseStorage implements IStorage {
         creatorId,
         leagueId: null, // Standalone team has no league
         captainId: creatorId, // Creator is also the captain
+        logoUrl: photoUrl || null,
+        facilityId: facilityId || null,
       })
       .returning();
     
@@ -1481,6 +1489,37 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { successCount, failedCount, createdMemberships };
+  }
+
+  async addManualPlayer(
+    teamId: string,
+    firstName: string,
+    lastName: string,
+    email?: string | null,
+    jerseyNumber?: string | null,
+    position?: string | null
+  ): Promise<TeamMembership> {
+    // Check if user exists by email
+    let user = email ? await this.getUserByEmail(email) : null;
+    
+    if (user) {
+      // User exists, create team membership
+      const [membership] = await db
+        .insert(teamMemberships)
+        .values({
+          userId: user.id,
+          teamId,
+          position: position || null,
+          jerseyNumber: jerseyNumber ? parseInt(jerseyNumber) : null,
+          status: 'approved', // Manually added players are auto-approved
+        })
+        .returning();
+      return membership;
+    } else {
+      // User doesn't exist - store as placeholder player name for now
+      // We'll just create a membership without a userId (will need to handle this in queries)
+      throw new Error('Player email not found. Please invite them to create an account first.');
+    }
   }
 
   async requestTeamJoinLeague(

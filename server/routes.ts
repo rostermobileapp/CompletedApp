@@ -2279,13 +2279,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/teams/standalone', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { teamName } = req.body;
+      const { teamName, photoUrl, facilityId } = req.body;
 
       if (!teamName || typeof teamName !== 'string' || teamName.trim().length === 0) {
         return res.status(400).json({ message: 'Team name is required' });
       }
 
-      const team = await storage.createStandaloneTeam(teamName.trim(), userId);
+      const team = await storage.createStandaloneTeam(
+        teamName.trim(), 
+        userId, 
+        photoUrl || null, 
+        facilityId || null
+      );
       res.json(team);
     } catch (error) {
       console.error('Error creating standalone team:', error);
@@ -2334,6 +2339,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error importing team players:', error);
       res.status(500).json({ message: 'Failed to import players' });
+    }
+  });
+
+  app.post('/api/teams/:teamId/players/manual', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { teamId } = req.params;
+      const { firstName, lastName, email, jerseyNumber, position } = req.body;
+
+      // Verify team exists and user is the creator/captain
+      const team = await storage.getTeam(teamId);
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+
+      if (team.captainId !== userId && team.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only team captain or creator can add players' });
+      }
+
+      if (!firstName || !lastName) {
+        return res.status(400).json({ message: 'First name and last name are required' });
+      }
+
+      const membership = await storage.addManualPlayer(
+        teamId, 
+        firstName, 
+        lastName, 
+        email, 
+        jerseyNumber, 
+        position
+      );
+      res.json(membership);
+    } catch (error) {
+      console.error('Error adding manual player:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : 'Failed to add player' });
     }
   });
 
