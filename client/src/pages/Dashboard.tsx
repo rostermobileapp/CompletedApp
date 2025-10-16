@@ -881,6 +881,19 @@ export default function Dashboard() {
     queryKey: ['/api/user/leagues'],
   });
   
+  // Filter leagues to only show those where user has no team
+  const leaguesWithoutTeams = React.useMemo(() => {
+    if (!Array.isArray(userLeagues) || !Array.isArray(userTeamsAll)) {
+      return [];
+    }
+    
+    return userLeagues.filter(league => {
+      // Check if user has any team in this league
+      const hasTeamInLeague = userTeamsAll.some(team => team.leagueId === league.id);
+      return !hasTeamInLeague;
+    });
+  }, [userLeagues, userTeamsAll]);
+  
   // Set default selection - prefer team first, then league
   // Also validate that saved selection still exists
   React.useEffect(() => {
@@ -990,19 +1003,6 @@ export default function Dashboard() {
     if (!league) return 'Select League';
     return league.name;
   }, []);
-  
-  // Filter leagues to only show those where user has no team
-  const leaguesWithoutTeams = React.useMemo(() => {
-    if (!Array.isArray(userLeagues) || !Array.isArray(userTeamsAll)) {
-      return [];
-    }
-    
-    return userLeagues.filter(league => {
-      // Check if user has any team in this league
-      const hasTeamInLeague = userTeamsAll.some(team => team.leagueId === league.id);
-      return !hasTeamInLeague;
-    });
-  }, [userLeagues, userTeamsAll]);
   
   // Determine the effective league ID for feature access
   // If a team is selected and it's part of a league, use that league ID
