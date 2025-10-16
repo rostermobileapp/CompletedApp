@@ -14,7 +14,7 @@ The frontend is a mobile-first, responsive single-page application built with Re
 
 ## Backend Architecture
 
-The backend is a REST API developed with Express.js and TypeScript, featuring a modular design for authentication, database operations, and route handling. Authentication uses Replit's OpenID Connect via Passport.js with secure user sessions stored in PostgreSQL.
+The backend is a REST API developed with Express.js and TypeScript, featuring a modular design for authentication, database operations, and route handling. Authentication uses Replit's OpenID Connect via Passport.js with secure user sessions stored in PostgreSQL. The messaging system properly handles both direct team memberships (via `team_memberships` table) and league-assigned team memberships (via `assigned_team_id` in `league_memberships` table) when creating team group conversations, ensuring all team members can participate regardless of how they joined the team.
 
 ## Data Storage Solutions
 
