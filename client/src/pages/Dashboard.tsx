@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { notifyDashboardSelectionChange } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -17,11 +17,31 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 import FeedbackModal from '@/components/FeedbackModal';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
+
+// Form schemas
+const personalReminderSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  scheduledAt: z.string().min(1, "Date and time are required"),
+});
+
+const teamGameSchema = z.object({
+  teamId: z.string().min(1, "Team is required"),
+  opponentName: z.string().min(1, "Opponent name is required"),
+  scheduledAt: z.string().min(1, "Date and time are required"),
+  venue: z.string().optional(),
+  notes: z.string().optional(),
+});
 
 // Notification Badge Component
 function AnnouncementBadge({ leagueId }: { leagueId: string | null }) {
@@ -785,6 +805,89 @@ export default function Dashboard() {
   // Feedback modal state
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   
+  // Add event dialog state
+  const [showAddEventDialog, setShowAddEventDialog] = useState(false);
+  const [eventType, setEventType] = useState<'reminder' | 'game' | null>(null);
+  
+  // Reminder form
+  const reminderForm = useForm<z.infer<typeof personalReminderSchema>>({
+    resolver: zodResolver(personalReminderSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      scheduledAt: "",
+    },
+  });
+
+  // Game form
+  const gameForm = useForm<z.infer<typeof teamGameSchema>>({
+    resolver: zodResolver(teamGameSchema),
+    defaultValues: {
+      teamId: "",
+      opponentName: "",
+      scheduledAt: "",
+      venue: "",
+      notes: "",
+    },
+  });
+
+  // Create personal reminder mutation
+  const createReminderMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof personalReminderSchema>) => {
+      await apiRequest("POST", "/api/personal-reminders", {
+        ...data,
+        scheduledAt: new Date(data.scheduledAt).toISOString(),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/personal-reminders"] });
+      toast({
+        title: "Reminder Created",
+        description: "Your personal reminder has been added to your calendar.",
+      });
+      setEventType(null);
+      reminderForm.reset();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create reminder. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create team game mutation
+  const createGameMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof teamGameSchema>) => {
+      await apiRequest("POST", "/api/games", {
+        homeTeamId: data.teamId,
+        awayTeamId: null,
+        opponentName: data.opponentName,
+        scheduledAt: new Date(data.scheduledAt).toISOString(),
+        venue: data.venue || null,
+        notes: data.notes || null,
+        leagueId: null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
+      toast({
+        title: "Game Created",
+        description: "Your game has been added to the schedule.",
+      });
+      setEventType(null);
+      gameForm.reset();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create game. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+  
   const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
     select: (games) => {
@@ -1499,7 +1602,16 @@ export default function Dashboard() {
       {/* Upcoming Games */}
       <div className="px-6 mt-[8px] mb-[8px]">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold" data-testid="text-schedule-title">Schedule</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold" data-testid="text-schedule-title">Schedule</h2>
+            <Button
+              onClick={() => setShowAddEventDialog(true)}
+              className="w-8 h-8 p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
+              data-testid="button-add-event"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
           <button 
             onClick={() => navigate('/calendar')}
             className="text-primary text-sm"
@@ -1774,6 +1886,220 @@ export default function Dashboard() {
         isOpen={showFeedbackModal}
         onClose={() => setShowFeedbackModal(false)}
       />
+
+      {/* Add Event Dialog */}
+      <Dialog open={showAddEventDialog} onOpenChange={setShowAddEventDialog}>
+        <DialogContent className="sm:max-w-[425px]" data-testid="dialog-add-event">
+          <DialogHeader>
+            <DialogTitle data-testid="text-add-event-title">Add Event</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <Button
+              onClick={() => {
+                setEventType('reminder');
+                setShowAddEventDialog(false);
+              }}
+              variant="outline"
+              className="w-full h-auto py-4 px-6 justify-start text-left"
+              data-testid="button-select-reminder"
+            >
+              <div>
+                <div className="font-semibold">Personal Reminder</div>
+                <div className="text-sm text-muted-foreground">Add a personal note or reminder to your calendar</div>
+              </div>
+            </Button>
+            <Button
+              onClick={() => {
+                setEventType('game');
+                setShowAddEventDialog(false);
+              }}
+              variant="outline"
+              className="w-full h-auto py-4 px-6 justify-start text-left"
+              data-testid="button-select-game"
+            >
+              <div>
+                <div className="font-semibold">Team Game</div>
+                <div className="text-sm text-muted-foreground">Schedule a game for your team</div>
+              </div>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Personal Reminder Form Dialog */}
+      <Dialog open={eventType === 'reminder'} onOpenChange={(open) => !open && setEventType(null)}>
+        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-reminder">
+          <DialogHeader>
+            <DialogTitle data-testid="text-create-reminder-title">Create Personal Reminder</DialogTitle>
+          </DialogHeader>
+          <Form {...reminderForm}>
+            <form onSubmit={reminderForm.handleSubmit((data) => createReminderMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={reminderForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Reminder title" {...field} data-testid="input-reminder-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={reminderForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Add more details..." {...field} data-testid="input-reminder-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={reminderForm.control}
+                name="scheduledAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date & Time</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} data-testid="input-reminder-datetime" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEventType(null)}
+                  data-testid="button-cancel-reminder"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createReminderMutation.isPending}
+                  data-testid="button-submit-reminder"
+                >
+                  {createReminderMutation.isPending ? "Creating..." : "Create Reminder"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Team Game Form Dialog */}
+      <Dialog open={eventType === 'game'} onOpenChange={(open) => !open && setEventType(null)}>
+        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-game">
+          <DialogHeader>
+            <DialogTitle data-testid="text-create-game-title">Create Team Game</DialogTitle>
+          </DialogHeader>
+          <Form {...gameForm}>
+            <form onSubmit={gameForm.handleSubmit((data) => createGameMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={gameForm.control}
+                name="teamId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Team</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-game-team">
+                          <SelectValue placeholder="Select your team" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Array.isArray(userTeams) && userTeams.map((team: any) => (
+                          <SelectItem key={team.id} value={team.id} data-testid={`option-team-${team.id}`}>
+                            {team.leagueId && team.league ? `${team.league.name}: ${team.name}` : team.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={gameForm.control}
+                name="opponentName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Opponent Team</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Opponent team name" {...field} data-testid="input-game-opponent" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={gameForm.control}
+                name="scheduledAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date & Time</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} data-testid="input-game-datetime" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={gameForm.control}
+                name="venue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Venue (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Game location" {...field} data-testid="input-game-venue" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={gameForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Additional information..." {...field} data-testid="input-game-notes" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEventType(null)}
+                  data-testid="button-cancel-game"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createGameMutation.isPending}
+                  data-testid="button-submit-game"
+                >
+                  {createGameMutation.isPending ? "Creating..." : "Create Game"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
