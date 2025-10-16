@@ -72,6 +72,8 @@ export default function CreateTeam() {
       return response.json();
     },
     onSuccess: (data: TeamResponse) => {
+      // Invalidate teams query so the dashboard shows the new team
+      queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
       setCreatedTeam(data);
       toast({
         title: 'Team Created',

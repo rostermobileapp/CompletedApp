@@ -865,9 +865,9 @@ export default function Dashboard() {
   React.useEffect(() => {
     if (!selectedId) {
       // First try to select a team
-      if (Array.isArray(userTeams) && userTeams.length > 0) {
+      if (Array.isArray(userTeamsAll) && userTeamsAll.length > 0) {
         setSelectedType('team');
-        setSelectedId(userTeams[0].id);
+        setSelectedId(userTeamsAll[0].id);
       }
       // Otherwise select a league
       else if (Array.isArray(userLeagues) && userLeagues.length > 0) {
@@ -875,7 +875,7 @@ export default function Dashboard() {
         setSelectedId(userLeagues[0].id);
       }
     }
-  }, [userTeams, userLeagues, selectedId]);
+  }, [userTeamsAll, userLeagues, selectedId]);
   
   // Close dropdown when clicking outside
   React.useEffect(() => {
@@ -1156,7 +1156,7 @@ export default function Dashboard() {
         </div>
       </div>
       {/* Team/League Selection Dropdown */}
-      {((Array.isArray(userTeams) && userTeams.length > 0) || (Array.isArray(userLeagues) && userLeagues.length > 0)) && (
+      {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(userLeagues) && userLeagues.length > 0)) && (
         <div className="px-6 mb-4">
           <div className="relative" ref={dropdownRef}>
             <button
@@ -1172,7 +1172,7 @@ export default function Dashboard() {
                 )}
                 <span className="font-medium text-sm">
                   {selectedType === 'team' 
-                    ? (userTeams as any[]).find((t: any) => t.id === selectedId)?.name || 'Select Team'
+                    ? (userTeamsAll as any[])?.find((t: any) => t.id === selectedId)?.name || 'Select Team'
                     : selectedLeague?.name || 'Select League'}
                 </span>
               </div>
@@ -1182,8 +1182,8 @@ export default function Dashboard() {
                   let totalNotifications = 0;
                   
                   // Count notifications from other teams and leagues (not the currently selected one)
-                  if (Array.isArray(userTeams)) {
-                    userTeams.forEach((team: any) => {
+                  if (Array.isArray(userTeamsAll)) {
+                    userTeamsAll.forEach((team: any) => {
                       if (!(selectedType === 'team' && selectedId === team.id)) {
                         // Add team notification logic here when available
                         // For now, we'll use 0
@@ -1209,12 +1209,12 @@ export default function Dashboard() {
             {showDropdown && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-[400px] overflow-y-auto">
                 {/* Teams Section */}
-                {Array.isArray(userTeams) && userTeams.length > 0 && (
+                {Array.isArray(userTeamsAll) && userTeamsAll.length > 0 && (
                   <>
                     <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30">
                       MY TEAMS
                     </div>
-                    {userTeams.map((team: any) => (
+                    {userTeamsAll.map((team: any) => (
                       <button
                         key={`team-${team.id}`}
                         onClick={() => {
