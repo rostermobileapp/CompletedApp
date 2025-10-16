@@ -48,6 +48,7 @@ Key features include:
 - **Messages Scroll to First Unread**: Automatically scrolls to the newest unread message when opening a conversation, falling back to the bottom if no unread messages.
 - **Dashboard Enhancements**: Includes localStorage persistence for team/league selection, unified team/league selector mirroring the Profile page, and correct display of approved scrimmages with a relocated "Finalize & Invoice" button. Smart league feature access: when a team that belongs to a league is selected, users can access league features (News, Standings, To-Do) through the team's league context.
 - **Team-Scoped Messages and Payments**: Messages and Payments pages now filter by the currently selected team on the Dashboard. Uses a custom event system (`useDashboardSelection` hook with `notifyDashboardSelectionChange()`) to sync selection changes in real-time within the same browser tab, ensuring conversations and payment requests only show data relevant to the selected team.
+- **Dashboard-Teams Page Synchronization**: The Teams page (My Team) now uses the shared `useDashboardSelection` hook to stay synchronized with Dashboard team selection. Bidirectional sync ensures when a team is selected on Dashboard, it displays on Teams page, and vice versa. The hook provides `setTeamSelection()` and `setLeagueSelection()` functions to update the selection from any page, maintaining localStorage as single source of truth.
 
 # External Dependencies
 
