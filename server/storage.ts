@@ -152,15 +152,15 @@ async function generateUniqueTeamId(): Promise<string> {
     // Generate a 6-character ID (3 letters + 3 numbers for ABC123 format)
     let teamId = '';
     
-    // First 3 characters: letters
+    // First 3 characters: letters (indices 0-22)
     for (let i = 0; i < 3; i++) {
       const randomIndex = Math.floor(Math.random() * 23); // 23 letters (excluding I and O)
       teamId += characters[randomIndex];
     }
     
-    // Last 3 characters: numbers
+    // Last 3 characters: numbers (indices 24-31, representing digits 2-9)
     for (let i = 0; i < 3; i++) {
-      const randomIndex = Math.floor(Math.random() * 8) + 23; // 8 numbers (excluding 0 and 1)
+      const randomIndex = Math.floor(Math.random() * 8) + 24; // 8 numbers (2-9, excluding 0 and 1)
       teamId += characters[randomIndex];
     }
     

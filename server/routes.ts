@@ -1579,12 +1579,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Team not found" });
       }
 
-      // Check authorization - only commissioner of the league can set team captain
-      const league = await storage.getLeague(team.leagueId);
-      const isCommissioner = league && league.commissionerId === userId;
-
-      if (!isCommissioner) {
-        return res.status(403).json({ message: "Only league commissioners can assign team captains" });
+      // Check authorization
+      // For league teams: only commissioner can set captain
+      // For standalone teams: only team creator can set captain
+      if (team.leagueId) {
+        const league = await storage.getLeague(team.leagueId);
+        const isCommissioner = league && league.commissionerId === userId;
+        if (!isCommissioner) {
+          return res.status(403).json({ message: "Only league commissioners can assign team captains" });
+        }
+      } else {
+        // Standalone team - only creator can set captain
+        if (team.creatorId !== userId) {
+          return res.status(403).json({ message: "Only team creator can assign team captain" });
+        }
       }
 
       // Validate captainId if provided
@@ -1598,8 +1606,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const teamMembers = await storage.getTeamMembers(teamId);
         const hasDirectMembership = teamMembers.some(member => member.userId === captainId);
         
-        const leagueMembership = await storage.getUserLeagueMembership(captainId, team.leagueId);
-        const hasLeagueAssignment = leagueMembership && leagueMembership.assignedTeamId === teamId;
+        let hasLeagueAssignment = false;
+        if (team.leagueId) {
+          const leagueMembership = await storage.getUserLeagueMembership(captainId, team.leagueId);
+          hasLeagueAssignment = leagueMembership !== undefined && leagueMembership.assignedTeamId === teamId;
+        }
 
         if (!hasDirectMembership && !hasLeagueAssignment) {
           return res.status(400).json({ message: "User must be a member of this team to be assigned as captain" });
@@ -2261,6 +2272,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'You are not a member of this team' });
       }
       res.status(500).json({ message: 'Failed to leave team' });
+    }
+  });
+
+  // Standalone team routes
+  app.post('/api/teams/standalone', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { teamName } = req.body;
+
+      if (!teamName || typeof teamName !== 'string' || teamName.trim().length === 0) {
+        return res.status(400).json({ message: 'Team name is required' });
+      }
+
+      const team = await storage.createStandaloneTeam(teamName.trim(), userId);
+      res.json(team);
+    } catch (error) {
+      console.error('Error creating standalone team:', error);
+      res.status(500).json({ message: 'Failed to create standalone team' });
+    }
+  });
+
+  app.get('/api/teams/by-code/:uniqueTeamId', async (req, res) => {
+    try {
+      const { uniqueTeamId } = req.params;
+      const team = await storage.getTeamByUniqueId(uniqueTeamId.toUpperCase());
+      
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+      
+      res.json(team);
+    } catch (error) {
+      console.error('Error fetching team by unique ID:', error);
+      res.status(500).json({ message: 'Failed to fetch team' });
+    }
+  });
+
+  app.post('/api/teams/:teamId/players/import', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { teamId } = req.params;
+      const { csvData } = req.body;
+
+      // Verify team exists and user is the creator/captain
+      const team = await storage.getTeam(teamId);
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+
+      if (team.captainId !== userId && team.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only team captain or creator can import players' });
+      }
+
+      if (!Array.isArray(csvData) || csvData.length === 0) {
+        return res.status(400).json({ message: 'CSV data is required' });
+      }
+
+      const result = await storage.importTeamPlayers(teamId, csvData);
+      res.json(result);
+    } catch (error) {
+      console.error('Error importing team players:', error);
+      res.status(500).json({ message: 'Failed to import players' });
+    }
+  });
+
+  app.post('/api/teams/:teamId/join-league', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { teamId } = req.params;
+      const { leagueId } = req.body;
+
+      // Verify team exists and user is the creator
+      const team = await storage.getTeam(teamId);
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+
+      if (team.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only team creator can request to join a league' });
+      }
+
+      // Check if team already has a league
+      if (team.leagueId) {
+        return res.status(400).json({ message: 'Team is already part of a league' });
+      }
+
+      // Verify league exists
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      const request = await storage.requestTeamJoinLeague(teamId, leagueId, userId);
+      res.json(request);
+    } catch (error) {
+      console.error('Error requesting team join league:', error);
+      res.status(500).json({ message: 'Failed to request team join league' });
+    }
+  });
+
+  app.get('/api/teams/:teamId/league-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const requests = await storage.getTeamLeagueRequests({ teamId });
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching team league requests:', error);
+      res.status(500).json({ message: 'Failed to fetch team league requests' });
+    }
+  });
+
+  app.get('/api/leagues/:leagueId/team-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const { status } = req.query;
+      
+      const requests = await storage.getTeamLeagueRequests({ 
+        leagueId, 
+        status: status as string 
+      });
+      
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching league team requests:', error);
+      res.status(500).json({ message: 'Failed to fetch league team requests' });
+    }
+  });
+
+  app.post('/api/team-league-requests/:requestId/approve', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { requestId } = req.params;
+
+      // Get the request to verify the league
+      const [request] = await storage.getTeamLeagueRequests({ });
+      const targetRequest = request ? await storage.getTeamLeagueRequests({}) : null;
+      
+      if (!targetRequest || targetRequest.length === 0) {
+        return res.status(404).json({ message: 'Request not found' });
+      }
+
+      const theRequest = targetRequest.find((r: any) => r.id === requestId);
+      if (!theRequest) {
+        return res.status(404).json({ message: 'Request not found' });
+      }
+
+      // Verify user is a commissioner of the league
+      const league = await storage.getLeague(theRequest.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      const user = await storage.getUser(userId);
+      const isCommissioner = user && (
+        user.role === 'commissioner' || 
+        user.role === 'secondary_commissioner' || 
+        user.specialPermissions?.includes('admin')
+      );
+
+      if (!isCommissioner && league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only league commissioners can approve team requests' });
+      }
+
+      const approvedRequest = await storage.approveTeamJoinLeague(requestId, userId);
+      res.json(approvedRequest);
+    } catch (error) {
+      console.error('Error approving team league request:', error);
+      res.status(500).json({ message: 'Failed to approve team league request' });
+    }
+  });
+
+  app.post('/api/team-league-requests/:requestId/reject', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { requestId } = req.params;
+
+      // Get the request to verify the league
+      const allRequests = await storage.getTeamLeagueRequests({});
+      const theRequest = allRequests.find((r: any) => r.id === requestId);
+      
+      if (!theRequest) {
+        return res.status(404).json({ message: 'Request not found' });
+      }
+
+      // Verify user is a commissioner of the league
+      const league = await storage.getLeague(theRequest.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      const user = await storage.getUser(userId);
+      const isCommissioner = user && (
+        user.role === 'commissioner' || 
+        user.role === 'secondary_commissioner' || 
+        user.specialPermissions?.includes('admin')
+      );
+
+      if (!isCommissioner && league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only league commissioners can reject team requests' });
+      }
+
+      const rejectedRequest = await storage.rejectTeamJoinLeague(requestId, userId);
+      res.json(rejectedRequest);
+    } catch (error) {
+      console.error('Error rejecting team league request:', error);
+      res.status(500).json({ message: 'Failed to reject team league request' });
     }
   });
 
