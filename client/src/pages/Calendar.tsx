@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
 import { ScrimmageRSVPButtons } from "@/components/ScrimmageRSVPButtons";
 import { ScrimmageRSVPStatusIcon } from "@/components/ScrimmageRSVPStatusIcon";
+import { useDashboardSelection } from "@/hooks/useDashboardSelection";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 
 export default function Calendar() {
@@ -23,6 +24,7 @@ export default function Calendar() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const gamesListRef = useRef<HTMLDivElement>(null);
+  const { selectedTeamId } = useDashboardSelection();
   
   // Modal state for RSVP details and substitute requests
   const [showRSVPModal, setShowRSVPModal] = useState(false);
@@ -60,8 +62,18 @@ export default function Calendar() {
     queryKey: ["/api/user/teams"],
   });
 
-  // Get primary team (first team for now)
-  const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
+  // Get active team based on Dashboard selection (or first team if none selected/invalid)
+  const activeTeam = (() => {
+    if (!Array.isArray(userTeams) || userTeams.length === 0) return null;
+    
+    if (selectedTeamId) {
+      const selectedTeam = userTeams.find((team: any) => team.id === selectedTeamId);
+      // If selected team exists, use it; otherwise fall back to first team
+      return selectedTeam || userTeams[0];
+    }
+    
+    return userTeams[0];
+  })();
 
   // Fetch all games (past and future)
   const { data: allGames, isLoading: gamesLoading } = useQuery({
@@ -104,15 +116,24 @@ export default function Calendar() {
     },
   });
 
-  // Filter games for user's teams and sort chronologically
+  // Filter games by active team (or all user teams if none selected)
   const userGames = Array.isArray(allGames) && Array.isArray(userTeams) 
     ? allGames.filter((game: any) => {
-        const userTeamIds = userTeams.map((team: any) => team.id);
-        return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
+        if (selectedTeamId) {
+          // Team is selected - filter by activeTeam (which has fallback logic)
+          return activeTeam && (game.homeTeamId === activeTeam.id || game.awayTeamId === activeTeam.id);
+        } else {
+          // No team selected - show games for all user teams
+          const userTeamIds = userTeams.map((team: any) => team.id);
+          return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
+        }
       }).sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
     : [];
 
-  // Get user's relevant scrimmages (created + approved requests)
+  // Get active team's league (if a team is active)
+  const activeTeamLeagueId = activeTeam?.leagueId;
+
+  // Get user's relevant scrimmages (created + approved requests), filtered by selected team's league
   const userScrimmages = [
     // User's created scrimmages
     ...createdScrimmages.map(scrimmage => ({
@@ -130,16 +151,30 @@ export default function Calendar() {
         userRole: 'participant' as const,
         scheduledAt: request.scrimmage.dateTime, // Match games field name
       }))
-  ];
+  ].filter(scrimmage => {
+    // Filter by active team's league if a team is selected
+    if (selectedTeamId) {
+      return activeTeamLeagueId && scrimmage.leagueId === activeTeamLeagueId;
+    }
+    return true;
+  });
 
-  // Get user's substitute games (games they're subbing for)
+  // Get user's substitute games (games they're subbing for), filtered by selected team
   const substituteGames = Array.isArray(mySubstitutions) 
-    ? mySubstitutions.map((sub: any) => ({
-        ...sub.game,
-        type: 'substitute' as const,
-        substituteForTeam: sub.requestingTeam,
-        scheduledAt: sub.game.scheduledAt,
-      }))
+    ? mySubstitutions
+        .map((sub: any) => ({
+          ...sub.game,
+          type: 'substitute' as const,
+          substituteForTeam: sub.requestingTeam,
+          scheduledAt: sub.game.scheduledAt,
+        }))
+        .filter((game: any) => {
+          // Filter by active team if a team is selected
+          if (selectedTeamId) {
+            return activeTeam && (game.homeTeamId === activeTeam.id || game.awayTeamId === activeTeam.id);
+          }
+          return true;
+        })
     : [];
 
   // Combine games, scrimmages, and substitute games, then sort chronologically
@@ -309,7 +344,7 @@ export default function Calendar() {
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
                     {(() => {
-                      const opponentTeam = game.homeTeam?.id === primaryTeam?.id ? game.awayTeam : game.homeTeam;
+                      const opponentTeam = game.homeTeam?.id === activeTeam?.id ? game.awayTeam : game.homeTeam;
                       return opponentTeam?.logoUrl ? (
                         <img 
                           src={opponentTeam.logoUrl} 
@@ -324,7 +359,7 @@ export default function Calendar() {
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
-                      vs {game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}
+                      vs {game.homeTeam?.id === activeTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}
                     </h3>
                     <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
                       {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
@@ -337,11 +372,11 @@ export default function Calendar() {
                     {/* Score display for completed games */}
                     {isCompleted && (
                       <div className="text-sm font-medium mt-1" data-testid={`text-game-score-${game.id}`}>
-                        <span className={game.homeTeam?.id === primaryTeam?.id ? "text-primary" : "text-muted-foreground"}>
+                        <span className={game.homeTeam?.id === activeTeam?.id ? "text-primary" : "text-muted-foreground"}>
                           {game.homeTeam?.name}: {game.homeScore ?? 0}
                         </span>
                         <span className="text-muted-foreground mx-2">•</span>
-                        <span className={game.awayTeam?.id === primaryTeam?.id ? "text-primary" : "text-muted-foreground"}>
+                        <span className={game.awayTeam?.id === activeTeam?.id ? "text-primary" : "text-muted-foreground"}>
                           {game.awayTeam?.name}: {game.awayScore ?? 0}
                         </span>
                       </div>
@@ -354,7 +389,7 @@ export default function Calendar() {
                     )}
                     
                     {/* View Details Button for upcoming games */}
-                    {!isCompleted && !isPastGame && user && primaryTeam && (game.homeTeam?.id === primaryTeam.id || game.awayTeam?.id === primaryTeam.id) && (
+                    {!isCompleted && !isPastGame && user && activeTeam && (game.homeTeam?.id === activeTeam.id || game.awayTeam?.id === activeTeam.id) && (
                       <Button
                         size="sm"
                         variant="outline" 
@@ -371,11 +406,11 @@ export default function Calendar() {
                     )}
 
                     {/* RSVP Buttons for upcoming games */}
-                    {!isCompleted && !isPastGame && user && primaryTeam && (game.homeTeam?.id === primaryTeam.id || game.awayTeam?.id === primaryTeam.id) && (
+                    {!isCompleted && !isPastGame && user && activeTeam && (game.homeTeam?.id === activeTeam.id || game.awayTeam?.id === activeTeam.id) && (
                       <RSVPButtons 
                         gameId={game.id} 
                         userId={(user as any).id}
-                        userTeamId={primaryTeam.id}
+                        userTeamId={activeTeam.id}
                         className="mb-1"
                       />
                     )}
@@ -410,8 +445,8 @@ export default function Calendar() {
                           variant="outline"
                           className="h-8 w-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
                           onClick={() => {
-                            const userTeam = game.homeTeam?.id === primaryTeam?.id ? game.homeTeam : game.awayTeam;
-                            if (userTeam && primaryTeam) {
+                            const userTeam = game.homeTeam?.id === activeTeam?.id ? game.homeTeam : game.awayTeam;
+                            if (userTeam && activeTeam) {
                               claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
                             }
                           }}
