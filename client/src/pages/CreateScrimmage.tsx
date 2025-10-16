@@ -316,7 +316,7 @@ export default function CreateScrimmage() {
                     form.setValue('isRecurring', checked);
                     form.setValue('recurrenceType', checked ? 'weekly' : 'none');
                   }}
-                  className="bg-[#3b82f3]"
+                  className="bg-[#3c83f6]"
                   data-testid="switch-recurring"
                 />
               </div>
