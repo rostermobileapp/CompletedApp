@@ -279,7 +279,7 @@ export const teamLeagueRequests = pgTable("team_league_requests", {
 // Games table
 export const games = pgTable("games", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id), // Made nullable for standalone team games
   seasonId: varchar("season_id").references(() => seasons.id), // Made nullable for safe migration
   homeTeamId: varchar("home_team_id").references(() => teams.id).notNull(),
   awayTeamId: varchar("away_team_id").references(() => teams.id).notNull(),
@@ -298,6 +298,21 @@ export const games = pgTable("games", {
   resultType: gameResultTypeEnum("result_type").default("regulation"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Personal reminders table
+export const personalReminders = pgTable("personal_reminders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  isCompleted: boolean("is_completed").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_personal_reminders_user_id").on(table.userId),
+  index("idx_personal_reminders_scheduled_at").on(table.scheduledAt),
+]);
 
 // Game score submissions table
 export const gameScoreSubmissions = pgTable("game_score_submissions", {
@@ -1647,6 +1662,14 @@ export const insertGameSchema = createInsertSchema(games).omit({
   scheduledAt: z.string().transform((val) => new Date(val)),
 });
 
+export const insertPersonalReminderSchema = createInsertSchema(personalReminders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  scheduledAt: z.string().transform((val) => new Date(val)),
+});
+
 export const insertGameScoreSubmissionSchema = createInsertSchema(gameScoreSubmissions).omit({
   id: true,
   submittedAt: true,
@@ -2117,6 +2140,8 @@ export type TeamLeagueRequest = typeof teamLeagueRequests.$inferSelect;
 export type InsertTeamLeagueRequest = z.infer<typeof insertTeamLeagueRequestSchema>;
 export type Game = typeof games.$inferSelect;
 export type InsertGame = z.infer<typeof insertGameSchema>;
+export type PersonalReminder = typeof personalReminders.$inferSelect;
+export type InsertPersonalReminder = z.infer<typeof insertPersonalReminderSchema>;
 export type GameScoreSubmission = typeof gameScoreSubmissions.$inferSelect;
 export type InsertGameScoreSubmission = z.infer<typeof insertGameScoreSubmissionSchema>;
 export type GameGoalie = typeof gameGoalies.$inferSelect;
