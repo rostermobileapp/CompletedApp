@@ -23,6 +23,7 @@ import {
   insertLeagueMembershipSchema,
   insertTeamMembershipSchema,
   insertGameSchema,
+  insertPersonalReminderSchema,
   insertGameRsvpSchema,
   insertSubstituteRequestSchema,
   insertMessageSchema,
@@ -210,6 +211,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating navigation preferences:", error);
       res.status(500).json({ message: "Failed to update navigation preferences" });
+    }
+  });
+
+  // Personal Reminders Routes
+  app.get('/api/user/personal-reminders', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const reminders = await storage.getUserPersonalReminders(userId);
+      res.json(reminders);
+    } catch (error) {
+      console.error("Error fetching personal reminders:", error);
+      res.status(500).json({ message: "Failed to fetch personal reminders" });
+    }
+  });
+
+  app.post('/api/personal-reminders', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const reminderData = insertPersonalReminderSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      const reminder = await storage.createPersonalReminder(reminderData);
+      res.json(reminder);
+    } catch (error) {
+      console.error("Error creating personal reminder:", error);
+      res.status(500).json({ message: "Failed to create personal reminder" });
     }
   });
 
@@ -2102,11 +2143,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Determine the user's role in this game
       let submitterRole = '';
       
-      // Check if user is commissioner
-      const league = await storage.getLeague(game.leagueId);
-      if (league && league.commissionerId === userId) {
-        submitterRole = 'commissioner';
-      } else {
+      // Check if user is commissioner (only for league games)
+      if (game.leagueId) {
+        const league = await storage.getLeague(game.leagueId);
+        if (league && league.commissionerId === userId) {
+          submitterRole = 'commissioner';
+        }
+      }
+      
+      if (!submitterRole) {
         // Check if user is captain of home team
         const homeTeam = await storage.getTeam(game.homeTeamId);
         const homeTeamCaptain = homeTeam && homeTeam.captainId === userId;
@@ -2192,8 +2237,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user has permission to view submissions (captain or commissioner)
-      const league = await storage.getLeague(game.leagueId);
-      const isCommissioner = league && league.commissionerId === userId;
+      let isCommissioner = false;
+      if (game.leagueId) {
+        const league = await storage.getLeague(game.leagueId);
+        isCommissioner = !!(league && league.commissionerId === userId);
+      }
       
       // Check if user is captain of either team
       const homeTeam = await storage.getTeam(game.homeTeamId);
@@ -2691,10 +2739,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Game not found' });
       }
 
-      // Verify user has access to this game's league
-      const userMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
-      if (!userMembership || userMembership.status !== 'approved') {
-        return res.status(403).json({ message: 'Access denied - not an approved league member' });
+      // Verify user has access to this game (league member or team member)
+      let hasAccess = false;
+      if (game.leagueId) {
+        const userMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
+        hasAccess = !!(userMembership && userMembership.status === 'approved');
+      } else {
+        // For standalone games, check if user is a member of either team
+        const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
+        const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+        hasAccess = [...homeTeamMembers, ...awayTeamMembers].some(m => m.userId === userId);
+      }
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
       }
       
       // Get members from both home and away teams
@@ -2799,9 +2857,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamMembers = await storage.getTeamMembers(teamId);
       const hasDirectTeamMembership = teamMembers.some(member => member.userId === userId);
       
-      // Also check if user has league membership with this team assigned
-      const leagueMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
-      const hasLeagueTeamAssignment = leagueMembership && leagueMembership.assignedTeamId === teamId;
+      // Also check if user has league membership with this team assigned (only for league games)
+      let hasLeagueTeamAssignment = false;
+      if (game.leagueId) {
+        const leagueMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
+        hasLeagueTeamAssignment = !!(leagueMembership && leagueMembership.assignedTeamId === teamId);
+      }
       
       if (!hasDirectTeamMembership && !hasLeagueTeamAssignment) {
         return res.status(403).json({ message: 'You must be on this team to RSVP' });
@@ -2840,8 +2901,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is captain or commissioner
       const user = await storage.getUser(userId);
-      const league = await storage.getLeague(game.leagueId);
-      const isCommissioner = league && league.commissionerId === userId;
+      let isCommissioner = false;
+      if (game.leagueId) {
+        const league = await storage.getLeague(game.leagueId);
+        isCommissioner = !!(league && league.commissionerId === userId);
+      }
       
       // Check if user is captain of either team
       const homeTeam = await storage.getTeam(game.homeTeamId);
@@ -2859,9 +2923,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const teamMembers = await storage.getTeamMembers(teamId as string);
         const isMemberOfTeam = teamMembers.some(member => member.userId === userId);
         
-        // Also check league membership assignment
-        const leagueMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
-        const hasLeagueTeamAssignment = leagueMembership && leagueMembership.assignedTeamId === teamId;
+        // Also check league membership assignment (only for league games)
+        let hasLeagueTeamAssignment = false;
+        let leagueMembership = null;
+        if (game.leagueId) {
+          leagueMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
+          hasLeagueTeamAssignment = !!(leagueMembership && leagueMembership.assignedTeamId === teamId);
+        }
         
         console.log('RSVP Summary Auth Debug:', {
           userId,
@@ -2888,10 +2956,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const isOnHomeTeam = homeTeamMembers.some(member => member.userId === userId);
         const isOnAwayTeam = awayTeamMembers.some(member => member.userId === userId);
         
-        // Check league membership assignments
-        const leagueMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
-        const hasHomeTeamAssignment = leagueMembership && leagueMembership.assignedTeamId === game.homeTeamId;
-        const hasAwayTeamAssignment = leagueMembership && leagueMembership.assignedTeamId === game.awayTeamId;
+        // Check league membership assignments (only for league games)
+        let hasHomeTeamAssignment = false;
+        let hasAwayTeamAssignment = false;
+        if (game.leagueId) {
+          const leagueMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
+          hasHomeTeamAssignment = !!(leagueMembership && leagueMembership.assignedTeamId === game.homeTeamId);
+          hasAwayTeamAssignment = !!(leagueMembership && leagueMembership.assignedTeamId === game.awayTeamId);
+        }
         
         if (!isCommissioner && !isHomeCaptain && !isAwayCaptain && !isOnHomeTeam && !isOnAwayTeam && !hasHomeTeamAssignment && !hasAwayTeamAssignment) {
           return res.status(403).json({ message: 'You must be on a team, captain, or commissioner to view attendance' });
@@ -3031,6 +3103,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const game = await storage.getGameById(gameId);
       if (!game) {
         return res.status(404).json({ message: 'Game not found' });
+      }
+      
+      // Substitute requests are only available for league games
+      if (!game.leagueId) {
+        return res.status(400).json({ message: 'Substitute requests are only available for league games' });
       }
       
       // Get league to verify commissioner ownership if needed
@@ -3262,8 +3339,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                        (awayTeam && awayTeam.captainId === userId);
       
       // CRITICAL SECURITY FIX: Only the league's commissioner can access, not any commissioner
-      const league = await storage.getLeague(request.game.leagueId);
-      const isLeagueCommissioner = league && league.commissionerId === userId;
+      let isLeagueCommissioner = false;
+      if (request.game.leagueId) {
+        const league = await storage.getLeague(request.game.leagueId);
+        isLeagueCommissioner = !!(league && league.commissionerId === userId);
+      }
 
       if (!isLeagueCommissioner && !isInvolved && !isCaptain) {
         return res.status(403).json({ message: 'Access denied' });
@@ -3337,8 +3417,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // CRITICAL SECURITY FIX: Only the requester or the league's commissioner can update
       const user = await storage.getUser(userId);
-      const league = await storage.getLeague(request.game.leagueId);
-      const isLeagueCommissioner = league && league.commissionerId === userId;
+      let isLeagueCommissioner = false;
+      if (request.game.leagueId) {
+        const league = await storage.getLeague(request.game.leagueId);
+        isLeagueCommissioner = !!(league && league.commissionerId === userId);
+      }
       const isRequester = request.requestedBy === userId;
 
       if (!isLeagueCommissioner && !isRequester) {
@@ -3346,7 +3429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // SECURITY: If substitute player is being updated, validate they exist and are league members
-      if (validatedUpdates.substitutePlayerId) {
+      if (validatedUpdates.substitutePlayerId && request.game.leagueId) {
         const substitutePlayer = await storage.getUser(validatedUpdates.substitutePlayerId);
         if (!substitutePlayer) {
           return res.status(400).json({ message: 'Substitute player not found' });

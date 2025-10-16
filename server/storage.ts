@@ -8,6 +8,7 @@ import {
   placeholderPlayers,
   teamLeagueRequests,
   games,
+  personalReminders,
   gameScoreSubmissions,
   gameRsvps,
   gameGoalies,
@@ -69,6 +70,8 @@ import {
   type InsertTeamLeagueRequest,
   type Game,
   type InsertGame,
+  type PersonalReminder,
+  type InsertPersonalReminder,
   type GameScoreSubmission,
   type InsertGameScoreSubmission,
   type GameRsvp,
@@ -272,6 +275,10 @@ export interface IStorage {
   releaseBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game>;
   saveGameNotes(gameId: string, userId: string, teamId: string, notes: string): Promise<any>;
   deleteGame(id: string): Promise<void>;
+  
+  // Personal Reminders
+  getUserPersonalReminders(userId: string): Promise<PersonalReminder[]>;
+  createPersonalReminder(reminder: InsertPersonalReminder): Promise<PersonalReminder>;
   
   // RSVP operations
   createOrUpdateRsvp(rsvp: InsertGameRsvp): Promise<GameRsvp>;
@@ -3138,6 +3145,19 @@ export class DatabaseStorage implements IStorage {
       console.error(`Error deleting game ${id}:`, error);
       throw error;
     }
+  }
+
+  // Personal Reminders operations
+  async getUserPersonalReminders(userId: string): Promise<PersonalReminder[]> {
+    return await db.select()
+      .from(personalReminders)
+      .where(eq(personalReminders.userId, userId))
+      .orderBy(asc(personalReminders.scheduledAt));
+  }
+
+  async createPersonalReminder(reminder: InsertPersonalReminder): Promise<PersonalReminder> {
+    const [newReminder] = await db.insert(personalReminders).values(reminder).returning();
+    return newReminder;
   }
 
   async deleteTeam(teamId: string): Promise<void> {
