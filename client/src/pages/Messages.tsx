@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { League, ChatPoll, ChatPollVote } from '@shared/schema';
 
 import { MediaGallery } from '@/components/MediaGallery';
@@ -463,6 +464,7 @@ export default function Messages() {
   const { canAccessPremiumFeatures } = usePermissions();
   const currentUserId = (user as any)?.id;
   const params = useParams();
+  const { selectedTeamId } = useDashboardSelection();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
 
   // Handle conversation ID from URL parameter
@@ -536,10 +538,20 @@ export default function Messages() {
   });
 
   // Fetch conversations
-  const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
+  const { data: allConversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
     queryKey: ['/api/conversations'],
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
+
+  // Filter conversations by selected team from Dashboard
+  const conversations = useMemo(() => {
+    if (!selectedTeamId) {
+      // No team selected, show all conversations
+      return allConversations;
+    }
+    // Filter conversations that belong to the selected team
+    return allConversations.filter(conv => conv.teamId === selectedTeamId);
+  }, [allConversations, selectedTeamId]);
 
   // Fetch unread message counts per conversation
   const { data: unreadCountsData } = useQuery<{ unreadCounts: Array<{ conversationId: string; unreadCount: number }> }>({

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -8,10 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { apiRequest } from '@/lib/queryClient';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<'created' | 'received'>('created');
+  const { selectedTeamId } = useDashboardSelection();
 
   // Fetch unpaid count for badge
   const { data: unpaidCount } = useQuery({
@@ -23,18 +25,58 @@ export default function PaymentRequests() {
     refetchInterval: 30000, // Check every 30 seconds
   });
 
+  // Fetch conversations to map payment requests to teams
+  const { data: allConversations = [] } = useQuery<any[]>({
+    queryKey: ['/api/conversations'],
+  });
+
+  // Create a map of conversationId to teamId for filtering
+  const conversationTeamMap = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    allConversations.forEach((conv: any) => {
+      map[conv.id] = conv.teamId || null;
+    });
+    return map;
+  }, [allConversations]);
+
   // Fetch payment requests created by the user
-  const { data: createdRequests = [], isLoading: createdLoading } = useQuery({
+  const { data: allCreatedRequests = [], isLoading: createdLoading } = useQuery({
     queryKey: ['/api/payment-requests/created/by-me'],
   });
 
   // Fetch payment requests where the user is a recipient
-  const { data: receivedRequests = [], isLoading: receivedLoading } = useQuery({
+  const { data: allReceivedRequests = [], isLoading: receivedLoading } = useQuery({
     queryKey: ['/api/payment-requests/received/by-me'],
   });
 
-  const createdRequestsArray = createdRequests as any[];
-  const receivedRequestsArray = receivedRequests as any[];
+  // Filter payment requests by selected team
+  const createdRequestsArray = useMemo(() => {
+    const requests = allCreatedRequests as any[];
+    if (!selectedTeamId) return requests;
+    
+    return requests.filter(request => {
+      // If payment request is linked to a conversation, check if that conversation belongs to the selected team
+      if (request.relatedConversationId) {
+        return conversationTeamMap[request.relatedConversationId] === selectedTeamId;
+      }
+      // If not linked to a conversation, exclude it when team is selected
+      return false;
+    });
+  }, [allCreatedRequests, selectedTeamId, conversationTeamMap]);
+
+  const receivedRequestsArray = useMemo(() => {
+    const requests = allReceivedRequests as any[];
+    if (!selectedTeamId) return requests;
+    
+    return requests.filter(request => {
+      // If payment request is linked to a conversation, check if that conversation belongs to the selected team
+      if (request.relatedConversationId) {
+        return conversationTeamMap[request.relatedConversationId] === selectedTeamId;
+      }
+      // If not linked to a conversation, exclude it when team is selected
+      return false;
+    });
+  }, [allReceivedRequests, selectedTeamId, conversationTeamMap]);
 
   const getPaymentStatus = (request: any, isCreator: boolean) => {
     if (isCreator) {

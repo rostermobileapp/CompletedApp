@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { usePermissions } from '@/context/SubscriptionContext';
+import { notifyDashboardSelectionChange } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
 import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -758,6 +759,8 @@ export default function Dashboard() {
     } else {
       localStorage.removeItem('dashboardSelectedId');
     }
+    // Notify other components in the same tab about the selection change
+    notifyDashboardSelectionChange();
   }, [selectedType, selectedId]);
   
   // Backward compatibility
