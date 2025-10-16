@@ -42,6 +42,9 @@ export default function Profile() {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingPaymentMethods, setIsEditingPaymentMethods] = useState(false);
+  const [selectedTeamForLeagueRequest, setSelectedTeamForLeagueRequest] = useState<string | null>(null);
+  const [showLeagueRequestDialog, setShowLeagueRequestDialog] = useState(false);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
 
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -169,6 +172,37 @@ export default function Profile() {
     onError: (error: any) => {
       toast({ 
         title: 'Failed to leave team', 
+        description: error.message || 'Please try again.',
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  // Query for available leagues
+  const { data: availableLeagues } = useQuery<any[]>({
+    queryKey: ['/api/leagues'],
+    enabled: showLeagueRequestDialog,
+  });
+
+  // Request team to join league mutation
+  const requestTeamJoinLeagueMutation = useMutation({
+    mutationFn: async ({ teamId, leagueId }: { teamId: string; leagueId: string }) => {
+      const response = await apiRequest('POST', `/api/teams/${teamId}/join-league`, { leagueId });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ 
+        title: 'Request Submitted',
+        description: 'Your team\'s request to join the league has been sent to the commissioner for approval.' 
+      });
+      setShowLeagueRequestDialog(false);
+      setSelectedTeamForLeagueRequest(null);
+      setSelectedLeagueId('');
+      queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Request Failed', 
         description: error.message || 'Please try again.',
         variant: 'destructive' 
       });
@@ -604,52 +638,78 @@ export default function Profile() {
         <div className="px-6 mb-6">
           <h2 className="text-lg font-semibold mb-4" data-testid="text-teams-title">Your Teams</h2>
           <div className="space-y-3">
-            {userTeams.map((team: any) => (
-              <div key={team.id} className="bg-card rounded-lg border border-border p-4" data-testid={`card-team-${team.id}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Users className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium" data-testid={`text-team-name-${team.id}`}>{team.name}</p>
+            {userTeams.map((team: any) => {
+              const isStandalone = !team.leagueId;
+              const isTeamCreator = team.creatorId === user?.id;
+              const showJoinLeagueButton = isStandalone && isTeamCreator;
+              
+              return (
+                <div key={team.id} className="bg-card rounded-lg border border-border p-4" data-testid={`card-team-${team.id}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium" data-testid={`text-team-name-${team.id}`}>{team.name}</p>
+                        {isStandalone ? (
+                          <p className="text-xs text-muted-foreground">
+                            Standalone Team {team.uniqueTeamId && `• ID: ${team.uniqueTeamId}`}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Part of a league</p>
+                        )}
+                      </div>
                     </div>
+                    
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          className="px-3 py-1 text-sm text-destructive border border-destructive rounded-md hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+                          disabled={leaveTeamMutation.isPending}
+                          data-testid={`button-leave-team-${team.id}`}
+                        >
+                          {leaveTeamMutation.isPending ? 'Leaving...' : 'Leave'}
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent data-testid={`dialog-leave-team-${team.id}`}>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Leave Team</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to leave "{team.name}"? This will:
+                            <br />• Remove you from the team roster
+                            <br />• Clear your game RSVPs for this team
+                            <br />• Remove your beverage duty assignments
+                            <br /><br />This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel data-testid={`button-cancel-leave-team-${team.id}`}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => leaveTeamMutation.mutate(team.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            data-testid={`button-confirm-leave-team-${team.id}`}
+                          >
+                            Leave Team
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                   
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <button
-                        className="px-3 py-1 text-sm text-destructive border border-destructive rounded-md hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
-                        disabled={leaveTeamMutation.isPending}
-                        data-testid={`button-leave-team-${team.id}`}
-                      >
-                        {leaveTeamMutation.isPending ? 'Leaving...' : 'Leave'}
-                      </button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent data-testid={`dialog-leave-team-${team.id}`}>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Leave Team</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to leave "{team.name}"? This will:
-                          <br />• Remove you from the team roster
-                          <br />• Clear your game RSVPs for this team
-                          <br />• Remove your beverage duty assignments
-                          <br /><br />This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel data-testid={`button-cancel-leave-team-${team.id}`}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => leaveTeamMutation.mutate(team.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          data-testid={`button-confirm-leave-team-${team.id}`}
-                        >
-                          Leave Team
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  {showJoinLeagueButton && (
+                    <button
+                      onClick={() => {
+                        setSelectedTeamForLeagueRequest(team.id);
+                        setShowLeagueRequestDialog(true);
+                      }}
+                      className="w-full mt-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                      data-testid={`button-request-join-league-${team.id}`}
+                    >
+                      Request to Join League
+                    </button>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -753,6 +813,63 @@ export default function Profile() {
           </button>
         </div>
       </div>
+
+      {/* League Request Dialog */}
+      <AlertDialog open={showLeagueRequestDialog} onOpenChange={setShowLeagueRequestDialog}>
+        <AlertDialogContent data-testid="dialog-request-join-league">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Request to Join League</AlertDialogTitle>
+            <AlertDialogDescription>
+              Select a league for your team to join. Your request will be sent to the league commissioner for approval.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium mb-2 block">Select League</label>
+            <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
+              <SelectTrigger data-testid="select-league">
+                <SelectValue placeholder="Choose a league" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableLeagues && availableLeagues.length > 0 ? (
+                  availableLeagues.map((league: any) => (
+                    <SelectItem key={league.id} value={league.id} data-testid={`option-league-${league.id}`}>
+                      {league.name} - {league.sport}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>No leagues available</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setShowLeagueRequestDialog(false);
+                setSelectedTeamForLeagueRequest(null);
+                setSelectedLeagueId('');
+              }}
+              data-testid="button-cancel-league-request"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (selectedTeamForLeagueRequest && selectedLeagueId) {
+                  requestTeamJoinLeagueMutation.mutate({
+                    teamId: selectedTeamForLeagueRequest,
+                    leagueId: selectedLeagueId,
+                  });
+                }
+              }}
+              disabled={!selectedLeagueId || requestTeamJoinLeagueMutation.isPending}
+              data-testid="button-confirm-league-request"
+            >
+              {requestTeamJoinLeagueMutation.isPending ? 'Sending...' : 'Send Request'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
