@@ -46,6 +46,17 @@ function AnnouncementBadge({ leagueId }: { leagueId: string | null }) {
   );
 }
 
+// Inline Notification Badge for Dropdown Items
+function NotificationBadge({ count }: { count: number }) {
+  if (!count || count === 0) return null;
+  
+  return (
+    <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+      <span className="text-white text-xs font-bold">{count}</span>
+    </div>
+  );
+}
+
 
 // Needs Attention Modal Component
 function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: { 
@@ -1126,7 +1137,31 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                {/* Notification badges will go here */}
+                {/* Total notification count for ALL other teams/leagues */}
+                {(() => {
+                  let totalNotifications = 0;
+                  
+                  // Count notifications from other teams and leagues (not the currently selected one)
+                  if (Array.isArray(userTeams)) {
+                    userTeams.forEach((team: any) => {
+                      if (!(selectedType === 'team' && selectedId === team.id)) {
+                        // Add team notification logic here when available
+                        // For now, we'll use 0
+                      }
+                    });
+                  }
+                  
+                  if (Array.isArray(userLeagues)) {
+                    userLeagues.forEach((league: any) => {
+                      if (!(selectedType === 'league' && selectedId === league.id)) {
+                        // We can't easily fetch all unread counts here without making it too heavy
+                        // This will be implemented with a summary endpoint later
+                      }
+                    });
+                  }
+                  
+                  return totalNotifications > 0 ? <NotificationBadge count={totalNotifications} /> : null;
+                })()}
                 <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
               </div>
             </button>
