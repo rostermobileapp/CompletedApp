@@ -5,6 +5,7 @@ import {
   teams,
   leagueMemberships,
   teamMemberships,
+  teamLeagueRequests,
   games,
   gameScoreSubmissions,
   gameRsvps,
@@ -61,6 +62,8 @@ import {
   type InsertLeagueMembership,
   type TeamMembership,
   type InsertTeamMembership,
+  type TeamLeagueRequest,
+  type InsertTeamLeagueRequest,
   type Game,
   type InsertGame,
   type GameScoreSubmission,
@@ -138,6 +141,45 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, not } from "drizzle-orm";
+
+// Helper function to generate unique 6-character alphanumeric team IDs (ABC123 format)
+async function generateUniqueTeamId(): Promise<string> {
+  const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars: I, O, 0, 1
+  let attempts = 0;
+  const maxAttempts = 100;
+  
+  while (attempts < maxAttempts) {
+    // Generate a 6-character ID (3 letters + 3 numbers for ABC123 format)
+    let teamId = '';
+    
+    // First 3 characters: letters
+    for (let i = 0; i < 3; i++) {
+      const randomIndex = Math.floor(Math.random() * 23); // 23 letters (excluding I and O)
+      teamId += characters[randomIndex];
+    }
+    
+    // Last 3 characters: numbers
+    for (let i = 0; i < 3; i++) {
+      const randomIndex = Math.floor(Math.random() * 8) + 23; // 8 numbers (excluding 0 and 1)
+      teamId += characters[randomIndex];
+    }
+    
+    // Check if this ID already exists
+    const existingTeam = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.uniqueTeamId, teamId))
+      .limit(1);
+    
+    if (existingTeam.length === 0) {
+      return teamId;
+    }
+    
+    attempts++;
+  }
+  
+  throw new Error('Failed to generate unique team ID after maximum attempts');
+}
 
 export interface IStorage {
   // User operations (required for Replit Auth)
