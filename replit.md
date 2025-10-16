@@ -4,6 +4,14 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 # Recent Changes
 
+## October 16, 2025 - Profile "Your Teams" Section with Leave Functionality
+Added a "Your Teams" section to the Profile page that allows users to view and leave their team memberships:
+- **Teams Display**: Shows all teams the user is a member of (both direct team memberships and league-assigned teams)
+- **Leave Team Feature**: Users can leave teams with a confirmation dialog, similar to the "Leave League" functionality
+- **Team Captain Protection**: Team captains cannot leave their team and must transfer the captain role first
+- **Comprehensive Cleanup**: Leaving a team removes team memberships, clears game RSVPs, and removes beverage duty assignments
+- Backend implementation includes the `/api/teams/:teamId/leave` endpoint and `leaveTeam` storage method
+
 ## October 15, 2025 - Messages Scroll to First Unread
 Updated the messages thread view to automatically scroll to the newest unread message instead of the newest message overall when opening a conversation:
 - **Smart Scroll Positioning**: When opening a conversation, the view now scrolls to the first unread message (messages not from the current user without read receipts)
