@@ -8,6 +8,7 @@ import {
   userOnlineStatus,
   users,
   teamMemberships,
+  leagueMemberships,
   teams,
   chatPolls,
   chatPollVotes,
@@ -616,8 +617,20 @@ export class MessagingService {
         eq(teamMemberships.status, 'approved')
       ));
 
-    // Create a set of all unique team participants (members + captain)
-    const participantIds = new Set<string>(teamMembershipsData.map(m => m.userId));
+    // Also get league members who are assigned to this team
+    const leagueMembershipsData = await db
+      .select({ userId: leagueMemberships.userId })
+      .from(leagueMemberships)
+      .where(and(
+        eq(leagueMemberships.assignedTeamId, teamId),
+        eq(leagueMemberships.status, 'approved')
+      ));
+
+    // Create a set of all unique team participants (members + captain + league-assigned members)
+    const participantIds = new Set<string>([
+      ...teamMembershipsData.map(m => m.userId),
+      ...leagueMembershipsData.map(m => m.userId)
+    ]);
     
     // Always add the captain if they exist
     if (team.captainId) {
