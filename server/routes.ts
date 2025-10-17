@@ -67,6 +67,7 @@ import Papa from "papaparse";
 import * as fs from 'fs';
 import * as path from 'path';
 import Stripe from "stripe";
+import { nanoid } from "nanoid";
 
 
 // Utility function to format game scheduledAt as timezone-agnostic string
@@ -1008,7 +1009,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Generate unique league ID if not provided
       if (!leagueData.uniqueLeagueId) {
-        leagueData.uniqueLeagueId = `${leagueData.name.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substring(2, 8)}`;
+        const sanitizedName = leagueData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'league';
+        const uniqueId = nanoid(8);
+        leagueData.uniqueLeagueId = `${sanitizedName}-${uniqueId}`;
       }
       
       // Check if unique league ID already exists
