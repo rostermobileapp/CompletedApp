@@ -431,8 +431,8 @@ export default function Teams() {
                   </CardHeader>
                   <CardContent className="p-6 pt-[5px] pb-[5px] bg-[212121]">
                     {teamStanding ? (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="text-center">
+                      <div className="flex justify-between items-center gap-2">
+                        <div className="text-center flex-1">
                           <div className="text-2xl font-bold text-primary">
                             {teamStanding.position}
                             {teamStanding.position === 1 ? 'st' : 
@@ -443,16 +443,16 @@ export default function Teams() {
                             of {teamStanding.totalTeams}
                           </div>
                         </div>
-                        <div className="text-center">
+                        <div className="text-center flex-1">
                           <div className="text-2xl font-bold text-blue-600">{teamStanding.points}</div>
                           <div className="text-sm text-muted-foreground">Points</div>
                         </div>
-                        <div className="text-center">
+                        <div className="text-center flex-1">
                           <div className="text-2xl font-bold">
                             {teamStanding.wins}-{teamStanding.losses}-{teamStanding.ties}
                           </div>
                         </div>
-                        <div className="text-center">
+                        <div className="text-center flex-1">
                           <div className={`text-2xl font-bold ${teamStanding.goalDifferential >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {teamStanding.goalDifferential >= 0 ? '+' : ''}{teamStanding.goalDifferential}
                           </div>
