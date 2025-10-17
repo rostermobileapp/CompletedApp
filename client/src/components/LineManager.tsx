@@ -247,7 +247,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
     return (
       <div
         key={position}
-        className="relative border-2 border-dashed rounded-lg p-4 min-h-[80px] flex flex-col items-center justify-center transition-colors hover:border-primary/50 pt-[2px] pb-[2px] pl-[2px] pr-[2px]"
+        className="relative border-2 border-dashed rounded-lg p-4 min-h-[40px] flex flex-col items-center justify-center transition-colors hover:border-primary/50 pt-[2px] pb-[2px] pl-[2px] pr-[2px]"
         onDragOver={handleDragOver}
         onDrop={(e) => handleDrop(e, lineCombination, position)}
         data-testid={`position-${lineCombination.id}-${position}`}
