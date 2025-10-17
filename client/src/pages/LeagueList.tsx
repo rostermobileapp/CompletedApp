@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Plus, Users, Trophy, Calendar } from 'lucide-react';
+import { ArrowLeft, Plus, Users, Trophy, Calendar, Search } from 'lucide-react';
 import { usePermissions } from '@/context/SubscriptionContext';
 
 type League = {
@@ -17,11 +18,17 @@ type League = {
 export default function LeagueList() {
   const [, navigate] = useLocation();
   const { canManageLeague } = usePermissions();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { data: leagues, isLoading } = useQuery<League[]>({
     queryKey: ['/api/leagues/commissioner'],
     retry: false,
   });
+
+  // Filter leagues by search term (case-insensitive search on uniqueLeagueId)
+  const filteredLeagues = leagues?.filter(league => 
+    league.uniqueLeagueId.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
 
   if (isLoading) {
     return (
@@ -65,6 +72,23 @@ export default function LeagueList() {
         </button>
       </div>
 
+      {/* Search Input */}
+      {leagues && leagues.length > 0 && (
+        <div className="px-6 mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by League ID..."
+              className="w-full bg-card border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              data-testid="input-search-league"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Leagues List */}
       <div className="px-6">
         {!leagues || leagues.length === 0 ? (
@@ -82,9 +106,24 @@ export default function LeagueList() {
               Create Your First League
             </button>
           </div>
+        ) : filteredLeagues.length === 0 ? (
+          <div className="bg-card rounded-xl border border-border p-8 text-center">
+            <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No leagues found</h3>
+            <p className="text-muted-foreground mb-4">
+              No leagues match "{searchTerm}". Try a different search term.
+            </p>
+            <button
+              onClick={() => setSearchTerm('')}
+              className="bg-primary text-primary-foreground rounded-lg px-6 py-2 font-medium"
+              data-testid="button-clear-search"
+            >
+              Clear Search
+            </button>
+          </div>
         ) : (
           <div className="space-y-4">
-            {leagues.map((league) => (
+            {filteredLeagues.map((league) => (
               <div
                 key={league.id}
                 className="bg-card rounded-xl border border-border p-6 cursor-pointer hover:bg-card/80 transition-colors"
