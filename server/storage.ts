@@ -919,7 +919,8 @@ export class DatabaseStorage implements IStorage {
       conditions.push(
         or(
           ilike(leagues.name, `%${search}%`),
-          ilike(leagues.location, `%${search}%`)
+          ilike(leagues.location, `%${search}%`),
+          ilike(leagues.uniqueLeagueId, `%${search}%`)
         )
       );
     }
