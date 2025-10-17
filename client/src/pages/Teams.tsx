@@ -427,7 +427,7 @@ export default function Teams() {
                 {/* Team Standings */}
                 <Card className="rounded-lg border text-card-foreground shadow-sm bg-[#212121]">
                   <CardHeader className="flex flex-col space-y-1.5 p-6 pt-[5px] pb-[5px]">
-                    <div className="flex items-center justify-center gap-3">
+                    <div className="flex items-center justify-between">
                       <CardTitle className="text-2xl font-semibold leading-none tracking-tight">League Standing</CardTitle>
                       {teamStanding && (
                         <span className="text-lg font-bold text-primary">
@@ -435,7 +435,6 @@ export default function Teams() {
                           {teamStanding.position === 1 ? 'st' : 
                            teamStanding.position === 2 ? 'nd' : 
                            teamStanding.position === 3 ? 'rd' : 'th'}
-                          {' '}of {teamStanding.totalTeams}
                         </span>
                       )}
                     </div>
