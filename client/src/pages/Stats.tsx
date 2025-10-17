@@ -525,6 +525,7 @@ export default function Stats() {
                   getInitials={getInitials}
                   showPosition={true}
                   membershipMap={membershipMap}
+                  onClick={() => handleStatClick('wins')}
                 />
               )}
 
@@ -538,6 +539,7 @@ export default function Stats() {
                   getInitials={getInitials}
                   showPosition={true}
                   membershipMap={membershipMap}
+                  onClick={() => handleStatClick('goalsAgainstAverage')}
                 />
               )}
 
@@ -551,6 +553,7 @@ export default function Stats() {
                   getInitials={getInitials}
                   showPosition={true}
                   membershipMap={membershipMap}
+                  onClick={() => handleStatClick('shutouts')}
                 />
               )}
             </div>
