@@ -59,8 +59,8 @@ export default function PaymentRequests() {
       if (request.relatedConversationId) {
         return conversationTeamMap[request.relatedConversationId] === selectedTeamId;
       }
-      // If not linked to a conversation, exclude it when team is selected
-      return false;
+      // If not linked to a conversation, show it (standalone payment requests should always be visible)
+      return true;
     });
   }, [allCreatedRequests, selectedTeamId, conversationTeamMap]);
 
@@ -73,8 +73,8 @@ export default function PaymentRequests() {
       if (request.relatedConversationId) {
         return conversationTeamMap[request.relatedConversationId] === selectedTeamId;
       }
-      // If not linked to a conversation, exclude it when team is selected
-      return false;
+      // If not linked to a conversation, show it (standalone payment requests should always be visible)
+      return true;
     });
   }, [allReceivedRequests, selectedTeamId, conversationTeamMap]);
 
