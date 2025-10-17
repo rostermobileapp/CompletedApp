@@ -425,7 +425,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
             
             {defenseLines.map((line: LineCombination) => (
               <Card key={line.id} className="p-4 pl-[4px] pr-[4px] pt-[4px] pb-[4px] mt-[0px] mb-[0px]">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mt-[0px] mb-[0px]">
                   <h5 className="font-medium" data-testid={`text-line-name-${line.id}`}>{line.name}</h5>
                   {isTeamCaptain && (
                     <Button
