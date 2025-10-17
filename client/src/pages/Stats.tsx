@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, ChevronRight, Settings, Trophy } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -18,34 +19,49 @@ export default function Stats() {
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
 
-  // Get league ID or team ID from URL parameter if provided, otherwise use user's primary league
-  const urlParams = new URLSearchParams(location.split('?')[1] || '');
-  const urlLeagueId = urlParams.get('league');
-  const urlTeamId = urlParams.get('team');
+  // Use dashboard selection to determine league/team context
+  const { selectedType, selectedId, selectedTeamId, selectedLeagueId } = useDashboardSelection();
 
-  const { data: userTeams, isLoading: teamsLoading } = useQuery({
+  // Fetch user teams to get league info for selected team
+  const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
-    staleTime: 0, // Always refetch to prevent stale team data
-    gcTime: 0, // Don't cache this query
   });
 
-  console.log('[Stats Debug] userTeams:', userTeams);
-  console.log('[Stats Debug] urlTeamId:', urlTeamId);
-  console.log('[Stats Debug] urlLeagueId:', urlLeagueId);
+  // Fetch user leagues
+  const { data: userLeagues } = useQuery({
+    queryKey: ['/api/user/leagues'],
+  });
 
-  const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
+  // Determine effective league ID based on dashboard selection
+  let leagueId: string | null | undefined = null;
   
-  // Determine league ID: prioritize URL league, then URL team's league, then primary team's league
-  const selectedTeamFromUrl = urlTeamId && Array.isArray(userTeams) 
-    ? userTeams.find((team: any) => team.id === urlTeamId) 
-    : null;
-  
-  console.log('[Stats Debug] selectedTeamFromUrl:', selectedTeamFromUrl);
-  console.log('[Stats Debug] primaryTeam:', primaryTeam);
-  
-  const leagueId = urlLeagueId || selectedTeamFromUrl?.leagueId || primaryTeam?.leagueId;
-  
-  console.log('[Stats Debug] Final leagueId:', leagueId);
+  if (selectedType === 'league') {
+    // Direct league selection
+    leagueId = selectedLeagueId;
+  } else if (selectedType === 'team' && selectedTeamId) {
+    // Team selected - find its league
+    const selectedTeam = Array.isArray(userTeams) 
+      ? userTeams.find((t: any) => t.id === selectedTeamId)
+      : null;
+    leagueId = selectedTeam?.leagueId;
+  } else {
+    // Fallback to URL params or first league
+    const urlParams = new URLSearchParams(location.split('?')[1] || '');
+    const urlLeagueId = urlParams.get('league');
+    const urlTeamId = urlParams.get('team');
+    
+    if (urlLeagueId) {
+      leagueId = urlLeagueId;
+    } else if (urlTeamId && Array.isArray(userTeams)) {
+      const teamFromUrl = userTeams.find((t: any) => t.id === urlTeamId);
+      leagueId = teamFromUrl?.leagueId;
+    } else {
+      // Fallback to first league
+      leagueId = Array.isArray(userLeagues) && userLeagues.length > 0 
+        ? userLeagues[0].id 
+        : null;
+    }
+  }
 
   // Fetch league seasons for filtering
   const { data: seasons } = useQuery({

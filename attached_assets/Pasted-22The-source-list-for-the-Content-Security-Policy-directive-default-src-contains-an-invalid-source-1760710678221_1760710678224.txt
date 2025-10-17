@@ -1,0 +1,133 @@
+22The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+22The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+22The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+Roster:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+Roster:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+Roster:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-1f721ab05f533594.js:28 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+_app-1f721ab05f533594.js:28 [LaunchDarkly] LaunchDarkly client initialized
+framework-a3a44a9ea573d496.js:1 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+_ @ framework-a3a44a9ea573d496.js:1Understand this error
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'battery'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'layout-animations'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'navigation-override'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'oversized-images'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'publickey-credentials'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'speaker-selection'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'unoptimized-images'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'unsized-media'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Unrecognized feature: 'pointer-lock'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+framework-a3a44a9ea573d496.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-a3a44a9ea573d496.js:1Understand this warning
+Roster:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+/oidc-login-consent/Bi7mUqfGSew0Y6kvZux_1:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+/oidc-login-consent/Bi7mUqfGSew0Y6kvZux_1:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+/oidc-login-consent/Bi7mUqfGSew0Y6kvZux_1:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+[Violation] Potential permissions policy violation: payment is not allowed in this document.Understand this error
+[Violation] Potential permissions policy violation: payment is not allowed in this document.Understand this error
+ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.google.com') does not match the recipient window's origin ('https://replit.com').
+vu @ www.googletagmanager…=AW-11411994397:472Understand this warning
+ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube.com') does not match the recipient window's origin ('https://replit.com').
+vu @ www.googletagmanager…=AW-11411994397:472Understand this warning
+ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://m.youtube.com') does not match the recipient window's origin ('https://replit.com').
+vu @ www.googletagmanager…=AW-11411994397:472Understand this warning
+framework-a3a44a9ea573d496.js:1 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+_ @ framework-a3a44a9ea573d496.js:1Understand this error
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+ WebSocket connection to 'wss://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/?token=Mb8cQsDmxSP1' failed: 
+setupWebSocket @ client:536Understand this error
+workspace_iframe.html?initialPath=%2F&id=%3Arfa%3A:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+client:536 WebSocket connection to 'wss://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/?token=Mb8cQsDmxSP1' failed: 
+setupWebSocket @ client:536Understand this error
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=Mb8cQsDmxSP1' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)Understand this error
+injected.js:27 Connecting to WebSocket at: wss://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/ws
+injected.js:27 Connected to messaging WebSocket
+injected.js:27 Disconnected from messaging WebSocket
+injected.js:27 Connecting to WebSocket at: wss://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/ws
+injected.js:27 Connected to messaging WebSocket
+injected.js:27 Disconnected from messaging WebSocket
+injected.js:27 📖 Announcements marked as read
+injected.js:27 Connecting to WebSocket at: wss://39867995-7b19-456e-8c3d-5a178c8dbc31-00-3fsxtypouswh5.picard.replit.dev/ws
+injected.js:27 Connected to messaging WebSocket
+injected.js:27 Disconnected from messaging WebSocket
+_app-1f721ab05f533594.js:28 task queue exceeded allotted deadline by 43ms
+(anonymous) @ _app-1f721ab05f533594.js:28
+_process @ 7b975a49.624fc974192b48d0.js:3
+(anonymous) @ 7b975a49.624fc974192b48d0.js:3
+n @ _app-1f721ab05f533594.js:28
+setTimeout
+(anonymous) @ _app-1f721ab05f533594.js:28
+_requestCallback @ 7b975a49.624fc974192b48d0.js:3
+_start @ 7b975a49.624fc974192b48d0.js:3
+enqueue @ 7b975a49.624fc974192b48d0.js:3
+set @ 7b975a49.624fc974192b48d0.js:3
+handleResize @ 7b975a49.624fc974192b48d0.js:3
+(anonymous) @ 7b975a49.624fc974192b48d0.js:3
+fire @ 7b975a49.624fc974192b48d0.js:3
+(anonymous) @ 7b975a49.624fc974192b48d0.js:3
+fire @ 7b975a49.624fc974192b48d0.js:3
+resize @ 7b975a49.624fc974192b48d0.js:3
+resize @ 7b975a49.624fc974192b48d0.js:3
+resize @ 7b975a49.624fc974192b48d0.js:3
+resize @ 7b975a49.624fc974192b48d0.js:3
+(anonymous) @ 5144-762e59d82e6244c7.js:1
+oO @ framework-a3a44a9ea573d496.js:1
+uB @ framework-a3a44a9ea573d496.js:1
+u_ @ framework-a3a44a9ea573d496.js:1
+r6 @ framework-a3a44a9ea573d496.js:1
+(anonymous) @ framework-a3a44a9ea573d496.js:1
+uO @ framework-a3a44a9ea573d496.js:1
+uS @ framework-a3a44a9ea573d496.js:1
+C @ framework-a3a44a9ea573d496.js:1
+z @ framework-a3a44a9ea573d496.js:1Understand this warning
+2_app-1f721ab05f533594.js:28 task queue exceeded allotted deadline by 47ms
