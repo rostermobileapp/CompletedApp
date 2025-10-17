@@ -18,6 +18,8 @@ The backend is a REST API developed with Express.js and TypeScript, featuring a 
 
 **Unique ID Generation**: League creation automatically generates unique, URL-friendly IDs using nanoid. When a league is created without specifying a custom ID, the system generates an 8-character unique identifier. Format: `{8-char-nanoid}` (e.g., "aB3xY9kL").
 
+**Drizzle Field Naming Issue**: Drizzle ORM returns snake_case field names from database queries under certain conditions, even when the schema defines camelCase properties. The `/api/leagues/commissioner` endpoint includes explicit field mapping to ensure `uniqueLeagueId` is always returned in camelCase format for frontend compatibility.
+
 ## Data Storage Solutions
 
 PostgreSQL is the primary database, using Drizzle ORM for type-safe operations. The schema includes entities for users, leagues, teams, games, memberships, and messaging, with Drizzle Kit managing migrations. Session storage is also PostgreSQL-based.
