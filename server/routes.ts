@@ -1599,6 +1599,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const teams = await storage.getUserTeams(userId);
+      
+      // Prevent browser caching to ensure fresh data
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
       res.json(teams);
     } catch (error) {
       console.error("Error fetching user teams:", error);
