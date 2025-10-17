@@ -1347,7 +1347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: member.user.firstName,
         lastName: member.user.lastName,
         email: member.user.email,
-        isGoalie: (member.user as any).isGoalie || false,
+        isGoalie: member.isGoalie || false,
         teamName: member.assignedTeamId ? null : null // Will be populated if we have team info
       }));
       
@@ -2782,16 +2782,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
       const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
       
+      // Get league memberships to access isGoalie field
+      const allMembers = [...homeTeamMembers, ...awayTeamMembers];
+      const leagueMembershipsMap = new Map();
+      
+      if (game.leagueId) {
+        for (const member of allMembers) {
+          const leagueMembership = await storage.getUserLeagueMembership(member.user.id, game.leagueId);
+          if (leagueMembership) {
+            leagueMembershipsMap.set(member.user.id, leagueMembership);
+          }
+        }
+      }
+      
       // Combine all participants and format for stats management
-      const participants = [...homeTeamMembers, ...awayTeamMembers].map(member => ({
-        id: member.user.id,
-        userId: member.user.id,
-        firstName: member.user.firstName,
-        lastName: member.user.lastName,
-        email: member.user.email,
-        isGoalie: (member.user as any).isGoalie || false,
-        teamName: member.teamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name
-      }));
+      const participants = allMembers.map(member => {
+        const leagueMembership = leagueMembershipsMap.get(member.user.id);
+        return {
+          id: member.user.id,
+          userId: member.user.id,
+          firstName: member.user.firstName,
+          lastName: member.user.lastName,
+          email: member.user.email,
+          isGoalie: leagueMembership?.isGoalie || false,
+          teamName: member.teamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name
+        };
+      });
 
       res.json(participants);
     } catch (error) {
