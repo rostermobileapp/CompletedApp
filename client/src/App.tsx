@@ -13,6 +13,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import LeagueSearch from "@/pages/LeagueSearch";
+import TeamSearch from "@/pages/TeamSearch";
 import Teams from "@/pages/Teams";
 import Messages from "@/pages/Messages";
 import Profile from "@/pages/Profile";
@@ -73,6 +74,7 @@ function Router() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/league-search" component={LeagueSearch} />
+            <Route path="/team-search" component={TeamSearch} />
             <Route path="/teams" component={Teams} />
             <Route path="/messages" component={Messages} />
             <Route path="/messages/:conversationId" component={Messages} />
