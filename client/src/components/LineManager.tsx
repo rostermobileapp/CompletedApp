@@ -321,7 +321,6 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
               <SelectValue placeholder="Select game" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="default">Default Lines</SelectItem>
               {upcomingGames.map((game: any) => (
                 <SelectItem key={game.id} value={game.id}>
                   vs {game.homeTeamId === teamId ? game.awayTeam?.name : game.homeTeam?.name} - {new Date(game.scheduledAt).toLocaleDateString()}
