@@ -857,6 +857,27 @@ export default function Dashboard() {
     },
   });
 
+  // Delete personal reminder mutation
+  const deleteReminderMutation = useMutation({
+    mutationFn: async (reminderId: string) => {
+      await apiRequest("DELETE", `/api/personal-reminders/${reminderId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/personal-reminders"] });
+      toast({
+        title: "Reminder Dismissed",
+        description: "Your reminder has been removed from your calendar.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to dismiss reminder. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Create team game mutation
   const createGameMutation = useMutation({
     mutationFn: async (data: z.infer<typeof teamGameSchema>) => {
@@ -1742,6 +1763,17 @@ export default function Dashboard() {
                         </p>
                       )}
                     </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteReminderMutation.mutate(reminder.id);
+                      }}
+                      className="p-2 hover:bg-muted rounded-lg transition-colors"
+                      data-testid={`button-dismiss-reminder-${reminder.id}`}
+                      disabled={deleteReminderMutation.isPending}
+                    >
+                      <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                    </button>
                   </div>
                 </div>
               ))}
