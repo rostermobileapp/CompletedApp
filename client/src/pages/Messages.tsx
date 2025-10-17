@@ -464,7 +464,7 @@ export default function Messages() {
   const { canAccessPremiumFeatures } = usePermissions();
   const currentUserId = (user as any)?.id;
   const params = useParams();
-  const { selectedTeamId } = useDashboardSelection();
+  const { selectedTeamId, selectedLeagueId } = useDashboardSelection();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
 
   // Handle conversation ID from URL parameter
@@ -537,20 +537,29 @@ export default function Messages() {
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
-  // Fetch conversations
+  // Fetch conversations - backend will filter by leagueId if provided
   const { data: allConversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
-    queryKey: ['/api/conversations'],
+    queryKey: selectedLeagueId ? ['/api/conversations', { leagueId: selectedLeagueId }] : ['/api/conversations'],
+    queryFn: async () => {
+      const url = selectedLeagueId 
+        ? `/api/conversations?leagueId=${selectedLeagueId}` 
+        : '/api/conversations';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch conversations');
+      return response.json();
+    },
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
-  // Filter conversations by selected team from Dashboard
+  // Filter conversations by selected team (client-side filtering for team selection)
   const conversations = useMemo(() => {
-    if (!selectedTeamId) {
-      // No team selected, show all conversations
-      return allConversations;
+    if (selectedTeamId) {
+      // When a team is selected, show ONLY conversations with matching teamId
+      return allConversations.filter(conv => conv.teamId === selectedTeamId);
     }
-    // When a team is selected, show ONLY conversations with matching teamId
-    return allConversations.filter(conv => conv.teamId === selectedTeamId);
+    // For league selection, backend already filtered by leagueId via query param
+    // No team selected, show all conversations (already filtered by league if selected)
+    return allConversations;
   }, [allConversations, selectedTeamId]);
 
   // Fetch unread message counts per conversation
