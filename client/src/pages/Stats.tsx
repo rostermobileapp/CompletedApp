@@ -25,6 +25,8 @@ export default function Stats() {
 
   const { data: userTeams, isLoading: teamsLoading } = useQuery({
     queryKey: ['/api/user/teams'],
+    staleTime: 0, // Always refetch to prevent stale team data
+    gcTime: 0, // Don't cache this query
   });
 
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
