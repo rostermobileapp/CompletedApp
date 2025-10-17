@@ -1432,6 +1432,10 @@ export default function Messages() {
       return conversation.title || 'Group Chat';
     }
     
+    if (conversation.type === 'captain_only') {
+      return 'Captains Only';
+    }
+    
     // For direct messages, find the other participant
     if (!conversation.participants) {
       return 'Loading...';
