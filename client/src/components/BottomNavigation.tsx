@@ -76,7 +76,7 @@ export function BottomNavigation() {
                   style={{ width: '30px', height: '30px' }}
                 />
               ) : Icon && (
-                <div className="relative text-[#ffffff]">
+                <div className="relative">
                   <Icon className="w-5 h-5 mb-1" />
                   {shortcut.id === 'messages' && unreadCount > 0 && (
                     <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid="message-badge">
@@ -90,7 +90,7 @@ export function BottomNavigation() {
                   )}
                 </div>
               )}
-              <span className="text-xs font-extrabold text-[#ffffff]">{shortcut.label}</span>
+              <span className={cn("text-xs", isActive ? "font-bold" : "font-medium")}>{shortcut.label}</span>
             </button>
           );
         })}
