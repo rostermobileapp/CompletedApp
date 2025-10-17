@@ -23,7 +23,7 @@ export default function Stats() {
   const urlLeagueId = urlParams.get('league');
   const urlTeamId = urlParams.get('team');
 
-  const { data: userTeams } = useQuery({
+  const { data: userTeams, isLoading: teamsLoading } = useQuery({
     queryKey: ['/api/user/teams'],
   });
 
@@ -31,7 +31,7 @@ export default function Stats() {
   
   // Determine league ID: prioritize URL league, then URL team's league, then primary team's league
   const selectedTeamFromUrl = urlTeamId && Array.isArray(userTeams) 
-    ? userTeams.find(team => team.id === urlTeamId) 
+    ? userTeams.find((team: any) => team.id === urlTeamId) 
     : null;
   
   const leagueId = urlLeagueId || selectedTeamFromUrl?.leagueId || primaryTeam?.leagueId;
@@ -170,6 +170,16 @@ export default function Stats() {
     }
     return 'Unknown Player';
   };
+
+  // Show loading while teams are being fetched (to properly resolve team ID to league)
+  if (teamsLoading || (urlTeamId && !userTeams)) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6">
+        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mb-4"></div>
+        <p className="text-gray-400">Loading...</p>
+      </div>
+    );
+  }
 
   if (!leagueId) {
     return (
