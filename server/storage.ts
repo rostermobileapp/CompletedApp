@@ -237,6 +237,7 @@ export interface IStorage {
   getTeamsByLeague(leagueId: string): Promise<Team[]>;
   getTeam(id: string): Promise<Team | undefined>;
   getTeamByUniqueId(uniqueTeamId: string): Promise<Team | undefined>;
+  searchTeams(search?: string): Promise<(Team & { league?: League | null })[]>;
   getUserTeams(userId: string): Promise<Team[]>;
   updateTeam(id: string, data: Partial<Pick<Team, 'name'>>): Promise<Team>;
   updateTeamLogo(id: string, logoUrl: string): Promise<Team>;
@@ -1452,6 +1453,26 @@ export class DatabaseStorage implements IStorage {
       .from(teams)
       .where(eq(teams.uniqueTeamId, uniqueTeamId));
     return team;
+  }
+
+  async searchTeams(search?: string): Promise<(Team & { league?: League | null })[]> {
+    if (!search || search.trim().length === 0) {
+      return [];
+    }
+
+    const results = await db
+      .select({
+        team: teams,
+        league: leagues
+      })
+      .from(teams)
+      .leftJoin(leagues, eq(teams.leagueId, leagues.id))
+      .where(ilike(teams.uniqueTeamId, `%${search}%`));
+
+    return results.map(r => ({
+      ...r.team,
+      league: r.league || null
+    }));
   }
 
   async importTeamPlayers(

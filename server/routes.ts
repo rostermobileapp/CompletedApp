@@ -2403,6 +2403,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/teams/search', async (req, res) => {
+    try {
+      const { search } = req.query;
+      const teams = await storage.searchTeams(search as string);
+      
+      // Map to ensure uniqueTeamId is in camelCase
+      const mappedTeams = teams.map(team => ({
+        ...team,
+        uniqueTeamId: team.uniqueTeamId || (team as any).unique_team_id
+      }));
+      
+      res.json(mappedTeams);
+    } catch (error) {
+      console.error('Error searching teams:', error);
+      res.status(500).json({ message: 'Failed to search teams' });
+    }
+  });
+
   app.get('/api/teams/by-code/:uniqueTeamId', async (req, res) => {
     try {
       const { uniqueTeamId } = req.params;

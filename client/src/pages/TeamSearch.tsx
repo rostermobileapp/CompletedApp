@@ -1,18 +1,11 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Search, Users } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
-import { apiRequest } from '@/lib/queryClient';
-import { isUnauthorizedError } from '@/lib/authUtils';
 
 export default function TeamSearch() {
   const [search, setSearch] = useState('');
-  const { user } = useAuth();
-  const { toast } = useToast();
   const [, navigate] = useLocation();
-  const queryClient = useQueryClient();
 
   const { data: teams, isLoading } = useQuery({
     queryKey: ['/api/teams/search', { search }],
@@ -27,37 +20,6 @@ export default function TeamSearch() {
     enabled: search.trim().length > 0,
   });
 
-  const joinTeamMutation = useMutation({
-    mutationFn: async (teamId: string) => {
-      const response = await apiRequest('POST', `/api/teams/${teamId}/request-join`);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Request Sent",
-        description: "Your request has been sent to the team captain",
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/teams/search'] });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to request team membership",
-        variant: "destructive",
-      });
-    },
-  });
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="team-search-page">
@@ -133,14 +95,6 @@ export default function TeamSearch() {
                       </p>
                     )}
                   </div>
-                  <button
-                    onClick={() => joinTeamMutation.mutate(team.id)}
-                    disabled={joinTeamMutation.isPending}
-                    className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm disabled:opacity-50 whitespace-nowrap"
-                    data-testid={`button-join-team-${team.id}`}
-                  >
-                    {joinTeamMutation.isPending ? 'Requesting...' : 'Request to Join'}
-                  </button>
                 </div>
               </div>
             ))}
