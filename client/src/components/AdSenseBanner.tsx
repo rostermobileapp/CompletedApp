@@ -11,7 +11,7 @@ export function AdSenseBanner() {
   return (
     <div 
       className="fixed left-0 right-0 z-40 flex items-center justify-center bg-muted/50 border-t border-border"
-      style={{ bottom: '102px', height: '50px' }}
+      style={{ bottom: '66px', height: '50px' }}
       data-testid="adsense-banner-container"
     >
       <div 
