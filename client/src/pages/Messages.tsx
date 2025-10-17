@@ -551,14 +551,17 @@ export default function Messages() {
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
-  // Filter conversations by selected team (client-side filtering for team selection)
+  // Filter conversations by selected team or league
   const conversations = useMemo(() => {
     if (selectedTeamId) {
-      // When a team is selected, show ONLY conversations with matching teamId
-      return allConversations.filter(conv => conv.teamId === selectedTeamId);
+      // When a team is selected, show team chat AND league-wide chats (direct, captain)
+      // This includes conversations with matching teamId OR conversations with no teamId (direct/captain chats)
+      return allConversations.filter(conv => 
+        conv.teamId === selectedTeamId || conv.teamId === null
+      );
     }
     // For league selection, backend already filtered by leagueId via query param
-    // No team selected, show all conversations (already filtered by league if selected)
+    // No team/league selected, show all conversations
     return allConversations;
   }, [allConversations, selectedTeamId]);
 
