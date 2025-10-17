@@ -554,12 +554,15 @@ export default function StatsManagement() {
     });
   };
 
-  // Sort players alphabetically by name
+  // Sort players alphabetically by last name, then first name
   const getSortedPlayersAlphabetically = (playersList: Player[]) => {
     return [...playersList].sort((a, b) => {
-      const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
-      const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
-      return nameA.localeCompare(nameB);
+      // Sort by last name first
+      const lastNameCompare = a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase());
+      if (lastNameCompare !== 0) return lastNameCompare;
+      
+      // If last names are the same, sort by first name
+      return a.firstName.toLowerCase().localeCompare(b.firstName.toLowerCase());
     });
   };
 
