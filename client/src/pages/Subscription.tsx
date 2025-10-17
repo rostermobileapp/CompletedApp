@@ -106,19 +106,29 @@ export default function Subscription() {
       };
 
       const priceId = STRIPE_PRICES[tier];
+      console.log('[Checkout] Starting checkout for tier:', tier, 'with priceId:', priceId);
 
       const response = await apiRequest('POST', '/api/stripe/create-checkout-session', {
         priceId,
       });
-      const data = await response.json() as { url: string };
+      console.log('[Checkout] Got response:', response.status, response.statusText);
       
+      const data = await response.json() as { url: string };
+      console.log('[Checkout] Parsed data:', data);
+      console.log('[Checkout] Checkout URL:', data.url);
+      
+      if (!data.url) {
+        throw new Error('No checkout URL received from server');
+      }
+      
+      console.log('[Checkout] Redirecting to:', data.url);
       // Redirect to Stripe Checkout
       window.location.href = data.url;
     } catch (error: any) {
-      console.error('Error creating checkout session:', error);
+      console.error('[Checkout] Error creating checkout session:', error);
       toast({
         title: 'Error',
-        description: 'Failed to start checkout. Please try again.',
+        description: error.message || 'Failed to start checkout. Please try again.',
         variant: 'destructive',
       });
       setIsLoading(false);
