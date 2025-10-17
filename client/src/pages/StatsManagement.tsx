@@ -598,9 +598,9 @@ export default function StatsManagement() {
           <Card>
             <CardContent className="py-12 text-center">
               <Trophy className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-              <h2 className="text-xl font-semibold mb-2">No Commissioner Leagues Found</h2>
+              <h2 className="text-xl font-semibold mb-2">No Leagues Found</h2>
               <p className="text-muted-foreground mb-6">
-                You need to be a commissioner of a league to manage player statistics.
+                You need to be a member of a league to manage player statistics.
               </p>
               <Button onClick={() => navigate('/league-search')} data-testid="button-find-league">
                 Find a League

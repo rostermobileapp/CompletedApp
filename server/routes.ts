@@ -995,7 +995,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const leagues = await storage.getLeaguesByCommissioner(userId);
+      // Check if user has stat_manager permission
+      const hasStatManager = user.specialPermissions && user.specialPermissions.includes('stat_manager');
+      
+      // Stat managers can see all leagues they're a member of
+      // Commissioners only see leagues they commission
+      const leagues = hasStatManager 
+        ? await storage.getUserLeagues(userId)
+        : await storage.getLeaguesByCommissioner(userId);
+      
       // Explicitly map to ensure uniqueLeagueId is present
       const mappedLeagues = leagues.map(league => ({
         ...league,
