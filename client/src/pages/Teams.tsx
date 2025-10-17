@@ -292,7 +292,7 @@ export default function Teams() {
   );
 
   return (
-    <div className="container mx-auto px-4 py-6 pb-20">
+    <div className="w-full px-4 py-6 pb-20">
       <div className="space-y-6">
         {(userTeams as any[]).length === 0 ? (
           <Card>

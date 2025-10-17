@@ -313,22 +313,6 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
             <Badge variant="secondary" className="ml-2">Captain</Badge>
           )}
         </CardTitle>
-        
-        {/* Game Selection */}
-        <div className="flex items-center gap-4">
-          <Select value={selectedGame} onValueChange={setSelectedGame}>
-            <SelectTrigger className="w-48" data-testid="select-game">
-              <SelectValue placeholder="Select game" />
-            </SelectTrigger>
-            <SelectContent>
-              {upcomingGames.map((game: any) => (
-                <SelectItem key={game.id} value={game.id}>
-                  vs {game.homeTeamId === teamId ? game.awayTeam?.name : game.homeTeam?.name} - {new Date(game.scheduledAt).toLocaleDateString()}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </CardHeader>
       
       <CardContent className="p-6 space-y-6 pt-[2px] pb-[2px]">
