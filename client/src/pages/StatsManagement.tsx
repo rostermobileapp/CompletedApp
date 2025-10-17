@@ -21,6 +21,7 @@ interface Player {
   firstName: string;
   lastName: string;
   email: string | null;
+  isGoalie?: boolean;
   teamName?: string;
 }
 
@@ -112,14 +113,18 @@ export default function StatsManagement() {
   });
 
   // Filter out goalies from game participants (their stats are auto-calculated)
-  const nonGoalieParticipants = Array.isArray(gameParticipants) 
-    ? gameParticipants.filter((p: any) => !p.isGoalie) 
-    : [];
+  const nonGoalieParticipants = useMemo(() => {
+    return Array.isArray(gameParticipants) 
+      ? gameParticipants.filter((p: any) => !p.isGoalie) 
+      : [];
+  }, [gameParticipants]);
 
   // Filter out goalies from players list (their stats are auto-calculated)
-  const nonGoaliePlayers = Array.isArray(players) 
-    ? (players as any[]).filter((p: any) => !p.isGoalie) 
-    : [];
+  const nonGoaliePlayers = useMemo(() => {
+    return Array.isArray(players) 
+      ? (players as any[]).filter((p: any) => !p.isGoalie) 
+      : [];
+  }, [players]);
 
   // Get individual player stats for selected player
   const { data: currentPlayerStats } = useQuery<PlayerStatsResponse>({

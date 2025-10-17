@@ -1347,6 +1347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: member.user.firstName,
         lastName: member.user.lastName,
         email: member.user.email,
+        isGoalie: (member.user as any).isGoalie || false,
         teamName: member.assignedTeamId ? null : null // Will be populated if we have team info
       }));
       
@@ -2788,6 +2789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: member.user.firstName,
         lastName: member.user.lastName,
         email: member.user.email,
+        isGoalie: (member.user as any).isGoalie || false,
         teamName: member.teamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name
       }));
 
