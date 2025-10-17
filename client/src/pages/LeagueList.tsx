@@ -11,6 +11,7 @@ type League = {
   description?: string;
   location?: string;
   isActive: boolean;
+  uniqueLeagueId: string;
 };
 
 export default function LeagueList() {
@@ -92,6 +93,11 @@ export default function LeagueList() {
               >
                 <div className="mb-3">
                   <h3 className="text-lg font-semibold mb-1">{league.name}</h3>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                    <span className="font-mono bg-muted px-2 py-0.5 rounded" data-testid={`league-id-${league.id}`}>
+                      {league.uniqueLeagueId}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="capitalize">{league.sport}</span>
                     {league.location && (
