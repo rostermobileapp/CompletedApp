@@ -83,8 +83,12 @@ export default function Subscription() {
       const response = await apiRequest('POST', '/api/stripe/create-portal-session');
       const data = await response.json() as { url: string };
       
-      // Open billing portal in same window
-      window.location.href = data.url;
+      // Open billing portal in a new window/tab for better compatibility
+      const stripeWindow = window.open(data.url, '_blank');
+      if (!stripeWindow) {
+        // If popup was blocked, try direct navigation as fallback
+        window.location.href = data.url;
+      }
     } catch (error: any) {
       console.error('Error creating portal session:', error);
       toast({
@@ -122,8 +126,12 @@ export default function Subscription() {
       }
       
       console.log('[Checkout] Redirecting to:', data.url);
-      // Redirect to Stripe Checkout
-      window.location.href = data.url;
+      // Open Stripe Checkout in a new window/tab for better compatibility
+      const stripeWindow = window.open(data.url, '_blank');
+      if (!stripeWindow) {
+        // If popup was blocked, try direct navigation as fallback
+        window.location.href = data.url;
+      }
     } catch (error: any) {
       console.error('[Checkout] Error creating checkout session:', error);
       toast({
