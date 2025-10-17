@@ -357,11 +357,11 @@ export default function Calendar() {
                           e.stopPropagation();
                           deleteReminderMutation.mutate(event.id);
                         }}
-                        className="p-2 hover:bg-muted rounded-lg transition-colors"
+                        className="px-3 py-1 text-sm hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
                         data-testid={`button-dismiss-reminder-${event.id}`}
                         disabled={deleteReminderMutation.isPending}
                       >
-                        <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                        Dismiss
                       </button>
                     </div>
                   </div>
