@@ -143,28 +143,23 @@ export default function StatsManagement() {
   });
 
   // Initialize player stats when game participants change (excluding goalies)
-  // Load existing stats from allPlayerStats if available
+  // For "By Game" tab, always start at 0 since we're recording stats for THIS GAME ONLY
   useEffect(() => {
     if (Array.isArray(nonGoalieParticipants) && nonGoalieParticipants.length > 0) {
       const initialStats: Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }> = {};
       
       nonGoalieParticipants.forEach((participant: any) => {
-        // Find existing stats for this player
-        const existingStats = Array.isArray(allPlayerStats) 
-          ? allPlayerStats.find((stat: any) => stat.userId === participant.userId)
-          : null;
-        
         initialStats[participant.userId] = {
-          goals: existingStats?.goals?.toString() || '0',
-          assists: existingStats?.assists?.toString() || '0', 
-          penaltyMinutes: existingStats?.penaltyMinutes?.toString() || '0',
-          gamesPlayed: existingStats?.gamesPlayed?.toString() || '1'
+          goals: '0',
+          assists: '0', 
+          penaltyMinutes: '0',
+          gamesPlayed: '1'
         };
       });
       
       setPlayerGameStats(initialStats);
     }
-  }, [nonGoalieParticipants, allPlayerStats]);
+  }, [nonGoalieParticipants]);
 
   // Initialize individual player stats when current player stats change
   useEffect(() => {
