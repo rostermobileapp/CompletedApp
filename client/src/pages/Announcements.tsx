@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { 
   Megaphone, 
   Plus, 
@@ -1011,6 +1012,15 @@ export default function Announcements() {
   const [, navigate] = useLocation();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // Get the selected team or league from dashboard selection
+  const { selectedTeamId, selectedLeagueId } = useDashboardSelection();
+
+  // Get user teams to find the league for a selected team
+  const { data: userTeams = [] } = useQuery({
+    queryKey: ['/api/user/teams'],
+    enabled: !!user
+  });
+
   // Get league ID from URL params - for now, we'll use the user's first league
   const { data: userLeagues = [] } = useQuery({
     queryKey: ['/api/user/leagues'],
@@ -1023,7 +1033,15 @@ export default function Announcements() {
     enabled: !!user
   });
 
-  const currentLeague = (userLeagues as any[])[0];
+  // Determine the effective league ID based on selection
+  const selectedTeam = selectedTeamId && Array.isArray(userTeams) 
+    ? userTeams.find((team: any) => team.id === selectedTeamId) 
+    : null;
+  
+  const effectiveLeagueId = selectedTeam?.leagueId || selectedLeagueId;
+  const currentLeague = Array.isArray(userLeagues) && effectiveLeagueId
+    ? userLeagues.find((league: any) => league.id === effectiveLeagueId)
+    : (userLeagues as any[])[0];
   const leagueId = currentLeague?.id;
   
   // Check if user is commissioner - either league owner or has commissioner role in membership

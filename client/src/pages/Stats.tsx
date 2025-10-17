@@ -18,16 +18,23 @@ export default function Stats() {
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
 
-  // Get league ID from URL parameter if provided, otherwise use user's primary league
+  // Get league ID or team ID from URL parameter if provided, otherwise use user's primary league
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const urlLeagueId = urlParams.get('league');
+  const urlTeamId = urlParams.get('team');
 
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
   });
 
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
-  const leagueId = urlLeagueId || primaryTeam?.leagueId;
+  
+  // Determine league ID: prioritize URL league, then URL team's league, then primary team's league
+  const selectedTeamFromUrl = urlTeamId && Array.isArray(userTeams) 
+    ? userTeams.find(team => team.id === urlTeamId) 
+    : null;
+  
+  const leagueId = urlLeagueId || selectedTeamFromUrl?.leagueId || primaryTeam?.leagueId;
 
   // Fetch league seasons for filtering
   const { data: seasons } = useQuery({
