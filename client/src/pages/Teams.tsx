@@ -147,29 +147,12 @@ export default function Teams() {
     }
   };
 
-  const createTeamLogoUploadComplete = (teamId: string) => async (files: File[]) => {
-    if (files.length === 0) return;
+  const createTeamLogoUploadComplete = (teamId: string) => (result: { successful?: Array<{ uploadURL: string }>; failed?: Array<any> }) => {
+    if (!result.successful || result.successful.length === 0) return;
     
     try {
-      // Get upload parameters for this file
-      const uploadParams = await handleGetTeamLogoUploadParameters();
-      const file = files[0]; // Only handle the first file since maxNumberOfFiles is 1
-      
-      // Upload the file to object storage using the pre-signed URL
-      const uploadResponse = await fetch(uploadParams.url, {
-        method: uploadParams.method,
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-      });
-      
-      if (!uploadResponse.ok) {
-        throw new Error(`Upload failed with status: ${uploadResponse.status}`);
-      }
-      
-      // Extract the public URL from the upload URL (remove query parameters)
-      const logoUrl = uploadParams.url.split('?')[0];
+      // Extract the public URL from the upload result
+      const logoUrl = result.successful[0].uploadURL;
       
       // Update the team logo in the database
       updateTeamLogoMutation.mutate({ teamId, logoUrl });
@@ -372,7 +355,7 @@ export default function Teams() {
                             maxFileSize={10485760}
                             onGetUploadParameters={handleGetTeamLogoUploadParameters}
                             onComplete={createTeamLogoUploadComplete(team.id)}
-                            buttonClassName="absolute inset-0 w-full h-full rounded-lg opacity-0 hover:opacity-100 bg-black/50 flex items-center justify-center transition-opacity"
+                            buttonClassName="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-lg opacity-0 hover:opacity-100 bg-black/50 flex items-center justify-center transition-opacity"
                           >
                             <Upload className="w-6 h-6 text-white" />
                           </ObjectUploader>
