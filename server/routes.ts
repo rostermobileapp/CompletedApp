@@ -1009,9 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Generate unique league ID if not provided
       if (!leagueData.uniqueLeagueId) {
-        const sanitizedName = leagueData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'league';
-        const uniqueId = nanoid(8);
-        leagueData.uniqueLeagueId = `${sanitizedName}-${uniqueId}`;
+        leagueData.uniqueLeagueId = nanoid(8);
       }
       
       // Check if unique league ID already exists
