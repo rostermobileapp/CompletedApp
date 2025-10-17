@@ -198,16 +198,6 @@ export default function Stats() {
     return 'Unknown Player';
   };
 
-  // Show loading while teams are being fetched (to properly resolve team ID to league)
-  if (teamsLoading || (urlTeamId && !userTeams)) {
-    return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6">
-        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mb-4"></div>
-        <p className="text-gray-400">Loading...</p>
-      </div>
-    );
-  }
-
   if (!leagueId) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6" data-testid="no-league-state">
