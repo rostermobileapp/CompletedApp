@@ -597,7 +597,7 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
         </div>
 
         {/* Content */}
-        <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()} className="flex-1 flex flex-col">
+        <FeatureLockOverlay isLocked={false} className="flex-1 flex flex-col">
         <div className="flex-1 overflow-auto p-6">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
