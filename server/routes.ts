@@ -379,6 +379,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId = customer.id;
         await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
         console.log('[Stripe] Created customer:', customerId);
+      } else {
+        // Update existing customer's email to match current profile
+        console.log('[Stripe] Updating customer email for checkout:', customerId);
+        await stripe.customers.update(customerId, {
+          email: user.email || undefined,
+          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+        });
       }
 
       // Build URL from request for reliability
@@ -442,6 +449,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Save customer ID to database
         await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
         console.log('[Stripe] Created customer:', customerId);
+      } else {
+        // Update existing customer's email to match current profile
+        console.log('[Stripe] Updating customer email for portal:', customerId);
+        await stripe.customers.update(customerId, {
+          email: user.email || undefined,
+          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+        });
       }
 
       // Create billing portal session
