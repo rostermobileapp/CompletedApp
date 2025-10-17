@@ -18,6 +18,8 @@ export default function Stats() {
   const [location, navigate] = useLocation();
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
+  const [viewMode, setViewMode] = useState<'summary' | 'table'>('summary');
+  const [sortBy, setSortBy] = useState<'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'wins' | 'goalsAgainstAverage' | 'shutouts'>('points');
 
   // Use dashboard selection to determine league/team context
   const { selectedType, selectedId, selectedTeamId, selectedLeagueId } = useDashboardSelection();
@@ -170,6 +172,54 @@ export default function Stats() {
     }
   };
 
+  // Handle stat card click to show full table
+  const handleStatClick = (category: typeof sortBy) => {
+    setSortBy(category);
+    setViewMode('table');
+  };
+
+  // Handle back to summary
+  const handleBackToSummary = () => {
+    setViewMode('summary');
+  };
+
+  // Get sorted stats for table view
+  const getSortedStatsForTable = () => {
+    const stats = [...filteredStats];
+    
+    if (activeTab === 'goalies') {
+      const goalieStats = stats.filter((stat): stat is GoalieStats => stat.type === 'goalie');
+      
+      switch (sortBy) {
+        case 'wins':
+          return goalieStats.sort((a, b) => (b.wins || 0) - (a.wins || 0));
+        case 'goalsAgainstAverage':
+          return goalieStats
+            .filter(g => g.gamesPlayed > 0)
+            .sort((a, b) => (a.goalsAgainstAverage || 999) - (b.goalsAgainstAverage || 999));
+        case 'shutouts':
+          return goalieStats.sort((a, b) => (b.shutouts || 0) - (a.shutouts || 0));
+        default:
+          return goalieStats;
+      }
+    } else {
+      const skaterStats = stats.filter((stat): stat is SkaterStats => stat.type === 'skater');
+      
+      switch (sortBy) {
+        case 'points':
+          return skaterStats.sort((a, b) => (b.points || 0) - (a.points || 0));
+        case 'goals':
+          return skaterStats.sort((a, b) => (b.goals || 0) - (a.goals || 0));
+        case 'assists':
+          return skaterStats.sort((a, b) => (b.assists || 0) - (a.assists || 0));
+        case 'penaltyMinutes':
+          return skaterStats.sort((a, b) => (b.penaltyMinutes || 0) - (a.penaltyMinutes || 0));
+        default:
+          return skaterStats;
+      }
+    }
+  };
+
   // Get initials for avatar fallback
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     if (firstName && lastName) {
@@ -313,7 +363,101 @@ export default function Stats() {
               <Trophy className="w-12 h-12 text-gray-600 mx-auto mb-4" />
               <p className="text-gray-400">No player statistics available</p>
             </div>
+          ) : viewMode === 'table' ? (
+            /* Table View */
+            <div className="space-y-4">
+              {/* Back button and title */}
+              <div className="flex items-center gap-3 mb-6">
+                <button 
+                  onClick={handleBackToSummary}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  data-testid="button-back-to-summary"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <h2 className="text-xl font-bold text-white capitalize" data-testid="text-table-title">
+                  {sortBy === 'penaltyMinutes' ? 'Penalty Minutes' : sortBy === 'goalsAgainstAverage' ? 'Goals Against Average' : sortBy}
+                </h2>
+              </div>
+
+              {/* Stats Table */}
+              <div className="overflow-auto border border-gray-800 rounded-lg">
+                <table className="w-full" data-testid="table-stats">
+                  <thead className="bg-gray-900 border-b border-gray-800">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">#</th>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Player</th>
+                      {activeTab === 'skaters' ? (
+                        <>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">GP</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">G</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">A</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">PTS</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">PIM</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">GP</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">W</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">L</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">GAA</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">SO</th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getSortedStatsForTable().map((stat, index) => {
+                      const membership = membershipMap.get(stat.userId);
+                      return (
+                        <tr key={stat.userId} className="border-b border-gray-800 hover:bg-gray-900/50" data-testid={`row-player-${index}`}>
+                          <td className="px-4 py-3 text-gray-400 text-sm">{index + 1}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-8 h-8">
+                                <AvatarImage src={stat.user?.profileImageUrl || undefined} />
+                                <AvatarFallback className="bg-gray-700 text-white text-xs">
+                                  {getInitials(stat.user?.firstName, stat.user?.lastName)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="text-white text-sm font-medium">
+                                  {formatPlayerName(stat)}
+                                </div>
+                                {membership && (
+                                  <div className="text-gray-400 text-xs">
+                                    {membership.position?.toUpperCase() || 'N/A'} • #{membership.jerseyNumber || 'N/A'}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          {activeTab === 'skaters' && stat.type === 'skater' ? (
+                            <>
+                              <td className="text-center px-4 py-3 text-white text-sm">{stat.gamesPlayed || 0}</td>
+                              <td className="text-center px-4 py-3 text-white text-sm font-medium">{stat.goals || 0}</td>
+                              <td className="text-center px-4 py-3 text-white text-sm">{stat.assists || 0}</td>
+                              <td className="text-center px-4 py-3 text-white text-sm font-medium">{stat.points || 0}</td>
+                              <td className="text-center px-4 py-3 text-white text-sm">{stat.penaltyMinutes || 0}</td>
+                            </>
+                          ) : stat.type === 'goalie' ? (
+                            <>
+                              <td className="text-center px-4 py-3 text-white text-sm">{stat.gamesPlayed || 0}</td>
+                              <td className="text-center px-4 py-3 text-white text-sm font-medium">{stat.wins || 0}</td>
+                              <td className="text-center px-4 py-3 text-white text-sm">{stat.losses || 0}</td>
+                              <td className="text-center px-4 py-3 text-white text-sm font-medium">{stat.goalsAgainstAverage?.toFixed(2) || '0.00'}</td>
+                              <td className="text-center px-4 py-3 text-white text-sm">{stat.shutouts || 0}</td>
+                            </>
+                          ) : null}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : (
+            /* Summary View */
             <div className="space-y-8">
               {/* Points Section */}
               {activeTab !== 'goalies' && (
@@ -324,6 +468,7 @@ export default function Stats() {
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
                   membershipMap={membershipMap}
+                  onClick={() => handleStatClick('points')}
                 />
               )}
 
@@ -337,6 +482,7 @@ export default function Stats() {
                   getInitials={getInitials}
                   showPosition={true}
                   membershipMap={membershipMap}
+                  onClick={() => handleStatClick('goals')}
                 />
               )}
 
@@ -351,6 +497,7 @@ export default function Stats() {
                   showPosition={true}
                   showMoreIndicator={true}
                   membershipMap={membershipMap}
+                  onClick={() => handleStatClick('assists')}
                 />
               )}
 
@@ -364,6 +511,7 @@ export default function Stats() {
                   getInitials={getInitials}
                   showPosition={true}
                   membershipMap={membershipMap}
+                  onClick={() => handleStatClick('penaltyMinutes')}
                 />
               )}
 
@@ -437,6 +585,7 @@ interface StatSectionProps {
   showPosition?: boolean;
   showMoreIndicator?: boolean;
   membershipMap: Map<any, any>;
+  onClick?: () => void;
 }
 
 function StatSection({ 
@@ -447,7 +596,8 @@ function StatSection({
   getInitials, 
   showPosition = false,
   showMoreIndicator = false,
-  membershipMap
+  membershipMap,
+  onClick
 }: StatSectionProps) {
   if (players.length === 0) return null;
 
@@ -463,6 +613,7 @@ function StatSection({
       </h2>
       
       <button
+        onClick={onClick}
         className="w-full bg-[#0a0a0a] rounded-lg p-4 flex items-center justify-between hover:bg-gray-900 transition-colors group"
         data-testid={`button-${title.toLowerCase().replace(/\s+/g, '-')}`}
       >
