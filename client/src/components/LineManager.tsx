@@ -314,8 +314,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
           )}
         </CardTitle>
       </CardHeader>
-      
-      <CardContent className="p-6 space-y-6 pt-[2px] pb-[2px]">
+      <CardContent className="p-6 space-y-6 pl-[12px] pr-[12px] pt-[4px] pb-[4px]">
         {/* Available Players */}
         {isTeamCaptain && (
           <div>
