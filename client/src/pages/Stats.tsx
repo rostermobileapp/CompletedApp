@@ -29,6 +29,10 @@ export default function Stats() {
     gcTime: 0, // Don't cache this query
   });
 
+  console.log('[Stats Debug] userTeams:', userTeams);
+  console.log('[Stats Debug] urlTeamId:', urlTeamId);
+  console.log('[Stats Debug] urlLeagueId:', urlLeagueId);
+
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
   
   // Determine league ID: prioritize URL league, then URL team's league, then primary team's league
@@ -36,7 +40,12 @@ export default function Stats() {
     ? userTeams.find((team: any) => team.id === urlTeamId) 
     : null;
   
+  console.log('[Stats Debug] selectedTeamFromUrl:', selectedTeamFromUrl);
+  console.log('[Stats Debug] primaryTeam:', primaryTeam);
+  
   const leagueId = urlLeagueId || selectedTeamFromUrl?.leagueId || primaryTeam?.leagueId;
+  
+  console.log('[Stats Debug] Final leagueId:', leagueId);
 
   // Fetch league seasons for filtering
   const { data: seasons } = useQuery({
