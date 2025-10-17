@@ -1388,6 +1388,7 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground mr-1">Select Team</span>
                 {/* Total notification count for ALL other teams/leagues */}
                 {(() => {
                   let totalNotifications = 0;
