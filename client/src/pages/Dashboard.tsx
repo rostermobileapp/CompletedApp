@@ -1606,10 +1606,10 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold" data-testid="text-schedule-title">Schedule</h2>
             <Button
               onClick={() => setShowAddEventDialog(true)}
-              className="w-8 h-8 p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
+              className="w-[25.6px] h-[25.6px] p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
               data-testid="button-add-event"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-[12.8px] h-[12.8px]" />
             </Button>
           </div>
           <button 
