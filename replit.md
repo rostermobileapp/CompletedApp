@@ -16,6 +16,8 @@ The frontend is a mobile-first, responsive single-page application built with Re
 
 The backend is a REST API developed with Express.js and TypeScript, featuring a modular design for authentication, database operations, and route handling. Authentication uses Replit's OpenID Connect via Passport.js with secure user sessions stored in PostgreSQL. The messaging system properly handles both direct team memberships (via `team_memberships` table) and league-assigned team memberships (via `assigned_team_id` in `league_memberships` table) when creating team group conversations, ensuring all team members can participate regardless of how they joined the team.
 
+**Unique ID Generation**: League creation automatically generates unique, URL-friendly IDs using nanoid. When a league is created without specifying a custom ID, the system generates one by sanitizing the league name (removing special characters, converting to lowercase) and appending an 8-character unique identifier. Format: `{sanitized-league-name}-{8-char-nanoid}` (e.g., "Downtown Hockey League" → "downtown-hockey-league-aB3xY9kL"). If the sanitized name is empty (e.g., league name contains only special characters), it defaults to "league" as the prefix.
+
 ## Data Storage Solutions
 
 PostgreSQL is the primary database, using Drizzle ORM for type-safe operations. The schema includes entities for users, leagues, teams, games, memberships, and messaging, with Drizzle Kit managing migrations. Session storage is also PostgreSQL-based.
