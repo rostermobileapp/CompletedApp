@@ -1016,9 +1016,10 @@ export default function Dashboard() {
     }
     
     if (selectedId && selectedType === 'league') {
-      const leagueExists = Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.some(league => league.id === selectedId);
+      // Check if league exists in ALL user leagues (not just leaguesWithoutTeams)
+      const leagueExists = Array.isArray(userLeagues) && userLeagues.some(league => league.id === selectedId);
       if (!leagueExists) {
-        // Saved league no longer valid (either doesn't exist or user now has a team in it), reset
+        // Saved league no longer exists, reset
         setSelectedId(null);
         return;
       }
