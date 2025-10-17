@@ -111,6 +111,16 @@ export default function StatsManagement() {
     enabled: !!selectedGame,
   });
 
+  // Filter out goalies from game participants (their stats are auto-calculated)
+  const nonGoalieParticipants = Array.isArray(gameParticipants) 
+    ? gameParticipants.filter((p: any) => !p.isGoalie) 
+    : [];
+
+  // Filter out goalies from players list (their stats are auto-calculated)
+  const nonGoaliePlayers = Array.isArray(players) 
+    ? (players as any[]).filter((p: any) => !p.isGoalie) 
+    : [];
+
   // Get individual player stats for selected player
   const { data: currentPlayerStats } = useQuery<PlayerStatsResponse>({
     queryKey: [`/api/leagues/${selectedLeague}/stats/player/${selectedPlayer}`, selectedSeason],
@@ -127,12 +137,12 @@ export default function StatsManagement() {
     enabled: !!selectedLeague && !!selectedSeason,
   });
 
-  // Initialize player stats when game participants change
+  // Initialize player stats when game participants change (excluding goalies)
   useEffect(() => {
-    if (Array.isArray(gameParticipants) && gameParticipants.length > 0) {
+    if (Array.isArray(nonGoalieParticipants) && nonGoalieParticipants.length > 0) {
       const initialStats: Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }> = {};
       
-      gameParticipants.forEach((participant: any) => {
+      nonGoalieParticipants.forEach((participant: any) => {
         initialStats[participant.userId] = {
           goals: '0',
           assists: '0', 
@@ -143,7 +153,7 @@ export default function StatsManagement() {
       
       setPlayerGameStats(initialStats);
     }
-  }, [gameParticipants]);
+  }, [nonGoalieParticipants]);
 
   // Initialize individual player stats when current player stats change
   useEffect(() => {
@@ -175,11 +185,11 @@ export default function StatsManagement() {
       
       setBulkPlayerStats(initialBulkStats);
     } else {
-      // Initialize with players from the league if no stats exist yet
-      if (Array.isArray(players) && players.length > 0) {
+      // Initialize with players from the league if no stats exist yet (excluding goalies)
+      if (Array.isArray(nonGoaliePlayers) && nonGoaliePlayers.length > 0) {
         const initialBulkStats: Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }> = {};
         
-        (players as Player[]).forEach((player: Player) => {
+        nonGoaliePlayers.forEach((player: Player) => {
           initialBulkStats[player.id] = {
             goals: '0',
             assists: '0',
@@ -191,7 +201,7 @@ export default function StatsManagement() {
         setBulkPlayerStats(initialBulkStats);
       }
     }
-  }, [allPlayerStats, players, selectedSeason]);
+  }, [allPlayerStats, nonGoaliePlayers, selectedSeason]);
 
   // Auto-select first commissioner league if not provided in URL
   useEffect(() => {
@@ -230,7 +240,7 @@ export default function StatsManagement() {
     };
 
     syncScrolls();
-  }, [gameParticipants]);
+  }, [nonGoalieParticipants]);
 
   // Stats update mutation
   const updateStatsMutation = useMutation({
@@ -625,10 +635,10 @@ export default function StatsManagement() {
                     </Select>
                   </div>
 
-                  {selectedGame && Array.isArray(gameParticipants) && gameParticipants.length > 0 && (
+                  {selectedGame && Array.isArray(nonGoalieParticipants) && nonGoalieParticipants.length > 0 && (
                     <div className="space-y-4">
                       <div className="text-sm text-muted-foreground" data-testid="text-participants-count">
-                        {gameParticipants.length} players found for this game
+                        {nonGoalieParticipants.length} players found for this game
                       </div>
                       
                       {/* Fixed Header */}
@@ -680,7 +690,7 @@ export default function StatsManagement() {
                       <div ref={gameTableBodyRef} className="max-h-96 overflow-auto border-l border-r border-b rounded-b-lg">
                         <Table data-testid="table-game-stats" style={{minWidth: '600px'}}>
                           <TableBody>
-                            {getSortedPlayers(gameParticipants).map((participant: any, index: number) => (
+                            {getSortedPlayers(nonGoalieParticipants).map((participant: any, index: number) => (
                               <TableRow key={participant.userId} data-testid={`row-participant-${participant.userId}`}>
                                 <TableCell className="font-medium w-32 pl-[2px] pr-[2px] pt-[5px] pb-[5px]" data-testid={`cell-name-${participant.userId}`}>
                                   <div className="flex items-center gap-3">
@@ -824,11 +834,11 @@ export default function StatsManagement() {
                     </div>
                   )}
 
-                  {selectedGame && Array.isArray(gameParticipants) && gameParticipants.length === 0 && (
+                  {selectedGame && Array.isArray(nonGoalieParticipants) && nonGoalieParticipants.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground" data-testid="text-no-participants">
                       <AlertCircle className="w-12 h-12 mx-auto mb-4" />
-                      <p>No participants found for this game.</p>
-                      <p className="text-sm">Players need to be assigned to teams in this game.</p>
+                      <p>No skater participants found for this game.</p>
+                      <p className="text-sm">Skaters need to be assigned to teams in this game.</p>
                     </div>
                   )}
                 </CardContent>
@@ -865,10 +875,10 @@ export default function StatsManagement() {
                   </div>
 
                   {/* Bulk Update Mode */}
-                  {updateMode === 'bulk' && Array.isArray(players) && players.length > 0 && (
+                  {updateMode === 'bulk' && Array.isArray(nonGoaliePlayers) && nonGoaliePlayers.length > 0 && (
                     <div className="space-y-4">
                       <div className="text-sm text-muted-foreground" data-testid="text-bulk-players">
-                        {players.length} players found - Edit stats for multiple players simultaneously
+                        {nonGoaliePlayers.length} players found - Edit stats for multiple players simultaneously
                       </div>
                       
                       <div className="overflow-auto border rounded-lg mt-[2px] mb-[2px]" style={{ maxHeight: 'calc(100vh - 280px)' }}>
@@ -882,7 +892,7 @@ export default function StatsManagement() {
                             </tr>
                           </thead>
                           <tbody className="[&_tr:last-child]:border-0">
-                            {getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
+                            {getSortedPlayersAlphabetically(nonGoaliePlayers as Player[]).map((player: Player) => (
                               <tr key={player.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-testid={`row-bulk-player-${player.id}`}>
                                 {/* Player Name */}
                                 <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0 font-medium pl-2 pr-1">
@@ -1013,7 +1023,7 @@ export default function StatsManagement() {
                             <SelectValue placeholder="Select a player" />
                           </SelectTrigger>
                           <SelectContent>
-                            {Array.isArray(players) && getSortedPlayersAlphabetically(players as Player[]).map((player: Player) => (
+                            {Array.isArray(nonGoaliePlayers) && getSortedPlayersAlphabetically(nonGoaliePlayers as Player[]).map((player: Player) => (
                               <SelectItem key={player.id} value={player.id}>
                                 {player.firstName} {player.lastName}
                               </SelectItem>
@@ -1025,7 +1035,7 @@ export default function StatsManagement() {
                       {selectedPlayer && (
                         <div className="space-y-4">
                           <div className="text-sm text-muted-foreground" data-testid="text-selected-player">
-                            Editing stats for: {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.firstName} {(players as Player[]).find((p: Player) => p.id === selectedPlayer)?.lastName}
+                            Editing stats for: {nonGoaliePlayers.find((p: Player) => p.id === selectedPlayer)?.firstName} {nonGoaliePlayers.find((p: Player) => p.id === selectedPlayer)?.lastName}
                           </div>
                           
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
