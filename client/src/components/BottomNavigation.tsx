@@ -90,7 +90,7 @@ export function BottomNavigation() {
                   )}
                 </div>
               )}
-              <span className="text-xs">{shortcut.label}</span>
+              <span className="text-xs font-extrabold text-[#ffffff]">{shortcut.label}</span>
             </button>
           );
         })}
