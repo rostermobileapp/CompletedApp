@@ -1388,7 +1388,7 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground mr-1">Select Team</span>
+                <span className="text-xs mr-1 text-[#3c83f6] font-bold">Select Team</span>
                 {/* Total notification count for ALL other teams/leagues */}
                 {(() => {
                   let totalNotifications = 0;
@@ -1887,7 +1887,6 @@ export default function Dashboard() {
         isOpen={showFeedbackModal}
         onClose={() => setShowFeedbackModal(false)}
       />
-
       {/* Add Event Dialog */}
       <Dialog open={showAddEventDialog} onOpenChange={setShowAddEventDialog}>
         <DialogContent className="sm:max-w-[425px]" data-testid="dialog-add-event">
@@ -1926,7 +1925,6 @@ export default function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Personal Reminder Form Dialog */}
       <Dialog open={eventType === 'reminder'} onOpenChange={(open) => !open && setEventType(null)}>
         <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-reminder">
@@ -1995,7 +1993,6 @@ export default function Dashboard() {
           </Form>
         </DialogContent>
       </Dialog>
-
       {/* Team Game Form Dialog */}
       <Dialog open={eventType === 'game'} onOpenChange={(open) => !open && setEventType(null)}>
         <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-game">
