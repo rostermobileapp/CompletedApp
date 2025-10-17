@@ -9,8 +9,8 @@ const FIXED_SHORTCUTS = [
   { id: 'teams', icon: Users, label: 'My Team', path: '/teams' },
   { id: 'messages', icon: MessageCircle, label: 'Messages', path: '/messages' },
   { id: 'home', icon: null, label: 'Home', path: '/' },
-  { id: 'profile', icon: User, label: 'Profile', path: '/profile' },
   { id: 'payments', icon: DollarSign, label: 'Payments', path: '/payment-requests' },
+  { id: 'profile', icon: User, label: 'Profile', path: '/profile' },
 ];
 
 export function BottomNavigation() {

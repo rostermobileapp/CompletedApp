@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Menu, Calendar, Settings, Plus, Crown, DollarSign, Users, X } from 'lucide-react';
+import { Menu, Calendar, Settings, Plus, Crown, Users, X } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 
@@ -60,15 +60,6 @@ export function SlideOutMenu() {
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-amber-500/20',
       iconColor: 'text-amber-500',
-    },
-    {
-      icon: DollarSign,
-      label: 'Payments',
-      path: '/payment-requests',
-      locked: false,
-      requiredTier: null,
-      bgColor: 'bg-emerald-500/20',
-      iconColor: 'text-emerald-500',
     },
   ];
 
