@@ -10,8 +10,8 @@ export function AdSenseBanner() {
 
   return (
     <div 
-      className="fixed left-0 right-0 z-40 flex items-center justify-center bg-muted/50 border-t border-border"
-      style={{ bottom: '66px', height: '50px' }}
+      className="left-0 right-0 flex items-center justify-center bg-muted/50 border-t border-border"
+      style={{ position: 'fixed', bottom: '82px', height: '50px', zIndex: 40 }}
       data-testid="adsense-banner-container"
     >
       <div 
