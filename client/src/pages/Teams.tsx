@@ -427,30 +427,30 @@ export default function Teams() {
                 {/* Team Standings */}
                 <Card className="rounded-lg border text-card-foreground shadow-sm bg-[#212121]">
                   <CardHeader className="flex flex-col space-y-1.5 p-6 pt-[5px] pb-[5px]">
-                    <CardTitle className="text-2xl font-semibold leading-none tracking-tight text-center">League Standing</CardTitle>
+                    <div className="flex items-center justify-center gap-3">
+                      <CardTitle className="text-2xl font-semibold leading-none tracking-tight">League Standing</CardTitle>
+                      {teamStanding && (
+                        <span className="text-lg font-bold text-primary">
+                          {teamStanding.position}
+                          {teamStanding.position === 1 ? 'st' : 
+                           teamStanding.position === 2 ? 'nd' : 
+                           teamStanding.position === 3 ? 'rd' : 'th'}
+                          {' '}of {teamStanding.totalTeams}
+                        </span>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent className="p-6 pt-[5px] pb-[5px] bg-[212121]">
                     {teamStanding ? (
                       <div className="flex justify-between items-center gap-2">
                         <div className="text-center flex-1">
-                          <div className="text-2xl font-bold text-primary">
-                            {teamStanding.position}
-                            {teamStanding.position === 1 ? 'st' : 
-                             teamStanding.position === 2 ? 'nd' : 
-                             teamStanding.position === 3 ? 'rd' : 'th'}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            of {teamStanding.totalTeams}
+                          <div className="text-2xl font-bold">
+                            {teamStanding.wins}-{teamStanding.losses}-{teamStanding.ties}
                           </div>
                         </div>
                         <div className="text-center flex-1">
                           <div className="text-2xl font-bold text-blue-600">{teamStanding.points}</div>
                           <div className="text-sm text-muted-foreground">Points</div>
-                        </div>
-                        <div className="text-center flex-1">
-                          <div className="text-2xl font-bold">
-                            {teamStanding.wins}-{teamStanding.losses}-{teamStanding.ties}
-                          </div>
                         </div>
                         <div className="text-center flex-1">
                           <div className={`text-2xl font-bold ${teamStanding.goalDifferential >= 0 ? 'text-green-600' : 'text-red-600'}`}>
