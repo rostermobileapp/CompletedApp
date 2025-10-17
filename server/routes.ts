@@ -2218,8 +2218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (homeTeamCaptain) {
           submitterRole = 'home_captain';
-        } else {
-          // Check if user is captain of away team
+        } else if (game.awayTeamId) {
+          // Check if user is captain of away team (only if awayTeamId exists)
           const awayTeam = await storage.getTeam(game.awayTeamId);
           const awayTeamCaptain = awayTeam && awayTeam.captainId === userId;
           
@@ -2305,7 +2305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is captain of either team
       const homeTeam = await storage.getTeam(game.homeTeamId);
-      const awayTeam = await storage.getTeam(game.awayTeamId);
+      const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId) : null;
       const isHomeCaptain = homeTeam && homeTeam.captainId === userId;
       const isAwayCaptain = awayTeam && awayTeam.captainId === userId;
       
@@ -2825,7 +2825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // For standalone games, check if user is a member of either team
         const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
-        const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+        const awayTeamMembers = game.awayTeamId ? await storage.getTeamMembers(game.awayTeamId) : [];
         hasAccess = [...homeTeamMembers, ...awayTeamMembers].some(m => m.userId === userId);
       }
       
@@ -2835,7 +2835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get members from both home and away teams
       const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
-      const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+      const awayTeamMembers = game.awayTeamId ? await storage.getTeamMembers(game.awayTeamId) : [];
       
       // Get league memberships to access isGoalie field
       const allMembers = [...homeTeamMembers, ...awayTeamMembers];
@@ -3004,7 +3004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is captain of either team
       const homeTeam = await storage.getTeam(game.homeTeamId);
-      const awayTeam = await storage.getTeam(game.awayTeamId);
+      const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId) : null;
       const isHomeCaptain = homeTeam && homeTeam.captainId === userId;
       const isAwayCaptain = awayTeam && awayTeam.captainId === userId;
       
@@ -3047,7 +3047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // General access - require being on either team, captain, or commissioner
         const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
-        const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+        const awayTeamMembers = game.awayTeamId ? await storage.getTeamMembers(game.awayTeamId) : [];
         const isOnHomeTeam = homeTeamMembers.some(member => member.userId === userId);
         const isOnAwayTeam = awayTeamMembers.some(member => member.userId === userId);
         
@@ -3219,7 +3219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is captain of either team
       const homeTeam = await storage.getTeam(game.homeTeamId);
-      const awayTeam = await storage.getTeam(game.awayTeamId);
+      const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId) : null;
       const isHomeCaptain = homeTeam && homeTeam.captainId === userId;
       const isAwayCaptain = awayTeam && awayTeam.captainId === userId;
       
@@ -3270,7 +3270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // VALIDATION: Check if substitute player is already on either team for this game
         const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
-        const awayTeamMembers = await storage.getTeamMembers(game.awayTeamId);
+        const awayTeamMembers = game.awayTeamId ? await storage.getTeamMembers(game.awayTeamId) : [];
         const substituteOnHomeTeam = homeTeamMembers.some(m => m.userId === substitutePlayerId);
         const substituteOnAwayTeam = awayTeamMembers.some(m => m.userId === substitutePlayerId);
         
@@ -3429,7 +3429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is captain of involved teams
       const homeTeam = await storage.getTeam(request.game.homeTeamId);
-      const awayTeam = await storage.getTeam(request.game.awayTeamId);
+      const awayTeam = request.game.awayTeamId ? await storage.getTeam(request.game.awayTeamId) : null;
       const isCaptain = (homeTeam && homeTeam.captainId === userId) ||
                        (awayTeam && awayTeam.captainId === userId);
       

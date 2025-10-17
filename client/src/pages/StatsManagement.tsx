@@ -204,7 +204,26 @@ export default function StatsManagement() {
           };
         });
         
-        setBulkPlayerStats(initialBulkStats);
+        setBulkPlayerStats(prevStats => {
+          // Only update if the data has actually changed
+          const prevKeys = Object.keys(prevStats);
+          const newKeys = Object.keys(initialBulkStats);
+          
+          if (prevKeys.length !== newKeys.length) {
+            return initialBulkStats;
+          }
+          
+          // Check if any values changed
+          const hasChanges = newKeys.some(key => 
+            !prevStats[key] || 
+            prevStats[key].goals !== initialBulkStats[key].goals ||
+            prevStats[key].assists !== initialBulkStats[key].assists ||
+            prevStats[key].penaltyMinutes !== initialBulkStats[key].penaltyMinutes ||
+            prevStats[key].gamesPlayed !== initialBulkStats[key].gamesPlayed
+          );
+          
+          return hasChanges ? initialBulkStats : prevStats;
+        });
       }
     }
   }, [allPlayerStats, nonGoaliePlayers, selectedSeason]);

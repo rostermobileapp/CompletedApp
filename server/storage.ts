@@ -2223,7 +2223,7 @@ export class DatabaseStorage implements IStorage {
         );
 
       // Check if user is assigned to this team via league membership BEFORE any updates
-      const [leagueMembership] = await tx
+      const [leagueMembership] = team.leagueId ? await tx
         .select()
         .from(leagueMemberships)
         .where(
@@ -2232,7 +2232,7 @@ export class DatabaseStorage implements IStorage {
             eq(leagueMemberships.leagueId, team.leagueId),
             eq(leagueMemberships.assignedTeamId, teamId)
           )
-        );
+        ) : [undefined];
 
       // If user has no membership at all, throw error
       if (!directMembership && !leagueMembership) {
@@ -2459,6 +2459,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: new Date(),
         updatedAt: new Date()
       },
+      opponentName: null,
       // Mark as scrimmage for frontend identification
       isScrimmage: true,
       scrimmageTitle: scrimmage.title,
@@ -2695,6 +2696,9 @@ export class DatabaseStorage implements IStorage {
         leagueId: row.home_team_league_id as string,
         seasonId: row.home_team_season_id as string | null,
         captainId: row.home_team_captain_id as string | null,
+        facilityId: null,
+        uniqueTeamId: null,
+        creatorId: null,
         wins: row.home_team_wins as number,
         losses: row.home_team_losses as number,
         ties: row.home_team_ties as number,
@@ -2710,6 +2714,9 @@ export class DatabaseStorage implements IStorage {
         leagueId: row.away_team_league_id as string,
         seasonId: row.away_team_season_id as string | null,
         captainId: row.away_team_captain_id as string | null,
+        facilityId: null,
+        uniqueTeamId: null,
+        creatorId: null,
         wins: row.away_team_wins as number,
         losses: row.away_team_losses as number,
         ties: row.away_team_ties as number,
@@ -2859,6 +2866,9 @@ export class DatabaseStorage implements IStorage {
         leagueId: row.home_team_league_id as string,
         seasonId: row.home_team_season_id as string | null,
         captainId: row.home_team_captain_id as string | null,
+        facilityId: null,
+        uniqueTeamId: null,
+        creatorId: null,
         wins: row.home_team_wins as number,
         losses: row.home_team_losses as number,
         ties: row.home_team_ties as number,
@@ -2874,6 +2884,9 @@ export class DatabaseStorage implements IStorage {
         leagueId: row.away_team_league_id as string,
         seasonId: row.away_team_season_id as string | null,
         captainId: row.away_team_captain_id as string | null,
+        facilityId: null,
+        uniqueTeamId: null,
+        creatorId: null,
         wins: row.away_team_wins as number,
         losses: row.away_team_losses as number,
         ties: row.away_team_ties as number,
@@ -2933,6 +2946,9 @@ export class DatabaseStorage implements IStorage {
         leagueId: row.home_team_league_id as string,
         seasonId: row.home_team_season_id as string | null,
         captainId: row.home_team_captain_id as string | null,
+        facilityId: null,
+        uniqueTeamId: null,
+        creatorId: null,
         wins: row.home_team_wins as number,
         losses: row.home_team_losses as number,
         ties: row.home_team_ties as number,
@@ -2948,6 +2964,9 @@ export class DatabaseStorage implements IStorage {
         leagueId: row.away_team_league_id as string,
         seasonId: row.away_team_season_id as string | null,
         captainId: row.away_team_captain_id as string | null,
+        facilityId: null,
+        uniqueTeamId: null,
+        creatorId: null,
         wins: row.away_team_wins as number,
         losses: row.away_team_losses as number,
         ties: row.away_team_ties as number,
