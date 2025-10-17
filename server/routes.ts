@@ -991,7 +991,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const leagues = await storage.getLeaguesByCommissioner(userId);
-      res.json(leagues);
+      // Explicitly map to ensure uniqueLeagueId is present
+      const mappedLeagues = leagues.map(league => ({
+        ...league,
+        uniqueLeagueId: league.uniqueLeagueId || (league as any).unique_league_id
+      }));
+      res.json(mappedLeagues);
     } catch (error) {
       console.error("Error fetching commissioner leagues:", error);
       res.status(500).json({ message: "Failed to fetch leagues" });
