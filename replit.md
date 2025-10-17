@@ -30,7 +30,7 @@ Authentication uses Replit's OpenID Connect with session-based methods. Role-bas
 
 The UI/UX emphasizes a mobile-first responsive design using `shadcn/ui`. Key design elements include an Apple Fitness+ inspired landing page, horizontal button layouts for mobile game schedules, dark-themed player substitution components, an NHL.com mobile-inspired Stats page redesign with tab navigation and season filtering, and streamlined Stats Management. Premium features are presented with an elegant dialog for free-tier users. A fixed 5-item bottom navigation bar (Teams, Messages, Home, Profile, Payments) provides quick access, complemented by a global slide-out hamburger menu for permission-gated features.
 
-**League List Display**: Each league card prominently displays the league's unique ID in a monospace font badge below the league name, providing easy identification and reference for users.
+**League List Display**: Each league card prominently displays the league's unique ID in a monospace font badge below the league name, providing easy identification and reference for users. The league list includes a search input that allows users to search for leagues by their unique ID with case-insensitive matching, displaying real-time filtered results.
 
 ## Feature Specifications
 
