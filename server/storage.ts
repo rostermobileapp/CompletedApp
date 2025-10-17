@@ -279,6 +279,7 @@ export interface IStorage {
   // Personal Reminders
   getUserPersonalReminders(userId: string): Promise<PersonalReminder[]>;
   createPersonalReminder(reminder: InsertPersonalReminder): Promise<PersonalReminder>;
+  deletePersonalReminder(reminderId: string, userId: string): Promise<void>;
   
   // RSVP operations
   createOrUpdateRsvp(rsvp: InsertGameRsvp): Promise<GameRsvp>;
@@ -3156,6 +3157,14 @@ export class DatabaseStorage implements IStorage {
   async createPersonalReminder(reminder: InsertPersonalReminder): Promise<PersonalReminder> {
     const [newReminder] = await db.insert(personalReminders).values(reminder).returning();
     return newReminder;
+  }
+
+  async deletePersonalReminder(reminderId: string, userId: string): Promise<void> {
+    await db.delete(personalReminders)
+      .where(and(
+        eq(personalReminders.id, reminderId),
+        eq(personalReminders.userId, userId)
+      ));
   }
 
   async deleteTeam(teamId: string): Promise<void> {

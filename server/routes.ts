@@ -254,6 +254,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/personal-reminders/:reminderId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { reminderId } = req.params;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      await storage.deletePersonalReminder(reminderId, userId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting personal reminder:", error);
+      res.status(500).json({ message: "Failed to delete personal reminder" });
+    }
+  });
+
   // Get user's created scrimmages - MUST be before /api/users/:userId
   app.get('/api/users/scrimmages', isAuthenticated, async (req: any, res) => {
     try {
