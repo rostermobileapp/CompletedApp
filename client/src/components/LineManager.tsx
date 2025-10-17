@@ -263,17 +263,6 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
             <div className="text-sm text-center font-medium truncate max-w-full">
               {player.lastName}
             </div>
-            {isTeamCaptain && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                onClick={() => handleRemovePlayer(assignment.id)}
-                data-testid={`button-remove-${assignment.id}`}
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
-            )}
           </div>
         ) : (
           <div className="text-xs text-muted-foreground text-center">
