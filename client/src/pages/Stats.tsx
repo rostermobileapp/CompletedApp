@@ -268,7 +268,7 @@ export default function Stats() {
 
   return (
     <div className="min-h-screen bg-black text-white pb-24" data-testid="stats-page">
-      <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()} className="min-h-screen flex flex-col">
+      <FeatureLockOverlay isLocked={!canAccessPremiumFeatures() && !canEditStats()} className="min-h-screen flex flex-col">
         {/* Header */}
         <div className="sticky top-0 z-50 bg-black/95 backdrop-blur-sm border-b border-gray-800">
           <div className="px-4 pt-8 pb-3">
