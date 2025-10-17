@@ -952,6 +952,11 @@ export default function Dashboard() {
     }
   });
 
+  // Fetch user's personal reminders
+  const { data: personalReminders = [], isLoading: remindersLoading } = useQuery({
+    queryKey: ['/api/user/personal-reminders'],
+  });
+
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
     select: (teams) => {
@@ -1623,11 +1628,11 @@ export default function Dashboard() {
           </button>
         </div>
         
-        {gamesLoading || invitesLoading || requestsLoading ? (
+        {gamesLoading || invitesLoading || requestsLoading || remindersLoading ? (
           <div className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid="loading-upcoming-games">
             <div className="h-16 bg-muted rounded"></div>
           </div>
-        ) : (Array.isArray(upcomingGames) && upcomingGames.length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.length > 0) || (Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved').length > 0) ? (
+        ) : (Array.isArray(upcomingGames) && upcomingGames.length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.length > 0) || (Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved').length > 0) || (Array.isArray(personalReminders) && personalReminders.length > 0) ? (
           <div className="space-y-3">
             {/* First show scrimmage invites */}
             {Array.isArray(scrimmageInvites) && scrimmageInvites.map((invite: any) => (
@@ -1705,6 +1710,41 @@ export default function Dashboard() {
                   </div>
                 );
               })}
+            
+            {/* Show personal reminders */}
+            {Array.isArray(personalReminders) && personalReminders
+              .filter((reminder: any) => !reminder.isCompleted)
+              .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+              .slice(0, 4)
+              .map((reminder: any) => (
+                <div 
+                  key={`reminder-${reminder.id}`}
+                  className="rounded-xl border border-green-200 dark:border-green-800 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#212121]"
+                  data-testid={`card-reminder-${reminder.id}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
+                      <Clock className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold" data-testid={`text-reminder-title-${reminder.id}`}>
+                          {reminder.title}
+                        </h3>
+                        <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">Reminder</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground" data-testid={`text-reminder-time-${reminder.id}`}>
+                        {format(new Date(reminder.scheduledAt), 'MMM d • h:mm a')}
+                      </p>
+                      {reminder.description && (
+                        <p className="text-xs text-muted-foreground" data-testid={`text-reminder-description-${reminder.id}`}>
+                          {reminder.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             
             {/* Then show regular games */}
             {(upcomingGames as any[])
