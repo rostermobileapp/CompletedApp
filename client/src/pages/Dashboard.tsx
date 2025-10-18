@@ -1527,7 +1527,7 @@ export default function Dashboard() {
             onClick={() => effectiveLeagueId && navigate('/announcements')}
           >
             <div className="h-full flex flex-col items-center justify-center">
-              <Megaphone className="w-8 h-8 text-orange-500 mb-3" />
+              <Megaphone className="w-8 h-8 text-blue-500 mb-3" />
               <p className="text-xs font-medium">News</p>
             </div>
             {effectiveLeagueId && <AnnouncementBadge leagueId={effectiveLeagueId} />}
@@ -1548,7 +1548,7 @@ export default function Dashboard() {
             }}
           >
             <div className="h-full flex flex-col items-center justify-center">
-              <BarChart3 className="w-8 h-8 text-purple-500 mb-3" />
+              <BarChart3 className="w-8 h-8 text-blue-500 mb-3" />
               <p className="text-xs font-medium">Stats</p>
             </div>
           </div>
