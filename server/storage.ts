@@ -24,6 +24,9 @@ import {
   announcementPollVotes,
   scrimmages,
   scrimmageRequests,
+  inviteGroups,
+  inviteGroupMembers,
+  scrimmageInvites,
   playerImports,
   importedPlayers,
   playerMergeRequests,
@@ -110,6 +113,12 @@ import {
   type InsertScrimmage,
   type ScrimmageRequest,
   type InsertScrimmageRequest,
+  type InviteGroup,
+  type InsertInviteGroup,
+  type InviteGroupMember,
+  type InsertInviteGroupMember,
+  type ScrimmageInvite,
+  type InsertScrimmageInvite,
   type PlayerImport,
   type InsertPlayerImport,
   type ImportedPlayer,
@@ -400,6 +409,24 @@ export interface IStorage {
   deleteScrimmageRequest(requestId: string): Promise<void>;
   getScrimmageRequestsByPlayer(playerId: string): Promise<(ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[]>;
   getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User })[]>;
+
+  // Invite group operations
+  createInviteGroup(groupData: InsertInviteGroup): Promise<InviteGroup>;
+  getInviteGroups(userId: string, leagueId?: string): Promise<InviteGroup[]>;
+  getInviteGroup(groupId: string): Promise<InviteGroup | undefined>;
+  updateInviteGroup(groupId: string, updates: Partial<InsertInviteGroup>): Promise<InviteGroup>;
+  deleteInviteGroup(groupId: string): Promise<void>;
+  addMembersToInviteGroup(groupId: string, members: InsertInviteGroupMember[]): Promise<InviteGroupMember[]>;
+  removeMemberFromInviteGroup(groupId: string, memberId: string): Promise<void>;
+  getInviteGroupMembers(groupId: string): Promise<(InviteGroupMember & { user?: User })[]>;
+  
+  // Scrimmage invite operations
+  createScrimmageInvites(scrimmageId: string, emails: string[]): Promise<ScrimmageInvite[]>;
+  getScrimmageInvites(scrimmageId: string): Promise<ScrimmageInvite[]>;
+  deleteScrimmageInvite(inviteId: string): Promise<void>;
+  
+  // User search operations
+  searchUsersByEmail(email: string, limit?: number): Promise<User[]>;
   
   // Player stats operations
   getPlayerStats(leagueId: string, seasonId?: string): Promise<(PlayerStats & { user: User })[]>;
@@ -5116,6 +5143,121 @@ export class DatabaseStorage implements IStorage {
       ...r.scrimmage,
       creator: r.creator
     }));
+  }
+
+  // Invite group operations
+  async createInviteGroup(groupData: InsertInviteGroup): Promise<InviteGroup> {
+    const [newGroup] = await db.insert(inviteGroups).values(groupData).returning();
+    return newGroup;
+  }
+
+  async getInviteGroups(userId: string, leagueId?: string): Promise<InviteGroup[]> {
+    const conditions = [eq(inviteGroups.creatorId, userId)];
+    
+    if (leagueId) {
+      conditions.push(
+        or(
+          eq(inviteGroups.leagueId, leagueId),
+          isNull(inviteGroups.leagueId)
+        ) as any
+      );
+    }
+    
+    return await db
+      .select()
+      .from(inviteGroups)
+      .where(and(...conditions))
+      .orderBy(desc(inviteGroups.createdAt));
+  }
+
+  async getInviteGroup(groupId: string): Promise<InviteGroup | undefined> {
+    const [group] = await db.select().from(inviteGroups).where(eq(inviteGroups.id, groupId));
+    return group;
+  }
+
+  async updateInviteGroup(groupId: string, updates: Partial<InsertInviteGroup>): Promise<InviteGroup> {
+    const [updated] = await db
+      .update(inviteGroups)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(inviteGroups.id, groupId))
+      .returning();
+    return updated;
+  }
+
+  async deleteInviteGroup(groupId: string): Promise<void> {
+    // First delete all members
+    await db.delete(inviteGroupMembers).where(eq(inviteGroupMembers.groupId, groupId));
+    // Then delete the group
+    await db.delete(inviteGroups).where(eq(inviteGroups.id, groupId));
+  }
+
+  async addMembersToInviteGroup(groupId: string, members: InsertInviteGroupMember[]): Promise<InviteGroupMember[]> {
+    if (members.length === 0) return [];
+    
+    const membersWithGroupId = members.map(m => ({ ...m, groupId }));
+    return await db.insert(inviteGroupMembers).values(membersWithGroupId).returning();
+  }
+
+  async removeMemberFromInviteGroup(groupId: string, memberId: string): Promise<void> {
+    await db.delete(inviteGroupMembers).where(
+      and(
+        eq(inviteGroupMembers.groupId, groupId),
+        eq(inviteGroupMembers.id, memberId)
+      )
+    );
+  }
+
+  async getInviteGroupMembers(groupId: string): Promise<(InviteGroupMember & { user?: User })[]> {
+    const results = await db
+      .select()
+      .from(inviteGroupMembers)
+      .leftJoin(users, eq(inviteGroupMembers.userId, users.id))
+      .where(eq(inviteGroupMembers.groupId, groupId))
+      .orderBy(asc(inviteGroupMembers.createdAt));
+
+    return results.map(r => ({
+      ...r.invite_group_members,
+      user: r.users || undefined
+    }));
+  }
+
+  // Scrimmage invite operations
+  async createScrimmageInvites(scrimmageId: string, emails: string[]): Promise<ScrimmageInvite[]> {
+    if (emails.length === 0) return [];
+    
+    // Find matching users for each email
+    const inviteData = await Promise.all(
+      emails.map(async (email) => {
+        const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
+        return {
+          scrimmageId,
+          email: email.toLowerCase(),
+          userId: user?.id || null
+        };
+      })
+    );
+    
+    return await db.insert(scrimmageInvites).values(inviteData).returning();
+  }
+
+  async getScrimmageInvites(scrimmageId: string): Promise<ScrimmageInvite[]> {
+    return await db
+      .select()
+      .from(scrimmageInvites)
+      .where(eq(scrimmageInvites.scrimmageId, scrimmageId));
+  }
+
+  async deleteScrimmageInvite(inviteId: string): Promise<void> {
+    await db.delete(scrimmageInvites).where(eq(scrimmageInvites.id, inviteId));
+  }
+
+  // User search operations
+  async searchUsersByEmail(email: string, limit: number = 10): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(ilike(users.email, `%${email}%`))
+      .limit(limit);
   }
 
   // Player stats operations
