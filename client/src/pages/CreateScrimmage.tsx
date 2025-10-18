@@ -118,6 +118,11 @@ export default function CreateScrimmage() {
   // Search users by email
   const { data: emailSearchResults = [], isLoading: emailSearchLoading } = useQuery({
     queryKey: ['/api/users/search', emailSearchTerm],
+    queryFn: async () => {
+      const response = await fetch(`/api/users/search?email=${encodeURIComponent(emailSearchTerm)}`);
+      if (!response.ok) throw new Error('Failed to search users');
+      return response.json();
+    },
     enabled: emailSearchTerm.length > 2,
   });
 
@@ -272,9 +277,11 @@ export default function CreateScrimmage() {
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) return;
     
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
+    // Strict email validation using zod
+    const emailSchema = z.string().email();
+    const validationResult = emailSchema.safeParse(trimmedEmail);
+    
+    if (!validationResult.success) {
       toast({
         title: 'Invalid Email',
         description: 'Please enter a valid email address',
@@ -283,6 +290,7 @@ export default function CreateScrimmage() {
       return;
     }
     
+    // Check for duplicates
     if (selectedEmails.includes(trimmedEmail)) {
       toast({
         title: 'Duplicate Email',
@@ -292,6 +300,7 @@ export default function CreateScrimmage() {
       return;
     }
     
+    // Add the validated, normalized email
     setSelectedEmails([...selectedEmails, trimmedEmail]);
     setManualEmail("");
     setEmailSearchTerm("");

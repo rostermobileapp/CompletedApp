@@ -5549,15 +5549,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Created ${dates.length - 1} recurring scrimmages linked to parent ${parentScrimmage.id}`);
         
         // Save email invites if provided
-        if (req.body.selectedEmails && req.body.selectedEmails.length > 0) {
+        if (req.body.selectedEmails && Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
           try {
-            const emailInvites = req.body.selectedEmails.map((email: string) => ({
-              scrimmageId: parentScrimmage.id,
-              email: email.toLowerCase().trim(),
-              status: 'pending',
-            }));
-            await storage.createScrimmageInvites(emailInvites);
-            console.log(`📧 Created ${emailInvites.length} email invites for scrimmage ${parentScrimmage.id}`);
+            // Validate and normalize emails
+            const emailSchema = z.string().email();
+            const validEmails = req.body.selectedEmails
+              .map((email: string) => email.toLowerCase().trim())
+              .filter((email: string) => emailSchema.safeParse(email).success);
+            
+            // Deduplicate emails
+            const uniqueEmails = [...new Set(validEmails)];
+            
+            if (uniqueEmails.length > 0) {
+              const emailInvites = uniqueEmails.map((email: string) => ({
+                scrimmageId: parentScrimmage.id,
+                email: email,
+              }));
+              await storage.createScrimmageInvites(emailInvites);
+              console.log(`📧 Created ${emailInvites.length} email invites for scrimmage ${parentScrimmage.id}`);
+            }
           } catch (emailError) {
             console.error('Error creating email invites:', emailError);
             // Continue even if email invites fail
@@ -5575,15 +5585,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Created scrimmage ${scrimmage.id}${announcementId ? ` linked to announcement ${announcementId}` : ''}`);
         
         // Save email invites if provided
-        if (req.body.selectedEmails && req.body.selectedEmails.length > 0) {
+        if (req.body.selectedEmails && Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
           try {
-            const emailInvites = req.body.selectedEmails.map((email: string) => ({
-              scrimmageId: scrimmage.id,
-              email: email.toLowerCase().trim(),
-              status: 'pending',
-            }));
-            await storage.createScrimmageInvites(emailInvites);
-            console.log(`📧 Created ${emailInvites.length} email invites for scrimmage ${scrimmage.id}`);
+            // Validate and normalize emails
+            const emailSchema = z.string().email();
+            const validEmails = req.body.selectedEmails
+              .map((email: string) => email.toLowerCase().trim())
+              .filter((email: string) => emailSchema.safeParse(email).success);
+            
+            // Deduplicate emails
+            const uniqueEmails = [...new Set(validEmails)];
+            
+            if (uniqueEmails.length > 0) {
+              const emailInvites = uniqueEmails.map((email: string) => ({
+                scrimmageId: scrimmage.id,
+                email: email,
+              }));
+              await storage.createScrimmageInvites(emailInvites);
+              console.log(`📧 Created ${emailInvites.length} email invites for scrimmage ${scrimmage.id}`);
+            }
           } catch (emailError) {
             console.error('Error creating email invites:', emailError);
             // Continue even if email invites fail
