@@ -5360,8 +5360,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }, z.date().nullable().optional()),
   });
 
-  // Create scrimmage (Player Plus+ only)
-  app.post('/api/scrimmages', isAuthenticated, loadUserPermissions, requirePremiumFeatures, async (req: any, res) => {
+  // Create scrimmage (available to all users)
+  app.post('/api/scrimmages', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -5561,12 +5561,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const uniqueEmails = [...new Set(validEmails)];
             
             if (uniqueEmails.length > 0) {
-              const emailInvites = uniqueEmails.map((email: string) => ({
-                scrimmageId: parentScrimmage.id,
-                email: email,
-              }));
-              await storage.createScrimmageInvites(emailInvites);
-              console.log(`📧 Created ${emailInvites.length} email invites for scrimmage ${parentScrimmage.id}`);
+              await storage.createScrimmageInvites(parentScrimmage.id, uniqueEmails);
+              console.log(`📧 Created ${uniqueEmails.length} email invites for scrimmage ${parentScrimmage.id}`);
             }
           } catch (emailError) {
             console.error('Error creating email invites:', emailError);
@@ -5597,12 +5593,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const uniqueEmails = [...new Set(validEmails)];
             
             if (uniqueEmails.length > 0) {
-              const emailInvites = uniqueEmails.map((email: string) => ({
-                scrimmageId: scrimmage.id,
-                email: email,
-              }));
-              await storage.createScrimmageInvites(emailInvites);
-              console.log(`📧 Created ${emailInvites.length} email invites for scrimmage ${scrimmage.id}`);
+              await storage.createScrimmageInvites(scrimmage.id, uniqueEmails);
+              console.log(`📧 Created ${uniqueEmails.length} email invites for scrimmage ${scrimmage.id}`);
             }
           } catch (emailError) {
             console.error('Error creating email invites:', emailError);

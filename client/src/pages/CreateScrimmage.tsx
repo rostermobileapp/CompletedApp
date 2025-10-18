@@ -586,9 +586,12 @@ export default function CreateScrimmage() {
                   </SelectContent>
                 </Select>
               ) : (
-                <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
-                  No facilities available. You can still enter a location manually below.
-                </div>
+                <Input
+                  id="venue"
+                  {...form.register('venue')}
+                  placeholder="Enter venue location (e.g., Ice Rink, Sports Complex)"
+                  data-testid="input-venue"
+                />
               )}
               {form.formState.errors.venue && (
                 <p className="text-sm text-destructive mt-1">{form.formState.errors.venue.message}</p>
