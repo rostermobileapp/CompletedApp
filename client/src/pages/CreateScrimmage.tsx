@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Calendar, Crown, MapPin, Users, Search } from 'lucide-react';
+import { ArrowLeft, Calendar, Crown, MapPin, Users, Search, Mail, X, UserPlus, BookMarked } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { createScrimmageRequestSchema } from '@shared/schema';
 import { z } from 'zod';
@@ -21,10 +21,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Badge } from '@/components/ui/badge';
 
 // Create form schema - includes UI fields that map to database fields
 const createScrimmageSchema = createScrimmageRequestSchema.extend({
   selectedMemberIds: z.array(z.string()).optional().default([]), // Optional when no league available
+  selectedEmails: z.array(z.string()).optional().default([]), // Email invites
   date: z.string().min(1, 'Date is required'),
   time: z.string().min(1, 'Time is required'),
   venue: z.string().min(1, 'Venue is required'), // UI field that maps to location
@@ -53,6 +55,14 @@ export default function CreateScrimmage() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  
+  // Email invite states
+  const [emailSearchTerm, setEmailSearchTerm] = useState("");
+  const [manualEmail, setManualEmail] = useState("");
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  
+  // Invite group states
+  const [selectedInviteGroupId, setSelectedInviteGroupId] = useState<string>("");
 
   // Fetch user's facility memberships
   const { data: facilityMemberships, isLoading: facilitiesLoading } = useQuery<Array<{ facility: { id: string; name: string; address: string; city: string; state: string } }>>({
@@ -97,6 +107,18 @@ export default function CreateScrimmage() {
   const { data: leagueMembers = [], isLoading: membersLoading } = useQuery({
     queryKey: [`/api/leagues/${selectedLeague?.id}/members-for-scrimmage`],
     enabled: !!selectedLeague?.id,
+  });
+
+  // Fetch invite groups for the current user
+  const { data: inviteGroups = [], isLoading: groupsLoading } = useQuery({
+    queryKey: ['/api/invite-groups', selectedLeague?.id],
+    enabled: !!user,
+  });
+
+  // Search users by email
+  const { data: emailSearchResults = [], isLoading: emailSearchLoading } = useQuery({
+    queryKey: ['/api/users/search', emailSearchTerm],
+    enabled: emailSearchTerm.length > 2,
   });
 
   // Filter members based on search term (names only)
@@ -179,6 +201,7 @@ export default function CreateScrimmage() {
       const response = await apiRequest('POST', '/api/scrimmages', {
         ...scrimmageData,
         selectedMemberIds: filteredMemberIds, // Include for targeted announcements
+        selectedEmails: data.selectedEmails || [], // Include email invites
       });
       return response.json();
     },
@@ -203,17 +226,18 @@ export default function CreateScrimmage() {
 
   const onSubmit = (data: CreateScrimmageForm) => {
     // Additional validation for member selection when league is available
-    if (selectedLeague && selectedMemberIds.length === 0) {
+    if (selectedLeague && selectedMemberIds.length === 0 && selectedEmails.length === 0) {
       form.setError('selectedMemberIds', {
         type: 'required',
-        message: 'Please select at least one member to invite'
+        message: 'Please select at least one member or add an email invite'
       });
       return;
     }
     
     const formData = { 
       ...data, 
-      selectedMemberIds: selectedLeague ? selectedMemberIds : [] 
+      selectedMemberIds: selectedLeague ? selectedMemberIds : [],
+      selectedEmails: selectedLeague ? selectedEmails : [],
     };
     createScrimmageRequest.mutate(formData);
   };
@@ -241,6 +265,77 @@ export default function CreateScrimmage() {
     setSelectedMemberIds([]);
     form.setValue('selectedMemberIds', []);
     form.trigger('selectedMemberIds');
+  };
+
+  // Email invite handlers
+  const addEmailInvite = (email: string) => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) return;
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      toast({
+        title: 'Invalid Email',
+        description: 'Please enter a valid email address',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (selectedEmails.includes(trimmedEmail)) {
+      toast({
+        title: 'Duplicate Email',
+        description: 'This email is already in your invite list',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setSelectedEmails([...selectedEmails, trimmedEmail]);
+    setManualEmail("");
+    setEmailSearchTerm("");
+  };
+
+  const removeEmailInvite = (email: string) => {
+    setSelectedEmails(selectedEmails.filter(e => e !== email));
+  };
+
+  // Load invite group
+  const loadInviteGroup = async (groupId: string) => {
+    if (!groupId) return;
+    
+    try {
+      const response = await apiRequest('GET', `/api/invite-groups/${groupId}`);
+      const groupData = await response.json();
+      
+      if (groupData.members) {
+        const userIds: string[] = [];
+        const emails: string[] = [];
+        
+        groupData.members.forEach((member: any) => {
+          if (member.userId) {
+            userIds.push(member.userId);
+          } else if (member.email) {
+            emails.push(member.email);
+          }
+        });
+        
+        setSelectedMemberIds(Array.from(new Set([...selectedMemberIds, ...userIds])));
+        setSelectedEmails(Array.from(new Set([...selectedEmails, ...emails])));
+        
+        toast({
+          title: 'Group Loaded',
+          description: `Added ${userIds.length} members and ${emails.length} email invites from "${groupData.name}"`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load invite group',
+        variant: 'destructive',
+      });
+    }
   };
 
   // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
@@ -530,20 +625,59 @@ export default function CreateScrimmage() {
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Users className="w-5 h-5" />
-              Invite League Members
+              Invite Members
             </h3>
 
-          {/* Search */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-members"
-            />
-          </div>
+          {/* Invite Group Selector */}
+          {(inviteGroups as any[]).length > 0 && (
+            <div className="mb-4">
+              <Label htmlFor="invite-group">Quick Load from Saved Group</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={selectedInviteGroupId}
+                  onValueChange={(value) => {
+                    setSelectedInviteGroupId(value);
+                    loadInviteGroup(value);
+                  }}
+                >
+                  <SelectTrigger data-testid="select-invite-group">
+                    <SelectValue placeholder="Select a group..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(inviteGroups as any[]).map((group: any) => (
+                      <SelectItem key={group.id} value={group.id}>
+                        {group.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/invite-groups')}
+                  data-testid="button-manage-groups"
+                >
+                  Manage
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* League Members Section */}
+          <div className="mb-6">
+            <Label>League Members</Label>
+            {/* Search */}
+            <div className="relative mt-2 mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-members"
+              />
+            </div>
 
           {/* Selected count and bulk actions */}
           <div className="mb-4 flex items-center justify-between">
@@ -621,9 +755,131 @@ export default function CreateScrimmage() {
               </div>
             )}
           </ScrollArea>
+          </div>
 
-            {selectedMemberIds.length === 0 && (
-              <p className="text-sm text-destructive mt-2">Please select at least one member to invite</p>
+          {/* Email Invites Section */}
+          <div className="mt-6 border-t border-border pt-6">
+            <Label className="text-base mb-3 block">
+              <Mail className="inline-block w-4 h-4 mr-2" />
+              Invite by Email
+            </Label>
+            <p className="text-sm text-muted-foreground mb-4">
+              Invite users who aren't in the league yet
+            </p>
+
+            {/* Email Search */}
+            <div className="mb-4">
+              <Label htmlFor="email-search" className="text-sm">Search by email</Label>
+              <div className="relative mt-2">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email-search"
+                  type="email"
+                  placeholder="Search existing users..."
+                  value={emailSearchTerm}
+                  onChange={(e) => setEmailSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-email"
+                />
+              </div>
+              
+              {/* Email Search Results */}
+              {emailSearchTerm.length > 2 && (
+                <div className="mt-2 border border-border rounded-md max-h-32 overflow-y-auto">
+                  {emailSearchLoading ? (
+                    <div className="p-3 text-sm text-muted-foreground">Searching...</div>
+                  ) : (emailSearchResults as any[]).length > 0 ? (
+                    (emailSearchResults as any[]).map((user: any) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => addEmailInvite(user.email)}
+                        className="w-full flex items-center gap-2 p-2 hover:bg-muted text-left"
+                        data-testid={`button-add-email-${user.email}`}
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={user.profileImageUrl || undefined} />
+                          <AvatarFallback>
+                            {user.firstName?.[0]}{user.lastName?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {user.firstName} {user.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        </div>
+                        <UserPlus className="w-4 h-4" />
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-3 text-sm text-muted-foreground">No users found</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Manual Email Input */}
+            <div className="mb-4">
+              <Label htmlFor="manual-email" className="text-sm">Or enter email manually</Label>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  id="manual-email"
+                  type="email"
+                  placeholder="user@example.com"
+                  value={manualEmail}
+                  onChange={(e) => setManualEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addEmailInvite(manualEmail);
+                    }
+                  }}
+                  data-testid="input-manual-email"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => addEmailInvite(manualEmail)}
+                  disabled={!manualEmail}
+                  data-testid="button-add-manual-email"
+                >
+                  <UserPlus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Selected Emails Display */}
+            {selectedEmails.length > 0 && (
+              <div>
+                <Label className="text-sm mb-2 block">Email Invites ({selectedEmails.length})</Label>
+                <div className="flex flex-wrap gap-2">
+                  {selectedEmails.map((email) => (
+                    <Badge
+                      key={email}
+                      variant="secondary"
+                      className="pl-2 pr-1 py-1"
+                      data-testid={`badge-email-${email}`}
+                    >
+                      <Mail className="w-3 h-3 mr-1" />
+                      {email}
+                      <button
+                        type="button"
+                        onClick={() => removeEmailInvite(email)}
+                        className="ml-1 hover:bg-muted rounded-full p-0.5"
+                        data-testid={`button-remove-email-${email}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+            {selectedMemberIds.length === 0 && selectedEmails.length === 0 && (
+              <p className="text-sm text-destructive mt-4">Please select at least one member or add an email invite</p>
             )}
           </div>
         ) : (
@@ -658,7 +914,7 @@ export default function CreateScrimmage() {
             disabled={
               createScrimmageRequest.isPending || 
               !selectedLeague?.id || 
-              selectedMemberIds.length === 0
+              (selectedMemberIds.length === 0 && selectedEmails.length === 0)
             }
             data-testid="button-create-scrimmage"
           >

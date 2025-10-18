@@ -5548,6 +5548,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`✅ Created ${dates.length - 1} recurring scrimmages linked to parent ${parentScrimmage.id}`);
         
+        // Save email invites if provided
+        if (req.body.selectedEmails && req.body.selectedEmails.length > 0) {
+          try {
+            const emailInvites = req.body.selectedEmails.map((email: string) => ({
+              scrimmageId: parentScrimmage.id,
+              email: email.toLowerCase().trim(),
+              status: 'pending',
+            }));
+            await storage.createScrimmageInvites(emailInvites);
+            console.log(`📧 Created ${emailInvites.length} email invites for scrimmage ${parentScrimmage.id}`);
+          } catch (emailError) {
+            console.error('Error creating email invites:', emailError);
+            // Continue even if email invites fail
+          }
+        }
+        
         res.status(201).json(parentScrimmage);
       } else {
         // Create single scrimmage (non-recurring)
@@ -5557,6 +5573,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         console.log(`✅ Created scrimmage ${scrimmage.id}${announcementId ? ` linked to announcement ${announcementId}` : ''}`);
+        
+        // Save email invites if provided
+        if (req.body.selectedEmails && req.body.selectedEmails.length > 0) {
+          try {
+            const emailInvites = req.body.selectedEmails.map((email: string) => ({
+              scrimmageId: scrimmage.id,
+              email: email.toLowerCase().trim(),
+              status: 'pending',
+            }));
+            await storage.createScrimmageInvites(emailInvites);
+            console.log(`📧 Created ${emailInvites.length} email invites for scrimmage ${scrimmage.id}`);
+          } catch (emailError) {
+            console.error('Error creating email invites:', emailError);
+            // Continue even if email invites fail
+          }
+        }
         
         res.status(201).json(scrimmage);
       }
