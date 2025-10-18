@@ -678,6 +678,40 @@ export const scrimmageRequests = pgTable("scrimmage_requests", {
   unique("unique_scrimmage_player_request").on(table.scrimmageId, table.playerId),
 ]);
 
+// Invite groups table - allows users to save groups of people for quick invites
+export const inviteGroups = pgTable("invite_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id), // Optional: group can be league-specific or user-wide
+  name: varchar("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Invite group members table - stores members (users or emails) in each group
+export const inviteGroupMembers = pgTable("invite_group_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").references(() => inviteGroups.id).notNull(),
+  userId: varchar("user_id").references(() => users.id), // If member is a registered user
+  email: varchar("email"), // If member is invited by email (not yet registered)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_group_user").on(table.groupId, table.userId),
+  unique("unique_group_email").on(table.groupId, table.email),
+]);
+
+// Scrimmage invites table - tracks email-based invites for non-members
+export const scrimmageInvites = pgTable("scrimmage_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scrimmageId: varchar("scrimmage_id").references(() => scrimmages.id).notNull(),
+  email: varchar("email").notNull(),
+  invitedAt: timestamp("invited_at").defaultNow().notNull(),
+  userId: varchar("user_id").references(() => users.id), // If the invited email matches a registered user
+}, (table) => [
+  unique("unique_scrimmage_email_invite").on(table.scrimmageId, table.email),
+]);
+
 // Facility membership status enum
 export const facilityMembershipStatusEnum = pgEnum("facility_membership_status", [
   "active",
@@ -1832,6 +1866,22 @@ export const insertScrimmageRequestSchema = createInsertSchema(scrimmageRequests
   requestedAt: true,
 });
 
+export const insertInviteGroupSchema = createInsertSchema(inviteGroups).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInviteGroupMemberSchema = createInsertSchema(inviteGroupMembers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertScrimmageInviteSchema = createInsertSchema(scrimmageInvites).omit({
+  id: true,
+  invitedAt: true,
+});
+
 // Payment request schemas
 export const insertPaymentRequestSchema = createInsertSchema(paymentRequests).omit({
   id: true,
@@ -2245,6 +2295,12 @@ export type ScrimmageRequest = typeof scrimmageRequests.$inferSelect;
 export type InsertScrimmageRequest = z.infer<typeof insertScrimmageRequestSchema>;
 export type CreateScrimmageRequest = z.infer<typeof createScrimmageRequestSchema>;
 export type UpdateScrimmageRequest = z.infer<typeof updateScrimmageRequestSchema>;
+export type InviteGroup = typeof inviteGroups.$inferSelect;
+export type InsertInviteGroup = z.infer<typeof insertInviteGroupSchema>;
+export type InviteGroupMember = typeof inviteGroupMembers.$inferSelect;
+export type InsertInviteGroupMember = z.infer<typeof insertInviteGroupMemberSchema>;
+export type ScrimmageInvite = typeof scrimmageInvites.$inferSelect;
+export type InsertScrimmageInvite = z.infer<typeof insertScrimmageInviteSchema>;
 export type PaymentRequest = typeof paymentRequests.$inferSelect;
 export type InsertPaymentRequest = z.infer<typeof insertPaymentRequestSchema>;
 export type CreatePaymentRequest = z.infer<typeof createPaymentRequestSchema>;
