@@ -7780,6 +7780,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Invite group routes
+  // Get all invite groups for the current user
+  app.get('/api/invite-groups', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const leagueId = req.query.leagueId as string | undefined;
+      
+      const groups = await storage.getInviteGroups(userId, leagueId);
+      res.json(groups);
+    } catch (error) {
+      console.error('Error fetching invite groups:', error);
+      res.status(500).json({ message: 'Failed to fetch invite groups' });
+    }
+  });
+
+  // Get a specific invite group with members
+  app.get('/api/invite-groups/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const groupId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const group = await storage.getInviteGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: 'Invite group not found' });
+      }
+      
+      // Check ownership
+      if (group.creatorId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const members = await storage.getInviteGroupMembers(groupId);
+      res.json({ ...group, members });
+    } catch (error) {
+      console.error('Error fetching invite group:', error);
+      res.status(500).json({ message: 'Failed to fetch invite group' });
+    }
+  });
+
+  // Create a new invite group
+  app.post('/api/invite-groups', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, description, leagueId, members } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ message: 'Group name is required' });
+      }
+      
+      const groupData = {
+        creatorId: userId,
+        name,
+        description: description || null,
+        leagueId: leagueId || null,
+      };
+      
+      const newGroup = await storage.createInviteGroup(groupData);
+      
+      // Add members if provided
+      if (members && Array.isArray(members) && members.length > 0) {
+        await storage.addMembersToInviteGroup(newGroup.id, members);
+      }
+      
+      res.status(201).json(newGroup);
+    } catch (error) {
+      console.error('Error creating invite group:', error);
+      res.status(500).json({ message: 'Failed to create invite group' });
+    }
+  });
+
+  // Update an invite group
+  app.patch('/api/invite-groups/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const groupId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { name, description } = req.body;
+      
+      const group = await storage.getInviteGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: 'Invite group not found' });
+      }
+      
+      if (group.creatorId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const updates: any = {};
+      if (name) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      
+      const updatedGroup = await storage.updateInviteGroup(groupId, updates);
+      res.json(updatedGroup);
+    } catch (error) {
+      console.error('Error updating invite group:', error);
+      res.status(500).json({ message: 'Failed to update invite group' });
+    }
+  });
+
+  // Delete an invite group
+  app.delete('/api/invite-groups/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const groupId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const group = await storage.getInviteGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: 'Invite group not found' });
+      }
+      
+      if (group.creatorId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      await storage.deleteInviteGroup(groupId);
+      res.json({ message: 'Invite group deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting invite group:', error);
+      res.status(500).json({ message: 'Failed to delete invite group' });
+    }
+  });
+
+  // Add members to an invite group
+  app.post('/api/invite-groups/:id/members', isAuthenticated, async (req: any, res) => {
+    try {
+      const groupId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { members } = req.body;
+      
+      if (!members || !Array.isArray(members) || members.length === 0) {
+        return res.status(400).json({ message: 'Members array is required' });
+      }
+      
+      const group = await storage.getInviteGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: 'Invite group not found' });
+      }
+      
+      if (group.creatorId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const newMembers = await storage.addMembersToInviteGroup(groupId, members);
+      res.status(201).json(newMembers);
+    } catch (error) {
+      console.error('Error adding members to invite group:', error);
+      res.status(500).json({ message: 'Failed to add members' });
+    }
+  });
+
+  // Remove a member from an invite group
+  app.delete('/api/invite-groups/:groupId/members/:memberId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { groupId, memberId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const group = await storage.getInviteGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: 'Invite group not found' });
+      }
+      
+      if (group.creatorId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      await storage.removeMemberFromInviteGroup(groupId, memberId);
+      res.json({ message: 'Member removed successfully' });
+    } catch (error) {
+      console.error('Error removing member from invite group:', error);
+      res.status(500).json({ message: 'Failed to remove member' });
+    }
+  });
+
+  // Search users by email
+  app.get('/api/users/search', isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.query.email as string;
+      
+      if (!email) {
+        return res.status(400).json({ message: 'Email query parameter is required' });
+      }
+      
+      const users = await storage.searchUsersByEmail(email, 10);
+      res.json(users);
+    } catch (error) {
+      console.error('Error searching users:', error);
+      res.status(500).json({ message: 'Failed to search users' });
+    }
+  });
+
   // Payment request routes
   // Create a new payment request
   app.post('/api/payment-requests', isAuthenticated, async (req: any, res) => {
