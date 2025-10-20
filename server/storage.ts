@@ -3207,12 +3207,24 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Deleting game ${id}`);
       
-      // First delete all score submissions for this game
+      // Delete all related records first to avoid foreign key constraints
+      
+      // 1. Delete score submissions
       console.log(`Deleting score submissions for game ${id}`);
       const deletedSubmissions = await db.delete(gameScoreSubmissions).where(eq(gameScoreSubmissions.gameId, id));
       console.log(`Deleted ${deletedSubmissions.rowCount || 0} score submissions`);
       
-      // Then delete the game
+      // 2. Delete game goalies
+      console.log(`Deleting game goalies for game ${id}`);
+      const deletedGoalies = await db.delete(gameGoalies).where(eq(gameGoalies.gameId, id));
+      console.log(`Deleted ${deletedGoalies.rowCount || 0} game goalies`);
+      
+      // 3. Delete game RSVPs
+      console.log(`Deleting game RSVPs for game ${id}`);
+      const deletedRsvps = await db.delete(gameRsvps).where(eq(gameRsvps.gameId, id));
+      console.log(`Deleted ${deletedRsvps.rowCount || 0} game RSVPs`);
+      
+      // Finally, delete the game itself
       const deletedGame = await db.delete(games).where(eq(games.id, id));
       console.log(`Deleted ${deletedGame.rowCount || 0} game records`);
       
