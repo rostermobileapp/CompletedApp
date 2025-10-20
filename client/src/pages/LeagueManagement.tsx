@@ -4678,7 +4678,7 @@ export default function LeagueManagement() {
                                 <p className="text-sm text-muted-foreground">
                                   {teams.find((t: Team) => t.id === selectedGame.awayTeamId)?.name || 'Away'}
                                 </p>
-                                <p className="text-2xl font-bold text-green-600">{selectedGame.awayScore}</p>
+                                <p className="text-2xl font-bold text-[#ffffff]">{selectedGame.awayScore}</p>
                               </div>
                             </div>
                           </div>
