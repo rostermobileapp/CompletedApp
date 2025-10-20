@@ -2627,7 +2627,7 @@ export class DatabaseStorage implements IStorage {
           goalsFor += teamScore || 0;
           goalsAgainst += opponentScore || 0;
           
-          // Determine win/loss/tie/SOL
+          // Determine win/loss/tie/OTL
           if (teamScore !== null && opponentScore !== null) {
             if (teamScore > opponentScore) {
               wins++;
@@ -2645,7 +2645,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // Calculate points: Wins = 2 points, Ties = 1 point, SOL = 1 point, Losses = 0
+      // Calculate points: Wins = 2 points, Ties = 1 point, OTL = 1 point, Losses = 0
       const points = (wins * 2) + (ties * 1) + (shootoutLosses * 1);
 
       standings.push({

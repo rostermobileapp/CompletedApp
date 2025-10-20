@@ -620,7 +620,7 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
                     <th className="text-center p-3 font-semibold">W</th>
                     <th className="text-center p-3 font-semibold">L</th>
                     <th className="text-center p-3 font-semibold">T</th>
-                    <th className="text-center p-3 font-semibold">SOL</th>
+                    <th className="text-center p-3 font-semibold">OTL</th>
                     <th className="text-center p-3 font-semibold">PTS</th>
                     <th className="text-center p-3 font-semibold">GF</th>
                     <th className="text-center p-3 font-semibold">GA</th>
