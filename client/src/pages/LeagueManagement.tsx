@@ -4626,7 +4626,7 @@ export default function LeagueManagement() {
                             </div>
                           </div>
                         ) : (
-                          <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                          <div className="dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 bg-[#212121]">
                             <div className="flex items-center justify-between mb-2">
                               <p className="text-sm font-medium text-green-600">Final Score:</p>
                               {isCommissioner && (
