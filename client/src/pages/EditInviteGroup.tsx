@@ -50,7 +50,7 @@ export default function EditInviteGroup() {
 
   // Fetch league members
   const { data: members = [], isLoading: membersLoading } = useQuery({
-    queryKey: ['/api/leagues', approvedLeague?.id, 'members'],
+    queryKey: [`/api/leagues/${approvedLeague?.id}/members-for-scrimmage`],
     enabled: !!approvedLeague?.id,
   });
 
