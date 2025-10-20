@@ -640,10 +640,12 @@ export default function CreateScrimmage() {
               Invite Members
             </h3>
 
-          {/* Invite Group Selector */}
-          {(inviteGroups as any[]).length > 0 && (
-            <div className="mb-4">
-              <Label htmlFor="invite-group">Quick Load from Saved Group</Label>
+          {/* Invite Group Selector - Always shown at top */}
+          <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-border">
+            <Label htmlFor="invite-group" className="text-base font-semibold mb-2 block">
+              Quick Load from Saved Group
+            </Label>
+            {(inviteGroups as any[]).length > 0 ? (
               <div className="flex gap-2">
                 <Select
                   value={selectedInviteGroupId}
@@ -673,8 +675,23 @@ export default function CreateScrimmage() {
                   Manage
                 </Button>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  No invite groups yet. Create groups to quickly invite the same people to scrimmages.
+                </p>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={() => navigate('/invite-groups')}
+                  data-testid="button-create-group"
+                >
+                  Create Group
+                </Button>
+              </div>
+            )}
+          </div>
 
           {/* League Members Section */}
           <div className="mb-6">
