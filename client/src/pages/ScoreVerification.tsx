@@ -235,7 +235,7 @@ export default function ScoreVerification() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(`/league/${leagueId}`)}
+            onClick={() => navigate('/league-management')}
             className="flex items-center gap-2"
             data-testid="button-back-to-league"
           >
