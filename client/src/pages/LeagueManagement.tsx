@@ -4470,7 +4470,7 @@ export default function LeagueManagement() {
                       <div className="space-y-4 mb-4">
                         {isEditingGameScore && isCommissioner ? (
                           <div className="dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-[#212121]">
-                            <p className="text-sm font-medium text-blue-600 mb-3 text-center">Edit Final Score:</p>
+                            <p className="text-sm font-medium mb-3 text-center text-[#ffffff]">Edit Final Score:</p>
                             <div className="grid grid-cols-3 gap-3 items-center mb-4">
                               <div className="text-center">
                                 <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
