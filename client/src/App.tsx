@@ -25,6 +25,7 @@ import CreateTeam from "@/pages/CreateTeam";
 import CreateScrimmage from "@/pages/CreateScrimmage";
 import ScrimmageManagement from "@/pages/ScrimmageManagement";
 import InviteGroups from "@/pages/InviteGroups";
+import EditInviteGroup from "@/pages/EditInviteGroup";
 import LeagueManagement from "@/pages/LeagueManagement";
 import LeagueList from "@/pages/LeagueList";
 import Calendar from "@/pages/Calendar";
@@ -88,6 +89,8 @@ function Router() {
             <Route path="/create-scrimmage" component={CreateScrimmage} />
             <Route path="/scrimmage-management" component={ScrimmageManagement} />
             <Route path="/invite-groups" component={InviteGroups} />
+            <Route path="/invite-groups/new" component={EditInviteGroup} />
+            <Route path="/invite-groups/:id" component={EditInviteGroup} />
             <Route path="/league-management" component={LeagueManagement} />
             <Route path="/league/:leagueId/score-verification" component={ScoreVerification} />
             <Route path="/league-list" component={LeagueList} />

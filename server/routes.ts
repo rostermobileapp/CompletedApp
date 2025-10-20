@@ -7945,16 +7945,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add members to an invite group
+  // Add/Replace members in an invite group
   app.post('/api/invite-groups/:id/members', isAuthenticated, async (req: any, res) => {
     try {
       const groupId = req.params.id;
       const userId = req.user.claims.sub;
       const { members } = req.body;
-      
-      if (!members || !Array.isArray(members) || members.length === 0) {
-        return res.status(400).json({ message: 'Members array is required' });
-      }
       
       const group = await storage.getInviteGroup(groupId);
       if (!group) {
@@ -7965,11 +7961,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
       
-      const newMembers = await storage.addMembersToInviteGroup(groupId, members);
-      res.status(201).json(newMembers);
+      // If members array is provided (even if empty), replace all members
+      if (members !== undefined && Array.isArray(members)) {
+        // Get existing members
+        const existingMembers = await storage.getInviteGroupMembers(groupId);
+        
+        // Remove all existing members
+        for (const member of existingMembers) {
+          await storage.removeMemberFromInviteGroup(groupId, member.id);
+        }
+        
+        // Add new members if any
+        let newMembers: any[] = [];
+        if (members.length > 0) {
+          newMembers = await storage.addMembersToInviteGroup(groupId, members);
+        }
+        
+        res.status(201).json(newMembers);
+      } else {
+        return res.status(400).json({ message: 'Members array is required' });
+      }
     } catch (error) {
-      console.error('Error adding members to invite group:', error);
-      res.status(500).json({ message: 'Failed to add members' });
+      console.error('Error updating members in invite group:', error);
+      res.status(500).json({ message: 'Failed to update members' });
     }
   });
 

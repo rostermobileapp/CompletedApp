@@ -1,57 +1,20 @@
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, BookMarked, Plus, Trash2, Edit2, Users, Mail } from 'lucide-react';
+import { ArrowLeft, BookMarked, Plus, Trash2, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function InviteGroups() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<any>(null);
-  const [groupName, setGroupName] = useState('');
-  const [groupDescription, setGroupDescription] = useState('');
 
   // Fetch invite groups
   const { data: inviteGroups = [], isLoading } = useQuery({
     queryKey: ['/api/invite-groups'],
-  });
-
-  // Create group mutation
-  const createGroupMutation = useMutation({
-    mutationFn: async (data: { name: string; description?: string }) => {
-      const response = await apiRequest('POST', '/api/invite-groups', data);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: 'Group Created',
-        description: 'Your invite group has been created successfully.',
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/invite-groups'] });
-      setIsCreateDialogOpen(false);
-      setGroupName('');
-      setGroupDescription('');
-    },
-    onError: () => {
-      toast({
-        title: 'Error',
-        description: 'Failed to create invite group.',
-        variant: 'destructive',
-      });
-    },
   });
 
   // Delete group mutation
@@ -75,22 +38,6 @@ export default function InviteGroups() {
       });
     },
   });
-
-  const handleCreateGroup = () => {
-    if (!groupName.trim()) {
-      toast({
-        title: 'Validation Error',
-        description: 'Group name is required.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    createGroupMutation.mutate({
-      name: groupName,
-      description: groupDescription || undefined,
-    });
-  };
 
   const handleDeleteGroup = (groupId: string) => {
     if (confirm('Are you sure you want to delete this invite group?')) {
@@ -121,49 +68,14 @@ export default function InviteGroups() {
         </p>
 
         {/* Create Group Button */}
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="w-full" data-testid="button-create-group">
-              <Plus className="w-4 h-4 mr-2" />
-              Create New Group
-            </Button>
-          </DialogTrigger>
-          <DialogContent data-testid="dialog-create-group">
-            <DialogHeader>
-              <DialogTitle>Create Invite Group</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="group-name">Group Name</Label>
-                <Input
-                  id="group-name"
-                  placeholder="e.g., Regular Players"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  data-testid="input-group-name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="group-description">Description (Optional)</Label>
-                <Textarea
-                  id="group-description"
-                  placeholder="Add a description for this group..."
-                  value={groupDescription}
-                  onChange={(e) => setGroupDescription(e.target.value)}
-                  data-testid="input-group-description"
-                />
-              </div>
-              <Button
-                onClick={handleCreateGroup}
-                disabled={createGroupMutation.isPending}
-                className="w-full"
-                data-testid="button-save-group"
-              >
-                {createGroupMutation.isPending ? 'Creating...' : 'Create Group'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button 
+          className="w-full" 
+          onClick={() => navigate('/invite-groups/new')}
+          data-testid="button-create-group"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Create New Group
+        </Button>
       </div>
 
       {/* Groups List */}
