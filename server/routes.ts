@@ -68,6 +68,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
+import { sendBulkScrimmageInvites } from "./emails";
 
 
 // Utility function to format game scheduledAt as timezone-agnostic string
@@ -5558,11 +5559,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .filter((email: string) => emailSchema.safeParse(email).success);
             
             // Deduplicate emails
-            const uniqueEmails = [...new Set(validEmails)];
+            const uniqueEmails = Array.from(new Set(validEmails));
             
             if (uniqueEmails.length > 0) {
               await storage.createScrimmageInvites(parentScrimmage.id, uniqueEmails);
               console.log(`📧 Created ${uniqueEmails.length} email invites for scrimmage ${parentScrimmage.id}`);
+              
+              // Send email notifications
+              try {
+                const creator = await storage.getUser(userId);
+                const creatorName = creator ? `${creator.firstName} ${creator.lastName}` : 'A league member';
+                
+                const emailData = {
+                  scrimmageId: parentScrimmage.id,
+                  title: parentScrimmage.title,
+                  dateTime: new Date(parentScrimmage.dateTime),
+                  location: parentScrimmage.location,
+                  creatorName,
+                  skillLevel: parentScrimmage.skillLevel || undefined,
+                  costPerPlayer: parentScrimmage.costPerPlayer || undefined,
+                  notes: parentScrimmage.notes || undefined,
+                  maxPlayers: parentScrimmage.maxPlayers,
+                };
+                
+                const emailResults = await sendBulkScrimmageInvites(uniqueEmails, emailData);
+                console.log(`✅ Sent ${emailResults.sent.length} email notifications, ${emailResults.failed.length} failed`);
+              } catch (emailSendError) {
+                console.error('Error sending email notifications:', emailSendError);
+                // Continue even if email notifications fail
+              }
             }
           } catch (emailError) {
             console.error('Error creating email invites:', emailError);
@@ -5590,11 +5615,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .filter((email: string) => emailSchema.safeParse(email).success);
             
             // Deduplicate emails
-            const uniqueEmails = [...new Set(validEmails)];
+            const uniqueEmails = Array.from(new Set(validEmails));
             
             if (uniqueEmails.length > 0) {
               await storage.createScrimmageInvites(scrimmage.id, uniqueEmails);
               console.log(`📧 Created ${uniqueEmails.length} email invites for scrimmage ${scrimmage.id}`);
+              
+              // Send email notifications
+              try {
+                const creator = await storage.getUser(userId);
+                const creatorName = creator ? `${creator.firstName} ${creator.lastName}` : 'A league member';
+                
+                const emailData = {
+                  scrimmageId: scrimmage.id,
+                  title: scrimmage.title,
+                  dateTime: new Date(scrimmage.dateTime),
+                  location: scrimmage.location,
+                  creatorName,
+                  skillLevel: scrimmage.skillLevel || undefined,
+                  costPerPlayer: scrimmage.costPerPlayer || undefined,
+                  notes: scrimmage.notes || undefined,
+                  maxPlayers: scrimmage.maxPlayers,
+                };
+                
+                const emailResults = await sendBulkScrimmageInvites(uniqueEmails, emailData);
+                console.log(`✅ Sent ${emailResults.sent.length} email notifications, ${emailResults.failed.length} failed`);
+              } catch (emailSendError) {
+                console.error('Error sending email notifications:', emailSendError);
+                // Continue even if email notifications fail
+              }
             }
           } catch (emailError) {
             console.error('Error creating email invites:', emailError);
