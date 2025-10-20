@@ -56,6 +56,7 @@ Key features include:
 - **Team-Scoped Messages and Payments**: Messages and Payments pages now filter by the currently selected team on the Dashboard. Uses a custom event system (`useDashboardSelection` hook with `notifyDashboardSelectionChange()`) to sync selection changes in real-time within the same browser tab, ensuring conversations and payment requests only show data relevant to the selected team.
 - **Dashboard-Teams Page Synchronization**: The Teams page (My Team) now uses the shared `useDashboardSelection` hook to stay synchronized with Dashboard team selection. Bidirectional sync ensures when a team is selected on Dashboard, it displays on Teams page, and vice versa. The hook provides `setTeamSelection()` and `setLeagueSelection()` functions to update the selection from any page, maintaining localStorage as single source of truth.
 - **Calendar Team Filtering**: The Calendar/Schedule page (accessed via "View All" button) respects Dashboard team selection. When a team is selected, Calendar shows only games, scrimmages, and substitute games for that team. Uses `activeTeam` logic with automatic fallback to first team if selected team is invalid/deleted, ensuring consistent filtering and UI rendering even with stale selections.
+- **Email Notifications for Scrimmage Invites**: When scrimmages are created with email invites, the system automatically sends email notifications to all invited email addresses using the Resend service. Emails include complete scrimmage details (title, date/time, location, creator name, skill level, cost, notes, max players) in both HTML and plain text formats, along with a link to view and respond to the invitation. Email sending is non-blocking - if emails fail to send, the scrimmage is still created successfully and errors are logged. Notifications are sent for both single and recurring scrimmages.
 
 # External Dependencies
 
@@ -65,6 +66,7 @@ Key features include:
 - **Neon Database**: PostgreSQL hosting.
 - **Stripe**: Payment processing and subscription management.
 - **Google Cloud Storage**: User-uploaded content.
+- **Resend**: Email delivery service for scrimmage invite notifications.
 
 ## UI and Component Libraries
 
