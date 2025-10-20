@@ -235,26 +235,14 @@ export default function ScoreVerification() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/league-management')}
-            className="flex items-center gap-2"
-            data-testid="button-back-to-league"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to League
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Target className="w-6 h-6 text-primary" />
-              Score Verification
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Review and verify game scores that need attention
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Target className="w-6 h-6 text-primary" />
+            Score Verification
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Review and verify game scores that need attention
+          </p>
         </div>
       </div>
 
