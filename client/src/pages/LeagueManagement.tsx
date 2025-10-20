@@ -2897,7 +2897,7 @@ export default function LeagueManagement() {
                 </p>
               ) : (
                 <>
-                  {/* Desktop: Show calendar view if selected, otherwise list view */}
+                  {/* Desktop: Show calendar view if selected, otherwise table view */}
                   <div className="hidden md:block">
                     {gamesViewMode === 'calendar' ? (
                       <GamesCalendar games={games} teams={teams} onGameClick={(game) => {
@@ -2905,146 +2905,232 @@ export default function LeagueManagement() {
                         setShowEditGame(true);
                       }} />
                     ) : (
-                      <div className="space-y-3">
-                        {games.map((game: any) => {
+                      <div className="max-h-[600px] overflow-y-auto border rounded-lg">
+                        <table className="w-full">
+                          <thead className="bg-muted/50 sticky top-0 z-10">
+                            <tr>
+                              <th className="text-left p-3 text-sm font-semibold">Date & Time</th>
+                              <th className="text-left p-3 text-sm font-semibold">Home Team</th>
+                              <th className="text-center p-3 text-sm font-semibold">Score</th>
+                              <th className="text-left p-3 text-sm font-semibold">Away Team</th>
+                              <th className="text-left p-3 text-sm font-semibold">Venue</th>
+                              <th className="text-center p-3 text-sm font-semibold">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              
+                              // Sort games: future/unscored first, then past/scored
+                              const sortedGames = [...games].sort((a, b) => {
+                                const dateA = new Date(a.scheduledAt);
+                                const dateB = new Date(b.scheduledAt);
+                                const isPastA = dateA < today;
+                                const isPastB = dateB < today;
+                                const hasScoreA = typeof a.homeScore === 'number' && typeof a.awayScore === 'number';
+                                const hasScoreB = typeof b.homeScore === 'number' && typeof b.awayScore === 'number';
+                                
+                                // Priority: future games or games without scores come first
+                                const priorityA = (!isPastA || !hasScoreA) ? 0 : 1;
+                                const priorityB = (!isPastB || !hasScoreB) ? 0 : 1;
+                                
+                                if (priorityA !== priorityB) {
+                                  return priorityA - priorityB;
+                                }
+                                
+                                // Within same priority, sort by date (most recent first for future, most recent first for past)
+                                return dateB.getTime() - dateA.getTime();
+                              });
+                              
+                              return sortedGames.map((game: any) => {
+                                const homeTeam = teams.find((t: Team) => t.id === game.homeTeamId);
+                                const awayTeam = teams.find((t: Team) => t.id === game.awayTeamId);
+                                const gameDate = new Date(game.scheduledAt);
+                                const hasScore = typeof game.homeScore === 'number' && typeof game.awayScore === 'number';
+                                
+                                return (
+                                  <tr 
+                                    key={game.id}
+                                    className="border-b hover:bg-muted/30 cursor-pointer transition-colors"
+                                    onClick={() => {
+                                      setSelectedGame(game);
+                                      setShowEditGame(true);
+                                    }}
+                                    data-testid={`game-${game.id}`}
+                                  >
+                                    <td className="p-3 text-sm">
+                                      <div>{gameDate.toLocaleDateString()}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </div>
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="flex items-center gap-2">
+                                        {homeTeam?.logoUrl ? (
+                                          <img 
+                                            src={homeTeam.logoUrl} 
+                                            alt={`${homeTeam.name} logo`}
+                                            className="w-8 h-8 rounded object-cover"
+                                            data-testid={`img-home-team-logo-${game.id}`}
+                                          />
+                                        ) : (
+                                          <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
+                                            <Trophy className="w-4 h-4 text-primary-foreground" />
+                                          </div>
+                                        )}
+                                        <span className="font-medium text-sm">{homeTeam?.name || 'Unknown'}</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      {hasScore ? (
+                                        <span className="font-bold text-lg">{game.homeScore} - {game.awayScore}</span>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">-</span>
+                                      )}
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="flex items-center gap-2">
+                                        {awayTeam?.logoUrl ? (
+                                          <img 
+                                            src={awayTeam.logoUrl} 
+                                            alt={`${awayTeam.name} logo`}
+                                            className="w-8 h-8 rounded object-cover"
+                                            data-testid={`img-away-team-logo-${game.id}`}
+                                          />
+                                        ) : (
+                                          <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
+                                            <Trophy className="w-4 h-4 text-primary-foreground" />
+                                          </div>
+                                        )}
+                                        <span className="font-medium text-sm">{awayTeam?.name || 'Unknown'}</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-3 text-sm text-muted-foreground">
+                                      {game.venue || '-'}
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      <span className="text-xs bg-blue-100/50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-full">
+                                        {game.status || 'SCHEDULED'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mobile: Always show list view with scrolling and sorting */}
+                  <div className="md:hidden">
+                    <div className="max-h-[600px] overflow-y-auto space-y-3 border rounded-lg p-2">
+                      {(() => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        
+                        // Sort games: future/unscored first, then past/scored
+                        const sortedGames = [...games].sort((a, b) => {
+                          const dateA = new Date(a.scheduledAt);
+                          const dateB = new Date(b.scheduledAt);
+                          const isPastA = dateA < today;
+                          const isPastB = dateB < today;
+                          const hasScoreA = typeof a.homeScore === 'number' && typeof a.awayScore === 'number';
+                          const hasScoreB = typeof b.homeScore === 'number' && typeof b.awayScore === 'number';
+                          
+                          // Priority: future games or games without scores come first
+                          const priorityA = (!isPastA || !hasScoreA) ? 0 : 1;
+                          const priorityB = (!isPastB || !hasScoreB) ? 0 : 1;
+                          
+                          if (priorityA !== priorityB) {
+                            return priorityA - priorityB;
+                          }
+                          
+                          // Within same priority, sort by date (most recent first for future, most recent first for past)
+                          return dateB.getTime() - dateA.getTime();
+                        });
+                        
+                        return sortedGames.map((game: any) => {
                           const homeTeam = teams.find((t: Team) => t.id === game.homeTeamId);
                           const awayTeam = teams.find((t: Team) => t.id === game.awayTeamId);
                           const gameDate = new Date(game.scheduledAt);
+                          const hasScore = typeof game.homeScore === 'number' && typeof game.awayScore === 'number';
                           
                           return (
                             <div 
                               key={game.id} 
-                              className="flex items-center justify-between p-4 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
+                              className="p-3 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
                               onClick={() => {
                                 setSelectedGame(game);
                                 setShowEditGame(true);
                               }}
                               data-testid={`game-${game.id}`}
                             >
-                              <div className="flex-1">
-                                <div className="flex items-center gap-4 mb-2">
-                                  <div className="flex flex-col items-center">
-                                    <div className="w-10 h-10 bg-primary rounded flex items-center justify-center mb-1">
-                                      {homeTeam?.logoUrl ? (
-                                        <img 
-                                          src={homeTeam.logoUrl} 
-                                          alt={`${homeTeam.name} logo`}
-                                          className="w-full h-full rounded object-cover"
-                                          data-testid={`img-home-team-logo-${game.id}`}
-                                        />
-                                      ) : (
-                                        <Trophy className="w-5 h-5 text-primary-foreground" />
-                                      )}
-                                    </div>
-                                    <p className="font-medium text-center">{homeTeam?.name || 'Unknown'}</p>
-                                    <p className="text-xs text-muted-foreground">HOME</p>
+                              {/* Team Matchup */}
+                              <div className="flex items-center justify-between">
+                                {/* Home Team */}
+                                <div className="flex flex-col items-center flex-1">
+                                  <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
+                                    {homeTeam?.logoUrl ? (
+                                      <img 
+                                        src={homeTeam.logoUrl} 
+                                        alt={`${homeTeam.name} logo`}
+                                        className="w-full h-full rounded-lg object-cover"
+                                        data-testid={`img-home-team-logo-${game.id}`}
+                                      />
+                                    ) : (
+                                      <Trophy className="w-7 h-7 text-primary-foreground" />
+                                    )}
                                   </div>
-                                  <div className="text-muted-foreground font-bold">VS</div>
-                                  <div className="flex flex-col items-center">
-                                    <div className="w-10 h-10 bg-primary rounded flex items-center justify-center mb-1">
-                                      {awayTeam?.logoUrl ? (
-                                        <img 
-                                          src={awayTeam.logoUrl} 
-                                          alt={`${awayTeam.name} logo`}
-                                          className="w-full h-full rounded object-cover"
-                                          data-testid={`img-away-team-logo-${game.id}`}
-                                        />
-                                      ) : (
-                                        <Trophy className="w-5 h-5 text-primary-foreground" />
-                                      )}
-                                    </div>
-                                    <p className="font-medium text-center">{awayTeam?.name || 'Unknown'}</p>
-                                    <p className="text-xs text-muted-foreground">AWAY</p>
-                                  </div>
+                                  <p className="font-semibold text-center text-xs">{homeTeam?.name || 'Unknown'}</p>
+                                  <p className="text-xs text-muted-foreground">HOME</p>
+                                  {hasScore && (
+                                    <p className="text-sm font-bold mt-1">{game.homeScore}</p>
+                                  )}
                                 </div>
-                                <div className="text-sm text-muted-foreground">
-                                  <p>📅 {gameDate.toLocaleDateString()} at {gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                  {game.venue && <p>📍 {game.venue}</p>}
+
+                                {/* Date & Time */}
+                                <div className="px-3 flex flex-col items-center justify-center">
+                                  <p className="text-xs font-semibold text-center">{gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                                  <p className="text-xs text-muted-foreground">{gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                  {!hasScore && (
+                                    <p className="text-xs text-muted-foreground mt-1">-</p>
+                                  )}
+                                </div>
+
+                                {/* Away Team */}
+                                <div className="flex flex-col items-center flex-1">
+                                  <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
+                                    {awayTeam?.logoUrl ? (
+                                      <img 
+                                        src={awayTeam.logoUrl} 
+                                        alt={`${awayTeam.name} logo`}
+                                        className="w-full h-full rounded-lg object-cover"
+                                        data-testid={`img-away-team-logo-${game.id}`}
+                                      />
+                                    ) : (
+                                      <Trophy className="w-7 h-7 text-primary-foreground" />
+                                    )}
+                                  </div>
+                                  <p className="font-semibold text-center text-xs">{awayTeam?.name || 'Unknown'}</p>
+                                  <p className="text-xs text-muted-foreground">AWAY</p>
+                                  {hasScore && (
+                                    <p className="text-sm font-bold mt-1">{game.awayScore}</p>
+                                  )}
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <span className="text-xs bg-blue-100/50 text-blue-800/50 px-2 py-1 rounded-full">
-                                  {game.status || 'SCHEDULED'}
-                                </span>
-                              </div>
+                              {/* Venue (if present) */}
+                              {game.venue && (
+                                <div className="text-center text-xs text-muted-foreground mt-2 pt-2 border-t">
+                                  📍 {game.venue}
+                                </div>
+                              )}
                             </div>
                           );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Mobile: Always show list view */}
-                  <div className="md:hidden">
-                    <div className="space-y-3">
-                      {games.map((game: any) => {
-                        const homeTeam = teams.find((t: Team) => t.id === game.homeTeamId);
-                        const awayTeam = teams.find((t: Team) => t.id === game.awayTeamId);
-                        const gameDate = new Date(game.scheduledAt);
-                        
-                        return (
-                          <div 
-                            key={game.id} 
-                            className="p-3 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[4px] mb-[4px]"
-                            onClick={() => {
-                              setSelectedGame(game);
-                              setShowEditGame(true);
-                            }}
-                            data-testid={`game-${game.id}`}
-                          >
-                            {/* Team Matchup */}
-                            <div className="flex items-center justify-between">
-                              {/* Home Team */}
-                              <div className="flex flex-col items-center flex-1">
-                                <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
-                                  {homeTeam?.logoUrl ? (
-                                    <img 
-                                      src={homeTeam.logoUrl} 
-                                      alt={`${homeTeam.name} logo`}
-                                      className="w-full h-full rounded-lg object-cover"
-                                      data-testid={`img-home-team-logo-${game.id}`}
-                                    />
-                                  ) : (
-                                    <Trophy className="w-7 h-7 text-primary-foreground" />
-                                  )}
-                                </div>
-                                <p className="font-semibold text-center text-xs">{homeTeam?.name || 'Unknown'}</p>
-                                <p className="text-xs text-muted-foreground">HOME</p>
-                              </div>
-
-                              {/* Date & Time */}
-                              <div className="px-3 flex flex-col items-center justify-center">
-                                <p className="text-xs font-semibold text-center">{gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-                                <p className="text-xs text-muted-foreground">{gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                              </div>
-
-                              {/* Away Team */}
-                              <div className="flex flex-col items-center flex-1">
-                                <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
-                                  {awayTeam?.logoUrl ? (
-                                    <img 
-                                      src={awayTeam.logoUrl} 
-                                      alt={`${awayTeam.name} logo`}
-                                      className="w-full h-full rounded-lg object-cover"
-                                      data-testid={`img-away-team-logo-${game.id}`}
-                                    />
-                                  ) : (
-                                    <Trophy className="w-7 h-7 text-primary-foreground" />
-                                  )}
-                                </div>
-                                <p className="font-semibold text-center text-xs">{awayTeam?.name || 'Unknown'}</p>
-                                <p className="text-xs text-muted-foreground">AWAY</p>
-                              </div>
-                            </div>
-                            {/* Venue (if present) */}
-                            {game.venue && (
-                              <div className="text-center text-xs text-muted-foreground mt-2 pt-2 border-t">
-                                📍 {game.venue}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                        });
+                      })()}
                     </div>
                   </div>
                 </>
