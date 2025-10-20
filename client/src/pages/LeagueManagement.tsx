@@ -4567,7 +4567,7 @@ export default function LeagueManagement() {
                                     </div>
                                   </div>
                                   <div className="text-right">
-                                    <p className="text-xs font-medium capitalize">
+                                    <p className="text-xs font-medium capitalize text-[#000000]">
                                       {submission.submitterRole.replace('_', ' ')}
                                       {submission.submitterRole === 'commissioner' && ' (Override)'}
                                     </p>
