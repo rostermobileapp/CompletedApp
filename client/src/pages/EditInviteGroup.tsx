@@ -39,19 +39,17 @@ export default function EditInviteGroup() {
   const [manualEmail, setManualEmail] = useState('');
 
   // Fetch user's leagues for member selection
-  const { data: userLeagues } = useQuery({
+  const { data: userLeagues = [] } = useQuery({
     queryKey: ['/api/user/leagues'],
   });
 
-  // Get the first approved league for member selection
-  const approvedLeague = (userLeagues as any[])?.find(
-    (league: any) => league.membership?.status === 'approved'
-  );
+  // Use first league (same logic as CreateScrimmage)
+  const selectedLeague = (userLeagues as any[])?.[0];
 
   // Fetch league members
   const { data: members = [], isLoading: membersLoading } = useQuery({
-    queryKey: [`/api/leagues/${approvedLeague?.id}/members-for-scrimmage`],
-    enabled: !!approvedLeague?.id,
+    queryKey: [`/api/leagues/${selectedLeague?.id}/members-for-scrimmage`],
+    enabled: !!selectedLeague?.id,
   });
 
   // Fetch existing group data if editing
@@ -187,7 +185,7 @@ export default function EditInviteGroup() {
         // Create new group
         const response = await apiRequest('POST', '/api/invite-groups', {
           ...data,
-          leagueId: approvedLeague?.id || null,
+          leagueId: selectedLeague?.id || null,
         });
         const group = await response.json();
         
@@ -310,7 +308,7 @@ export default function EditInviteGroup() {
           <div className="mb-6">
             <Label>Select from League Members</Label>
             
-            {!approvedLeague ? (
+            {!selectedLeague ? (
               <div className="mt-2 p-4 bg-muted/30 rounded-lg border border-border">
                 <p className="text-sm text-muted-foreground">
                   You need to be an approved member of a league to select league members. 
