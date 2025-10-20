@@ -108,11 +108,25 @@ export default function Stats() {
     enabled: !!leagueId,
   });
 
+  // Fetch league teams to get team names
+  const { data: leagueTeams } = useQuery({
+    queryKey: [`/api/leagues/${leagueId}/teams`],
+    enabled: !!leagueId,
+  });
+
   // Create a map of userId to membership data
   const membershipMap = new Map();
   if (Array.isArray(leagueMemberships)) {
     leagueMemberships.forEach((membership: any) => {
       membershipMap.set(membership.userId, membership);
+    });
+  }
+
+  // Create a map of teamId to team name
+  const teamMap = new Map();
+  if (Array.isArray(leagueTeams)) {
+    leagueTeams.forEach((team: any) => {
+      teamMap.set(team.id, team.name);
     });
   }
 
@@ -426,7 +440,7 @@ export default function Stats() {
                                 </div>
                                 {membership && (
                                   <div className="text-gray-400 text-xs">
-                                    {membership.position?.toUpperCase() || 'N/A'} • #{membership.jerseyNumber || 'N/A'}
+                                    {teamMap.get(membership.assignedTeamId) || 'N/A'} • #{membership.jerseyNumber || 'N/A'}
                                   </div>
                                 )}
                               </div>
@@ -468,6 +482,7 @@ export default function Stats() {
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
                   membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('points')}
                 />
               )}
@@ -482,6 +497,7 @@ export default function Stats() {
                   getInitials={getInitials}
                   showPosition={true}
                   membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('goals')}
                 />
               )}
@@ -497,6 +513,7 @@ export default function Stats() {
                   showPosition={true}
                   showMoreIndicator={true}
                   membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('assists')}
                 />
               )}
@@ -511,6 +528,7 @@ export default function Stats() {
                   getInitials={getInitials}
                   showPosition={true}
                   membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('penaltyMinutes')}
                 />
               )}
@@ -525,6 +543,7 @@ export default function Stats() {
                   getInitials={getInitials}
                   showPosition={true}
                   membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('wins')}
                 />
               )}
@@ -539,6 +558,7 @@ export default function Stats() {
                   getInitials={getInitials}
                   showPosition={true}
                   membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('goalsAgainstAverage')}
                 />
               )}
@@ -553,6 +573,7 @@ export default function Stats() {
                   getInitials={getInitials}
                   showPosition={true}
                   membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('shutouts')}
                 />
               )}
@@ -588,6 +609,7 @@ interface StatSectionProps {
   showPosition?: boolean;
   showMoreIndicator?: boolean;
   membershipMap: Map<any, any>;
+  teamMap: Map<any, any>;
   onClick?: () => void;
 }
 
@@ -600,6 +622,7 @@ function StatSection({
   showPosition = false,
   showMoreIndicator = false,
   membershipMap,
+  teamMap,
   onClick
 }: StatSectionProps) {
   if (players.length === 0) return null;
@@ -659,8 +682,8 @@ function StatSection({
             {showPosition && !isTied && (() => {
               const membership = membershipMap.get(players[0].userId);
               return (
-                <div className="text-gray-400 text-sm" data-testid="text-player-position">
-                  {membership?.position?.toUpperCase() || 'N/A'} • #{membership?.jerseyNumber || 'N/A'}
+                <div className="text-gray-400 text-sm" data-testid="text-player-team">
+                  {teamMap.get(membership?.assignedTeamId) || 'N/A'} • #{membership?.jerseyNumber || 'N/A'}
                 </div>
               );
             })()}
