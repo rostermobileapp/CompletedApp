@@ -328,6 +328,7 @@ type Game = {
   homeScore?: number; // Added missing property
   awayScore?: number; // Added missing property
   isCompleted: boolean; // Added missing property
+  resultType?: 'regulation' | 'overtime' | 'shootout'; // Added for OTL tracking
   homeBeverageDutyUserId?: string;
   homeBeverageDutyClaimedAt?: string;
   awayBeverageDutyUserId?: string;
@@ -553,6 +554,8 @@ export default function LeagueManagement() {
   const [isEditingGameScore, setIsEditingGameScore] = useState(false);
   const [editGameHomeScore, setEditGameHomeScore] = useState('');
   const [editGameAwayScore, setEditGameAwayScore] = useState('');
+  const [editGameIsOvertimeShootout, setEditGameIsOvertimeShootout] = useState(false);
+  const [editGameResultType, setEditGameResultType] = useState<'overtime' | 'shootout'>('overtime');
   const datePickerRef = React.useRef<HTMLDivElement>(null);
   const timePickerRef = React.useRef<HTMLDivElement>(null);
   
@@ -4501,6 +4504,44 @@ export default function LeagueManagement() {
                                 />
                               </div>
                             </div>
+                            
+                            <div className="mb-3 space-y-3">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id="edit-overtime-shootout"
+                                  checked={editGameIsOvertimeShootout}
+                                  onCheckedChange={(checked) => setEditGameIsOvertimeShootout(checked === true)}
+                                  data-testid="checkbox-edit-overtime-shootout"
+                                />
+                                <Label
+                                  htmlFor="edit-overtime-shootout"
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  Overtime/Shootout
+                                </Label>
+                              </div>
+
+                              {editGameIsOvertimeShootout && (
+                                <div>
+                                  <Label htmlFor="edit-result-type" className="text-xs font-medium">
+                                    Result Type
+                                  </Label>
+                                  <Select
+                                    value={editGameResultType}
+                                    onValueChange={(value: 'overtime' | 'shootout') => setEditGameResultType(value)}
+                                  >
+                                    <SelectTrigger id="edit-result-type" data-testid="select-edit-result-type" className="mt-1">
+                                      <SelectValue placeholder="Select result type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="overtime">Overtime</SelectItem>
+                                      <SelectItem value="shootout">Shootout</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                            </div>
+                            
                             <div className="flex gap-3">
                               <Button
                                 variant="outline"
@@ -4508,6 +4549,8 @@ export default function LeagueManagement() {
                                   setIsEditingGameScore(false);
                                   setEditGameHomeScore('');
                                   setEditGameAwayScore('');
+                                  setEditGameIsOvertimeShootout(false);
+                                  setEditGameResultType('overtime');
                                 }}
                                 className="flex-1"
                                 data-testid="button-cancel-game-score-edit"
@@ -4540,13 +4583,16 @@ export default function LeagueManagement() {
                                     return;
                                   }
                                   
+                                  const resultType = editGameIsOvertimeShootout ? editGameResultType : 'regulation';
                                   commissionerScoreOverrideMutation.mutate(
-                                    { gameId: selectedGame.id, homeScore: home, awayScore: away, resultType: 'regulation' },
+                                    { gameId: selectedGame.id, homeScore: home, awayScore: away, resultType },
                                     {
                                       onSuccess: () => {
                                         setIsEditingGameScore(false);
                                         setEditGameHomeScore('');
                                         setEditGameAwayScore('');
+                                        setEditGameIsOvertimeShootout(false);
+                                        setEditGameResultType('overtime');
                                         
                                         // Comprehensive cache invalidation
                                         queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games'] });
@@ -4602,6 +4648,15 @@ export default function LeagueManagement() {
                                     const currentAwayScore = selectedGame.awayScore ?? 0;
                                     setEditGameHomeScore(currentHomeScore.toString());
                                     setEditGameAwayScore(currentAwayScore.toString());
+                                    
+                                    // Prefill overtime/shootout state
+                                    if (selectedGame.resultType === 'overtime' || selectedGame.resultType === 'shootout') {
+                                      setEditGameIsOvertimeShootout(true);
+                                      setEditGameResultType(selectedGame.resultType);
+                                    } else {
+                                      setEditGameIsOvertimeShootout(false);
+                                      setEditGameResultType('overtime');
+                                    }
                                   }}
                                   className="flex items-center gap-2 text-xs"
                                   data-testid="button-edit-game-score"
