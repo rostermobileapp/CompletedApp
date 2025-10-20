@@ -50,6 +50,14 @@ import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { GoogleAddressAutocomplete } from '@/components/GoogleAddressAutocomplete';
 import {
@@ -540,6 +548,8 @@ export default function LeagueManagement() {
   // Score management state
   const [commissionerHomeScore, setCommissionerHomeScore] = useState('');
   const [commissionerAwayScore, setCommissionerAwayScore] = useState('');
+  const [commissionerIsOvertimeShootout, setCommissionerIsOvertimeShootout] = useState(false);
+  const [commissionerResultType, setCommissionerResultType] = useState<'overtime' | 'shootout'>('overtime');
   const [isEditingGameScore, setIsEditingGameScore] = useState(false);
   const [editGameHomeScore, setEditGameHomeScore] = useState('');
   const [editGameAwayScore, setEditGameAwayScore] = useState('');
@@ -1670,8 +1680,8 @@ export default function LeagueManagement() {
 
   // Commissioner score override mutation
   const commissionerScoreOverrideMutation = useMutation({
-    mutationFn: async ({ gameId, homeScore, awayScore }: { gameId: string; homeScore: number; awayScore: number }) => {
-      return await apiRequest("POST", `/api/games/${gameId}/submit-score`, { homeScore, awayScore });
+    mutationFn: async ({ gameId, homeScore, awayScore, resultType }: { gameId: string; homeScore: number; awayScore: number; resultType?: 'regulation' | 'overtime' | 'shootout' }) => {
+      return await apiRequest("POST", `/api/games/${gameId}/submit-score`, { homeScore, awayScore, resultType: resultType || 'regulation' });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${selectedGame?.id}/score-submissions`] });
@@ -4531,7 +4541,7 @@ export default function LeagueManagement() {
                                   }
                                   
                                   commissionerScoreOverrideMutation.mutate(
-                                    { gameId: selectedGame.id, homeScore: home, awayScore: away },
+                                    { gameId: selectedGame.id, homeScore: home, awayScore: away, resultType: 'regulation' },
                                     {
                                       onSuccess: () => {
                                         setIsEditingGameScore(false);
@@ -4726,16 +4736,56 @@ export default function LeagueManagement() {
                               />
                             </div>
                           </div>
+                          
+                          <div className="mb-3 space-y-3">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id="commissioner-overtime-shootout"
+                                checked={commissionerIsOvertimeShootout}
+                                onCheckedChange={(checked) => setCommissionerIsOvertimeShootout(checked === true)}
+                                data-testid="checkbox-overtime-shootout"
+                              />
+                              <Label
+                                htmlFor="commissioner-overtime-shootout"
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                Overtime/Shootout
+                              </Label>
+                            </div>
+
+                            {commissionerIsOvertimeShootout && (
+                              <div>
+                                <Label htmlFor="commissioner-result-type" className="text-xs font-medium">
+                                  Result Type
+                                </Label>
+                                <Select
+                                  value={commissionerResultType}
+                                  onValueChange={(value: 'overtime' | 'shootout') => setCommissionerResultType(value)}
+                                >
+                                  <SelectTrigger id="commissioner-result-type" data-testid="select-result-type" className="mt-1">
+                                    <SelectValue placeholder="Select result type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="overtime">Overtime</SelectItem>
+                                    <SelectItem value="shootout">Shootout</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
+                          
                           <Button
                             type="button"
                             onClick={() => {
                               const home = parseInt(commissionerHomeScore);
                               const away = parseInt(commissionerAwayScore);
                               if (!isNaN(home) && !isNaN(away) && home >= 0 && away >= 0) {
+                                const resultType = commissionerIsOvertimeShootout ? commissionerResultType : 'regulation';
                                 commissionerScoreOverrideMutation.mutate({ 
                                   gameId: selectedGame.id, 
                                   homeScore: home, 
-                                  awayScore: away 
+                                  awayScore: away,
+                                  resultType
                                 });
                               }
                             }}
