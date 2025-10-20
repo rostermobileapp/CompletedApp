@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Menu, Calendar, Settings, Plus, Crown, Users, X } from 'lucide-react';
+import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 
@@ -20,10 +20,19 @@ export function SlideOutMenu() {
       icon: Calendar,
       label: 'Schedule Scrimmage',
       path: '/create-scrimmage',
-      locked: !canAccessPremiumFeatures(),
-      requiredTier: 'PRO',
+      locked: false,
+      requiredTier: null,
       bgColor: 'bg-blue-500/20',
       iconColor: 'text-blue-500',
+    },
+    {
+      icon: UserPlus,
+      label: 'Invite Groups',
+      path: '/invite-groups',
+      locked: false,
+      requiredTier: null,
+      bgColor: 'bg-teal-500/20',
+      iconColor: 'text-teal-500',
     },
     {
       icon: Settings,
