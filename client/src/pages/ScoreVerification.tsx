@@ -25,7 +25,8 @@ export default function ScoreVerification() {
       
       // Find games that need commissioner verification based on the correct business logic:
       // 1. Today's date is AFTER the game's date (past games)
-      // 2. Game has problematic score submissions (0, 1, or 2 mismatched)
+      // 2. Game does NOT have final scores set yet
+      // 3. Game has problematic score submissions (0, 1, or 2 mismatched)
       const gamesNeedingVerification = [];
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Start of today
@@ -37,6 +38,11 @@ export default function ScoreVerification() {
         // Only check games from past dates
         if (gameDate >= today) {
           continue; // Skip future games
+        }
+        
+        // Skip games that already have final scores set
+        if (game.homeScore !== null && game.awayScore !== null) {
+          continue; // Game already has final scores
         }
         
         try {
