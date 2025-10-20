@@ -381,12 +381,12 @@ export default function EditInviteGroup() {
                       {filteredMembers.map((member: any) => (
                         <div
                           key={member.user.id}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-                          onClick={() => toggleMemberSelection(member.user.id)}
-                          data-testid={`member-${member.user.id}`}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50"
+                          data-testid={`member-item-${member.user.id}`}
                         >
                           <Checkbox
                             checked={selectedMemberIds.includes(member.user.id)}
+                            onCheckedChange={() => toggleMemberSelection(member.user.id)}
                             data-testid={`checkbox-member-${member.user.id}`}
                           />
                           <Avatar className="h-10 w-10">
