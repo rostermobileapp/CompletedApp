@@ -7863,6 +7863,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get members of a specific invite group
+  app.get('/api/invite-groups/:id/members', isAuthenticated, async (req: any, res) => {
+    try {
+      const groupId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const group = await storage.getInviteGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: 'Invite group not found' });
+      }
+      
+      // Check ownership
+      if (group.creatorId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const members = await storage.getInviteGroupMembers(groupId);
+      res.json(members);
+    } catch (error) {
+      console.error('Error fetching invite group members:', error);
+      res.status(500).json({ message: 'Failed to fetch invite group members' });
+    }
+  });
+
   // Create a new invite group
   app.post('/api/invite-groups', isAuthenticated, async (req: any, res) => {
     try {

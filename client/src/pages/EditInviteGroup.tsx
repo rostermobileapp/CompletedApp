@@ -313,8 +313,14 @@ export default function EditInviteGroup() {
               <div className="space-y-2">
                 {/* Selected League Members */}
                 {selectedMemberIds.map(userId => {
-                  const member = (members as any[])?.find((m: any) => m.user.id === userId);
-                  if (!member) return null;
+                  // When editing, try to find in existingMembers first, then fall back to members
+                  const existingMember = (existingMembers as any[])?.find((m: any) => m.userId === userId);
+                  const member = existingMember || (members as any[])?.find((m: any) => m.user.id === userId);
+                  
+                  // Get user data from either source
+                  const user = existingMember?.user || member?.user;
+                  if (!user) return null;
+                  
                   return (
                     <div
                       key={userId}
@@ -322,14 +328,14 @@ export default function EditInviteGroup() {
                       data-testid={`selected-member-${userId}`}
                     >
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={member.user.profileImageUrl || undefined} />
+                        <AvatarImage src={user.profileImageUrl || undefined} />
                         <AvatarFallback className="text-xs">
-                          {member.user.firstName?.[0]}{member.user.lastName?.[0]}
+                          {user.firstName?.[0]}{user.lastName?.[0]}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <p className="text-sm font-medium">
-                          {member.user.firstName} {member.user.lastName}
+                          {user.firstName} {user.lastName}
                         </p>
                       </div>
                       <Button
