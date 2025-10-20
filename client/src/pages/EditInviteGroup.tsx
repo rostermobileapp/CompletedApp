@@ -304,6 +304,75 @@ export default function EditInviteGroup() {
             Add Members to Group
           </h3>
 
+          {/* Currently Selected Members */}
+          {(selectedMemberIds.length > 0 || selectedEmails.length > 0) && (
+            <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-border">
+              <h4 className="font-semibold text-sm mb-3">
+                Currently in Group ({selectedMemberIds.length + selectedEmails.length})
+              </h4>
+              <div className="space-y-2">
+                {/* Selected League Members */}
+                {selectedMemberIds.map(userId => {
+                  const member = (members as any[])?.find((m: any) => m.user.id === userId);
+                  if (!member) return null;
+                  return (
+                    <div
+                      key={userId}
+                      className="flex items-center gap-3 p-2 bg-background rounded-lg"
+                      data-testid={`selected-member-${userId}`}
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={member.user.profileImageUrl || undefined} />
+                        <AvatarFallback className="text-xs">
+                          {member.user.firstName?.[0]}{member.user.lastName?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">
+                          {member.user.firstName} {member.user.lastName}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleMemberSelection(userId)}
+                        data-testid={`button-remove-member-${userId}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+                
+                {/* Selected Email Invites */}
+                {selectedEmails.map(email => (
+                  <div
+                    key={email}
+                    className="flex items-center gap-3 p-2 bg-background rounded-lg"
+                    data-testid={`selected-email-${email}`}
+                  >
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{email}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeEmailInvite(email)}
+                      data-testid={`button-remove-email-${email}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* League Members Section */}
           <div className="mb-6">
             <Label>Select from League Members</Label>
