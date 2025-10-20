@@ -307,101 +307,111 @@ export default function EditInviteGroup() {
           </h3>
 
           {/* League Members Section */}
-          {approvedLeague && (
-            <div className="mb-6">
-              <Label>Select from League Members</Label>
-              
-              {/* Search */}
-              <div className="relative mt-2 mb-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                  data-testid="input-search-members"
-                />
-              </div>
-
-              {/* Selected count and bulk actions */}
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-sm text-muted-foreground" data-testid="text-selected-count">
-                  {selectedMemberIds.length} member{selectedMemberIds.length !== 1 ? 's' : ''} selected
+          <div className="mb-6">
+            <Label>Select from League Members</Label>
+            
+            {!approvedLeague ? (
+              <div className="mt-2 p-4 bg-muted/30 rounded-lg border border-border">
+                <p className="text-sm text-muted-foreground">
+                  You need to be an approved member of a league to select league members. 
+                  You can still add people by email below.
                 </p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={selectAllMembers}
-                    disabled={filteredMembers.length === 0}
-                    data-testid="button-select-all"
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={deselectAllMembers}
-                    disabled={selectedMemberIds.length === 0}
-                    data-testid="button-deselect-all"
-                  >
-                    Deselect All
-                  </Button>
-                </div>
               </div>
+            ) : (
+              <>
+                {/* Search */}
+                <div className="relative mt-2 mb-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search-members"
+                  />
+                </div>
 
-              {/* Member list */}
-              <ScrollArea className="h-64">
-                {membersLoading ? (
-                  <div className="space-y-3">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
-                        <div className="w-10 h-10 bg-muted rounded-full"></div>
-                        <div className="flex-1">
-                          <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
-                          <div className="h-3 bg-muted rounded w-1/2"></div>
+                {/* Selected count and bulk actions */}
+                <div className="mb-4 flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground" data-testid="text-selected-count">
+                    {selectedMemberIds.length} member{selectedMemberIds.length !== 1 ? 's' : ''} selected
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={selectAllMembers}
+                      disabled={filteredMembers.length === 0}
+                      data-testid="button-select-all"
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={deselectAllMembers}
+                      disabled={selectedMemberIds.length === 0}
+                      data-testid="button-deselect-all"
+                    >
+                      Deselect All
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Member list */}
+                <ScrollArea className="h-64 border border-border rounded-lg">
+                  {membersLoading ? (
+                    <div className="space-y-3 p-2">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
+                          <div className="w-10 h-10 bg-muted rounded-full"></div>
+                          <div className="flex-1">
+                            <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
+                            <div className="h-3 bg-muted rounded w-1/2"></div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : filteredMembers.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {searchTerm ? 'No members found' : 'No league members available'}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredMembers.map((member: any) => (
-                      <div
-                        key={member.user.id}
-                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted cursor-pointer"
-                        onClick={() => toggleMemberSelection(member.user.id)}
-                        data-testid={`member-${member.user.id}`}
-                      >
-                        <Checkbox
-                          checked={selectedMemberIds.includes(member.user.id)}
-                          onCheckedChange={() => toggleMemberSelection(member.user.id)}
-                          data-testid={`checkbox-member-${member.user.id}`}
-                        />
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={member.user.profileImageUrl || undefined} />
-                          <AvatarFallback>
-                            {member.user.firstName?.[0]}{member.user.lastName?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <p className="font-medium" data-testid={`text-member-name-${member.user.id}`}>
-                            {member.user.firstName} {member.user.lastName}
-                          </p>
+                      ))}
+                    </div>
+                  ) : filteredMembers.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      {searchTerm ? 'No members found' : 'No league members available'}
+                    </div>
+                  ) : (
+                    <div className="space-y-1 p-2">
+                      {filteredMembers.map((member: any) => (
+                        <div
+                          key={member.user.id}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                          onClick={() => toggleMemberSelection(member.user.id)}
+                          data-testid={`member-${member.user.id}`}
+                        >
+                          <Checkbox
+                            checked={selectedMemberIds.includes(member.user.id)}
+                            onCheckedChange={() => toggleMemberSelection(member.user.id)}
+                            data-testid={`checkbox-member-${member.user.id}`}
+                            className="pointer-events-none"
+                          />
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={member.user.profileImageUrl || undefined} />
+                            <AvatarFallback>
+                              {member.user.firstName?.[0]}{member.user.lastName?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <p className="font-medium" data-testid={`text-member-name-${member.user.id}`}>
+                              {member.user.firstName} {member.user.lastName}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-          )}
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </>
+            )}
+          </div>
 
           {/* Email Invites Section */}
           <div className="mt-6 border-t border-border pt-6">
