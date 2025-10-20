@@ -4802,7 +4802,7 @@ export default function LeagueManagement() {
                               />
                               <Label
                                 htmlFor="commissioner-overtime-shootout"
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[#ffffff]"
                               >
                                 Overtime/Shootout
                               </Label>
