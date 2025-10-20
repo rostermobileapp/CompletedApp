@@ -2610,7 +2610,7 @@ export class DatabaseStorage implements IStorage {
       let wins = 0;
       let losses = 0;
       let ties = 0;
-      let shootoutLosses = 0; // For now, this will be 0 until we add shootout data
+      let shootoutLosses = 0;
       let goalsFor = 0;
       let goalsAgainst = 0;
 
@@ -2627,12 +2627,17 @@ export class DatabaseStorage implements IStorage {
           goalsFor += teamScore || 0;
           goalsAgainst += opponentScore || 0;
           
-          // Determine win/loss/tie
+          // Determine win/loss/tie/SOL
           if (teamScore !== null && opponentScore !== null) {
             if (teamScore > opponentScore) {
               wins++;
             } else if (teamScore < opponentScore) {
-              losses++;
+              // Check if this is an overtime/shootout loss (gets 1 point)
+              if (game.resultType === 'overtime' || game.resultType === 'shootout') {
+                shootoutLosses++;
+              } else {
+                losses++;
+              }
             } else {
               ties++;
             }
@@ -3325,7 +3330,7 @@ export class DatabaseStorage implements IStorage {
     return submission;
   }
 
-  async updateGameScore(gameId: string, homeScore: number, awayScore: number): Promise<Game> {
+  async updateGameScore(gameId: string, homeScore: number, awayScore: number, resultType: 'regulation' | 'overtime' | 'shootout' = 'regulation'): Promise<Game> {
     return await db.transaction(async (tx) => {
       // Update the game score
       const [updatedGame] = await tx
@@ -3333,7 +3338,8 @@ export class DatabaseStorage implements IStorage {
         .set({ 
           homeScore, 
           awayScore, 
-          isCompleted: true 
+          isCompleted: true,
+          resultType
         })
         .where(eq(games.id, gameId))
         .returning();

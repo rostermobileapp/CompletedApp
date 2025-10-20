@@ -116,10 +116,11 @@ export default function ScoreVerification() {
 
   // Mutation to submit/update score for a game
   const submitScoreMutation = useMutation({
-    mutationFn: async ({ gameId, homeScore, awayScore }: { gameId: string; homeScore: number; awayScore: number }) => {
+    mutationFn: async ({ gameId, homeScore, awayScore, resultType }: { gameId: string; homeScore: number; awayScore: number; resultType?: string }) => {
       const response = await apiRequest('POST', `/api/games/${gameId}/submit-score`, {
         homeScore,
         awayScore,
+        resultType: resultType || 'regulation',
       });
       return response.json();
     },
@@ -145,6 +146,7 @@ export default function ScoreVerification() {
   const ScoreSubmissionCard = ({ game }: { game: any }) => {
     const [homeScore, setHomeScore] = useState('');
     const [awayScore, setAwayScore] = useState('');
+    const [isOvertimeShootout, setIsOvertimeShootout] = useState(false);
 
     const handleSubmitScore = () => {
       const home = parseInt(homeScore);
@@ -159,7 +161,10 @@ export default function ScoreVerification() {
         return;
       }
       
-      submitScoreMutation.mutate({ gameId: game.id, homeScore: home, awayScore: away });
+      // Determine result type
+      const resultType = isOvertimeShootout ? 'overtime' : 'regulation';
+      
+      submitScoreMutation.mutate({ gameId: game.id, homeScore: home, awayScore: away, resultType });
     };
 
     return (
@@ -219,6 +224,25 @@ export default function ScoreVerification() {
             />
           </div>
         </div>
+        
+        {/* Overtime/Shootout Checkbox */}
+        <div className="flex items-center gap-2 my-3 p-2 bg-muted/50 rounded-lg">
+          <input
+            type="checkbox"
+            id={`overtime-${game.id}`}
+            checked={isOvertimeShootout}
+            onChange={(e) => setIsOvertimeShootout(e.target.checked)}
+            className="h-4 w-4 rounded border-border"
+            data-testid={`checkbox-overtime-${game.id}`}
+          />
+          <label 
+            htmlFor={`overtime-${game.id}`} 
+            className="text-sm font-medium cursor-pointer"
+          >
+            Game ended in Overtime/Shootout (losing team gets 1 point)
+          </label>
+        </div>
+        
         <Button
           onClick={handleSubmitScore}
           disabled={submitScoreMutation.isPending || !homeScore || !awayScore}

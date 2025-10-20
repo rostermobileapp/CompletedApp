@@ -2177,7 +2177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/games/:gameId/submit-score", isAuthenticated, async (req: any, res) => {
     try {
       const { gameId } = req.params;
-      const { homeScore, awayScore } = req.body;
+      const { homeScore, awayScore, resultType } = req.body;
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
@@ -2248,7 +2248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If it's a commissioner submission, update the game score immediately
       if (submitterRole === 'commissioner') {
-        await storage.updateGameScore(gameId, parseInt(homeScore), parseInt(awayScore));
+        await storage.updateGameScore(gameId, parseInt(homeScore), parseInt(awayScore), resultType || 'regulation');
         res.json({ 
           submission, 
           gameUpdated: true, 
@@ -2260,7 +2260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (matchResult.isMatch && matchResult.homeScore !== undefined && matchResult.awayScore !== undefined) {
           // Update the game score automatically
-          await storage.updateGameScore(gameId, matchResult.homeScore, matchResult.awayScore);
+          await storage.updateGameScore(gameId, matchResult.homeScore, matchResult.awayScore, resultType || 'regulation');
           res.json({ 
             submission, 
             gameUpdated: true, 
