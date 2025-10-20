@@ -3205,8 +3205,14 @@ export class DatabaseStorage implements IStorage {
 
   async deleteGame(id: string): Promise<void> {
     try {
-      // Then delete the game
       console.log(`Deleting game ${id}`);
+      
+      // First delete all score submissions for this game
+      console.log(`Deleting score submissions for game ${id}`);
+      const deletedSubmissions = await db.delete(gameScoreSubmissions).where(eq(gameScoreSubmissions.gameId, id));
+      console.log(`Deleted ${deletedSubmissions.rowCount || 0} score submissions`);
+      
+      // Then delete the game
       const deletedGame = await db.delete(games).where(eq(games.id, id));
       console.log(`Deleted ${deletedGame.rowCount || 0} game records`);
       
