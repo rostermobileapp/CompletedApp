@@ -2939,8 +2939,8 @@ export default function LeagueManagement() {
                                   return priorityA - priorityB;
                                 }
                                 
-                                // Within same priority, sort by date (most recent first for future, most recent first for past)
-                                return dateB.getTime() - dateA.getTime();
+                                // Within same priority, sort by date (nearest first, furthest last)
+                                return dateA.getTime() - dateB.getTime();
                               });
                               
                               return sortedGames.map((game: any) => {
@@ -3048,8 +3048,8 @@ export default function LeagueManagement() {
                             return priorityA - priorityB;
                           }
                           
-                          // Within same priority, sort by date (most recent first for future, most recent first for past)
-                          return dateB.getTime() - dateA.getTime();
+                          // Within same priority, sort by date (nearest first, furthest last)
+                          return dateA.getTime() - dateB.getTime();
                         });
                         
                         return sortedGames.map((game: any) => {
