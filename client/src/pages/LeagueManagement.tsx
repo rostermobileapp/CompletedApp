@@ -4490,7 +4490,7 @@ export default function LeagueManagement() {
                                 -
                               </div>
                               <div className="text-center">
-                                <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                                <label className="block text-sm font-medium dark:text-blue-300 mb-1 text-[#ffffff]">
                                   {teams.find((t: Team) => t.id === selectedGame.awayTeamId)?.name || 'Away'}
                                 </label>
                                 <Input
