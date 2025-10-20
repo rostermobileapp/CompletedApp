@@ -41,7 +41,11 @@ export default function ScoreVerification() {
         }
         
         // Skip games that already have final scores set
-        if (game.homeScore !== null && game.awayScore !== null) {
+        // Check for both null and undefined, and ensure scores are actual numbers
+        const hasValidHomeScore = game.homeScore !== null && game.homeScore !== undefined && typeof game.homeScore === 'number';
+        const hasValidAwayScore = game.awayScore !== null && game.awayScore !== undefined && typeof game.awayScore === 'number';
+        
+        if (hasValidHomeScore && hasValidAwayScore) {
           continue; // Game already has final scores
         }
         
