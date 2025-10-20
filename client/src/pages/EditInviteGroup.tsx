@@ -389,7 +389,6 @@ export default function EditInviteGroup() {
                             checked={selectedMemberIds.includes(member.user.id)}
                             onCheckedChange={() => toggleMemberSelection(member.user.id)}
                             data-testid={`checkbox-member-${member.user.id}`}
-                            className="pointer-events-none"
                           />
                           <Avatar className="h-10 w-10">
                             <AvatarImage src={member.user.profileImageUrl || undefined} />
