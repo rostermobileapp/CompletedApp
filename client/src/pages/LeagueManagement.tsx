@@ -4473,7 +4473,7 @@ export default function LeagueManagement() {
                             <p className="text-sm font-medium mb-3 text-center text-[#ffffff]">Edit Final Score:</p>
                             <div className="grid grid-cols-3 gap-3 items-center mb-4">
                               <div className="text-center">
-                                <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                                <label className="block text-sm font-medium dark:text-blue-300 mb-1 text-[#ffffff]">
                                   {teams.find((t: Team) => t.id === selectedGame.homeTeamId)?.name || 'Home'}
                                 </label>
                                 <Input
