@@ -4556,7 +4556,7 @@ export default function LeagueManagement() {
                                       <p className="text-xs text-muted-foreground">
                                         {teams.find((t: Team) => t.id === selectedGame.homeTeamId)?.name || 'Home'}
                                       </p>
-                                      <p className="text-lg font-bold">{submission.homeScore}</p>
+                                      <p className="text-lg font-bold text-[#000000]">{submission.homeScore}</p>
                                     </div>
                                     <div className="text-sm font-bold text-muted-foreground">-</div>
                                     <div className="text-center">
