@@ -26,7 +26,7 @@ export default function EditInviteGroup() {
   const [, navigate] = useLocation();
   const [, params] = useRoute('/invite-groups/:id');
   const groupId = params?.id;
-  const isEditing = !!groupId;
+  const isEditing = groupId !== 'new' && !!groupId;
   const { toast } = useToast();
 
   // State for member selection
