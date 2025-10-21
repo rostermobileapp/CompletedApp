@@ -435,7 +435,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                   </p>
                                   <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] text-[#de0000] bg-[#ffffff00] text-[16px] font-extrabold text-left pl-[0px] pr-[0px]">Substitution requires approval</p>
                                   {request.originalPlayer && (
-                                    <p className="text-sm font-bold text-[#ffffff]">
+                                    <p className="font-bold text-[#ffffff] text-[16px]">
                                       Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
                                     </p>
                                   )}
