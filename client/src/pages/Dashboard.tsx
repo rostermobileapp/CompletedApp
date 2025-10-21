@@ -1159,11 +1159,48 @@ export default function Dashboard() {
     return userTeamsAll.some(team => team.leagueId === leagueId && team.captainId === (user as any).id);
   }, [userTeamsAll, (user as any)?.id]);
 
-  // Fetch team record based on game scores - dynamic based on selected team
-  const { data: teamRecord } = useQuery({
-    queryKey: [`/api/teams/${selectedType === 'team' ? selectedId : null}/record`],
+  // Fetch standings for the team's league to get accurate record
+  const selectedTeamLeagueId = React.useMemo(() => {
+    if (selectedType === 'team' && selectedId) {
+      const team = (userTeamsAll as any[])?.find((t: any) => t.id === selectedId);
+      return team?.leagueId || null;
+    }
+    return null;
+  }, [selectedType, selectedId, userTeamsAll]);
+
+  const { data: standingsData } = useQuery({
+    queryKey: ['/api/leagues', selectedTeamLeagueId, 'standings'],
+    queryFn: async () => {
+      if (!selectedTeamLeagueId) return [];
+      const response = await apiRequest('GET', `/api/leagues/${selectedTeamLeagueId}/standings`);
+      return response.json();
+    },
+    enabled: selectedType === 'team' && !!selectedId && !!selectedTeamLeagueId,
+  });
+
+  // Fetch team's total games to calculate games remaining
+  const { data: teamGames } = useQuery({
+    queryKey: ['/api/teams', selectedId, 'games'],
     enabled: selectedType === 'team' && !!selectedId,
   });
+
+  // Extract the team record from standings data and add gamesRemaining
+  const teamRecord = React.useMemo(() => {
+    if (selectedType !== 'team' || !selectedId || !Array.isArray(standingsData)) {
+      return null;
+    }
+    const standingsRecord = standingsData.find((team: any) => team.teamId === selectedId);
+    if (!standingsRecord) return null;
+    
+    // Calculate games remaining
+    const totalGames = Array.isArray(teamGames) ? teamGames.length : 0;
+    const gamesRemaining = totalGames - (standingsRecord.gamesPlayed || 0);
+    
+    return {
+      ...standingsRecord,
+      gamesRemaining: Math.max(0, gamesRemaining), // Ensure non-negative
+    };
+  }, [selectedType, selectedId, standingsData, teamGames]);
 
 
   // Beverage duty mutation
