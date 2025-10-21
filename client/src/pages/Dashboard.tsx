@@ -366,13 +366,11 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                 {request.originalPlayer && (
                                   <p className="text-sm text-muted-foreground">
                                     Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
-                                    {request.originalPlayer.skillLevel && ` • Skill: ${request.originalPlayer.skillLevel}`}
                                   </p>
                                 )}
                                 {request.substitutePlayer && (
                                   <p className="text-sm text-muted-foreground">
                                     Substitute: {request.substitutePlayer.firstName} {request.substitutePlayer.lastName}
-                                    {request.substitutePlayer.skillLevel && ` • Skill: ${request.substitutePlayer.skillLevel}`}
                                   </p>
                                 )}
                               </div>
@@ -439,13 +437,11 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                   {request.originalPlayer && (
                                     <p className="text-sm font-bold text-[#ffffff]">
                                       Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
-                                      {request.originalPlayer.skillLevel && ` • Skill: ${request.originalPlayer.skillLevel}`}
                                     </p>
                                   )}
                                   {request.substitutePlayer && (
                                     <p className="text-sm text-[#ffffff] font-bold">
                                       Substitute: {request.substitutePlayer.firstName} {request.substitutePlayer.lastName}
-                                      {request.substitutePlayer.skillLevel && ` • Skill: ${request.substitutePlayer.skillLevel}`}
                                     </p>
                                   )}
                                 </div>
