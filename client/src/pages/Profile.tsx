@@ -543,7 +543,7 @@ export default function Profile() {
       {/* Payment Methods */}
       <div className="px-6 mb-6">
         <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
-        <div className="bg-card rounded-xl border border-border p-6 pt-[4px] pb-[4px]">
+        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#212121]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-primary" />
