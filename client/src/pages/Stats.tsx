@@ -579,20 +579,6 @@ export default function Stats() {
               )}
             </div>
           )}
-
-          {/* All Categories & Filters Button */}
-          {filteredStats.length > 0 && (
-            <button
-              onClick={() => {
-                // Navigate to a detailed stats view or open filters
-                // For now, we'll just show a placeholder
-              }}
-              className="w-full mt-8 py-4 border border-gray-700 rounded-lg text-[#00A9FF] font-medium hover:bg-gray-900 transition-colors"
-              data-testid="button-all-categories"
-            >
-              All Categories & Filters
-            </button>
-          )}
         </div>
       </FeatureLockOverlay>
     </div>
