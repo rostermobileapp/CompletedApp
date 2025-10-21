@@ -1830,7 +1830,7 @@ export default function Messages() {
       {!selectedConversation ? (
         <>
           {/* Conversations List Header */}
-          <div className="sticky top-0 z-50 p-6 pt-12 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+          <div className="sticky top-0 z-50 p-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border pt-[12px] pb-[12px] mt-[12px] mb-[12px] pl-[36px] pr-[36px]">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold" data-testid="text-page-title">Messages</h1>
 {canAccessPremiumFeatures() ? (
