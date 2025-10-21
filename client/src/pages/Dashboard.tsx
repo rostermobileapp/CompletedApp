@@ -1406,7 +1406,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 pr-16">
             {teamRecord ? (
               <span className="text-[16px] text-center font-bold bg-[#3c83f685] text-[#ffffff] ml-[4px] mr-[4px] mt-[0px] mb-[0px] pl-[4px] pr-[4px] pt-[4px] pb-[4px]" data-testid="text-team-record">
-                {`${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}`}
+                {`${(teamRecord as any).wins}-${(teamRecord as any).losses}-${(teamRecord as any).ties}-${(teamRecord as any).shootoutLosses || 0}`}
               </span>
             ) : null}
             
