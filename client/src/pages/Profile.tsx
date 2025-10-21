@@ -812,17 +812,6 @@ export default function Profile() {
             </button>
           ))}
           
-          {/* Dark Mode Toggle */}
-          <div className="w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between" data-testid="card-dark-mode">
-            <div className="flex items-center gap-3">
-              <Moon className="w-5 h-5 text-muted-foreground" />
-              <span>Dark Mode</span>
-            </div>
-            <div className="w-12 h-6 bg-primary rounded-full flex items-center justify-end px-1" data-testid="toggle-dark-mode">
-              <div className="w-4 h-4 bg-primary-foreground rounded-full"></div>
-            </div>
-          </div>
-          
           {/* Delete Profile */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
