@@ -1750,7 +1750,7 @@ export default function Dashboard() {
             {/* Show approved scrimmages */}
             {Array.isArray(scrimmageRequests) && scrimmageRequests
               .filter((request: any) => request.status === 'approved' && request.scrimmage)
-              .slice(0, 4)
+              .slice(0, 5)
               .map((request: any) => {
                 const scrimmage = request.scrimmage;
                 return (
@@ -1786,7 +1786,7 @@ export default function Dashboard() {
             {Array.isArray(personalReminders) && personalReminders
               .filter((reminder: any) => !reminder.isCompleted)
               .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-              .slice(0, 4)
+              .slice(0, 5)
               .map((reminder: any) => (
                 <div 
                   key={`reminder-${reminder.id}`}
@@ -1839,7 +1839,7 @@ export default function Dashboard() {
                 const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
                 return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
               })
-              .slice(0, 4).map((game: any) => (
+              .slice(0, 5).map((game: any) => (
               <div 
                 key={game.id} 
                 className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#212121]" 
