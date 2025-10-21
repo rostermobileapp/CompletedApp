@@ -515,7 +515,18 @@ export default function Profile() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Phone:</span>
-                <span>{(user as any)?.phoneNumber || 'Not specified'}</span>
+                <span>
+                  {(user as any)?.phoneNumber 
+                    ? ((phone: string) => {
+                        const cleaned = phone.replace(/\D/g, '');
+                        if (cleaned.length === 10) {
+                          return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+                        }
+                        return phone;
+                      })((user as any).phoneNumber)
+                    : 'Not specified'
+                  }
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">City:</span>
