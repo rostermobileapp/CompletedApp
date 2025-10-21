@@ -392,7 +392,7 @@ export default function Profile() {
       </div>
       {/* Profile Details */}
       <div className="px-6 mb-6">
-        <div className="bg-card rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-border p-6 pt-[4px] pb-[4px]">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold" data-testid="text-profile-details-title">Profile Details</h2>
             <button
