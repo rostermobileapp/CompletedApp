@@ -1283,7 +1283,7 @@ export default function Dashboard() {
   };
 
   // Fetch needs attention data for the permanent bar
-  const { data: needsAttentionData } = useQuery({
+  const { data: needsAttentionData, isLoading: isLoadingNeedsAttention } = useQuery({
     queryKey: ['/api/needs-attention-summary', effectiveLeagueId],
     queryFn: async () => {
       if (!effectiveLeagueId) return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
@@ -1634,24 +1634,37 @@ export default function Dashboard() {
               </div>
             </div>
             
-            {effectiveLeagueId && needsAttentionData && (
+            {effectiveLeagueId && (
               <div className="rounded-xl border border-border bg-[#212121]">
-                <button
-                  onClick={() => setShowNeedsAttentionModal(true)}
-                  className="w-full h-full flex items-center justify-between hover:bg-gray-800 transition-colors rounded-xl px-3 py-2"
-                  data-testid="button-needs-attention-permanent"
-                >
-                  <div className="flex items-center gap-3">
-                    <Settings className="w-4 h-4 text-white" />
-                    <span className="text-white font-medium text-sm">To-Do</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
+                {isLoadingNeedsAttention ? (
+                  <div className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2">
+                    <div className="flex items-center gap-3">
+                      <Settings className="w-4 h-4 text-white" />
+                      <span className="text-white font-medium text-sm">To-Do</span>
                     </div>
-                    <ChevronDown className="w-4 h-4 text-white" />
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-gray-700 rounded-full animate-pulse"></div>
+                      <ChevronDown className="w-4 h-4 text-white" />
+                    </div>
                   </div>
-                </button>
+                ) : needsAttentionData ? (
+                  <button
+                    onClick={() => setShowNeedsAttentionModal(true)}
+                    className="w-full h-full flex items-center justify-between hover:bg-gray-800 transition-colors rounded-xl px-3 py-2"
+                    data-testid="button-needs-attention-permanent"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Settings className="w-4 h-4 text-white" />
+                      <span className="text-white font-medium text-sm">To-Do</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-white" />
+                    </div>
+                  </button>
+                ) : null}
               </div>
             )}
           </div>
