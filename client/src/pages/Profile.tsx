@@ -373,26 +373,19 @@ export default function Profile() {
                 >
                   {tierDisplay.label}
                 </span>
+                
+                {/* Career Stats */}
+                {userStats && (
+                  <span className="text-xs px-3 py-1 rounded-full font-semibold bg-muted text-muted-foreground" data-testid="stat-career">
+                    <span data-testid="stat-goals">{userStats.goals} G</span>
+                    <span className="mx-1">•</span>
+                    <span data-testid="stat-assists">{userStats.assists} A</span>
+                    <span className="mx-1">•</span>
+                    <span data-testid="stat-points">{userStats.points} P</span>
+                  </span>
+                )}
               </div>
             </div>
-            
-            {/* Career Stats */}
-            {userStats && (
-              <div className="flex gap-4 items-center">
-                <div className="text-center" data-testid="stat-goals">
-                  <div className="text-2xl font-bold text-primary">{userStats.goals}</div>
-                  <div className="text-xs text-muted-foreground">G</div>
-                </div>
-                <div className="text-center" data-testid="stat-assists">
-                  <div className="text-2xl font-bold text-primary">{userStats.assists}</div>
-                  <div className="text-xs text-muted-foreground">A</div>
-                </div>
-                <div className="text-center" data-testid="stat-points">
-                  <div className="text-2xl font-bold text-primary">{userStats.points}</div>
-                  <div className="text-xs text-muted-foreground">P</div>
-                </div>
-              </div>
-            )}
           </div>
           {/* Upgrade button removed as everyone is commissioner now */}
         </div>
