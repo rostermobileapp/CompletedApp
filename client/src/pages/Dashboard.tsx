@@ -1159,10 +1159,10 @@ export default function Dashboard() {
     return userTeamsAll.some(team => team.leagueId === leagueId && team.captainId === (user as any).id);
   }, [userTeamsAll, (user as any)?.id]);
 
-  // Fetch team record based on game scores
+  // Fetch team record based on game scores - dynamic based on selected team
   const { data: teamRecord } = useQuery({
-    queryKey: [`/api/teams/${primaryTeam?.id}/record`],
-    enabled: !!primaryTeam?.id,
+    queryKey: [`/api/teams/${selectedType === 'team' ? selectedId : null}/record`],
+    enabled: selectedType === 'team' && !!selectedId,
   });
 
 

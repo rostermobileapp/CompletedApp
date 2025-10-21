@@ -157,7 +157,7 @@ View and respond to this invitation:
 ${scrimmageUrl}
 
 ---
-This invitation was sent through Rosters - Your sports team management platform
+This invitation was sent through Rosters - Your Beer League Hockey App
 Visit: ${appUrl}
     `.trim();
     
