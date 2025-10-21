@@ -355,41 +355,41 @@ export default function Profile() {
             </div>
           </div>
           
-          <div className="flex-1">
-            <h2 className="text-xl font-bold mb-1" data-testid="text-user-name">
-              {(user as any)?.firstName && (user as any)?.lastName 
-                ? `${(user as any).lastName}, ${(user as any).firstName}`
-                : (user as any)?.firstName || 'User'
-              }
-            </h2>
-            <p className="text-xs text-muted-foreground/70 mb-2" data-testid="text-user-id">
-              ID: {(user as any)?.id}
-            </p>
-            <div className="flex items-center gap-2 mb-3">
-              <span 
-                className={`tier-badge text-xs px-3 py-1 rounded-full font-semibold ${tierDisplay.class}`}
-                data-testid="badge-user-tier"
-              >
-                {tierDisplay.label}
-              </span>
+          <div className="flex-1 flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-bold mb-1" data-testid="text-user-name">
+                {(user as any)?.firstName && (user as any)?.lastName 
+                  ? `${(user as any).lastName}, ${(user as any).firstName}`
+                  : (user as any)?.firstName || 'User'
+                }
+              </h2>
+              <p className="text-xs text-muted-foreground/70 mb-2" data-testid="text-user-id">
+                ID: {(user as any)?.id}
+              </p>
+              <div className="flex items-center gap-2">
+                <span 
+                  className={`tier-badge text-xs px-3 py-1 rounded-full font-semibold ${tierDisplay.class}`}
+                  data-testid="badge-user-tier"
+                >
+                  {tierDisplay.label}
+                </span>
+              </div>
             </div>
             
             {/* Career Stats */}
             {userStats && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="text-center" data-testid="stat-goals">
-                    <div className="text-2xl font-bold text-primary">{userStats.goals}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Goals</div>
-                  </div>
-                  <div className="text-center" data-testid="stat-assists">
-                    <div className="text-2xl font-bold text-primary">{userStats.assists}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Assists</div>
-                  </div>
-                  <div className="text-center" data-testid="stat-points">
-                    <div className="text-2xl font-bold text-primary">{userStats.points}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Points</div>
-                  </div>
+              <div className="flex gap-3 items-start">
+                <div className="text-center" data-testid="stat-goals">
+                  <div className="text-lg font-bold text-primary">{userStats.goals}</div>
+                  <div className="text-xs text-muted-foreground">G</div>
+                </div>
+                <div className="text-center" data-testid="stat-assists">
+                  <div className="text-lg font-bold text-primary">{userStats.assists}</div>
+                  <div className="text-xs text-muted-foreground">A</div>
+                </div>
+                <div className="text-center" data-testid="stat-points">
+                  <div className="text-lg font-bold text-primary">{userStats.points}</div>
+                  <div className="text-xs text-muted-foreground">P</div>
                 </div>
               </div>
             )}
