@@ -53,7 +53,7 @@ export default function InviteGroups() {
           <button 
             onClick={() => {
               setPageTransitionDirection('down');
-              navigate('/');
+              navigate('/create-scrimmage');
             }}
             className="text-muted-foreground"
             data-testid="button-back"
