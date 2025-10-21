@@ -546,7 +546,6 @@ export default function Profile() {
         <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#212121]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-primary" />
               <h2 className="text-lg font-semibold" data-testid="text-payment-methods-title">Payment Methods</h2>
             </div>
             <button
