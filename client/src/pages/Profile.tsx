@@ -355,7 +355,7 @@ export default function Profile() {
             </div>
           </div>
           
-          <div className="flex-1 flex items-start justify-between gap-4">
+          <div className="flex-1 flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
               <h2 className="text-xl font-bold mb-1" data-testid="text-user-name">
                 {(user as any)?.firstName && (user as any)?.lastName 
@@ -378,17 +378,17 @@ export default function Profile() {
             
             {/* Career Stats */}
             {userStats && (
-              <div className="flex gap-3 items-start">
+              <div className="flex gap-4 items-center">
                 <div className="text-center" data-testid="stat-goals">
-                  <div className="text-lg font-bold text-primary">{userStats.goals}</div>
+                  <div className="text-2xl font-bold text-primary">{userStats.goals}</div>
                   <div className="text-xs text-muted-foreground">G</div>
                 </div>
                 <div className="text-center" data-testid="stat-assists">
-                  <div className="text-lg font-bold text-primary">{userStats.assists}</div>
+                  <div className="text-2xl font-bold text-primary">{userStats.assists}</div>
                   <div className="text-xs text-muted-foreground">A</div>
                 </div>
                 <div className="text-center" data-testid="stat-points">
-                  <div className="text-lg font-bold text-primary">{userStats.points}</div>
+                  <div className="text-2xl font-bold text-primary">{userStats.points}</div>
                   <div className="text-xs text-muted-foreground">P</div>
                 </div>
               </div>
