@@ -768,7 +768,7 @@ export default function CreateScrimmage() {
                 {filteredMembers.map((member: any) => (
                   <div
                     key={member.user.id}
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50"
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 pt-[4px] pb-[4px]"
                     data-testid={`member-item-${member.user.id}`}
                   >
                     <Checkbox
