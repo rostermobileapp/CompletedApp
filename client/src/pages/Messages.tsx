@@ -1919,11 +1919,6 @@ export default function Messages() {
                             </div>
                           )}
                           {/* Group chat type indicator */}
-                          {conversation.type === 'captain_only' && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" data-testid={`badge-type-captain-${conversation.id}`}>
-                              Captain
-                            </span>
-                          )}
                         </div>
                         
                         {/* Enhanced last message display */}
