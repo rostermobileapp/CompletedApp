@@ -365,7 +365,7 @@ export default function Profile() {
             <p className="text-xs text-muted-foreground/70 mb-2" data-testid="text-user-id">
               ID: {(user as any)?.id}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-3">
               <span 
                 className={`tier-badge text-xs px-3 py-1 rounded-full font-semibold ${tierDisplay.class}`}
                 data-testid="badge-user-tier"
@@ -373,33 +373,30 @@ export default function Profile() {
                 {tierDisplay.label}
               </span>
             </div>
+            
+            {/* Career Stats */}
+            {userStats && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center" data-testid="stat-goals">
+                    <div className="text-2xl font-bold text-primary">{userStats.goals}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Goals</div>
+                  </div>
+                  <div className="text-center" data-testid="stat-assists">
+                    <div className="text-2xl font-bold text-primary">{userStats.assists}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Assists</div>
+                  </div>
+                  <div className="text-center" data-testid="stat-points">
+                    <div className="text-2xl font-bold text-primary">{userStats.points}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Points</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           {/* Upgrade button removed as everyone is commissioner now */}
         </div>
       </div>
-      
-      {/* Stats Card */}
-      {userStats && (
-        <div className="px-6 mb-6">
-          <div className="bg-card rounded-xl border border-border p-6">
-            <h2 className="text-lg font-semibold mb-4" data-testid="text-stats-title">Career Stats</h2>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center" data-testid="stat-goals">
-                <div className="text-3xl font-bold text-primary">{userStats.goals}</div>
-                <div className="text-sm text-muted-foreground mt-1">Goals</div>
-              </div>
-              <div className="text-center" data-testid="stat-assists">
-                <div className="text-3xl font-bold text-primary">{userStats.assists}</div>
-                <div className="text-sm text-muted-foreground mt-1">Assists</div>
-              </div>
-              <div className="text-center" data-testid="stat-points">
-                <div className="text-3xl font-bold text-primary">{userStats.points}</div>
-                <div className="text-sm text-muted-foreground mt-1">Points</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       
       {/* Profile Details */}
       <div className="px-6 mb-6">
