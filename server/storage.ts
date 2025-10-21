@@ -701,15 +701,72 @@ export class DatabaseStorage implements IStorage {
       // Delete RSVPs
       await tx.delete(gameRsvps).where(eq(gameRsvps.userId, id));
       
+      // Get all teams user is a member of before deleting memberships (for chat sync)
+      const userTeamMemberships = await tx
+        .select({ teamId: teamMemberships.teamId })
+        .from(teamMemberships)
+        .where(eq(teamMemberships.userId, id));
+      
+      const userLeagueMemberships = await tx
+        .select({ 
+          teamId: leagueMemberships.assignedTeamId,
+          leagueId: leagueMemberships.leagueId
+        })
+        .from(leagueMemberships)
+        .where(and(
+          eq(leagueMemberships.userId, id),
+          not(isNull(leagueMemberships.assignedTeamId))
+        ));
+      
+      // Collect all teams to sync (with their league IDs)
+      const teamsToSync = new Map<string, string>(); // teamId -> leagueId
+      
+      // Add teams from direct memberships
+      for (const membership of userTeamMemberships) {
+        const [team] = await tx
+          .select({ leagueId: teams.leagueId })
+          .from(teams)
+          .where(eq(teams.id, membership.teamId))
+          .limit(1);
+        if (team && team.leagueId) {
+          teamsToSync.set(membership.teamId, team.leagueId);
+        }
+      }
+      
+      // Add teams from league memberships
+      for (const membership of userLeagueMemberships) {
+        if (membership.teamId && membership.leagueId) {
+          teamsToSync.set(membership.teamId, membership.leagueId);
+        }
+      }
+      
       // Delete team and league memberships
       await tx.delete(teamMemberships).where(eq(teamMemberships.userId, id));
       await tx.delete(leagueMemberships).where(eq(leagueMemberships.userId, id));
+      
+      // Sync team chats after deletion (outside transaction to avoid blocking)
+      // We'll do this after the transaction completes
+      const teamsToSyncAfter = Array.from(teamsToSync.entries());
       
       // Clear team captain assignments
       await tx.update(teams).set({ captainId: null }).where(eq(teams.captainId, id));
       
       // Finally, delete the user
       await tx.delete(users).where(eq(users.id, id));
+      
+      // After transaction completes, sync team chats asynchronously
+      // This runs after the transaction to avoid holding locks
+      setImmediate(async () => {
+        for (const [teamId, leagueId] of teamsToSyncAfter) {
+          try {
+            const { MessagingService } = await import('./messagingService');
+            const messagingService = new MessagingService();
+            await messagingService.syncTeamChatParticipants(teamId, leagueId);
+          } catch (error) {
+            console.error(`Error syncing team chat after user deletion for team ${teamId}:`, error);
+          }
+        }
+      });
     });
   }
 
@@ -3324,6 +3381,13 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTeam(teamId: string): Promise<void> {
     try {
+      // Get team info before deletion for chat sync
+      const [team] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+      
       // Delete team memberships (players on the team)
       console.log(`Deleting team memberships for team ${teamId}`);
       const deletedMemberships = await db.delete(teamMemberships).where(eq(teamMemberships.teamId, teamId));
@@ -3335,6 +3399,18 @@ export class DatabaseStorage implements IStorage {
         .set({ assignedTeamId: null })
         .where(eq(leagueMemberships.assignedTeamId, teamId));
       console.log(`Updated ${updatedLeagueMemberships.rowCount || 0} league memberships`);
+
+      // Sync team chat to remove all participants (since team is being deleted)
+      if (team && team.leagueId) {
+        try {
+          const { MessagingService } = await import('./messagingService');
+          const messagingService = new MessagingService();
+          await messagingService.syncTeamChatParticipants(teamId, team.leagueId);
+        } catch (error) {
+          console.error('Error syncing team chat after team deletion:', error);
+          // Don't fail the deletion if chat sync fails
+        }
+      }
 
       // Delete games where this team is home or away team
       console.log(`Deleting games involving team ${teamId}`);
