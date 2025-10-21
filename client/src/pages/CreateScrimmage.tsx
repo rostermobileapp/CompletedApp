@@ -815,7 +815,7 @@ export default function CreateScrimmage() {
                   placeholder="Search existing users..."
                   value={emailSearchTerm}
                   onChange={(e) => setEmailSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-11"
                   data-testid="input-search-email"
                 />
               </div>
