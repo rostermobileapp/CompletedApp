@@ -433,7 +433,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                   <p className="text-[#ffffff] text-[16px]">
                                     {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
                                   </p>
-                                  <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] text-[#de0000] bg-[#ffffff00] text-[16px] font-extrabold text-left pl-[0px] pr-[0px]">Substitution requires approval</p>
+                                  <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] bg-[#ffffff00] font-extrabold text-left pl-[0px] pr-[0px] text-[#3c83f6] text-[20px]">Substitution Proposal</p>
                                   {request.originalPlayer && (
                                     <p className="font-bold text-[#ffffff] text-[16px]">
                                       Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
