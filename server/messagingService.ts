@@ -12,6 +12,7 @@ import {
   teams,
   chatPolls,
   chatPollVotes,
+  paymentRequests,
   type Conversation,
   type InsertConversation,
   type ConversationParticipant,
@@ -1050,7 +1051,12 @@ export class MessagingService {
 
   async deleteConversation(conversationId: string): Promise<void> {
     // Delete all related data in correct order
-    // First, delete chat poll votes (references chat_polls)
+    // First, nullify payment requests that reference this conversation
+    await db.update(paymentRequests)
+      .set({ relatedConversationId: null })
+      .where(eq(paymentRequests.relatedConversationId, conversationId));
+    
+    // Delete chat poll votes (references chat_polls)
     await db.delete(chatPollVotes)
       .where(sql`poll_id IN (SELECT id FROM chat_polls WHERE message_id IN (SELECT id FROM messages WHERE conversation_id = ${conversationId}))`);
     
