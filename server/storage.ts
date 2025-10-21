@@ -2167,6 +2167,28 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(teamMemberships.id, membershipId))
       .returning();
+    
+    // Sync team chat participants after approval
+    if (membership && membership.teamId) {
+      try {
+        // Get team to find league ID
+        const [team] = await db
+          .select()
+          .from(teams)
+          .where(eq(teams.id, membership.teamId))
+          .limit(1);
+        
+        if (team && team.leagueId) {
+          const { MessagingService } = await import('./messagingService');
+          const messagingService = new MessagingService();
+          await messagingService.syncTeamChatParticipants(membership.teamId, team.leagueId);
+        }
+      } catch (error) {
+        console.error('Error syncing team chat after approval:', error);
+        // Don't fail the approval if chat sync fails
+      }
+    }
+    
     return membership;
   }
 

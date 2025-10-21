@@ -703,6 +703,115 @@ export class MessagingService {
     return conversation;
   }
 
+  // Sync team chat participants with current team roster
+  async syncTeamChatParticipants(teamId: string, leagueId: string): Promise<void> {
+    // Get the team to access the captain
+    const [team] = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    if (!team) {
+      throw new Error(`Team ${teamId} not found`);
+    }
+
+    // Get all approved team members from team_memberships
+    const teamMembershipsData = await db
+      .select({ userId: teamMemberships.userId })
+      .from(teamMemberships)
+      .where(and(
+        eq(teamMemberships.teamId, teamId),
+        eq(teamMemberships.status, 'approved')
+      ));
+
+    // Also get league members who are assigned to this team
+    const leagueMembershipsData = await db
+      .select({ userId: leagueMemberships.userId })
+      .from(leagueMemberships)
+      .where(and(
+        eq(leagueMemberships.assignedTeamId, teamId),
+        eq(leagueMemberships.status, 'approved')
+      ));
+
+    // Create a set of all unique team participants (members + captain + league-assigned members)
+    const currentMemberIds = new Set<string>([
+      ...teamMembershipsData.map(m => m.userId),
+      ...leagueMembershipsData.map(m => m.userId)
+    ]);
+    
+    // Always add the captain if they exist
+    if (team.captainId) {
+      currentMemberIds.add(team.captainId);
+    }
+
+    // Find existing team group chat
+    const [existingChat] = await db
+      .select()
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.type, "team_group"),
+          eq(conversations.teamId, teamId)
+        )
+      )
+      .limit(1);
+
+    // If no chat exists yet, create it
+    if (!existingChat) {
+      await this.createTeamGroupChat(teamId, leagueId, team.captainId || team.creatorId || '');
+      return;
+    }
+
+    // Get current active participants (those who haven't left)
+    const currentParticipants = await db
+      .select()
+      .from(conversationParticipants)
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, existingChat.id),
+          isNull(conversationParticipants.leftAt)
+        )
+      );
+
+    const currentParticipantIds = new Set(currentParticipants.map(p => p.userId));
+
+    // Find members who need to be added
+    const membersToAdd = Array.from(currentMemberIds).filter(
+      userId => !currentParticipantIds.has(userId)
+    );
+
+    // Find participants who need to be removed (no longer team members)
+    const participantsToRemove = currentParticipants.filter(
+      p => !currentMemberIds.has(p.userId)
+    );
+
+    // Add new members
+    if (membersToAdd.length > 0) {
+      await db.insert(conversationParticipants)
+        .values(membersToAdd.map(userId => ({
+          conversationId: existingChat.id,
+          userId,
+        })))
+        .onConflictDoNothing({
+          target: [conversationParticipants.conversationId, conversationParticipants.userId]
+        });
+    }
+
+    // Remove members who are no longer on the team
+    if (participantsToRemove.length > 0) {
+      await db
+        .update(conversationParticipants)
+        .set({ leftAt: new Date() })
+        .where(
+          and(
+            eq(conversationParticipants.conversationId, existingChat.id),
+            inArray(conversationParticipants.userId, participantsToRemove.map(p => p.userId))
+          )
+        );
+    }
+  }
+
   async createCustomGroupChat(
     title: string, 
     leagueId: string, 
