@@ -807,18 +807,15 @@ export default function CreateScrimmage() {
             {/* Email Search */}
             <div className="mb-4">
               <Label htmlFor="email-search" className="text-sm">Search by email</Label>
-              <div className="relative mt-2">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email-search"
-                  type="email"
-                  placeholder="Search existing users..."
-                  value={emailSearchTerm}
-                  onChange={(e) => setEmailSearchTerm(e.target.value)}
-                  className="pl-20"
-                  data-testid="input-search-email"
-                />
-              </div>
+              <Input
+                id="email-search"
+                type="email"
+                placeholder="Search existing users..."
+                value={emailSearchTerm}
+                onChange={(e) => setEmailSearchTerm(e.target.value)}
+                className="mt-2"
+                data-testid="input-search-email"
+              />
               
               {/* Email Search Results */}
               {emailSearchTerm.length > 2 && (
