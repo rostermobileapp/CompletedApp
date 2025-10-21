@@ -1804,6 +1804,16 @@ export class DatabaseStorage implements IStorage {
         // Don't fail the approval if chat sync fails
       }
 
+      // Sync captain chat membership for the league (team captain should be added)
+      try {
+        const { MessagingService } = await import('./messagingService');
+        const messagingService = new MessagingService();
+        await messagingService.ensureCaptainChatMembership(request.leagueId);
+      } catch (error) {
+        console.error('Error syncing captain chat after team joins league:', error);
+        // Don't fail the approval if chat sync fails
+      }
+
       return approvedRequest;
     });
   }
@@ -3408,6 +3418,16 @@ export class DatabaseStorage implements IStorage {
           await messagingService.syncTeamChatParticipants(teamId, team.leagueId);
         } catch (error) {
           console.error('Error syncing team chat after team deletion:', error);
+          // Don't fail the deletion if chat sync fails
+        }
+
+        // Sync captain chat membership for the league (captain should be removed)
+        try {
+          const { MessagingService } = await import('./messagingService');
+          const messagingService = new MessagingService();
+          await messagingService.ensureCaptainChatMembership(team.leagueId);
+        } catch (error) {
+          console.error('Error syncing captain chat after team deletion:', error);
           // Don't fail the deletion if chat sync fails
         }
       }

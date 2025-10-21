@@ -7135,6 +7135,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== ADMIN / DEBUG ROUTES =====
   
+  // Sync all captain chats
+  app.post('/api/admin/sync-all-captain-chats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get all leagues
+      const allLeagues = await db
+        .select({ id: leagues.id })
+        .from(leagues);
+      
+      console.log(`Starting captain chat sync for ${allLeagues.length} leagues...`);
+      
+      let synced = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      
+      for (const league of allLeagues) {
+        try {
+          await messagingService.ensureCaptainChatMembership(league.id);
+          synced++;
+          console.log(`✓ Synced captain chat for league ${league.id}`);
+        } catch (error) {
+          failed++;
+          const errorMsg = `Failed to sync captain chat for league ${league.id}: ${error instanceof Error ? error.message : String(error)}`;
+          errors.push(errorMsg);
+          console.error(errorMsg);
+        }
+      }
+      
+      console.log(`Captain chat sync complete: ${synced} succeeded, ${failed} failed`);
+      
+      res.json({
+        success: true,
+        message: `Synced ${synced} captain chats`,
+        synced,
+        failed,
+        total: allLeagues.length,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      console.error('Error syncing captain chats:', error);
+      res.status(500).json({ 
+        message: 'Failed to sync captain chats',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+  
   // Sync all team chat participants
   app.post('/api/admin/sync-all-team-chats', isAuthenticated, async (req: any, res) => {
     try {
