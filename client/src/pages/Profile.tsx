@@ -878,6 +878,14 @@ export default function Profile() {
           </button>
         </div>
       </div>
+
+      {/* App Version */}
+      <div className="px-6 py-8 text-center">
+        <p className="text-sm text-muted-foreground" data-testid="text-app-version">
+          Version 1.0
+        </p>
+      </div>
+
       {/* League Request Dialog */}
       <AlertDialog open={showLeagueRequestDialog} onOpenChange={setShowLeagueRequestDialog}>
         <AlertDialogContent data-testid="dialog-request-join-league">
