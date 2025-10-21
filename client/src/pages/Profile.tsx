@@ -379,7 +379,7 @@ export default function Profile() {
       </div>
       
       {/* Stats Card */}
-      {userStats && (userStats.goals > 0 || userStats.assists > 0) && (
+      {userStats && (
         <div className="px-6 mb-6">
           <div className="bg-card rounded-xl border border-border p-6">
             <h2 className="text-lg font-semibold mb-4" data-testid="text-stats-title">Career Stats</h2>
