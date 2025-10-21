@@ -7133,6 +7133,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== ADMIN / DEBUG ROUTES =====
+  
+  // Sync all team chat participants
+  app.post('/api/admin/sync-all-team-chats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get all teams with a league_id (only those can have team chats)
+      const teamsWithLeagues = await db
+        .select({ id: teams.id, leagueId: teams.leagueId })
+        .from(teams)
+        .where(sql`${teams.leagueId} IS NOT NULL`);
+      
+      console.log(`Starting sync for ${teamsWithLeagues.length} teams...`);
+      
+      let synced = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      
+      for (const team of teamsWithLeagues) {
+        try {
+          await messagingService.syncTeamChatParticipants(team.id, team.leagueId);
+          synced++;
+          console.log(`✓ Synced team chat for team ${team.id}`);
+        } catch (error) {
+          failed++;
+          const errorMsg = `Failed to sync team ${team.id}: ${error instanceof Error ? error.message : String(error)}`;
+          errors.push(errorMsg);
+          console.error(errorMsg);
+        }
+      }
+      
+      console.log(`Sync complete: ${synced} succeeded, ${failed} failed`);
+      
+      res.json({
+        success: true,
+        message: `Synced ${synced} team chats`,
+        synced,
+        failed,
+        total: teamsWithLeagues.length,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      console.error('Error syncing team chats:', error);
+      res.status(500).json({ 
+        message: 'Failed to sync team chats',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // ===== CHAT POLL ROUTES =====
 
   // Create a poll on a message
