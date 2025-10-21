@@ -2388,6 +2388,18 @@ export class DatabaseStorage implements IStorage {
             )
           );
       }
+
+      // Sync team chat participants after user leaves team
+      if (team.leagueId) {
+        try {
+          const { MessagingService } = await import('./messagingService');
+          const messagingService = new MessagingService();
+          await messagingService.syncTeamChatParticipants(teamId, team.leagueId);
+        } catch (error) {
+          console.error('Error syncing team chat after user leaves team:', error);
+          // Don't fail the leave operation if chat sync fails
+        }
+      }
     });
   }
 
