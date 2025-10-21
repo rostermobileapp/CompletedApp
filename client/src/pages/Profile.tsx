@@ -376,7 +376,7 @@ export default function Profile() {
                 
                 {/* Career Stats */}
                 {userStats && (
-                  <span className="text-xs px-3 py-1 rounded-full font-semibold bg-muted text-muted-foreground" data-testid="stat-career">
+                  <span className="text-xs px-3 py-1 rounded-full font-semibold text-[#ffffff] bg-[#212121]" data-testid="stat-career">
                     <span data-testid="stat-goals">{userStats.goals} G</span>
                     <span className="mx-1">•</span>
                     <span data-testid="stat-assists">{userStats.assists} A</span>
@@ -390,7 +390,6 @@ export default function Profile() {
           {/* Upgrade button removed as everyone is commissioner now */}
         </div>
       </div>
-      
       {/* Profile Details */}
       <div className="px-6 mb-6">
         <div className="bg-card rounded-xl border border-border p-6">
@@ -881,7 +880,6 @@ export default function Profile() {
           </button>
         </div>
       </div>
-
       {/* League Request Dialog */}
       <AlertDialog open={showLeagueRequestDialog} onOpenChange={setShowLeagueRequestDialog}>
         <AlertDialogContent data-testid="dialog-request-join-league">
