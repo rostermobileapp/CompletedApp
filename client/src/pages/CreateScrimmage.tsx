@@ -642,7 +642,7 @@ export default function CreateScrimmage() {
 
         {/* Member Selection - Only show if user has leagues */}
         {selectedLeague ? (
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="rounded-xl border border-border p-6 bg-[#212121]">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Users className="w-5 h-5" />
               Invite Members
