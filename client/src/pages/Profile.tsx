@@ -207,6 +207,17 @@ export default function Profile() {
     enabled: showLeagueRequestDialog,
   });
 
+  // Query for aggregated user stats
+  const { data: userStats } = useQuery<{
+    goals: number;
+    assists: number;
+    points: number;
+    gamesPlayed: number;
+    penaltyMinutes: number;
+  }>({
+    queryKey: ['/api/user/stats/aggregate'],
+  });
+
   // Request team to join league mutation
   const requestTeamJoinLeagueMutation = useMutation({
     mutationFn: async ({ teamId, leagueId }: { teamId: string; leagueId: string }) => {
@@ -366,6 +377,30 @@ export default function Profile() {
           {/* Upgrade button removed as everyone is commissioner now */}
         </div>
       </div>
+      
+      {/* Stats Card */}
+      {userStats && (userStats.goals > 0 || userStats.assists > 0) && (
+        <div className="px-6 mb-6">
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold mb-4" data-testid="text-stats-title">Career Stats</h2>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center" data-testid="stat-goals">
+                <div className="text-3xl font-bold text-primary">{userStats.goals}</div>
+                <div className="text-sm text-muted-foreground mt-1">Goals</div>
+              </div>
+              <div className="text-center" data-testid="stat-assists">
+                <div className="text-3xl font-bold text-primary">{userStats.assists}</div>
+                <div className="text-sm text-muted-foreground mt-1">Assists</div>
+              </div>
+              <div className="text-center" data-testid="stat-points">
+                <div className="text-3xl font-bold text-primary">{userStats.points}</div>
+                <div className="text-sm text-muted-foreground mt-1">Points</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Profile Details */}
       <div className="px-6 mb-6">
         <div className="bg-card rounded-xl border border-border p-6">

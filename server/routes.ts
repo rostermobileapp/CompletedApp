@@ -6237,6 +6237,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Player Stats Routes
   
+  // Get aggregated user stats across all leagues
+  app.get('/api/user/stats/aggregate', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get all leagues the user is a member of
+      const leagues = await storage.getUserLeagues(userId);
+      
+      let totalGoals = 0;
+      let totalAssists = 0;
+      let totalGamesPlayed = 0;
+      let totalPenaltyMinutes = 0;
+      
+      // Aggregate stats across all leagues (non-seasonal only)
+      for (const league of leagues) {
+        try {
+          const stats = await storage.getPlayerStatsByUser(userId, league.id, undefined);
+          if (stats) {
+            totalGoals += stats.goals || 0;
+            totalAssists += stats.assists || 0;
+            totalGamesPlayed += stats.gamesPlayed || 0;
+            totalPenaltyMinutes += stats.penaltyMinutes || 0;
+          }
+        } catch (error) {
+          // Skip leagues where stats don't exist
+          continue;
+        }
+      }
+      
+      res.json({
+        goals: totalGoals,
+        assists: totalAssists,
+        points: totalGoals + totalAssists,
+        gamesPlayed: totalGamesPlayed,
+        penaltyMinutes: totalPenaltyMinutes,
+      });
+    } catch (error) {
+      console.error('Error fetching aggregate user stats:', error);
+      res.status(500).json({ message: 'Failed to fetch user stats' });
+    }
+  });
+  
   // Get player stats for a league (with optional season filter)
   app.get('/api/leagues/:leagueId/stats', isAuthenticated, async (req: any, res) => {
     try {
