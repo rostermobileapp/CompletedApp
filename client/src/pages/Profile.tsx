@@ -704,7 +704,7 @@ export default function Profile() {
               const showDeleteButton = isCaptain; // Captains can delete teams they manage
               
               return (
-                <div key={team.id} className="bg-card rounded-lg border border-border p-4" data-testid={`card-team-${team.id}`}>
+                <div key={team.id} className="bg-card rounded-lg border border-border p-4 pt-[4px] pb-[4px]" data-testid={`card-team-${team.id}`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <Users className="w-5 h-5 text-muted-foreground" />
@@ -772,7 +772,6 @@ export default function Profile() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
-                  
                   {showJoinLeagueButton && (
                     <button
                       onClick={() => {
