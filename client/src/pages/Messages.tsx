@@ -2585,9 +2585,6 @@ export default function Messages() {
                     <p className="font-medium truncate" data-testid={`member-name-${participant.userId}`}>
                       {participant.user?.displayName || 'Unknown User'}
                     </p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {participant.user?.email || ''}
-                    </p>
                   </div>
                   {participant.userId === currentUserId && (
                     <span className="text-xs text-muted-foreground bg-accent px-2 py-1 rounded">
@@ -2643,9 +2640,6 @@ export default function Messages() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate" data-testid={`add-user-name-${contact.id}`}>
                           {contact.displayFirstName || contact.firstName} {contact.displayLastName || contact.lastName}
-                        </p>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {contact.email}
                         </p>
                       </div>
                     </div>
