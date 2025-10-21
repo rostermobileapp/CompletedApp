@@ -1737,6 +1737,16 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
+      // Sync team chat participants after team joins league
+      try {
+        const { MessagingService } = await import('./messagingService');
+        const messagingService = new MessagingService();
+        await messagingService.syncTeamChatParticipants(request.teamId, request.leagueId);
+      } catch (error) {
+        console.error('Error syncing team chat after team joins league:', error);
+        // Don't fail the approval if chat sync fails
+      }
+
       return approvedRequest;
     });
   }
