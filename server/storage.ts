@@ -1576,6 +1576,26 @@ export class DatabaseStorage implements IStorage {
           status: 'approved', // Manually added players are auto-approved
         })
         .returning();
+      
+      // Sync team chat participants after adding player
+      try {
+        // Get team to find league ID
+        const [team] = await db
+          .select()
+          .from(teams)
+          .where(eq(teams.id, teamId))
+          .limit(1);
+        
+        if (team && team.leagueId) {
+          const { MessagingService } = await import('./messagingService');
+          const messagingService = new MessagingService();
+          await messagingService.syncTeamChatParticipants(teamId, team.leagueId);
+        }
+      } catch (error) {
+        console.error('Error syncing team chat after adding player:', error);
+        // Don't fail the addition if chat sync fails
+      }
+      
       return membership;
     } else {
       // User doesn't exist or no email provided - create placeholder player
