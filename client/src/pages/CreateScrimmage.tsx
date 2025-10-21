@@ -112,6 +112,14 @@ export default function CreateScrimmage() {
   // Fetch invite groups for the current user
   const { data: inviteGroups = [], isLoading: groupsLoading } = useQuery({
     queryKey: ['/api/invite-groups', selectedLeague?.id],
+    queryFn: async () => {
+      const url = selectedLeague?.id 
+        ? `/api/invite-groups?leagueId=${selectedLeague.id}`
+        : '/api/invite-groups';
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch invite groups');
+      return response.json();
+    },
     enabled: !!user,
   });
 
