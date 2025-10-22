@@ -4016,6 +4016,10 @@ export class DatabaseStorage implements IStorage {
       const homeMembers = await this.getTeamMembers(game.homeTeamId);
       const awayMembers = await this.getTeamMembers(game.awayTeamId);
       
+      console.log(`🔍 Game ${game.id.substring(0, 8)}...`);
+      console.log(`  Home team ${game.homeTeamId.substring(0, 8)}: ${homeMembers.length} members`);
+      console.log(`  Away team ${game.awayTeamId.substring(0, 8)}: ${awayMembers.length} members`);
+      
       homeMembers.forEach(member => {
         userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.homeTeamId });
       });
@@ -4024,6 +4028,8 @@ export class DatabaseStorage implements IStorage {
         userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.awayTeamId });
       });
     }
+
+    console.log(`🔍 Total players scheduled: ${userGameInfo.size} out of ${leagueMembers.length} league members`);
 
     // Get all users
     const allUsers = leagueMembers.map(member => member.user);
