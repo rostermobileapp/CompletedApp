@@ -431,6 +431,7 @@ export interface IStorage {
   // Player stats operations
   getPlayerStats(leagueId: string, seasonId?: string): Promise<(PlayerStats & { user: User })[]>;
   getPlayerStatsByUser(userId: string, leagueId: string, seasonId?: string): Promise<PlayerStats | undefined>;
+  getAllPlayerStatsByUser(userId: string, leagueId: string): Promise<PlayerStats[]>;
   createPlayerStats(stats: InsertPlayerStats): Promise<PlayerStats>;
   updatePlayerStats(userId: string, leagueId: string, updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>>, seasonId?: string): Promise<PlayerStats>;
   bulkUpdatePlayerStats(leagueId: string, statsUpdates: { userId: string; updates: Partial<Pick<InsertPlayerStats, 'gamesPlayed' | 'goals' | 'assists' | 'penaltyMinutes'>> }[], mode?: 'increment' | 'set', seasonId?: string): Promise<void>;
@@ -5608,6 +5609,18 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions));
     
     return stats;
+  }
+
+  async getAllPlayerStatsByUser(userId: string, leagueId: string): Promise<PlayerStats[]> {
+    const allStats = await db
+      .select()
+      .from(playerStats)
+      .where(and(
+        eq(playerStats.userId, userId),
+        eq(playerStats.leagueId, leagueId)
+      ));
+    
+    return allStats;
   }
 
   async createPlayerStats(stats: InsertPlayerStats): Promise<PlayerStats> {

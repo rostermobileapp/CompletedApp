@@ -6304,11 +6304,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let totalGamesPlayed = 0;
       let totalPenaltyMinutes = 0;
       
-      // Aggregate stats across all leagues (non-seasonal only)
+      // Aggregate stats across all leagues and all seasons
       for (const league of leagues) {
         try {
-          const stats = await storage.getPlayerStatsByUser(userId, league.id, undefined);
-          if (stats) {
+          const allStats = await storage.getAllPlayerStatsByUser(userId, league.id);
+          for (const stats of allStats) {
             totalGoals += stats.goals || 0;
             totalAssists += stats.assists || 0;
             totalGamesPlayed += stats.gamesPlayed || 0;

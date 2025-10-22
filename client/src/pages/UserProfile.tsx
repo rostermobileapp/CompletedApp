@@ -111,7 +111,7 @@ export default function UserProfile() {
             variant="outline"
             size="sm"
             onClick={downloadVCF}
-            className="flex items-center gap-2 text-[16px] bg-[#3a7eec]"
+            className="flex items-center gap-2 text-[16px] bg-[#3a7eec] text-white hover:bg-[#3a7eec]/90"
             data-testid="button-download-vcf"
           >
             <Download className="w-4 h-4" />
