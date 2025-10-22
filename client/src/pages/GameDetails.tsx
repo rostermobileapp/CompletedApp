@@ -170,7 +170,7 @@ export default function GameDetails() {
         description: "The game has been successfully deleted.",
       });
       setPageTransitionDirection('down');
-      navigate("/calendar");
+      navigate("/");
     },
     onError: (error: any) => {
       toast({
