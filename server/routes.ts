@@ -6299,6 +6299,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all leagues the user is a member of
       const leagues = await storage.getUserLeagues(userId);
       
+      console.log('📊 Stats Debug - User:', userId);
+      console.log('📊 Stats Debug - Leagues:', leagues.map(l => ({ id: l.id, name: l.name })));
+      
       let totalGoals = 0;
       let totalAssists = 0;
       let totalGamesPlayed = 0;
@@ -6308,17 +6311,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const league of leagues) {
         try {
           const allStats = await storage.getAllPlayerStatsByUser(userId, league.id);
+          console.log('📊 Stats Debug - League:', league.name, 'Stats found:', allStats.length);
           for (const stats of allStats) {
+            console.log('📊 Stats Debug - Individual stat:', { goals: stats.goals, assists: stats.assists, seasonId: stats.seasonId });
             totalGoals += stats.goals || 0;
             totalAssists += stats.assists || 0;
             totalGamesPlayed += stats.gamesPlayed || 0;
             totalPenaltyMinutes += stats.penaltyMinutes || 0;
           }
         } catch (error) {
+          console.error('📊 Stats Debug - Error for league:', league.name, error);
           // Skip leagues where stats don't exist
           continue;
         }
       }
+      
+      console.log('📊 Stats Debug - Final totals:', { totalGoals, totalAssists, totalGamesPlayed, totalPenaltyMinutes });
       
       res.json({
         goals: totalGoals,
