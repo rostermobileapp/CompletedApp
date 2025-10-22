@@ -1746,7 +1746,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const games = await storage.getUpcomingGames(userId);
+      
+      // Debug log raw data from database
+      const oct26Game = games.find(g => g.scheduledAt.toString().includes('2025-10-26'));
+      if (oct26Game) {
+        console.log('🎯 Raw from DB:', oct26Game.scheduledAt);
+        console.log('🎯 Type:', typeof oct26Game.scheduledAt);
+      }
+      
       const formattedGames = games.map(formatGameForResponse);
+      
+      // Debug log after formatting
+      const oct26Formatted = formattedGames.find(g => g.scheduledAt && g.scheduledAt.toString().includes('2025-10-26'));
+      if (oct26Formatted) {
+        console.log('🎯 After formatting:', oct26Formatted.scheduledAt);
+      }
+      
+      // Disable caching to force fresh response
+      res.setHeader('Cache-Control', 'no-store');
       res.json(formattedGames);
     } catch (error) {
       console.error("Error fetching upcoming games:", error);
