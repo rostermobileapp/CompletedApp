@@ -1152,38 +1152,32 @@ export default function Dashboard() {
     return userTeamsAll.some(team => team.leagueId === leagueId && team.captainId === (user as any).id);
   }, [userTeamsAll, (user as any)?.id]);
 
-  // Fetch standings for the team's league to get accurate record
-  const selectedTeamLeagueId = React.useMemo(() => {
-    if (selectedType === 'team' && selectedId) {
-      const team = (userTeamsAll as any[])?.find((t: any) => t.id === selectedId);
-      return team?.leagueId || null;
-    }
-    return null;
-  }, [selectedType, selectedId, userTeamsAll]);
+  // Fetch standings for the primary team's league to get accurate record
+  const primaryTeamLeagueId = React.useMemo(() => {
+    return primaryTeam?.leagueId || null;
+  }, [primaryTeam?.leagueId]);
 
   const { data: standingsData } = useQuery({
-    queryKey: ['/api/leagues', selectedTeamLeagueId, 'standings'],
+    queryKey: ['/api/leagues', primaryTeamLeagueId, 'standings'],
     queryFn: async () => {
-      if (!selectedTeamLeagueId) return [];
-      const response = await apiRequest('GET', `/api/leagues/${selectedTeamLeagueId}/standings`);
+      if (!primaryTeamLeagueId) return [];
+      const response = await apiRequest('GET', `/api/leagues/${primaryTeamLeagueId}/standings`);
       return response.json();
     },
-    enabled: selectedType === 'team' && !!selectedId && !!selectedTeamLeagueId,
+    enabled: !!primaryTeamLeagueId,
   });
 
   // Fetch team's total games to calculate games remaining
   const { data: teamGames } = useQuery({
-    queryKey: ['/api/teams', selectedId, 'games'],
-    enabled: selectedType === 'team' && !!selectedId,
+    queryKey: ['/api/teams', primaryTeam?.id, 'games'],
+    enabled: !!primaryTeam?.id,
   });
 
   // Extract the team record from standings data and add gamesRemaining
   const teamRecord = React.useMemo(() => {
-    if (selectedType !== 'team' || !selectedId || !Array.isArray(standingsData)) {
+    if (!primaryTeam?.id) {
       return null;
     }
-    const standingsRecord = standingsData.find((team: any) => team.teamId === selectedId);
-    if (!standingsRecord) return null;
     
     // Calculate games remaining by counting future games
     const now = new Date();
@@ -1192,11 +1186,16 @@ export default function Dashboard() {
       : [];
     const gamesRemaining = futureGames.length;
     
+    // Try to get standings data if available
+    const standingsRecord = Array.isArray(standingsData) 
+      ? standingsData.find((team: any) => team.teamId === primaryTeam.id)
+      : null;
+    
     return {
-      ...standingsRecord,
+      ...(standingsRecord || {}),
       gamesRemaining: gamesRemaining,
     };
-  }, [selectedType, selectedId, standingsData, teamGames]);
+  }, [primaryTeam?.id, standingsData, teamGames]);
 
 
   // Beverage duty mutation
