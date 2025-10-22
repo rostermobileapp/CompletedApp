@@ -3935,11 +3935,11 @@ export class DatabaseStorage implements IStorage {
     // Get all league members
     const leagueMembers = await this.getLeagueMembers(leagueId);
     
-    // Get all games on the same date
+    // Get all games on the same date - use UTC to match database times
     const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
+    startOfDay.setUTCHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    endOfDay.setUTCHours(23, 59, 59, 999);
 
     const gamesOnDate = await db
       .select()
@@ -3983,11 +3983,11 @@ export class DatabaseStorage implements IStorage {
     // Get all league members
     const leagueMembers = await this.getLeagueMembers(leagueId);
     
-    // Get all games on the same date
+    // Get all games on the same date - use UTC to match database times
     const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
+    startOfDay.setUTCHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    endOfDay.setUTCHours(23, 59, 59, 999);
 
     const gamesOnDate = await db
       .select()
