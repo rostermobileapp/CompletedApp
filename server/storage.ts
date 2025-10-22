@@ -3989,6 +3989,10 @@ export class DatabaseStorage implements IStorage {
     const endOfDay = new Date(date);
     endOfDay.setUTCHours(23, 59, 59, 999);
 
+    console.log('🔍 Availability Check - Input date:', date);
+    console.log('🔍 Availability Check - startOfDay:', startOfDay);
+    console.log('🔍 Availability Check - endOfDay:', endOfDay);
+
     const gamesOnDate = await db
       .select()
       .from(games)
@@ -3999,6 +4003,11 @@ export class DatabaseStorage implements IStorage {
           lte(games.scheduledAt, endOfDay)
         )
       );
+
+    console.log('🔍 Availability Check - Found games:', gamesOnDate.length);
+    gamesOnDate.forEach(game => {
+      console.log(`  Game ${game.id}: scheduledAt = ${game.scheduledAt}`);
+    });
 
     // Build a map of user -> game info (game time and team)
     const userGameInfo = new Map<string, { gameTime: Date; teamId: string }>();
