@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useParams } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, DollarSign } from 'lucide-react';
+import { ArrowLeft, DollarSign, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 export default function UserProfile() {
   const params = useParams();
   const userId = params.userId;
   const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const { data: user, isLoading } = useQuery({
     queryKey: ['/api/users', userId],
@@ -28,6 +31,39 @@ export default function UserProfile() {
       case 'commissioner': return { label: 'COMMISSIONER', class: 'bg-warning text-black' };
       default: return { label: 'FREE', class: 'bg-muted text-muted-foreground' };
     }
+  };
+
+  const downloadVCF = () => {
+    if (!user) return;
+
+    // Generate vCard content
+    const vCardContent = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `FN:${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      `N:${user.lastName || ''};${user.firstName || ''};;;`,
+      user.email ? `EMAIL:${user.email}` : '',
+      user.phoneNumber ? `TEL:${user.phoneNumber}` : '',
+      user.city ? `ADR:;;${user.city};;;;` : '',
+      user.dateOfBirth ? `BDAY:${user.dateOfBirth}` : '',
+      'END:VCARD'
+    ].filter(line => line && !line.endsWith(':')).join('\n');
+
+    // Create blob and download
+    const blob = new Blob([vCardContent], { type: 'text/vcard' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${user.firstName || 'contact'}_${user.lastName || 'info'}.vcf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Contact Downloaded",
+      description: `Contact information for ${user.firstName} ${user.lastName} has been downloaded.`,
+    });
   };
 
   if (isLoading) {
@@ -57,18 +93,30 @@ export default function UserProfile() {
     <div className="min-h-screen flex flex-col pb-24" data-testid="user-profile-page">
       {/* Header */}
       <div className="p-6 pt-12">
-        <div className="flex items-center gap-4 mb-6">
-          <button 
-            onClick={() => {
-              setPageTransitionDirection('down');
-              window.history.back();
-            }}
-            className="text-muted-foreground"
-            data-testid="button-back"
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => {
+                setPageTransitionDirection('down');
+                window.history.back();
+              }}
+              className="text-muted-foreground"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">User Profile</h1>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={downloadVCF}
+            className="flex items-center gap-2"
+            data-testid="button-download-vcf"
           >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">User Profile</h1>
+            <Download className="w-4 h-4" />
+            Contact
+          </Button>
         </div>
       </div>
 
