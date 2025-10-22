@@ -71,14 +71,21 @@ import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites } from "./emails";
 
 
-// Utility function to format game scheduledAt with proper timezone info
+// Utility function to format game scheduledAt as timezone-agnostic string
 function formatGameForResponse(game: any) {
   if (game && game.scheduledAt) {
     const date = new Date(game.scheduledAt);
-    // Return ISO string with timezone info so frontend can properly convert to user's timezone
+    // Format as YYYY-MM-DDTHH:mm without timezone to display as local time
+    // Use UTC accessors since database stores in GMT
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    
     return {
       ...game,
-      scheduledAt: date.toISOString()
+      scheduledAt: `${year}-${month}-${day}T${hours}:${minutes}`
     };
   }
   return game;
