@@ -90,6 +90,10 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
   const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
   const [comments, setComments] = useState("");
   const { toast } = useToast();
+  
+  // Get user's local timezone for proper date formatting
+  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
   // Fetch pending league member approvals
   const { data: pendingMembers = [], isLoading: pendingMembersLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'pending-members'],
@@ -359,7 +363,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                   {request.game.homeTeam.name} vs {request.game.awayTeam.name}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
+                                  {formatInTimeZone(new Date(request.game.scheduledAt), userTimeZone, 'MMM d, yyyy • h:mm a')}
                                 </p>
                                 <p className="text-sm text-purple-600">
                                   Substitute request from opposing captain
@@ -432,7 +436,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                     {request.game.homeTeam.name} vs {request.game.awayTeam.name}
                                   </p>
                                   <p className="text-[#ffffff] text-[16px]">
-                                    {format(new Date(request.game.scheduledAt), 'MMM d, yyyy • h:mm a')}
+                                    {formatInTimeZone(new Date(request.game.scheduledAt), userTimeZone, 'MMM d, yyyy • h:mm a')}
                                   </p>
                                   <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] bg-[#ffffff00] font-extrabold text-left pl-[0px] pr-[0px] text-[#3c83f6] text-[20px]">Substitution Proposal</p>
                                   {request.originalPlayer && (
@@ -514,7 +518,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                 {game.homeTeam?.name} vs {game.awayTeam?.name}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {format(new Date(game.scheduledAt), 'MMM d, yyyy • h:mm a')}
+                                {formatInTimeZone(new Date(game.scheduledAt), userTimeZone, 'MMM d, yyyy • h:mm a')}
                               </p>
                               <p className="text-sm text-orange-600">
                                 {game.reason}
@@ -751,6 +755,9 @@ export default function Dashboard() {
   const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  
+  // Get user's local timezone for proper date formatting
+  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   
   // Unified selection state - can be team or league (with localStorage persistence)
   const [selectedType, setSelectedType] = useState<'team' | 'league'>(() => {
@@ -1705,7 +1712,7 @@ export default function Dashboard() {
                       <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded">Invite</span>
                     </div>
                     <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
-                      {format(new Date(invite.dateTime), 'MMM d • h:mm a')}
+                      {formatInTimeZone(new Date(invite.dateTime), userTimeZone, 'MMM d • h:mm a')}
                     </p>
                     {invite.location && (
                       <p className="text-xs text-muted-foreground" data-testid={`text-invite-location-${invite.id}`}>
@@ -1750,7 +1757,7 @@ export default function Dashboard() {
                           {scrimmage.title}
                         </h3>
                         <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${scrimmage.id}`}>
-                          {format(new Date(scrimmage.dateTime), 'MMM d • h:mm a')}
+                          {formatInTimeZone(new Date(scrimmage.dateTime), userTimeZone, 'MMM d • h:mm a')}
                         </p>
                         {scrimmage.location && (
                           <p className="text-xs text-muted-foreground" data-testid={`text-scrimmage-location-${scrimmage.id}`}>
@@ -1786,7 +1793,7 @@ export default function Dashboard() {
                         <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">Reminder</span>
                       </div>
                       <p className="text-sm text-muted-foreground" data-testid={`text-reminder-time-${reminder.id}`}>
-                        {format(new Date(reminder.scheduledAt), 'MMM d • h:mm a')}
+                        {formatInTimeZone(new Date(reminder.scheduledAt), userTimeZone, 'MMM d • h:mm a')}
                       </p>
                       {reminder.description && (
                         <p className="text-xs text-muted-foreground" data-testid={`text-reminder-description-${reminder.id}`}>
@@ -1848,7 +1855,7 @@ export default function Dashboard() {
                       {game.isScrimmage ? game.scrimmageTitle : `vs ${game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}`}
                     </h3>
                     <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
-                      {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
+                      {formatInTimeZone(new Date(game.scheduledAt), userTimeZone, 'MMM d • h:mm a')}
                     </p>
                     {game.venue && (
                       <p className="text-xs text-muted-foreground" data-testid={`text-game-venue-${game.id}`}>
