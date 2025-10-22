@@ -363,7 +363,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                   {request.game.homeTeam.name} vs {request.game.awayTeam.name}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {formatInTimeZone(new Date(request.game.scheduledAt), userTimeZone, 'MMM d, yyyy • h:mm a')}
+                                  {formatInTimeZone(new Date(request.game.scheduledAt), userTimeZone, 'MMM d, yyyy')}
                                 </p>
                                 <p className="text-sm text-purple-600">
                                   Substitute request from opposing captain
@@ -436,7 +436,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                     {request.game.homeTeam.name} vs {request.game.awayTeam.name}
                                   </p>
                                   <p className="text-[#ffffff] text-[16px]">
-                                    {formatInTimeZone(new Date(request.game.scheduledAt), userTimeZone, 'MMM d, yyyy • h:mm a')}
+                                    {formatInTimeZone(new Date(request.game.scheduledAt), userTimeZone, 'MMM d, yyyy')}
                                   </p>
                                   <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] bg-[#ffffff00] font-extrabold text-left pl-[0px] pr-[0px] text-[#3c83f6] text-[20px]">Substitution Proposal</p>
                                   {request.originalPlayer && (
@@ -518,7 +518,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                 {game.homeTeam?.name} vs {game.awayTeam?.name}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {formatInTimeZone(new Date(game.scheduledAt), userTimeZone, 'MMM d, yyyy • h:mm a')}
+                                {formatInTimeZone(new Date(game.scheduledAt), userTimeZone, 'MMM d, yyyy')}
                               </p>
                               <p className="text-sm text-orange-600">
                                 {game.reason}
