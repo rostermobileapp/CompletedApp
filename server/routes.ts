@@ -2168,8 +2168,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updates = req.body;
       
-      // No need to convert scheduledAt - PostgreSQL handles the datetime string directly
-      // Converting to Date object causes timezone conversion issues
+      // Convert scheduledAt string to Date object if present
+      // Frontend sends format: "2025-10-27T22:30" (local time)
+      if (updates.scheduledAt && typeof updates.scheduledAt === 'string') {
+        updates.scheduledAt = new Date(updates.scheduledAt);
+      }
       
       const updatedGame = await storage.updateGame(gameId, updates);
       const formattedGame = formatGameForResponse(updatedGame);
