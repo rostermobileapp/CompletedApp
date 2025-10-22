@@ -1185,13 +1185,16 @@ export default function Dashboard() {
     const standingsRecord = standingsData.find((team: any) => team.teamId === selectedId);
     if (!standingsRecord) return null;
     
-    // Calculate games remaining
-    const totalGames = Array.isArray(teamGames) ? teamGames.length : 0;
-    const gamesRemaining = totalGames - (standingsRecord.gamesPlayed || 0);
+    // Calculate games remaining by counting future games
+    const now = new Date();
+    const futureGames = Array.isArray(teamGames) 
+      ? teamGames.filter((game: any) => new Date(game.scheduledAt) > now)
+      : [];
+    const gamesRemaining = futureGames.length;
     
     return {
       ...standingsRecord,
-      gamesRemaining: Math.max(0, gamesRemaining), // Ensure non-negative
+      gamesRemaining: gamesRemaining,
     };
   }, [selectedType, selectedId, standingsData, teamGames]);
 
