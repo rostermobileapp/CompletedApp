@@ -1386,15 +1386,6 @@ export default function Dashboard() {
               className="h-[30px] w-auto pt-[0px] pb-[0px] pl-[12px] pr-[12px]"
               data-testid="img-roster-logo"
             />
-            {tier !== 'free_tier' && (
-              <>
-                {tier === 'commissioner' || tier === 'secondary_commissioner' ? (
-                  <Crown className="w-[30px] h-[30px] text-yellow-500" data-testid="badge-subscription-tier" />
-                ) : (
-                  <Star className="w-[30px] h-[30px] text-primary fill-current" data-testid="badge-subscription-tier" />
-                )}
-              </>
-            )}
           </div>
           <div className="flex items-center gap-3 pr-16">
             <button 
