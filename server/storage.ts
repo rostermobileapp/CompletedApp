@@ -2823,7 +2823,7 @@ export class DatabaseStorage implements IStorage {
         at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
       FROM games g
       INNER JOIN teams ht ON g.home_team_id = ht.id
-      INNER JOIN teams at ON g.away_team_id = at.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE g.id = ${gameId}
     `);
     
@@ -2832,12 +2832,51 @@ export class DatabaseStorage implements IStorage {
     }
     
     const row = result.rows[0];
+    
+    // Create a placeholder team object when away team doesn't exist
+    const awayTeam = row.away_team_id ? {
+      id: row.away_team_id as string,
+      name: row.away_team_name as string,
+      logoUrl: row.away_team_logo_url as string | null,
+      leagueId: row.away_team_league_id as string,
+      seasonId: row.away_team_season_id as string | null,
+      captainId: row.away_team_captain_id as string | null,
+      facilityId: null,
+      uniqueTeamId: null,
+      creatorId: null,
+      wins: row.away_team_wins as number,
+      losses: row.away_team_losses as number,
+      ties: row.away_team_ties as number,
+      goalsFor: row.away_team_goals_for as number,
+      goalsAgainst: row.away_team_goals_against as number,
+      createdAt: row.away_team_created_at as Date,
+      updatedAt: row.away_team_updated_at as Date,
+    } : {
+      id: 'opponent',
+      name: row.opponent_name as string || 'Opponent',
+      logoUrl: null,
+      leagueId: row.league_id as string,
+      seasonId: row.season_id as string | null,
+      captainId: null,
+      facilityId: null,
+      uniqueTeamId: null,
+      creatorId: null,
+      wins: 0,
+      losses: 0,
+      ties: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    
     return {
       id: row.id as string,
       leagueId: row.league_id as string,
       seasonId: row.season_id as string | null,
       homeTeamId: row.home_team_id as string,
-      awayTeamId: row.away_team_id as string,
+      awayTeamId: row.away_team_id as string | null,
+      opponentName: row.opponent_name as string | null,
       scheduledAt: row.scheduled_at as Date,
       venue: row.venue as string | null,
       lockerRoom: row.locker_room as string | null,
@@ -2870,24 +2909,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: row.home_team_created_at as Date,
         updatedAt: row.home_team_updated_at as Date,
       },
-      awayTeam: {
-        id: row.away_team_id as string,
-        name: row.away_team_name as string,
-        logoUrl: row.away_team_logo_url as string | null,
-        leagueId: row.away_team_league_id as string,
-        seasonId: row.away_team_season_id as string | null,
-        captainId: row.away_team_captain_id as string | null,
-        facilityId: null,
-        uniqueTeamId: null,
-        creatorId: null,
-        wins: row.away_team_wins as number,
-        losses: row.away_team_losses as number,
-        ties: row.away_team_ties as number,
-        goalsFor: row.away_team_goals_for as number,
-        goalsAgainst: row.away_team_goals_against as number,
-        createdAt: row.away_team_created_at as Date,
-        updatedAt: row.away_team_updated_at as Date,
-      },
+      awayTeam,
     };
   }
 
