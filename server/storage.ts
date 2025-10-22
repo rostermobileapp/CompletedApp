@@ -2855,7 +2855,7 @@ export class DatabaseStorage implements IStorage {
       id: 'opponent',
       name: row.opponent_name as string || 'Opponent',
       logoUrl: null,
-      leagueId: row.league_id as string,
+      leagueId: row.league_id as string | null,
       seasonId: row.season_id as string | null,
       captainId: null,
       facilityId: null,
@@ -2872,7 +2872,7 @@ export class DatabaseStorage implements IStorage {
     
     return {
       id: row.id as string,
-      leagueId: row.league_id as string,
+      leagueId: row.league_id as string | null,
       seasonId: row.season_id as string | null,
       homeTeamId: row.home_team_id as string,
       awayTeamId: row.away_team_id as string | null,
@@ -2895,7 +2895,7 @@ export class DatabaseStorage implements IStorage {
         id: row.home_team_id as string,
         name: row.home_team_name as string,
         logoUrl: row.home_team_logo_url as string | null,
-        leagueId: row.home_team_league_id as string,
+        leagueId: row.home_team_league_id as string | null,
         seasonId: row.home_team_season_id as string | null,
         captainId: row.home_team_captain_id as string | null,
         facilityId: null,
