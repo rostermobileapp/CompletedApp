@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users } from "lucide-react";
+import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2 } from "lucide-react";
 import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPSummary } from "@/components/RSVPSummary";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
@@ -153,6 +153,29 @@ export default function GameDetails() {
       toast({
         title: "Error",
         description: error.message || "Failed to submit score. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete game mutation
+  const deleteGameMutation = useMutation({
+    mutationFn: async (gameId: string) => {
+      await apiRequest("DELETE", `/api/games/${gameId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
+      toast({
+        title: "Game Deleted",
+        description: "The game has been successfully deleted.",
+      });
+      setPageTransitionDirection('down');
+      navigate("/calendar");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete game. You may not have permission.",
         variant: "destructive",
       });
     },
@@ -474,26 +497,49 @@ export default function GameDetails() {
   const validAwayTeamBeverageDutyClaimed = awayTeamBeverageDutyClaimed && (awayTeamClaimantExists || awayTeamHasBeverageDuty);
   const validAwayTeamBeverageDutyClaimedByOther = validAwayTeamBeverageDutyClaimed && !awayTeamHasBeverageDuty;
 
+  // Check if user can delete the game (captain of home team or commissioner)
+  const canDeleteGame = isHomeCaptain || isCommissioner;
+
+  const handleDeleteGame = () => {
+    if (window.confirm('Are you sure you want to delete this game? This action cannot be undone.')) {
+      deleteGameMutation.mutate(game.id);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setPageTransitionDirection('down');
-              navigate("/calendar");
-            }}
-            className="p-2"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <h1 className="text-xl font-semibold" data-testid="text-game-details-title">
-            Game Details
-          </h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate("/calendar");
+              }}
+              className="p-2"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-xl font-semibold" data-testid="text-game-details-title">
+              Game Details
+            </h1>
+          </div>
+          {canDeleteGame && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDeleteGame}
+              className="p-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+              disabled={deleteGameMutation.isPending}
+              data-testid="button-delete-game"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </div>
       {/* Game Info */}

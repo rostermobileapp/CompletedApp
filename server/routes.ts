@@ -2199,6 +2199,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Game not found" });
       }
 
+      // Check if user has permission to delete the game
+      let hasPermission = false;
+      
+      // Check if user is captain of home team
+      const homeTeam = await storage.getTeam(game.homeTeamId);
+      if (homeTeam?.captainId === userId) {
+        hasPermission = true;
+      }
+      
+      // Check if user is commissioner of the league (only for league games)
+      if (!hasPermission && game.leagueId) {
+        const league = await storage.getLeague(game.leagueId);
+        if (league?.commissionerId === userId) {
+          hasPermission = true;
+        }
+      }
+      
+      if (!hasPermission) {
+        return res.status(403).json({ message: "You don't have permission to delete this game" });
+      }
+
       await storage.deleteGame(gameId);
       res.json({ message: "Game deleted successfully" });
     } catch (error) {
