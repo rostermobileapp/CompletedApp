@@ -1167,22 +1167,22 @@ export default function Dashboard() {
     enabled: !!primaryTeamLeagueId,
   });
 
-  // Fetch team's total games to calculate games remaining
-  const { data: teamGames } = useQuery({
-    queryKey: ['/api/teams', primaryTeam?.id, 'games'],
-    enabled: !!primaryTeam?.id,
-  });
-
-  // Extract the team record from standings data and add gamesRemaining
+  // Calculate games remaining from upcomingGames
   const teamRecord = React.useMemo(() => {
     if (!primaryTeam?.id) {
       return null;
     }
     
-    // Calculate games remaining by counting future games
+    // Calculate games remaining by counting future games for this team
     const now = new Date();
-    const futureGames = Array.isArray(teamGames) 
-      ? teamGames.filter((game: any) => new Date(game.scheduledAt) > now)
+    const futureGames = Array.isArray(upcomingGames) 
+      ? upcomingGames.filter((game: any) => {
+          // Check if this game involves the primary team
+          const isPrimaryTeamGame = game.homeTeamId === primaryTeam.id || game.awayTeamId === primaryTeam.id;
+          // Check if it's in the future
+          const isFuture = new Date(game.scheduledAt) > now;
+          return isPrimaryTeamGame && isFuture;
+        })
       : [];
     const gamesRemaining = futureGames.length;
     
@@ -1195,7 +1195,7 @@ export default function Dashboard() {
       ...(standingsRecord || {}),
       gamesRemaining: gamesRemaining,
     };
-  }, [primaryTeam?.id, standingsData, teamGames]);
+  }, [primaryTeam?.id, standingsData, upcomingGames]);
 
 
   // Beverage duty mutation
