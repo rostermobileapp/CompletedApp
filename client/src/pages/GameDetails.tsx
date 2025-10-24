@@ -1167,7 +1167,7 @@ export default function GameDetails() {
                         <div>
                           <Label htmlFor="firstStar" className="text-sm font-medium flex items-center gap-2 mb-1">
                             <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                            1st Star (3 points)
+                            1st Star
                           </Label>
                           <Select value={firstStarUserId} onValueChange={setFirstStarUserId}>
                             <SelectTrigger id="firstStar" data-testid="select-first-star">
@@ -1185,7 +1185,7 @@ export default function GameDetails() {
                         <div>
                           <Label htmlFor="secondStar" className="text-sm font-medium flex items-center gap-2 mb-1">
                             <Star className="w-4 h-4 text-gray-400 fill-gray-400" />
-                            2nd Star (2 points)
+                            2nd Star
                           </Label>
                           <Select value={secondStarUserId} onValueChange={setSecondStarUserId}>
                             <SelectTrigger id="secondStar" data-testid="select-second-star">
@@ -1203,7 +1203,7 @@ export default function GameDetails() {
                         <div>
                           <Label htmlFor="thirdStar" className="text-sm font-medium flex items-center gap-2 mb-1">
                             <Star className="w-4 h-4 text-amber-600 fill-amber-600" />
-                            3rd Star (1 point)
+                            3rd Star
                           </Label>
                           <Select value={thirdStarUserId} onValueChange={setThirdStarUserId}>
                             <SelectTrigger id="thirdStar" data-testid="select-third-star">
