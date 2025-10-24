@@ -575,7 +575,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                               <p className="text-sm text-muted-foreground">
                                 {formatInTimeZone(new Date(game.scheduledAt), userTimeZone, 'MMM d, yyyy')}
                               </p>
-                              <p className="text-sm text-yellow-600 font-medium">
+                              <p className="text-sm font-medium text-[#ffffff]">
                                 Your team won {game.homeScore > game.awayScore ? `${game.homeScore}-${game.awayScore}` : `${game.awayScore}-${game.homeScore}`}
                               </p>
                             </div>
