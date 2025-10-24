@@ -563,7 +563,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       {gamesNeedingStars.map((game: any) => (
                         <div 
                           key={game.id}
-                          className="dark:bg-card rounded-lg p-3 flex items-center justify-between pt-[4px] pb-[4px] bg-[#3c83f6]"
+                          className="dark:bg-card rounded-lg p-3 flex items-center justify-between pt-[4px] pb-[4px] bg-[#212121]"
                           data-testid={`stars-game-${game.id}`}
                         >
                           <div className="flex items-center gap-3">
