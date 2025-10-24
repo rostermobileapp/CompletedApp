@@ -273,9 +273,6 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
         {/* Header */}
         <div className="p-6 border-b border-border">
           <h2 className="text-2xl font-semibold text-center">Needs Attention</h2>
-          <p className="text-center text-muted-foreground mt-1">
-            {totalTasks} task{totalTasks === 1 ? '' : 's'} requiring your attention
-          </p>
         </div>
 
         {/* Content */}
