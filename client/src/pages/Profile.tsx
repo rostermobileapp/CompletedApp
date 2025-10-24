@@ -795,7 +795,7 @@ export default function Profile() {
         <h2 className="text-lg font-semibold mb-4" data-testid="text-settings-title">Settings</h2>
         <div className="space-y-2">
           {/* Theme Toggle */}
-          <div className="w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between">
+          <div className="w-full border border-border rounded-lg p-4 flex items-center justify-between pt-[4px] pb-[4px] bg-[#f5f5f5]">
             <div className="flex items-center gap-3">
               <Moon className="w-5 h-5 text-muted-foreground" />
               <span>Theme</span>
@@ -888,14 +888,12 @@ export default function Profile() {
           </button>
         </div>
       </div>
-
       {/* App Version */}
       <div className="px-6 py-8 text-center">
         <p className="text-sm text-muted-foreground" data-testid="text-app-version">
           Version 1.0
         </p>
       </div>
-
       {/* League Request Dialog */}
       <AlertDialog open={showLeagueRequestDialog} onOpenChange={setShowLeagueRequestDialog}>
         <AlertDialogContent data-testid="dialog-request-join-league">
