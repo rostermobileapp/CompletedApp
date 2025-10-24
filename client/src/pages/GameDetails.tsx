@@ -841,7 +841,7 @@ export default function GameDetails() {
 
         {/* Score Submission */}
         {(canSubmitScore || isGameCompleted) && (
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-6 mt-[4px] mb-[4px] pt-[4px] pb-[4px] pl-[4px] pr-[4px]">
             <h3 className="text-lg font-semibold mb-4" data-testid="text-score-title">
               <Target className="w-5 h-5 inline mr-2" />
               Game Score
