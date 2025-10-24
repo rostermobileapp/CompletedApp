@@ -1944,7 +1944,7 @@ export default function Dashboard() {
                           <img 
                             src={beverageJarUrl}
                             alt="Beverage Duty"
-                            className="h-8 w-auto"
+                            className="h-8 w-auto invert dark:invert-0"
                             style={{ aspectRatio: '9/16' }}
                             data-testid={`icon-beverage-duty-${game.id}`}
                           />
