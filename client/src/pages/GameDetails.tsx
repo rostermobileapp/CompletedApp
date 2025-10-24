@@ -750,7 +750,7 @@ export default function GameDetails() {
 
         {/* Beverage Responsibility - Only show for user's team */}
         {isUserOnHomeTeam && !isGameCompleted && (
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] mt-[12px] mb-[12px] pt-[4px] pb-[4px]">
               <h3 className="text-lg font-semibold mb-4" data-testid="text-beverage-title">
                 Beverage Responsibility
               </h3>
