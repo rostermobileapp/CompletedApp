@@ -637,7 +637,7 @@ export default function GameDetails() {
                       <img 
                         src={beverageJarUrl}
                         alt="Beverage Duty"
-                        className="h-6 w-auto"
+                        className="h-6 w-auto invert dark:invert-0"
                         style={{ aspectRatio: '9/16' }}
                       />
                     </div>
@@ -664,7 +664,7 @@ export default function GameDetails() {
                     <img 
                       src={beverageJarUrl}
                       alt="Beverage Duty"
-                      className="h-6 w-auto opacity-50"
+                      className="h-6 w-auto opacity-50 invert dark:invert-0"
                       style={{ aspectRatio: '9/16' }}
                     />
                   </div>
@@ -701,7 +701,7 @@ export default function GameDetails() {
                     <img 
                       src={beverageJarUrl}
                       alt="Claim Beverage Duty"
-                      className="h-4 w-auto mr-2"
+                      className="h-4 w-auto mr-2 invert dark:invert-0"
                       style={{ aspectRatio: '9/16' }}
                     />
                     Claim Responsibility
@@ -762,7 +762,7 @@ export default function GameDetails() {
                       <img 
                         src={beverageJarUrl}
                         alt="Beverage Duty"
-                        className="h-6 w-auto"
+                        className="h-6 w-auto invert dark:invert-0"
                         style={{ aspectRatio: '9/16' }}
                       />
                     </div>
@@ -789,7 +789,7 @@ export default function GameDetails() {
                     <img 
                       src={beverageJarUrl}
                       alt="Beverage Duty"
-                      className="h-6 w-auto opacity-50"
+                      className="h-6 w-auto opacity-50 invert dark:invert-0"
                       style={{ aspectRatio: '9/16' }}
                     />
                   </div>
@@ -805,7 +805,7 @@ export default function GameDetails() {
                       <img 
                         src={beverageJarUrl}
                         alt="Beverage Duty"
-                        className="h-6 w-auto opacity-50"
+                        className="h-6 w-auto opacity-50 invert dark:invert-0"
                         style={{ aspectRatio: '9/16' }}
                       />
                     </div>
@@ -826,7 +826,7 @@ export default function GameDetails() {
                     <img 
                       src={beverageJarUrl}
                       alt="Claim Beverage Duty"
-                      className="h-4 w-auto mr-2"
+                      className="h-4 w-auto mr-2 invert dark:invert-0"
                       style={{ aspectRatio: '9/16' }}
                     />
                     Claim Responsibility
