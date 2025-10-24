@@ -276,7 +276,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-6 pl-[4px] pr-[4px]">
           {(pendingMembersLoading || gamesLoading || substituteApprovalsLoading) ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
