@@ -2517,6 +2517,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get games needing star awards for a user (winning captain, not yet awarded)
+  app.get("/api/user/games-needing-stars", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId } = req.query;
+
+      // Get all games where user is a team captain
+      const allGames = await storage.getAllUserGames(userId);
+      
+      const gamesNeedingStars = [];
+
+      for (const game of allGames) {
+        // Only check completed games with scores
+        if (!game.isCompleted || game.homeScore === null || game.awayScore === null) {
+          continue;
+        }
+
+        // Skip tied games
+        if (game.homeScore === game.awayScore) {
+          continue;
+        }
+
+        // Filter by league if specified
+        if (leagueId && game.leagueId !== leagueId) {
+          continue;
+        }
+
+        // Determine winning team
+        const winningTeamId = game.homeScore > game.awayScore ? game.homeTeamId : game.awayTeamId;
+        
+        // Check if user is captain of winning team
+        const winningTeam = await storage.getTeam(winningTeamId);
+        if (!winningTeam || winningTeam.captainId !== userId) {
+          continue;
+        }
+
+        // Check if stars have already been awarded
+        const existingStars = await storage.getGameStars(game.id);
+        if (existingStars) {
+          continue;
+        }
+
+        gamesNeedingStars.push(game);
+      }
+
+      res.json(gamesNeedingStars);
+    } catch (error) {
+      console.error("Error fetching games needing stars:", error);
+      res.status(500).json({ message: "Failed to fetch games needing stars" });
+    }
+  });
+
   // Delete team
   app.delete("/api/teams/:teamId", isAuthenticated, async (req: any, res) => {
     try {

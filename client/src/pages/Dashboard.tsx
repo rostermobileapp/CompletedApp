@@ -190,9 +190,21 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
     enabled: !!leagueId && isOpen,
   });
 
+  // Fetch games needing star awards
+  const { data: gamesNeedingStars = [], isLoading: starsLoading } = useQuery({
+    queryKey: ['/api/user/games-needing-stars', leagueId],
+    queryFn: async () => {
+      if (!leagueId) return [];
+      const response = await apiRequest('GET', `/api/user/games-needing-stars?leagueId=${leagueId}`);
+      return response.json();
+    },
+    enabled: !!leagueId && isOpen,
+  });
+
   const totalTasks = (Array.isArray(pendingMembers) ? pendingMembers.length : 0) + 
                      (Array.isArray(gamesNeedingVerification) ? gamesNeedingVerification.length : 0) +
-                     (pendingSubstituteApprovals?.total || 0);
+                     (pendingSubstituteApprovals?.total || 0) +
+                     (Array.isArray(gamesNeedingStars) ? gamesNeedingStars.length : 0);
 
   // Process substitute approval mutation
   const processApprovalMutation = useMutation({
@@ -532,6 +544,55 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                             data-testid={`button-verify-game-${game.id}`}
                           >
                             Verify
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Games Needing Star Awards Section */}
+              {Array.isArray(gamesNeedingStars) && gamesNeedingStars.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Star className="w-5 h-5 text-yellow-600" />
+                    <h3 className="text-lg font-semibold text-yellow-600">
+                      Award 3 Stars ({gamesNeedingStars.length})
+                    </h3>
+                  </div>
+                  <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <div className="space-y-3">
+                      {gamesNeedingStars.map((game: any) => (
+                        <div 
+                          key={game.id}
+                          className="bg-white dark:bg-card border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 flex items-center justify-between"
+                          data-testid={`stars-game-${game.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                            <div>
+                              <p className="font-medium text-[#000000]">
+                                {game.homeTeam?.name} vs {game.awayTeam?.name}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {formatInTimeZone(new Date(game.scheduledAt), userTimeZone, 'MMM d, yyyy')}
+                              </p>
+                              <p className="text-sm text-yellow-600 font-medium">
+                                Your team won {game.homeScore > game.awayScore ? `${game.homeScore}-${game.awayScore}` : `${game.awayScore}-${game.homeScore}`}
+                              </p>
+                            </div>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                            onClick={() => {
+                              onClose();
+                              onNavigate(`/game/${game.id}`);
+                            }}
+                            data-testid={`button-award-stars-${game.id}`}
+                          >
+                            Award Stars
                           </Button>
                         </div>
                       ))}
