@@ -434,7 +434,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                         return (
                           <div 
                             key={request.id}
-                            className="dark:bg-card rounded-lg p-3 text-[#ffffff] bg-[#000000]"
+                            className="dark:bg-card rounded-lg p-3 text-[#ffffff] bg-[#212121]"
                             data-testid={`pending-substitute-commissioner-${request.id}`}
                           >
                             <div className="flex items-center justify-between mb-2">
