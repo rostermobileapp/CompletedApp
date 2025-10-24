@@ -353,7 +353,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       Substitute Approvals
                     </h3>
                   </div>
-                  <div className="dark:bg-purple-950 rounded-lg p-4 bg-[#6b6b6b85]">
+                  <div className="dark:bg-purple-950 rounded-lg p-4 bg-[#212121] pt-[0px] pb-[0px] pl-[0px] pr-[0px]">
                     <div className="space-y-3">
                       {/* Captain Approvals */}
                       {pendingSubstituteApprovals.captain.map((request: any) => (
