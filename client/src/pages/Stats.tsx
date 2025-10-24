@@ -305,6 +305,23 @@ export default function Stats() {
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <h1 className="text-2xl font-bold" data-testid="text-page-title">Stats</h1>
+                
+                {/* Season Selector */}
+                {Array.isArray(seasons) && seasons.length > 0 && (
+                  <select
+                    value={selectedSeason}
+                    onChange={(e) => setSelectedSeason(e.target.value)}
+                    className="bg-gray-900 text-gray-300 border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00A9FF] focus:border-transparent"
+                    data-testid="select-season"
+                  >
+                    <option value="all">All Seasons</option>
+                    {seasons.map((season: any) => (
+                      <option key={season.id} value={season.id}>
+                        {season.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               
               {canEditStats() && (
@@ -325,25 +342,6 @@ export default function Stats() {
                 </Button>
               )}
             </div>
-            
-            {/* Season Selector */}
-            {Array.isArray(seasons) && seasons.length > 0 && (
-              <div className="mt-3">
-                <select
-                  value={selectedSeason}
-                  onChange={(e) => setSelectedSeason(e.target.value)}
-                  className="bg-gray-900 text-gray-300 border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00A9FF] focus:border-transparent"
-                  data-testid="select-season"
-                >
-                  <option value="all">All Seasons</option>
-                  {seasons.map((season: any) => (
-                    <option key={season.id} value={season.id}>
-                      {season.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
 
           {/* Tabs */}
