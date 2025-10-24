@@ -656,7 +656,7 @@ function StatSection({
       </h2>
       <button
         onClick={onClick}
-        className="w-full bg-[#0a0a0a] rounded-lg p-4 flex items-center justify-between hover:bg-gray-900 transition-colors group"
+        className="w-full bg-[#0a0a0a] rounded-lg p-4 flex items-center justify-between hover:bg-gray-900 transition-colors group pt-[8px] pb-[8px]"
         data-testid={`button-${title.toLowerCase().replace(/\s+/g, '-')}`}
       >
         <div className="flex items-center gap-4 flex-1">
