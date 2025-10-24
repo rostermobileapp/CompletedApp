@@ -383,7 +383,7 @@ export default function CreateScrimmage() {
       {/* Form */}
       <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 space-y-6">
         {/* Scrimmage Details */}
-        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] pl-[4px] pr-[4px] bg-[#212121] text-[#ffffff]">
+        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] pl-[4px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Calendar className="w-5 h-5" />
             Scrimmage Details
@@ -561,7 +561,7 @@ export default function CreateScrimmage() {
         </div>
 
         {/* Venue Information */}
-        <div className="rounded-xl border border-border p-6 bg-[#212121] text-[#ffffff] pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[12px] mb-[12px]">
+        <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff] pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[12px] mb-[12px]">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5" />
             Venue Information
@@ -642,7 +642,7 @@ export default function CreateScrimmage() {
 
         {/* Member Selection - Only show if user has leagues */}
         {selectedLeague ? (
-          <div className="rounded-xl border border-border p-6 bg-[#212121]">
+          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121]">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Users className="w-5 h-5" />
               Invite Members

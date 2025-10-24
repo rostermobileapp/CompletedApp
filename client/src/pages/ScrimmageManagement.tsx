@@ -403,7 +403,7 @@ export default function ScrimmageManagement() {
                             {rosterData.approvedPlayers.map((request) => (
                               <div
                                 key={request.id}
-                                className="flex items-center gap-3 p-3 rounded-lg dark:bg-white border bg-[#000000] text-[#ffffff]"
+                                className="flex items-center gap-3 p-3 rounded-lg dark:bg-white border bg-[#000000] text-[#212121] dark:text-[#ffffff]"
                                 data-testid={`roster-player-${request.id}`}
                               >
                                 <Avatar className="h-8 w-8">
@@ -413,7 +413,7 @@ export default function ScrimmageManagement() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1">
-                                  <p className="font-medium text-[#ffffff] text-[16px]">
+                                  <p className="font-medium text-[#212121] dark:text-[#ffffff] text-[16px]">
                                     {request.player.firstName} {request.player.lastName}
                                   </p>
                                 </div>
@@ -536,7 +536,7 @@ export default function ScrimmageManagement() {
                                     {getApprovedRequests(requests).map((request) => (
                                       <div
                                         key={request.id}
-                                        className="flex items-center gap-3 p-3 rounded-lg border dark:bg-green-950/20 bg-[#212121] text-[#ffffff]"
+                                        className="flex items-center gap-3 p-3 rounded-lg border dark:bg-green-950/20 bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]"
                                         data-testid={`approved-${request.id}`}
                                       >
                                         <Avatar className="h-10 w-10">

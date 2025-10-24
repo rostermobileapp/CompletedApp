@@ -4469,7 +4469,7 @@ export default function LeagueManagement() {
                     {selectedGame.isCompleted || (selectedGame.homeScore !== null && selectedGame.awayScore !== null) ? (
                       <div className="space-y-4 mb-4">
                         {isEditingGameScore && isCommissioner ? (
-                          <div className="dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-[#212121]">
+                          <div className="dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-[#e2e2e2] dark:bg-[#212121]">
                             <p className="text-sm font-medium mb-3 text-center text-[#ffffff]">Edit Final Score:</p>
                             <div className="grid grid-cols-3 gap-3 items-center mb-4">
                               <div className="text-center">
@@ -4626,7 +4626,7 @@ export default function LeagueManagement() {
                             </div>
                           </div>
                         ) : (
-                          <div className="dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 bg-[#212121]">
+                          <div className="dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 bg-[#e2e2e2] dark:bg-[#212121]">
                             <div className="flex items-center justify-between mb-2">
                               <p className="text-sm font-medium text-[#ffffff]">Final Score:</p>
                               {isCommissioner && (

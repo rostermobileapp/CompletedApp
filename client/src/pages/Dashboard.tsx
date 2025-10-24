@@ -353,7 +353,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       Substitute Approvals
                     </h3>
                   </div>
-                  <div className="dark:bg-purple-950 rounded-lg p-4 bg-[#212121] pt-[0px] pb-[0px] pl-[0px] pr-[0px]">
+                  <div className="dark:bg-purple-950 rounded-lg p-4 bg-[#e2e2e2] dark:bg-[#212121] pt-[0px] pb-[0px] pl-[0px] pr-[0px]">
                     <div className="space-y-3">
                       {/* Captain Approvals */}
                       {pendingSubstituteApprovals.captain.map((request: any) => (
@@ -434,27 +434,27 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                         return (
                           <div 
                             key={request.id}
-                            className="dark:bg-card rounded-lg p-3 text-[#ffffff] bg-[#212121]"
+                            className="dark:bg-card rounded-lg p-3 text-[#212121] dark:text-[#ffffff] bg-[#e2e2e2] dark:bg-[#212121]"
                             data-testid={`pending-substitute-commissioner-${request.id}`}
                           >
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-3">
                                 
                                 <div>
-                                  <p className="font-medium text-[#ffffff]">
+                                  <p className="font-medium text-[#212121] dark:text-[#ffffff]">
                                     {request.game.homeTeam.name} vs {request.game.awayTeam.name}
                                   </p>
-                                  <p className="text-[#ffffff] text-[16px]">
+                                  <p className="text-[#212121] dark:text-[#ffffff] text-[16px]">
                                     {formatInTimeZone(new Date(request.game.scheduledAt), userTimeZone, 'MMM d, yyyy')}
                                   </p>
                                   <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] bg-[#ffffff00] font-extrabold text-left pl-[0px] pr-[0px] text-[#3c83f6] text-[20px]">Substitution Proposal</p>
                                   {request.originalPlayer && (
-                                    <p className="font-bold text-[#ffffff] text-[16px]">
+                                    <p className="font-bold text-[#212121] dark:text-[#ffffff] text-[16px]">
                                       Player: {request.originalPlayer.firstName} {request.originalPlayer.lastName}
                                     </p>
                                   )}
                                   {request.substitutePlayer && (
-                                    <p className="text-[#ffffff] font-bold text-[16px]">
+                                    <p className="text-[#212121] dark:text-[#ffffff] font-bold text-[16px]">
                                       Substitute: {request.substitutePlayer.firstName} {request.substitutePlayer.lastName}
                                     </p>
                                   )}
@@ -554,28 +554,28 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                 <div>
                   <div className="flex items-center gap-2 mb-4">
                     <Star className="w-5 h-5 text-yellow-600" />
-                    <h3 className="text-lg font-semibold text-[#ffffff]">
+                    <h3 className="text-lg font-semibold text-[#212121] dark:text-[#ffffff]">
                       Award 3 Stars
                     </h3>
                   </div>
-                  <div className="dark:bg-yellow-950 rounded-lg p-4 bg-[#212121]">
+                  <div className="dark:bg-yellow-950 rounded-lg p-4 bg-[#e2e2e2] dark:bg-[#212121]">
                     <div className="space-y-3">
                       {gamesNeedingStars.map((game: any) => (
                         <div 
                           key={game.id}
-                          className="dark:bg-card rounded-lg p-3 flex items-center justify-between pt-[4px] pb-[4px] bg-[#212121]"
+                          className="dark:bg-card rounded-lg p-3 flex items-center justify-between pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]"
                           data-testid={`stars-game-${game.id}`}
                         >
                           <div className="flex items-center gap-3">
                             <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                             <div>
-                              <p className="font-medium text-[#ffffff]">
+                              <p className="font-medium text-[#212121] dark:text-[#ffffff]">
                                 {game.homeTeam?.name} vs {game.awayTeam?.name}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {formatInTimeZone(new Date(game.scheduledAt), userTimeZone, 'MMM d, yyyy')}
                               </p>
-                              <p className="text-sm font-medium text-[#ffffff]">
+                              <p className="text-sm font-medium text-[#212121] dark:text-[#ffffff]">
                                 Your team won {game.homeScore > game.awayScore ? `${game.homeScore}-${game.awayScore}` : `${game.awayScore}-${game.homeScore}`}
                               </p>
                             </div>
@@ -1494,7 +1494,7 @@ export default function Dashboard() {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="w-full border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#212121]"
+              className="w-full border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
               data-testid="button-selector"
             >
               <div className="flex items-center gap-2">
@@ -1613,7 +1613,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-3 gap-3">
           {/* Announcements Card - Active when a league or league team is selected */}
           <div 
-            className={`rounded-xl border border-border p-5 min-h-[72px] relative transition-colors bg-[#212121] ${
+            className={`rounded-xl border border-border p-5 min-h-[72px] relative transition-colors bg-[#e2e2e2] dark:bg-[#212121] ${
               effectiveLeagueId 
                 ? 'cursor-pointer hover:bg-muted/50' 
                 : 'opacity-50 cursor-not-allowed'
@@ -1630,7 +1630,7 @@ export default function Dashboard() {
 
           {/* Stats Card */}
           <div 
-            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#212121]" 
+            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
             data-testid="card-stats"
             onClick={() => {
               if (selectedType === 'team' && selectedId) {
@@ -1650,7 +1650,7 @@ export default function Dashboard() {
 
           {/* Standings Card - Active when a league or league team is selected */}
           <div 
-            className={`rounded-xl border border-border p-5 min-h-[72px] transition-colors bg-[#212121] ${
+            className={`rounded-xl border border-border p-5 min-h-[72px] transition-colors bg-[#e2e2e2] dark:bg-[#212121] ${
               effectiveLeagueId 
                 ? 'cursor-pointer hover:bg-muted/50' 
                 : 'opacity-50 cursor-not-allowed'
@@ -1669,7 +1669,7 @@ export default function Dashboard() {
       {primaryTeam && (
         <div className="px-6 mb-6">
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-xl border border-border p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#212121]" data-testid="card-games-stat">
+            <div className="rounded-xl border border-border p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                   {primaryTeam?.logoUrl ? (
@@ -1693,7 +1693,7 @@ export default function Dashboard() {
             </div>
             
             {effectiveLeagueId && (
-              <div className="rounded-xl border border-border bg-[#212121]">
+              <div className="rounded-xl border border-border bg-[#e2e2e2] dark:bg-[#212121]">
                 {isLoadingNeedsAttention ? (
                   <div className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2">
                     <div className="flex items-center gap-3">
@@ -1767,7 +1767,7 @@ export default function Dashboard() {
             {Array.isArray(scrimmageInvites) && scrimmageInvites.map((invite: any) => (
               <div 
                 key={`invite-${invite.id}`}
-                className="rounded-xl border border-yellow-500/50 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#212121]"
+                className="rounded-xl border border-yellow-500/50 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
                 data-testid={`card-scrimmage-invite-${invite.id}`}
               >
                 <div className="flex items-center gap-4">
@@ -1814,7 +1814,7 @@ export default function Dashboard() {
                 return (
                   <div 
                     key={`scrimmage-${scrimmage.id}`}
-                    className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#212121]" 
+                    className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                     onClick={() => navigate(`/scrimmage/${scrimmage.id}`)}
                     data-testid={`card-scrimmage-${scrimmage.id}`}
                   >
@@ -1848,7 +1848,7 @@ export default function Dashboard() {
               .map((reminder: any) => (
                 <div 
                   key={`reminder-${reminder.id}`}
-                  className="rounded-xl border border-green-200 dark:border-green-800 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#212121]"
+                  className="rounded-xl border border-green-200 dark:border-green-800 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
                   data-testid={`card-reminder-${reminder.id}`}
                 >
                   <div className="flex items-center gap-4">
@@ -1900,7 +1900,7 @@ export default function Dashboard() {
               .slice(0, 5).map((game: any) => (
               <div 
                 key={game.id} 
-                className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#212121]" 
+                className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                 onClick={() => navigate(game.isScrimmage ? `/scrimmage/${game.id}` : `/game/${game.id}`)}
                 data-testid={`card-game-${game.id}`}
               >

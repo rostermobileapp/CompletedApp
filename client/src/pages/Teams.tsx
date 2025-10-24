@@ -333,7 +333,7 @@ export default function Teams() {
               <TabsContent key={team.id} value={team.id} className="space-y-6">
                 {/* Team Header Card */}
                 <Card>
-                  <CardHeader className="flex flex-col space-y-1.5 p-6 bg-[#212121] pl-[12px] pr-[12px] pt-[4px] pb-[4px]">
+                  <CardHeader className="flex flex-col space-y-1.5 p-6 bg-[#e2e2e2] dark:bg-[#212121] pl-[12px] pr-[12px] pt-[4px] pb-[4px]">
                     <div className="flex items-center gap-4">
                       <div className="relative group">
                         <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${team.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
@@ -425,7 +425,7 @@ export default function Teams() {
                 </Card>
 
                 {/* Team Standings */}
-                <Card className="rounded-lg border text-card-foreground shadow-sm bg-[#212121]">
+                <Card className="rounded-lg border text-card-foreground shadow-sm bg-[#e2e2e2] dark:bg-[#212121]">
                   <CardHeader className="flex flex-col space-y-1.5 p-6 pt-[5px] pb-[5px]">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-2xl font-semibold leading-none tracking-tight">League Standing</CardTitle>
@@ -472,7 +472,7 @@ export default function Teams() {
                     {teamLeaders ? (
                       <>
                         {/* Points Leader */}
-                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#212121]" data-testid="card-team-points-leader">
+                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-points-leader">
                           <div className="flex items-center gap-3">
                             <TrendingUp className="w-5 h-5 text-primary" />
                             <div className="flex items-center gap-2">
@@ -483,7 +483,7 @@ export default function Teams() {
                         </Card>
 
                         {/* Goals Leader */}
-                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#212121]" data-testid="card-team-goals-leader">
+                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-goals-leader">
                           <div className="flex items-center gap-3">
                             <Target className="w-5 h-5 text-success" />
                             <div className="flex items-center gap-2">
@@ -494,7 +494,7 @@ export default function Teams() {
                         </Card>
 
                         {/* Assists Leader */}
-                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#212121]" data-testid="card-team-assists-leader">
+                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-assists-leader">
                           <div className="flex items-center gap-3">
                             <Apple className="w-5 h-5 text-info" />
                             <div className="flex items-center gap-2">
@@ -505,7 +505,7 @@ export default function Teams() {
                         </Card>
 
                         {/* Penalty Minutes Leader */}
-                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#212121]" data-testid="card-team-penalty-leader">
+                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-penalty-leader">
                           <div className="flex items-center gap-3">
                             <Flag className="w-5 h-5 text-red-500" />
                             <div className="flex items-center gap-2">

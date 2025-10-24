@@ -293,7 +293,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
   const defenseLines = lineCombinations.filter((line: LineCombination) => line.lineType === 'defense');
 
   return (
-    <Card className="rounded-lg border text-card-foreground shadow-sm bg-[#212121] mt-[4px] mb-[4px]">
+    <Card className="rounded-lg border text-card-foreground shadow-sm bg-[#e2e2e2] dark:bg-[#212121] mt-[4px] mb-[4px]">
       <CardHeader className="flex flex-col space-y-1.5 p-6 pl-[0px] pr-[0px] pt-[2px] pb-[2px]">
         <CardTitle className="flex items-center gap-2">
           <Users className="w-5 h-5" />

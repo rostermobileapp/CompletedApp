@@ -86,7 +86,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
 
   const RequestCard = ({ request, isPending = true }: { request: any; isPending?: boolean }) => (
     <Card 
-      className="rounded-lg border shadow-sm transition-all border-border bg-[#212121] text-[#ffffff]"
+      className="rounded-lg border shadow-sm transition-all border-border bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]"
       data-testid={`request-card-${request.id}`}
     >
       <CardHeader className="pt-[8px] pb-[8px] pl-[8px] pr-[8px]">
@@ -95,7 +95,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
             <Badge 
               variant={request.status === 'pending' ? 'secondary' : request.status === 'approved' ? 'default' : 'destructive'}
               className={
-                request.status === 'pending' ? 'bg-[#000000] text-[#ffffff]' :
+                request.status === 'pending' ? 'bg-[#000000] text-[#212121] dark:text-[#ffffff]' :
                 request.status === 'approved' ? 'bg-gray-700 text-gray-100 dark:bg-gray-700 dark:text-gray-100' :
                 'bg-red-600 text-white dark:bg-red-700 dark:text-white'
               }
@@ -128,7 +128,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {/* Original Player */}
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-2">Player Unable to Attend:</p>
-          <div className="flex items-center gap-3 p-3 bg-[#212121] rounded-lg border border-border">
+          <div className="flex items-center gap-3 p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-border">
             <ClickableAvatar
               userId={request.originalPlayer.id}
               profileImageUrl={request.originalPlayer.profileImageUrl}
@@ -151,7 +151,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {request.substitutePlayer && (
           <div>
             <p className="text-sm font-medium text-muted-foreground mb-2">Requested Substitute:</p>
-            <div className="flex items-center gap-3 p-3 bg-[#212121] rounded-lg border border-border">
+            <div className="flex items-center gap-3 p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-border">
               <ClickableAvatar
                 userId={request.substitutePlayer.id}
                 profileImageUrl={request.substitutePlayer.profileImageUrl}
@@ -174,7 +174,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {/* Requested By */}
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-2">Requested By:</p>
-          <div className="flex items-center gap-3 p-3 bg-[#212121] rounded-lg border border-border">
+          <div className="flex items-center gap-3 p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-border">
             <User className="h-4 w-4" />
             <div>
               <p className="text-sm font-medium">
@@ -189,7 +189,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {request.reason && (
           <div>
             <p className="text-sm font-medium text-muted-foreground mb-2">Reason:</p>
-            <div className="p-3 bg-[#212121] rounded-lg border border-border">
+            <div className="p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-border">
               <p className="text-sm">{request.reason}</p>
             </div>
           </div>

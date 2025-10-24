@@ -721,7 +721,7 @@ function AnnouncementCard({
   };
 
   return (
-    <Card className="rounded-lg border text-card-foreground shadow-sm relative border-primary bg-[#212121]">
+    <Card className="rounded-lg border text-card-foreground shadow-sm relative border-primary bg-[#e2e2e2] dark:bg-[#212121]">
       {announcement.isPinned && (
         <div className="absolute top-3 right-3">
           <Pin className="w-4 h-4 text-primary" />

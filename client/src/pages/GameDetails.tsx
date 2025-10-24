@@ -629,7 +629,7 @@ export default function GameDetails() {
 
         {/* Beverage Responsibility - Away Team */}
         {isUserOnAwayTeam && !isGameCompleted && (
-          <div className="rounded-xl border border-border p-6 pl-[8px] pr-[8px] pt-[8px] pb-[8px] mt-[8px] mb-[8px] ml-[0px] mr-[0px] bg-[#212121] text-[#ffffff]">
+          <div className="rounded-xl border border-border p-6 pl-[8px] pr-[8px] pt-[8px] pb-[8px] mt-[8px] mb-[8px] ml-[0px] mr-[0px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
               {awayTeamHasBeverageDuty ? (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -685,7 +685,7 @@ export default function GameDetails() {
                       />
                     </div>
                     <div>
-                      <p className="font-medium text-[#ffffff]" data-testid="text-beverage-available">Beverage Duty Available</p>
+                      <p className="font-medium text-[#212121] dark:text-[#ffffff]" data-testid="text-beverage-available">Beverage Duty Available</p>
                     </div>
                   </div>
                   <Button
@@ -713,7 +713,7 @@ export default function GameDetails() {
 
         {/* RSVP Section */}
         {!isGameCompleted && (
-          <div className="rounded-xl border border-border p-6 mt-[0px] mb-[0px] pt-[2px] pb-[2px] bg-[#212121] text-[#ffffff]">
+          <div className="rounded-xl border border-border p-6 mt-[0px] mb-[0px] pt-[2px] pb-[2px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Users className="w-5 h-5" />
               RSVP & Attendance
@@ -838,7 +838,7 @@ export default function GameDetails() {
 
         {/* Substitute Requests Dashboard for Commissioners */}
         {isCommissioner && (
-          <div className="rounded-xl border border-border p-6 pt-[8px] pb-[8px] mt-[8px] mb-[8px] text-[#ffffff] bg-[#212121]">
+          <div className="rounded-xl border border-border p-6 pt-[8px] pb-[8px] mt-[8px] mb-[8px] text-[#212121] dark:text-[#ffffff] bg-[#e2e2e2] dark:bg-[#212121]">
             <h3 className="text-lg font-semibold mb-4">Substitute Requests for This Game</h3>
             <SubstituteRequestsDashboard gameId={game.id} />
           </div>
@@ -856,11 +856,11 @@ export default function GameDetails() {
               <div className="space-y-4">
                 {/* Score Management Section for Commissioners */}
                 {isCommissioner && (
-                  <div className="dark:bg-blue-950 rounded-lg p-4 pt-[4px] pb-[4px] pl-[4px] pr-[4px] bg-[#212121]">
+                  <div className="dark:bg-blue-950 rounded-lg p-4 pt-[4px] pb-[4px] pl-[4px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <Target className="w-5 h-5 text-blue-600" />
-                        <h4 className="text-lg font-semibold text-[#ffffff]">Score Management</h4>
+                        <h4 className="text-lg font-semibold text-[#212121] dark:text-[#ffffff]">Score Management</h4>
                       </div>
                       <Button
                         variant="outline"
@@ -963,20 +963,20 @@ export default function GameDetails() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="text-center text-sm font-medium text-[#ffffff]">
+                        <div className="text-center text-sm font-medium text-[#212121] dark:text-[#ffffff]">
                           Final Score:
                         </div>
                         <div className="flex items-center justify-center space-x-4">
                           <div className="text-center">
-                            <p className="text-sm text-[#ffffff]">{game.homeTeam?.name}</p>
-                            <p className="text-3xl font-bold text-[#ffffff]">
+                            <p className="text-sm text-[#212121] dark:text-[#ffffff]">{game.homeTeam?.name}</p>
+                            <p className="text-3xl font-bold text-[#212121] dark:text-[#ffffff]">
                               {game.homeScore}
                             </p>
                           </div>
-                          <div className="text-2xl font-bold text-[#ffffff]">-</div>
+                          <div className="text-2xl font-bold text-[#212121] dark:text-[#ffffff]">-</div>
                           <div className="text-center">
-                            <p className="text-sm text-[#ffffff]">{game.awayTeam?.name}</p>
-                            <p className="text-3xl font-bold text-[#ffffff]">
+                            <p className="text-sm text-[#212121] dark:text-[#ffffff]">{game.awayTeam?.name}</p>
+                            <p className="text-3xl font-bold text-[#212121] dark:text-[#ffffff]">
                               {game.awayScore}
                             </p>
                           </div>
@@ -1084,7 +1084,7 @@ export default function GameDetails() {
 
         {/* Game Stars Section */}
         {!isScrimmage && isGameCompleted && (
-          <div className="rounded-xl border border-border p-6 bg-[#212121]">
+          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121]">
             <h3 className="text-lg font-semibold mb-4" data-testid="text-stars-title">
               <Star className="w-5 h-5 inline mr-2 text-yellow-500" />
               Three Stars of the Game
@@ -1092,29 +1092,29 @@ export default function GameDetails() {
             
             {gameStars ? (
               <div className="space-y-3">
-                <div className="dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-center gap-3 bg-[#212121] pt-[4px] pb-[4px]">
+                <div className="dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-center gap-3 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px]">
                   <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
                   <div>
-                    <p className="text-sm font-medium text-[#ffffff]">1st Star (3 points)</p>
-                    <p className="font-bold text-[#ffffff]" data-testid="text-first-star">
+                    <p className="text-sm font-medium text-[#212121] dark:text-[#ffffff]">1st Star (3 points)</p>
+                    <p className="font-bold text-[#212121] dark:text-[#ffffff]" data-testid="text-first-star">
                       {gameStars.firstStar?.firstName} {gameStars.firstStar?.lastName}
                     </p>
                   </div>
                 </div>
-                <div className="dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-4 flex items-center gap-3 bg-[#212121] pt-[4px] pb-[4px]">
+                <div className="dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-4 flex items-center gap-3 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px]">
                   <Star className="w-7 h-7 text-gray-400 fill-gray-400" />
                   <div>
-                    <p className="text-sm font-medium text-[#ffffff]">2nd Star (2 points)</p>
-                    <p className="font-bold text-[#ffffff]" data-testid="text-second-star">
+                    <p className="text-sm font-medium text-[#212121] dark:text-[#ffffff]">2nd Star (2 points)</p>
+                    <p className="font-bold text-[#212121] dark:text-[#ffffff]" data-testid="text-second-star">
                       {gameStars.secondStar?.firstName} {gameStars.secondStar?.lastName}
                     </p>
                   </div>
                 </div>
-                <div className="dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center gap-3 bg-[#212121] pt-[4px] pb-[4px]">
+                <div className="dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center gap-3 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px]">
                   <Star className="w-6 h-6 text-amber-600 fill-amber-600" />
                   <div>
-                    <p className="text-sm font-medium text-[#ffffff]">3rd Star (1 point)</p>
-                    <p className="font-bold text-[#ffffff]" data-testid="text-third-star">
+                    <p className="text-sm font-medium text-[#212121] dark:text-[#ffffff]">3rd Star (1 point)</p>
+                    <p className="font-bold text-[#212121] dark:text-[#ffffff]" data-testid="text-third-star">
                       {gameStars.thirdStar?.firstName} {gameStars.thirdStar?.lastName}
                     </p>
                   </div>

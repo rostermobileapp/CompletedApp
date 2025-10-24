@@ -377,7 +377,7 @@ export default function Profile() {
                 
                 {/* Career Stats */}
                 {userStats && (
-                  <span className="text-xs px-3 py-1 rounded-full font-semibold text-[#ffffff] bg-[#212121]" data-testid="stat-career">
+                  <span className="text-xs px-3 py-1 rounded-full font-semibold text-[#212121] dark:text-[#ffffff] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="stat-career">
                     <span data-testid="stat-goals">{userStats.goals} G</span>
                     <span className="mx-1">•</span>
                     <span data-testid="stat-assists">{userStats.assists} A</span>
@@ -393,7 +393,7 @@ export default function Profile() {
       </div>
       {/* Profile Details */}
       <div className="px-6 mb-6">
-        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#212121]">
+        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold" data-testid="text-profile-details-title">Profile Details</h2>
             <button
@@ -544,7 +544,7 @@ export default function Profile() {
       {/* Payment Methods */}
       <div className="px-6 mb-6">
         <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
-        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#212121]">
+        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold" data-testid="text-payment-methods-title">Payment Methods</h2>

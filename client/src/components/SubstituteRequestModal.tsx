@@ -171,7 +171,7 @@ export function SubstituteRequestModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl h-[85vh] flex flex-col bg-[#212121] border-border" data-testid="substitute-request-modal">
+      <DialogContent className="max-w-2xl h-[85vh] flex flex-col bg-[#e2e2e2] dark:bg-[#212121] border-border" data-testid="substitute-request-modal">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
