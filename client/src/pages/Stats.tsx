@@ -367,7 +367,7 @@ export default function Stats() {
 
         {/* Star Leaders Section */}
         {Array.isArray(starLeaderboard) && starLeaderboard.length > 0 && (
-          <div className="px-4 py-4 bg-gradient-to-b from-yellow-900/10 to-transparent pt-[4px] pb-[4px] pl-[12px] pr-[12px]">
+          <div className="px-4 py-6 pt-[4px] pb-[4px]"></div>
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2" data-testid="text-star-leaders-title">
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
               Star Leaders
