@@ -2380,6 +2380,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Game Stars Routes
+  app.post("/api/games/:gameId/submit-stars", isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const { firstStarUserId, secondStarUserId, thirdStarUserId } = req.body;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get the game to validate it exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      // Check if the game is completed
+      if (!game.isCompleted || game.homeScore === null || game.awayScore === null) {
+        return res.status(400).json({ message: "Stars can only be awarded after game is completed with a final score" });
+      }
+
+      // Check if stars have already been awarded
+      const existingStars = await storage.getGameStars(gameId);
+      if (existingStars) {
+        return res.status(400).json({ message: "Stars have already been awarded for this game" });
+      }
+
+      // Determine the winning team
+      let winningTeamId: string | null = null;
+      if (game.homeScore > game.awayScore) {
+        winningTeamId = game.homeTeamId;
+      } else if (game.awayScore > game.homeScore) {
+        winningTeamId = game.awayTeamId;
+      } else {
+        return res.status(400).json({ message: "Stars cannot be awarded for tied games" });
+      }
+
+      // Check if user is captain of the winning team
+      const winningTeam = await storage.getTeam(winningTeamId);
+      if (!winningTeam || winningTeam.captainId !== userId) {
+        return res.status(403).json({ 
+          message: "Only the winning team captain can award the stars" 
+        });
+      }
+
+      // Validate star selections
+      if (!firstStarUserId || !secondStarUserId || !thirdStarUserId) {
+        return res.status(400).json({ message: "All three stars must be selected" });
+      }
+
+      // Check for duplicate star selections
+      if (firstStarUserId === secondStarUserId || 
+          firstStarUserId === thirdStarUserId || 
+          secondStarUserId === thirdStarUserId) {
+        return res.status(400).json({ message: "Each star must be a different player" });
+      }
+
+      // Validate that the selected players participated in the game
+      const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
+      const awayTeamMembers = game.awayTeamId ? await storage.getTeamMembers(game.awayTeamId) : [];
+      const allParticipants = [...homeTeamMembers, ...awayTeamMembers];
+      const participantUserIds = new Set(allParticipants.map(m => m.userId));
+
+      const invalidStars = [];
+      if (!participantUserIds.has(firstStarUserId)) invalidStars.push('first star');
+      if (!participantUserIds.has(secondStarUserId)) invalidStars.push('second star');
+      if (!participantUserIds.has(thirdStarUserId)) invalidStars.push('third star');
+
+      if (invalidStars.length > 0) {
+        return res.status(400).json({ 
+          message: `The selected ${invalidStars.join(', ')} must be a player who participated in this game` 
+        });
+      }
+
+      // Submit the stars
+      const stars = await storage.submitGameStars({
+        gameId,
+        firstStarUserId,
+        secondStarUserId,
+        thirdStarUserId,
+        awardedBy: userId,
+      });
+
+      res.json({ 
+        stars,
+        message: "Stars awarded successfully" 
+      });
+    } catch (error) {
+      console.error("Error submitting game stars:", error);
+      res.status(500).json({ message: "Failed to submit stars" });
+    }
+  });
+
+  app.get("/api/games/:gameId/stars", async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+
+      // Get the game to validate it exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      const stars = await storage.getGameStars(gameId);
+      
+      if (!stars) {
+        return res.json(null);
+      }
+
+      res.json(stars);
+    } catch (error) {
+      console.error("Error fetching game stars:", error);
+      res.status(500).json({ message: "Failed to fetch stars" });
+    }
+  });
+
+  app.get("/api/leagues/:leagueId/star-leaderboard", async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+
+      // Verify league exists
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      const leaderboard = await storage.getLeagueStarLeaderboard(leagueId, limit);
+      res.json(leaderboard);
+    } catch (error) {
+      console.error("Error fetching star leaderboard:", error);
+      res.status(500).json({ message: "Failed to fetch leaderboard" });
+    }
+  });
+
   // Delete team
   app.delete("/api/teams/:teamId", isAuthenticated, async (req: any, res) => {
     try {

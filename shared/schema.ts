@@ -344,6 +344,23 @@ export const gameGoalies = pgTable("game_goalies", {
   index("idx_game_goalies_user_id").on(table.goalieUserId),
 ]);
 
+// Game stars table - tracks the 3 stars awarded after each game
+export const gameStars = pgTable("game_stars", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: varchar("game_id").references(() => games.id).notNull(),
+  firstStarUserId: varchar("first_star_user_id").references(() => users.id).notNull(),
+  secondStarUserId: varchar("second_star_user_id").references(() => users.id).notNull(),
+  thirdStarUserId: varchar("third_star_user_id").references(() => users.id).notNull(),
+  awardedBy: varchar("awarded_by").references(() => users.id).notNull(),
+  awardedAt: timestamp("awarded_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_game_stars").on(table.gameId),
+  index("idx_game_stars_game_id").on(table.gameId),
+  index("idx_game_stars_first_star").on(table.firstStarUserId),
+  index("idx_game_stars_second_star").on(table.secondStarUserId),
+  index("idx_game_stars_third_star").on(table.thirdStarUserId),
+]);
+
 // Game RSVPs table
 export const gameRsvps = pgTable("game_rsvps", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1715,6 +1732,11 @@ export const insertGameGoalieSchema = createInsertSchema(gameGoalies).omit({
   createdAt: true,
 });
 
+export const insertGameStarsSchema = createInsertSchema(gameStars).omit({
+  id: true,
+  awardedAt: true,
+});
+
 // Messaging schemas
 export const insertConversationSchema = createInsertSchema(conversations).omit({
   id: true,
@@ -2197,6 +2219,8 @@ export type GameScoreSubmission = typeof gameScoreSubmissions.$inferSelect;
 export type InsertGameScoreSubmission = z.infer<typeof insertGameScoreSubmissionSchema>;
 export type GameGoalie = typeof gameGoalies.$inferSelect;
 export type InsertGameGoalie = z.infer<typeof insertGameGoalieSchema>;
+export type GameStar = typeof gameStars.$inferSelect;
+export type InsertGameStar = z.infer<typeof insertGameStarsSchema>;
 // Messaging types
 export type Conversation = typeof conversations.$inferSelect;
 export type InsertConversation = z.infer<typeof insertConversationSchema>;

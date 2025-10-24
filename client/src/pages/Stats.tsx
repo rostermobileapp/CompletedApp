@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, ChevronRight, Settings, Trophy } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Settings, Trophy, Star } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -96,6 +96,12 @@ export default function Stats() {
       const query = params.toString();
       return fetch(`/api/leagues/${leagueId}/stats${query ? `?${query}` : ''}`).then(res => res.json());
     },
+    enabled: !!leagueId,
+  });
+
+  // Fetch star leaderboard
+  const { data: starLeaderboard } = useQuery({
+    queryKey: [`/api/leagues/${leagueId}/star-leaderboard`],
     enabled: !!leagueId,
   });
 
@@ -360,6 +366,57 @@ export default function Stats() {
             </TabsList>
           </Tabs>
         </div>
+
+        {/* Star Leaders Section */}
+        {Array.isArray(starLeaderboard) && starLeaderboard.length > 0 && (
+          <div className="px-4 py-4 bg-gradient-to-b from-yellow-900/10 to-transparent">
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2" data-testid="text-star-leaders-title">
+              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+              Star Leaders
+            </h2>
+            <div className="space-y-2">
+              {starLeaderboard.slice(0, 3).map((leader: any, index: number) => (
+                <div 
+                  key={leader.user.id} 
+                  className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 flex items-center justify-between"
+                  data-testid={`row-star-leader-${index}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl font-bold text-gray-600">
+                      {index + 1}
+                    </div>
+                    <Avatar className="w-10 h-10">
+                      <AvatarImage src={leader.user?.profileImageUrl || undefined} />
+                      <AvatarFallback className="bg-gray-700 text-white text-sm">
+                        {getInitials(leader.user?.firstName, leader.user?.lastName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="text-white font-medium" data-testid={`text-star-leader-name-${index}`}>
+                        {leader.user.firstName} {leader.user.lastName}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {leader.firstStars > 0 && `${leader.firstStars}× 1st`}
+                        {leader.firstStars > 0 && leader.secondStars > 0 && ` • `}
+                        {leader.secondStars > 0 && `${leader.secondStars}× 2nd`}
+                        {(leader.firstStars > 0 || leader.secondStars > 0) && leader.thirdStars > 0 && ` • `}
+                        {leader.thirdStars > 0 && `${leader.thirdStars}× 3rd`}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-yellow-500" data-testid={`text-star-points-${index}`}>
+                      {leader.starPoints}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {leader.starPoints === 1 ? 'point' : 'points'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="px-4 py-6">

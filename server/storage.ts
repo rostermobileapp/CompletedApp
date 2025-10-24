@@ -12,6 +12,7 @@ import {
   gameScoreSubmissions,
   gameRsvps,
   gameGoalies,
+  gameStars,
   substituteRequests,
   substitutionApprovals,
   messages,
@@ -79,6 +80,8 @@ import {
   type InsertGameScoreSubmission,
   type GameRsvp,
   type InsertGameRsvp,
+  type GameStar,
+  type InsertGameStar,
   type SubstituteRequest,
   type InsertSubstituteRequest,
   type SubstitutionApproval,
@@ -285,6 +288,11 @@ export interface IStorage {
   releaseBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game>;
   saveGameNotes(gameId: string, userId: string, teamId: string, notes: string): Promise<any>;
   deleteGame(id: string): Promise<void>;
+  
+  // Game stars operations
+  submitGameStars(stars: InsertGameStar): Promise<GameStar>;
+  getGameStars(gameId: string): Promise<(GameStar & { firstStar: User; secondStar: User; thirdStar: User; awarder: User }) | undefined>;
+  getLeagueStarLeaderboard(leagueId: string, limit?: number): Promise<{ user: User; starPoints: number; firstStars: number; secondStars: number; thirdStars: number }[]>;
   
   // Personal Reminders
   getUserPersonalReminders(userId: string): Promise<PersonalReminder[]>;
@@ -3373,7 +3381,12 @@ export class DatabaseStorage implements IStorage {
       const deletedGoalies = await db.delete(gameGoalies).where(eq(gameGoalies.gameId, id));
       console.log(`Deleted ${deletedGoalies.rowCount || 0} game goalies`);
       
-      // 3. Delete game RSVPs
+      // 3. Delete game stars
+      console.log(`Deleting game stars for game ${id}`);
+      const deletedStars = await db.delete(gameStars).where(eq(gameStars.gameId, id));
+      console.log(`Deleted ${deletedStars.rowCount || 0} game stars`);
+      
+      // 4. Delete game RSVPs
       console.log(`Deleting game RSVPs for game ${id}`);
       const deletedRsvps = await db.delete(gameRsvps).where(eq(gameRsvps.gameId, id));
       console.log(`Deleted ${deletedRsvps.rowCount || 0} game RSVPs`);
@@ -3389,6 +3402,117 @@ export class DatabaseStorage implements IStorage {
       console.error(`Error deleting game ${id}:`, error);
       throw error;
     }
+  }
+
+  // Game stars operations
+  async submitGameStars(stars: InsertGameStar): Promise<GameStar> {
+    const [newStars] = await db
+      .insert(gameStars)
+      .values(stars)
+      .returning();
+    return newStars;
+  }
+
+  async getGameStars(gameId: string): Promise<(GameStar & { firstStar: User; secondStar: User; thirdStar: User; awarder: User }) | undefined> {
+    const results = await db
+      .select({
+        id: gameStars.id,
+        gameId: gameStars.gameId,
+        firstStarUserId: gameStars.firstStarUserId,
+        secondStarUserId: gameStars.secondStarUserId,
+        thirdStarUserId: gameStars.thirdStarUserId,
+        awardedBy: gameStars.awardedBy,
+        awardedAt: gameStars.awardedAt,
+        firstStar: users,
+        secondStar: sql`NULL`.as('secondStar'),
+        thirdStar: sql`NULL`.as('thirdStar'),
+        awarder: sql`NULL`.as('awarder'),
+      })
+      .from(gameStars)
+      .leftJoin(users, eq(gameStars.firstStarUserId, users.id))
+      .where(eq(gameStars.gameId, gameId))
+      .limit(1);
+
+    if (results.length === 0) return undefined;
+
+    const gameStarRecord = results[0];
+    
+    const [secondStar] = await db.select().from(users).where(eq(users.id, gameStarRecord.secondStarUserId));
+    const [thirdStar] = await db.select().from(users).where(eq(users.id, gameStarRecord.thirdStarUserId));
+    const [awarder] = await db.select().from(users).where(eq(users.id, gameStarRecord.awardedBy));
+
+    return {
+      id: gameStarRecord.id,
+      gameId: gameStarRecord.gameId,
+      firstStarUserId: gameStarRecord.firstStarUserId,
+      secondStarUserId: gameStarRecord.secondStarUserId,
+      thirdStarUserId: gameStarRecord.thirdStarUserId,
+      awardedBy: gameStarRecord.awardedBy,
+      awardedAt: gameStarRecord.awardedAt,
+      firstStar: gameStarRecord.firstStar,
+      secondStar,
+      thirdStar,
+      awarder,
+    };
+  }
+
+  async getLeagueStarLeaderboard(leagueId: string, limit: number = 10): Promise<{ user: User; starPoints: number; firstStars: number; secondStars: number; thirdStars: number }[]> {
+    const allGames = await db
+      .select()
+      .from(games)
+      .where(eq(games.leagueId, leagueId));
+    
+    const gameIds = allGames.map(g => g.id);
+    
+    if (gameIds.length === 0) return [];
+
+    const allStars = await db
+      .select()
+      .from(gameStars)
+      .where(inArray(gameStars.gameId, gameIds));
+
+    const playerStarCounts: Record<string, { firstStars: number; secondStars: number; thirdStars: number }> = {};
+
+    for (const star of allStars) {
+      if (!playerStarCounts[star.firstStarUserId]) {
+        playerStarCounts[star.firstStarUserId] = { firstStars: 0, secondStars: 0, thirdStars: 0 };
+      }
+      playerStarCounts[star.firstStarUserId].firstStars++;
+
+      if (!playerStarCounts[star.secondStarUserId]) {
+        playerStarCounts[star.secondStarUserId] = { firstStars: 0, secondStars: 0, thirdStars: 0 };
+      }
+      playerStarCounts[star.secondStarUserId].secondStars++;
+
+      if (!playerStarCounts[star.thirdStarUserId]) {
+        playerStarCounts[star.thirdStarUserId] = { firstStars: 0, secondStars: 0, thirdStars: 0 };
+      }
+      playerStarCounts[star.thirdStarUserId].thirdStars++;
+    }
+
+    const playerIds = Object.keys(playerStarCounts);
+    if (playerIds.length === 0) return [];
+
+    const playersData = await db
+      .select()
+      .from(users)
+      .where(inArray(users.id, playerIds));
+
+    const leaderboard = playersData.map(user => {
+      const counts = playerStarCounts[user.id];
+      const starPoints = (counts.firstStars * 3) + (counts.secondStars * 2) + (counts.thirdStars * 1);
+      return {
+        user,
+        starPoints,
+        firstStars: counts.firstStars,
+        secondStars: counts.secondStars,
+        thirdStars: counts.thirdStars,
+      };
+    });
+
+    leaderboard.sort((a, b) => b.starPoints - a.starPoints);
+
+    return leaderboard.slice(0, limit);
   }
 
   // Personal Reminders operations

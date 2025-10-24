@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2 } from "lucide-react";
+import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star } from "lucide-react";
 import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPSummary } from "@/components/RSVPSummary";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
@@ -11,6 +11,7 @@ import { SubstituteRequestsDashboard } from "@/components/SubstituteRequestsDash
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
@@ -37,6 +38,9 @@ export default function GameDetails() {
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
   const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string; teamId?: string } | null>(null);
+  const [firstStarUserId, setFirstStarUserId] = useState("");
+  const [secondStarUserId, setSecondStarUserId] = useState("");
+  const [thirdStarUserId, setThirdStarUserId] = useState("");
 
   // Fetch user's teams
   const { data: userTeams } = useQuery<UserTeam[]>({
@@ -176,6 +180,46 @@ export default function GameDetails() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete game. You may not have permission.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Fetch game stars
+  const { data: gameStars } = useQuery({
+    queryKey: [`/api/games/${gameId}/stars`],
+    enabled: !!gameId && !isScrimmage,
+  });
+
+  // Submit stars mutation
+  const submitStarsMutation = useMutation({
+    mutationFn: async ({ gameId, firstStarUserId, secondStarUserId, thirdStarUserId }: { 
+      gameId: string; 
+      firstStarUserId: string; 
+      secondStarUserId: string; 
+      thirdStarUserId: string; 
+    }) => {
+      const response = await apiRequest("POST", `/api/games/${gameId}/submit-stars`, { 
+        firstStarUserId, 
+        secondStarUserId, 
+        thirdStarUserId 
+      });
+      return await response.json();
+    },
+    onSuccess: (data: { message: string }) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/stars`] });
+      setFirstStarUserId("");
+      setSecondStarUserId("");
+      setThirdStarUserId("");
+      toast({
+        title: "Stars Awarded",
+        description: data.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit stars. Please try again.",
         variant: "destructive",
       });
     },
@@ -1049,6 +1093,173 @@ export default function GameDetails() {
                   Only team captains and commissioners can submit scores
                 </p>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Game Stars Section */}
+        {!isScrimmage && isGameCompleted && (
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h3 className="text-lg font-semibold mb-4" data-testid="text-stars-title">
+              <Star className="w-5 h-5 inline mr-2 text-yellow-500" />
+              Three Stars of the Game
+            </h3>
+            
+            {gameStars ? (
+              <div className="space-y-3">
+                <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-center gap-3">
+                  <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
+                  <div>
+                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">1st Star (3 points)</p>
+                    <p className="font-bold" data-testid="text-first-star">
+                      {gameStars.firstStar?.firstName} {gameStars.firstStar?.lastName}
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-4 flex items-center gap-3">
+                  <Star className="w-7 h-7 text-gray-400 fill-gray-400" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">2nd Star (2 points)</p>
+                    <p className="font-bold" data-testid="text-second-star">
+                      {gameStars.secondStar?.firstName} {gameStars.secondStar?.lastName}
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center gap-3">
+                  <Star className="w-6 h-6 text-amber-600 fill-amber-600" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">3rd Star (1 point)</p>
+                    <p className="font-bold" data-testid="text-third-star">
+                      {gameStars.thirdStar?.firstName} {gameStars.thirdStar?.lastName}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground text-center mt-3">
+                  Awarded by {gameStars.awarder?.firstName} {gameStars.awarder?.lastName}
+                </p>
+              </div>
+            ) : (
+              <>
+                {(() => {
+                  if (!game.homeScore || !game.awayScore || game.homeScore === game.awayScore) {
+                    return (
+                      <div className="text-center py-4">
+                        <p className="text-muted-foreground">
+                          Stars can be awarded once the game has a winner
+                        </p>
+                      </div>
+                    );
+                  }
+                  
+                  const winningTeamId = game.homeScore > game.awayScore ? game.homeTeamId : game.awayTeamId;
+                  const isWinningCaptain = (winningTeamId === game.homeTeamId && game.homeTeam?.captainId === user?.id) ||
+                                           (winningTeamId === game.awayTeamId && game.awayTeam?.captainId === user?.id);
+                  
+                  if (!isWinningCaptain) {
+                    return (
+                      <div className="text-center py-4">
+                        <p className="text-muted-foreground">
+                          Only the winning team captain can award the three stars
+                        </p>
+                      </div>
+                    );
+                  }
+                  
+                  // Get all players from both teams
+                  const allPlayers = [
+                    ...(homeTeamMembers || []),
+                    ...(awayTeamMembers || [])
+                  ].filter((member, index, self) => 
+                    self.findIndex(m => m.user.id === member.user.id) === index
+                  );
+                  
+                  return (
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground mb-3">
+                        As the winning captain, select the three stars of the game:
+                      </p>
+                      <div className="space-y-3">
+                        <div>
+                          <Label htmlFor="firstStar" className="text-sm font-medium flex items-center gap-2 mb-1">
+                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                            1st Star (3 points)
+                          </Label>
+                          <Select value={firstStarUserId} onValueChange={setFirstStarUserId}>
+                            <SelectTrigger id="firstStar" data-testid="select-first-star">
+                              <SelectValue placeholder="Select player" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allPlayers.map((member) => (
+                                <SelectItem key={member.user.id} value={member.user.id}>
+                                  {member.user.firstName} {member.user.lastName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="secondStar" className="text-sm font-medium flex items-center gap-2 mb-1">
+                            <Star className="w-4 h-4 text-gray-400 fill-gray-400" />
+                            2nd Star (2 points)
+                          </Label>
+                          <Select value={secondStarUserId} onValueChange={setSecondStarUserId}>
+                            <SelectTrigger id="secondStar" data-testid="select-second-star">
+                              <SelectValue placeholder="Select player" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allPlayers.map((member) => (
+                                <SelectItem key={member.user.id} value={member.user.id}>
+                                  {member.user.firstName} {member.user.lastName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="thirdStar" className="text-sm font-medium flex items-center gap-2 mb-1">
+                            <Star className="w-4 h-4 text-amber-600 fill-amber-600" />
+                            3rd Star (1 point)
+                          </Label>
+                          <Select value={thirdStarUserId} onValueChange={setThirdStarUserId}>
+                            <SelectTrigger id="thirdStar" data-testid="select-third-star">
+                              <SelectValue placeholder="Select player" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allPlayers.map((member) => (
+                                <SelectItem key={member.user.id} value={member.user.id}>
+                                  {member.user.firstName} {member.user.lastName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (firstStarUserId && secondStarUserId && thirdStarUserId) {
+                            submitStarsMutation.mutate({ 
+                              gameId: game.id, 
+                              firstStarUserId, 
+                              secondStarUserId, 
+                              thirdStarUserId 
+                            });
+                          }
+                        }}
+                        disabled={
+                          submitStarsMutation.isPending || 
+                          !firstStarUserId || 
+                          !secondStarUserId || 
+                          !thirdStarUserId
+                        }
+                        className="w-full"
+                        data-testid="button-submit-stars"
+                      >
+                        {submitStarsMutation.isPending ? "Submitting..." : "Award Three Stars"}
+                      </Button>
+                    </div>
+                  );
+                })()}
+              </>
             )}
           </div>
         )}
