@@ -369,7 +369,7 @@ export default function Stats() {
 
         {/* Star Leaders Section */}
         {Array.isArray(starLeaderboard) && starLeaderboard.length > 0 && (
-          <div className="px-4 py-4 bg-gradient-to-b from-yellow-900/10 to-transparent">
+          <div className="px-4 py-4 bg-gradient-to-b from-yellow-900/10 to-transparent pt-[4px] pb-[4px] pl-[12px] pr-[12px]">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2" data-testid="text-star-leaders-title">
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
               Star Leaders
@@ -419,7 +419,7 @@ export default function Stats() {
             </div>
           ) : viewMode === 'table' ? (
             /* Table View */
-            <div className="space-y-4">
+            (<div className="space-y-4">
               {/* Back button and title */}
               <div className="flex items-center gap-3 mb-6">
                 <button 
@@ -433,7 +433,6 @@ export default function Stats() {
                   {sortBy === 'penaltyMinutes' ? 'Penalty Minutes' : sortBy === 'goalsAgainstAverage' ? 'Goals Against Average' : sortBy}
                 </h2>
               </div>
-
               {/* Stats Table */}
               <div className="overflow-auto border border-gray-800 rounded-lg">
                 <table className="w-full" data-testid="table-stats">
@@ -509,10 +508,10 @@ export default function Stats() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </div>)
           ) : (
             /* Summary View */
-            <div className="space-y-8">
+            (<div className="space-y-8">
               {/* Points Section */}
               {activeTab !== 'goalies' && (
                 <StatSection
@@ -526,7 +525,6 @@ export default function Stats() {
                   onClick={() => handleStatClick('points')}
                 />
               )}
-
               {/* Goals Section */}
               {activeTab !== 'goalies' && (
                 <StatSection
@@ -541,7 +539,6 @@ export default function Stats() {
                   onClick={() => handleStatClick('goals')}
                 />
               )}
-
               {/* Assists Section */}
               {activeTab !== 'goalies' && (
                 <StatSection
@@ -557,7 +554,6 @@ export default function Stats() {
                   onClick={() => handleStatClick('assists')}
                 />
               )}
-
               {/* Penalty Minutes Section */}
               {activeTab !== 'goalies' && (
                 <StatSection
@@ -572,7 +568,6 @@ export default function Stats() {
                   onClick={() => handleStatClick('penaltyMinutes')}
                 />
               )}
-
               {/* Wins Section (Goalies) */}
               {activeTab === 'goalies' && (
                 <StatSection
@@ -587,7 +582,6 @@ export default function Stats() {
                   onClick={() => handleStatClick('wins')}
                 />
               )}
-
               {/* Goals Against Average Section (Goalies) */}
               {activeTab === 'goalies' && (
                 <StatSection
@@ -602,7 +596,6 @@ export default function Stats() {
                   onClick={() => handleStatClick('goalsAgainstAverage')}
                 />
               )}
-
               {/* Shutouts Section (Goalies) */}
               {activeTab === 'goalies' && (
                 <StatSection
@@ -617,7 +610,7 @@ export default function Stats() {
                   onClick={() => handleStatClick('shutouts')}
                 />
               )}
-            </div>
+            </div>)
           )}
         </div>
       </FeatureLockOverlay>
@@ -663,7 +656,6 @@ function StatSection({
       <h2 className="text-[#00A9FF] text-sm font-semibold mb-3 uppercase tracking-wide" data-testid={`header-${title.toLowerCase().replace(/\s+/g, '-')}`}>
         {title}
       </h2>
-      
       <button
         onClick={onClick}
         className="w-full bg-[#0a0a0a] rounded-lg p-4 flex items-center justify-between hover:bg-gray-900 transition-colors group"
@@ -674,7 +666,7 @@ function StatSection({
           <div className="flex -space-x-2">
             {isTied ? (
               // Show multiple avatars for tied players
-              <>
+              (<>
                 {tiedPlayers.slice(0, 3).map((player, idx) => (
                   <Avatar key={idx} className="w-12 h-12 border-2 border-black" data-testid={`avatar-player-${idx}`}>
                     <AvatarImage src={player.user?.profileImageUrl || undefined} />
@@ -688,15 +680,15 @@ function StatSection({
                     +{tiedPlayers.length - 3}
                   </div>
                 )}
-              </>
+              </>)
             ) : (
               // Show single avatar
-              <Avatar className="w-12 h-12" data-testid="avatar-player-single">
+              (<Avatar className="w-12 h-12" data-testid="avatar-player-single">
                 <AvatarImage src={players[0].user?.profileImageUrl || undefined} />
                 <AvatarFallback className="bg-gray-700 text-white text-sm">
                   {getInitials(players[0].user?.firstName, players[0].user?.lastName)}
                 </AvatarFallback>
-              </Avatar>
+              </Avatar>)
             )}
           </div>
 
