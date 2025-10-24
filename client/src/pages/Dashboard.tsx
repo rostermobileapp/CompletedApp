@@ -350,7 +350,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                 <div>
                   <div className="flex items-center gap-2 mb-4">
                     <h3 className="text-lg font-black text-[#3c83f6]">
-                      Substitute Approvals ({pendingSubstituteApprovals.total})
+                      Substitute Approvals
                     </h3>
                   </div>
                   <div className="dark:bg-purple-950 rounded-lg p-4 bg-[#6b6b6b85]">
