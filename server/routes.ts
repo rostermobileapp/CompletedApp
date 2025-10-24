@@ -2523,45 +2523,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { leagueId } = req.query;
 
+      console.log(`🌟 [STARS] Getting games needing stars for user ${userId}, leagueId: ${leagueId}`);
+
       // Get all games where user is a team captain
       const allGames = await storage.getAllUserGames(userId);
+      console.log(`🌟 [STARS] Found ${allGames.length} total games for user`);
       
       const gamesNeedingStars = [];
 
       for (const game of allGames) {
+        console.log(`🌟 [STARS] Checking game ${game.id} - completed: ${game.isCompleted}, homeScore: ${game.homeScore}, awayScore: ${game.awayScore}`);
+        
         // Only check completed games with scores
         if (!game.isCompleted || game.homeScore === null || game.awayScore === null) {
+          console.log(`🌟 [STARS] Skipping game ${game.id} - not completed or no scores`);
           continue;
         }
 
         // Skip tied games
         if (game.homeScore === game.awayScore) {
+          console.log(`🌟 [STARS] Skipping game ${game.id} - tied game`);
           continue;
         }
 
         // Filter by league if specified
         if (leagueId && game.leagueId !== leagueId) {
+          console.log(`🌟 [STARS] Skipping game ${game.id} - wrong league (${game.leagueId} !== ${leagueId})`);
           continue;
         }
 
         // Determine winning team
         const winningTeamId = game.homeScore > game.awayScore ? game.homeTeamId : game.awayTeamId;
+        console.log(`🌟 [STARS] Game ${game.id} winning team: ${winningTeamId}`);
         
         // Check if user is captain of winning team
         const winningTeam = await storage.getTeam(winningTeamId);
+        console.log(`🌟 [STARS] Winning team captain: ${winningTeam?.captainId}, user: ${userId}`);
         if (!winningTeam || winningTeam.captainId !== userId) {
+          console.log(`🌟 [STARS] Skipping game ${game.id} - user not captain of winning team`);
           continue;
         }
 
         // Check if stars have already been awarded
         const existingStars = await storage.getGameStars(game.id);
+        console.log(`🌟 [STARS] Existing stars for game ${game.id}: ${existingStars ? 'YES' : 'NO'}`);
         if (existingStars) {
+          console.log(`🌟 [STARS] Skipping game ${game.id} - stars already awarded`);
           continue;
         }
 
+        console.log(`🌟 [STARS] ✅ Game ${game.id} needs stars!`);
         gamesNeedingStars.push(game);
       }
 
+      console.log(`🌟 [STARS] Returning ${gamesNeedingStars.length} games needing stars`);
       res.json(gamesNeedingStars);
     } catch (error) {
       console.error("Error fetching games needing stars:", error);
