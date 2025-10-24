@@ -1084,7 +1084,7 @@ export default function GameDetails() {
 
         {/* Game Stars Section */}
         {!isScrimmage && isGameCompleted && (
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="rounded-xl border border-border p-6 bg-[#212121]">
             <h3 className="text-lg font-semibold mb-4" data-testid="text-stars-title">
               <Star className="w-5 h-5 inline mr-2 text-yellow-500" />
               Three Stars of the Game
