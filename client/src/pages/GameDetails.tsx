@@ -1101,7 +1101,7 @@ export default function GameDetails() {
                     </p>
                   </div>
                 </div>
-                <div className="dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-4 flex items-center gap-3 bg-[#212121]">
+                <div className="dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-4 flex items-center gap-3 bg-[#212121] pt-[4px] pb-[4px]">
                   <Star className="w-7 h-7 text-gray-400 fill-gray-400" />
                   <div>
                     <p className="text-sm font-medium text-[#ffffff]">2nd Star (2 points)</p>
