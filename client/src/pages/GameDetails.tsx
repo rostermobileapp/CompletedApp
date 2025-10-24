@@ -1092,7 +1092,7 @@ export default function GameDetails() {
             
             {gameStars ? (
               <div className="space-y-3">
-                <div className="dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-center gap-3 bg-[#212121]">
+                <div className="dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-center gap-3 bg-[#212121] pt-[4px] pb-[4px]">
                   <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
                   <div>
                     <p className="text-sm font-medium text-[#ffffff]">1st Star (3 points)</p>
