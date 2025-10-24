@@ -807,9 +807,7 @@ export default function Profile() {
             <button
               key={index}
               onClick={item.action}
-              className={`w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:bg-card/80 ${
-                item.highlight ? 'border-warning' : ''
-              }`}
+              className="w-full border border-border rounded-lg p-4 flex items-center justify-between hover:bg-card/80 bg-[#e2e2e2]"
               data-testid={`button-setting-${index}`}
             >
               <div className="flex items-center gap-3">
