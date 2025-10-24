@@ -876,7 +876,7 @@ export default function Profile() {
           {/* Sign Out */}
           <button
             onClick={() => window.location.href = '/api/logout'}
-            className="w-full border border-border rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-card/80 bg-[#e2e2e2]"
+            className="w-full border border-border rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-card/80 bg-[#e2e2e2] font-bold"
             data-testid="button-sign-out"
           >
             <div className="flex items-center gap-3">
