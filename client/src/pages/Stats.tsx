@@ -381,9 +381,9 @@ export default function Stats() {
                   className="bg-gray-900/50 border border-gray-800 rounded-lg p-3 flex items-start gap-2 pt-[4px] pb-[4px] pl-[4px] pr-[4px]"
                   data-testid={`row-star-leader-${index}`}
                 >
-                  <Avatar className="w-8 h-8">
+                  <Avatar className="w-12 h-12">
                     <AvatarImage src={leader.user?.profileImageUrl || undefined} />
-                    <AvatarFallback className="bg-gray-700 text-white text-xs">
+                    <AvatarFallback className="bg-gray-700 text-white text-sm">
                       {getInitials(leader.user?.firstName, leader.user?.lastName)}
                     </AvatarFallback>
                   </Avatar>
