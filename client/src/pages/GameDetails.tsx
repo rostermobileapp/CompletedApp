@@ -851,7 +851,7 @@ export default function GameDetails() {
               <div className="space-y-4">
                 {/* Score Management Section for Commissioners */}
                 {isCommissioner && (
-                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 pt-[4px] pb-[4px] pl-[4px] pr-[4px]">
                     <div className="flex items-center gap-2 mb-3">
                       <Target className="w-5 h-5 text-blue-600" />
                       <h4 className="text-lg font-semibold text-blue-600">Score Management</h4>
