@@ -378,20 +378,22 @@ export default function Stats() {
               {starLeaderboard.slice(0, 3).map((leader: any, index: number) => (
                 <div 
                   key={leader.user.id} 
-                  className="bg-gray-900/50 border border-gray-800 rounded-lg p-3 flex flex-col items-center"
+                  className="bg-gray-900/50 border border-gray-800 rounded-lg p-3 flex items-start gap-2"
                   data-testid={`row-star-leader-${index}`}
                 >
-                  <Avatar className="w-14 h-14 mb-2">
+                  <Avatar className="w-8 h-8">
                     <AvatarImage src={leader.user?.profileImageUrl || undefined} />
-                    <AvatarFallback className="bg-gray-700 text-white text-sm">
+                    <AvatarFallback className="bg-gray-700 text-white text-xs">
                       {getInitials(leader.user?.firstName, leader.user?.lastName)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="text-white font-medium text-sm text-center mb-1" data-testid={`text-star-leader-name-${index}`}>
-                    {leader.user.lastName}
-                  </div>
-                  <div className="text-xl font-bold text-yellow-500" data-testid={`text-star-points-${index}`}>
-                    {leader.starPoints}
+                  <div className="flex flex-col">
+                    <div className="text-white font-medium text-sm" data-testid={`text-star-leader-name-${index}`}>
+                      {leader.user.lastName}
+                    </div>
+                    <div className="text-xl font-bold text-yellow-500" data-testid={`text-star-points-${index}`}>
+                      {leader.starPoints}
+                    </div>
                   </div>
                 </div>
               ))}
