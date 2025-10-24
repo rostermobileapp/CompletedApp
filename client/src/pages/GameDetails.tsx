@@ -958,7 +958,7 @@ export default function GameDetails() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="text-center text-sm text-blue-600 font-medium">
+                        <div className="text-center text-sm font-medium text-[#ffffff]">
                           Final Score:
                         </div>
                         <div className="flex items-center justify-center space-x-4">
