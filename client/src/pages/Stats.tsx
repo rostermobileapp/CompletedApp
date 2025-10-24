@@ -367,7 +367,7 @@ export default function Stats() {
 
         {/* Star Leaders Section */}
         {Array.isArray(starLeaderboard) && starLeaderboard.length > 0 && (
-          <div className="px-4 py-6 pt-[4px] pb-[4px]"></div>
+          <div className="px-4 py-4 bg-gradient-to-b from-yellow-900/10 to-transparent">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2" data-testid="text-star-leaders-title">
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
               Star Leaders
@@ -376,7 +376,7 @@ export default function Stats() {
               {starLeaderboard.slice(0, 3).map((leader: any, index: number) => (
                 <div 
                   key={leader.user.id} 
-                  className="bg-gray-900/50 border border-gray-800 rounded-lg p-3 flex items-start gap-2 pt-[4px] pb-[4px] pl-[4px] pr-[4px]"
+                  className="bg-gray-900/50 border border-gray-800 rounded-lg p-3 flex items-start gap-2"
                   data-testid={`row-star-leader-${index}`}
                 >
                   <Avatar className="w-12 h-12">
@@ -400,7 +400,7 @@ export default function Stats() {
         )}
 
         {/* Content */}
-        <div className="px-4 py-6">
+        <div className="px-4 py-6 pt-[4px] pb-[4px]">
           {isLoading ? (
             <div className="space-y-6" data-testid="loading-stats">
               {[...Array(3)].map((_, i) => (
