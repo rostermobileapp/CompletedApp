@@ -605,7 +605,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
         </div>
 
         {/* Footer with Close Button */}
-        <div className="p-6 border-t border-border">
+        <div className="p-6 border-t border-border pt-[4px] pb-[4px] mt-[4px] mb-[4px]">
           <div className="flex justify-center">
             <Button 
               onClick={onClose}
