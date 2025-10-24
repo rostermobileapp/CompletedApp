@@ -558,7 +558,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       Award 3 Stars ({gamesNeedingStars.length})
                     </h3>
                   </div>
-                  <div className="dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 bg-[#212121]">
+                  <div className="dark:bg-yellow-950 rounded-lg p-4 bg-[#212121]">
                     <div className="space-y-3">
                       {gamesNeedingStars.map((game: any) => (
                         <div 
