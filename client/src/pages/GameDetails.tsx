@@ -855,7 +855,7 @@ export default function GameDetails() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <Target className="w-5 h-5 text-blue-600" />
-                        <h4 className="text-lg font-semibold text-blue-600">Score Management</h4>
+                        <h4 className="text-lg font-semibold text-[#ffffff]">Score Management</h4>
                       </div>
                       <Button
                         variant="outline"
