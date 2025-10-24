@@ -869,7 +869,7 @@ export default function GameDetails() {
                           setEditHomeScore(game.homeScore?.toString() || "");
                           setEditAwayScore(game.awayScore?.toString() || "");
                         }}
-                        className="flex items-center gap-2"
+                        className="flex items-center gap-2 bg-[#0079f2]"
                         data-testid="button-edit-final-score"
                       >
                         <Target className="w-4 h-4" />
