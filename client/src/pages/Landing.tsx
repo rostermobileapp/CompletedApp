@@ -43,7 +43,7 @@ export default function Landing() {
           <img 
             src={logoWhite} 
             alt="Roster Logo" 
-            className="h-8"
+            className="h-8 invert dark:invert-0"
             data-testid="logo-image"
           />
           <button 

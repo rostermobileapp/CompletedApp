@@ -72,7 +72,7 @@ export function BottomNavigation() {
                 <img 
                   src={rostersLogoUrl}
                   alt="Home"
-                  className="mb-1 object-contain"
+                  className="mb-1 object-contain invert dark:invert-0"
                   style={{ width: '30px', height: '30px' }}
                 />
               ) : Icon && (

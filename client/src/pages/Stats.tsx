@@ -270,10 +270,10 @@ export default function Stats() {
 
   if (!leagueId) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6" data-testid="no-league-state">
+      <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center px-6" data-testid="no-league-state">
         <Trophy className="w-16 h-16 text-gray-500 mb-4" />
-        <h2 className="text-xl font-bold text-white mb-2">No League Found</h2>
-        <p className="text-gray-400 text-center mb-6">
+        <h2 className="text-xl font-bold text-[#212121] dark:text-white mb-2">No League Found</h2>
+        <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
           You need to join a league to view player stats
         </p>
         <Button 
@@ -287,10 +287,10 @@ export default function Stats() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white pb-24" data-testid="stats-page">
+    <div className="min-h-screen bg-white dark:bg-black text-[#212121] dark:text-white pb-24" data-testid="stats-page">
       <FeatureLockOverlay isLocked={!canAccessPremiumFeatures() && !canEditStats()} className="min-h-screen flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 z-50 bg-black/95 backdrop-blur-sm border-b border-gray-800">
+        <div className="sticky top-0 z-50 bg-white/95 dark:bg-black/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
           <div className="px-4 pt-[4px] pb-[4px]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -299,7 +299,7 @@ export default function Stats() {
                     setPageTransitionDirection('down');
                     navigate('/');
                   }}
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-gray-600 dark:text-gray-400 hover:text-[#212121] dark:hover:text-white transition-colors"
                   data-testid="button-back"
                 >
                   <ArrowLeft className="w-5 h-5" />
@@ -311,7 +311,7 @@ export default function Stats() {
                   <select
                     value={selectedSeason}
                     onChange={(e) => setSelectedSeason(e.target.value)}
-                    className="bg-gray-900 text-gray-300 border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00A9FF] focus:border-transparent"
+                    className="bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00A9FF] focus:border-transparent"
                     data-testid="select-season"
                   >
                     <option value="all">All Seasons</option>
@@ -336,7 +336,7 @@ export default function Stats() {
                   size="sm"
                   variant="ghost"
                   data-testid="button-update-stats"
-                  className="text-gray-400 hover:text-white"
+                  className="text-gray-600 dark:text-gray-400 hover:text-[#212121] dark:hover:text-white"
                 >
                   Update Stats
                 </Button>
@@ -346,17 +346,17 @@ export default function Stats() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full">
-            <TabsList className="w-full bg-transparent border-b border-gray-800 rounded-none h-auto p-0 gap-8 px-4">
+            <TabsList className="w-full bg-transparent border-b border-gray-200 dark:border-gray-800 rounded-none h-auto p-0 gap-8 px-4">
               <TabsTrigger 
                 value="skaters" 
-                className="bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A9FF] data-[state=active]:bg-transparent px-0 pb-3 text-gray-400 data-[state=active]:text-white font-medium"
+                className="bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A9FF] data-[state=active]:bg-transparent px-0 pb-3 text-gray-600 dark:text-gray-400 data-[state=active]:text-[#212121] dark:data-[state=active]:text-white font-medium"
                 data-testid="tab-skaters"
               >
                 Skaters
               </TabsTrigger>
               <TabsTrigger 
                 value="goalies" 
-                className="bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A9FF] data-[state=active]:bg-transparent px-0 pb-3 text-gray-400 data-[state=active]:text-white font-medium"
+                className="bg-transparent rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A9FF] data-[state=active]:bg-transparent px-0 pb-3 text-gray-600 dark:text-gray-400 data-[state=active]:text-[#212121] dark:data-[state=active]:text-white font-medium"
                 data-testid="tab-goalies"
               >
                 Goalies
@@ -376,17 +376,17 @@ export default function Stats() {
               {starLeaderboard.slice(0, 3).map((leader: any, index: number) => (
                 <div 
                   key={leader.user.id} 
-                  className="bg-gray-900/50 border border-gray-800 rounded-lg p-3 flex items-start gap-2"
+                  className="bg-gray-100/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-lg p-3 flex items-start gap-2"
                   data-testid={`row-star-leader-${index}`}
                 >
                   <Avatar className="w-12 h-12">
                     <AvatarImage src={leader.user?.profileImageUrl || undefined} />
-                    <AvatarFallback className="bg-gray-700 text-white text-sm">
+                    <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
                       {getInitials(leader.user?.firstName, leader.user?.lastName)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col">
-                    <div className="text-white font-medium text-[16px]" data-testid={`text-star-leader-name-${index}`}>
+                    <div className="text-[#212121] dark:text-white font-medium text-[16px]" data-testid={`text-star-leader-name-${index}`}>
                       {leader.user.lastName}
                     </div>
                     <div className="text-xl font-bold text-yellow-500" data-testid={`text-star-points-${index}`}>
@@ -405,15 +405,15 @@ export default function Stats() {
             <div className="space-y-6" data-testid="loading-stats">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="animate-pulse">
-                  <div className="h-4 bg-gray-800 rounded w-20 mb-4" />
-                  <div className="h-20 bg-gray-800 rounded" />
+                  <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-20 mb-4" />
+                  <div className="h-20 bg-gray-200 dark:bg-gray-800 rounded" />
                 </div>
               ))}
             </div>
           ) : filteredStats.length === 0 ? (
             <div className="text-center py-12" data-testid="no-stats-state">
               <Trophy className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400">No player statistics available</p>
+              <p className="text-gray-600 dark:text-gray-400">No player statistics available</p>
             </div>
           ) : viewMode === 'table' ? (
             /* Table View */
@@ -422,7 +422,7 @@ export default function Stats() {
               <div className="flex items-center gap-3 mb-6">
                 <button 
                   onClick={handleBackToSummary}
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-gray-600 dark:text-gray-400 hover:text-[#212121] dark:hover:text-white transition-colors"
                   data-testid="button-back-to-summary"
                 >
                   <ArrowLeft className="w-5 h-5" />
@@ -434,25 +434,25 @@ export default function Stats() {
               {/* Stats Table */}
               <div className="overflow-auto border border-gray-800 rounded-lg">
                 <table className="w-full" data-testid="table-stats">
-                  <thead className="bg-gray-900 border-b border-gray-800">
+                  <thead className="bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">#</th>
-                      <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Player</th>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">#</th>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Player</th>
                       {activeTab === 'skaters' ? (
                         <>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">GP</th>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">G</th>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">A</th>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">PTS</th>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">PIM</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">GP</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">G</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">A</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">PTS</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">PIM</th>
                         </>
                       ) : (
                         <>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">GP</th>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">W</th>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">L</th>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">GAA</th>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-400">SO</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">GP</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">W</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">L</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">GAA</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">SO</th>
                         </>
                       )}
                     </tr>
@@ -461,22 +461,22 @@ export default function Stats() {
                     {getSortedStatsForTable().map((stat, index) => {
                       const membership = membershipMap.get(stat.userId);
                       return (
-                        <tr key={stat.userId} className="border-b border-gray-800 hover:bg-gray-900/50" data-testid={`row-player-${index}`}>
-                          <td className="px-4 py-3 text-gray-400 text-sm">{index + 1}</td>
+                        <tr key={stat.userId} className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-900/50" data-testid={`row-player-${index}`}>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-sm">{index + 1}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <Avatar className="w-8 h-8">
                                 <AvatarImage src={stat.user?.profileImageUrl || undefined} />
-                                <AvatarFallback className="bg-gray-700 text-white text-xs">
+                                <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-white text-xs">
                                   {getInitials(stat.user?.firstName, stat.user?.lastName)}
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <div className="text-white text-sm font-medium">
+                                <div className="text-[#212121] dark:text-[#212121] dark:text-white text-sm font-medium">
                                   {formatPlayerName(stat)}
                                 </div>
                                 {membership && (
-                                  <div className="text-gray-400 text-xs">
+                                  <div className="text-gray-600 dark:text-gray-400 text-xs">
                                     {teamMap.get(membership.assignedTeamId) || 'N/A'} • #{membership.jerseyNumber || 'N/A'}
                                   </div>
                                 )}
@@ -485,19 +485,19 @@ export default function Stats() {
                           </td>
                           {activeTab === 'skaters' && stat.type === 'skater' ? (
                             <>
-                              <td className="text-center px-4 py-3 text-white text-sm">{stat.gamesPlayed || 0}</td>
-                              <td className="text-center px-4 py-3 text-white text-sm font-medium">{stat.goals || 0}</td>
-                              <td className="text-center px-4 py-3 text-white text-sm">{stat.assists || 0}</td>
-                              <td className="text-center px-4 py-3 text-white text-sm font-medium">{stat.points || 0}</td>
-                              <td className="text-center px-4 py-3 text-white text-sm">{stat.penaltyMinutes || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.gamesPlayed || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.goals || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.assists || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.points || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.penaltyMinutes || 0}</td>
                             </>
                           ) : stat.type === 'goalie' ? (
                             <>
-                              <td className="text-center px-4 py-3 text-white text-sm">{stat.gamesPlayed || 0}</td>
-                              <td className="text-center px-4 py-3 text-white text-sm font-medium">{stat.wins || 0}</td>
-                              <td className="text-center px-4 py-3 text-white text-sm">{stat.losses || 0}</td>
-                              <td className="text-center px-4 py-3 text-white text-sm font-medium">{stat.goalsAgainstAverage?.toFixed(2) || '0.00'}</td>
-                              <td className="text-center px-4 py-3 text-white text-sm">{stat.shutouts || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.gamesPlayed || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.wins || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.losses || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.goalsAgainstAverage?.toFixed(2) || '0.00'}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.shutouts || 0}</td>
                             </>
                           ) : null}
                         </tr>
@@ -656,7 +656,7 @@ function StatSection({
       </h2>
       <button
         onClick={onClick}
-        className="w-full bg-[#0a0a0a] rounded-lg p-4 flex items-center justify-between hover:bg-gray-900 transition-colors group pt-[8px] pb-[8px]"
+        className="w-full bg-[#f5f5f5] dark:bg-[#0a0a0a] rounded-lg p-4 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors group pt-[8px] pb-[8px]"
         data-testid={`button-${title.toLowerCase().replace(/\s+/g, '-')}`}
       >
         <div className="flex items-center gap-4 flex-1">
@@ -668,7 +668,7 @@ function StatSection({
                 {tiedPlayers.slice(0, 3).map((player, idx) => (
                   <Avatar key={idx} className="w-12 h-12 border-2 border-black" data-testid={`avatar-player-${idx}`}>
                     <AvatarImage src={player.user?.profileImageUrl || undefined} />
-                    <AvatarFallback className="bg-gray-700 text-white text-sm">
+                    <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
                       {getInitials(player.user?.firstName, player.user?.lastName)}
                     </AvatarFallback>
                   </Avatar>
@@ -683,7 +683,7 @@ function StatSection({
               // Show single avatar
               (<Avatar className="w-12 h-12" data-testid="avatar-player-single">
                 <AvatarImage src={players[0].user?.profileImageUrl || undefined} />
-                <AvatarFallback className="bg-gray-700 text-white text-sm">
+                <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
                   {getInitials(players[0].user?.firstName, players[0].user?.lastName)}
                 </AvatarFallback>
               </Avatar>)
@@ -692,7 +692,7 @@ function StatSection({
 
           {/* Player Info */}
           <div className="flex-1 text-left">
-            <div className="text-white font-medium" data-testid="text-player-name">
+            <div className="text-[#212121] dark:text-white font-medium" data-testid="text-player-name">
               {isTied ? `${tiedPlayers.length} Tied` : formatPlayerName(players[0])}
             </div>
             {showPosition && !isTied && (() => {
@@ -708,7 +708,7 @@ function StatSection({
 
         {/* Stat Value */}
         <div className="flex items-center gap-3">
-          <span className="text-3xl font-bold text-white" data-testid="text-stat-value">
+          <span className="text-3xl font-bold text-[#212121] dark:text-white" data-testid="text-stat-value">
             {renderStat(players[0])}
           </span>
           <ChevronRight className="w-5 h-5 text-[#00A9FF] group-hover:translate-x-1 transition-transform" data-testid="icon-chevron" />
