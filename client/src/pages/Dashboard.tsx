@@ -271,7 +271,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 pb-24 z-50">
       <div className="bg-card rounded-lg border border-border w-full max-w-6xl h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b border-border">
+        <div className="p-6 border-b border-border pt-[4px] pb-[4px]">
           <h2 className="text-2xl font-semibold text-center">Needs Attention</h2>
         </div>
 
