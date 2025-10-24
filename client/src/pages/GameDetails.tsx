@@ -186,7 +186,12 @@ export default function GameDetails() {
   });
 
   // Fetch game stars
-  const { data: gameStars } = useQuery({
+  const { data: gameStars } = useQuery<{
+    firstStar: User;
+    secondStar: User;
+    thirdStar: User;
+    awarder: User;
+  }>({
     queryKey: [`/api/games/${gameId}/stars`],
     enabled: !!gameId && !isScrimmage,
   });
@@ -963,15 +968,15 @@ export default function GameDetails() {
                         </div>
                         <div className="flex items-center justify-center space-x-4">
                           <div className="text-center">
-                            <p className="text-sm text-blue-700 dark:text-blue-300">{game.homeTeam?.name}</p>
-                            <p className="text-3xl font-bold text-blue-600">
+                            <p className="text-sm text-[#ffffff]">{game.homeTeam?.name}</p>
+                            <p className="text-3xl font-bold text-[#ffffff]">
                               {game.homeScore}
                             </p>
                           </div>
-                          <div className="text-2xl font-bold text-blue-600">-</div>
+                          <div className="text-2xl font-bold text-[#ffffff]">-</div>
                           <div className="text-center">
-                            <p className="text-sm text-blue-700 dark:text-blue-300">{game.awayTeam?.name}</p>
-                            <p className="text-3xl font-bold text-blue-600">
+                            <p className="text-sm text-[#ffffff]">{game.awayTeam?.name}</p>
+                            <p className="text-3xl font-bold text-[#ffffff]">
                               {game.awayScore}
                             </p>
                           </div>
@@ -1262,11 +1267,11 @@ export default function GameDetails() {
         <SubstituteRequestModal
           gameId={game.id}
           gameDate={format(new Date(game.scheduledAt), 'yyyy-MM-dd')}
-          leagueId={game.leagueId}
+          leagueId={game.leagueId ?? ''}
           originalPlayerId={substituteRequestData.playerId}
           originalPlayerName={substituteRequestData.playerName}
-          homeTeamId={game.homeTeamId}
-          awayTeamId={game.awayTeamId}
+          homeTeamId={game.homeTeamId ?? ''}
+          awayTeamId={game.awayTeamId ?? ''}
           originalPlayerTeamId={substituteRequestData.teamId}
           isOpen={showSubstituteModal}
           onClose={() => {
