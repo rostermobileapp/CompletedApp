@@ -822,7 +822,7 @@ export default function Profile() {
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <button
-                className="w-full bg-card border border-destructive rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-destructive/10"
+                className="w-full border border-destructive rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-destructive/10 bg-[#e2e2e2] font-bold"
                 data-testid="button-delete-profile"
               >
                 <div className="flex items-center gap-3">
