@@ -370,7 +370,7 @@ export default function Stats() {
           <div className="px-4 py-4 bg-gradient-to-b from-yellow-900/10 to-transparent pt-[4px] pb-[4px]">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2" data-testid="text-star-leaders-title">
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-              Star Leaders
+              3 Stars of the League
             </h2>
             <div className="grid grid-cols-3 gap-3">
               {starLeaderboard.slice(0, 3).map((leader: any, index: number) => (
