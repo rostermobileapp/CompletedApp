@@ -642,7 +642,7 @@ export default function Profile() {
           <h2 className="text-lg font-semibold mb-4" data-testid="text-leagues-title">Your Leagues</h2>
           <div className="space-y-3">
             {userLeagues.map((league: any) => (
-              <div key={league.id} className="rounded-lg border border-border p-4 pt-[4px] pb-[4px] bg-[#e2e2e2]" data-testid={`card-league-${league.id}`}>
+              <div key={league.id} className="rounded-lg border border-border p-4 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid={`card-league-${league.id}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Users className="w-5 h-5 text-muted-foreground" />
@@ -704,7 +704,7 @@ export default function Profile() {
               const showDeleteButton = isCaptain; // Captains can delete teams they manage
               
               return (
-                <div key={team.id} className="rounded-lg border border-border p-4 pt-[4px] pb-[4px] bg-[#e2e2e2]" data-testid={`card-team-${team.id}`}>
+                <div key={team.id} className="rounded-lg border border-border p-4 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid={`card-team-${team.id}`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <Users className="w-5 h-5 text-muted-foreground" />
@@ -795,7 +795,7 @@ export default function Profile() {
         <h2 className="text-lg font-semibold mb-4" data-testid="text-settings-title">Settings</h2>
         <div className="space-y-2">
           {/* Theme Toggle */}
-          <div className="w-full border border-border rounded-lg p-4 flex items-center justify-between bg-[#e2e2e2] pt-[4px] pb-[4px]">
+          <div className="w-full border border-border rounded-lg p-4 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px]">
             <div className="flex items-center gap-3">
               <Moon className="w-5 h-5 text-muted-foreground" />
               <span>Dark Mode</span>
@@ -807,7 +807,7 @@ export default function Profile() {
             <button
               key={index}
               onClick={item.action}
-              className="w-full border border-border rounded-lg p-4 flex items-center justify-between hover:bg-card/80 bg-[#e2e2e2]"
+              className="w-full border border-border rounded-lg p-4 flex items-center justify-between hover:bg-card/80 bg-[#e2e2e2] dark:bg-[#212121]"
               data-testid={`button-setting-${index}`}
             >
               <div className="flex items-center gap-3">
@@ -822,7 +822,7 @@ export default function Profile() {
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <button
-                className="w-full border border-destructive rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-destructive/10 bg-[#e2e2e2] font-bold"
+                className="w-full border border-destructive rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-destructive/10 bg-[#e2e2e2] dark:bg-[#212121] font-bold"
                 data-testid="button-delete-profile"
               >
                 <div className="flex items-center gap-3">
@@ -876,7 +876,7 @@ export default function Profile() {
           {/* Sign Out */}
           <button
             onClick={() => window.location.href = '/api/logout'}
-            className="w-full border border-border rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-card/80 bg-[#e2e2e2] font-bold"
+            className="w-full border border-border rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-card/80 bg-[#e2e2e2] dark:bg-[#212121] font-bold"
             data-testid="button-sign-out"
           >
             <div className="flex items-center gap-3">
