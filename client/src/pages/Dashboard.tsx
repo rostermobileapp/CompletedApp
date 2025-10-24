@@ -1712,14 +1712,14 @@ export default function Dashboard() {
                     data-testid="button-needs-attention-permanent"
                   >
                     <div className="flex items-center gap-3">
-                      <Settings className="w-4 h-4 text-white" />
-                      <span className="font-medium text-sm text-[#212121]">To-Do</span>
+                      <Settings className="w-4 h-4 text-[#212121] dark:text-white" />
+                      <span className="font-medium text-sm text-[#212121] dark:text-white">To-Do</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
                         <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
                       </div>
-                      <ChevronDown className="w-4 h-4 text-white" />
+                      <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
                     </div>
                   </button>
                 ) : null}

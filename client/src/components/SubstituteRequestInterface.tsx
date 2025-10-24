@@ -213,7 +213,7 @@ export function SubstituteRequestInterface({ className }: SubstituteRequestInter
               <Button
                 size="sm"
                 variant="outline"
-                className="flex-1 text-green-700 border-green-200 hover:bg-green-50"
+                className="flex-1 text-green-700 dark:text-green-700 border-green-200 dark:border-green-200 hover:bg-blue-50 dark:hover:bg-green-50"
                 onClick={() => handleApprove(request, request.nextApprover)}
                 disabled={processApprovalMutation.isPending}
                 data-testid={`button-approve-${request.id}`}
