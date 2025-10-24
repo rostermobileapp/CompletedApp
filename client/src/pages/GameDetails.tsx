@@ -680,7 +680,7 @@ export default function GameDetails() {
                       <img 
                         src={beverageJarUrl}
                         alt="Beverage Duty"
-                        className="h-6 w-auto opacity-50"
+                        className="h-6 w-auto opacity-50 invert dark:invert-0"
                         style={{ aspectRatio: '9/16' }}
                       />
                     </div>
