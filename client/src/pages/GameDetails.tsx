@@ -981,27 +981,7 @@ export default function GameDetails() {
                   </div>
                 )}
                 
-                {/* Final Score Display for All Users */}
-                <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                  <div className="flex items-center justify-center space-x-4">
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground">{game.homeTeam?.name}</p>
-                      <p className="text-3xl font-bold text-green-600" data-testid="text-final-home-score">
-                        {game.homeScore}
-                      </p>
-                    </div>
-                    <div className="text-2xl font-bold text-muted-foreground">-</div>
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground">{game.awayTeam?.name}</p>
-                      <p className="text-3xl font-bold text-green-600" data-testid="text-final-away-score">
-                        {game.awayScore}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-center text-sm text-green-600 mt-2 font-medium">
-                    Game Complete
-                  </p>
-                </div>
+                
               </div>
             ) : canSubmitScore ? (
               <div className="space-y-4">
