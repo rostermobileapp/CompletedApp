@@ -413,8 +413,12 @@ export default function Calendar() {
               return (
               <div 
                 key={game.id} 
-                className="bg-card rounded-xl border border-border p-4 relative hover:bg-muted/50 transition-colors" 
+                className="bg-card rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors" 
                 data-testid={`card-game-${game.id}`}
+                onClick={() => {
+                  setPageTransitionDirection('up');
+                  navigate(`/game/${game.id}`);
+                }}
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
@@ -482,12 +486,14 @@ export default function Calendar() {
 
                     {/* RSVP Buttons for upcoming games */}
                     {!isCompleted && !isPastGame && user && activeTeam && (game.homeTeam?.id === activeTeam.id || game.awayTeam?.id === activeTeam.id) && (
-                      <RSVPButtons 
-                        gameId={game.id} 
-                        userId={(user as any).id}
-                        userTeamId={activeTeam.id}
-                        className="mb-1"
-                      />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <RSVPButtons 
+                          gameId={game.id} 
+                          userId={(user as any).id}
+                          userTeamId={activeTeam.id}
+                          className="mb-1"
+                        />
+                      </div>
                     )}
                     
                     <div className="flex items-center gap-2">
@@ -519,7 +525,8 @@ export default function Calendar() {
                           size="sm"
                           variant="outline"
                           className="h-8 w-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             const userTeam = game.homeTeam?.id === activeTeam?.id ? game.homeTeam : game.awayTeam;
                             if (userTeam && activeTeam) {
                               claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
