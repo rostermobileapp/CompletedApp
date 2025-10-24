@@ -569,7 +569,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                           <div className="flex items-center gap-3">
                             <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                             <div>
-                              <p className="font-medium text-[#000000]">
+                              <p className="font-medium text-[#ffffff]">
                                 {game.homeTeam?.name} vs {game.awayTeam?.name}
                               </p>
                               <p className="text-sm text-muted-foreground">
