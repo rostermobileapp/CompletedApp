@@ -1119,9 +1119,6 @@ export default function GameDetails() {
                     </p>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground text-center mt-3">
-                  Awarded by {gameStars.awarder?.firstName} {gameStars.awarder?.lastName}
-                </p>
               </div>
             ) : (
               <>
