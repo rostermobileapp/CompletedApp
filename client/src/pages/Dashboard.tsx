@@ -195,16 +195,11 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
     queryKey: ['/api/user/games-needing-stars', leagueId],
     queryFn: async () => {
       if (!leagueId) return [];
-      console.log(`🌟 [FRONTEND] Fetching games needing stars for league: ${leagueId}`);
       const response = await apiRequest('GET', `/api/user/games-needing-stars?leagueId=${leagueId}`);
-      const data = await response.json();
-      console.log(`🌟 [FRONTEND] Received ${Array.isArray(data) ? data.length : 0} games needing stars`, data);
-      return data;
+      return response.json();
     },
     enabled: !!leagueId && isOpen,
   });
-
-  console.log(`🌟 [FRONTEND] Modal state - isOpen: ${isOpen}, leagueId: ${leagueId}, gamesNeedingStars:`, gamesNeedingStars, 'starsLoading:', starsLoading);
 
   const totalTasks = (Array.isArray(pendingMembers) ? pendingMembers.length : 0) + 
                      (Array.isArray(gamesNeedingVerification) ? gamesNeedingVerification.length : 0) +
