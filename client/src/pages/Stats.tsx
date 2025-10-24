@@ -292,7 +292,7 @@ export default function Stats() {
         {/* Header */}
         <div className="sticky top-0 z-50 bg-black/95 backdrop-blur-sm border-b border-gray-800">
           <div className="px-4 pt-[4px] pb-[4px]">
-            <div className="flex items-center justify-between mt-[16px] mb-[16px]"></div>
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <button 
                   onClick={() => {
