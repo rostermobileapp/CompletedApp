@@ -22,7 +22,6 @@ export function ThemeToggle() {
         className={`h-4 w-4 transition-colors ${isLightMode ? 'text-primary' : 'text-muted-foreground'}`} 
         data-testid="icon-sun" 
       />
-      <span className="sr-only">Toggle theme</span>
     </div>
   );
 }
