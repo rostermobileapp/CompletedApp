@@ -582,7 +582,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                           </div>
                           <Button 
                             size="sm" 
-                            className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                            className="hover:bg-yellow-700 text-white bg-[#3c83f6]"
                             onClick={() => {
                               onClose();
                               onNavigate(`/game/${game.id}`);
