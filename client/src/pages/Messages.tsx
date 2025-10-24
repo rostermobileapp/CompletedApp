@@ -1885,7 +1885,7 @@ export default function Messages() {
                 {conversations.map((conversation: Conversation) => (
                   <div 
                     key={conversation.id}
-                    className="rounded-lg border border-border p-4 cursor-pointer hover:bg-accent/50 transition-colors group dark:bg-[#212121] bg-[#16a24900]" 
+                    className="rounded-lg border border-border p-4 cursor-pointer hover:bg-accent/50 transition-colors group dark:bg-[#212121] bg-[#e2e2e2]" 
                     data-testid={`card-conversation-${conversation.id}`}
                     onClick={() => setSelectedConversation(conversation.id)}
                   >
