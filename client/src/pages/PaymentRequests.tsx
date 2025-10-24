@@ -188,7 +188,7 @@ export default function PaymentRequests() {
             <button 
               onClick={() => {
                 setPageTransitionDirection('down');
-                navigate('/more');
+                navigate('/');
               }}
               className="text-muted-foreground"
               data-testid="button-back"
