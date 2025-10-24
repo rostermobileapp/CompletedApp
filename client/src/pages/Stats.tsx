@@ -374,43 +374,24 @@ export default function Stats() {
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
               Star Leaders
             </h2>
-            <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-3">
               {starLeaderboard.slice(0, 3).map((leader: any, index: number) => (
                 <div 
                   key={leader.user.id} 
-                  className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 flex items-center justify-between"
+                  className="bg-gray-900/50 border border-gray-800 rounded-lg p-3 flex flex-col items-center"
                   data-testid={`row-star-leader-${index}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="text-2xl font-bold text-gray-600">
-                      {index + 1}
-                    </div>
-                    <Avatar className="w-10 h-10">
-                      <AvatarImage src={leader.user?.profileImageUrl || undefined} />
-                      <AvatarFallback className="bg-gray-700 text-white text-sm">
-                        {getInitials(leader.user?.firstName, leader.user?.lastName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="text-white font-medium" data-testid={`text-star-leader-name-${index}`}>
-                        {leader.user.firstName} {leader.user.lastName}
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        {leader.firstStars > 0 && `${leader.firstStars}× 1st`}
-                        {leader.firstStars > 0 && leader.secondStars > 0 && ` • `}
-                        {leader.secondStars > 0 && `${leader.secondStars}× 2nd`}
-                        {(leader.firstStars > 0 || leader.secondStars > 0) && leader.thirdStars > 0 && ` • `}
-                        {leader.thirdStars > 0 && `${leader.thirdStars}× 3rd`}
-                      </div>
-                    </div>
+                  <Avatar className="w-14 h-14 mb-2">
+                    <AvatarImage src={leader.user?.profileImageUrl || undefined} />
+                    <AvatarFallback className="bg-gray-700 text-white text-sm">
+                      {getInitials(leader.user?.firstName, leader.user?.lastName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-white font-medium text-sm text-center mb-1" data-testid={`text-star-leader-name-${index}`}>
+                    {leader.user.lastName}
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-yellow-500" data-testid={`text-star-points-${index}`}>
-                      {leader.starPoints}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {leader.starPoints === 1 ? 'point' : 'points'}
-                    </div>
+                  <div className="text-xl font-bold text-yellow-500" data-testid={`text-star-points-${index}`}>
+                    {leader.starPoints}
                   </div>
                 </div>
               ))}
