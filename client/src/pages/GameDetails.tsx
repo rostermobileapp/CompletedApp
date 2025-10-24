@@ -623,7 +623,7 @@ export default function GameDetails() {
         </div>
 
         {/* Beverage Responsibility - Away Team */}
-        {isUserOnAwayTeam && (
+        {isUserOnAwayTeam && !isGameCompleted && (
           <div className="rounded-xl border border-border p-6 pl-[8px] pr-[8px] pt-[8px] pb-[8px] mt-[8px] mb-[8px] ml-[0px] mr-[0px] bg-[#212121] text-[#ffffff]">
               {awayTeamHasBeverageDuty ? (
                 <div className="flex items-center justify-between">
@@ -744,7 +744,7 @@ export default function GameDetails() {
         )}
 
         {/* Beverage Responsibility - Only show for user's team */}
-        {isUserOnHomeTeam && (
+        {isUserOnHomeTeam && !isGameCompleted && (
           <div className="bg-card rounded-xl border border-border p-6">
               <h3 className="text-lg font-semibold mb-4" data-testid="text-beverage-title">
                 Beverage Responsibility
