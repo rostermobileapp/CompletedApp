@@ -642,7 +642,7 @@ export default function Profile() {
           <h2 className="text-lg font-semibold mb-4" data-testid="text-leagues-title">Your Leagues</h2>
           <div className="space-y-3">
             {userLeagues.map((league: any) => (
-              <div key={league.id} className="bg-card rounded-lg border border-border p-4 pt-[4px] pb-[4px]" data-testid={`card-league-${league.id}`}>
+              <div key={league.id} className="rounded-lg border border-border p-4 pt-[4px] pb-[4px] bg-[#e2e2e2]" data-testid={`card-league-${league.id}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Users className="w-5 h-5 text-muted-foreground" />
