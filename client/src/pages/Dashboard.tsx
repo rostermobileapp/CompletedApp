@@ -554,8 +554,8 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                 <div>
                   <div className="flex items-center gap-2 mb-4">
                     <Star className="w-5 h-5 text-yellow-600" />
-                    <h3 className="text-lg font-semibold text-yellow-600">
-                      Award 3 Stars ({gamesNeedingStars.length})
+                    <h3 className="text-lg font-semibold text-[#ffffff]">
+                      Award 3 Stars
                     </h3>
                   </div>
                   <div className="dark:bg-yellow-950 rounded-lg p-4 bg-[#212121]">
