@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
@@ -101,18 +102,23 @@ export function SlideOutMenu() {
         </SheetTrigger>
         <SheetContent 
           side="right" 
-          className="w-[85%] sm:w-[400px] border-l border-border bg-[#000000] pt-[40px] pb-[40px] pl-[0px] pr-[0px] [&>button]:hidden"
+          className="w-[85%] sm:w-[400px] border-l border-border bg-background pt-[40px] pb-[40px] pl-[0px] pr-[0px] [&>button]:hidden"
         >
           <SheetHeader className="mb-8 relative">
-            <SheetTitle className="text-2xl font-bold">Menu</SheetTitle>
-            <SheetClose asChild>
-              <button
-                className="absolute top-0 right-6 w-10 h-10 bg-red-600 hover:bg-red-700 rounded flex items-center justify-center transition-colors"
-                data-testid="button-close-menu"
-              >
-                <X className="w-5 h-5 text-white" />
-              </button>
-            </SheetClose>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="text-2xl font-bold">Menu</SheetTitle>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <SheetClose asChild>
+                  <button
+                    className="w-10 h-10 bg-red-600 hover:bg-red-700 rounded flex items-center justify-center transition-colors"
+                    data-testid="button-close-menu"
+                  >
+                    <X className="w-5 h-5 text-white" />
+                  </button>
+                </SheetClose>
+              </div>
+            </div>
           </SheetHeader>
           
           <div className="space-y-3">

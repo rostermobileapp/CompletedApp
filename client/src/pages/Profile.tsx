@@ -10,6 +10,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { setPageTransitionDirection } from '@/components/PageTransition';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
@@ -793,6 +794,15 @@ export default function Profile() {
       <div className="px-6">
         <h2 className="text-lg font-semibold mb-4" data-testid="text-settings-title">Settings</h2>
         <div className="space-y-2">
+          {/* Theme Toggle */}
+          <div className="w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Moon className="w-5 h-5 text-muted-foreground" />
+              <span>Theme</span>
+            </div>
+            <ThemeToggle />
+          </div>
+          
           {settingsItems.map((item, index) => (
             <button
               key={index}
