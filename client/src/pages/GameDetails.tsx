@@ -852,9 +852,24 @@ export default function GameDetails() {
                 {/* Score Management Section for Commissioners */}
                 {isCommissioner && (
                   <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 pt-[4px] pb-[4px] pl-[4px] pr-[4px]">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Target className="w-5 h-5 text-blue-600" />
-                      <h4 className="text-lg font-semibold text-blue-600">Score Management</h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Target className="w-5 h-5 text-blue-600" />
+                        <h4 className="text-lg font-semibold text-blue-600">Score Management</h4>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditingScore(true);
+                          setEditHomeScore(game.homeScore?.toString() || "");
+                          setEditAwayScore(game.awayScore?.toString() || "");
+                        }}
+                        className="flex items-center gap-2"
+                        data-testid="button-edit-final-score"
+                      >
+                        <Target className="w-4 h-4" />
+                        Edit Score
+                      </Button>
                     </div>
                     
                     {isEditingScore ? (
@@ -960,21 +975,6 @@ export default function GameDetails() {
                               {game.awayScore}
                             </p>
                           </div>
-                        </div>
-                        <div className="text-center">
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setIsEditingScore(true);
-                              setEditHomeScore(game.homeScore?.toString() || "");
-                              setEditAwayScore(game.awayScore?.toString() || "");
-                            }}
-                            className="flex items-center gap-2"
-                            data-testid="button-edit-final-score"
-                          >
-                            <Target className="w-4 h-4" />
-                            Edit Score
-                          </Button>
                         </div>
                       </div>
                     )}
