@@ -1095,8 +1095,8 @@ export default function GameDetails() {
                 <div className="dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-center gap-3 bg-[#212121]">
                   <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
                   <div>
-                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">1st Star (3 points)</p>
-                    <p className="font-bold" data-testid="text-first-star">
+                    <p className="text-sm font-medium text-[#ffffff]">1st Star (3 points)</p>
+                    <p className="font-bold text-[#ffffff]" data-testid="text-first-star">
                       {gameStars.firstStar?.firstName} {gameStars.firstStar?.lastName}
                     </p>
                   </div>
@@ -1104,8 +1104,8 @@ export default function GameDetails() {
                 <div className="dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-4 flex items-center gap-3 bg-[#212121]">
                   <Star className="w-7 h-7 text-gray-400 fill-gray-400" />
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">2nd Star (2 points)</p>
-                    <p className="font-bold" data-testid="text-second-star">
+                    <p className="text-sm font-medium text-[#ffffff]">2nd Star (2 points)</p>
+                    <p className="font-bold text-[#ffffff]" data-testid="text-second-star">
                       {gameStars.secondStar?.firstName} {gameStars.secondStar?.lastName}
                     </p>
                   </div>
@@ -1113,8 +1113,8 @@ export default function GameDetails() {
                 <div className="dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center gap-3 bg-[#212121]">
                   <Star className="w-6 h-6 text-amber-600 fill-amber-600" />
                   <div>
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">3rd Star (1 point)</p>
-                    <p className="font-bold" data-testid="text-third-star">
+                    <p className="text-sm font-medium text-[#ffffff]">3rd Star (1 point)</p>
+                    <p className="font-bold text-[#ffffff]" data-testid="text-third-star">
                       {gameStars.thirdStar?.firstName} {gameStars.thirdStar?.lastName}
                     </p>
                   </div>
