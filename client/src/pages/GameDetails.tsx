@@ -670,7 +670,6 @@ export default function GameDetails() {
                   </div>
                   <div>
                     <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">{awayTeamClaimantName} has beverage duty</p>
-                    <p className="text-sm text-muted-foreground">{awayTeamClaimantName} is bringing beverages</p>
                   </div>
                 </div>
               ) : (
