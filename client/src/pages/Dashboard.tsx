@@ -1427,18 +1427,30 @@ export default function Dashboard() {
           pendingSubstituteApprovals = 0;
         }
         
+        // Fetch games needing star awards
+        let gamesNeedingStars = 0;
+        try {
+          const starsResponse = await apiRequest('GET', `/api/user/games-needing-stars?leagueId=${effectiveLeagueId}`);
+          const starsData = await starsResponse.json();
+          gamesNeedingStars = Array.isArray(starsData) ? starsData.length : 0;
+        } catch (error) {
+          // If star awards endpoint fails, just continue without it
+          gamesNeedingStars = 0;
+        }
+        
         const pendingMembersCount = Array.isArray(pendingMembers) ? pendingMembers.length : 0;
-        const total = pendingMembersCount + gamesNeedingVerification + pendingSubstituteApprovals;
+        const total = pendingMembersCount + gamesNeedingVerification + pendingSubstituteApprovals + gamesNeedingStars;
         
         
         return {
           pendingMembers: pendingMembersCount,
           gamesNeedingVerification,
           pendingSubstituteApprovals,
+          gamesNeedingStars,
           total
         };
       } catch (error) {
-        return { pendingMembers: 0, gamesNeedingVerification: 0, pendingSubstituteApprovals: 0, total: 0 };
+        return { pendingMembers: 0, gamesNeedingVerification: 0, pendingSubstituteApprovals: 0, gamesNeedingStars: 0, total: 0 };
       }
     },
     enabled: !!effectiveLeagueId,
