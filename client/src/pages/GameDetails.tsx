@@ -390,16 +390,16 @@ export default function GameDetails() {
                 {approvedPlayers.map((request: any) => (
                   <div 
                     key={request.id} 
-                    className="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-white text-black border"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-[#e2e2e2] dark:bg-[#212121] border"
                     data-testid={`player-${request.player?.id || 'unknown'}`}
                   >
-                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                      <span className="text-black text-xs font-semibold">
+                    <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                      <span className="text-black dark:text-white text-xs font-semibold">
                         {request.player?.firstName?.[0] || '?'}{request.player?.lastName?.[0] || ''}
                       </span>
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-black" data-testid={`text-player-name-${request.player?.id || 'unknown'}`}>
+                      <p className="font-medium text-black dark:text-white" data-testid={`text-player-name-${request.player?.id || 'unknown'}`}>
                         {request.player?.firstName || 'Unknown'} {request.player?.lastName || 'Player'}
                       </p>
                     </div>
@@ -593,7 +593,7 @@ export default function GameDetails() {
       </div>
       {/* Game Info */}
       <div className="px-6 py-6 space-y-6 pt-[4px] pb-[4px] pl-[12px] pr-[12px]">
-        <div className="rounded-xl border border-border p-6 pt-[2px] pb-[2px] pl-[5px] pr-[5px] bg-[#e2e2e2]">
+        <div className="rounded-xl border border-border p-6 pt-[2px] pb-[2px] pl-[5px] pr-[5px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center">
               {opponentTeam?.logoUrl ? (
@@ -749,7 +749,7 @@ export default function GameDetails() {
 
         {/* Beverage Responsibility - Only show for user's team */}
         {isUserOnHomeTeam && !isGameCompleted && (
-          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] mt-[12px] mb-[12px] pt-[4px] pb-[4px]">
+          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121] mt-[12px] mb-[12px] pt-[4px] pb-[4px]">
               <h3 className="text-lg font-semibold mb-4" data-testid="text-beverage-title">
                 Beverage Responsibility
               </h3>
