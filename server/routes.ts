@@ -3219,8 +3219,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify user is a member of the team
-      const teamMembership = await storage.getTeamMembershipByUserId(userId, teamId);
-      if (!teamMembership) {
+      const teamMembers = await storage.getTeamMembers(teamId);
+      const isMember = teamMembers.some(member => member.userId === userId);
+      if (!isMember) {
         return res.status(403).json({ message: 'You are not a member of this team' });
       }
 
@@ -3258,8 +3259,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify user is a member of the team
-      const teamMembership = await storage.getTeamMembershipByUserId(userId, teamId);
-      if (!teamMembership) {
+      const teamMembers = await storage.getTeamMembers(teamId);
+      const isMember = teamMembers.some(member => member.userId === userId);
+      if (!isMember) {
         return res.status(403).json({ message: 'You are not a member of this team' });
       }
 
