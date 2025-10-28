@@ -628,17 +628,6 @@ export default function GameDetails() {
           </div>
         </div>
 
-        {/* Custom Duties Section - Away Team */}
-        {!isGameCompleted && (
-          <DutiesSection 
-            gameId={game.id}
-            teamId={game.awayTeam.id}
-            userId={(user as User).id}
-            isCaptain={game.awayTeam.captainId === (user as User).id}
-            isTeamMember={isUserOnAwayTeam}
-          />
-        )}
-
         {/* RSVP Section */}
         {!isGameCompleted && (
           <div className="rounded-xl border border-border p-6 mt-[0px] mb-[0px] pt-[2px] pb-[2px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
