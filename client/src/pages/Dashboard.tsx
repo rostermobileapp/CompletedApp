@@ -2008,14 +2008,19 @@ export default function Dashboard() {
                             // Special handling for Beverages duty (show beverage jar)
                             if (assignment.dutyTemplate?.name === 'Beverages') {
                               return (
-                                <img 
+                                <div 
                                   key={`${assignment.id}-${index}`}
-                                  src={beverageJarUrl}
-                                  alt="Beverage Duty"
-                                  className="h-8 w-auto invert dark:invert-0"
-                                  style={{ aspectRatio: '9/16' }}
+                                  className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
+                                  title={assignment.dutyTemplate?.name}
                                   data-testid={`icon-duty-${assignment.dutyTemplate.name}-${game.id}`}
-                                />
+                                >
+                                  <img 
+                                    src={beverageJarUrl}
+                                    alt="Beverage Duty"
+                                    className="h-5 w-auto invert dark:invert-0"
+                                    style={{ aspectRatio: '9/16' }}
+                                  />
+                                </div>
                               );
                             }
                             
