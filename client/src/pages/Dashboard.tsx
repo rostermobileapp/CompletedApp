@@ -2005,7 +2005,22 @@ export default function Dashboard() {
                       return (
                         <div className="flex items-center gap-1">
                           {userDuties.map((assignment: any, index: number) => {
-                            // Special handling for Beverages duty (show beverage jar)
+                            // First check if there's a Lucide icon available
+                            const IconComponent = getIconComponent(assignment.dutyTemplate?.icon);
+                            if (IconComponent) {
+                              return (
+                                <div 
+                                  key={`${assignment.id}-${index}`}
+                                  className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
+                                  title={assignment.dutyTemplate?.name}
+                                  data-testid={`icon-duty-${assignment.dutyTemplate.name}-${game.id}`}
+                                >
+                                  <IconComponent className="w-5 h-5 text-primary-foreground" />
+                                </div>
+                              );
+                            }
+                            
+                            // Fallback to beverage jar for default duties that haven't been edited
                             if (assignment.dutyTemplate?.name === 'Beverages') {
                               return (
                                 <div 
@@ -2024,20 +2039,7 @@ export default function Dashboard() {
                               );
                             }
                             
-                            // For custom duties, show lucide icon
-                            const IconComponent = getIconComponent(assignment.dutyTemplate?.icon);
-                            if (!IconComponent) return null;
-                            
-                            return (
-                              <div 
-                                key={`${assignment.id}-${index}`}
-                                className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
-                                title={assignment.dutyTemplate?.name}
-                                data-testid={`icon-duty-${assignment.dutyTemplate.name}-${game.id}`}
-                              >
-                                <IconComponent className="w-5 h-5 text-primary-foreground" />
-                              </div>
-                            );
+                            return null;
                           })}
                         </div>
                       );
