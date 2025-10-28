@@ -536,14 +536,14 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
               {Array.isArray(gamesNeedingVerification) && gamesNeedingVerification.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-4">
-                    <BarChart3 className="w-5 h-5 text-orange-600" />
-                    <h3 className="text-lg font-semibold text-orange-600">
+                    <BarChart3 className="w-5 h-5 text-[#3c83f6]" />
+                    <h3 className="text-lg font-semibold text-[#3c83f6]">
                       Score Verifications ({gamesNeedingVerification.length})
                     </h3>
                   </div>
                   <div className="bg-[#e2e2e2] dark:bg-[#212121] rounded-lg p-4">
                     <Button 
-                      className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                      className="w-full bg-[#3c83f6] hover:bg-[#2563eb] text-white"
                       onClick={() => onNavigate(`/league-management?leagueId=${leagueId}`)}
                       data-testid="button-verify-scores"
                     >
