@@ -541,7 +541,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       Score Verifications ({gamesNeedingVerification.length})
                     </h3>
                   </div>
-                  <div className="bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+                  <div className="dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg p-4 bg-[#212121]">
                     <div className="space-y-3">
                       {gamesNeedingVerification.map((game: any) => (
                         <div 
