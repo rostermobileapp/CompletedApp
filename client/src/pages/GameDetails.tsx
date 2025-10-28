@@ -19,6 +19,7 @@ import { useState } from "react";
 import * as React from "react";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User } from "@shared/schema";
+import DutiesSection from "@/components/DutiesSection";
 
 export default function GameDetails() {
   const { user } = useAuth();
@@ -627,87 +628,15 @@ export default function GameDetails() {
           </div>
         </div>
 
-        {/* Beverage Responsibility - Away Team */}
-        {isUserOnAwayTeam && !isGameCompleted && (
-          <div className="rounded-xl border border-border p-6 pl-[8px] pr-[8px] pt-[8px] pb-[8px] mt-[8px] mb-[8px] ml-[0px] mr-[0px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
-              {awayTeamHasBeverageDuty ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary w-10 h-10 rounded-lg flex items-center justify-center">
-                      <img 
-                        src={beverageJarUrl}
-                        alt="Beverage Duty"
-                        className="h-6 w-auto invert dark:invert-0"
-                        style={{ aspectRatio: '9/16' }}
-                      />
-                    </div>
-                    <div>
-                      <p className="font-medium text-primary text-[16px]" data-testid="text-beverage-assigned">{(user as User)?.firstName} {(user as User)?.lastName} has beverage duty</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (game.awayTeam) {
-                        releaseBeverageDutyMutation.mutate({ gameId: game.id, teamId: game.awayTeam.id });
-                      }
-                    }}
-                    disabled={releaseBeverageDutyMutation.isPending}
-                    data-testid="button-release-beverage-duty"
-                  >
-                    Release Duty
-                  </Button>
-                </div>
-              ) : validAwayTeamBeverageDutyClaimedByOther ? (
-                <div className="flex items-center gap-3">
-                  <div className="bg-muted w-10 h-10 rounded-lg flex items-center justify-center">
-                    <img 
-                      src={beverageJarUrl}
-                      alt="Beverage Duty"
-                      className="h-6 w-auto opacity-50 invert dark:invert-0"
-                      style={{ aspectRatio: '9/16' }}
-                    />
-                  </div>
-                  <div>
-                    <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">{awayTeamClaimantName} has beverage duty</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-muted w-10 h-10 rounded-lg flex items-center justify-center">
-                      <img 
-                        src={beverageJarUrl}
-                        alt="Beverage Duty"
-                        className="h-6 w-auto opacity-50 invert dark:invert-0"
-                        style={{ aspectRatio: '9/16' }}
-                      />
-                    </div>
-                    <div>
-                      <p className="font-medium text-[#212121] dark:text-[#ffffff]" data-testid="text-beverage-available">Beverage Duty Available</p>
-                    </div>
-                  </div>
-                  <Button
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                    onClick={() => {
-                      if (game.awayTeam) {
-                        claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: game.awayTeam.id });
-                      }
-                    }}
-                    disabled={claimBeverageDutyMutation.isPending}
-                    data-testid="button-claim-beverage-duty"
-                  >
-                    <img 
-                      src={beverageJarUrl}
-                      alt="Claim Beverage Duty"
-                      className="h-4 w-auto mr-2 invert dark:invert-0"
-                      style={{ aspectRatio: '9/16' }}
-                    />
-                    Claim Responsibility
-                  </Button>
-                </div>
-              )}
-          </div>
+        {/* Custom Duties Section - Away Team */}
+        {!isGameCompleted && (
+          <DutiesSection 
+            gameId={game.id}
+            teamId={game.awayTeam.id}
+            userId={(user as User).id}
+            isCaptain={game.awayTeam.captainId === (user as User).id}
+            isTeamMember={isUserOnAwayTeam}
+          />
         )}
 
         {/* RSVP Section */}
@@ -747,91 +676,15 @@ export default function GameDetails() {
           </div>
         )}
 
-        {/* Beverage Responsibility - Only show for user's team */}
-        {isUserOnHomeTeam && !isGameCompleted && (
-          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121] mt-[12px] mb-[12px] pt-[4px] pb-[4px]">
-              <h3 className="text-lg font-semibold mb-4" data-testid="text-beverage-title">
-                Beverage Responsibility
-              </h3>
-              
-              {homeTeamHasBeverageDuty ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary w-10 h-10 rounded-lg flex items-center justify-center">
-                      <img 
-                        src={beverageJarUrl}
-                        alt="Beverage Duty"
-                        className="h-6 w-auto invert dark:invert-0"
-                        style={{ aspectRatio: '9/16' }}
-                      />
-                    </div>
-                    <div>
-                      <p className="font-medium text-primary" data-testid="text-beverage-assigned">{(user as User)?.firstName} {(user as User)?.lastName} has beverage duty</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (game.homeTeam) {
-                        releaseBeverageDutyMutation.mutate({ gameId: game.id, teamId: game.homeTeam.id });
-                      }
-                    }}
-                    disabled={releaseBeverageDutyMutation.isPending}
-                    data-testid="button-release-beverage-duty"
-                  >
-                    Release Duty
-                  </Button>
-                </div>
-              ) : validHomeTeamBeverageDutyClaimedByOther ? (
-                <div className="flex items-center gap-3">
-                  <div className="bg-muted w-10 h-10 rounded-lg flex items-center justify-center">
-                    <img 
-                      src={beverageJarUrl}
-                      alt="Beverage Duty"
-                      className="h-6 w-auto opacity-50 invert dark:invert-0"
-                      style={{ aspectRatio: '9/16' }}
-                    />
-                  </div>
-                  <div>
-                    <p className="font-medium text-muted-foreground" data-testid="text-beverage-claimed">{homeTeamClaimantName} has beverage duty</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-muted w-10 h-10 rounded-lg flex items-center justify-center">
-                      <img 
-                        src={beverageJarUrl}
-                        alt="Beverage Duty"
-                        className="h-6 w-auto opacity-50 invert dark:invert-0"
-                        style={{ aspectRatio: '9/16' }}
-                      />
-                    </div>
-                    <div>
-                      <p className="font-medium text-muted-foreground" data-testid="text-beverage-available">Beverage Duty Available</p>
-                    </div>
-                  </div>
-                  <Button
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                    onClick={() => {
-                      if (game.homeTeam) {
-                        claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: game.homeTeam.id });
-                      }
-                    }}
-                    disabled={claimBeverageDutyMutation.isPending}
-                    data-testid="button-claim-beverage-duty"
-                  >
-                    <img 
-                      src={beverageJarUrl}
-                      alt="Claim Beverage Duty"
-                      className="h-4 w-auto mr-2 invert dark:invert-0"
-                      style={{ aspectRatio: '9/16' }}
-                    />
-                    Claim Responsibility
-                  </Button>
-                </div>
-              )}
-          </div>
+        {/* Custom Duties Section - Home Team */}
+        {!isGameCompleted && (
+          <DutiesSection 
+            gameId={game.id}
+            teamId={game.homeTeam.id}
+            userId={(user as User).id}
+            isCaptain={game.homeTeam.captainId === (user as User).id}
+            isTeamMember={isUserOnHomeTeam}
+          />
         )}
 
         {/* Substitute Requests Dashboard for Commissioners */}

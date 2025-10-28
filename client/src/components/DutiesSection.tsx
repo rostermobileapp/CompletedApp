@@ -60,9 +60,10 @@ interface DutiesSectionProps {
   teamId: string;
   userId: string;
   isCaptain: boolean;
+  isTeamMember: boolean;
 }
 
-export default function DutiesSection({ gameId, teamId, userId, isCaptain }: DutiesSectionProps) {
+export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTeamMember }: DutiesSectionProps) {
   const { toast } = useToast();
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -194,27 +195,31 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain }: Dut
                 </div>
               </div>
 
-              {isClaimedByMe ? (
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => releaseDutyMutation.mutate({ dutyTemplateId: template.id })}
-                  disabled={releaseDutyMutation.isPending}
-                  data-testid={`button-release-duty-${template.id}`}
-                >
-                  Release
-                </Button>
-              ) : !isClaimed ? (
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => claimDutyMutation.mutate({ dutyTemplateId: template.id })}
-                  disabled={claimDutyMutation.isPending}
-                  data-testid={`button-claim-duty-${template.id}`}
-                >
-                  Claim
-                </Button>
-              ) : null}
+              {isTeamMember && (
+                <>
+                  {isClaimedByMe ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => releaseDutyMutation.mutate({ dutyTemplateId: template.id })}
+                      disabled={releaseDutyMutation.isPending}
+                      data-testid={`button-release-duty-${template.id}`}
+                    >
+                      Release
+                    </Button>
+                  ) : !isClaimed ? (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => claimDutyMutation.mutate({ dutyTemplateId: template.id })}
+                      disabled={claimDutyMutation.isPending}
+                      data-testid={`button-claim-duty-${template.id}`}
+                    >
+                      Claim
+                    </Button>
+                  ) : null}
+                </>
+              )}
             </div>
           );
         })}
