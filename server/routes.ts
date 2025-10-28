@@ -14,7 +14,7 @@ import {
   requireSpecialPermission
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema } from "@shared/schema";
+import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate } from "@shared/schema";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
 import {
@@ -3167,6 +3167,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating duty template:', error);
       res.status(500).json({ message: 'Failed to create duty template' });
+    }
+  });
+
+  // Update duty template (captain only)
+  app.put('/api/teams/:teamId/duties/:dutyTemplateId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { teamId, dutyTemplateId } = req.params;
+      const { name, icon, scope } = req.body;
+      
+      // Verify team captain
+      const team = await storage.getTeam(teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: 'Only team captains can edit duties' });
+      }
+
+      // Verify template belongs to team
+      const template = await storage.getDutyTemplateById(dutyTemplateId);
+      if (!template || template.teamId !== teamId) {
+        return res.status(404).json({ message: 'Duty template not found' });
+      }
+
+      // Prevent editing default duties
+      if (template.isDefault) {
+        return res.status(400).json({ message: 'Cannot edit default duties' });
+      }
+
+      // Build updates object
+      const updates: Partial<Pick<DutyTemplate, 'name' | 'icon' | 'scope'>> = {};
+      if (name) updates.name = name;
+      if (icon) updates.icon = icon;
+      if (scope) updates.scope = scope;
+
+      const updated = await storage.updateDutyTemplate(dutyTemplateId, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating duty template:', error);
+      res.status(500).json({ message: 'Failed to update duty template' });
+    }
+  });
+
+  // Delete duty from a specific game only (captain only)
+  app.delete('/api/games/:gameId/duties/:dutyTemplateId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { gameId, dutyTemplateId } = req.params;
+      
+      // Verify template exists and get team
+      const template = await storage.getDutyTemplateById(dutyTemplateId);
+      if (!template) {
+        return res.status(404).json({ message: 'Duty template not found' });
+      }
+
+      // Verify user is team captain
+      const team = await storage.getTeam(template.teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: 'Only team captains can delete duty assignments' });
+      }
+
+      // Delete assignments for this specific game and template
+      await storage.deleteDutyAssignmentsForGameAndTemplate(gameId, dutyTemplateId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting duty assignment:', error);
+      res.status(500).json({ message: 'Failed to delete duty assignment' });
     }
   });
 
