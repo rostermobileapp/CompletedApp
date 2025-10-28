@@ -4207,14 +4207,71 @@ export class DatabaseStorage implements IStorage {
 
   // Substitute request operations
   async createSubstituteRequest(request: InsertSubstituteRequest): Promise<SubstituteRequest> {
-    const [newRequest] = await db
-      .insert(substituteRequests)
-      .values({
-        ...request,
-        updatedAt: new Date(),
-      })
-      .returning();
-    return newRequest;
+    return await db.transaction(async (tx) => {
+      const [newRequest] = await tx
+        .insert(substituteRequests)
+        .values({
+          ...request,
+          updatedAt: new Date(),
+        })
+        .returning();
+      
+      // Send immediate notification to substitute player to confirm availability
+      if (request.substitutePlayerId && request.gameId) {
+        try {
+          // Get game and player details for notification
+          const gameResult = await tx
+            .select()
+            .from(games)
+            .leftJoin(teams, eq(games.homeTeamId, teams.id))
+            .where(eq(games.id, request.gameId))
+            .limit(1);
+          
+          if (gameResult.length > 0 && gameResult[0].games.leagueId) {
+            const game = gameResult[0].games;
+            const homeTeam = gameResult[0].teams;
+            
+            // Get away team
+            const awayTeamResult = game.awayTeamId 
+              ? await tx.select().from(teams).where(eq(teams.id, game.awayTeamId)).limit(1)
+              : [];
+            const awayTeam = awayTeamResult[0];
+            
+            // Get original player
+            const originalPlayerResult = await tx
+              .select()
+              .from(users)
+              .where(eq(users.id, request.originalPlayerId))
+              .limit(1);
+            const originalPlayer = originalPlayerResult[0];
+            
+            if (homeTeam && awayTeam && originalPlayer) {
+              const content = `🏆 You've been requested as a substitute player! The ${homeTeam.name} vs ${awayTeam.name} game needs you to substitute for ${originalPlayer.firstName} ${originalPlayer.lastName}. Please confirm your availability.`;
+              
+              const [announcement] = await tx
+                .insert(announcements)
+                .values({
+                  leagueId: game.leagueId,
+                  authorId: request.requestedBy,
+                  content,
+                  isPinned: false,
+                })
+                .returning();
+              
+              await tx.insert(announcementVisibility).values({
+                announcementId: announcement.id,
+                userId: request.substitutePlayerId,
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error creating initial substitute notification:', error);
+          // Don't throw - notification failure shouldn't prevent request creation
+        }
+      }
+      
+      return newRequest;
+    });
   }
 
   async getSubstituteRequests(options?: { status?: string; gameId?: string; userId?: string; requestingTeamId?: string; leagueIds?: string[] }): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] })[]> {
@@ -4786,39 +4843,46 @@ export class DatabaseStorage implements IStorage {
       let content = '';
       
       if (decision === 'denied') {
-        // Denial notifications - notify requesting team captain
-        const requestingTeam = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
-          ? originalRequest.game.homeTeam 
-          : originalRequest.game.awayTeam;
-        
-        if (requestingTeam.captainId) {
-          targetUserId = requestingTeam.captainId;
-          const approverRole = approverType === 'opposing_captain' ? 'opposing team captain' : 
-                              approverType === 'commissioner' ? 'league commissioner' : 'substitute player';
-          content = `🚫 Your substitution request for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game has been denied by the ${approverRole}.`;
+        // Handle denials based on new workflow
+        if (approverType === 'opposing_captain') {
+          // Opposing captain denied → notify commissioner for final decision
+          const league = await tx.select().from(leagues).where(eq(leagues.id, leagueId)).limit(1);
+          if (league[0]?.commissionerId) {
+            targetUserId = league[0].commissionerId;
+            content = `⚖️ Commissioner decision needed: A substitution request for the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game has been denied by the opposing team captain. Please review and make a final decision.`;
+          }
+        } else {
+          // All other denials (substitute player or commissioner) - notify requesting team captain
+          const requestingTeam = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
+            ? originalRequest.game.homeTeam 
+            : originalRequest.game.awayTeam;
+          
+          if (requestingTeam.captainId) {
+            targetUserId = requestingTeam.captainId;
+            const approverRole = approverType === 'commissioner' ? 'league commissioner' : 'substitute player';
+            content = `🚫 Your substitution request for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game has been denied by the ${approverRole}.`;
+          }
         }
       } else if (decision === 'approved') {
         // Approval notifications - notify next person in workflow
         switch (updatedRequest.status) {
-          case 'pending_commissioner_approval':
-            // Opposing captain approved → notify commissioner
-            const league = await tx.select().from(leagues).where(eq(leagues.id, leagueId)).limit(1);
-            if (league[0]?.commissionerId) {
-              targetUserId = league[0].commissionerId;
-              content = `⚖️ Commissioner approval needed: A substitution request for the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game has been approved by the opposing team captain and now needs your approval as league commissioner.`;
-            }
-            break;
+          case 'pending_opponent_approval':
+            // NEW: Substitute player confirmed availability → notify opposing captain
+            const opposingTeam = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
+              ? originalRequest.game.awayTeam 
+              : originalRequest.game.homeTeam;
             
-          case 'pending_substitute_approval':
-            // Commissioner approved → notify substitute player
-            if (originalRequest.substitutePlayer?.id) {
-              targetUserId = originalRequest.substitutePlayer.id;
-              content = `🏆 You've been requested as a substitute player! The ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game needs you to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName}. Please confirm your availability.`;
+            if (opposingTeam.captainId) {
+              targetUserId = opposingTeam.captainId;
+              const substitutePlayerName = originalRequest.substitutePlayer 
+                ? `${originalRequest.substitutePlayer.firstName} ${originalRequest.substitutePlayer.lastName}`
+                : 'a substitute player';
+              content = `⚽ Substitution approval needed: ${substitutePlayerName} has confirmed availability to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in your upcoming game against ${originalRequest.requestingTeamId === originalRequest.game.homeTeamId ? originalRequest.game.homeTeam.name : originalRequest.game.awayTeam.name}. Please review and approve.`;
             }
             break;
             
           case 'approved':
-            // Substitute player confirmed → notify all parties
+            // Opposing captain OR commissioner approved → FINAL APPROVAL, notify all parties
             const allParticipants: string[] = [];
             
             // Add requesting team captain
@@ -4830,11 +4894,11 @@ export class DatabaseStorage implements IStorage {
             }
             
             // Add opposing team captain
-            const opposingTeam = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
+            const oppTeam = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
               ? originalRequest.game.awayTeam 
               : originalRequest.game.homeTeam;
-            if (opposingTeam.captainId) {
-              allParticipants.push(opposingTeam.captainId);
+            if (oppTeam.captainId) {
+              allParticipants.push(oppTeam.captainId);
             }
             
             // Add commissioner
@@ -4848,19 +4912,24 @@ export class DatabaseStorage implements IStorage {
               allParticipants.push(originalRequest.originalPlayerId);
             }
             
+            // Add substitute player
+            if (originalRequest.substitutePlayer?.id) {
+              allParticipants.push(originalRequest.substitutePlayer.id);
+            }
+            
             // Create notifications for all participants (multiple target users)
             if (allParticipants.length > 0) {
               const substitutePlayerName = originalRequest.substitutePlayer 
                 ? `${originalRequest.substitutePlayer.firstName} ${originalRequest.substitutePlayer.lastName}`
                 : 'the substitute player';
-              content = `✅ Substitution confirmed! ${substitutePlayerName} has confirmed they will substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game.`;
+              content = `✅ Substitution approved! ${substitutePlayerName} will substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game.`;
               
               // Create the announcement
               const [announcement] = await tx
                 .insert(announcements)
                 .values({
                   leagueId,
-                  authorId: originalRequest.requestedBy, // System notification from the requesting user
+                  authorId: originalRequest.requestedBy,
                   content,
                   isPinned: false,
                 })
@@ -4904,35 +4973,45 @@ export class DatabaseStorage implements IStorage {
   }
 
   // SECURITY: Derive next status from current state and approval decision
+  // New workflow: substitute_player → opposing_captain → (only if denied) commissioner
   private deriveNextStatus(
     currentStatus: string, 
     approverType: 'opposing_captain' | 'commissioner' | 'substitute_player', 
     decision: 'approved' | 'denied'
   ): 'pending_opponent_approval' | 'pending_commissioner_approval' | 'pending_substitute_approval' | 'approved' | 'denied' | 'expired' {
+    // Handle denials based on who denied
     if (decision === 'denied') {
+      // If opposing captain denies, send to commissioner for final decision
+      if (approverType === 'opposing_captain') {
+        return 'pending_commissioner_approval';
+      }
+      // All other denials are final
       return 'denied';
     }
 
     // Only allow approved decisions to advance workflow
     switch (approverType) {
-      case 'opposing_captain':
-        if (currentStatus !== 'pending_opponent_approval') {
-          throw new Error(`Invalid transition: cannot process opposing_captain approval from status ${currentStatus}`);
-        }
-        return 'pending_commissioner_approval';
-        
-      case 'commissioner':
-        // Commissioners can approve at either pending_opponent_approval or pending_commissioner_approval
-        if (currentStatus !== 'pending_opponent_approval' && currentStatus !== 'pending_commissioner_approval') {
-          throw new Error(`Invalid transition: cannot process commissioner approval from status ${currentStatus}`);
-        }
-        // When commissioner approves, move to pending_substitute_approval
-        return 'pending_substitute_approval';
-        
       case 'substitute_player':
+        // First step: substitute confirms availability → notify opposing captain
         if (currentStatus !== 'pending_substitute_approval') {
           throw new Error(`Invalid transition: cannot process substitute_player approval from status ${currentStatus}`);
         }
+        return 'pending_opponent_approval';
+        
+      case 'opposing_captain':
+        // Second step: opposing captain approves → FULLY APPROVED (bypass commissioner)
+        if (currentStatus !== 'pending_opponent_approval') {
+          throw new Error(`Invalid transition: cannot process opposing_captain approval from status ${currentStatus}`);
+        }
+        return 'approved';
+        
+      case 'commissioner':
+        // Commissioner only sees requests if opposing captain denied them
+        // Commissioners can approve at either pending_opponent_approval (if they jumped in early) or pending_commissioner_approval
+        if (currentStatus !== 'pending_opponent_approval' && currentStatus !== 'pending_commissioner_approval') {
+          throw new Error(`Invalid transition: cannot process commissioner approval from status ${currentStatus}`);
+        }
+        // Commissioner approval is final
         return 'approved';
         
       default:

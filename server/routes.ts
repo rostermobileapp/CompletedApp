@@ -3530,7 +3530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         requestedBy: userId,
         requestingTeamId,
         reason,
-        status: 'pending_opponent_approval',
+        status: 'pending_substitute_approval',
         expiresAt: expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
       });
 
