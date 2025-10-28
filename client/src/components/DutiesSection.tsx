@@ -279,8 +279,8 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Captain edit/delete buttons (only for non-default duties) */}
-                {isCaptain && !template.isDefault && (
+                {/* Captain edit/delete buttons */}
+                {isCaptain && (
                   <>
                     <Button
                       size="sm"
