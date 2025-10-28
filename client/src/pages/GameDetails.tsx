@@ -666,13 +666,24 @@ export default function GameDetails() {
         )}
 
         {/* Custom Duties Section - Home Team */}
-        {!isGameCompleted && (
+        {!isGameCompleted && isUserOnHomeTeam && (
           <DutiesSection 
             gameId={game.id}
             teamId={game.homeTeam.id}
             userId={(user as User).id}
             isCaptain={game.homeTeam.captainId === (user as User).id}
             isTeamMember={isUserOnHomeTeam}
+          />
+        )}
+
+        {/* Custom Duties Section - Away Team */}
+        {!isGameCompleted && isUserOnAwayTeam && (
+          <DutiesSection 
+            gameId={game.id}
+            teamId={game.awayTeam.id}
+            userId={(user as User).id}
+            isCaptain={game.awayTeam.captainId === (user as User).id}
+            isTeamMember={isUserOnAwayTeam}
           />
         )}
 
