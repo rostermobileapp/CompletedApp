@@ -541,7 +541,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       Score Verifications ({gamesNeedingVerification.length})
                     </h3>
                   </div>
-                  <div className="dark:bg-orange-950 rounded-lg p-4 bg-[#212121]">
+                  <div className="bg-[#212121] rounded-lg p-4">
                     <Button 
                       className="w-full bg-orange-600 hover:bg-orange-700 text-white"
                       onClick={() => onNavigate(`/league-management?leagueId=${leagueId}`)}
