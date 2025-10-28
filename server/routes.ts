@@ -3138,6 +3138,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Custom duty routes
+  app.post('/api/teams/:teamId/duties', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const teamId = req.params.teamId;
+      const { name, icon, scope } = req.body;
+      
+      if (!name || !icon || !scope) {
+        return res.status(400).json({ message: 'Name, icon, and scope are required' });
+      }
+
+      const team = await storage.getTeam(teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: 'Only team captains can create duties' });
+      }
+
+      const template = await storage.createDutyTemplate({
+        teamId,
+        name,
+        icon,
+        scope,
+        isDefault: false,
+        createdBy: userId,
+      });
+      
+      res.json(template);
+    } catch (error) {
+      console.error('Error creating duty template:', error);
+      res.status(500).json({ message: 'Failed to create duty template' });
+    }
+  });
+
+  app.get('/api/games/:gameId/teams/:teamId/duties', async (req: any, res) => {
+    try {
+      const { gameId, teamId } = req.params;
+      const templates = await storage.getDutyTemplatesForGame(teamId, gameId);
+      res.json(templates);
+    } catch (error) {
+      console.error('Error fetching duty templates for game:', error);
+      res.status(500).json({ message: 'Failed to fetch duty templates' });
+    }
+  });
+
+  app.delete('/api/duties/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dutyId = req.params.id;
+      
+      const template = await storage.getDutyTemplateById(dutyId);
+      if (!template) {
+        return res.status(404).json({ message: 'Duty template not found' });
+      }
+
+      const team = await storage.getTeam(template.teamId);
+      if (!team || team.captainId !== userId) {
+        return res.status(403).json({ message: 'Only team captains can delete duties' });
+      }
+
+      if (template.isDefault) {
+        return res.status(400).json({ message: 'Cannot delete default duties' });
+      }
+
+      await storage.deleteDutyTemplate(dutyId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting duty template:', error);
+      res.status(500).json({ message: 'Failed to delete duty template' });
+    }
+  });
+
+  app.post('/api/games/:gameId/duties/:dutyTemplateId/claim', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { gameId, dutyTemplateId } = req.params;
+      const { teamId } = req.body;
+      
+      if (!teamId) {
+        return res.status(400).json({ message: 'Team ID is required' });
+      }
+
+      // Verify user is a member of the team
+      const teamMembership = await storage.getTeamMembershipByUserId(userId, teamId);
+      if (!teamMembership) {
+        return res.status(403).json({ message: 'You are not a member of this team' });
+      }
+
+      // Attempt to claim the duty
+      try {
+        const assignment = await storage.claimDuty({
+          dutyTemplateId,
+          gameId,
+          userId,
+          teamId,
+        });
+        
+        res.json(assignment);
+      } catch (error: any) {
+        // Handle unique constraint violations (duty already claimed)
+        if (error.code === '23505' || error.message?.includes('unique')) {
+          return res.status(409).json({ message: 'This duty has already been claimed' });
+        }
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error claiming duty:', error);
+      res.status(500).json({ message: 'Failed to claim duty' });
+    }
+  });
+
+  app.post('/api/games/:gameId/duties/:dutyTemplateId/release', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { gameId, dutyTemplateId } = req.params;
+      const { teamId } = req.body;
+      
+      if (!teamId) {
+        return res.status(400).json({ message: 'Team ID is required' });
+      }
+
+      // Verify user is a member of the team
+      const teamMembership = await storage.getTeamMembershipByUserId(userId, teamId);
+      if (!teamMembership) {
+        return res.status(403).json({ message: 'You are not a member of this team' });
+      }
+
+      await storage.releaseDuty(dutyTemplateId, gameId, teamId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error releasing duty:', error);
+      res.status(500).json({ message: 'Failed to release duty' });
+    }
+  });
+
+  app.get('/api/games/:gameId/duties', async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const assignments = await storage.getDutyAssignmentsByGame(gameId);
+      res.json(assignments);
+    } catch (error) {
+      console.error('Error fetching duty assignments:', error);
+      res.status(500).json({ message: 'Failed to fetch duty assignments' });
+    }
+  });
+
   // Save notes for game
   app.post('/api/games/:gameId/notes', isAuthenticated, async (req: any, res) => {
     try {

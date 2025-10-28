@@ -72,6 +72,12 @@ export const scrimmageStatusEnum = pgEnum("scrimmage_status", [
   "cancelled"
 ]);
 
+// Duty scope enum
+export const dutyScopeEnum = pgEnum("duty_scope", [
+  "single_game",
+  "every_game"
+]);
+
 // Scrimmage request status enum
 export const scrimmageRequestStatusEnum = pgEnum("scrimmage_request_status", [
   "pending",
@@ -299,6 +305,35 @@ export const games = pgTable("games", {
   resultType: gameResultTypeEnum("result_type").default("regulation"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Duty templates table - defines the types of duties (beverage, custom, etc.)
+export const dutyTemplates = pgTable("duty_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").references(() => teams.id).notNull(), // Which team this duty belongs to
+  name: varchar("name").notNull(), // e.g., "Beverages", "Snacks", "Camera"
+  icon: varchar("icon").notNull(), // Icon name from lucide-react
+  scope: dutyScopeEnum("scope").notNull(), // single_game or every_game
+  isDefault: boolean("is_default").default(false).notNull(), // true for beverage duty
+  createdBy: varchar("created_by").references(() => users.id).notNull(), // Captain who created it
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_duty_templates_team_id").on(table.teamId),
+]);
+
+// Duty assignments table - tracks who claimed which duty for which game
+export const dutyAssignments = pgTable("duty_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dutyTemplateId: varchar("duty_template_id").references(() => dutyTemplates.id).notNull(),
+  gameId: varchar("game_id").references(() => games.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(), // Who claimed it
+  teamId: varchar("team_id").references(() => teams.id).notNull(), // Which team they're representing
+  claimedAt: timestamp("claimed_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_duty_game_assignment").on(table.dutyTemplateId, table.gameId, table.teamId),
+  index("idx_duty_assignments_game_id").on(table.gameId),
+  index("idx_duty_assignments_user_id").on(table.userId),
+  index("idx_duty_assignments_template_id").on(table.dutyTemplateId),
+]);
 
 // Personal reminders table
 export const personalReminders = pgTable("personal_reminders", {
@@ -1219,6 +1254,39 @@ export const gamesRelations = relations(games, ({ one, many }) => ({
   }),
   rsvps: many(gameRsvps),
   substituteRequests: many(substituteRequests),
+  dutyAssignments: many(dutyAssignments),
+}));
+
+// Duty relations
+export const dutyTemplatesRelations = relations(dutyTemplates, ({ one, many }) => ({
+  team: one(teams, {
+    fields: [dutyTemplates.teamId],
+    references: [teams.id],
+  }),
+  createdBy: one(users, {
+    fields: [dutyTemplates.createdBy],
+    references: [users.id],
+  }),
+  assignments: many(dutyAssignments),
+}));
+
+export const dutyAssignmentsRelations = relations(dutyAssignments, ({ one }) => ({
+  dutyTemplate: one(dutyTemplates, {
+    fields: [dutyAssignments.dutyTemplateId],
+    references: [dutyTemplates.id],
+  }),
+  game: one(games, {
+    fields: [dutyAssignments.gameId],
+    references: [games.id],
+  }),
+  user: one(users, {
+    fields: [dutyAssignments.userId],
+    references: [users.id],
+  }),
+  team: one(teams, {
+    fields: [dutyAssignments.teamId],
+    references: [teams.id],
+  }),
 }));
 
 // Messaging relations
@@ -1712,6 +1780,16 @@ export const insertGameSchema = createInsertSchema(games).omit({
   createdAt: true,
 }).extend({
   scheduledAt: z.string().transform((val) => new Date(val)),
+});
+
+export const insertDutyTemplateSchema = createInsertSchema(dutyTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDutyAssignmentSchema = createInsertSchema(dutyAssignments).omit({
+  id: true,
+  claimedAt: true,
 });
 
 export const insertPersonalReminderSchema = createInsertSchema(personalReminders).omit({
@@ -2213,6 +2291,10 @@ export type TeamLeagueRequest = typeof teamLeagueRequests.$inferSelect;
 export type InsertTeamLeagueRequest = z.infer<typeof insertTeamLeagueRequestSchema>;
 export type Game = typeof games.$inferSelect;
 export type InsertGame = z.infer<typeof insertGameSchema>;
+export type DutyTemplate = typeof dutyTemplates.$inferSelect;
+export type InsertDutyTemplate = z.infer<typeof insertDutyTemplateSchema>;
+export type DutyAssignment = typeof dutyAssignments.$inferSelect;
+export type InsertDutyAssignment = z.infer<typeof insertDutyAssignmentSchema>;
 export type PersonalReminder = typeof personalReminders.$inferSelect;
 export type InsertPersonalReminder = z.infer<typeof insertPersonalReminderSchema>;
 export type GameScoreSubmission = typeof gameScoreSubmissions.$inferSelect;

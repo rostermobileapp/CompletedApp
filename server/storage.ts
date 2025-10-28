@@ -8,6 +8,8 @@ import {
   placeholderPlayers,
   teamLeagueRequests,
   games,
+  dutyTemplates,
+  dutyAssignments,
   personalReminders,
   gameScoreSubmissions,
   gameRsvps,
@@ -74,6 +76,10 @@ import {
   type InsertTeamLeagueRequest,
   type Game,
   type InsertGame,
+  type DutyTemplate,
+  type InsertDutyTemplate,
+  type DutyAssignment,
+  type InsertDutyAssignment,
   type PersonalReminder,
   type InsertPersonalReminder,
   type GameScoreSubmission,
@@ -288,6 +294,17 @@ export interface IStorage {
   releaseBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game>;
   saveGameNotes(gameId: string, userId: string, teamId: string, notes: string): Promise<any>;
   deleteGame(id: string): Promise<void>;
+  
+  // Duty operations
+  createDutyTemplate(template: InsertDutyTemplate): Promise<DutyTemplate>;
+  getDutyTemplatesByTeam(teamId: string): Promise<DutyTemplate[]>;
+  getDutyTemplatesForGame(teamId: string, gameId: string): Promise<DutyTemplate[]>;
+  getDutyTemplateById(id: string): Promise<DutyTemplate | undefined>;
+  deleteDutyTemplate(id: string): Promise<void>;
+  claimDuty(assignment: InsertDutyAssignment): Promise<DutyAssignment>;
+  releaseDuty(dutyTemplateId: string, gameId: string, teamId: string): Promise<void>;
+  getDutyAssignmentsByGame(gameId: string): Promise<(DutyAssignment & { dutyTemplate: DutyTemplate; user: User })[]>;
+  getDutyAssignmentsByUser(userId: string): Promise<(DutyAssignment & { dutyTemplate: DutyTemplate; game: Game })[]>;
   
   // Game stars operations
   submitGameStars(stars: InsertGameStar): Promise<GameStar>;
@@ -2984,6 +3001,163 @@ export class DatabaseStorage implements IStorage {
     }
     
     return updatedGame;
+  }
+
+  async createDutyTemplate(template: InsertDutyTemplate): Promise<DutyTemplate> {
+    const [created] = await db
+      .insert(dutyTemplates)
+      .values(template)
+      .returning();
+    
+    if (!created) {
+      throw new Error('Failed to create duty template');
+    }
+    
+    return created;
+  }
+
+  async getDutyTemplatesByTeam(teamId: string): Promise<DutyTemplate[]> {
+    const templates = await db
+      .select()
+      .from(dutyTemplates)
+      .where(eq(dutyTemplates.teamId, teamId))
+      .orderBy(desc(dutyTemplates.isDefault), asc(dutyTemplates.createdAt));
+    
+    // Auto-create default beverage template if it doesn't exist
+    const hasDefaultBeverage = templates.some(t => t.isDefault);
+    if (!hasDefaultBeverage) {
+      const team = await this.getTeam(teamId);
+      if (team && team.captainId) {
+        const beverageTemplate = await this.createDutyTemplate({
+          teamId,
+          name: 'Beverages',
+          icon: 'Beer',
+          scope: 'every_game',
+          isDefault: true,
+          createdBy: team.captainId,
+        });
+        templates.unshift(beverageTemplate);
+      }
+    }
+    
+    return templates;
+  }
+
+  async getDutyTemplatesForGame(teamId: string, gameId: string): Promise<DutyTemplate[]> {
+    // Get all templates for this team
+    const allTemplates = await this.getDutyTemplatesByTeam(teamId);
+    
+    // Get all assignments for this team across all games
+    const allAssignments = await db
+      .select()
+      .from(dutyAssignments)
+      .where(eq(dutyAssignments.teamId, teamId));
+    
+    // Filter templates based on scope
+    const filteredTemplates = allTemplates.filter(template => {
+      if (template.scope === 'every_game') {
+        // Always show every_game duties
+        return true;
+      }
+      
+      // For single_game duties:
+      // Show if: (1) never claimed, OR (2) claimed for this specific game
+      const assignments = allAssignments.filter(a => a.dutyTemplateId === template.id);
+      if (assignments.length === 0) {
+        // Never claimed, so show it
+        return true;
+      }
+      
+      // Check if claimed for this specific game
+      return assignments.some(a => a.gameId === gameId);
+    });
+    
+    return filteredTemplates;
+  }
+
+  async getDutyTemplateById(id: string): Promise<DutyTemplate | undefined> {
+    const [template] = await db
+      .select()
+      .from(dutyTemplates)
+      .where(eq(dutyTemplates.id, id));
+    
+    return template;
+  }
+
+  async deleteDutyTemplate(id: string): Promise<void> {
+    await db.delete(dutyTemplates).where(eq(dutyTemplates.id, id));
+  }
+
+  async claimDuty(assignment: InsertDutyAssignment): Promise<DutyAssignment> {
+    // Check the template exists and belongs to the supplied team
+    const template = await this.getDutyTemplateById(assignment.dutyTemplateId);
+    if (!template) {
+      throw new Error('Duty template not found');
+    }
+    
+    // Validate that the template belongs to the supplied team
+    if (template.teamId !== assignment.teamId) {
+      throw new Error('Duty template does not belong to this team');
+    }
+    
+    const [created] = await db
+      .insert(dutyAssignments)
+      .values(assignment)
+      .returning();
+    
+    if (!created) {
+      throw new Error('Failed to claim duty');
+    }
+    
+    return created;
+  }
+
+  async releaseDuty(dutyTemplateId: string, gameId: string, teamId: string): Promise<void> {
+    // Validate that the template belongs to the supplied team
+    const template = await this.getDutyTemplateById(dutyTemplateId);
+    if (template && template.teamId !== teamId) {
+      throw new Error('Duty template does not belong to this team');
+    }
+    
+    await db
+      .delete(dutyAssignments)
+      .where(
+        and(
+          eq(dutyAssignments.dutyTemplateId, dutyTemplateId),
+          eq(dutyAssignments.gameId, gameId),
+          eq(dutyAssignments.teamId, teamId)
+        )
+      );
+  }
+
+  async getDutyAssignmentsByGame(gameId: string): Promise<(DutyAssignment & { dutyTemplate: DutyTemplate; user: User })[]> {
+    const results = await db
+      .select()
+      .from(dutyAssignments)
+      .where(eq(dutyAssignments.gameId, gameId))
+      .innerJoin(dutyTemplates, eq(dutyAssignments.dutyTemplateId, dutyTemplates.id))
+      .innerJoin(users, eq(dutyAssignments.userId, users.id));
+    
+    return results.map(row => ({
+      ...row.duty_assignments,
+      dutyTemplate: row.duty_templates,
+      user: row.users,
+    }));
+  }
+
+  async getDutyAssignmentsByUser(userId: string): Promise<(DutyAssignment & { dutyTemplate: DutyTemplate; game: Game })[]> {
+    const results = await db
+      .select()
+      .from(dutyAssignments)
+      .where(eq(dutyAssignments.userId, userId))
+      .innerJoin(dutyTemplates, eq(dutyAssignments.dutyTemplateId, dutyTemplates.id))
+      .innerJoin(games, eq(dutyAssignments.gameId, games.id));
+    
+    return results.map(row => ({
+      ...row.duty_assignments,
+      dutyTemplate: row.duty_templates,
+      game: row.games,
+    }));
   }
 
   async saveGameNotes(gameId: string, userId: string, teamId: string, notes: string): Promise<any> {
