@@ -300,7 +300,9 @@ export interface IStorage {
   getDutyTemplatesByTeam(teamId: string): Promise<DutyTemplate[]>;
   getDutyTemplatesForGame(teamId: string, gameId: string): Promise<DutyTemplate[]>;
   getDutyTemplateById(id: string): Promise<DutyTemplate | undefined>;
+  updateDutyTemplate(id: string, updates: Partial<Pick<DutyTemplate, 'name' | 'icon' | 'scope'>>): Promise<DutyTemplate>;
   deleteDutyTemplate(id: string): Promise<void>;
+  deleteDutyAssignmentsForGameAndTemplate(gameId: string, dutyTemplateId: string): Promise<void>;
   claimDuty(assignment: InsertDutyAssignment): Promise<DutyAssignment>;
   releaseDuty(dutyTemplateId: string, gameId: string, teamId: string): Promise<void>;
   getDutyAssignmentsByGame(gameId: string): Promise<(DutyAssignment & { dutyTemplate: DutyTemplate; user: User })[]>;
@@ -3084,8 +3086,36 @@ export class DatabaseStorage implements IStorage {
     return template;
   }
 
+  async updateDutyTemplate(id: string, updates: Partial<Pick<DutyTemplate, 'name' | 'icon' | 'scope'>>): Promise<DutyTemplate> {
+    const [updated] = await db
+      .update(dutyTemplates)
+      .set(updates)
+      .where(eq(dutyTemplates.id, id))
+      .returning();
+    
+    if (!updated) {
+      throw new Error('Duty template not found');
+    }
+    
+    return updated;
+  }
+
   async deleteDutyTemplate(id: string): Promise<void> {
+    // First delete all assignments for this template
+    await db.delete(dutyAssignments).where(eq(dutyAssignments.dutyTemplateId, id));
+    // Then delete the template itself
     await db.delete(dutyTemplates).where(eq(dutyTemplates.id, id));
+  }
+
+  async deleteDutyAssignmentsForGameAndTemplate(gameId: string, dutyTemplateId: string): Promise<void> {
+    await db
+      .delete(dutyAssignments)
+      .where(
+        and(
+          eq(dutyAssignments.gameId, gameId),
+          eq(dutyAssignments.dutyTemplateId, dutyTemplateId)
+        )
+      );
   }
 
   async claimDuty(assignment: InsertDutyAssignment): Promise<DutyAssignment> {
