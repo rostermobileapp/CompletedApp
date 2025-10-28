@@ -542,38 +542,14 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                     </h3>
                   </div>
                   <div className="dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg p-4 bg-[#212121]">
-                    <div className="space-y-3">
-                      {gamesNeedingVerification.map((game: any) => (
-                        <div 
-                          key={game.id}
-                          className="bg-white dark:bg-card border border-orange-200 dark:border-orange-800 rounded-lg p-3 flex items-center justify-between"
-                          data-testid={`verification-game-${game.id}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <AlertCircle className="w-5 h-5 text-orange-500" />
-                            <div>
-                              <p className="font-medium text-[#000000]">
-                                {game.homeTeam?.name} vs {game.awayTeam?.name}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {formatInTimeZone(new Date(game.scheduledAt), userTimeZone, 'MMM d, yyyy')}
-                              </p>
-                              <p className="text-sm text-orange-600">
-                                {game.reason}
-                              </p>
-                            </div>
-                          </div>
-                          <Button 
-                            size="sm" 
-                            className="bg-orange-600 hover:bg-orange-700 text-white"
-                            onClick={() => onNavigate(`/league-management?leagueId=${leagueId}`)}
-                            data-testid={`button-verify-game-${game.id}`}
-                          >
-                            Verify
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
+                    <Button 
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                      onClick={() => onNavigate(`/league-management?leagueId=${leagueId}`)}
+                      data-testid="button-verify-scores"
+                    >
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                      Verify Scores
+                    </Button>
                   </div>
                 </div>
               )}
