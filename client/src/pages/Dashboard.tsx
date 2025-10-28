@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { notifyDashboardSelectionChange } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, LucideIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,35 @@ import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 import FeedbackModal from '@/components/FeedbackModal';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
+
+// Icon mapper for duty icons
+const ICON_MAP: Record<string, LucideIcon> = {
+  Pizza,
+  Coffee,
+  UtensilsCrossed,
+  Cookie,
+  IceCream,
+  Beer,
+  Wine,
+  CupSoda,
+  Milk,
+  Wrench,
+  Clipboard,
+  Package,
+  ShoppingBag,
+  Camera,
+  Heart,
+  Star,
+  Trophy,
+  Smile,
+  ThumbsUp,
+  Flag,
+  Music,
+};
+
+function getIconComponent(iconName: string): LucideIcon | null {
+  return ICON_MAP[iconName] || null;
+}
 
 // Form schemas
 const personalReminderSchema = z.object({
@@ -993,6 +1022,30 @@ export default function Dashboard() {
     }
   });
 
+  // Fetch duty assignments for upcoming games
+  const { data: dutyAssignments = [] } = useQuery({
+    queryKey: ['/api/duty-assignments', upcomingGames],
+    queryFn: async () => {
+      if (!Array.isArray(upcomingGames) || upcomingGames.length === 0) return [];
+      
+      // Fetch duty assignments for each game
+      const assignmentPromises = upcomingGames.map(async (game: any) => {
+        try {
+          const response = await apiRequest('GET', `/api/games/${game.id}/duties`);
+          const assignments = await response.json();
+          return { gameId: game.id, assignments: assignments || [] };
+        } catch (error) {
+          console.error(`Failed to fetch duties for game ${game.id}:`, error);
+          return { gameId: game.id, assignments: [] };
+        }
+      });
+      
+      const results = await Promise.all(assignmentPromises);
+      return results;
+    },
+    enabled: !!upcomingGames && Array.isArray(upcomingGames) && upcomingGames.length > 0,
+  });
+
   const { data: scrimmageInvites, isLoading: invitesLoading } = useQuery({
     queryKey: ['/api/users/scrimmage-invites'],
     select: (invites) => {
@@ -1934,24 +1987,56 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* Beverage Duty Icon - Left side */}
+                    {/* Duty Icons */}
                     {(() => {
-                      // Show beverage icon if user has beverage duty
-                      const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
+                      // Find duty assignments for this game
+                      const gameAssignments = dutyAssignments?.find((ga: any) => ga.gameId === game.id);
+                      if (!gameAssignments || !Array.isArray(gameAssignments.assignments)) {
+                        return null;
+                      }
                       
-                      return hasBeverageDuty ? (
-                        <div className="flex items-center">
-                          <img 
-                            src={beverageJarUrl}
-                            alt="Beverage Duty"
-                            className="h-8 w-auto invert dark:invert-0"
-                            style={{ aspectRatio: '9/16' }}
-                            data-testid={`icon-beverage-duty-${game.id}`}
-                          />
+                      // Filter assignments claimed by current user
+                      const userDuties = gameAssignments.assignments.filter(
+                        (assignment: any) => assignment.userId === (user as any)?.id
+                      );
+                      
+                      if (userDuties.length === 0) return null;
+                      
+                      return (
+                        <div className="flex items-center gap-1">
+                          {userDuties.map((assignment: any, index: number) => {
+                            // Special handling for Beverages duty (show beverage jar)
+                            if (assignment.dutyTemplate?.name === 'Beverages') {
+                              return (
+                                <img 
+                                  key={`${assignment.id}-${index}`}
+                                  src={beverageJarUrl}
+                                  alt="Beverage Duty"
+                                  className="h-8 w-auto invert dark:invert-0"
+                                  style={{ aspectRatio: '9/16' }}
+                                  data-testid={`icon-duty-${assignment.dutyTemplate.name}-${game.id}`}
+                                />
+                              );
+                            }
+                            
+                            // For custom duties, show lucide icon
+                            const IconComponent = getIconComponent(assignment.dutyTemplate?.icon);
+                            if (!IconComponent) return null;
+                            
+                            return (
+                              <div 
+                                key={`${assignment.id}-${index}`}
+                                className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
+                                title={assignment.dutyTemplate?.name}
+                                data-testid={`icon-duty-${assignment.dutyTemplate.name}-${game.id}`}
+                              >
+                                <IconComponent className="w-5 h-5 text-primary-foreground" />
+                              </div>
+                            );
+                          })}
                         </div>
-                      ) : null;
+                      );
                     })()}
-                    
                   </div>
                 </div>
               </div>
