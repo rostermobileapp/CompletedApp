@@ -3189,11 +3189,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Duty template not found' });
       }
 
-      // Prevent editing default duties
-      if (template.isDefault) {
-        return res.status(400).json({ message: 'Cannot edit default duties' });
-      }
-
       // Build updates object
       const updates: Partial<Pick<DutyTemplate, 'name' | 'icon' | 'scope'>> = {};
       if (name) updates.name = name;
@@ -3259,10 +3254,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const team = await storage.getTeam(template.teamId);
       if (!team || team.captainId !== userId) {
         return res.status(403).json({ message: 'Only team captains can delete duties' });
-      }
-
-      if (template.isDefault) {
-        return res.status(400).json({ message: 'Cannot delete default duties' });
       }
 
       await storage.deleteDutyTemplate(dutyId);
