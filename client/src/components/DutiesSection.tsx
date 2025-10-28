@@ -2,7 +2,17 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Pizza,
   Coffee,
@@ -30,6 +40,7 @@ import {
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import { useState } from 'react';
 import AddDutyModal from './AddDutyModal';
+import EditDutyModal from './EditDutyModal';
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Pizza,
@@ -66,6 +77,10 @@ interface DutiesSectionProps {
 export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTeamMember }: DutiesSectionProps) {
   const { toast } = useToast();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingDuty, setEditingDuty] = useState<any>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletingDuty, setDeletingDuty] = useState<any>(null);
 
   const { data: dutyTemplates = [] } = useQuery({
     queryKey: ['/api/games', gameId, 'teams', teamId, 'duties'],
@@ -129,8 +144,76 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
     },
   });
 
+  const deleteFromGameMutation = useMutation({
+    mutationFn: async ({ dutyTemplateId }: { dutyTemplateId: string }) => {
+      const response = await apiRequest('DELETE', `/api/games/${gameId}/duties/${dutyTemplateId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'duties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'teams', teamId, 'duties'] });
+      toast({
+        title: 'Success',
+        description: 'Duty removed from this game',
+      });
+      setShowDeleteDialog(false);
+      setDeletingDuty(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete duty',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteFromAllGamesMutation = useMutation({
+    mutationFn: async ({ dutyTemplateId }: { dutyTemplateId: string }) => {
+      const response = await apiRequest('DELETE', `/api/duties/${dutyTemplateId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'duties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'teams', teamId, 'duties'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && 
+                 key[0] === '/api/games' && 
+                 key[2] === 'teams' && 
+                 key[3] === teamId && 
+                 key[4] === 'duties';
+        }
+      });
+      toast({
+        title: 'Success',
+        description: 'Duty deleted from all games',
+      });
+      setShowDeleteDialog(false);
+      setDeletingDuty(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete duty',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const getAssignment = (dutyTemplateId: string) => {
     return dutyAssignments.find((a: any) => a.dutyTemplateId === dutyTemplateId && a.teamId === teamId);
+  };
+
+  const handleEdit = (template: any) => {
+    setEditingDuty(template);
+    setShowEditModal(true);
+  };
+
+  const handleDeleteClick = (template: any) => {
+    setDeletingDuty(template);
+    setShowDeleteDialog(true);
   };
 
   const renderIcon = (template: any) => {
@@ -195,37 +278,110 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
                 </div>
               </div>
 
-              {isTeamMember && (
-                <>
-                  {isClaimedByMe ? (
+              <div className="flex items-center gap-2">
+                {/* Captain edit/delete buttons (only for non-default duties) */}
+                {isCaptain && !template.isDefault && (
+                  <>
                     <Button
                       size="sm"
-                      variant="destructive"
-                      onClick={() => releaseDutyMutation.mutate({ dutyTemplateId: template.id })}
-                      disabled={releaseDutyMutation.isPending}
-                      data-testid={`button-release-duty-${template.id}`}
+                      variant="ghost"
+                      onClick={() => handleEdit(template)}
+                      data-testid={`button-edit-duty-${template.id}`}
                     >
-                      Release
+                      <Pencil className="w-4 h-4" />
                     </Button>
-                  ) : !isClaimed ? (
                     <Button
                       size="sm"
-                      variant="default"
-                      onClick={() => claimDutyMutation.mutate({ dutyTemplateId: template.id })}
-                      disabled={claimDutyMutation.isPending}
-                      data-testid={`button-claim-duty-${template.id}`}
+                      variant="ghost"
+                      onClick={() => handleDeleteClick(template)}
+                      className="text-destructive hover:text-destructive"
+                      data-testid={`button-delete-duty-${template.id}`}
                     >
-                      Claim
+                      <Trash2 className="w-4 h-4" />
                     </Button>
-                  ) : null}
-                </>
-              )}
+                  </>
+                )}
+
+                {/* Team member claim/release buttons */}
+                {isTeamMember && (
+                  <>
+                    {isClaimedByMe ? (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => releaseDutyMutation.mutate({ dutyTemplateId: template.id })}
+                        disabled={releaseDutyMutation.isPending}
+                        data-testid={`button-release-duty-${template.id}`}
+                      >
+                        Release
+                      </Button>
+                    ) : !isClaimed ? (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => claimDutyMutation.mutate({ dutyTemplateId: template.id })}
+                        disabled={claimDutyMutation.isPending}
+                        data-testid={`button-claim-duty-${template.id}`}
+                      >
+                        Claim
+                      </Button>
+                    ) : null}
+                  </>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
 
+      {/* Add Duty Modal */}
       <AddDutyModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} teamId={teamId} />
+
+      {/* Edit Duty Modal */}
+      {editingDuty && (
+        <EditDutyModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingDuty(null);
+          }}
+          teamId={teamId}
+          duty={editingDuty}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent data-testid="dialog-delete-duty">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Duty</AlertDialogTitle>
+            <AlertDialogDescription>
+              How would you like to delete "{deletingDuty?.name}"?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-col gap-2">
+            <AlertDialogAction
+              onClick={() => deleteFromGameMutation.mutate({ dutyTemplateId: deletingDuty?.id })}
+              disabled={deleteFromGameMutation.isPending}
+              className="w-full"
+              data-testid="button-delete-from-game"
+            >
+              {deleteFromGameMutation.isPending ? 'Deleting...' : 'Delete from This Game Only'}
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => deleteFromAllGamesMutation.mutate({ dutyTemplateId: deletingDuty?.id })}
+              disabled={deleteFromAllGamesMutation.isPending}
+              className="w-full bg-destructive hover:bg-destructive/90"
+              data-testid="button-delete-from-all-games"
+            >
+              {deleteFromAllGamesMutation.isPending ? 'Deleting...' : 'Delete from All Games'}
+            </AlertDialogAction>
+            <AlertDialogCancel className="w-full" data-testid="button-cancel-delete">
+              Cancel
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
