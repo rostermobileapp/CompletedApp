@@ -217,6 +217,13 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
   };
 
   const renderIcon = (template: any) => {
+    // Check if template has a custom icon (Lucide icon)
+    const Icon = ICON_MAP[template.icon];
+    if (Icon) {
+      return <Icon className="w-6 h-6" />;
+    }
+    
+    // Fallback to beverage jar for default duties that haven't been edited
     if (template.isDefault) {
       return (
         <img
@@ -228,9 +235,7 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
       );
     }
 
-    const Icon = ICON_MAP[template.icon];
-    if (!Icon) return null;
-    return <Icon className="w-6 h-6" />;
+    return null;
   };
 
   return (
