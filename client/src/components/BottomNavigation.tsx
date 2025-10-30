@@ -53,7 +53,7 @@ export function BottomNavigation() {
   
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50" data-testid="bottom-navigation">
-      <div className="grid py-2 grid-cols-5">
+      <div className="grid py-2 grid-cols-5 bg-[#212121]">
         {FIXED_SHORTCUTS.map((shortcut) => {
           const Icon = shortcut.icon;
           const isActive = activeId === shortcut.id;
