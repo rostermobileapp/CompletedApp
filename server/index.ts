@@ -1,8 +1,17 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// CORS configuration for Vercel frontend
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || true,
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 
 // Stripe webhook needs raw body for signature verification
 app.use('/api/stripe-webhook', express.raw({ type: 'application/json' }));
