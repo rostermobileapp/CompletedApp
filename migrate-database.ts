@@ -120,11 +120,11 @@ async function migrateData() {
     }
     console.log(`   ✅ Migrated ${seasons.length} seasons`);
 
-    const stats = await sourceDb.select().from(schema.stats);
-    for (const stat of stats) {
-      await destDb.insert(schema.stats).values(stat).onConflictDoNothing();
+    const playerStats = await sourceDb.select().from(schema.playerStats);
+    for (const stat of playerStats) {
+      await destDb.insert(schema.playerStats).values(stat).onConflictDoNothing();
     }
-    console.log(`   ✅ Migrated ${stats.length} stats`);
+    console.log(`   ✅ Migrated ${playerStats.length} player stats`);
 
     const conversations = await sourceDb.select().from(schema.conversations);
     for (const conv of conversations) {
