@@ -203,10 +203,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       await storage.deleteUser(userId);
-      // Destroy the session after deleting the user
-      req.logout(() => {
-        res.json({ message: "Profile deleted successfully" });
-      });
+      // User deletion successful - Supabase handles auth state
+      res.json({ message: "Profile deleted successfully" });
     } catch (error: any) {
       console.error("Error deleting user:", error);
       res.status(400).json({ message: error.message || "Failed to delete profile" });

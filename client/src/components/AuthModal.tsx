@@ -30,17 +30,28 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: undefined,
+          }
         });
         
         if (error) throw error;
         
-        toast({
-          title: 'Success!',
-          description: 'Check your email to verify your account.',
-        });
+        // Check if email confirmation is required
+        if (data.user && !data.session) {
+          toast({
+            title: 'Almost there!',
+            description: 'Check your email to verify your account before signing in.',
+          });
+        } else {
+          toast({
+            title: 'Success!',
+            description: 'Your account has been created. You can now sign in.',
+          });
+        }
         onOpenChange(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({
