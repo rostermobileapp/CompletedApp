@@ -542,6 +542,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin diagnostic endpoint - checks user's Stripe status and finds any active subscriptions
+  app.get('/api/admin/stripe/diagnose/:userId', isAuthenticated, requireSpecialPermission('admin'), async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const diagnostic: any = {
+        database: {
+          userId: user.id,
+          email: user.email,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+          currentRole: user.role,
+          stripeCustomerId: user.stripeCustomerId || null,
+          stripeSubscriptionId: user.stripeSubscriptionId || null,
+        },
+        stripe: {
+          customer: null,
+          subscriptions: [],
+          activeSubscription: null,
+        },
+        sync: {
+          inSync: false,
+          issues: [],
+          recommendations: [],
+        }
+      };
+
+      // Check if user has Stripe customer ID
+      if (!user.stripeCustomerId) {
+        diagnostic.sync.issues.push('No Stripe customer ID in database');
+        diagnostic.sync.recommendations.push('User needs to initiate a subscription through Stripe first');
+        return res.json(diagnostic);
+      }
+
+      try {
+        // Fetch customer from Stripe
+        const customer = await stripe.customers.retrieve(user.stripeCustomerId);
+        if (customer.deleted) {
+          diagnostic.sync.issues.push('Stripe customer has been deleted');
+          diagnostic.stripe.customer = { deleted: true };
+        } else {
+          diagnostic.stripe.customer = {
+            id: customer.id,
+            email: customer.email,
+            name: customer.name,
+            deleted: false,
+          };
+        }
+
+        // Fetch all subscriptions for this customer
+        const subscriptions = await stripe.subscriptions.list({
+          customer: user.stripeCustomerId,
+          limit: 10,
+        });
+
+        diagnostic.stripe.subscriptions = subscriptions.data.map(sub => ({
+          id: sub.id,
+          status: sub.status,
+          cancelAtPeriodEnd: sub.cancel_at_period_end,
+          currentPeriodEnd: sub.current_period_end,
+          priceId: sub.items.data[0]?.price?.id,
+          productName: sub.items.data[0]?.price?.nickname,
+        }));
+
+        // Find active subscription
+        const activeSubscription = subscriptions.data.find(sub => 
+          sub.status === 'active' || sub.status === 'trialing'
+        );
+
+        if (activeSubscription) {
+          diagnostic.stripe.activeSubscription = {
+            id: activeSubscription.id,
+            status: activeSubscription.status,
+            cancelAtPeriodEnd: activeSubscription.cancel_at_period_end,
+            priceId: activeSubscription.items.data[0]?.price?.id,
+          };
+
+          // Check if database subscription ID matches
+          if (user.stripeSubscriptionId !== activeSubscription.id) {
+            diagnostic.sync.issues.push('Database subscription ID does not match active Stripe subscription');
+            diagnostic.sync.recommendations.push('Run sync to update database with active subscription');
+          }
+
+          // Map Stripe price to expected role
+          const PRICE_TO_ROLE: Record<string, 'player_pro' | 'commissioner'> = {
+            [process.env.STRIPE_PRICE_PLAYER_PRO_MONTHLY || '']: 'player_pro',
+            [process.env.STRIPE_PRICE_COMMISSIONER_MONTHLY || '']: 'commissioner',
+            [process.env.STRIPE_PRICE_PLAYER_PRO_YEARLY || '']: 'player_pro',
+            [process.env.STRIPE_PRICE_COMMISSIONER_YEARLY || '']: 'commissioner',
+          };
+
+          const priceId = activeSubscription.items.data[0]?.price?.id;
+          const expectedRole = priceId ? PRICE_TO_ROLE[priceId] : null;
+
+          if (expectedRole) {
+            diagnostic.sync.expectedRole = expectedRole;
+            if (user.role !== expectedRole) {
+              diagnostic.sync.issues.push(`User role (${user.role}) does not match subscription tier (${expectedRole})`);
+              diagnostic.sync.recommendations.push(`Update user role to ${expectedRole}`);
+            }
+          } else {
+            diagnostic.sync.issues.push('Unknown Stripe price ID - cannot determine expected role');
+          }
+        } else {
+          // No active subscription
+          diagnostic.sync.issues.push('No active subscription found in Stripe');
+          if (user.role !== 'free_tier') {
+            diagnostic.sync.recommendations.push('Downgrade user to free_tier');
+          }
+        }
+
+        // Check overall sync status
+        diagnostic.sync.inSync = diagnostic.sync.issues.length === 0;
+
+      } catch (stripeError: any) {
+        diagnostic.sync.issues.push(`Stripe API error: ${stripeError.message}`);
+      }
+
+      res.json(diagnostic);
+    } catch (error: any) {
+      console.error('[Stripe Diagnostic] Error:', error);
+      res.status(500).json({ message: 'Failed to run diagnostic', error: error.message });
+    }
+  });
+
+  // Admin force sync endpoint - syncs subscription by customer ID (works even without stored subscription ID)
+  app.post('/api/admin/stripe/force-sync/:userId', isAuthenticated, requireSpecialPermission('admin'), async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      if (!user.stripeCustomerId) {
+        return res.status(400).json({ message: 'User has no Stripe customer ID' });
+      }
+
+      // Map Stripe price IDs to user roles
+      const PRICE_TO_ROLE: Record<string, 'player_pro' | 'commissioner'> = {
+        [process.env.STRIPE_PRICE_PLAYER_PRO_MONTHLY || '']: 'player_pro',
+        [process.env.STRIPE_PRICE_COMMISSIONER_MONTHLY || '']: 'commissioner',
+        [process.env.STRIPE_PRICE_PLAYER_PRO_YEARLY || '']: 'player_pro',
+        [process.env.STRIPE_PRICE_COMMISSIONER_YEARLY || '']: 'commissioner',
+      };
+
+      // Get all subscriptions for this customer from Stripe
+      const subscriptions = await stripe.subscriptions.list({
+        customer: user.stripeCustomerId,
+        limit: 10,
+      });
+
+      console.log(`[Force Sync] Found ${subscriptions.data.length} subscriptions for user ${userId}`);
+
+      // Find active subscription
+      const activeSubscription = subscriptions.data.find(sub => 
+        sub.status === 'active' || sub.status === 'trialing'
+      );
+
+      if (!activeSubscription) {
+        // No active subscription - downgrade to free tier
+        console.log('[Force Sync] No active subscription - downgrading to free_tier');
+        await storage.updateUserRole(userId, 'free_tier');
+        await storage.updateUserStripeInfo(userId, user.stripeCustomerId, '');
+        
+        return res.json({ 
+          message: 'No active subscription found - user downgraded to free_tier', 
+          previousRole: user.role,
+          newRole: 'free_tier',
+          subscriptionsFound: subscriptions.data.map(s => ({ id: s.id, status: s.status }))
+        });
+      }
+
+      // Check if subscription should be active
+      if (activeSubscription.cancel_at_period_end || activeSubscription.status === 'canceled' || activeSubscription.status === 'unpaid') {
+        console.log('[Force Sync] Subscription cancelled - downgrading to free_tier');
+        await storage.updateUserRole(userId, 'free_tier');
+        await storage.updateUserStripeInfo(userId, user.stripeCustomerId, '');
+        
+        return res.json({ 
+          message: 'Subscription is cancelled - user downgraded to free_tier', 
+          previousRole: user.role,
+          newRole: 'free_tier',
+          subscriptionId: activeSubscription.id,
+          reason: activeSubscription.cancel_at_period_end ? 'cancel_at_period_end' : `status=${activeSubscription.status}`
+        });
+      }
+
+      // Active subscription found - update user
+      const priceId = activeSubscription.items.data[0]?.price?.id;
+      const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
+
+      if (!tier) {
+        console.warn('[Force Sync] Unknown price ID:', priceId);
+        return res.status(400).json({ 
+          message: 'Unknown subscription price ID', 
+          priceId,
+          subscriptionId: activeSubscription.id 
+        });
+      }
+
+      // Update subscription ID and role
+      await storage.updateUserStripeInfo(userId, user.stripeCustomerId, activeSubscription.id);
+      await storage.updateUserRole(userId, tier);
+
+      console.log('[Force Sync] Successfully synced subscription:', activeSubscription.id, 'to tier:', tier);
+      
+      res.json({ 
+        message: 'Subscription synced successfully', 
+        previousRole: user.role,
+        newRole: tier,
+        subscriptionId: activeSubscription.id,
+        subscriptionStatus: activeSubscription.status
+      });
+    } catch (error: any) {
+      console.error('[Force Sync] Error syncing subscription:', error);
+      res.status(500).json({ message: 'Failed to sync subscription', error: error.message });
+    }
+  });
+
   // Manual subscription sync endpoint - checks Stripe and updates user role
   app.post('/api/stripe/sync-subscription/:userId', isAuthenticated, requireSpecialPermission('admin'), async (req: any, res) => {
     try {
