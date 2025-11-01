@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Express, RequestHandler } from 'express';
+import { storage } from './storage';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -31,10 +32,30 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    // Attach user to request object
-    req.user = user as any;
+    // Sync user with our database
+    await storage.upsertUser({
+      id: user.id,
+      email: user.email || '',
+      firstName: user.user_metadata?.first_name || user.email?.split('@')[0] || '',
+      lastName: user.user_metadata?.last_name || '',
+      profileImageUrl: user.user_metadata?.profile_image_url || user.user_metadata?.avatar_url || null,
+      role: null, // Will be set based on subscription status
+    });
+
+    // Attach user to request object with Replit-compatible format
+    req.user = {
+      claims: {
+        sub: user.id,
+        email: user.email,
+        first_name: user.user_metadata?.first_name,
+        last_name: user.user_metadata?.last_name,
+        profile_image_url: user.user_metadata?.profile_image_url || user.user_metadata?.avatar_url,
+      }
+    } as any;
+
     return next();
   } catch (error) {
+    console.error('Auth error:', error);
     return res.status(401).json({ message: 'Unauthorized' });
   }
 };
