@@ -39,11 +39,11 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
       firstName: user.user_metadata?.first_name || user.email?.split('@')[0] || '',
       lastName: user.user_metadata?.last_name || '',
       profileImageUrl: user.user_metadata?.profile_image_url || user.user_metadata?.avatar_url || null,
-      role: null, // Will be set based on subscription status
+      role: 'free_tier', // Default to free tier, will be updated based on subscription
     });
 
     // Attach user to request object with Replit-compatible format
-    req.user = {
+    (req as any).user = {
       claims: {
         sub: user.id,
         email: user.email,
