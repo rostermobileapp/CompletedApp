@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import logoWhite from '@assets/Roster Logo White_1759233840726.png';
-import heroVideo from '@assets/out (online-video-cutter.com)_1759852289677.mp4';
+import heroImage from '@assets/previewed_1761963923150.png';
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
@@ -95,13 +95,11 @@ export default function Landing() {
             <span className="text-[#3c82f4]">Organized</span>
           </h1>
           <div className="flex flex-col md:flex-row gap-8 items-start justify-center mb-12">
-            <video 
-              src={heroVideo}
-              autoPlay
-              muted
-              playsInline
+            <img 
+              src={heroImage}
+              alt="Roster app interface"
               className="w-full md:w-1/2 max-w-[336px] rounded-lg shadow-2xl"
-              data-testid="video-hero"
+              data-testid="image-hero"
             />
             <div 
               className="text-base md:text-lg leading-relaxed text-[#ffffff] md:w-1/2 max-w-md md:mt-16"
