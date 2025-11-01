@@ -2,6 +2,15 @@
 
 Rosters is a free, comprehensive sports team management platform for various sports, offering league and team organization, game scheduling, and messaging functionalities to streamline sports team management.
 
+## Recent Changes
+
+**November 1, 2025**: Landing page visitor counter feature
+- Added visitor count tracking system with dedicated database table
+- Implemented atomic SQL increment to prevent race conditions
+- Landing page header displays visitor counter (replaced Sign In button)
+- Uses sessionStorage to prevent double-counting within browser sessions
+- Updated pricing from $8/month to $5/month for Player Pro tier
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
