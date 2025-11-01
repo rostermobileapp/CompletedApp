@@ -14,7 +14,7 @@ import {
   requireSpecialPermission
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate } from "@shared/schema";
+import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount } from "@shared/schema";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
 import {
@@ -107,6 +107,40 @@ function formatGameForResponse(game: any) {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Visitor count routes (public)
+  app.get('/api/visitor-count', async (req, res) => {
+    try {
+      const [visitor] = await db.select().from(visitorCount).limit(1);
+      if (!visitor) {
+        // Initialize if doesn't exist
+        const [newVisitor] = await db.insert(visitorCount).values({ id: 1, count: 0 }).returning();
+        return res.json({ count: newVisitor.count });
+      }
+      res.json({ count: visitor.count });
+    } catch (error) {
+      console.error("Error fetching visitor count:", error);
+      res.status(500).json({ message: "Failed to fetch visitor count" });
+    }
+  });
+
+  app.post('/api/visitor-count/increment', async (req, res) => {
+    try {
+      const [visitor] = await db.select().from(visitorCount).limit(1);
+      if (!visitor) {
+        const [newVisitor] = await db.insert(visitorCount).values({ id: 1, count: 1 }).returning();
+        return res.json({ count: newVisitor.count });
+      }
+      const [updated] = await db.update(visitorCount)
+        .set({ count: visitor.count + 1, updatedAt: new Date() })
+        .where(eq(visitorCount.id, 1))
+        .returning();
+      res.json({ count: updated.count });
+    } catch (error) {
+      console.error("Error incrementing visitor count:", error);
+      res.status(500).json({ message: "Failed to increment visitor count" });
+    }
+  });
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {

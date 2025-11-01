@@ -26,6 +26,12 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// Visitor count table
+export const visitorCount = pgTable("visitor_count", {
+  id: integer("id").primaryKey().default(1),
+  count: integer("count").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
 // Sports enum
 export const sportEnum = pgEnum("sport", [
@@ -2482,3 +2488,8 @@ export type CalendarEventWithDetails = CalendarEvent & {
 export type EventParticipantWithUser = EventParticipant & {
   user: User;
 };
+
+// Visitor Count
+export const insertVisitorCountSchema = createInsertSchema(visitorCount);
+export type VisitorCount = typeof visitorCount.$inferSelect;
+export type InsertVisitorCount = z.infer<typeof insertVisitorCountSchema>;
