@@ -14,12 +14,9 @@ Rosters is a free, comprehensive sports team management platform for various spo
 - Default user role set to 'free_tier' on account creation
 - End-to-end authentication flow tested and verified
 
-**November 1, 2025**: Landing page visitor counter feature
-- Added visitor count tracking system with dedicated database table
-- Implemented atomic SQL increment to prevent race conditions
-- Landing page header displays visitor counter (replaced Sign In button)
-- Uses sessionStorage to prevent double-counting within browser sessions
+**November 1, 2025**: Landing page pricing update
 - Updated pricing from $8/month to $5/month for Player Pro tier
+- Simplified landing page header layout (logo centered, login button on right)
 
 # User Preferences
 
