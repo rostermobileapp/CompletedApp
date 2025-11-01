@@ -48,11 +48,11 @@ export default function LeagueSearch() {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
+          description: "You are logged out. Redirecting to login...",
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          navigate('/');
         }, 500);
         return;
       }
