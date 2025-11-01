@@ -4,6 +4,16 @@ Rosters is a free, comprehensive sports team management platform for various spo
 
 ## Recent Changes
 
+**November 1, 2025**: Supabase Authentication Migration
+- Migrated from Replit Auth (OIDC) to Supabase Authentication
+- Implemented email/password authentication with sign-up, sign-in, and sign-out
+- Email confirmation disabled for immediate access after signup
+- JWT token-based authentication with automatic header injection on API requests
+- Frontend uses Supabase client (@supabase/supabase-js) with session state management
+- Backend validates JWT tokens using Supabase service role key
+- Default user role set to 'free_tier' on account creation
+- End-to-end authentication flow tested and verified
+
 **November 1, 2025**: Landing page visitor counter feature
 - Added visitor count tracking system with dedicated database table
 - Implemented atomic SQL increment to prevent race conditions
@@ -23,7 +33,7 @@ The frontend is a mobile-first, responsive single-page application built with Re
 
 ## Backend Architecture
 
-The backend is a REST API developed with Express.js and TypeScript, featuring a modular design for authentication, database operations, and route handling. Authentication uses Replit's OpenID Connect via Passport.js with secure user sessions stored in PostgreSQL. The messaging system properly handles both direct team memberships (via `team_memberships` table) and league-assigned team memberships (via `assigned_team_id` in `league_memberships` table) when creating team group conversations, ensuring all team members can participate regardless of how they joined the team.
+The backend is a REST API developed with Express.js and TypeScript, featuring a modular design for authentication, database operations, and route handling. Authentication uses Supabase JWT token verification, where the backend validates access tokens on protected endpoints using the Supabase service role key. User data is synchronized to the local PostgreSQL database on authentication. The messaging system properly handles both direct team memberships (via `team_memberships` table) and league-assigned team memberships (via `assigned_team_id` in `league_memberships` table) when creating team group conversations, ensuring all team members can participate regardless of how they joined the team.
 
 **Unique ID Generation**: League creation automatically generates unique, URL-friendly IDs using nanoid. When a league is created without specifying a custom ID, the system generates an 8-character unique identifier. Format: `{8-char-nanoid}` (e.g., "aB3xY9kL").
 
@@ -35,7 +45,7 @@ PostgreSQL is the primary database, using Drizzle ORM for type-safe operations. 
 
 ## Authentication and Authorization
 
-Authentication uses Replit's OpenID Connect with session-based methods. Role-based access control is implemented via subscription tiers (free, player_plus, commissioner) with hierarchical permissions, enforced at both API and UI levels. A dual-layer system (Stripe webhooks and proactive verification) ensures real-time enforcement of subscription cancellations.
+Authentication uses Supabase Authentication with email/password credentials and JWT token-based verification. The frontend uses the Supabase client library to manage user sessions and automatically includes JWT tokens in API requests. The backend validates these tokens using Supabase's service role key. New users are automatically assigned the 'free_tier' role on signup. Role-based access control is implemented via subscription tiers (free_tier, player_pro, commissioner, secondary_commissioner) with hierarchical permissions, enforced at both API and UI levels. A dual-layer system (Stripe webhooks and proactive verification) ensures real-time enforcement of subscription cancellations.
 
 ## UI/UX Decisions
 
@@ -77,7 +87,7 @@ Key features include:
 
 ## Third-Party Services
 
-- **Replit Authentication**: User authentication and session management.
+- **Supabase Authentication**: User authentication and session management with email/password login.
 - **Neon Database**: PostgreSQL hosting.
 - **Stripe**: Payment processing and subscription management.
 - **Google Cloud Storage**: User-uploaded content.
