@@ -1,12 +1,14 @@
-import { Users, Calendar, Trophy, MessageCircle, ArrowRight, Check } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { Users, Calendar, Trophy, MessageCircle, Check } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { AuthModal } from '@/components/AuthModal';
 import logoWhite from '@assets/Roster Logo White_1759233840726.png';
 import heroImage from '@assets/previewed_1761963923150.png';
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -39,31 +41,10 @@ export default function Landing() {
     }
   }, []);
 
-  const features = [
-    {
-      icon: Users,
-      title: 'Team Management',
-      description: 'Build and manage your roster with comprehensive player profiles, stats tracking, and team messaging in one place.',
-    },
-    {
-      icon: Calendar,
-      title: 'Smart Scheduling',
-      description: 'Coordinate games, practices, and ice time effortlessly. Automated reminders keep everyone in sync.',
-    },
-    {
-      icon: Trophy,
-      title: 'League Statistics',
-      description: 'Track performance with detailed analytics. View rankings, standings, and individual player statistics.',
-    },
-    {
-      icon: MessageCircle,
-      title: 'Real-time Communication',
-      description: 'Stay connected with team and league-wide chat. Share updates, photos, and coordinate on the fly.',
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-black text-white" data-testid="landing-page">
+      <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />
+      
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -77,7 +58,7 @@ export default function Landing() {
             data-testid="logo-image"
           />
           <button
-            onClick={() => window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/login`}
+            onClick={() => setShowAuthModal(true)}
             className="px-6 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
             data-testid="button-login-header"
           >
@@ -112,7 +93,7 @@ export default function Landing() {
               data-testid="text-hero-body"
             >
               <p className="mb-1 text-[24px] pt-[20px] pb-[20px]">Every rec league team falls apart the exact same way.</p>
-              <p className="mb-6 text-[24px] pt-[20px] pb-[20px]">Nobody knows who’s playing, nobody knows when the game is—and half the team just doesn’t show up.</p>
+              <p className="mb-6 text-[24px] pt-[20px] pb-[20px]">Nobody knows who's playing, nobody knows when the game is—and half the team just doesn't show up.</p>
               
               <p className="text-xl md:text-2xl mb-6 font-normal pt-[10px] pb-[10px]">Group texts, half-baked spreadsheets, email chains...</p>
               
@@ -145,7 +126,7 @@ export default function Landing() {
           </div>
         </div>
       </section>
-      {/* Features Section */}
+      {/* Features Section - Comparison Table */}
       <section className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
@@ -364,7 +345,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/login`}
+                onClick={() => setShowAuthModal(true)}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
                 data-testid="button-pricing-free"
               >
@@ -385,7 +366,7 @@ export default function Landing() {
               <ul className="space-y-3 mb-8">
                 <li className="flex items-start gap-3" data-testid="feature-player-0">
                   <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">FREE +</span>
+                  <span className="text-sm text-white">Everything in FREE +</span>
                 </li>
                 <li className="flex items-start gap-3" data-testid="feature-player-1">
                   <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
@@ -417,7 +398,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/login`}
+                onClick={() => setShowAuthModal(true)}
                 className="w-full py-3 px-6 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold"
                 data-testid="button-pricing-player"
               >
@@ -463,7 +444,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/login`}
+                onClick={() => setShowAuthModal(true)}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
                 data-testid="button-pricing-commissioner"
               >
