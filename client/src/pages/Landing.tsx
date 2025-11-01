@@ -77,7 +77,7 @@ export default function Landing() {
             data-testid="logo-image"
           />
           <button
-            onClick={() => window.location.href = '/api/login'}
+            onClick={() => window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/login`}
             className="px-6 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
             data-testid="button-login-header"
           >
@@ -364,7 +364,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => window.location.href = '/api/login'}
+                onClick={() => window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/login`}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
                 data-testid="button-pricing-free"
               >
@@ -417,7 +417,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => window.location.href = '/api/login'}
+                onClick={() => window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/login`}
                 className="w-full py-3 px-6 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold"
                 data-testid="button-pricing-player"
               >
@@ -463,7 +463,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => window.location.href = '/api/login'}
+                onClick={() => window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/login`}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
                 data-testid="button-pricing-commissioner"
               >
