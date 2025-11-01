@@ -7,7 +7,6 @@ import heroVideo from '@assets/out (online-video-cutter.com)_1759852289677.mp4';
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
-  const hasIncremented = useRef(false);
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -24,14 +23,18 @@ export default function Landing() {
       const res = await apiRequest('POST', '/api/visitor-count/increment');
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/visitor-count'] });
+    onSuccess: (data) => {
+      // Immediately update the cache with the new count
+      queryClient.setQueryData(['/api/visitor-count'], data);
+      // Mark as counted in sessionStorage
+      sessionStorage.setItem('visitor_counted', 'true');
     },
   });
 
   useEffect(() => {
-    if (!hasIncremented.current) {
-      hasIncremented.current = true;
+    // Check if already counted in this session
+    const alreadyCounted = sessionStorage.getItem('visitor_counted');
+    if (!alreadyCounted) {
       incrementMutation.mutate();
     }
   }, []);

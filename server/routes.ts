@@ -126,16 +126,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/visitor-count/increment', async (req, res) => {
     try {
-      const [visitor] = await db.select().from(visitorCount).limit(1);
-      if (!visitor) {
-        const [newVisitor] = await db.insert(visitorCount).values({ id: 1, count: 1 }).returning();
-        return res.json({ count: newVisitor.count });
+      // Atomic increment using SQL to prevent race conditions
+      const result = await db.execute(sql`
+        UPDATE visitor_count 
+        SET count = count + 1, updated_at = NOW() 
+        WHERE id = 1 
+        RETURNING *
+      `);
+      
+      if (result.rows && result.rows.length > 0) {
+        return res.json({ count: result.rows[0].count });
       }
-      const [updated] = await db.update(visitorCount)
-        .set({ count: visitor.count + 1, updatedAt: new Date() })
-        .where(eq(visitorCount.id, 1))
-        .returning();
-      res.json({ count: updated.count });
+      
+      // If no row exists, initialize it
+      const [newVisitor] = await db.insert(visitorCount).values({ id: 1, count: 1 }).returning();
+      res.json({ count: newVisitor.count });
     } catch (error) {
       console.error("Error incrementing visitor count:", error);
       res.status(500).json({ message: "Failed to increment visitor count" });
