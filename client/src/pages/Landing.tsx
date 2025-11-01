@@ -1,15 +1,39 @@
 import { Users, Calendar, Trophy, MessageCircle, ArrowRight, Check } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import logoWhite from '@assets/Roster Logo White_1759233840726.png';
 import heroVideo from '@assets/out (online-video-cutter.com)_1759852289677.mp4';
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
+  const hasIncremented = useRef(false);
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const { data: visitorData } = useQuery<{ count: number }>({
+    queryKey: ['/api/visitor-count'],
+  });
+
+  const incrementMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/visitor-count/increment');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/visitor-count'] });
+    },
+  });
+
+  useEffect(() => {
+    if (!hasIncremented.current) {
+      hasIncremented.current = true;
+      incrementMutation.mutate();
+    }
   }, []);
 
   const features = [
@@ -40,19 +64,16 @@ export default function Landing() {
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div className="text-sm text-gray-400" data-testid="visitor-counter">
+            <span data-testid="visitor-count">{visitorData?.count ?? 0}</span>
+          </div>
           <img 
             src={logoWhite} 
             alt="Roster Logo" 
             className="h-8"
             data-testid="logo-image"
           />
-          <button 
-            onClick={() => window.location.href = '/api/login'}
-            className="text-sm font-medium text-white hover:text-[#3c82f4] transition-colors"
-            data-testid="button-sign-in"
-          >
-            Sign In
-          </button>
+          <div className="w-24" />
         </div>
       </header>
       {/* Hero Section */}
@@ -143,7 +164,7 @@ export default function Landing() {
               <tbody>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 font-medium text-white">Price</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10 font-bold text-white">$8 / Month</td>
+                  <td className="text-center p-4 bg-[#3c82f4]/10 font-bold text-white">$5 / Month</td>
                   <td className="text-center p-4 text-white">$9 / Month</td>
                   <td className="text-center p-4 text-white">$16 / Month</td>
                   <td className="text-center p-4 text-white">$1,299 / Year</td>
@@ -351,7 +372,7 @@ export default function Landing() {
               </div>
               <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-player">PLAYER PRO</h3>
               <div className="mb-6">
-                <span className="text-5xl font-bold" data-testid="text-price-player">$8</span>
+                <span className="text-5xl font-bold" data-testid="text-price-player">$5</span>
                 <span className="text-gray-400"> / Month</span>
               </div>
               <ul className="space-y-3 mb-8">
