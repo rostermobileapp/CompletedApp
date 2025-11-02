@@ -575,7 +575,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ url: portalSession.url });
     } catch (error: any) {
       console.error('[Stripe] Error creating portal session:', error);
-      res.status(500).json({ message: 'Failed to create billing portal session' });
+      
+      // Return a more specific error message to help with debugging
+      let errorMessage = 'Failed to create billing portal session';
+      
+      if (error.code === 'account_invalid') {
+        errorMessage = 'Stripe billing portal is not configured. Please configure it in your Stripe Dashboard.';
+      } else if (error.message) {
+        errorMessage = `Stripe error: ${error.message}`;
+      }
+      
+      res.status(500).json({ message: errorMessage });
     }
   });
 
