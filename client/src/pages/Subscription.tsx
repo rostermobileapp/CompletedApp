@@ -91,9 +91,30 @@ export default function Subscription() {
       }
     } catch (error: any) {
       console.error('Error creating portal session:', error);
+      
+      // Extract the actual error message from the server response
+      let errorMessage = 'Failed to open subscription management. Please try again.';
+      
+      if (error.message) {
+        // Parse the error message which is in format "500: {...json...}"
+        try {
+          const match = error.message.match(/\d+:\s*(.+)/);
+          if (match) {
+            const jsonStr = match[1];
+            const errorData = JSON.parse(jsonStr);
+            if (errorData.message) {
+              errorMessage = errorData.message;
+            }
+          }
+        } catch (parseError) {
+          // If parsing fails, use the original error message
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: 'Error',
-        description: 'Failed to open subscription management. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
       setIsLoading(false);
