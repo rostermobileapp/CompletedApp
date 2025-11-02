@@ -679,6 +679,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User> {
+    console.log('[updateUserRole] Updating user:', id, 'to role:', role);
     const [user] = await db
       .update(users)
       .set({
@@ -688,6 +689,7 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(users.id, id))
       .returning();
+    console.log('[updateUserRole] Updated user returned:', { id: user?.id, role: user?.role });
     return user;
   }
 
