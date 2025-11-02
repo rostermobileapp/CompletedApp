@@ -129,16 +129,18 @@ export const loadUserPermissions: RequestHandler = async (req, res, next) => {
       return res.status(401).json({ message: "User not found" });
     }
 
-    // Automatically verify and enforce subscription status
-    // This catches cancelled subscriptions even if webhooks are delayed
-    const wasDowngraded = await verifyAndEnforceSubscriptionStatus(user);
-    if (wasDowngraded) {
-      // Refetch user to get updated role
-      user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(401).json({ message: "User not found after downgrade" });
-      }
-    }
+    // TEMPORARILY DISABLED: Automatic subscription verification
+    // This was causing issues where the subscription sync was working but then
+    // this middleware was immediately overwriting it back to free_tier
+    // TODO: Debug why Stripe is reporting the subscription as needing downgrade
+    // const wasDowngraded = await verifyAndEnforceSubscriptionStatus(user);
+    // if (wasDowngraded) {
+    //   // Refetch user to get updated role
+    //   user = await storage.getUser(userId);
+    //   if (!user) {
+    //     return res.status(401).json({ message: "User not found after downgrade" });
+    //   }
+    // }
 
     // Type cast to work around TypeScript cache issue - fields exist at runtime
     req.userWithPermissions = user as UserWithPermissions;
