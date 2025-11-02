@@ -682,19 +682,19 @@ export class DatabaseStorage implements IStorage {
     console.log('[updateUserRole] Updating user:', id, 'to role:', role);
     
     // Use raw SQL to bypass any potential Drizzle issues
-    const [user] = await db.execute(sql`
+    const result = await db.execute(sql`
       UPDATE users 
       SET role = ${role}::user_role, 
           last_updated = NOW(), 
           updated_at = NOW()
       WHERE id = ${id}
-      RETURNING *
     `);
     
-    console.log('[updateUserRole] Updated user returned:', { id: user?.id, role: user?.role });
+    console.log('[updateUserRole] Update executed, rows affected:', result.rowCount);
     
     // Fetch user again to return properly typed object
     const [updatedUser] = await db.select().from(users).where(eq(users.id, id));
+    console.log('[updateUserRole] Updated user fetched from DB:', { id: updatedUser?.id, role: updatedUser?.role });
     return updatedUser;
   }
 
