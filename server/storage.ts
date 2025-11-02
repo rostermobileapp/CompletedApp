@@ -681,21 +681,28 @@ export class DatabaseStorage implements IStorage {
   async updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User> {
     console.log('[updateUserRole] Updating user:', id, 'to role:', role);
     
-    // Use raw SQL to bypass any potential Drizzle issues
-    const result = await db.execute(sql`
-      UPDATE users 
-      SET role = ${role}::user_role, 
-          last_updated = NOW(), 
-          updated_at = NOW()
-      WHERE id = ${id}
-    `);
+    // First verify the current value
+    const [beforeUser] = await db.select().from(users).where(eq(users.id, id));
+    console.log('[updateUserRole] BEFORE update - current role in DB:', beforeUser?.role);
     
-    console.log('[updateUserRole] Update executed, rows affected:', result.rowCount);
+    // Use standard Drizzle update
+    const [user] = await db
+      .update(users)
+      .set({
+        role,
+        lastUpdated: sql`NOW()`,
+        updatedAt: sql`NOW()`,
+      })
+      .where(eq(users.id, id))
+      .returning();
     
-    // Fetch user again to return properly typed object
-    const [updatedUser] = await db.select().from(users).where(eq(users.id, id));
-    console.log('[updateUserRole] Updated user fetched from DB:', { id: updatedUser?.id, role: updatedUser?.role });
-    return updatedUser;
+    console.log('[updateUserRole] AFTER update - returned user role:', user?.role);
+    
+    // Verify the update by fetching again
+    const [afterUser] = await db.select().from(users).where(eq(users.id, id));
+    console.log('[updateUserRole] VERIFICATION - role in DB after update:', afterUser?.role);
+    
+    return user;
   }
 
   async updateUserNavigationPreferences(id: string, preferences: any): Promise<User> {
