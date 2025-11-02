@@ -40,12 +40,18 @@ const roleHierarchy: Record<UserRole, number> = {
 };
 
 export function PermissionProvider({ children }: { children: ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user: authUser, isLoading: authLoading } = useAuth();
+  
+  // Fetch full user from database (includes role from PostgreSQL)
+  const { data: user, isLoading: userLoading } = useQuery<User>({
+    queryKey: ['/api/user'],
+    enabled: !!authUser,
+  });
   
   // Fetch user's league memberships with permissions
   const { data: leagueMemberships = [], isLoading: isMembershipsLoading } = useQuery<any[]>({
     queryKey: ['/api/user/league-memberships'],
-    enabled: !!user,
+    enabled: !!authUser,
   });
   
   const role: UserRole = user?.role || 'free_tier';
@@ -170,7 +176,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
       canManageLeagueSpecific,
       canEditLeagueStats,
       getUserLeagueMembership,
-      isLoading: isLoading || isMembershipsLoading
+      isLoading: authLoading || userLoading || isMembershipsLoading
     }}>
       {children}
     </PermissionContext.Provider>
