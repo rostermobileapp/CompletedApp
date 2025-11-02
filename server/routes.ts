@@ -1120,12 +1120,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const priceId = subscription.items.data[0]?.price?.id;
       const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
 
+      console.log('[Sync] Debug - Price ID from Stripe:', priceId);
+      console.log('[Sync] Debug - PRICE_TO_ROLE mapping:', PRICE_TO_ROLE);
+      console.log('[Sync] Debug - Determined tier:', tier);
+      console.log('[Sync] Debug - Current user role:', user.role);
+
       if (!tier) {
         console.warn('[Sync] Unknown price ID:', priceId);
         return res.status(400).json({ 
           message: 'Unknown subscription price ID', 
           priceId,
-          subscriptionId: subscription.id 
+          subscriptionId: subscription.id,
+          availablePriceIds: Object.keys(PRICE_TO_ROLE)
         });
       }
 
