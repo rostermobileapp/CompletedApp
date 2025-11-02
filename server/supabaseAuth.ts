@@ -36,13 +36,13 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     }
 
     // Sync user with our database
+    // NOTE: Do NOT set role here - it's managed by Stripe subscription sync
     await storage.upsertUser({
       id: user.id,
       email: user.email || '',
       firstName: user.user_metadata?.first_name || user.email?.split('@')[0] || '',
       lastName: user.user_metadata?.last_name || '',
       profileImageUrl: user.user_metadata?.profile_image_url || user.user_metadata?.avatar_url || null,
-      role: 'free_tier', // Default to free tier, will be updated based on subscription
     });
 
     // Attach user to request object with Replit-compatible format
