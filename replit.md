@@ -26,6 +26,16 @@ Rosters is a free, comprehensive sports team management platform for various spo
 - Display IDs stored in `displayId` field with unique constraint in users table
 - Available via `/api/user` and `/api/auth/user` endpoints
 
+**November 2, 2025**: Stripe Subscription Price ID Fix
+- Fixed 405/400 errors when upgrading subscriptions via Stripe
+- Removed hardcoded test price IDs from frontend Subscription.tsx
+- Created new GET endpoint `/api/stripe/prices` to serve configured price IDs from environment variables
+- Frontend now dynamically fetches price IDs via React Query on subscription page load
+- Price IDs remain server-side for security while exposed only as needed to frontend
+- Upgrade buttons disabled until price configuration loads
+- Clear error messages if pricing unavailable or unconfigured
+- Resolves price ID mismatch between frontend hardcoded values and backend environment variables
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
