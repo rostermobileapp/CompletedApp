@@ -549,8 +549,22 @@ export class DatabaseStorage implements IStorage {
 
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    // WORKAROUND: Use raw SQL to explicitly select role column as user_role type
+    // The users table has duplicate role columns (Supabase auth + app schema)
+    const result = await db.execute(sql`
+      SELECT 
+        id, display_id, email, first_name, last_name, profile_image_url,
+        age, date_of_birth, phone_number, city, primary_sport, player_type,
+        role::text as role,
+        special_permissions, is_primary_commissioner, created_by,
+        stripe_customer_id, stripe_subscription_id,
+        venmo_username, cashapp_username, navigation_preferences,
+        last_updated, created_at, updated_at
+      FROM users 
+      WHERE id = ${id}
+      LIMIT 1
+    `);
+    return result.rows[0] as User | undefined;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {

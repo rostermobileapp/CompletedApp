@@ -11,6 +11,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Export supabase client for use in other modules
+export { supabase };
+
 export async function setupAuth(app: Express) {
   // No special setup needed for Supabase auth
   // Authentication will be handled via JWT verification middleware

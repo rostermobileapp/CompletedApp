@@ -4,6 +4,17 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 ## Recent Changes
 
+**November 2, 2025**: Subscription Role Persistence Fix
+- Fixed critical bug where user subscription tier upgrades were not persisting in the database
+- Root cause: Users table contained duplicate "role" columns from both Supabase auth.users and app schema
+- Drizzle ORM was updating the correct enum column but selecting the wrong VARCHAR column on reads
+- Implemented workarounds using raw SQL:
+  - Modified `storage.getUser()` to explicitly select role column with type casting
+  - Modified `/api/stripe/sync-subscription` to use `sql.raw()` for direct database updates
+- Added Supabase user metadata sync: subscription tier now stored in both PostgreSQL and Supabase metadata
+- Temporary permission middleware disabled to prevent automatic downgrades during testing
+- Note: Proper fix requires database migration to separate Supabase auth data from application user profile data
+
 **November 2, 2025**: Stripe Subscription Routing Fix
 - Fixed issue where clicking "Upgrade Plan" was incorrectly routing to billing portal instead of checkout
 - Root cause: Users with stale database roles (e.g., cancelled subscriptions not updated to free_tier) were treated as paid users

@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { messagingService } from "./messagingService";
-import { setupAuth, isAuthenticated } from "./supabaseAuth";
+import { setupAuth, isAuthenticated, supabase } from "./supabaseAuth";
 import { 
   loadUserPermissions, 
   requireRole, 
@@ -1141,13 +1141,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // WORKAROUND: Use raw SQL to update role column to bypass Drizzle column confusion
       // The users table has TWO role columns (Supabase auth.users + app schema)
       // Drizzle was updating the correct enum column but selecting the wrong VARCHAR column
-      await db.execute(sql`
+      await db.execute(sql.raw(`
         UPDATE users 
-        SET role = ${tier}::user_role,
+        SET role = '${tier}'::user_role,
             last_updated = NOW(),
             updated_at = NOW()
-        WHERE id = ${userId}
-      `);
+        WHERE id = '${userId}'
+      `));
+      
+      // Also sync role to Supabase user metadata for tracking
+      try {
+        const { error: supabaseError } = await supabase.auth.admin.updateUserById(userId, {
+          user_metadata: { subscription_tier: tier }
+        });
+        if (supabaseError) {
+          console.warn('[Sync] Failed to update Supabase metadata:', supabaseError.message);
+        } else {
+          console.log('[Sync] Supabase metadata updated with tier:', tier);
+        }
+      } catch (supabaseErr) {
+        console.warn('[Sync] Error updating Supabase metadata:', supabaseErr);
+      }
       
       console.log('[Sync] Successfully synced subscription for user:', userId, 'to tier:', tier);
       
