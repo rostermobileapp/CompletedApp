@@ -373,7 +373,7 @@ export default function Profile() {
                   : (user as any)?.firstName || 'User'
                 }
               </h2>
-              <p className="text-xs text-muted-foreground/70 mb-2 font-mono" data-testid="text-user-id">
+              <p className="text-xs text-muted-foreground/70 mb-2 font-mono font-bold" data-testid="text-user-id">
                 User ID: {user ? ((user as any)?.displayId || 'Not assigned') : 'Loading...'}
               </p>
               <div className="flex items-center gap-2">
