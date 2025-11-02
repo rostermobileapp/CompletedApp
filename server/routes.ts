@@ -601,6 +601,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get Stripe pricing configuration (public endpoint)
+  app.get('/api/stripe/prices', async (req, res) => {
+    try {
+      const prices = {
+        player_pro_monthly: process.env.STRIPE_PRICE_PLAYER_PRO_MONTHLY || null,
+        commissioner_monthly: process.env.STRIPE_PRICE_COMMISSIONER_MONTHLY || null,
+        player_pro_yearly: process.env.STRIPE_PRICE_PLAYER_PRO_YEARLY || null,
+        commissioner_yearly: process.env.STRIPE_PRICE_COMMISSIONER_YEARLY || null,
+      };
+
+      // Filter out null values (prices that aren't configured)
+      const availablePrices = Object.fromEntries(
+        Object.entries(prices).filter(([_, value]) => value !== null)
+      );
+
+      res.json(availablePrices);
+    } catch (error: any) {
+      console.error('[Stripe] Error fetching prices:', error);
+      res.status(500).json({ message: 'Failed to fetch pricing information' });
+    }
+  });
+
   // Admin diagnostic endpoint - checks user's Stripe status and finds any active subscriptions
   app.get('/api/admin/stripe/diagnose/:userId', isAuthenticated, requireSpecialPermission('admin'), async (req: any, res) => {
     try {

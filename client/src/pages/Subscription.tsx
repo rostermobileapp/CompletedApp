@@ -4,6 +4,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,6 +17,16 @@ export default function Subscription() {
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
   const isFree = role === 'free_tier';
+
+  // Fetch Stripe price IDs from backend
+  const { data: stripePrices, isLoading: pricesLoading } = useQuery<{
+    player_pro_monthly?: string;
+    commissioner_monthly?: string;
+    player_pro_yearly?: string;
+    commissioner_yearly?: string;
+  }>({
+    queryKey: ['/api/stripe/prices'],
+  });
 
   const subscriptionPlans = [
     {
@@ -124,13 +135,18 @@ export default function Subscription() {
   const handleUpgradePlan = async (tier: 'player_pro' | 'commissioner') => {
     setIsLoading(true);
     try {
-      // Stripe Price IDs (monthly subscriptions)
-      const STRIPE_PRICES = {
-        player_pro: 'price_1SDUByBRVRpXAintAWGODStk',
-        commissioner: 'price_1SDTIvBRVRpXAintvxPYZCb7',
-      };
+      // Get the correct price ID from the fetched Stripe prices
+      if (!stripePrices) {
+        throw new Error('Pricing information not available. Please try again.');
+      }
 
-      const priceId = STRIPE_PRICES[tier];
+      const priceId = tier === 'player_pro' 
+        ? stripePrices.player_pro_monthly 
+        : stripePrices.commissioner_monthly;
+
+      if (!priceId) {
+        throw new Error(`Price not configured for ${tier}. Please contact support.`);
+      }
 
       const response = await apiRequest('POST', '/api/stripe/create-checkout-session', {
         priceId,
@@ -326,7 +342,7 @@ export default function Subscription() {
                     handleManageSubscription();
                   }
                 }}
-                disabled={plan.buttonDisabled || isLoading}
+                disabled={plan.buttonDisabled || isLoading || pricesLoading}
                 className={`w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${
                   plan.current
                     ? 'bg-secondary text-secondary-foreground cursor-not-allowed'
@@ -334,7 +350,7 @@ export default function Subscription() {
                 }`}
                 data-testid={`button-${plan.tier}`}
               >
-                {isLoading && !plan.current ? (
+                {(isLoading || pricesLoading) && !plan.current ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Loading...
