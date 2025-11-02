@@ -137,7 +137,7 @@ export const playerTypeEnum = pgEnum("player_type", [
 // Users table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userNumber: integer("user_number").unique(),
+  displayId: varchar("display_id", { length: 6 }).unique(),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),

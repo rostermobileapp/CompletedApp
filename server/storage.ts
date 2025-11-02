@@ -1,3 +1,4 @@
+import { customAlphabet } from 'nanoid';
 import {
   users,
   leagues,
@@ -517,7 +518,35 @@ export interface IStorage {
   checkInEventParticipant(id: string): Promise<EventParticipant>;
 }
 
+// Helper function to generate unique 6-character alphanumeric display ID
+const generateDisplayId = customAlphabet('0123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz', 6);
+
 export class DatabaseStorage implements IStorage {
+  // Generate a unique display ID for a user
+  async generateUniqueDisplayId(): Promise<string> {
+    let displayId: string;
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    do {
+      displayId = generateDisplayId();
+      // Check if this display ID already exists
+      const [existing] = await db
+        .select()
+        .from(users)
+        .where(eq(users.displayId, displayId))
+        .limit(1);
+      
+      if (!existing) {
+        return displayId;
+      }
+      attempts++;
+    } while (attempts < maxAttempts);
+    
+    // If we still haven't found a unique ID after max attempts, throw an error
+    throw new Error('Unable to generate unique display ID after multiple attempts');
+  }
+
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -547,6 +576,11 @@ export class DatabaseStorage implements IStorage {
       
       // DO NOT update ID - it's a primary key referenced by foreign keys
       // Once a user is created, their ID should never change
+      
+      // Generate display ID if user doesn't have one
+      if (!existingUser.displayId) {
+        updateSet.displayId = await this.generateUniqueDisplayId();
+      }
       
       // Only update firstName if user doesn't have one yet
       if (userData.firstName !== undefined && !existingUser.firstName) {
@@ -581,10 +615,14 @@ export class DatabaseStorage implements IStorage {
       return user;
     }
     
-    // No existing user, insert new one
+    // No existing user, insert new one with generated display ID
+    const displayId = await this.generateUniqueDisplayId();
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values({
+        ...userData,
+        displayId,
+      })
       .returning();
     return user;
   }
