@@ -1137,8 +1137,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update user's subscription info and role
       await storage.updateUserStripeInfo(userId, user.stripeCustomerId, subscription.id);
-      const updatedUser = await storage.updateUserRole(userId, tier);
-
+      
+      // WORKAROUND: Use raw SQL to update role column to bypass Drizzle column confusion
+      // The users table has TWO role columns (Supabase auth.users + app schema)
+      // Drizzle was updating the correct enum column but selecting the wrong VARCHAR column
+      await db.execute(sql`
+        UPDATE users 
+        SET role = ${tier}::user_role,
+            last_updated = NOW(),
+            updated_at = NOW()
+        WHERE id = ${userId}
+      `);
+      
       console.log('[Sync] Successfully synced subscription for user:', userId, 'to tier:', tier);
       
       // Verify the update by fetching the user again
