@@ -1093,8 +1093,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
+      console.log('[Sync] Debug - User object:', JSON.stringify(user, null, 2));
+      console.log('[Sync] Debug - stripeCustomerId:', user?.stripeCustomerId);
+      
       if (!user || !user.stripeCustomerId) {
-        return res.status(400).json({ message: 'User does not have a Stripe customer ID' });
+        return res.status(400).json({ message: 'User does not have a Stripe customer ID', userId, userKeys: user ? Object.keys(user) : [] });
       }
 
       // Map Stripe price IDs to user roles
