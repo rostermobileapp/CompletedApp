@@ -680,17 +680,22 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User> {
     console.log('[updateUserRole] Updating user:', id, 'to role:', role);
-    const [user] = await db
-      .update(users)
-      .set({
-        role,
-        lastUpdated: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, id))
-      .returning();
+    
+    // Use raw SQL to bypass any potential Drizzle issues
+    const [user] = await db.execute(sql`
+      UPDATE users 
+      SET role = ${role}::user_role, 
+          last_updated = NOW(), 
+          updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `);
+    
     console.log('[updateUserRole] Updated user returned:', { id: user?.id, role: user?.role });
-    return user;
+    
+    // Fetch user again to return properly typed object
+    const [updatedUser] = await db.select().from(users).where(eq(users.id, id));
+    return updatedUser;
   }
 
   async updateUserNavigationPreferences(id: string, preferences: any): Promise<User> {
