@@ -1137,14 +1137,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update user's subscription info and role
       await storage.updateUserStripeInfo(userId, user.stripeCustomerId, subscription.id);
-      await storage.updateUserRole(userId, tier);
+      const updatedUser = await storage.updateUserRole(userId, tier);
 
       console.log('[Sync] Successfully synced subscription for user:', userId, 'to tier:', tier);
+      
+      // Verify the update by fetching the user again
+      const verifyUser = await storage.getUser(userId);
+      console.log('[Sync] Verification - User role after update:', verifyUser?.role);
       
       res.json({ 
         message: 'Subscription synced successfully', 
         tier,
-        subscriptionId: subscription.id 
+        subscriptionId: subscription.id,
+        actualRole: verifyUser?.role // Add this to see what's actually in DB
       });
     } catch (error: any) {
       console.error('[Sync] Error syncing subscription:', error);
