@@ -559,72 +559,73 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    // First, try to find existing user by ID (primary OIDC identifier)
-    let existingUser = userData.id ? await this.getUser(userData.id) : undefined;
-    
-    // If no user found by ID, check by email to handle ID changes
-    if (!existingUser && userData.email) {
-      existingUser = await this.getUserByEmail(userData.email);
-    }
-    
-    if (existingUser) {
-      // Update existing user - only update fields if they have values
-      // Do NOT overwrite existing firstName/lastName with auth claims to preserve user-set names
-      const updateSet: any = {
-        updatedAt: new Date(),
-      };
+    try {
+      // Generate display ID upfront for both insert and update scenarios
+      const displayId = await this.generateUniqueDisplayId();
       
-      // DO NOT update ID - it's a primary key referenced by foreign keys
-      // Once a user is created, their ID should never change
-      
-      // Generate display ID if user doesn't have one
-      if (!existingUser.displayId) {
-        updateSet.displayId = await this.generateUniqueDisplayId();
-      }
-      
-      // Only update firstName if user doesn't have one yet
-      if (userData.firstName !== undefined && !existingUser.firstName) {
-        updateSet.firstName = userData.firstName;
-      }
-      
-      // Only update lastName if user doesn't have one yet
-      if (userData.lastName !== undefined && !existingUser.lastName) {
-        updateSet.lastName = userData.lastName;
-      }
-      
-      // Update email if provided (user might change email in OIDC provider)
-      if (userData.email !== undefined) {
-        updateSet.email = userData.email;
-      }
-      
-      // Include role in update if provided (for OIDC testing)
-      if (userData.role !== undefined) {
-        updateSet.role = userData.role;
-      }
-      
-      // Include profile image if provided and user doesn't have one
-      if (userData.profileImageUrl !== undefined && !existingUser.profileImageUrl) {
-        updateSet.profileImageUrl = userData.profileImageUrl;
-      }
-      
+      // Use INSERT...ON CONFLICT to handle race conditions properly
       const [user] = await db
-        .update(users)
-        .set(updateSet)
-        .where(eq(users.id, existingUser.id))
+        .insert(users)
+        .values({
+          ...userData,
+          displayId,
+        })
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            // Only update email (user might change it in Supabase)
+            email: userData.email || undefined,
+            // Only update firstName if not already set
+            firstName: sql`COALESCE(${users.firstName}, ${userData.firstName})`,
+            // Only update lastName if not already set
+            lastName: sql`COALESCE(${users.lastName}, ${userData.lastName})`,
+            // Only update profileImageUrl if not already set
+            profileImageUrl: sql`COALESCE(${users.profileImageUrl}, ${userData.profileImageUrl})`,
+            // Only update displayId if not already set
+            displayId: sql`COALESCE(${users.displayId}, ${displayId})`,
+            // Update role if provided
+            role: userData.role || sql`${users.role}`,
+            // Always update timestamp
+            updatedAt: new Date(),
+          },
+        })
         .returning();
+      
       return user;
+    } catch (error: any) {
+      // If there's still a conflict issue, fall back to explicit check and update
+      console.error('[Storage] Error in upsertUser, trying fallback:', error.message);
+      
+      const existingUser = userData.id ? await this.getUser(userData.id) : undefined;
+      
+      if (existingUser) {
+        // User exists, update with display ID if needed
+        const updateSet: any = {
+          updatedAt: new Date(),
+        };
+        
+        if (!existingUser.displayId) {
+          updateSet.displayId = await this.generateUniqueDisplayId();
+        }
+        
+        if (userData.email) updateSet.email = userData.email;
+        if (userData.role) updateSet.role = userData.role;
+        if (userData.firstName && !existingUser.firstName) updateSet.firstName = userData.firstName;
+        if (userData.lastName && !existingUser.lastName) updateSet.lastName = userData.lastName;
+        if (userData.profileImageUrl && !existingUser.profileImageUrl) updateSet.profileImageUrl = userData.profileImageUrl;
+        
+        const [user] = await db
+          .update(users)
+          .set(updateSet)
+          .where(eq(users.id, existingUser.id))
+          .returning();
+        
+        return user;
+      }
+      
+      // If we still can't upsert, throw the error
+      throw error;
     }
-    
-    // No existing user, insert new one with generated display ID
-    const displayId = await this.generateUniqueDisplayId();
-    const [user] = await db
-      .insert(users)
-      .values({
-        ...userData,
-        displayId,
-      })
-      .returning();
-    return user;
   }
 
 

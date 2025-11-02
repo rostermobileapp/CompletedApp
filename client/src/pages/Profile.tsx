@@ -37,7 +37,7 @@ const paymentMethodsSchema = z.object({
 type PaymentMethodsForm = z.infer<typeof paymentMethodsSchema>;
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user: supabaseUser } = useAuth();
   const { role, hasRole, canManageLeague, canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -47,6 +47,12 @@ export default function Profile() {
   const [selectedTeamForLeagueRequest, setSelectedTeamForLeagueRequest] = useState<string | null>(null);
   const [showLeagueRequestDialog, setShowLeagueRequestDialog] = useState(false);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
+
+  // Fetch full user profile from database (includes displayId)
+  const { data: user } = useQuery({
+    queryKey: ['/api/user'],
+    enabled: !!supabaseUser,
+  });
 
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -77,6 +83,7 @@ export default function Profile() {
     },
     onSuccess: () => {
       toast({ title: 'Profile updated successfully' });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
       setIsEditing(false);
     },
@@ -95,6 +102,7 @@ export default function Profile() {
     },
     onSuccess: () => {
       toast({ title: 'Profile photo updated successfully' });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
     },
     onError: () => {
