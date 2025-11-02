@@ -553,13 +553,30 @@ export class DatabaseStorage implements IStorage {
     // The users table has duplicate role columns (Supabase auth + app schema)
     const result = await db.execute(sql`
       SELECT 
-        id, display_id, email, first_name, last_name, profile_image_url,
-        age, date_of_birth, phone_number, city, primary_sport, player_type,
+        id, 
+        display_id as "displayId", 
+        email, 
+        first_name as "firstName", 
+        last_name as "lastName", 
+        profile_image_url as "profileImageUrl",
+        age, 
+        date_of_birth as "dateOfBirth", 
+        phone_number as "phoneNumber", 
+        city, 
+        primary_sport as "primarySport", 
+        player_type as "playerType",
         role::text as role,
-        special_permissions, is_primary_commissioner, created_by,
-        stripe_customer_id, stripe_subscription_id,
-        venmo_username, cashapp_username, navigation_preferences,
-        last_updated, created_at, updated_at
+        special_permissions as "specialPermissions", 
+        is_primary_commissioner as "isPrimaryCommissioner", 
+        created_by as "createdBy",
+        stripe_customer_id as "stripeCustomerId", 
+        stripe_subscription_id as "stripeSubscriptionId",
+        venmo_username as "venmoUsername", 
+        cashapp_username as "cashappUsername", 
+        navigation_preferences as "navigationPreferences",
+        last_updated as "lastUpdated", 
+        created_at as "createdAt", 
+        updated_at as "updatedAt"
       FROM users 
       WHERE id = ${id}
       LIMIT 1
