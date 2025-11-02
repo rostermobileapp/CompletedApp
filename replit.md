@@ -2,6 +2,25 @@
 
 Rosters is a free, comprehensive sports team management platform designed for various sports. Its primary purpose is to streamline sports team management by offering league and team organization, game scheduling, and messaging functionalities. The platform supports a freemium model with subscription-gated features, aiming to provide a robust solution for sports enthusiasts and administrators.
 
+## Recent Changes
+
+**November 2, 2025**: Stripe Subscription Routing Fix
+- Fixed issue where clicking "Upgrade Plan" was incorrectly routing to billing portal instead of checkout
+- Root cause: Users with stale database roles (e.g., cancelled subscriptions not updated to free_tier) were treated as paid users
+- Modified button logic to use button text ("Upgrade Plan" vs "Manage Subscription") instead of user role to determine routing
+- Added automatic subscription sync on page load that checks Stripe and corrects role mismatches
+- Ensures "Upgrade Plan" always goes to Stripe Checkout with pricing, "Manage Subscription" goes to billing portal
+- Sync runs silently in background without disrupting user experience
+
+**November 2, 2025**: Stripe Subscription Price ID Fix
+- Fixed 405/400 errors when upgrading subscriptions via Stripe
+- Removed hardcoded test price IDs from frontend Subscription.tsx
+- Created new GET endpoint `/api/stripe/prices` to serve configured price IDs from environment variables
+- Frontend now dynamically fetches price IDs via React Query on subscription page load
+- Price IDs remain server-side for security while exposed only as needed to frontend
+- Upgrade buttons disabled until price configuration loads
+- Clear error messages if pricing unavailable or unconfigured
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
