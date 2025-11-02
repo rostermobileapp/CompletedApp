@@ -18,6 +18,14 @@ Rosters is a free, comprehensive sports team management platform for various spo
 - Updated pricing from $8/month to $5/month for Player Pro tier
 - Simplified landing page header layout (logo centered, login button on right)
 
+**November 2, 2025**: User Display ID System
+- Implemented 6-character alphanumeric display IDs for all users (e.g., "A3xY9k", "LFB3Kf")
+- Display IDs are automatically generated using nanoid on user creation with collision detection
+- Existing users automatically receive display IDs on next login (automatic backfill)
+- Profile page displays user's display ID in monospace font below name
+- Display IDs stored in `displayId` field with unique constraint in users table
+- Available via `/api/user` and `/api/auth/user` endpoints
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
