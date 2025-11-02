@@ -3,9 +3,9 @@ import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { useLocation } from 'wouter';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Subscription() {
@@ -17,6 +17,21 @@ export default function Subscription() {
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
   const isFree = role === 'free_tier';
+
+  // Auto-sync subscription status on page load to ensure role is accurate
+  useEffect(() => {
+    const syncSubscription = async () => {
+      try {
+        await apiRequest('POST', '/api/stripe/sync-subscription');
+        // Invalidate user query to refresh role
+        queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      } catch (error) {
+        // Silent fail - sync is best effort
+        console.log('Subscription sync check:', error);
+      }
+    };
+    syncSubscription();
+  }, []);
 
   // Fetch Stripe price IDs from backend
   const { data: stripePrices, isLoading: pricesLoading } = useQuery<{
@@ -333,12 +348,12 @@ export default function Subscription() {
                 onClick={() => {
                   if (plan.current) return;
                   
-                  // Free users upgrading to paid plan -> Checkout
-                  if (isFree && plan.tier !== 'free_tier') {
+                  // Use button text to determine action:
+                  // "Upgrade Plan" -> Checkout
+                  // "Manage Subscription" -> Portal
+                  if (plan.buttonText === "Upgrade Plan" && plan.tier !== 'free_tier') {
                     handleUpgradePlan(plan.tier);
-                  } 
-                  // Paid users managing subscription -> Portal
-                  else {
+                  } else {
                     handleManageSubscription();
                   }
                 }}
