@@ -4,16 +4,20 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 ## Recent Changes
 
-**November 2, 2025**: Subscription Role Persistence Fix
+**November 2, 2025**: Subscription Role Persistence Fix (RESOLVED)
 - Fixed critical bug where user subscription tier upgrades were not persisting in the database
-- Root cause: Users table contained duplicate "role" columns from both Supabase auth.users and app schema
-- Drizzle ORM was updating the correct enum column but selecting the wrong VARCHAR column on reads
-- Implemented workarounds using raw SQL:
-  - Modified `storage.getUser()` to explicitly select role column with type casting
+- Root causes identified and resolved:
+  1. **Duplicate role columns**: Users table contained duplicate "role" columns from both Supabase auth.users and app schema - Drizzle ORM was updating the correct enum column but selecting the wrong VARCHAR column
+  2. **Authentication overwriting role**: Every API request was calling `upsertUser()` with `role: 'free_tier'`, overwriting paid subscriptions
+  3. **Column name mismatch**: Raw SQL queries returned snake_case column names but TypeScript expected camelCase
+- Implemented comprehensive fixes:
+  - Modified `storage.getUser()` to use raw SQL with proper column aliases (snake_case → camelCase)
   - Modified `/api/stripe/sync-subscription` to use `sql.raw()` for direct database updates
-- Added Supabase user metadata sync: subscription tier now stored in both PostgreSQL and Supabase metadata
-- Temporary permission middleware disabled to prevent automatic downgrades during testing
-- Note: Proper fix requires database migration to separate Supabase auth data from application user profile data
+  - Removed role parameter from authentication middleware to prevent overwriting existing roles
+  - Added Supabase user metadata sync: subscription tier now stored in both PostgreSQL (`role` column) and Supabase metadata (`subscription_tier`)
+- Temporary permission middleware disabled to prevent automatic downgrades
+- Testing confirmed: Subscription upgrades and downgrades now properly sync and persist
+- Note: Proper long-term fix requires database migration to separate Supabase auth data from application user profile data
 
 **November 2, 2025**: Stripe Subscription Routing Fix
 - Fixed issue where clicking "Upgrade Plan" was incorrectly routing to billing portal instead of checkout
