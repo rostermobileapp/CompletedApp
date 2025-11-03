@@ -1007,12 +1007,12 @@ function AnnouncementCard({
 }
 
 export default function Announcements() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const [showCreateModal, setShowCreateModal] = useState(false);
   
-  console.log('Announcements page rendering, user:', user?.id);
+  console.log('Announcements page rendering, user:', user?.id, 'authLoading:', authLoading);
 
   // Get the selected team or league from dashboard selection
   const { selectedTeamId, selectedLeagueId } = useDashboardSelection();
@@ -1087,6 +1087,15 @@ export default function Announcements() {
   // Normalize the data to handle both array and object responses
   const announcements: Announcement[] = Array.isArray(data) ? data : (data?.announcements ?? []);
   const pagination = Array.isArray(data) ? undefined : data?.pagination;
+
+  // Show loading state while auth is loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
+        <div className="text-center">Loading...</div>
+      </div>
+    );
+  }
 
   if (!user) {
     navigate('/');
