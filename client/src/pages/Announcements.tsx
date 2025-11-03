@@ -1011,8 +1011,6 @@ export default function Announcements() {
   const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  
-  console.log('Announcements page rendering, user:', user?.id, 'authLoading:', authLoading);
 
   // Get the selected team or league from dashboard selection
   const { selectedTeamId, selectedLeagueId } = useDashboardSelection();
@@ -1103,7 +1101,6 @@ export default function Announcements() {
   }
 
   if (!currentLeague) {
-    console.log('No league found, showing empty state');
     return (
       <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center px-6 pb-20" data-testid="no-league-state">
         <Megaphone className="w-16 h-16 text-muted-foreground mb-4" />

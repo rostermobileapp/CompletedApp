@@ -4,6 +4,14 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 ## Recent Changes
 
+**November 3, 2025**: Dashboard Card Consistency & Navigation Fixes
+- Fixed Teams page black screen caused by React Hooks order violation - all hooks now called before conditional returns
+- Updated News and Standings cards to match Stats card behavior - all three cards now always clickable with identical styling
+- Fixed Announcements page navigation issue where authentication loading caused immediate redirect
+- Added loading state to Announcements page to wait for auth before rendering
+- Updated Announcements empty state to match Stats page design with centered layout and "Find a League" button
+- Added pointer-events-none to AnnouncementBadge to prevent click interference
+
 **November 2, 2025**: Subscription Role Persistence Fix (RESOLVED)
 - Fixed critical bug where user subscription tier upgrades were not persisting in the database
 - Root causes identified and resolved:
