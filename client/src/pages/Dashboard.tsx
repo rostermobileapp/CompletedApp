@@ -91,7 +91,7 @@ function AnnouncementBadge({ leagueId }: { leagueId: string | null }) {
   }
 
   return (
-    <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+    <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center pointer-events-none">
       <span className="text-white text-xs font-bold">{unreadCount.count}</span>
     </div>
   );
@@ -1650,7 +1650,10 @@ export default function Dashboard() {
           <div 
             className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-announcements"
-            onClick={() => navigate('/announcements')}
+            onClick={() => {
+              console.log('News card clicked, navigating to /announcements');
+              navigate('/announcements');
+            }}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <Megaphone className="w-8 h-8 text-blue-500 mb-3" />
