@@ -813,11 +813,17 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
-  const tier = (user as any)?.role || 'free_tier';
+  const { user: supabaseUser } = useAuth();
+  const tier = (supabaseUser as any)?.role || 'free_tier';
   const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+
+  // Fetch full user profile (includes profileImageUrl, firstName, etc.)
+  const { data: userProfile } = useQuery({
+    queryKey: ['/api/user'],
+    enabled: !!supabaseUser,
+  });
   
   // Get user's local timezone for proper date formatting
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -1237,15 +1243,15 @@ export default function Dashboard() {
   
   // Compute captain status for the selected league using team.captainId
   const isTeamCaptainInSelectedLeague = React.useMemo(() => {
-    if (!selectedLeagueId || !Array.isArray(userTeams) || !(user as any)?.id) return false;
-    return userTeams.some(team => team.captainId === (user as any).id);
-  }, [selectedLeagueId, userTeams, (user as any)?.id]);
+    if (!selectedLeagueId || !Array.isArray(userTeams) || !(userProfile as any)?.id) return false;
+    return userTeams.some(team => team.captainId === (userProfile as any).id);
+  }, [selectedLeagueId, userTeams, (userProfile as any)?.id]);
   
   // Helper to compute captain status for any league (for dropdown badges)
   const isCaptainInLeague = React.useCallback((leagueId: string) => {
-    if (!Array.isArray(userTeamsAll) || !(user as any)?.id) return false;
-    return userTeamsAll.some(team => team.leagueId === leagueId && team.captainId === (user as any).id);
-  }, [userTeamsAll, (user as any)?.id]);
+    if (!Array.isArray(userTeamsAll) || !(userProfile as any)?.id) return false;
+    return userTeamsAll.some(team => team.leagueId === leagueId && team.captainId === (userProfile as any).id);
+  }, [userTeamsAll, (userProfile as any)?.id]);
 
   // Fetch standings for the primary team's league to get accurate record
   const primaryTeamLeagueId = React.useMemo(() => {
@@ -1502,15 +1508,15 @@ export default function Dashboard() {
               className="w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden bg-primary"
               data-testid="button-profile"
             >
-              {(user as any)?.profileImageUrl ? (
+              {(userProfile as any)?.profileImageUrl ? (
                 <img 
-                  src={(user as any).profileImageUrl} 
+                  src={(userProfile as any).profileImageUrl} 
                   alt="Profile"
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <span className="text-primary-foreground text-lg font-semibold">
-                  {(user as any)?.firstName?.[0] || 'U'}
+                  {(userProfile as any)?.firstName?.[0] || 'U'}
                 </span>
               )}
             </button>
@@ -1973,7 +1979,7 @@ export default function Dashboard() {
                       
                       // Filter assignments claimed by current user
                       const userDuties = gameAssignments.assignments.filter(
-                        (assignment: any) => assignment.userId === (user as any)?.id
+                        (assignment: any) => assignment.userId === (userProfile as any)?.id
                       );
                       
                       if (userDuties.length === 0) return null;

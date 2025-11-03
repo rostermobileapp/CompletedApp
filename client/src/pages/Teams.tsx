@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
+import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ import type { UploadResult } from '@uppy/core';
 
 export default function Teams() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const [, navigate] = useLocation();
   const { hasRole } = usePermissions();
   const { toast } = useToast();
   const { selectedTeamId, setTeamSelection } = useDashboardSelection();
@@ -285,6 +287,23 @@ export default function Teams() {
               <p className="text-muted-foreground mb-4">
                 You're not currently a member of any teams. Join a league to get started!
               </p>
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={() => navigate('/leagues')}
+                  className="w-full"
+                  data-testid="button-find-league"
+                >
+                  Find a League
+                </Button>
+                <Button
+                  onClick={() => navigate('/')}
+                  variant="outline"
+                  className="w-full"
+                  data-testid="button-back-home"
+                >
+                  Back to Home
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : (
