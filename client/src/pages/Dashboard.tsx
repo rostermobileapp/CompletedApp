@@ -1646,15 +1646,11 @@ export default function Dashboard() {
       {/* 3-Card Section */}
       <div className="px-6 mb-6">
         <div className="grid grid-cols-3 gap-3">
-          {/* Announcements Card - Active when a league or league team is selected */}
+          {/* Announcements Card */}
           <div 
-            className={`rounded-xl border border-border p-5 min-h-[72px] relative transition-colors bg-[#e2e2e2] dark:bg-[#212121] ${
-              effectiveLeagueId 
-                ? 'cursor-pointer hover:bg-muted/50' 
-                : 'opacity-50 cursor-not-allowed'
-            }`}
+            className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-announcements"
-            onClick={() => effectiveLeagueId && navigate('/announcements')}
+            onClick={() => navigate('/announcements')}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <Megaphone className="w-8 h-8 text-blue-500 mb-3" />
@@ -1683,15 +1679,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Standings Card - Active when a league or league team is selected */}
+          {/* Standings Card */}
           <div 
-            className={`rounded-xl border border-border p-5 min-h-[72px] transition-colors bg-[#e2e2e2] dark:bg-[#212121] ${
-              effectiveLeagueId 
-                ? 'cursor-pointer hover:bg-muted/50' 
-                : 'opacity-50 cursor-not-allowed'
-            }`}
+            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-standings"
-            onClick={() => effectiveLeagueId && setShowStandingsModal(true)}
+            onClick={() => setShowStandingsModal(true)}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <Award className="w-8 h-8 text-blue-500 mb-3" />
