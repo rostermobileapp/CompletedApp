@@ -169,33 +169,7 @@ export default function Teams() {
     }
   };
 
-  const handleClaimBeverageDuty = (gameId: string) => {
-    if (currentTeam) {
-      claimBeverageDutyMutation.mutate({ gameId, teamId: currentTeam.id });
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-6 pb-20">
-        <div className="text-center">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="container mx-auto px-4 py-6 pb-20">
-        <div className="text-center">Please log in to view your teams.</div>
-      </div>
-    );
-  }
-
-  const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
-  const isCommissioner = hasRole('secondary_commissioner');
-  const canUploadLogo = isTeamCaptain || isCommissioner;
-
-  // Fetch team stats for leaders
+  // Fetch team stats for leaders (must be BEFORE early returns)
   const { data: teamStats = [] } = useQuery({
     queryKey: ['/api/leagues', currentTeam?.leagueId, 'stats', 'team', currentTeam?.id, 'members', teamMembers?.length],
     queryFn: async () => {
@@ -275,6 +249,35 @@ export default function Teams() {
   const teamGames = (upcomingGames as any[]).filter((game: any) => 
     currentTeam && (game.homeTeamId === currentTeam.id || game.awayTeamId === currentTeam.id)
   );
+
+  // Helper functions (after all hooks, before early returns)
+  const handleClaimBeverageDuty = (gameId: string) => {
+    if (currentTeam) {
+      claimBeverageDutyMutation.mutate({ gameId, teamId: currentTeam.id });
+    }
+  };
+
+  // Early returns (must come AFTER all hooks)
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-6 pb-20">
+        <div className="text-center">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="container mx-auto px-4 py-6 pb-20">
+        <div className="text-center">Please log in to view your teams.</div>
+      </div>
+    );
+  }
+
+  // Computed values (after early returns)
+  const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
+  const isCommissioner = hasRole('secondary_commissioner');
+  const canUploadLogo = isTeamCaptain || isCommissioner;
 
   return (
     <div className="w-full px-4 py-6 pb-20">
