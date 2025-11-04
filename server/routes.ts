@@ -278,6 +278,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User Notifications Routes
+  app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const notifications = await storage.getUserNotifications(userId);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get('/api/notifications/unread', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const unreadNotifications = await storage.getUnreadNotifications(userId);
+      res.json({ count: unreadNotifications.length, notifications: unreadNotifications });
+    } catch (error) {
+      console.error("Error fetching unread notifications:", error);
+      res.status(500).json({ message: "Failed to fetch unread notifications" });
+    }
+  });
+
+  app.patch('/api/notifications/:id/read', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const notification = await storage.markNotificationAsRead(id, userId);
+      
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found or access denied" });
+      }
+      
+      res.json(notification);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  app.patch('/api/notifications/:id/dismiss', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const notification = await storage.dismissNotification(id, userId);
+      
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found or access denied" });
+      }
+      
+      res.json(notification);
+    } catch (error) {
+      console.error("Error dismissing notification:", error);
+      res.status(500).json({ message: "Failed to dismiss notification" });
+    }
+  });
+
   // Personal Reminders Routes
   app.get('/api/user/personal-reminders', isAuthenticated, async (req: any, res) => {
     try {
@@ -1072,7 +1129,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         case 'invoice.payment_failed': {
           const invoice = event.data.object as Stripe.Invoice;
-          console.log('Payment failed for invoice:', invoice.id);
+          console.log('[Webhook] Payment failed for invoice:', invoice.id);
+          
+          // Find user by subscription ID
+          const subscriptionId = invoice.subscription as string;
+          if (subscriptionId) {
+            const users = await storage.getAllUsers();
+            const user = users.find(u => u.stripeSubscriptionId === subscriptionId);
+            
+            if (user) {
+              console.log('[Webhook] Payment failed - downgrading user', user.id, 'to free_tier');
+              
+              // Downgrade user to free tier
+              await storage.updateUserRole(user.id, 'free_tier');
+              
+              // Clear subscription ID
+              await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', '');
+              
+              // Create notification for user
+              await storage.createNotification({
+                userId: user.id,
+                type: 'payment_failed',
+                title: 'Payment Failed',
+                message: 'Your subscription payment failed. Please update your payment method to continue using premium features.',
+                actionUrl: '/settings/billing',
+                actionText: 'Update Payment Method',
+                isRead: false,
+                isDismissed: false,
+              });
+              
+              console.log('[Webhook] User downgraded and notification created');
+            } else {
+              console.log('[Webhook] User not found for subscription:', subscriptionId);
+            }
+          }
           break;
         }
 

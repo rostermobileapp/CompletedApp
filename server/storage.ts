@@ -59,8 +59,12 @@ import {
   facilityMemberships,
   calendarEvents,
   eventParticipants,
+  // Notifications
+  userNotifications,
   type User,
   type UpsertUser,
+  type UserNotification,
+  type InsertUserNotification,
   type League,
   type InsertLeague,
   type Season,
@@ -217,6 +221,14 @@ export interface IStorage {
   updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User>;
   deleteUser(id: string): Promise<void>;
   updateUserNavigationPreferences(id: string, preferences: any): Promise<User>;
+  
+  // User notification operations
+  createNotification(notification: InsertUserNotification): Promise<UserNotification>;
+  getUserNotifications(userId: string): Promise<UserNotification[]>;
+  getUnreadNotifications(userId: string): Promise<UserNotification[]>;
+  markNotificationAsRead(id: string, userId: string): Promise<UserNotification | undefined>;
+  dismissNotification(id: string, userId: string): Promise<UserNotification | undefined>;
+  deleteNotification(id: string): Promise<void>;
   
   // Permission management operations (global - deprecated, use league-specific instead)
   getAllUsers(): Promise<User[]>;
@@ -746,6 +758,67 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  async createNotification(notification: InsertUserNotification): Promise<UserNotification> {
+    const [newNotification] = await db
+      .insert(userNotifications)
+      .values(notification)
+      .returning();
+    return newNotification;
+  }
+
+  async getUserNotifications(userId: string): Promise<UserNotification[]> {
+    return await db
+      .select()
+      .from(userNotifications)
+      .where(and(
+        eq(userNotifications.userId, userId),
+        eq(userNotifications.isDismissed, false)
+      ))
+      .orderBy(desc(userNotifications.createdAt));
+  }
+
+  async getUnreadNotifications(userId: string): Promise<UserNotification[]> {
+    return await db
+      .select()
+      .from(userNotifications)
+      .where(and(
+        eq(userNotifications.userId, userId),
+        eq(userNotifications.isRead, false),
+        eq(userNotifications.isDismissed, false)
+      ))
+      .orderBy(desc(userNotifications.createdAt));
+  }
+
+  async markNotificationAsRead(id: string, userId: string): Promise<UserNotification | undefined> {
+    const [notification] = await db
+      .update(userNotifications)
+      .set({ isRead: true })
+      .where(and(
+        eq(userNotifications.id, id),
+        eq(userNotifications.userId, userId)
+      ))
+      .returning();
+    return notification;
+  }
+
+  async dismissNotification(id: string, userId: string): Promise<UserNotification | undefined> {
+    const [notification] = await db
+      .update(userNotifications)
+      .set({ isDismissed: true })
+      .where(and(
+        eq(userNotifications.id, id),
+        eq(userNotifications.userId, userId)
+      ))
+      .returning();
+    return notification;
+  }
+
+  async deleteNotification(id: string): Promise<void> {
+    await db
+      .delete(userNotifications)
+      .where(eq(userNotifications.id, id));
   }
 
   async deleteUser(id: string): Promise<void> {

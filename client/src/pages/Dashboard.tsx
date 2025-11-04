@@ -28,6 +28,7 @@ import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 import FeedbackModal from '@/components/FeedbackModal';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
+import { NotificationBell } from '@/components/NotificationBell';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -1502,7 +1503,8 @@ export default function Dashboard() {
               data-testid="img-roster-logo"
             />
           </div>
-          <div className="flex items-center gap-3 pr-16">
+          <div className="flex items-center gap-2 pr-16">
+            <NotificationBell />
             <button 
               onClick={() => navigate('/profile')}
               className="w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden bg-primary"

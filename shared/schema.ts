@@ -134,6 +134,14 @@ export const playerTypeEnum = pgEnum("player_type", [
   "Goalie"
 ]);
 
+// Notification type enum
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "payment_failed",
+  "subscription_canceled",
+  "subscription_renewed",
+  "general"
+]);
+
 // Users table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -165,6 +173,23 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// User notifications table
+export const userNotifications = pgTable("user_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  type: notificationTypeEnum("type").notNull(),
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  actionUrl: varchar("action_url"),
+  actionText: varchar("action_text"),
+  isRead: boolean("is_read").default(false).notNull(),
+  isDismissed: boolean("is_dismissed").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_user_notifications_user").on(table.userId),
+  index("idx_user_notifications_read").on(table.isRead),
+]);
 
 // Leagues table
 export const leagues = pgTable("leagues", {
@@ -1739,6 +1764,11 @@ export const updateUserPermissionsSchema = createInsertSchema(users).pick({
   createdBy: true,
 });
 
+export const insertUserNotificationSchema = createInsertSchema(userNotifications).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertLeagueSchema = createInsertSchema(leagues).omit({
   id: true,
   createdAt: true,
@@ -2282,6 +2312,8 @@ export const createEventParticipantRequestSchema = createInsertSchema(eventParti
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UserNotification = typeof userNotifications.$inferSelect;
+export type InsertUserNotification = z.infer<typeof insertUserNotificationSchema>;
 export type League = typeof leagues.$inferSelect;
 export type InsertLeague = z.infer<typeof insertLeagueSchema>;
 export type Season = typeof seasons.$inferSelect;
