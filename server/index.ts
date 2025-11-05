@@ -6,8 +6,12 @@ import { setupVite, serveStatic, log } from "./vite";
 const app = express();
 
 // CORS configuration for Vercel frontend
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  : true;
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || true,
+  origin: allowedOrigins,
   credentials: true,
   optionsSuccessStatus: 200
 };
