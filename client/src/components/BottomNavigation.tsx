@@ -53,7 +53,7 @@ export function BottomNavigation() {
   
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50" data-testid="bottom-navigation">
-      <div className="grid py-2 grid-cols-5 bg-[#212121]">
+      <div className="grid py-2 grid-cols-5 bg-[#e2e2e2] dark:bg-[#212121]">
         {FIXED_SHORTCUTS.map((shortcut) => {
           const Icon = shortcut.icon;
           const isActive = activeId === shortcut.id;
@@ -64,7 +64,7 @@ export function BottomNavigation() {
               onClick={() => handleNavClick(shortcut)}
               className={cn(
                 "flex flex-col items-center py-2 w-full transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground"
+                isActive ? "text-[#212121] dark:text-primary" : "text-[#212121]/70 dark:text-muted-foreground"
               )}
               data-testid={`nav-${shortcut.id}`}
             >
