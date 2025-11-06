@@ -142,6 +142,7 @@ export default function Teams() {
       return {
         method: 'PUT' as const,
         url: data.uploadURL,
+        path: data.path, // Return path for later use
       };
     } catch (error) {
       console.error('Failed to get upload URL:', error);
@@ -149,12 +150,12 @@ export default function Teams() {
     }
   };
 
-  const createTeamLogoUploadComplete = (teamId: string) => (result: { successful?: Array<{ uploadURL: string }>; failed?: Array<any> }) => {
+  const createTeamLogoUploadComplete = (teamId: string) => (result: { successful?: Array<{ uploadURL: string; path?: string }>; failed?: Array<any> }) => {
     if (!result.successful || result.successful.length === 0) return;
     
     try {
-      // Extract the public URL from the upload result
-      const logoUrl = result.successful[0].uploadURL;
+      // Use path if available, otherwise fall back to uploadURL
+      const logoUrl = result.successful[0].path || result.successful[0].uploadURL;
       
       // Update the team logo in the database
       updateTeamLogoMutation.mutate({ teamId, logoUrl });

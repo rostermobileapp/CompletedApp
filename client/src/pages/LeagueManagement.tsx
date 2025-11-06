@@ -1284,6 +1284,7 @@ export default function LeagueManagement() {
       return {
         method: 'PUT' as const,
         url: data.uploadURL,
+        path: data.path, // Return path for later use
       };
     } catch (error) {
       console.error('Failed to get upload URL:', error);
@@ -1291,9 +1292,9 @@ export default function LeagueManagement() {
     }
   };
 
-  const createTeamLogoUploadComplete = (teamId: string) => (result: { successful?: Array<{ uploadURL: string }>; failed?: Array<any> }) => {
+  const createTeamLogoUploadComplete = (teamId: string) => (result: { successful?: Array<{ uploadURL: string; path?: string }>; failed?: Array<any> }) => {
     if (result.successful && result.successful.length > 0) {
-      const logoUrl = result.successful[0].uploadURL;
+      const logoUrl = result.successful[0].path || result.successful[0].uploadURL;
       updateTeamLogoMutation.mutate({ teamId, logoUrl });
     } else if (result.failed && result.failed.length > 0) {
       toast({

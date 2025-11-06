@@ -278,17 +278,18 @@ export default function Profile() {
 
   const handleGetUploadParameters = async () => {
     const response = await apiRequest('POST', '/api/profile-images/upload');
-    const { uploadURL } = await response.json();
+    const { uploadURL, path } = await response.json();
     return {
       method: 'PUT' as const,
       url: uploadURL,
+      path, // Return path for later use
     };
   };
 
   const handleUploadComplete = (result: any) => {
     if (result.successful && result.successful.length > 0) {
-      const uploadURL = result.successful[0].uploadURL;
-      updateImageMutation.mutate(uploadURL);
+      const imagePath = result.successful[0].path || result.successful[0].uploadURL;
+      updateImageMutation.mutate(imagePath);
     }
   };
 

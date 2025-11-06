@@ -13,6 +13,7 @@ import { Upload, X } from "lucide-react";
 interface UploadResult {
   successful?: Array<{
     uploadURL: string;
+    path?: string;
   }>;
   failed?: Array<any>;
 }
@@ -23,6 +24,7 @@ interface ObjectUploaderProps {
   onGetUploadParameters: () => Promise<{
     method: "PUT";
     url: string;
+    path?: string;
   }>;
   onComplete?: (result: UploadResult) => void;
   buttonClassName?: string;
@@ -109,13 +111,13 @@ export function ObjectUploader({
     
     setIsUploading(true);
     try {
-      const successful: Array<{ uploadURL: string }> = [];
+      const successful: Array<{ uploadURL: string; path?: string }> = [];
       const failed: Array<any> = [];
       
       for (const file of selectedFiles) {
         try {
           // Get upload parameters from the parent component
-          const { method, url } = await onGetUploadParameters();
+          const { method, url, path } = await onGetUploadParameters();
           
           // Upload the file to object storage
           const uploadResponse = await fetch(url, {
@@ -130,9 +132,9 @@ export function ObjectUploader({
             throw new Error(`Upload failed with status ${uploadResponse.status}`);
           }
           
-          // Store the upload URL (use the signed URL but remove query parameters for storage)
-          const uploadURL = url.split('?')[0];
-          successful.push({ uploadURL });
+          // Store the path if available, otherwise fall back to parsed URL
+          const uploadURL = path || url.split('?')[0];
+          successful.push({ uploadURL, path });
         } catch (error) {
           console.error('Failed to upload file:', file.name, error);
           failed.push({ file: file.name, error });

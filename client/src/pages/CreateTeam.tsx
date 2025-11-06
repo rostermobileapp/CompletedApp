@@ -211,9 +211,9 @@ export default function CreateTeam() {
     try {
       setIsUploadingPhoto(true);
 
-      // Get upload URL
+      // Get upload URL and path
       const urlResponse = await apiRequest('POST', '/api/team-logos/upload', {});
-      const { uploadURL } = await urlResponse.json();
+      const { uploadURL, path } = await urlResponse.json();
 
       // Upload to object storage
       const uploadResponse = await fetch(uploadURL, {
@@ -228,10 +228,8 @@ export default function CreateTeam() {
         throw new Error('Failed to upload photo');
       }
 
-      // Extract the path from the upload URL
-      const url = new URL(uploadURL);
-      const photoPath = url.pathname;
-      setPhotoUrl(photoPath);
+      // Use the path returned from the API
+      setPhotoUrl(path);
 
       toast({
         title: 'Photo Uploaded',

@@ -1307,9 +1307,9 @@ export default function Messages() {
   const uploadFiles = async (files: File[]): Promise<any[]> => {
     const uploadPromises = files.map(async (file) => {
       try {
-        // Get upload URL
+        // Get upload URL and path
         const uploadUrlResponse = await apiRequest('POST', '/api/message-attachments/upload');
-        const { uploadURL } = await uploadUrlResponse.json();
+        const { uploadURL, path } = await uploadUrlResponse.json();
         
         // Upload file to object storage
         const uploadResponse = await fetch(uploadURL, {
@@ -1324,8 +1324,8 @@ export default function Messages() {
           throw new Error('Failed to upload file');
         }
         
-        // Extract file path from upload URL
-        const fileUrl = uploadURL.split('?')[0]; // Remove query parameters
+        // Use the path returned from the API
+        const fileUrl = path;
         
         return {
           fileName: file.name,

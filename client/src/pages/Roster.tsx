@@ -52,16 +52,18 @@ export default function Roster() {
 
   const handleGetTeamLogoUploadParameters = async () => {
     const response = await apiRequest('/api/team-logos/upload', 'POST');
+    const data = await response.json();
     return {
       method: 'PUT' as const,
-      url: (response as any).uploadURL,
+      url: data.uploadURL,
+      path: data.path, // Return path for later use
     };
   };
 
   const handleTeamLogoUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
     if (result.successful && result.successful[0]) {
-      const uploadURL = result.successful[0].uploadURL as string;
-      updateTeamLogoMutation.mutate(uploadURL);
+      const logoPath = (result.successful[0] as any).path || (result.successful[0] as any).uploadURL;
+      updateTeamLogoMutation.mutate(logoPath);
     }
   };
 
