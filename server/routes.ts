@@ -1274,13 +1274,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Object storage routes for profile images  
+  // Supabase storage routes for profile images  
   app.post("/api/profile-images/upload", isAuthenticated, async (req: any, res) => {
     try {
-      const { ObjectStorageService } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getProfileImageUploadURL();
-      res.json({ uploadURL });
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const { uploadURL, path } = await supabaseStorageService.getProfileImageUploadURL();
+      res.json({ uploadURL, path });
     } catch (error) {
       console.error("Error getting profile image upload URL:", error);
       res.status(500).json({ error: "Failed to get upload URL" });
@@ -1290,14 +1290,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve profile images
   app.get("/profile-images/:objectPath(*)", async (req, res) => {
     try {
-      const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
+      const { SupabaseStorageService, SupabaseStorageNotFoundError } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
       const fullPath = `/profile-images/${req.params.objectPath}`;
-      const objectFile = await objectStorageService.getProfileImageFile(fullPath);
-      await objectStorageService.downloadObject(objectFile, res);
+      const objectFile = await supabaseStorageService.getProfileImageFile(fullPath);
+      await supabaseStorageService.streamToResponse(objectFile, res);
     } catch (error) {
       console.error("Error serving profile image:", error);
-      if ((error as Error).name === 'ObjectNotFoundError') {
+      if ((error as Error).name === 'SupabaseStorageNotFoundError') {
         return res.sendStatus(404);
       }
       return res.sendStatus(500);
@@ -1307,10 +1307,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Team logo upload and serving routes
   app.post("/api/team-logos/upload", isAuthenticated, async (req: any, res) => {
     try {
-      const { ObjectStorageService } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getTeamLogoUploadURL();
-      res.json({ uploadURL });
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const { uploadURL, path } = await supabaseStorageService.getTeamLogoUploadURL();
+      res.json({ uploadURL, path });
     } catch (error) {
       console.error("Error getting team logo upload URL:", error);
       res.status(500).json({ error: "Failed to get upload URL" });
@@ -1320,14 +1320,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve team logos
   app.get("/team-logos/:objectPath(*)", async (req, res) => {
     try {
-      const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
+      const { SupabaseStorageService, SupabaseStorageNotFoundError } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
       const fullPath = `/team-logos/${req.params.objectPath}`;
-      const objectFile = await objectStorageService.getTeamLogoFile(fullPath);
-      await objectStorageService.downloadObject(objectFile, res);
+      const objectFile = await supabaseStorageService.getTeamLogoFile(fullPath);
+      await supabaseStorageService.streamToResponse(objectFile, res);
     } catch (error) {
       console.error("Error serving team logo:", error);
-      if ((error as Error).name === 'ObjectNotFoundError') {
+      if ((error as Error).name === 'SupabaseStorageNotFoundError') {
         return res.sendStatus(404);
       }
       return res.sendStatus(500);
@@ -1337,10 +1337,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Announcement media upload URL
   app.post("/api/announcement-media/upload", isAuthenticated, async (req: any, res) => {
     try {
-      const { ObjectStorageService } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getAnnouncementMediaUploadURL();
-      res.json({ uploadURL });
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const { uploadURL, path } = await supabaseStorageService.getAnnouncementMediaUploadURL();
+      res.json({ uploadURL, path });
     } catch (error) {
       console.error("Error getting announcement media upload URL:", error);
       res.status(500).json({ error: "Failed to get upload URL" });
@@ -1350,14 +1350,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve announcement media
   app.get("/announcement-media/:objectPath(*)", async (req, res) => {
     try {
-      const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
+      const { SupabaseStorageService, SupabaseStorageNotFoundError } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
       const fullPath = `/announcement-media/${req.params.objectPath}`;
-      const objectFile = await objectStorageService.getAnnouncementMediaFile(fullPath);
-      await objectStorageService.downloadObject(objectFile, res);
+      const objectFile = await supabaseStorageService.getAnnouncementMediaFile(fullPath);
+      await supabaseStorageService.streamToResponse(objectFile, res);
     } catch (error) {
       console.error("Error serving announcement media:", error);
-      if ((error as Error).name === 'ObjectNotFoundError') {
+      if ((error as Error).name === 'SupabaseStorageNotFoundError') {
         return res.sendStatus(404);
       }
       return res.sendStatus(500);
@@ -1367,10 +1367,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Message attachment upload URL
   app.post("/api/message-attachments/upload", isAuthenticated, async (req: any, res) => {
     try {
-      const { ObjectStorageService } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getMessageAttachmentUploadURL();
-      res.json({ uploadURL });
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const { uploadURL, path } = await supabaseStorageService.getMessageAttachmentUploadURL();
+      res.json({ uploadURL, path });
     } catch (error) {
       console.error("Error getting message attachment upload URL:", error);
       res.status(500).json({ error: "Failed to get upload URL" });
@@ -1381,8 +1381,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/message-attachments/:objectPath(*)", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
+      const { SupabaseStorageService, SupabaseStorageNotFoundError } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
       const fullPath = `/message-attachments/${req.params.objectPath}`;
       
       // Find the message attachment to verify access
@@ -1403,11 +1403,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.sendStatus(403);
       }
       
-      const objectFile = await objectStorageService.getMessageAttachmentFile(fullPath);
-      await objectStorageService.downloadObject(objectFile, res);
+      const objectFile = await supabaseStorageService.getMessageAttachmentFile(fullPath);
+      await supabaseStorageService.streamToResponse(objectFile, res);
     } catch (error) {
       console.error("Error serving message attachment:", error);
-      if ((error as Error).name === 'ObjectNotFoundError') {
+      if ((error as Error).name === 'SupabaseStorageNotFoundError') {
         return res.sendStatus(404);
       }
       return res.sendStatus(500);
