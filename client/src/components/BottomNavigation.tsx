@@ -64,7 +64,7 @@ export function BottomNavigation() {
               onClick={() => handleNavClick(shortcut)}
               className={cn(
                 "flex flex-col items-center py-2 w-full transition-colors",
-                isActive ? "text-[#212121] dark:text-primary" : "text-[#212121]/70 dark:text-muted-foreground"
+                isActive ? "text-primary" : "text-[#212121]/70 dark:text-muted-foreground"
               )}
               data-testid={`nav-${shortcut.id}`}
             >
