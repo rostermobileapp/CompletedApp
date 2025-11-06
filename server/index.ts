@@ -6,15 +6,24 @@ import { setupVite, serveStatic, log } from "./vite";
 const app = express();
 
 // CORS configuration for Vercel frontend
-const allowedOrigins = process.env.FRONTEND_URL 
+const allowedOriginsEnv = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : true;
+  : ['https://www.roster-app.com']; // fallback default
 
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: (origin: string | undefined, callback: Function) => {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOriginsEnv.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`❌ CORS blocked for origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 };
+
 app.use(cors(corsOptions));
 
 // Stripe webhook needs raw body for signature verification
