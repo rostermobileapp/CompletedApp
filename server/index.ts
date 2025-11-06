@@ -14,6 +14,14 @@ const corsOptions = {
   origin: (origin: string | undefined, callback: Function) => {
     // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
+    
+    // In development, allow all Replit domains and localhost
+    if (process.env.NODE_ENV === 'development') {
+      if (origin.includes('.replit.dev') || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+      }
+    }
+    
     if (allowedOriginsEnv.includes(origin)) {
       return callback(null, true);
     }
