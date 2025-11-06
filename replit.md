@@ -4,6 +4,15 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 ## Recent Changes
 
+**November 6, 2025**: Image Storage Migration to Supabase Storage
+- Migrated all image storage from Google Cloud Storage to Supabase Storage
+- Updated storage service to use Supabase Storage APIs for profile images, team logos, message attachments, and announcement media
+- All upload endpoints now return both `uploadURL` (signed URL for upload) and `path` (normalized path for database storage)
+- Frontend components updated to use the `path` returned from upload APIs
+- Storage buckets required in Supabase:
+  - `private` bucket for storing all user-uploaded content (profile images, team logos, message attachments, announcement media)
+- Bucket setup required: Create a bucket named "private" in Supabase Storage dashboard before uploading images
+
 **November 3, 2025**: Dashboard Card Consistency & Navigation Fixes
 - Fixed Teams page black screen caused by React Hooks order violation - all hooks now called before conditional returns
 - Updated News and Standings cards to match Stats card behavior - all three cards now always clickable with identical styling
@@ -103,9 +112,9 @@ Key features include:
 ## Third-Party Services
 
 - **Supabase Authentication**: User authentication and session management.
+- **Supabase Storage**: Cloud storage for user-uploaded images (profile photos, team logos, message attachments, announcement media).
 - **Neon Database**: PostgreSQL hosting.
 - **Stripe**: Payment processing and subscription management.
-- **Google Cloud Storage**: Storage for user-uploaded content.
 - **Resend**: Email delivery service.
 
 ## UI and Component Libraries
