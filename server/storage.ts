@@ -689,9 +689,9 @@ export class DatabaseStorage implements IStorage {
     // Try to normalize the profile image path for local serving
     let normalizedUrl = profileImageUrl;
     try {
-      const { ObjectStorageService } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
-      normalizedUrl = objectStorageService.normalizeProfileImagePath(profileImageUrl);
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      normalizedUrl = supabaseStorageService.normalizeProfileImagePath(profileImageUrl);
     } catch (error) {
       // If normalization fails, use original URL
       console.warn('Failed to normalize profile image path:', error);
@@ -1665,9 +1665,9 @@ export class DatabaseStorage implements IStorage {
     // Try to normalize the team logo path for local serving
     let normalizedUrl = logoUrl;
     try {
-      const { ObjectStorageService } = await import('./objectStorage');
-      const objectStorageService = new ObjectStorageService();
-      normalizedUrl = objectStorageService.normalizeTeamLogoPath(logoUrl);
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      normalizedUrl = supabaseStorageService.normalizeTeamLogoPath(logoUrl);
     } catch (error) {
       // If normalization fails, use original URL
       console.warn('Failed to normalize team logo path:', error);
