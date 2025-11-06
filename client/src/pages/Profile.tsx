@@ -278,18 +278,20 @@ export default function Profile() {
 
   const handleGetUploadParameters = async () => {
     const response = await apiRequest('POST', '/api/profile-images/upload');
-    const { uploadURL, path } = await response.json();
+    const { uploadURL, path, publicUrl } = await response.json();
     return {
       method: 'PUT' as const,
       url: uploadURL,
       path, // Return path for later use
+      publicUrl, // Return the full Supabase URL
     };
   };
 
   const handleUploadComplete = (result: any) => {
     if (result.successful && result.successful.length > 0) {
-      const imagePath = result.successful[0].path || result.successful[0].uploadURL;
-      updateImageMutation.mutate(imagePath);
+      // Use publicUrl if available, otherwise fall back to path
+      const imageUrl = result.successful[0].publicUrl || result.successful[0].path || result.successful[0].uploadURL;
+      updateImageMutation.mutate(imageUrl);
     }
   };
 

@@ -32,7 +32,7 @@ export class SupabaseStorageService {
   }
 
   // Profile Images
-  async getProfileImageUploadURL(): Promise<{ uploadURL: string; path: string }> {
+  async getProfileImageUploadURL(): Promise<{ uploadURL: string; path: string; publicUrl: string }> {
     const objectId = randomUUID();
     const filePath = `profile-images/${objectId}`;
 
@@ -46,9 +46,20 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
+    // Generate the public URL for this file that will work after upload
+    // Note: For private buckets, we need to use signed URLs. For public buckets, we'd use getPublicUrl()
+    // Since we're using a private bucket, we generate a long-lived signed URL (10 years)
+    const { data: publicUrlData } = await this.supabase.storage
+      .from("private")
+      .createSignedUrl(filePath, 315360000); // ~10 years in seconds
+
+    // If signed URL creation succeeds, use it; otherwise fall back to proxy path
+    const publicUrl = publicUrlData?.signedUrl || `/profile-images/${objectId}`;
+
     return {
       uploadURL: data.signedUrl,
       path: `/profile-images/${objectId}`,
+      publicUrl,
     };
   }
 
@@ -98,7 +109,7 @@ export class SupabaseStorageService {
   }
 
   // Team Logos
-  async getTeamLogoUploadURL(): Promise<{ uploadURL: string; path: string }> {
+  async getTeamLogoUploadURL(): Promise<{ uploadURL: string; path: string; publicUrl: string }> {
     const objectId = randomUUID();
     const filePath = `team-logos/${objectId}`;
 
@@ -111,9 +122,17 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
+    // Generate a long-lived signed URL for viewing
+    const { data: publicUrlData } = await this.supabase.storage
+      .from("private")
+      .createSignedUrl(filePath, 315360000); // ~10 years in seconds
+
+    const publicUrl = publicUrlData?.signedUrl || `/team-logos/${objectId}`;
+
     return {
       uploadURL: data.signedUrl,
       path: `/team-logos/${objectId}`,
+      publicUrl,
     };
   }
 
@@ -161,7 +180,7 @@ export class SupabaseStorageService {
   }
 
   // Message Attachments
-  async getMessageAttachmentUploadURL(): Promise<{ uploadURL: string; path: string }> {
+  async getMessageAttachmentUploadURL(): Promise<{ uploadURL: string; path: string; publicUrl: string }> {
     const objectId = randomUUID();
     const filePath = `message-attachments/${objectId}`;
 
@@ -174,9 +193,17 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
+    // Generate a long-lived signed URL for viewing
+    const { data: publicUrlData } = await this.supabase.storage
+      .from("private")
+      .createSignedUrl(filePath, 315360000); // ~10 years in seconds
+
+    const publicUrl = publicUrlData?.signedUrl || `/message-attachments/${objectId}`;
+
     return {
       uploadURL: data.signedUrl,
       path: `/message-attachments/${objectId}`,
+      publicUrl,
     };
   }
 
@@ -224,7 +251,7 @@ export class SupabaseStorageService {
   }
 
   // Announcement Media
-  async getAnnouncementMediaUploadURL(): Promise<{ uploadURL: string; path: string }> {
+  async getAnnouncementMediaUploadURL(): Promise<{ uploadURL: string; path: string; publicUrl: string }> {
     const objectId = randomUUID();
     const filePath = `announcement-media/${objectId}`;
 
@@ -237,9 +264,17 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
+    // Generate a long-lived signed URL for viewing
+    const { data: publicUrlData } = await this.supabase.storage
+      .from("private")
+      .createSignedUrl(filePath, 315360000); // ~10 years in seconds
+
+    const publicUrl = publicUrlData?.signedUrl || `/announcement-media/${objectId}`;
+
     return {
       uploadURL: data.signedUrl,
       path: `/announcement-media/${objectId}`,
+      publicUrl,
     };
   }
 

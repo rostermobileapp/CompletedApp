@@ -1279,8 +1279,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { SupabaseStorageService } = await import('./supabaseStorage');
       const supabaseStorageService = new SupabaseStorageService();
-      const { uploadURL, path } = await supabaseStorageService.getProfileImageUploadURL();
-      res.json({ uploadURL, path });
+      const { uploadURL, path, publicUrl } = await supabaseStorageService.getProfileImageUploadURL();
+      res.json({ uploadURL, path, publicUrl });
     } catch (error) {
       console.error("Error getting profile image upload URL:", error);
       res.status(500).json({ error: "Failed to get upload URL" });
@@ -1309,8 +1309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { SupabaseStorageService } = await import('./supabaseStorage');
       const supabaseStorageService = new SupabaseStorageService();
-      const { uploadURL, path } = await supabaseStorageService.getTeamLogoUploadURL();
-      res.json({ uploadURL, path });
+      const { uploadURL, path, publicUrl } = await supabaseStorageService.getTeamLogoUploadURL();
+      res.json({ uploadURL, path, publicUrl });
     } catch (error) {
       console.error("Error getting team logo upload URL:", error);
       res.status(500).json({ error: "Failed to get upload URL" });
@@ -1339,8 +1339,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { SupabaseStorageService } = await import('./supabaseStorage');
       const supabaseStorageService = new SupabaseStorageService();
-      const { uploadURL, path } = await supabaseStorageService.getAnnouncementMediaUploadURL();
-      res.json({ uploadURL, path });
+      const { uploadURL, path, publicUrl } = await supabaseStorageService.getAnnouncementMediaUploadURL();
+      res.json({ uploadURL, path, publicUrl });
     } catch (error) {
       console.error("Error getting announcement media upload URL:", error);
       res.status(500).json({ error: "Failed to get upload URL" });
@@ -1369,8 +1369,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { SupabaseStorageService } = await import('./supabaseStorage');
       const supabaseStorageService = new SupabaseStorageService();
-      const { uploadURL, path } = await supabaseStorageService.getMessageAttachmentUploadURL();
-      res.json({ uploadURL, path });
+      const { uploadURL, path, publicUrl } = await supabaseStorageService.getMessageAttachmentUploadURL();
+      res.json({ uploadURL, path, publicUrl });
     } catch (error) {
       console.error("Error getting message attachment upload URL:", error);
       res.status(500).json({ error: "Failed to get upload URL" });

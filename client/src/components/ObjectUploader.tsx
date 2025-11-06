@@ -14,6 +14,7 @@ interface UploadResult {
   successful?: Array<{
     uploadURL: string;
     path?: string;
+    publicUrl?: string;
   }>;
   failed?: Array<any>;
 }
@@ -25,6 +26,7 @@ interface ObjectUploaderProps {
     method: "PUT";
     url: string;
     path?: string;
+    publicUrl?: string;
   }>;
   onComplete?: (result: UploadResult) => void;
   buttonClassName?: string;
@@ -111,13 +113,13 @@ export function ObjectUploader({
     
     setIsUploading(true);
     try {
-      const successful: Array<{ uploadURL: string; path?: string }> = [];
+      const successful: Array<{ uploadURL: string; path?: string; publicUrl?: string }> = [];
       const failed: Array<any> = [];
       
       for (const file of selectedFiles) {
         try {
           // Get upload parameters from the parent component
-          const { method, url, path } = await onGetUploadParameters();
+          const { method, url, path, publicUrl } = await onGetUploadParameters();
           
           // Upload the file to object storage
           const uploadResponse = await fetch(url, {
@@ -134,7 +136,7 @@ export function ObjectUploader({
           
           // Store the path if available, otherwise fall back to parsed URL
           const uploadURL = path || url.split('?')[0];
-          successful.push({ uploadURL, path });
+          successful.push({ uploadURL, path, publicUrl });
         } catch (error) {
           console.error('Failed to upload file:', file.name, error);
           failed.push({ file: file.name, error });
