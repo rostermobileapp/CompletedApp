@@ -65,9 +65,7 @@ export default function ForgotPassword() {
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Mail className="h-6 w-6 text-primary" />
               </div>
-              <h1 className="text-2xl font-bold" data-testid="text-title">
-                Forgot Password
-              </h1>
+              <h1 className="text-2xl font-bold" data-testid="text-title">Forgot Password?</h1>
             </div>
             
             <p className="text-muted-foreground text-sm" data-testid="text-description">
