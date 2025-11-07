@@ -113,13 +113,13 @@ export function ObjectUploader({
     
     setIsUploading(true);
     try {
-      const successful: Array<{ uploadURL: string; path?: string; publicUrl?: string }> = [];
+      const successful: Array<{ uploadURL: string; path?: string }> = [];
       const failed: Array<any> = [];
       
       for (const file of selectedFiles) {
         try {
           // Get upload parameters from the parent component
-          const { method, url, path, publicUrl } = await onGetUploadParameters();
+          const { method, url, path } = await onGetUploadParameters();
           
           // Upload the file to object storage
           const uploadResponse = await fetch(url, {
@@ -134,9 +134,9 @@ export function ObjectUploader({
             throw new Error(`Upload failed with status ${uploadResponse.status}`);
           }
           
-          // Store the path if available, otherwise fall back to parsed URL
+          // Store the normalized path for backend proxy serving
           const uploadURL = path || url.split('?')[0];
-          successful.push({ uploadURL, path, publicUrl });
+          successful.push({ uploadURL, path });
         } catch (error) {
           console.error('Failed to upload file:', file.name, error);
           failed.push({ file: file.name, error });

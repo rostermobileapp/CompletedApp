@@ -38,7 +38,7 @@ export class SupabaseStorageService {
 
     // Generate a signed URL for uploading (15 minutes expiry)
     const { data, error } = await this.supabase.storage
-      .from("private")
+      .from("Private")
       .createSignedUploadUrl(filePath);
 
     if (error) {
@@ -84,7 +84,7 @@ export class SupabaseStorageService {
     const filePath = `profile-images/${objectId}`;
 
     const { data, error } = await this.supabase.storage
-      .from("private")
+      .from("Private")
       .download(filePath);
 
     if (error || !data) {
@@ -104,7 +104,7 @@ export class SupabaseStorageService {
     const filePath = `team-logos/${objectId}`;
 
     const { data, error } = await this.supabase.storage
-      .from("private")
+      .from("Private")
       .createSignedUploadUrl(filePath);
 
     if (error) {
@@ -148,7 +148,7 @@ export class SupabaseStorageService {
     const filePath = `team-logos/${objectId}`;
 
     const { data, error } = await this.supabase.storage
-      .from("private")
+      .from("Private")
       .download(filePath);
 
     if (error || !data) {
@@ -168,7 +168,7 @@ export class SupabaseStorageService {
     const filePath = `message-attachments/${objectId}`;
 
     const { data, error } = await this.supabase.storage
-      .from("private")
+      .from("Private")
       .createSignedUploadUrl(filePath);
 
     if (error) {
@@ -212,7 +212,7 @@ export class SupabaseStorageService {
     const filePath = `message-attachments/${objectId}`;
 
     const { data, error } = await this.supabase.storage
-      .from("private")
+      .from("Private")
       .download(filePath);
 
     if (error || !data) {
@@ -232,7 +232,7 @@ export class SupabaseStorageService {
     const filePath = `announcement-media/${objectId}`;
 
     const { data, error } = await this.supabase.storage
-      .from("private")
+      .from("Private")
       .createSignedUploadUrl(filePath);
 
     if (error) {
@@ -276,7 +276,7 @@ export class SupabaseStorageService {
     const filePath = `announcement-media/${objectId}`;
 
     const { data, error } = await this.supabase.storage
-      .from("private")
+      .from("Private")
       .download(filePath);
 
     if (error || !data) {
