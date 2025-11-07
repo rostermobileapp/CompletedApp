@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -50,6 +50,16 @@ import StripeAdmin from "@/pages/StripeAdmin";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  const [location] = useLocation();
+
+  // Always render password reset pages standalone, regardless of auth state
+  if (location === '/reset-password') {
+    return <ResetPassword />;
+  }
+
+  if (location === '/forgot-password') {
+    return <ForgotPassword />;
+  }
 
   if (isLoading) {
     return (
@@ -65,8 +75,6 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
-        <Route path="/forgot-password" component={ForgotPassword} />
-        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/facilities" component={FacilityBrowse} />
         <Route path="/facilities/:id" component={FacilityDetail} />
         <Route component={Landing} />
@@ -81,7 +89,6 @@ function Router() {
         <PageTransition>
           <Switch>
             <Route path="/" component={Dashboard} />
-            <Route path="/reset-password" component={ResetPassword} />
             <Route path="/league-search" component={LeagueSearch} />
             <Route path="/team-search" component={TeamSearch} />
             <Route path="/teams" component={Teams} />
