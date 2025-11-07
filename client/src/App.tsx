@@ -12,6 +12,8 @@ import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
 import LeagueSearch from "@/pages/LeagueSearch";
 import TeamSearch from "@/pages/TeamSearch";
@@ -63,6 +65,8 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/facilities" component={FacilityBrowse} />
         <Route path="/facilities/:id" component={FacilityDetail} />
         <Route component={Landing} />

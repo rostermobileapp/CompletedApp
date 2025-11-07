@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'wouter';
 
 interface AuthModalProps {
   open: boolean;
@@ -23,6 +24,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,6 +130,22 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           >
             {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
           </Button>
+          
+          {!isSignUp && (
+            <div className="text-center text-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenChange(false);
+                  setLocation('/forgot-password');
+                }}
+                className="text-primary hover:underline"
+                data-testid="link-forgot-password"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
           
           <div className="text-center text-sm">
             <button
