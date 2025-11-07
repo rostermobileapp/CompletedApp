@@ -13,15 +13,32 @@ export default function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
-  const [isValidToken, setIsValidToken] = useState(false);
+  const [isValidToken, setIsValidToken] = useState<boolean | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if we have a valid session (from the reset link)
+    let timeoutId: NodeJS.Timeout;
+
+    // Listen for PASSWORD_RECOVERY event
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsValidToken(true);
+      } else if (event === 'SIGNED_IN' && session) {
+        setIsValidToken(true);
+      }
+    });
+
+    // Also check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setIsValidToken(true);
-      } else {
+      }
+    });
+
+    // Set a timeout to show error if no valid token after 10 seconds
+    timeoutId = setTimeout(() => {
+      if (isValidToken === null) {
+        setIsValidToken(false);
         toast({
           variant: 'destructive',
           title: 'Invalid or expired link',
@@ -29,8 +46,13 @@ export default function ResetPassword() {
         });
         setTimeout(() => setLocation('/forgot-password'), 3000);
       }
-    });
-  }, [toast, setLocation]);
+    }, 10000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeoutId);
+    };
+  }, [toast, setLocation, isValidToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,13 +103,33 @@ export default function ResetPassword() {
     }
   };
 
-  if (!isValidToken) {
+  if (isValidToken === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4" data-testid="page-reset-password-validating">
+        <div className="w-full max-w-md text-center">
+          <div className="bg-card border border-border rounded-lg shadow-lg p-8">
+            <div className="flex justify-center mb-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+            <p className="text-muted-foreground" data-testid="text-validating-token">
+              Validating reset link...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isValidToken === false) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4" data-testid="page-reset-password-invalid">
         <div className="w-full max-w-md text-center">
           <div className="bg-card border border-border rounded-lg shadow-lg p-8">
-            <p className="text-muted-foreground" data-testid="text-invalid-token">
-              Validating reset link...
+            <p className="text-destructive font-semibold mb-2" data-testid="text-invalid-token">
+              Invalid or Expired Link
+            </p>
+            <p className="text-muted-foreground text-sm">
+              Redirecting to password reset request...
             </p>
           </div>
         </div>
