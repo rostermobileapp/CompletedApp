@@ -12,7 +12,12 @@ Rosters is a free, comprehensive sports team management platform designed for va
 - Leverages Supabase's built-in password reset functionality (resetPasswordForEmail and updateUser methods)
 - Token validation uses Supabase's PASSWORD_RECOVERY event for reliable detection of valid reset links
 - Includes proper error handling, loading states, and user feedback throughout the flow
-- All pages accessible without authentication for ease of use
+- **Router Fix**: Added /reset-password route to BOTH authenticated and unauthenticated routing to prevent "Page Not Found" errors when Supabase authenticates users during password recovery flow
+- Vercel deployment configuration updated to use `npm run build` for proper frontend-only builds
+- **Deployment Requirements**:
+  - Supabase redirect URL must be whitelisted: Add production URL + `/reset-password` to Supabase Dashboard → Authentication → URL Configuration
+  - Vercel Authentication must be disabled to allow password reset email links to work
+  - Custom domain recommended to hide personal information from deployment URLs
 
 **November 6, 2025**: Image Storage Migration to Supabase Storage
 - Migrated all image storage from Google Cloud Storage to Supabase Storage

@@ -81,6 +81,7 @@ function Router() {
         <PageTransition>
           <Switch>
             <Route path="/" component={Dashboard} />
+            <Route path="/reset-password" component={ResetPassword} />
             <Route path="/league-search" component={LeagueSearch} />
             <Route path="/team-search" component={TeamSearch} />
             <Route path="/teams" component={Teams} />
