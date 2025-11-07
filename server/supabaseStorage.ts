@@ -32,7 +32,7 @@ export class SupabaseStorageService {
   }
 
   // Profile Images
-  async getProfileImageUploadURL(): Promise<{ uploadURL: string; path: string; publicUrl: string }> {
+  async getProfileImageUploadURL(): Promise<{ uploadURL: string; path: string }> {
     const objectId = randomUUID();
     const filePath = `profile-images/${objectId}`;
 
@@ -46,17 +46,10 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
-    // Get the public URL since bucket is public
-    const { data: publicUrlData } = this.supabase.storage
-      .from("private")
-      .getPublicUrl(filePath);
-
-    const publicUrl = publicUrlData.publicUrl;
-
+    // Return normalized path for backend proxy serving
     return {
       uploadURL: data.signedUrl,
       path: `/profile-images/${objectId}`,
-      publicUrl,
     };
   }
 
@@ -106,7 +99,7 @@ export class SupabaseStorageService {
   }
 
   // Team Logos
-  async getTeamLogoUploadURL(): Promise<{ uploadURL: string; path: string; publicUrl: string }> {
+  async getTeamLogoUploadURL(): Promise<{ uploadURL: string; path: string }> {
     const objectId = randomUUID();
     const filePath = `team-logos/${objectId}`;
 
@@ -119,17 +112,10 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
-    // Get the public URL since bucket is public
-    const { data: publicUrlData } = this.supabase.storage
-      .from("private")
-      .getPublicUrl(filePath);
-
-    const publicUrl = publicUrlData.publicUrl;
-
+    // Return normalized path for backend proxy serving
     return {
       uploadURL: data.signedUrl,
       path: `/team-logos/${objectId}`,
-      publicUrl,
     };
   }
 
@@ -177,7 +163,7 @@ export class SupabaseStorageService {
   }
 
   // Message Attachments
-  async getMessageAttachmentUploadURL(): Promise<{ uploadURL: string; path: string; publicUrl: string }> {
+  async getMessageAttachmentUploadURL(): Promise<{ uploadURL: string; path: string }> {
     const objectId = randomUUID();
     const filePath = `message-attachments/${objectId}`;
 
@@ -190,17 +176,10 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
-    // Get the public URL since bucket is public
-    const { data: publicUrlData } = this.supabase.storage
-      .from("private")
-      .getPublicUrl(filePath);
-
-    const publicUrl = publicUrlData.publicUrl;
-
+    // Return normalized path for backend proxy serving
     return {
       uploadURL: data.signedUrl,
       path: `/message-attachments/${objectId}`,
-      publicUrl,
     };
   }
 
@@ -248,7 +227,7 @@ export class SupabaseStorageService {
   }
 
   // Announcement Media
-  async getAnnouncementMediaUploadURL(): Promise<{ uploadURL: string; path: string; publicUrl: string }> {
+  async getAnnouncementMediaUploadURL(): Promise<{ uploadURL: string; path: string }> {
     const objectId = randomUUID();
     const filePath = `announcement-media/${objectId}`;
 
@@ -261,17 +240,10 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
-    // Get the public URL since bucket is public
-    const { data: publicUrlData } = this.supabase.storage
-      .from("private")
-      .getPublicUrl(filePath);
-
-    const publicUrl = publicUrlData.publicUrl;
-
+    // Return normalized path for backend proxy serving
     return {
       uploadURL: data.signedUrl,
       path: `/announcement-media/${objectId}`,
-      publicUrl,
     };
   }
 

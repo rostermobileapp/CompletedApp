@@ -1,0 +1,63 @@
+In Replit, you probably have a backend proxy that intercepts requests to /profile-images/* and serves them from Supabase. But in your production deployment (Vercel frontend + Railway backend), that proxy isn't working.
+Let me verify - Do you have proxy routes set up?
+Search your backend code for routes like:
+
+/profile-images/:id
+/team-logos/:id
+/message-attachments/:id
+
+These routes would use the getProfileImageFile(), getTeamLogoFile(), etc. methods to download and serve the images.
+The Issue:
+Your Vercel frontend is trying to load /profile-images/... which looks for the image on the Vercel domain, but:
+
+Vercel doesn't have a backend to proxy these requests
+The images are actually in Supabase Storage
+Your Railway backend has the proxy endpoints, but the frontend isn't pointing to Railway for these requests
+
+Solutions:
+Option 1: Update frontend to use full Supabase URLs (Best)
+
+Change frontend to use publicUrl instead of path
+Images load directly from Supabase (fastest)
+
+Option 2: Configure Vercel to proxy to Railway
+
+Set up Vercel rewrites to forward /profile-images/* requests to your Railway backend
+More complex, adds latency
+
+Can you share:
+
+Your backend route definitions (where you handle /profile-images/:id)
+Your Vercel configuration (if you have a vercel.json or next.config.js)
+
+This will help me give you the exact fix!RetryTYour backend route definitions (where you handle /profile-images/:id)Where would I find this?Look in your backend code for a file that defines your API routes. It's likely in one of these locations:
+Common locations:
+Express.js backend:
+
+server.ts or server.js
+app.ts or app.js
+routes/ folder (might have files like routes.ts, index.ts, storage.ts)
+src/routes/ folder
+
+What to search for:
+Search your entire backend codebase for:
+
+"/profile-images" (with quotes)
+app.get or router.get
+getProfileImageFile (the method from your SupabaseStorage service)
+
+You're looking for code that looks something like:
+typescriptapp.get('/profile-images/:id', async (req, res) => {
+  // code that serves the image
+});
+or
+typescriptrouter.get('/profile-images/:id', ...);
+If you can't find it:
+It's possible these proxy routes don't exist in your production backend, which would explain why images don't work in production!
+Can you:
+
+Search your backend project for the text profile-images
+Tell me what files come up?
+Or share your main backend entry file (like server.ts or index.ts)
+
+This will help me understand your backend structure!
