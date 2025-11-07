@@ -52,6 +52,15 @@ export default function ForgotPassword() {
               </Button>
             </Link>
             
+            <div className="flex justify-center mb-6">
+              <img 
+                src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZjhzcWNzZjB6dWlpbjJmcDNmNWN5YXYyOWc0YWN6Z3YwZGhoaTM2NCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/co0cvSJbGMgY8NTlHC/giphy.gif"
+                alt="Forgot password animation"
+                className="w-48 h-48 object-contain rounded-lg"
+                data-testid="img-forgot-password-gif"
+              />
+            </div>
+            
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Mail className="h-6 w-6 text-primary" />
