@@ -4,6 +4,16 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 ## Recent Changes
 
+**November 7, 2025**: Password Reset Feature
+- Implemented comprehensive password reset functionality for users who forget their passwords
+- Created dedicated ForgotPassword page (/forgot-password) where users can request password reset links via email
+- Created ResetPassword page (/reset-password) for setting new passwords using tokens from email links
+- Updated AuthModal to include a "Forgot password?" link in sign-in mode that navigates to the forgot password page
+- Leverages Supabase's built-in password reset functionality (resetPasswordForEmail and updateUser methods)
+- Token validation uses Supabase's PASSWORD_RECOVERY event for reliable detection of valid reset links
+- Includes proper error handling, loading states, and user feedback throughout the flow
+- All pages accessible without authentication for ease of use
+
 **November 6, 2025**: Image Storage Migration to Supabase Storage
 - Migrated all image storage from Google Cloud Storage to Supabase Storage
 - Updated storage service to use Supabase Storage APIs for profile images, team logos, message attachments, and announcement media
