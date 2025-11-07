@@ -71,7 +71,7 @@ export default function ForgotPassword() {
             <p className="text-muted-foreground text-sm" data-testid="text-description">
               {emailSent
                 ? 'Check your email for the password reset link.'
-                : 'Enter your email address and we\'ll send you a link to reset your password.'}
+                : 'We are disappointed in you, but if you give us your email, we can reset it for you.'}
             </p>
           </div>
 
