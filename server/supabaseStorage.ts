@@ -46,15 +46,12 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
-    // Generate the public URL for this file that will work after upload
-    // Note: For private buckets, we need to use signed URLs. For public buckets, we'd use getPublicUrl()
-    // Since we're using a private bucket, we generate a long-lived signed URL (10 years)
-    const { data: publicUrlData } = await this.supabase.storage
+    // Get the public URL since bucket is public
+    const { data: publicUrlData } = this.supabase.storage
       .from("private")
-      .createSignedUrl(filePath, 315360000); // ~10 years in seconds
+      .getPublicUrl(filePath);
 
-    // If signed URL creation succeeds, use it; otherwise fall back to proxy path
-    const publicUrl = publicUrlData?.signedUrl || `/profile-images/${objectId}`;
+    const publicUrl = publicUrlData.publicUrl;
 
     return {
       uploadURL: data.signedUrl,
@@ -122,12 +119,12 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
-    // Generate a long-lived signed URL for viewing
-    const { data: publicUrlData } = await this.supabase.storage
+    // Get the public URL since bucket is public
+    const { data: publicUrlData } = this.supabase.storage
       .from("private")
-      .createSignedUrl(filePath, 315360000); // ~10 years in seconds
+      .getPublicUrl(filePath);
 
-    const publicUrl = publicUrlData?.signedUrl || `/team-logos/${objectId}`;
+    const publicUrl = publicUrlData.publicUrl;
 
     return {
       uploadURL: data.signedUrl,
@@ -193,12 +190,12 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
-    // Generate a long-lived signed URL for viewing
-    const { data: publicUrlData } = await this.supabase.storage
+    // Get the public URL since bucket is public
+    const { data: publicUrlData } = this.supabase.storage
       .from("private")
-      .createSignedUrl(filePath, 315360000); // ~10 years in seconds
+      .getPublicUrl(filePath);
 
-    const publicUrl = publicUrlData?.signedUrl || `/message-attachments/${objectId}`;
+    const publicUrl = publicUrlData.publicUrl;
 
     return {
       uploadURL: data.signedUrl,
@@ -264,12 +261,12 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL");
     }
 
-    // Generate a long-lived signed URL for viewing
-    const { data: publicUrlData } = await this.supabase.storage
+    // Get the public URL since bucket is public
+    const { data: publicUrlData } = this.supabase.storage
       .from("private")
-      .createSignedUrl(filePath, 315360000); // ~10 years in seconds
+      .getPublicUrl(filePath);
 
-    const publicUrl = publicUrlData?.signedUrl || `/announcement-media/${objectId}`;
+    const publicUrl = publicUrlData.publicUrl;
 
     return {
       uploadURL: data.signedUrl,
