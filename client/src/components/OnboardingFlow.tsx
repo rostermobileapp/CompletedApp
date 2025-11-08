@@ -687,15 +687,6 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
               </Card>
             </div>
 
-            <div className="bg-gray-900 dark:bg-gray-900 border border-gray-700 dark:border-gray-700 rounded-lg p-6 mb-8">
-              <h3 className="font-semibold mb-3 text-white dark:text-white">Quick Tips</h3>
-              <ul className="text-left space-y-2 text-sm text-gray-400 dark:text-gray-400">
-                <li>• Check your schedule for upcoming games</li>
-                <li>• Complete your profile for better teammate connections</li>
-                <li>• Explore league standings and stats</li>
-              </ul>
-            </div>
-
             <Button
               size="lg"
               onClick={handleComplete}
