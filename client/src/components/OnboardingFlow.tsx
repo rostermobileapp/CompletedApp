@@ -582,6 +582,18 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
                   </div>
                 </CardContent>
               </Card>
+
+              <Card className="bg-gray-900 dark:bg-gray-900 border-gray-700 dark:border-gray-700">
+                <CardContent className="p-4 flex items-start gap-4">
+                  <Users className="h-6 w-6 text-orange-500 flex-shrink-0 mt-1" />
+                  <div>
+                    <p className="font-semibold text-white dark:text-white">Manage team and line combinations</p>
+                    <p className="text-sm text-gray-400 dark:text-gray-400">
+                      Organize your roster and create custom line pairings
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             <div className="flex gap-4">
