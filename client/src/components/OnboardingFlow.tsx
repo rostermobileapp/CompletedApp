@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { ObjectUploader } from '@/components/ObjectUploader';
 import { 
   X, 
   ChevronRight, 
@@ -56,7 +55,6 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [facilitySearchQuery, setFacilitySearchQuery] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'pro' | null>(null);
-  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [isLoadingProgress, setIsLoadingProgress] = useState(!isReplay);
   
   const { toast } = useToast();
@@ -66,7 +64,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
   const startScreen = isReplay ? 1 : 0;
 
   // Fetch user data for replay and resume
-  const { data: userData } = useQuery({
+  const { data: userData } = useQuery<any>({
     queryKey: ['/api/user'],
   });
 
@@ -93,7 +91,6 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
       phoneNumber: userData.phoneNumber || '',
       playerType: userData.playerType || undefined,
     });
-    setProfileImageUrl(userData.profileImageUrl || null);
 
     // Load saved onboarding progress for resume functionality
     if (!isReplay && userData.onboardingProgress) {
@@ -187,7 +184,6 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
 
       await saveProgressMutation.mutateAsync({
         ...formData,
-        profileImageUrl,
         onboardingProgress: { currentScreen: currentScreen + 1 },
       });
     } else if (currentScreen === 2 && selectedFacility) {
@@ -228,7 +224,6 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
     const formData = form.getValues();
     await completeOnboardingMutation.mutateAsync({
       ...formData,
-      profileImageUrl,
       selectedFacilityId: selectedFacility?.id || null,
       role: selectedPlan === 'pro' ? 'player_pro' : 'free_tier',
     });
@@ -285,19 +280,6 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
             <p className="text-gray-400 dark:text-gray-400 mb-6">Tell us a bit about yourself</p>
 
             <div className="space-y-4">
-              <div className="flex justify-center mb-6">
-                <ObjectUploader
-                  bucketName="private"
-                  path="profile-images"
-                  onUploadComplete={(path) => {
-                    setProfileImageUrl(path);
-                    toast({ title: 'Profile photo uploaded!' });
-                  }}
-                  currentImageUrl={profileImageUrl || undefined}
-                  variant="avatar"
-                />
-              </div>
-
               <div>
                 <Label htmlFor="firstName" className="text-white dark:text-white">
                   First Name <span className="text-red-500">*</span>
