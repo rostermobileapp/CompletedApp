@@ -169,6 +169,10 @@ export const users = pgTable("users", {
   cashappUsername: varchar("cashapp_username"),
   // Navigation preferences
   navigationPreferences: jsonb("navigation_preferences"),
+  // Onboarding tracking
+  onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
+  onboardingProgress: jsonb("onboarding_progress"),
+  selectedFacilityId: varchar("selected_facility_id"),
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1755,6 +1759,22 @@ export const insertUserSchema = createInsertSchema(users).pick({
   lastName: true,
   primarySport: true,
 });
+
+// Onboarding schema for updating onboarding-related fields
+export const updateOnboardingSchema = createInsertSchema(users).pick({
+  firstName: true,
+  lastName: true,
+  email: true,
+  phoneNumber: true,
+  playerType: true,
+  profileImageUrl: true,
+  selectedFacilityId: true,
+  onboardingProgress: true,
+  onboardingCompleted: true,
+  role: true,
+});
+
+export type UpdateOnboarding = z.infer<typeof updateOnboardingSchema>;
 
 // Admin-only schema for updating user permissions (to be used by commissioners only)
 export const updateUserPermissionsSchema = createInsertSchema(users).pick({

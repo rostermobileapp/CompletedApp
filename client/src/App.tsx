@@ -10,6 +10,9 @@ import { AdSenseBanner } from "@/components/AdSenseBanner";
 import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { OnboardingFlow } from "@/components/OnboardingFlow";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -51,6 +54,20 @@ import StripeAdmin from "@/pages/StripeAdmin";
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Fetch onboarding status
+  const { data: onboardingData, isLoading: isLoadingOnboarding } = useQuery({
+    queryKey: ['/api/user/onboarding'],
+    enabled: isAuthenticated,
+  });
+
+  // Show onboarding if user hasn't completed it yet
+  const shouldShowOnboarding = isAuthenticated && 
+    !isLoadingOnboarding && 
+    onboardingData && 
+    !onboardingData.onboardingCompleted &&
+    !showOnboarding;
 
   // Always render password reset pages standalone, regardless of auth state
   if (location === '/reset-password') {
@@ -61,7 +78,7 @@ function Router() {
     return <ForgotPassword />;
   }
 
-  if (isLoading) {
+  if (isLoading || (isAuthenticated && isLoadingOnboarding)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background" data-testid="loading-app">
         <div className="animate-pulse">
@@ -79,6 +96,17 @@ function Router() {
         <Route path="/facilities/:id" component={FacilityDetail} />
         <Route component={Landing} />
       </Switch>
+    );
+  }
+
+  // Show onboarding flow for first-time users
+  if (shouldShowOnboarding) {
+    return (
+      <OnboardingFlow
+        onComplete={() => setShowOnboarding(true)}
+        onSkip={() => setShowOnboarding(true)}
+        isReplay={false}
+      />
     );
   }
 

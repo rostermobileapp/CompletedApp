@@ -12,7 +12,8 @@ import { ObjectUploader } from '@/components/ObjectUploader';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign } from 'lucide-react';
+import { OnboardingFlow } from '@/components/OnboardingFlow';
+import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, RotateCcw } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -47,6 +48,7 @@ export default function Profile() {
   const [selectedTeamForLeagueRequest, setSelectedTeamForLeagueRequest] = useState<string | null>(null);
   const [showLeagueRequestDialog, setShowLeagueRequestDialog] = useState(false);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Fetch full user profile from database (includes displayId)
   const { data: user } = useQuery({
@@ -884,6 +886,18 @@ export default function Profile() {
             </AlertDialogContent>
           </AlertDialog>
 
+          {/* Replay Onboarding */}
+          <button
+            onClick={() => setShowOnboarding(true)}
+            className="w-full border border-border rounded-lg p-4 flex items-center justify-between hover:bg-card/80 bg-[#e2e2e2] dark:bg-[#212121]"
+            data-testid="button-replay-onboarding"
+          >
+            <div className="flex items-center gap-3">
+              <RotateCcw className="w-5 h-5" />
+              <span>Replay Onboarding</span>
+            </div>
+          </button>
+
           {/* Sign Out */}
           <button
             onClick={async () => {
@@ -900,6 +914,18 @@ export default function Profile() {
           </button>
         </div>
       </div>
+
+      {/* Onboarding Flow Replay */}
+      {showOnboarding && (
+        <OnboardingFlow
+          onComplete={() => {
+            setShowOnboarding(false);
+            queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+          }}
+          onSkip={() => setShowOnboarding(false)}
+          isReplay={true}
+        />
+      )}
       {/* App Version */}
       <div className="px-6 py-8 text-center">
         <p className="text-sm text-muted-foreground" data-testid="text-app-version">

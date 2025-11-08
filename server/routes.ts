@@ -278,6 +278,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Onboarding Routes
+  app.get('/api/user/onboarding', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({
+        onboardingCompleted: user.onboardingCompleted || false,
+        onboardingProgress: user.onboardingProgress || {},
+        selectedFacilityId: user.selectedFacilityId || null,
+      });
+    } catch (error) {
+      console.error("Error fetching onboarding status:", error);
+      res.status(500).json({ message: "Failed to fetch onboarding status" });
+    }
+  });
+
+  app.patch('/api/user/onboarding', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const {
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        playerType,
+        profileImageUrl,
+        selectedFacilityId,
+        onboardingProgress,
+        onboardingCompleted,
+        role,
+      } = req.body;
+
+      const updateData: any = {};
+      if (firstName !== undefined) updateData.firstName = firstName;
+      if (lastName !== undefined) updateData.lastName = lastName;
+      if (email !== undefined) updateData.email = email;
+      if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+      if (playerType !== undefined) updateData.playerType = playerType;
+      if (profileImageUrl !== undefined) updateData.profileImageUrl = profileImageUrl;
+      if (selectedFacilityId !== undefined) updateData.selectedFacilityId = selectedFacilityId;
+      if (onboardingProgress !== undefined) updateData.onboardingProgress = onboardingProgress;
+      if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted;
+      if (role !== undefined) updateData.role = role;
+
+      const user = await storage.updateUserOnboarding(userId, updateData);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating onboarding:", error);
+      res.status(500).json({ message: "Failed to update onboarding" });
+    }
+  });
+
   // User Notifications Routes
   app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
     try {
