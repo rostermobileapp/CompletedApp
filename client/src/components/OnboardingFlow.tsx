@@ -596,29 +596,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
               </Card>
             </div>
 
-            <div className="flex gap-4">
-              <Button
-                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                onClick={() => {
-                  setSelectedPlan('pro');
-                  handleNext();
-                }}
-                data-testid="button-start-trial"
-              >
-                Start Free Trial
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setSelectedPlan('free');
-                  handleNext();
-                }}
-                data-testid="button-continue-free"
-              >
-                Continue with Free
-              </Button>
-            </div>
+            
           </div>
         );
 
