@@ -1,0 +1,221 @@
+Here's the updated prompt for Replit with the replay functionality:
+
+Roster App - First-Time User Onboarding Flow
+Build a multi-step onboarding experience for the Roster hockey management app. The onboarding should trigger only on a user's first login and guide them through setting up their profile, finding their facility, understanding app features, and exploring upgrade options.
+Requirements
+Technical Stack
+
+Modern, responsive React components
+Smooth transitions between screens
+Progress indicator showing current step
+Ability to skip onboarding and revisit later
+Save progress as user advances through screens
+All data collected must sync to user's profile page
+Replay onboarding capability from profile page
+Mobile-first design approach
+
+Screen Flow (8 Total Screens)
+Screen 1: Welcome to Roster
+
+Hero image or graphic
+Brief intro: "Welcome to Roster - Your all-in-one hockey league management platform"
+Tagline highlighting key value proposition
+"Get Started" CTA button
+"Skip for now" option (subtle)
+
+Screen 2: Set Up Your Profile
+
+Profile photo upload (optional)
+Full name (required)
+Email (pre-filled if available)
+Phone number (optional)
+Position: Radio buttons or dropdown
+
+Skater
+Goalie
+
+
+"Continue" button (validation for required fields)
+Data must save to profile: photo, name, email, phone, position
+
+Screen 3: Find Your Facility or League
+
+Search bar with placeholder: "Search by facility name, zip code, city, or state"
+Search functionality for:
+
+Facility name
+Zip code
+City
+State
+
+
+List of search results showing:
+
+Facility/league name
+Location (city, state)
+"Join" button for each result
+
+
+Option to "I'll join later" or "Skip this step"
+"Continue" button at bottom
+Data must save to profile: selected facility/league association
+
+Screen 4: Player Features Overview
+Free tier capabilities:
+
+Clean list or cards with icons for each feature:
+
+✓ RSVP to games
+✓ View your schedule
+✓ Claim game duties (referee, scorekeeper, etc.)
+✓ Get notifications for upcoming games
+✓ Basic team roster access
+
+
+Simple, text-based presentation (no animations or illustrations)
+"Next" button
+
+Screen 5: Upgrade to Player Pro
+Call to action screen:
+
+Prominent "Player Pro" branding
+14-Day Free Trial badge/highlight
+Feature list:
+
+Send and receive team & league messages
+View detailed league stats and standings
+In-app payment management
+Scrimmage management tools
+Create and manage your own team
+Advanced scheduling features
+
+
+Pricing information (after trial)
+Two CTA buttons:
+
+Primary: "Start Free Trial"
+Secondary: "Continue with Free" or "Maybe Later"
+
+
+Data must save to profile: plan selection (Free/Pro Trial)
+
+Screen 6: Commissioner Tier Preview
+Educational/informational screen:
+
+Title: "For League Administrators"
+Description: "The Commissioner tier is reserved for league administrators who need full control"
+Commissioner features:
+
+Set up entire leagues from scratch
+Manage multiple teams and divisions
+Advanced scheduling and tournament management
+Financial oversight and reporting
+Custom rules and settings
+Bulk communications
+Assign scorekeeper or stat manager
+
+
+Note: "Contact us to upgrade to Commissioner tier"
+"Next" button (not a sales pitch, just informational)
+
+Screen 7: You're All Set!
+
+Success message (text-based, no animation)
+Summary of what they set up:
+
+Profile created ✓
+Facility joined (if applicable) ✓
+Plan selected (Free/Pro/Trial)
+
+
+Quick tips section:
+
+"Check your schedule for upcoming games"
+"Complete your profile for better teammate connections"
+"Explore league standings and stats"
+
+
+Primary CTA: "Go to Dashboard" or "Start Using Roster"
+
+Profile Page Integration
+Replay Onboarding Button
+
+Location: Near the bottom of the profile page, in a secondary actions section
+Button text: "Replay Onboarding" or "Retake Tour"
+Button style: Secondary/outlined button (not primary CTA)
+On click: Launch the onboarding flow from Screen 1
+Behavior during replay:
+
+Pre-populate all fields with existing profile data
+Allow user to update any information
+Save changes to profile as they progress
+Show "Update" instead of "Continue" on buttons where data already exists
+Skip "Welcome" screen if desired (optional)
+Final screen should say "Profile Updated!" instead of "You're All Set!"
+
+
+
+Design Considerations
+
+Progress bar or step indicator (1/7, 2/7, etc.) at top of screen
+Consistent "Back" button on each screen
+Clean, modern UI with hockey-themed visuals
+Use brand colors throughout
+Smooth transitions between screens (slide or fade)
+Loading states when saving data
+Form validation with clear error messages
+Accessibility compliance (WCAG 2.1 AA)
+
+Data Persistence & Profile Integration
+
+CRITICAL: All onboarding data must be saved to the user's profile in real-time or upon completion
+Profile fields to update:
+
+Profile photo
+Full name
+Email
+Phone number
+Position (Skater/Goalie)
+Associated facility/league
+Plan type (Free/Player Pro/Trial status)
+
+
+Save onboarding progress after each screen
+Store completion status in user profile
+Option to revisit onboarding from settings
+Mark user as "onboarded" upon completion
+Verify all data appears correctly on profile page after completion
+When replaying onboarding: Load existing profile data into form fields
+
+Edge Cases to Handle
+
+User closes browser mid-onboarding (save progress)
+User wants to skip entire onboarding
+No facilities found in search
+Profile photo upload failure
+Network connectivity issues
+Validation for position selection
+User replays onboarding but cancels midway (keep original data)
+User replays onboarding and changes facility/league (handle existing associations)
+
+Success Metrics to Track
+
+Completion rate by screen
+Drop-off points
+Time spent on each screen
+Trial signup conversion rate
+Profile completion percentage
+Facility join rate
+Onboarding replay rate
+
+
+Additional Notes:
+
+This is a hockey-specific app - ensure terminology and imagery reflect this
+Make Player Pro trial the primary conversion goal
+Keep Commissioner tier informational only (not a hard sell)
+Ensure onboarding feels quick and non-intrusive
+All information entered during onboarding must be immediately accessible on the user's profile page
+Allow users to update all information later in settings
+Replay onboarding should feel like a guided profile update experience
+Consider adding a tooltip or helper text near the replay button: "Need to update your info or see the tour again?"
