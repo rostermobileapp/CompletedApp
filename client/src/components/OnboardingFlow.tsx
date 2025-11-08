@@ -647,10 +647,6 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
                 </CardContent>
               </Card>
             </div>
-
-            <p className="text-center text-sm text-gray-400 dark:text-gray-400 mb-4">
-              Contact us to upgrade to Commissioner tier
-            </p>
           </div>
         );
 
