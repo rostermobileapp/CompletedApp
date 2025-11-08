@@ -123,7 +123,7 @@ export default function Landing() {
               <tbody>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 font-medium text-white">Price</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10 font-bold text-white">$5 / Month</td>
+                  <td className="text-center p-4 bg-[#3c82f4]/10 font-bold text-white">$6.49 / Month</td>
                   <td className="text-center p-4 text-white">$9 / Month</td>
                   <td className="text-center p-4 text-white">$16 / Month</td>
                   <td className="text-center p-4 text-white">$1,299 / Year</td>
@@ -331,7 +331,7 @@ export default function Landing() {
               </div>
               <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-player">PLAYER PRO</h3>
               <div className="mb-6">
-                <span className="text-5xl font-bold" data-testid="text-price-player">$5</span>
+                <span className="text-5xl font-bold" data-testid="text-price-player">$6.49</span>
                 <span className="text-gray-400"> / Month</span>
               </div>
               <ul className="space-y-3 mb-8">
