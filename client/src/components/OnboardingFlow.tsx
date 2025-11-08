@@ -570,6 +570,18 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
                   </div>
                 </CardContent>
               </Card>
+
+              <Card className="bg-gray-900 dark:bg-gray-900 border-gray-700 dark:border-gray-700">
+                <CardContent className="p-4 flex items-start gap-4">
+                  <CheckCircle className="h-6 w-6 text-emerald-500 flex-shrink-0 mt-1" />
+                  <div>
+                    <p className="font-semibold text-white dark:text-white">Payments and Invoicing</p>
+                    <p className="text-sm text-gray-400 dark:text-gray-400">
+                      Send and track payment requests for league fees
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             <div className="flex gap-4">
