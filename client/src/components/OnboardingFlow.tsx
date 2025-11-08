@@ -52,22 +52,22 @@ interface Facility {
 }
 
 export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: OnboardingFlowProps) {
-  const [currentScreen, setCurrentScreen] = useState(0);
+  const [currentScreen, setCurrentScreen] = useState(isReplay ? 1 : 0);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [facilitySearchQuery, setFacilitySearchQuery] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'pro' | null>(null);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [isLoadingProgress, setIsLoadingProgress] = useState(!isReplay);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const totalScreens = isReplay ? 7 : 8; // Skip welcome screen on replay
+  const totalScreens = 8;
   const startScreen = isReplay ? 1 : 0;
 
-  // Fetch user data for replay
+  // Fetch user data for replay and resume
   const { data: userData } = useQuery({
     queryKey: ['/api/user'],
-    enabled: isReplay,
   });
 
   const form = useForm<ProfileForm>({
@@ -81,23 +81,41 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
     },
   });
 
-  // Pre-populate form on replay
+  // Load saved progress and pre-populate form data
   useEffect(() => {
-    if (isReplay && userData) {
-      form.reset({
-        firstName: userData.firstName || '',
-        lastName: userData.lastName || '',
-        email: userData.email || '',
-        phoneNumber: userData.phoneNumber || '',
-        playerType: userData.playerType || undefined,
-      });
-      setProfileImageUrl(userData.profileImageUrl || null);
-      if (userData.selectedFacilityId) {
-        // Fetch facility details if saved
-        fetchFacilityById(userData.selectedFacilityId);
+    if (!userData) return;
+
+    // Pre-populate form data from user profile
+    form.reset({
+      firstName: userData.firstName || '',
+      lastName: userData.lastName || '',
+      email: userData.email || '',
+      phoneNumber: userData.phoneNumber || '',
+      playerType: userData.playerType || undefined,
+    });
+    setProfileImageUrl(userData.profileImageUrl || null);
+
+    // Load saved onboarding progress for resume functionality
+    if (!isReplay && userData.onboardingProgress) {
+      const progress = userData.onboardingProgress;
+      if (progress.currentScreen && typeof progress.currentScreen === 'number') {
+        setCurrentScreen(progress.currentScreen);
+      }
+      if (progress.selectedFacility) {
+        setSelectedFacility(progress.selectedFacility);
+      }
+      if (progress.selectedPlan) {
+        setSelectedPlan(progress.selectedPlan);
       }
     }
-  }, [isReplay, userData, form]);
+
+    // Fetch facility details if saved
+    if (userData.selectedFacilityId) {
+      fetchFacilityById(userData.selectedFacilityId);
+    }
+
+    setIsLoadingProgress(false);
+  }, [userData, isReplay, form]);
 
   const fetchFacilityById = async (facilityId: string) => {
     try {
@@ -118,7 +136,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
   // Search facilities
   const { data: facilities = [], isLoading: isSearching } = useQuery<Facility[]>({
     queryKey: ['/api/facilities', facilitySearchQuery],
-    enabled: facilitySearchQuery.length >= 2 && currentScreen === (isReplay ? 2 : 3),
+    enabled: facilitySearchQuery.length >= 2 && currentScreen === 2,
   });
 
   const saveProgressMutation = useMutation({
@@ -158,10 +176,9 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
 
   const handleNext = async () => {
     const formData = form.getValues();
-    const adjustedScreen = isReplay ? currentScreen - 1 : currentScreen;
 
     // Save progress based on current screen
-    if (adjustedScreen === 1) {
+    if (currentScreen === 1) {
       // Profile setup screen
       const result = form.trigger();
       if (!await result) {
@@ -171,19 +188,24 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
       await saveProgressMutation.mutateAsync({
         ...formData,
         profileImageUrl,
-        onboardingProgress: { currentScreen: adjustedScreen + 1 },
+        onboardingProgress: { currentScreen: currentScreen + 1 },
       });
-    } else if (adjustedScreen === 2 && selectedFacility) {
+    } else if (currentScreen === 2 && selectedFacility) {
       // Facility selection screen
       await saveProgressMutation.mutateAsync({
         selectedFacilityId: selectedFacility.id,
-        onboardingProgress: { currentScreen: adjustedScreen + 1, selectedFacility },
+        onboardingProgress: { currentScreen: currentScreen + 1, selectedFacility },
       });
-    } else if (adjustedScreen === 4 && selectedPlan === 'pro') {
+    } else if (currentScreen === 4 && selectedPlan === 'pro') {
       // Player Pro upgrade screen
       await saveProgressMutation.mutateAsync({
         role: 'player_pro',
-        onboardingProgress: { currentScreen: adjustedScreen + 1, selectedPlan },
+        onboardingProgress: { currentScreen: currentScreen + 1, selectedPlan },
+      });
+    } else {
+      // Save progress for all other screens
+      await saveProgressMutation.mutateAsync({
+        onboardingProgress: { currentScreen: currentScreen + 1, selectedFacility, selectedPlan },
       });
     }
 
@@ -214,10 +236,17 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
 
   const progressPercentage = ((currentScreen - startScreen + 1) / (totalScreens - startScreen)) * 100;
 
-  const renderScreen = () => {
-    const adjustedScreen = isReplay ? currentScreen - 1 : currentScreen;
+  // Show loading state while fetching saved progress
+  if (isLoadingProgress) {
+    return (
+      <div className="fixed inset-0 bg-black dark:bg-black bg-opacity-95 dark:bg-opacity-95 z-[60] flex items-center justify-center">
+        <div className="text-white dark:text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
 
-    switch (adjustedScreen) {
+  const renderScreen = () => {
+    switch (currentScreen) {
       case 0: // Welcome Screen
         return (
           <div className="flex flex-col items-center justify-center min-h-[500px] text-center px-4" data-testid="screen-welcome">
@@ -704,7 +733,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
   };
 
   return (
-    <div className="fixed inset-0 bg-black dark:bg-black bg-opacity-95 dark:bg-opacity-95 z-50 overflow-y-auto">
+    <div className="fixed inset-0 bg-black dark:bg-black bg-opacity-95 dark:bg-opacity-95 z-[60] overflow-y-auto">
       <div className="min-h-screen p-4 py-8">
         {/* Header */}
         <div className="max-w-4xl mx-auto mb-6">
@@ -724,7 +753,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
                 Step {currentScreen - startScreen + 1} of {totalScreens - startScreen}
               </div>
             </div>
-            {!isReplay && adjustedScreen < 6 && (
+            {!isReplay && currentScreen < 6 && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -746,7 +775,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
         </div>
 
         {/* Navigation Buttons */}
-        {currentScreen !== startScreen && adjustedScreen !== 6 && (
+        {currentScreen !== startScreen && currentScreen !== 6 && (
           <div className="max-w-4xl mx-auto mt-8 flex justify-end">
             <Button
               onClick={handleNext}
