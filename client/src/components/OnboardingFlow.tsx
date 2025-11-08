@@ -687,6 +687,14 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
               </Card>
             </div>
 
+            <div className="mb-8">
+              <img 
+                src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjk1cThia2ZtZzEwYnN5ZGF4dmJoeXB0dGNyOXVvdzlrM29na2FuZSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/E1e2nyfdaD0g4Rg2aD/giphy.gif"
+                alt="Celebration"
+                className="mx-auto rounded-lg max-w-xs"
+              />
+            </div>
+
             <Button
               size="lg"
               onClick={handleComplete}
