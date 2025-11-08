@@ -161,6 +161,14 @@ export function ObjectUploader({
 
   return (
     <>
+      <Button
+        onClick={() => setShowModal(true)}
+        className={buttonClassName}
+        data-testid="button-upload-trigger"
+      >
+        {children}
+      </Button>
+
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-md max-h-[400px] flex flex-col">
           <DialogHeader>
