@@ -556,8 +556,9 @@ export default function Profile() {
       </div>
       {/* Payment Methods */}
       <div className="px-6 mb-6">
-        <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
-        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
+        <div className="overflow-hidden rounded-xl">
+          <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
+            <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold" data-testid="text-payment-methods-title">Payment Methods</h2>
@@ -647,7 +648,8 @@ export default function Profile() {
             </div>
           )}
         </div>
-        </FeatureLockOverlay>
+          </FeatureLockOverlay>
+        </div>
       </div>
       {/* League Management */}
       {userLeagues && Array.isArray(userLeagues) && userLeagues.length > 0 && (
