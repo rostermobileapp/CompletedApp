@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getImageUrl } from '@/lib/queryClient';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';

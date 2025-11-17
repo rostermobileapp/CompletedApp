@@ -191,7 +191,7 @@ export default function Roster() {
                   <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
                     {member.user.profileImageUrl ? (
                       <img 
-                        src={member.user.profileImageUrl} 
+                        src={getImageUrl(member.user.profileImageUrl) || ''} 
                         alt={`${member.user.firstName} ${member.user.lastName}`}
                         className="w-full h-full rounded-full object-cover"
                         data-testid={`img-player-avatar-${member.id}`}

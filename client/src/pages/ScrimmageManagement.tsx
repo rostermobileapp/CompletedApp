@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -68,8 +68,8 @@ export default function ScrimmageManagement() {
           ? 'Player has been added to the scrimmage'
           : 'Request has been declined',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] }, getImageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] }, getImageUrl);
     },
     onError: (error: any) => {
       toast({
@@ -92,8 +92,8 @@ export default function ScrimmageManagement() {
         title: 'Roster Finalized!',
         description: `Confirmation notifications have been sent for "${scrimmage?.title || 'the scrimmage'}".`,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] }, getImageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] }, getImageUrl);
     },
     onError: (error: any) => {
       toast({
@@ -115,7 +115,7 @@ export default function ScrimmageManagement() {
         title: 'Scrimmage Cancelled',
         description: 'The scrimmage has been cancelled and players have been notified.',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] }, getImageUrl);
       setSelectedScrimmage(null);
     },
     onError: (error: any) => {

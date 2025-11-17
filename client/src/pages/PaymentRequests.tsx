@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
 export default function PaymentRequests() {
@@ -131,7 +131,7 @@ export default function PaymentRequests() {
             {isCreator ? (
               <div className="flex items-center gap-2">
                 <Avatar className="w-6 h-6">
-                  <AvatarImage src={request.creator?.profileImageUrl} />
+                  <AvatarImage src={getImageUrl(request.creator?.profileImageUrl) || ''} />
                   <AvatarFallback className="text-xs">
                     {request.creator?.firstName?.[0]}
                   </AvatarFallback>
@@ -143,7 +143,7 @@ export default function PaymentRequests() {
             ) : (
               <div className="flex items-center gap-2">
                 <Avatar className="w-6 h-6">
-                  <AvatarImage src={request.creator?.profileImageUrl} />
+                  <AvatarImage src={getImageUrl(request.creator?.profileImageUrl) || ''} />
                   <AvatarFallback className="text-xs">
                     {request.creator?.firstName?.[0]}
                   </AvatarFallback>

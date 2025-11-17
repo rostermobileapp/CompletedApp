@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Calendar, Crown, MapPin, Users, Search, Mail, X, UserPlus, BookMarked } from 'lucide-react';
@@ -223,8 +223,8 @@ export default function CreateScrimmage() {
         title: 'Scrimmage Request Created',
         description: `"${scrimmage.title}" has been created. Selected members will be notified.`,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages'] }, getImageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] }, getImageUrl);
       setPageTransitionDirection('down');
       navigate(`/scrimmage/${scrimmage.id}`);
     },

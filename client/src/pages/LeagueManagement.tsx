@@ -2618,7 +2618,7 @@ export default function LeagueManagement() {
                             <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
                               {member.user.profileImageUrl ? (
                                 <img 
-                                  src={member.user.profileImageUrl} 
+                                  src={getImageUrl(member.user.profileImageUrl) || ''} 
                                   alt={formatUserName(member.user, member)}
                                   className="w-full h-full object-cover"
                                 />

@@ -6,7 +6,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -345,7 +345,7 @@ export default function Profile() {
             <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
               {(user as any)?.profileImageUrl ? (
                 <img 
-                  src={(user as any).profileImageUrl}
+                  src={getImageUrl((user as any).profileImageUrl) || ''}
                   alt="Profile" 
                   className="w-full h-full rounded-full object-cover"
                   data-testid="img-profile-avatar"

@@ -45,7 +45,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { EnhancedMediaUploader } from '@/components/EnhancedMediaUploader';
@@ -148,7 +148,7 @@ function CreateAnnouncementModal({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] }, getImageUrl);
       toast({ title: 'Announcement created successfully!' });
       onClose();
       resetForm();
@@ -639,7 +639,7 @@ function AnnouncementCard({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] }, getImageUrl);
     },
     onError: () => {
       toast({ title: 'Failed to update reaction', variant: 'destructive' });
@@ -652,7 +652,7 @@ function AnnouncementCard({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] }, getImageUrl);
       toast({ title: 'Vote recorded successfully!' });
     },
     onError: () => {
@@ -666,7 +666,7 @@ function AnnouncementCard({
       return await apiRequest('PATCH', `/api/announcements/${announcement.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] }, getImageUrl);
       toast({ title: 'Announcement updated successfully!' });
       setShowEditModal(false);
     },
@@ -681,7 +681,7 @@ function AnnouncementCard({
       return await apiRequest('DELETE', `/api/announcements/${announcement.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] }, getImageUrl);
       toast({ title: 'Announcement deleted successfully!' });
       setShowDeleteConfirm(false);
     },
@@ -730,7 +730,7 @@ function AnnouncementCard({
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
           <Avatar className="w-10 h-10">
-            <AvatarImage src={announcement.author.profileImageUrl} />
+            <AvatarImage src={getImageUrl(announcement.author.profileImageUrl) || ''} />
             <AvatarFallback>
               {announcement.author.firstName?.[0] || '?'}{announcement.author.lastName?.[0] || '?'}
             </AvatarFallback>

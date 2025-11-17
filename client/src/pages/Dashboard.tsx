@@ -1510,7 +1510,7 @@ export default function Dashboard() {
             >
               {(userProfile as any)?.profileImageUrl ? (
                 <img 
-                  src={(userProfile as any).profileImageUrl} 
+                  src={getImageUrl((userProfile as any).profileImageUrl) || ''} 
                   alt="Profile"
                   className="w-full h-full object-cover"
                 />

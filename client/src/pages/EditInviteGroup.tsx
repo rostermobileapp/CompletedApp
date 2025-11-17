@@ -4,7 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { queryClient, apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -209,7 +209,7 @@ export default function EditInviteGroup() {
           ? 'Your invite group has been updated successfully'
           : 'Your invite group has been created successfully',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/invite-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invite-groups'] }, getImageUrl);
       navigate('/invite-groups');
     },
     onError: (error: any) => {

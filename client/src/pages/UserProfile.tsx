@@ -4,6 +4,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, DollarSign, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { getImageUrl } from '@/lib/queryClient';
 
 export default function UserProfile() {
   const params = useParams();
@@ -127,7 +128,7 @@ export default function UserProfile() {
             <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
               {user.profileImageUrl ? (
                 <img 
-                  src={user.profileImageUrl}
+                  src={getImageUrl(user.profileImageUrl) || ''}
                   alt="Profile" 
                   className="w-full h-full rounded-full object-cover"
                   data-testid="img-profile-avatar"

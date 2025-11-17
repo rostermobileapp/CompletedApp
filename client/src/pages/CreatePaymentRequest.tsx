@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, DollarSign, Users, Search } from 'lucide-react';
@@ -337,7 +337,7 @@ export default function CreatePaymentRequest() {
                             data-testid={`checkbox-recipient-${member.user.id}`}
                           />
                           <Avatar className="w-10 h-10">
-                            <AvatarImage src={member.user.profileImageUrl} />
+                            <AvatarImage src={getImageUrl(member.user.profileImageUrl) || ''} />
                             <AvatarFallback>
                               {member.user.firstName?.[0]}{member.user.lastName?.[0]}
                             </AvatarFallback>

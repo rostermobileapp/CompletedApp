@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -166,7 +166,7 @@ export default function PaymentRequestDetail() {
           <div className="flex items-center gap-4 mb-4">
             <div className="flex items-center gap-2">
               <Avatar className="w-8 h-8">
-                <AvatarImage src={request.creator?.profileImageUrl} />
+                <AvatarImage src={getImageUrl(request.creator?.profileImageUrl) || ''} />
                 <AvatarFallback>
                   {request.creator?.firstName?.[0]}{request.creator?.lastName?.[0]}
                 </AvatarFallback>
@@ -233,7 +233,7 @@ export default function PaymentRequestDetail() {
                 >
                   <div className="flex items-center gap-3">
                     <Avatar className="w-10 h-10">
-                      <AvatarImage src={recipient.user?.profileImageUrl} />
+                      <AvatarImage src={getImageUrl(recipient.user?.profileImageUrl) || ''} />
                       <AvatarFallback>
                         {recipient.user?.firstName?.[0]}{recipient.user?.lastName?.[0]}
                       </AvatarFallback>
