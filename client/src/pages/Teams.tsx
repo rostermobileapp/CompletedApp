@@ -13,7 +13,7 @@ import { Trophy, Users, Star, Upload, Coffee, Target, Award, TrendingUp, Apple, 
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { LineManager } from '@/components/LineManager';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
 import type { UploadResult } from '@uppy/core';
 
 export default function Teams() {
@@ -362,7 +362,7 @@ export default function Teams() {
                         <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${team.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
                           {team.logoUrl ? (
                             <img 
-                              src={team.logoUrl} 
+                              src={getImageUrl(team.logoUrl) || ''} 
                               alt={`${team.name} logo`}
                               className="w-full h-full rounded-lg object-contain"
                               data-testid={`img-team-logo-${team.id}`}

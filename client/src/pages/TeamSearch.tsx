@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Users } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { getImageUrl } from '@/lib/queryClient';
 
 export default function TeamSearch() {
   const [search, setSearch] = useState('');
@@ -75,7 +76,7 @@ export default function TeamSearch() {
                 <div className="flex items-start gap-4">
                   {team.logoUrl && (
                     <img 
-                      src={team.logoUrl} 
+                      src={getImageUrl(team.logoUrl) || ''} 
                       alt={team.name}
                       className="w-16 h-16 rounded-lg object-cover"
                     />

@@ -5,7 +5,7 @@ import { ArrowLeft, Trophy, Users, Upload, Edit } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { useToast } from '@/hooks/use-toast';
-import { queryClient } from '@/lib/queryClient';
+import { queryClient, getImageUrl } from '@/lib/queryClient';
 import type { UploadResult } from '@uppy/core';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -115,7 +115,7 @@ export default function Roster() {
               <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center">
                 {primaryTeam.logoUrl ? (
                   <img 
-                    src={primaryTeam.logoUrl} 
+                    src={getImageUrl(primaryTeam.logoUrl) || ''} 
                     alt={`${primaryTeam.name} logo`}
                     className="w-full h-full rounded-lg object-cover"
                     data-testid="img-team-logo"

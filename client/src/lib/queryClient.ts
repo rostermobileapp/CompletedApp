@@ -3,6 +3,24 @@ import { supabase } from "./supabase";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
+/**
+ * Converts relative image paths to absolute URLs pointing to the backend.
+ * Profile pictures and team logos are served through the backend API.
+ */
+export function getImageUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  
+  // If it's already an absolute URL (http:// or https://), return as-is
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  
+  // If it's a relative path, prepend the API base URL
+  // Remove leading slash if present to avoid double slashes
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE_URL}${cleanPath}`;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

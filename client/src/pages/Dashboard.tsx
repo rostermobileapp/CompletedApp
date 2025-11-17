@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -1701,7 +1701,7 @@ export default function Dashboard() {
                 <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                   {primaryTeam?.logoUrl ? (
                     <img 
-                      src={primaryTeam.logoUrl} 
+                      src={getImageUrl(primaryTeam.logoUrl) || ''} 
                       alt={`${primaryTeam.name} logo`}
                       className="w-full h-full rounded-lg object-cover"
                       data-testid="img-team-logo"
@@ -1937,7 +1937,7 @@ export default function Dashboard() {
                       const opponentTeam = game.homeTeam?.id === primaryTeam?.id ? game.awayTeam : game.homeTeam;
                       return opponentTeam?.logoUrl ? (
                         <img 
-                          src={opponentTeam.logoUrl} 
+                          src={getImageUrl(opponentTeam.logoUrl) || ''} 
                           alt={`${opponentTeam.name} logo`}
                           className="w-full h-full rounded-lg object-cover"
                           data-testid={`img-opponent-logo-${game.id}`}

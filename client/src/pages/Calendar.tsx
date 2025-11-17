@@ -9,7 +9,7 @@ import { RSVPDetailModal } from "@/components/RSVPDetailModal";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
 import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
@@ -426,7 +426,7 @@ export default function Calendar() {
                       const opponentTeam = game.homeTeam?.id === activeTeam?.id ? game.awayTeam : game.homeTeam;
                       return opponentTeam?.logoUrl ? (
                         <img 
-                          src={opponentTeam.logoUrl} 
+                          src={getImageUrl(opponentTeam.logoUrl) || ''} 
                           alt={`${opponentTeam.name} logo`}
                           className="w-full h-full rounded-lg object-cover"
                           data-testid={`img-opponent-logo-${game.id}`}

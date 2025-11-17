@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
 import { useState } from "react";
 import * as React from "react";
@@ -599,7 +599,7 @@ export default function GameDetails() {
             <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center">
               {opponentTeam?.logoUrl ? (
                 <img 
-                  src={opponentTeam.logoUrl} 
+                  src={getImageUrl(opponentTeam.logoUrl) || ''} 
                   alt={`${opponentTeam.name} logo`}
                   className="w-full h-full rounded-lg object-cover"
                   data-testid="img-opponent-logo"

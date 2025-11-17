@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
@@ -3015,7 +3015,7 @@ export default function LeagueManagement() {
                                       <div className="flex items-center gap-2">
                                         {homeTeam?.logoUrl ? (
                                           <img 
-                                            src={homeTeam.logoUrl} 
+                                            src={getImageUrl(homeTeam.logoUrl) || ''} 
                                             alt={`${homeTeam.name} logo`}
                                             className="w-8 h-8 rounded object-cover"
                                             data-testid={`img-home-team-logo-${game.id}`}
@@ -3039,7 +3039,7 @@ export default function LeagueManagement() {
                                       <div className="flex items-center gap-2">
                                         {awayTeam?.logoUrl ? (
                                           <img 
-                                            src={awayTeam.logoUrl} 
+                                            src={getImageUrl(awayTeam.logoUrl) || ''} 
                                             alt={`${awayTeam.name} logo`}
                                             className="w-8 h-8 rounded object-cover"
                                             data-testid={`img-away-team-logo-${game.id}`}
@@ -3121,7 +3121,7 @@ export default function LeagueManagement() {
                                   <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
                                     {homeTeam?.logoUrl ? (
                                       <img 
-                                        src={homeTeam.logoUrl} 
+                                        src={getImageUrl(homeTeam.logoUrl) || ''} 
                                         alt={`${homeTeam.name} logo`}
                                         className="w-full h-full rounded-lg object-cover"
                                         data-testid={`img-home-team-logo-${game.id}`}
@@ -3151,7 +3151,7 @@ export default function LeagueManagement() {
                                   <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
                                     {awayTeam?.logoUrl ? (
                                       <img 
-                                        src={awayTeam.logoUrl} 
+                                        src={getImageUrl(awayTeam.logoUrl) || ''} 
                                         alt={`${awayTeam.name} logo`}
                                         className="w-full h-full rounded-lg object-cover"
                                         data-testid={`img-away-team-logo-${game.id}`}
@@ -5215,7 +5215,7 @@ export default function LeagueManagement() {
                 {(selectedTeamForEdit as any)?.logoUrl && (
                   <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                     <img 
-                      src={(selectedTeamForEdit as any).logoUrl} 
+                      src={getImageUrl((selectedTeamForEdit as any).logoUrl) || ''} 
                       alt={`${selectedTeamForEdit.name} logo`}
                       className="w-12 h-12 rounded-lg object-contain bg-background"
                     />
