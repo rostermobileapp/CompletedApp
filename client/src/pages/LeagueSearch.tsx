@@ -7,6 +7,7 @@ import { useLocation } from 'wouter';
 import { apiRequest } from '@/lib/queryClient';
 import { isUnauthorizedError } from '@/lib/authUtils';
 
+// API base URL from environment variable - points to Railway backend in production
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 const sportBadgeColors: Record<string, string> = {
@@ -28,11 +29,17 @@ export default function LeagueSearch() {
       if (search) params.append('search', search.trim());
       
       const fullUrl = `${API_BASE_URL}/api/leagues?${params}`;
+      console.log('League search - API Base URL:', API_BASE_URL);
+      console.log('League search - Full URL:', fullUrl);
+      
       const response = await fetch(fullUrl);
       if (!response.ok) {
+        console.error('League search failed:', response.status, response.statusText);
         throw new Error('Failed to fetch leagues');
       }
-      return response.json();
+      const data = await response.json();
+      console.log('League search - Results:', data);
+      return data;
     },
     enabled: search.trim().length > 0, // Only fetch when there's a search term
   });
