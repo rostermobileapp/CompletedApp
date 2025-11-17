@@ -4605,6 +4605,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Bulk Player Import Routes with error handler wrapper
   app.post('/api/leagues/:leagueId/players/import', isAuthenticated, (req: any, res, next) => {
+    console.log('🔵 Player import endpoint hit, leagueId:', req.params.leagueId);
+    console.log('🔵 User authenticated:', !!req.user);
+    console.log('🔵 Request method:', req.method);
+    
     upload.single('playerFile')(req, res, (err) => {
       if (err) {
         console.error('Multer error:', err);
@@ -4616,6 +4620,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         return res.status(400).json({ message: err.message || 'File upload error' });
       }
+      console.log('🔵 File uploaded successfully:', req.file?.originalname);
       next();
     });
   }, async (req: any, res) => {

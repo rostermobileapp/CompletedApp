@@ -1060,6 +1060,10 @@ export default function LeagueManagement() {
   // Upload mutation for bulk player import
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      if (!leagueId) {
+        throw new Error('League ID is required');
+      }
+
       const formData = new FormData();
       formData.append('playerFile', file);
 
@@ -1071,6 +1075,9 @@ export default function LeagueManagement() {
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
       }
+
+      console.log('Uploading to:', `/api/leagues/${leagueId}/players/import`);
+      console.log('Has auth token:', !!session?.access_token);
 
       const response = await fetch(`/api/leagues/${leagueId}/players/import`, {
         method: 'POST',
