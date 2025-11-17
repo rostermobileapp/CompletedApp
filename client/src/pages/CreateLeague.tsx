@@ -148,17 +148,30 @@ export default function CreateLeague() {
                   {...form.register('sport')}
                   className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   data-testid="select-sport"
+                  onChange={(e) => {
+                    if (e.target.value !== 'hockey') {
+                      toast({
+                        title: 'Coming Soon',
+                        description: 'Other sports coming soon',
+                      });
+                      form.setValue('sport', 'hockey');
+                      e.target.value = 'hockey';
+                    }
+                  }}
                 >
                   <option value="hockey">Hockey</option>
-                  <option value="basketball">Basketball</option>
-                  <option value="soccer">Soccer</option>
-                  <option value="baseball">Baseball</option>
-                  <option value="softball">Softball</option>
-                  <option value="football">Football</option>
-                  <option value="volleyball">Volleyball</option>
-                  <option value="tennis">Tennis</option>
-                  <option value="other">Other</option>
+                  <option value="basketball" style={{ color: '#888' }}>Basketball</option>
+                  <option value="soccer" style={{ color: '#888' }}>Soccer</option>
+                  <option value="baseball" style={{ color: '#888' }}>Baseball</option>
+                  <option value="softball" style={{ color: '#888' }}>Softball</option>
+                  <option value="football" style={{ color: '#888' }}>Football</option>
+                  <option value="volleyball" style={{ color: '#888' }}>Volleyball</option>
+                  <option value="tennis" style={{ color: '#888' }}>Tennis</option>
+                  <option value="other" style={{ color: '#888' }}>Other</option>
                 </select>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Other sports coming soon
+                </p>
               </div>
 
               <div>
