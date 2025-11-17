@@ -1070,8 +1070,15 @@ export default function LeagueManagement() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Upload failed');
+        let errorMessage = 'Upload failed';
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch (e) {
+          const text = await response.text();
+          errorMessage = text || `Upload failed with status ${response.status}`;
+        }
+        throw new Error(errorMessage);
       }
 
       return response.json();
@@ -1151,8 +1158,15 @@ export default function LeagueManagement() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Schedule upload failed');
+        let errorMessage = 'Schedule upload failed';
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch (e) {
+          const text = await response.text();
+          errorMessage = text || `Upload failed with status ${response.status}`;
+        }
+        throw new Error(errorMessage);
       }
 
       return response.json();

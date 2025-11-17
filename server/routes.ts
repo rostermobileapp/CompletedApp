@@ -4603,8 +4603,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Bulk Player Import Routes
-  app.post('/api/leagues/:leagueId/players/import', isAuthenticated, upload.single('playerFile'), async (req: any, res) => {
+  // Bulk Player Import Routes with error handler wrapper
+  app.post('/api/leagues/:leagueId/players/import', isAuthenticated, (req: any, res, next) => {
+    upload.single('playerFile')(req, res, (err) => {
+      if (err) {
+        console.error('Multer error:', err);
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ message: 'File size exceeds 5MB limit' });
+          }
+          return res.status(400).json({ message: err.message });
+        }
+        return res.status(400).json({ message: err.message || 'File upload error' });
+      }
+      next();
+    });
+  }, async (req: any, res) => {
     try {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
@@ -5198,8 +5212,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Bulk schedule upload
-  app.post('/api/leagues/:leagueId/schedules/import', isAuthenticated, upload.single('scheduleFile'), async (req: any, res) => {
+  // Bulk schedule upload with error handler wrapper
+  app.post('/api/leagues/:leagueId/schedules/import', isAuthenticated, (req: any, res, next) => {
+    upload.single('scheduleFile')(req, res, (err) => {
+      if (err) {
+        console.error('Multer error:', err);
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ message: 'File size exceeds 5MB limit' });
+          }
+          return res.status(400).json({ message: err.message });
+        }
+        return res.status(400).json({ message: err.message || 'File upload error' });
+      }
+      next();
+    });
+  }, async (req: any, res) => {
     try {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
