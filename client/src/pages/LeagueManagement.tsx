@@ -1063,10 +1063,19 @@ export default function LeagueManagement() {
       const formData = new FormData();
       formData.append('playerFile', file);
 
+      // Get auth headers from supabase
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const response = await fetch(`/api/leagues/${leagueId}/players/import`, {
         method: 'POST',
+        headers,
         body: formData,
-        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -1151,10 +1160,19 @@ export default function LeagueManagement() {
       const formData = new FormData();
       formData.append('scheduleFile', file);
 
+      // Get auth headers from supabase
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const response = await fetch(`/api/leagues/${leagueId}/schedules/import`, {
         method: 'POST',
+        headers,
         body: formData,
-        credentials: 'include',
       });
 
       if (!response.ok) {
