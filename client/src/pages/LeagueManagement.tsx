@@ -1081,11 +1081,11 @@ export default function LeagueManagement() {
       if (!response.ok) {
         let errorMessage = 'Upload failed';
         try {
-          const error = await response.json();
+          const text = await response.text();
+          const error = JSON.parse(text);
           errorMessage = error.message || errorMessage;
         } catch (e) {
-          const text = await response.text();
-          errorMessage = text || `Upload failed with status ${response.status}`;
+          errorMessage = `Upload failed with status ${response.status}`;
         }
         throw new Error(errorMessage);
       }
