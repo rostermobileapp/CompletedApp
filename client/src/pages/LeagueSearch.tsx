@@ -7,6 +7,8 @@ import { useLocation } from 'wouter';
 import { apiRequest } from '@/lib/queryClient';
 import { isUnauthorizedError } from '@/lib/authUtils';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
 const sportBadgeColors: Record<string, string> = {
   hockey: 'bg-primary text-primary-foreground',
 };
@@ -26,7 +28,9 @@ export default function LeagueSearch() {
       if (search) params.append('search', search.trim());
       
       console.log('Searching leagues with:', params.toString());
-      const response = await fetch(`/api/leagues?${params}`);
+      const fullUrl = `${API_BASE_URL}/api/leagues?${params}`;
+      console.log('Full API URL:', fullUrl);
+      const response = await fetch(fullUrl);
       if (!response.ok) {
         const errorText = await response.text();
         console.error('League search failed:', response.status, errorText);
