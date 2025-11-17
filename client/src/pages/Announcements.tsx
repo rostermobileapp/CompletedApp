@@ -148,7 +148,7 @@ function CreateAnnouncementModal({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] }, getImageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
       toast({ title: 'Announcement created successfully!' });
       onClose();
       resetForm();
@@ -639,7 +639,7 @@ function AnnouncementCard({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] }, getImageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
     },
     onError: () => {
       toast({ title: 'Failed to update reaction', variant: 'destructive' });
@@ -652,7 +652,7 @@ function AnnouncementCard({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] }, getImageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
       toast({ title: 'Vote recorded successfully!' });
     },
     onError: () => {
@@ -666,7 +666,7 @@ function AnnouncementCard({
       return await apiRequest('PATCH', `/api/announcements/${announcement.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] }, getImageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
       toast({ title: 'Announcement updated successfully!' });
       setShowEditModal(false);
     },
@@ -681,7 +681,7 @@ function AnnouncementCard({
       return await apiRequest('DELETE', `/api/announcements/${announcement.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] }, getImageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
       toast({ title: 'Announcement deleted successfully!' });
       setShowDeleteConfirm(false);
     },

@@ -223,8 +223,8 @@ export default function CreateScrimmage() {
         title: 'Scrimmage Request Created',
         description: `"${scrimmage.title}" has been created. Selected members will be notified.`,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages'] }, getImageUrl);
-      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] }, getImageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
       setPageTransitionDirection('down');
       navigate(`/scrimmage/${scrimmage.id}`);
     },

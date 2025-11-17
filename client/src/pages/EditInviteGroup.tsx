@@ -209,7 +209,7 @@ export default function EditInviteGroup() {
           ? 'Your invite group has been updated successfully'
           : 'Your invite group has been created successfully',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/invite-groups'] }, getImageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/invite-groups'] });
       navigate('/invite-groups');
     },
     onError: (error: any) => {
