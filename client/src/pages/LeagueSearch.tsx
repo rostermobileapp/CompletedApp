@@ -21,24 +21,18 @@ export default function LeagueSearch() {
   const queryClient = useQueryClient();
 
   const { data: leagues, isLoading, error } = useQuery({
-    queryKey: ['/api/leagues', 'hockey', search],
+    queryKey: ['/api/leagues', { sport: 'hockey', search }],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('sport', 'hockey');
       if (search) params.append('search', search.trim());
       
-      console.log('Searching leagues with:', params.toString());
       const fullUrl = `${API_BASE_URL}/api/leagues?${params}`;
-      console.log('Full API URL:', fullUrl);
       const response = await fetch(fullUrl);
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('League search failed:', response.status, errorText);
         throw new Error('Failed to fetch leagues');
       }
-      const data = await response.json();
-      console.log('League search results:', data);
-      return data;
+      return response.json();
     },
     enabled: search.trim().length > 0, // Only fetch when there's a search term
   });
