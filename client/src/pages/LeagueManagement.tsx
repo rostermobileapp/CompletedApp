@@ -1078,6 +1078,7 @@ export default function LeagueManagement() {
 
       console.log('Uploading to:', `/api/leagues/${leagueId}/players/import`);
       console.log('Has auth token:', !!session?.access_token);
+      console.log('File:', file.name, file.type, file.size);
 
       const response = await fetch(`/api/leagues/${leagueId}/players/import`, {
         method: 'POST',
@@ -1085,10 +1086,14 @@ export default function LeagueManagement() {
         body: formData,
       });
 
+      console.log('Response status:', response.status, response.statusText);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
         let errorMessage = 'Upload failed';
         try {
           const text = await response.text();
+          console.log('Response text:', text);
           const error = JSON.parse(text);
           errorMessage = error.message || errorMessage;
         } catch (e) {
