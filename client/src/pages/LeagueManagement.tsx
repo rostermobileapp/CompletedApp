@@ -1177,7 +1177,11 @@ export default function LeagueManagement() {
         headers['Authorization'] = `Bearer ${session.access_token}`;
       }
 
-      const response = await fetch(`/api/leagues/${leagueId}/schedules/import`, {
+      // Use API_BASE_URL from environment (Railway in prod, localhost in dev)
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+      const url = `${API_BASE_URL}/api/leagues/${leagueId}/schedules/import`;
+
+      const response = await fetch(url, {
         method: 'POST',
         headers,
         body: formData,
