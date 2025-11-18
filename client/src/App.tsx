@@ -54,7 +54,6 @@ import StripeAdmin from "@/pages/StripeAdmin";
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Fetch onboarding status
   const { data: onboardingData, isLoading: isLoadingOnboarding } = useQuery({
@@ -66,8 +65,7 @@ function Router() {
   const shouldShowOnboarding = isAuthenticated && 
     !isLoadingOnboarding && 
     onboardingData && 
-    !onboardingData.onboardingCompleted &&
-    !showOnboarding;
+    !onboardingData.onboardingCompleted;
 
   // Always render password reset pages standalone, regardless of auth state
   if (location === '/reset-password') {
@@ -103,8 +101,8 @@ function Router() {
   if (shouldShowOnboarding) {
     return (
       <OnboardingFlow
-        onComplete={() => setShowOnboarding(true)}
-        onSkip={() => setShowOnboarding(true)}
+        onComplete={() => {}}
+        onSkip={() => {}}
         isReplay={false}
       />
     );

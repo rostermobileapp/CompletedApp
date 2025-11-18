@@ -212,8 +212,8 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
     setCurrentScreen(Math.max(startScreen, currentScreen - 1));
   };
 
-  const handleSkipOnboarding = () => {
-    saveProgressMutation.mutateAsync({
+  const handleSkipOnboarding = async () => {
+    await saveProgressMutation.mutateAsync({
       onboardingCompleted: true,
       onboardingProgress: { skipped: true },
     });
