@@ -54,7 +54,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
   const [currentScreen, setCurrentScreen] = useState(isReplay ? 1 : 0);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [facilitySearchQuery, setFacilitySearchQuery] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState<'free' | 'pro' | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'free' | 'pro' | 'commissioner' | null>(null);
   const [isLoadingProgress, setIsLoadingProgress] = useState(!isReplay);
   
   const { toast } = useToast();
@@ -194,11 +194,19 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
         selectedFacilityId: selectedFacility.id,
         onboardingProgress: { currentScreen: currentScreen + 1, selectedFacility },
       });
-    } else if (currentScreen === 4 && selectedPlan === 'pro') {
-      // Player Pro upgrade screen
+    } else if (currentScreen === 4) {
+      // Player Pro upgrade screen - selecting pro tier
+      setSelectedPlan('pro');
       await saveProgressMutation.mutateAsync({
         role: 'player_pro',
-        onboardingProgress: { currentScreen: currentScreen + 1, selectedPlan },
+        onboardingProgress: { currentScreen: currentScreen + 1, selectedPlan: 'pro' },
+      });
+    } else if (currentScreen === 5) {
+      // Commissioner Tier screen - selecting commissioner tier
+      setSelectedPlan('commissioner');
+      await saveProgressMutation.mutateAsync({
+        role: 'commissioner',
+        onboardingProgress: { currentScreen: currentScreen + 1, selectedPlan: 'commissioner' },
       });
     } else {
       // Save progress for all other screens
@@ -224,10 +232,19 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
 
   const handleComplete = async () => {
     try {
-      console.log('Completing onboarding...');
+      console.log('Completing onboarding...', { selectedPlan, selectedFacility });
+      
+      // Determine role based on selected plan
+      let role: 'free_tier' | 'player_pro' | 'commissioner' = 'free_tier';
+      if (selectedPlan === 'commissioner') {
+        role = 'commissioner';
+      } else if (selectedPlan === 'pro') {
+        role = 'player_pro';
+      }
+      
       await completeOnboardingMutation.mutateAsync({
         selectedFacilityId: selectedFacility?.id || null,
-        role: selectedPlan === 'pro' ? 'player_pro' : 'free_tier',
+        role,
       });
       console.log('Onboarding completed successfully');
     } catch (error) {
@@ -692,7 +709,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
                 <CardContent className="p-4 flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
                   <p className="text-white dark:text-white">
-                    Plan: {selectedPlan === 'pro' ? 'Player Pro (Trial)' : 'Free'} ✓
+                    Plan: {selectedPlan === 'commissioner' ? 'Commissioner' : selectedPlan === 'pro' ? 'Player Pro (Trial)' : 'Free'} ✓
                   </p>
                 </CardContent>
               </Card>
