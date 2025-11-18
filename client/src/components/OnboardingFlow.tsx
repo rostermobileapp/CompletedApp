@@ -194,20 +194,6 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
         selectedFacilityId: selectedFacility.id,
         onboardingProgress: { currentScreen: currentScreen + 1, selectedFacility },
       });
-    } else if (currentScreen === 4) {
-      // Player Pro upgrade screen - selecting pro tier
-      setSelectedPlan('pro');
-      await saveProgressMutation.mutateAsync({
-        role: 'player_pro',
-        onboardingProgress: { currentScreen: currentScreen + 1, selectedPlan: 'pro' },
-      });
-    } else if (currentScreen === 5) {
-      // Commissioner Tier screen - selecting commissioner tier
-      setSelectedPlan('commissioner');
-      await saveProgressMutation.mutateAsync({
-        role: 'commissioner',
-        onboardingProgress: { currentScreen: currentScreen + 1, selectedPlan: 'commissioner' },
-      });
     } else {
       // Save progress for all other screens
       await saveProgressMutation.mutateAsync({
@@ -232,19 +218,11 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
 
   const handleComplete = async () => {
     try {
-      console.log('Completing onboarding...', { selectedPlan, selectedFacility });
+      console.log('Completing onboarding...', { selectedFacility });
       
-      // Determine role based on selected plan
-      let role: 'free_tier' | 'player_pro' | 'commissioner' = 'free_tier';
-      if (selectedPlan === 'commissioner') {
-        role = 'commissioner';
-      } else if (selectedPlan === 'pro') {
-        role = 'player_pro';
-      }
-      
+      // Just mark onboarding as complete, don't change role
       await completeOnboardingMutation.mutateAsync({
         selectedFacilityId: selectedFacility?.id || null,
-        role,
       });
       console.log('Onboarding completed successfully');
     } catch (error) {
@@ -704,15 +682,6 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
                   </CardContent>
                 </Card>
               )}
-
-              <Card className="bg-gray-900 dark:bg-gray-900 border-gray-700 dark:border-gray-700">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <p className="text-white dark:text-white">
-                    Plan: {selectedPlan === 'commissioner' ? 'Commissioner' : selectedPlan === 'pro' ? 'Player Pro (Trial)' : 'Free'} ✓
-                  </p>
-                </CardContent>
-              </Card>
             </div>
 
             <div className="mb-8">
