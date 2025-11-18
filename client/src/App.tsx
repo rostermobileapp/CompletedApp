@@ -56,7 +56,11 @@ function Router() {
   const [location] = useLocation();
 
   // Fetch onboarding status
-  const { data: onboardingData, isLoading: isLoadingOnboarding } = useQuery({
+  const { data: onboardingData, isLoading: isLoadingOnboarding } = useQuery<{
+    onboardingCompleted: boolean;
+    onboardingProgress?: any;
+    selectedFacilityId?: string | null;
+  }>({
     queryKey: ['/api/user/onboarding'],
     enabled: isAuthenticated,
   });

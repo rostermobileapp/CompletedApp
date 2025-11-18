@@ -143,6 +143,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/onboarding'] });
     },
   });
 
@@ -156,6 +157,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/onboarding'] });
       toast({
         title: isReplay ? 'Profile updated!' : 'Welcome to Roster!',
         description: isReplay ? 'Your information has been updated.' : 'You\'re all set to start using the app.',
