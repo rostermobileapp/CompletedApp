@@ -756,7 +756,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
         </div>
 
         {/* Navigation Buttons */}
-        {currentScreen !== startScreen && currentScreen !== 6 && (
+        {currentScreen !== 0 && currentScreen !== 6 && (
           <div className="max-w-4xl mx-auto mt-8 flex justify-end">
             <Button
               onClick={handleNext}
