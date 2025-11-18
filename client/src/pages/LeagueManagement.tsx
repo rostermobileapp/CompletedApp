@@ -1202,16 +1202,44 @@ export default function LeagueManagement() {
       return response.json();
     },
     onSuccess: (data) => {
-      const successMessage = [
-        `${data.successfulRecords} games scheduled successfully`,
-        data.teamsCreated > 0 ? `${data.teamsCreated} teams created` : null,
-        data.failedRecords > 0 ? `${data.failedRecords} failed` : null
-      ].filter(Boolean).join(', ');
+      // If all imports failed and we have errors, show detailed error
+      if (data.successfulRecords === 0 && data.errors && data.errors.length > 0) {
+        toast({
+          title: 'Schedule Import Failed',
+          description: (
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              <p>{`All ${data.failedRecords} games failed to import.`}</p>
+              <div className="text-sm mt-2 pt-2 border-t border-border">
+                <p className="font-semibold">Errors:</p>
+                <ul className="list-disc pl-4 mt-1">
+                  {data.errors.slice(0, 10).map((error: string, idx: number) => (
+                    <li key={idx} className="text-xs">{error}</li>
+                  ))}
+                  {data.errors.length > 10 && (
+                    <li className="text-xs italic">... and {data.errors.length - 10} more errors</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          ),
+          variant: 'destructive',
+          duration: 15000,
+        });
+      } else {
+        // Show success message with summary
+        const successMessage = [
+          `${data.gamesCreated || data.successfulRecords} games scheduled successfully`,
+          data.teamsCreated > 0 ? `${data.teamsCreated} teams created` : null,
+          data.gamesSkipped > 0 ? `${data.gamesSkipped} duplicates skipped` : null,
+          data.failedRecords > 0 ? `${data.failedRecords} failed` : null
+        ].filter(Boolean).join(', ');
+        
+        toast({
+          title: 'Schedule Import Successful',
+          description: successMessage,
+        });
+      }
       
-      toast({
-        title: 'Schedule Import Successful',
-        description: successMessage,
-      });
       setScheduleImportFile(null);
       if (scheduleFileInputRef.current) scheduleFileInputRef.current.value = '';
       setShowScheduleImport(false);
