@@ -223,12 +223,21 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
   };
 
   const handleComplete = async () => {
-    const formData = form.getValues();
-    await completeOnboardingMutation.mutateAsync({
-      ...formData,
-      selectedFacilityId: selectedFacility?.id || null,
-      role: selectedPlan === 'pro' ? 'player_pro' : 'free_tier',
-    });
+    try {
+      console.log('Completing onboarding...');
+      await completeOnboardingMutation.mutateAsync({
+        selectedFacilityId: selectedFacility?.id || null,
+        role: selectedPlan === 'pro' ? 'player_pro' : 'free_tier',
+      });
+      console.log('Onboarding completed successfully');
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to complete onboarding. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const progressPercentage = ((currentScreen - startScreen + 1) / (totalScreens - startScreen)) * 100;
