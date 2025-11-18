@@ -4659,7 +4659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         skipEmptyLines: true,
         transformHeader: (header: string) => {
           // Normalize header names for enhanced template format
-          const normalized = header.toLowerCase().trim().replace('*', ''); // Remove asterisks from required field markers
+          const normalized = header.toLowerCase().trim().replace(/\*/g, ''); // Remove asterisks from required field markers
           const mapping: Record<string, string> = {
             // New template format
             'player full name': 'fullName',
@@ -5258,8 +5258,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         header: true,
         skipEmptyLines: true,
         transformHeader: (header: string) => {
-          // Normalize header names
-          const normalized = header.toLowerCase().trim();
+          // Normalize header names - remove asterisks, lowercase, and trim
+          const normalized = header.toLowerCase().trim().replace(/\*/g, '');
           const mapping: Record<string, string> = {
             'date': 'date',
             'time': 'time',
