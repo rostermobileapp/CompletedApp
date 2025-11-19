@@ -2,24 +2,32 @@
 
 Rosters is a free, comprehensive sports team management platform designed to streamline sports team management for various sports. It offers league and team organization, game scheduling, messaging, and tournament/playoff management functionalities. The platform operates on a freemium model with subscription-gated features, aiming to provide a robust solution for sports enthusiasts and administrators.
 
-## Tournament System (In Progress - Nov 2025)
+## Tournament System (Complete - Nov 19, 2025)
 
 The platform now includes a comprehensive tournament/playoff system supporting:
 - **Tournament Types**: Season playoffs and standalone tournaments
-- **Formats**: Single elimination (canonical seeding with bye handling), double elimination (winners bracket), round robin, and split round robin
+- **Formats**: Single elimination (canonical seeding with bye handling), double elimination (beta - winners bracket only), round robin, and split round robin
 - **Features**: 
   - Canonical bracket generation (1v16, 2v15, etc.) with proper bye distribution
   - Automatic match creation with advancement pointers
-  - Match scheduling and score tracking
-  - Format recommendations based on team count
+  - Match scheduling and score tracking infrastructure
+  - Format recommendations based on team count (detailed pros/cons/game estimates)
   - Touch-optimized mobile-first design
 - **Access Control**: Commissioner, Secondary Commissioner, and Admin only
-- **Backend Status**: Complete and architect-approved
+- **Backend**: Complete and architect-approved ✅
   - Database schema (3 tables: tournaments, tournament_teams, tournament_matches)
-  - API routes with full CRUD and permissions
+  - API routes with full CRUD and permissions (requireLeagueManagement middleware)
   - Bracket generator with canonical seeding and bye auto-advancement
-  - Format recommendation engine
-- **Frontend Status**: Dashboard built, creator wizard and bracket viewer in progress
+  - Format recommendation engine with detailed pros/cons analysis
+- **Frontend**: Complete and architect-approved ✅
+  - Tournaments Dashboard (/leagues/:leagueId/tournaments) - List view with status badges
+  - Tournament Creator (/leagues/:leagueId/tournaments/create) - 3-step wizard with enhanced format recommendations
+  - Tournament Detail (/tournaments/:tournamentId) - Tabbed view (Bracket, Teams, Schedule)
+- **Known Limitations**:
+  - Double elimination is beta: Creates winners bracket + grand finals placeholder; losers bracket requires manual match setup
+  - Match result recording UI is placeholder (infrastructure exists)
+  - Match scheduling/editing buttons are placeholders (future enhancement)
+- **Testing Status**: Manual testing required (automated e2e blocked by auth configuration)
 
 # User Preferences
 
