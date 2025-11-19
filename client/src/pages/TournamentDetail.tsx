@@ -1,17 +1,32 @@
 import { useRoute, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Tournament, TournamentTeam, TournamentMatch } from "@shared/schema";
+import { useState } from "react";
 
 export default function TournamentDetail() {
   const [, params] = useRoute("/tournaments/:tournamentId");
   const [, setLocation] = useLocation();
   const tournamentId = params?.tournamentId;
+  const { toast } = useToast();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
@@ -26,6 +41,28 @@ export default function TournamentDetail() {
   const { data: matches, isLoading: matchesLoading } = useQuery<TournamentMatch[]>({
     queryKey: ['/api/tournaments', tournamentId, 'matches'],
     enabled: !!tournamentId
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('DELETE', `/api/tournaments/${tournamentId}`);
+      // apiRequest throws on error, so if we reach here, deletion succeeded
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', tournament?.leagueId, 'tournaments'] });
+      toast({
+        title: "Tournament deleted",
+        description: "The tournament has been deleted successfully"
+      });
+      setLocation(`/leagues/${tournament?.leagueId}/tournaments`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to delete tournament",
+        variant: "destructive"
+      });
+    }
   });
 
   const isLoading = tournamentLoading || teamsLoading || matchesLoading;
@@ -133,6 +170,17 @@ export default function TournamentDetail() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {tournament.status === 'draft' && (
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => setShowDeleteDialog(true)}
+                      data-testid="button-delete"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" data-testid="button-settings">
                     Settings
                   </Button>
@@ -397,6 +445,30 @@ export default function TournamentDetail() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Tournament?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{tournament?.name}"? This action cannot be undone.
+              All matches, teams, and tournament data will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Tournament"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
