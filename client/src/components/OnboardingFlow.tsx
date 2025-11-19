@@ -217,14 +217,16 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
   };
 
   const handleComplete = async () => {
+    console.log('handleComplete called!');
+    alert('Button clicked!');
     try {
       console.log('Completing onboarding...', { selectedFacility });
       
       // Just mark onboarding as complete, don't change role
-      await completeOnboardingMutation.mutateAsync({
+      const result = await completeOnboardingMutation.mutateAsync({
         selectedFacilityId: selectedFacility?.id || null,
       });
-      console.log('Onboarding completed successfully');
+      console.log('Onboarding completed successfully', result);
     } catch (error) {
       console.error('Error completing onboarding:', error);
       toast({
