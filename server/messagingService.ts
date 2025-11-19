@@ -458,12 +458,10 @@ export class MessagingService {
       .where(
         and(
           eq(conversationParticipants.userId, userId),
-          leagueId ? eq(conversations.leagueId, leagueId) : sql`true`,
-          // Only show conversations that are not hidden OR have new messages after hiddenAt
-          sql`(${conversationParticipants.hiddenAt} IS NULL OR ${conversations.lastMessageAt} > ${conversationParticipants.hiddenAt})`
+          leagueId ? eq(conversations.leagueId, leagueId) : sql`true`
         )
       )
-      .orderBy(desc(conversations.updatedAt));
+      .orderBy(sql`COALESCE(${conversations.lastMessageAt}, ${conversations.createdAt}) DESC`);
 
     return result.map(row => row.conversations);
   }
