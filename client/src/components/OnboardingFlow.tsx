@@ -149,13 +149,18 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
 
   const completeOnboardingMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest('PATCH', '/api/user/onboarding', {
+      const payload = {
         ...data,
         onboardingCompleted: true,
-      });
-      return response.json();
+      };
+      console.log('Sending PATCH request with payload:', payload);
+      const response = await apiRequest('PATCH', '/api/user/onboarding', payload);
+      const result = await response.json();
+      console.log('PATCH response:', result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Mutation onSuccess called with:', data);
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/onboarding'] });
       toast({
@@ -164,7 +169,8 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
       });
       onComplete();
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Mutation onError called with:', error);
       toast({
         title: 'Error',
         description: 'Failed to complete onboarding. Please try again.',
