@@ -21,8 +21,7 @@ export default function Tournaments() {
     const variants: Record<Tournament['status'], { variant: 'default' | 'secondary' | 'destructive' | 'outline', text: string }> = {
       draft: { variant: 'outline', text: 'Draft' },
       active: { variant: 'default', text: 'Active' },
-      completed: { variant: 'secondary', text: 'Completed' },
-      cancelled: { variant: 'destructive', text: 'Cancelled' }
+      completed: { variant: 'secondary', text: 'Completed' }
     };
     const config = variants[status];
     return <Badge variant={config.variant} data-testid={`badge-status-${status}`}>{config.text}</Badge>;

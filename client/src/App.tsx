@@ -47,6 +47,7 @@ import FacilityMemberships from "@/pages/FacilityMemberships";
 import CreateCalendarEvent from "@/pages/CreateCalendarEvent";
 import Privacy from "@/pages/Privacy";
 import StripeAdmin from "@/pages/StripeAdmin";
+import Tournaments from "@/pages/Tournaments";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -122,6 +123,7 @@ function Router() {
             <Route path="/facilities/:id" component={FacilityDetail} />
             <Route path="/facility-memberships" component={FacilityMemberships} />
             <Route path="/calendar-events/create" component={CreateCalendarEvent} />
+            <Route path="/leagues/:leagueId/tournaments" component={Tournaments} />
             <Route path="/privacy" component={Privacy} />
             <Route path="/admin/stripe" component={StripeAdmin} />
             <Route component={NotFound} />
