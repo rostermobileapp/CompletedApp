@@ -1872,7 +1872,8 @@ export class DatabaseStorage implements IStorage {
   async requestTeamJoinLeague(
     teamId: string,
     leagueId: string,
-    requestedBy: string
+    requestedBy: string,
+    message?: string
   ): Promise<TeamLeagueRequest> {
     const [request] = await db
       .insert(teamLeagueRequests)
@@ -1880,6 +1881,7 @@ export class DatabaseStorage implements IStorage {
         teamId,
         leagueId,
         requestedBy,
+        message,
         status: 'pending',
       })
       .returning();

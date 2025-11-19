@@ -255,6 +255,7 @@ export const leagueMemberships = pgTable("league_memberships", {
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
   skillLevel: varchar("skill_level"), // Text field for skill level (number or letter)
   status: membershipStatusEnum("status").default("pending").notNull(),
+  message: text("message"), // Optional personalized message when requesting to join
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
@@ -307,6 +308,7 @@ export const teamLeagueRequests = pgTable("team_league_requests", {
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
   requestedBy: varchar("requested_by").references(() => users.id).notNull(), // Team creator who made the request
   status: membershipStatusEnum("status").default("pending").notNull(),
+  message: text("message"), // Optional personalized message when requesting to join
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by").references(() => users.id), // League commissioner who approved

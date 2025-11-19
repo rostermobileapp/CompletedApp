@@ -1785,6 +1785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const membership = await storage.requestLeagueMembership({
         userId,
         leagueId,
+        message: req.body.message,
       });
       res.json(membership);
     } catch (error) {
@@ -3247,7 +3248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { teamId } = req.params;
-      const { leagueId } = req.body;
+      const { leagueId, message } = req.body;
 
       // Verify team exists and user is the creator
       const team = await storage.getTeam(teamId);
@@ -3270,7 +3271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'League not found' });
       }
 
-      const request = await storage.requestTeamJoinLeague(teamId, leagueId, userId);
+      const request = await storage.requestTeamJoinLeague(teamId, leagueId, userId, message);
       res.json(request);
     } catch (error) {
       console.error('Error requesting team join league:', error);
