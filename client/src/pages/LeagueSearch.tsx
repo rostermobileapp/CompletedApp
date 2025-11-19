@@ -6,6 +6,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { apiRequest } from '@/lib/queryClient';
 import { isUnauthorizedError } from '@/lib/authUtils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // API base URL from environment variable - points to Railway backend in production
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
@@ -16,6 +26,8 @@ const sportBadgeColors: Record<string, string> = {
 
 export default function LeagueSearch() {
   const [search, setSearch] = useState('');
+  const [selectedLeague, setSelectedLeague] = useState<any>(null);
+  const [joinMessage, setJoinMessage] = useState('');
   const { user } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -45,8 +57,8 @@ export default function LeagueSearch() {
   });
 
   const joinLeagueMutation = useMutation({
-    mutationFn: async (leagueId: string) => {
-      const response = await apiRequest('POST', `/api/leagues/${leagueId}/join`);
+    mutationFn: async ({ leagueId, message }: { leagueId: string; message?: string }) => {
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/join`, { message });
       return response.json();
     },
     onSuccess: () => {
@@ -55,6 +67,8 @@ export default function LeagueSearch() {
         description: "Your request has been sent to the league administrators",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
+      setSelectedLeague(null);
+      setJoinMessage('');
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -161,7 +175,7 @@ export default function LeagueSearch() {
                     </span>
                   </div>
                   <button
-                    onClick={() => joinLeagueMutation.mutate(league.id)}
+                    onClick={() => setSelectedLeague(league)}
                     disabled={joinLeagueMutation.isPending}
                     className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm disabled:opacity-50"
                     data-testid={`button-join-league-${league.id}`}
@@ -181,6 +195,54 @@ export default function LeagueSearch() {
           </div>
         )}
       </div>
+
+      {/* Join League Dialog with Message */}
+      <AlertDialog open={!!selectedLeague} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedLeague(null);
+          setJoinMessage('');
+        }
+      }}>
+        <AlertDialogContent data-testid="dialog-join-league">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Request to Join League</AlertDialogTitle>
+            <AlertDialogDescription>
+              You're requesting to join <strong>{selectedLeague?.name}</strong>. You can include an optional message to introduce yourself to the league administrators.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4">
+            <label className="block text-sm font-medium mb-2">Message (Optional)</label>
+            <textarea
+              value={joinMessage}
+              onChange={(e) => setJoinMessage(e.target.value)}
+              placeholder="e.g., Hi! I'm an experienced player looking to join a competitive league..."
+              className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
+              maxLength={500}
+              data-testid="textarea-join-message"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              {joinMessage.length}/500 characters
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-join">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (selectedLeague) {
+                  joinLeagueMutation.mutate({ 
+                    leagueId: selectedLeague.id, 
+                    message: joinMessage.trim() || undefined 
+                  });
+                }
+              }}
+              disabled={joinLeagueMutation.isPending}
+              data-testid="button-confirm-join"
+            >
+              {joinLeagueMutation.isPending ? 'Sending...' : 'Send Request'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
