@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import BracketView from "@/components/BracketView";
 import type { Tournament, TournamentTeam, TournamentMatch } from "@shared/schema";
 import { useState } from "react";
 
@@ -236,86 +237,11 @@ export default function TournamentDetail() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="overflow-x-auto -mx-6 px-6">
-                        <div className="flex gap-8 min-w-max pb-4">
-                          {rounds.map((round, roundIndex) => (
-                            <div key={round} className="flex flex-col gap-4 min-w-[280px]">
-                              <div className="font-semibold text-sm text-muted-foreground mb-2 sticky top-0 bg-card z-10">
-                                {round}
-                              </div>
-                              <div className="space-y-4">
-                                {matchesByRound[round]
-                                  .sort((a, b) => a.matchNumber - b.matchNumber)
-                                  .map((match) => (
-                                    <Card
-                                      key={match.id}
-                                      className="relative"
-                                      data-testid={`card-match-${match.matchNumber}`}
-                                    >
-                                      <CardHeader className="p-3">
-                                        <div className="flex items-center justify-between">
-                                          <CardTitle className="text-xs font-medium text-muted-foreground">
-                                            Match {match.matchNumber}
-                                          </CardTitle>
-                                          <Badge
-                                            variant={match.status === 'completed' ? 'default' : 'outline'}
-                                            className="text-xs"
-                                          >
-                                            {match.status}
-                                          </Badge>
-                                        </div>
-                                      </CardHeader>
-                                      <CardContent className="p-3 pt-0 space-y-2">
-                                        {/* Team 1 */}
-                                        <div
-                                          className={`flex items-center justify-between p-2 rounded ${
-                                            match.winnerId === match.team1Id
-                                              ? 'bg-primary/10 border border-primary/20'
-                                              : 'bg-muted/30'
-                                          }`}
-                                        >
-                                          <span className="font-medium text-sm" data-testid={`text-team1-${match.matchNumber}`}>
-                                            {getTeamName(match.team1Id)}
-                                          </span>
-                                          {match.team1Score !== null && (
-                                            <span className="font-bold text-lg" data-testid={`text-score1-${match.matchNumber}`}>
-                                              {match.team1Score}
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        {/* Team 2 */}
-                                        <div
-                                          className={`flex items-center justify-between p-2 rounded ${
-                                            match.winnerId === match.team2Id
-                                              ? 'bg-primary/10 border border-primary/20'
-                                              : 'bg-muted/30'
-                                          }`}
-                                        >
-                                          <span className="font-medium text-sm" data-testid={`text-team2-${match.matchNumber}`}>
-                                            {getTeamName(match.team2Id)}
-                                          </span>
-                                          {match.team2Score !== null && (
-                                            <span className="font-bold text-lg" data-testid={`text-score2-${match.matchNumber}`}>
-                                              {match.team2Score}
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        {/* Match Notes */}
-                                        {match.notes && (
-                                          <p className="text-xs text-muted-foreground italic" data-testid={`text-notes-${match.matchNumber}`}>
-                                            {match.notes}
-                                          </p>
-                                        )}
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                      <BracketView 
+                        matches={matches} 
+                        teams={teams || []} 
+                        format={tournament.format}
+                      />
                     </CardContent>
                   </Card>
                 ) : (
