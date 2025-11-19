@@ -6,9 +6,29 @@ export interface BracketGeneratorResult {
 }
 
 /**
+ * Build canonical seed slots using recursive pairing
+ * Returns array of seed positions in bracket order (1 vs 16, 8 vs 9, etc.)
+ */
+function buildSeedSlots(bracketSize: number): number[] {
+  if (bracketSize === 1) return [1];
+  if (bracketSize === 2) return [1, 2];
+  
+  // Recursively build smaller bracket
+  const halfSlots = buildSeedSlots(bracketSize / 2);
+  const slots: number[] = [];
+  
+  // Interleave with complementary seeds (1,16 -> 1,16,8,9 -> ...)
+  for (const seed of halfSlots) {
+    slots.push(seed);
+    slots.push(bracketSize + 1 - seed); // Complementary seed
+  }
+  
+  return slots;
+}
+
+/**
  * Generate Single Elimination bracket
- * Works with any number of teams (handles byes for non-power-of-2)
- * Creates ALL matches upfront with TBD teams, handles byes correctly
+ * Uses canonical seeding to properly handle byes for any team count
  */
 export function generateSingleElimination(
   teams: TournamentTeam[],
@@ -21,7 +41,7 @@ export function generateSingleElimination(
   const matches: Omit<TournamentMatch, 'id' | 'createdAt' | 'updatedAt'>[] = [];
   const rounds: string[] = [];
 
-  // Round names (build from finals backwards)
+  // Round names
   const roundNames: string[] = [];
   if (numRounds >= 1) roundNames.unshift('Finals');
   if (numRounds >= 2) roundNames.unshift('Semifinals');
@@ -33,119 +53,164 @@ export function generateSingleElimination(
   // Sort teams by seed
   const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
   
-  // Standard bracket pairing (1 vs lowest, 2 vs second-lowest, etc.)
-  const firstRoundSlots: Array<{ team1Id: string | null; team2Id: string | null }> = [];
-  for (let i = 0; i < bracketSize / 2; i++) {
-    const team1 = sortedTeams[i] || null;
-    const team2 = sortedTeams[bracketSize - 1 - i] || null;
-    firstRoundSlots.push({
-      team1Id: team1?.id || null,
-      team2Id: team2?.id || null
-    });
+  // Build canonical seed slots (1 vs bracketSize, 2 vs bracketSize-1, etc.)
+  const seedSlots = buildSeedSlots(bracketSize);
+  
+  // Map seeds to actual teams (or null for byes beyond numTeams)
+  const slotTeams: Array<TournamentTeam | null> = seedSlots.map(seed => {
+    return seed <= numTeams ? sortedTeams[seed - 1] : null;
+  });
+
+  // Build bracket tree bottom-up
+  interface BracketNode {
+    team: TournamentTeam | null;
+    matchNumber: number | null;
+    roundIndex: number;
+    position: number; // position within round
   }
 
-  // Pre-calculate match numbering and track bye advances
-  const matchIdMap: Record<string, number> = {};
-  const byeAdvances: Record<string, string> = {}; // nextMatchKey -> teamId that got bye
+  // Create leaf nodes for all bracket positions
+  let currentLevel: BracketNode[] = slotTeams.map((team, idx) => ({
+    team,
+    matchNumber: null,
+    roundIndex: 0,
+    position: idx
+  }));
+
   let matchCounter = 1;
-  
-  for (let roundIndex = 0; roundIndex < numRounds; roundIndex++) {
-    const matchesInRound = Math.pow(2, numRounds - roundIndex - 1);
-    for (let slotIndex = 0; slotIndex < matchesInRound; slotIndex++) {
-      const matchKey = `${roundIndex}_${slotIndex}`;
-      
-      // Check if this is a bye in round 1
-      if (roundIndex === 0) {
-        const slot = firstRoundSlots[slotIndex];
-        if (slot.team1Id && !slot.team2Id) {
-          // Bye - mark team to auto-advance to next round
-          const nextRoundIndex = 1;
-          const nextSlotIndex = Math.floor(slotIndex / 2);
-          const nextMatchKey = `${nextRoundIndex}_${nextSlotIndex}`;
-          const position = slotIndex % 2 === 0 ? 'team1' : 'team2';
-          byeAdvances[`${nextMatchKey}_${position}`] = slot.team1Id!;
-          continue;
-        }
-      }
-      
-      matchIdMap[matchKey] = matchCounter++;
-    }
-  }
-  
-  // Now generate all matches with correct advancement IDs and bye teams
+  const allMatches: Array<{
+    roundIndex: number;
+    roundName: string;
+    position: number;
+    matchNumber: number;
+    team1: TournamentTeam | null;
+    team2: TournamentTeam | null;
+    advancesToMatchNumber: number | null;
+    node1MatchNumber: number | null;
+    node2MatchNumber: number | null;
+  }> = [];
+
+  // Build bracket tree level by level
   for (let roundIndex = 0; roundIndex < numRounds; roundIndex++) {
     const roundName = roundNames[roundIndex];
     rounds.push(roundName);
     
-    const matchesInRound = Math.pow(2, numRounds - roundIndex - 1);
+    const nextLevel: BracketNode[] = [];
     
-    for (let slotIndex = 0; slotIndex < matchesInRound; slotIndex++) {
-      const matchKey = `${roundIndex}_${slotIndex}`;
-      const matchNumber = matchIdMap[matchKey];
+    // Pair adjacent nodes - ALWAYS create matches, never skip
+    for (let i = 0; i < currentLevel.length; i += 2) {
+      const node1 = currentLevel[i];
+      const node2 = currentLevel[i + 1];
+      const position = Math.floor(i / 2);
       
-      if (!matchNumber) continue; // Skip byes
+      // Check if either slot has content (team or previous match)
+      const hasContent1 = node1.team || node1.matchNumber;
+      const hasContent2 = node2.team || node2.matchNumber;
       
-      // Determine advancement
-      const nextRoundIndex = roundIndex + 1;
-      const nextSlotIndex = Math.floor(slotIndex / 2);
-      const nextMatchKey = `${nextRoundIndex}_${nextSlotIndex}`;
-      const nextMatchNumber = matchIdMap[nextMatchKey];
-      const advancesToMatchId = nextMatchNumber ? `match_${nextMatchNumber}` : null;
+      // Determine if this is a bye (one has a team, other has no content at all)
+      const isBye = (node1.team && !hasContent2) || (node2.team && !hasContent1);
+      const byeWinner = node1.team && !hasContent2 ? node1.team : 
+                        node2.team && !hasContent1 ? node2.team : null;
       
-      // First round: use actual teams
-      if (roundIndex === 0) {
-        const slot = firstRoundSlots[slotIndex];
-        
-        matches.push({
-          tournamentId,
-          gameId: null,
-          round: roundName,
-          matchNumber,
-          bracketType: null,
-          team1Id: slot.team1Id,
-          team2Id: slot.team2Id,
-          winnerId: null,
-          team1Score: null,
-          team2Score: null,
-          advancesToMatchId,
-          scheduledTime: null,
-          location: null,
-          status: 'scheduled',
-          notes: null
+      if (!hasContent1 && !hasContent2) {
+        // Both empty - create TBD placeholder
+        nextLevel.push({
+          team: null,
+          matchNumber: null,
+          roundIndex: roundIndex + 1,
+          position
         });
       } else {
-        // Future rounds: check for bye advances, otherwise TBD
-        const byeTeam1 = byeAdvances[`${matchKey}_team1`];
-        const byeTeam2 = byeAdvances[`${matchKey}_team2`];
+        // At least one slot has content - create the match
+        const matchNumber = matchCounter++;
         
-        const prevMatch1Key = `${roundIndex - 1}_${slotIndex * 2}`;
-        const prevMatch2Key = `${roundIndex - 1}_${slotIndex * 2 + 1}`;
-        const prevMatch1Num = matchIdMap[prevMatch1Key];
-        const prevMatch2Num = matchIdMap[prevMatch2Key];
-        
-        let team1Note = byeTeam1 ? 'Bye advance' : (prevMatch1Num ? `Winner of Match ${prevMatch1Num}` : 'TBD');
-        let team2Note = byeTeam2 ? 'Bye advance' : (prevMatch2Num ? `Winner of Match ${prevMatch2Num}` : 'TBD');
-        
-        matches.push({
-          tournamentId,
-          gameId: null,
-          round: roundName,
+        // If this is a bye, the winner is already known
+        nextLevel.push({
+          team: isBye ? byeWinner : null, // Bye recipient auto-advances
           matchNumber,
-          bracketType: null,
-          team1Id: byeTeam1 || null,
-          team2Id: byeTeam2 || null,
-          winnerId: null,
-          team1Score: null,
-          team2Score: null,
-          advancesToMatchId,
-          scheduledTime: null,
-          location: null,
-          status: 'scheduled',
-          notes: `${team1Note} vs ${team2Note}`
+          roundIndex: roundIndex + 1,
+          position
+        });
+        
+        allMatches.push({
+          roundIndex,
+          roundName,
+          position,
+          matchNumber,
+          team1: node1.team,
+          team2: node2.team,
+          advancesToMatchNumber: null, // Will be set below
+          node1MatchNumber: node1.matchNumber,
+          node2MatchNumber: node2.matchNumber
         });
       }
     }
+    
+    currentLevel = nextLevel;
   }
+
+  // Set advancement pointers by walking matches in reverse
+  for (let i = 0; i < allMatches.length; i++) {
+    const match = allMatches[i];
+    const nextRoundIndex = match.roundIndex + 1;
+    const nextPosition = Math.floor(match.position / 2);
+    
+    // Find the match in the next round that this match feeds into
+    const nextMatch = allMatches.find(m => 
+      m.roundIndex === nextRoundIndex && m.position === nextPosition
+    );
+    
+    match.advancesToMatchNumber = nextMatch?.matchNumber || null;
+  }
+
+  // Convert to final match format
+  allMatches.forEach(match => {
+    // Build descriptive notes
+    let notes: string | null = null;
+    
+    // Build team1 description
+    let team1Desc = '';
+    if (match.team1) {
+      team1Desc = match.team1.teamName;
+    } else if (match.node1MatchNumber) {
+      team1Desc = `Winner of Match ${match.node1MatchNumber}`;
+    } else {
+      team1Desc = 'TBD';
+    }
+    
+    // Build team2 description
+    let team2Desc = '';
+    if (match.team2) {
+      team2Desc = match.team2.teamName;
+    } else if (match.node2MatchNumber) {
+      team2Desc = `Winner of Match ${match.node2MatchNumber}`;
+    } else {
+      team2Desc = 'TBD';
+    }
+    
+    // Only add notes if there's something meaningful to say
+    if (!match.team1 || !match.team2) {
+      notes = `${team1Desc} vs ${team2Desc}`;
+    }
+    
+    matches.push({
+      tournamentId,
+      gameId: null,
+      round: match.roundName,
+      matchNumber: match.matchNumber,
+      bracketType: null,
+      team1Id: match.team1?.id || null,
+      team2Id: match.team2?.id || null,
+      winnerId: null,
+      team1Score: null,
+      team2Score: null,
+      advancesToMatchId: match.advancesToMatchNumber ? `match_${match.advancesToMatchNumber}` : null,
+      scheduledTime: null,
+      location: null,
+      status: 'scheduled',
+      notes
+    });
+  });
 
   return { matches, rounds };
 }
