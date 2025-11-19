@@ -10,9 +10,6 @@ import { AdSenseBanner } from "@/components/AdSenseBanner";
 import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { OnboardingFlow } from "@/components/OnboardingFlow";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -54,24 +51,6 @@ import StripeAdmin from "@/pages/StripeAdmin";
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
-  const [hasClosedOnboarding, setHasClosedOnboarding] = useState(false);
-
-  // Fetch onboarding status
-  const { data: onboardingData, isLoading: isLoadingOnboarding } = useQuery<{
-    onboardingCompleted: boolean;
-    onboardingProgress?: any;
-    selectedFacilityId?: string | null;
-  }>({
-    queryKey: ['/api/user/onboarding'],
-    enabled: isAuthenticated,
-  });
-
-  // Show onboarding if user hasn't completed it yet AND hasn't closed it this session
-  const shouldShowOnboarding = isAuthenticated && 
-    !isLoadingOnboarding && 
-    onboardingData && 
-    !onboardingData.onboardingCompleted &&
-    !hasClosedOnboarding;
 
   // Always render password reset pages standalone, regardless of auth state
   if (location === '/reset-password') {
@@ -82,7 +61,7 @@ function Router() {
     return <ForgotPassword />;
   }
 
-  if (isLoading || (isAuthenticated && isLoadingOnboarding)) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background" data-testid="loading-app">
         <div className="animate-pulse">
@@ -100,17 +79,6 @@ function Router() {
         <Route path="/facilities/:id" component={FacilityDetail} />
         <Route component={Landing} />
       </Switch>
-    );
-  }
-
-  // Show onboarding flow for first-time users
-  if (shouldShowOnboarding) {
-    return (
-      <OnboardingFlow
-        onComplete={() => setHasClosedOnboarding(true)}
-        onSkip={() => setHasClosedOnboarding(true)}
-        isReplay={false}
-      />
     );
   }
 
