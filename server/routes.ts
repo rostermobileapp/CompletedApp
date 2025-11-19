@@ -3083,9 +3083,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Team not found" });
       }
 
-      // Only team captains can delete the team
-      if (team.captainId !== userId) {
-        return res.status(403).json({ message: "Only team captains can delete the team" });
+      // Check if user is the team captain or commissioner
+      const isTeamCaptain = team.captainId === userId;
+      const isCommissioner = user && (user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin'));
+      
+      if (!isTeamCaptain && !isCommissioner) {
+        return res.status(403).json({ message: "Only team captains and commissioners can delete the team" });
       }
 
       await storage.deleteTeam(teamId);
@@ -3126,6 +3129,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'You are not a member of this team' });
       }
       res.status(500).json({ message: 'Failed to leave team' });
+    }
+  });
+
+  // Remove player from team (captain/commissioner action)
+  app.delete('/api/teams/:teamId/members/:memberId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId, memberId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Verify team exists
+      const team = await storage.getTeam(teamId);
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+
+      // Check if user is the team captain, creator, or commissioner
+      const user = await storage.getUser(userId);
+      const isTeamCaptainOrCreator = team.captainId === userId || team.creatorId === userId;
+      const isCommissioner = user && (user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin'));
+
+      if (!isTeamCaptainOrCreator && !isCommissioner) {
+        return res.status(403).json({ message: 'Only team captain, creator, or commissioners can remove players' });
+      }
+
+      // Prevent removing the captain
+      if (team.captainId === memberId) {
+        return res.status(403).json({ message: 'Cannot remove the team captain. Please transfer captain role first.' });
+      }
+
+      // Remove the player from the team
+      await storage.leaveTeam(memberId, teamId);
+
+      res.json({ success: true, message: 'Player removed successfully' });
+    } catch (error: any) {
+      console.error('Error removing player from team:', error);
+      if (error.message === 'TEAM_NOT_FOUND') {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+      if (error.message === 'TEAM_MEMBERSHIP_NOT_FOUND') {
+        return res.status(404).json({ message: 'Player is not a member of this team' });
+      }
+      res.status(500).json({ message: 'Failed to remove player from team' });
     }
   });
 
@@ -3192,14 +3237,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { teamId } = req.params;
       const { csvData } = req.body;
 
-      // Verify team exists and user is the creator/captain
+      // Verify team exists and user is the creator/captain/commissioner
       const team = await storage.getTeam(teamId);
       if (!team) {
         return res.status(404).json({ message: 'Team not found' });
       }
 
-      if (team.captainId !== userId && team.creatorId !== userId) {
-        return res.status(403).json({ message: 'Only team captain or creator can import players' });
+      const user = await storage.getUser(userId);
+      const isTeamCaptainOrCreator = team.captainId === userId || team.creatorId === userId;
+      const isCommissioner = user && (user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin'));
+
+      if (!isTeamCaptainOrCreator && !isCommissioner) {
+        return res.status(403).json({ message: 'Only team captain, creator, or commissioners can import players' });
       }
 
       if (!Array.isArray(csvData) || csvData.length === 0) {
@@ -3220,14 +3269,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { teamId } = req.params;
       const { firstName, lastName, email, jerseyNumber, position } = req.body;
 
-      // Verify team exists and user is the creator/captain
+      // Verify team exists and user is the creator/captain/commissioner
       const team = await storage.getTeam(teamId);
       if (!team) {
         return res.status(404).json({ message: 'Team not found' });
       }
 
-      if (team.captainId !== userId && team.creatorId !== userId) {
-        return res.status(403).json({ message: 'Only team captain or creator can add players' });
+      const user = await storage.getUser(userId);
+      const isTeamCaptainOrCreator = team.captainId === userId || team.creatorId === userId;
+      const isCommissioner = user && (user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin'));
+
+      if (!isTeamCaptainOrCreator && !isCommissioner) {
+        return res.status(403).json({ message: 'Only team captain, creator, or commissioners can add players' });
       }
 
       if (!firstName || !lastName) {
