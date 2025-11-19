@@ -10159,6 +10159,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update tournament (draft only)
+  app.patch('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { name, type, seasonId, format, description, teams } = req.body;
+
+      // Check tournament exists and is draft
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, id));
+
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      if (tournament.status !== 'draft') {
+        return res.status(400).json({ message: "Cannot edit tournament after it has started" });
+      }
+
+      // Update tournament metadata
+      const [updated] = await db
+        .update(tournaments)
+        .set({
+          name: name || tournament.name,
+          type: type || tournament.type,
+          seasonId: type === 'season_playoff' ? seasonId : null,
+          format: format || tournament.format,
+          description: description !== undefined ? description : tournament.description,
+          numTeams: teams ? teams.length : tournament.numTeams,
+          updatedAt: new Date()
+        })
+        .where(eq(tournaments.id, id))
+        .returning();
+
+      // If teams provided, regenerate bracket
+      if (teams && teams.length > 0) {
+        // Clear existing teams and matches
+        await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
+        await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, id));
+
+        // Insert new teams
+        const insertedTeams = await db
+          .insert(tournamentTeams)
+          .values(teams.map((team: any) => ({
+            ...team,
+            tournamentId: id
+          })))
+          .returning();
+
+        // Generate bracket based on format
+        const finalFormat = format || tournament.format;
+        let bracketResult;
+        switch (finalFormat) {
+          case 'single_elimination':
+            bracketResult = generateSingleElimination(insertedTeams, id);
+            break;
+          case 'double_elimination':
+            bracketResult = generateDoubleElimination(insertedTeams, id);
+            break;
+          case 'round_robin':
+            bracketResult = generateRoundRobin(insertedTeams, id);
+            break;
+          case 'round_robin_split':
+            bracketResult = generateRoundRobinSplit(insertedTeams, id);
+            break;
+          default:
+            return res.status(400).json({ message: "Invalid tournament format" });
+        }
+
+        // Insert generated matches
+        if (bracketResult.matches.length > 0) {
+          await db.insert(tournamentMatches).values(bracketResult.matches);
+        }
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating tournament:", error);
+      res.status(500).json({ message: "Failed to update tournament" });
+    }
+  });
+
   // Add teams to tournament and generate bracket
   app.post('/api/tournaments/:id/generate-bracket', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
