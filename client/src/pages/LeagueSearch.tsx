@@ -58,7 +58,14 @@ export default function LeagueSearch() {
 
   const joinLeagueMutation = useMutation({
     mutationFn: async ({ leagueId, message }: { leagueId: string; message?: string }) => {
-      const response = await apiRequest('POST', `/api/leagues/${leagueId}/join`, { message });
+      // Trim and validate message
+      const trimmedMessage = message?.trim();
+      if (trimmedMessage && trimmedMessage.length > 500) {
+        throw new Error('Message cannot exceed 500 characters');
+      }
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/join`, { 
+        message: trimmedMessage || undefined 
+      });
       return response.json();
     },
     onSuccess: () => {

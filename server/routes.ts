@@ -1766,6 +1766,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const leagueId = req.params.id;
       
+      // Validate message length if provided
+      if (req.body.message && typeof req.body.message === 'string' && req.body.message.length > 500) {
+        return res.status(400).json({ message: "Message cannot exceed 500 characters" });
+      }
+      
       // Check if already a member
       const existingMembership = await storage.getUserLeagueMembership(userId, leagueId);
       if (existingMembership) {
@@ -3249,6 +3254,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { teamId } = req.params;
       const { leagueId, message } = req.body;
+
+      // Validate message length if provided
+      if (message && typeof message === 'string' && message.length > 500) {
+        return res.status(400).json({ message: 'Message cannot exceed 500 characters' });
+      }
 
       // Verify team exists and user is the creator
       const team = await storage.getTeam(teamId);

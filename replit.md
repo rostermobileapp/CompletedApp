@@ -4,6 +4,17 @@ Rosters is a free, comprehensive sports team management platform designed for va
 
 ## Recent Changes
 
+**November 19, 2025**: Personalized Join Request Messages
+- Implemented personalized message functionality for league and team join requests
+- Users can now include optional messages (up to 500 characters) when requesting to join a league
+- Team captains can include messages when requesting their team to join a league
+- Commissioners/admins can view these messages when reviewing pending requests
+- Database schema updated with `message` field in both `leagueMemberships` and `teamLeagueRequests` tables
+- Both client-side (maxLength attribute + validation) and server-side (500 character limit) validation implemented
+- Messages are displayed in commissioner views (LeagueManagement page and Dashboard NeedsAttentionModal) with italic styling and quotes
+- All UI elements include proper data-testid attributes for testing
+- Feature enhances communication between users and league administrators during the approval process
+
 **November 7, 2025**: Password Reset Feature
 - Implemented comprehensive password reset functionality for users who forget their passwords
 - Created dedicated ForgotPassword page (/forgot-password) where users can request password reset links via email
