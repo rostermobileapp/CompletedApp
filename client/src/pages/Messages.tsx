@@ -537,33 +537,32 @@ export default function Messages() {
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
-  // Fetch conversations - backend will filter by leagueId if provided
+  // Fetch ALL conversations once - stable query key for instant caching
   const { data: allConversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
-    queryKey: selectedLeagueId ? ['/api/conversations', { leagueId: selectedLeagueId }] : ['/api/conversations'],
-    queryFn: async () => {
-      const url = selectedLeagueId 
-        ? `/api/conversations?leagueId=${selectedLeagueId}` 
-        : '/api/conversations';
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch conversations');
-      return response.json();
-    },
+    queryKey: ['/api/conversations'],
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
-  // Filter conversations by selected team or league
+  // Filter conversations by selected league and/or team (client-side for instant filtering)
   const conversations = useMemo(() => {
+    let filtered = allConversations;
+    
+    // Filter by league if one is selected
+    if (selectedLeagueId) {
+      filtered = filtered.filter(conv => conv.leagueId === selectedLeagueId);
+    }
+    
+    // Further filter by team if one is selected
     if (selectedTeamId) {
       // When a team is selected, show team chat AND league-wide chats (direct, captain)
       // This includes conversations with matching teamId OR conversations with no teamId (direct/captain chats)
-      return allConversations.filter(conv => 
+      filtered = filtered.filter(conv => 
         conv.teamId === selectedTeamId || conv.teamId === null
       );
     }
-    // For league selection, backend already filtered by leagueId via query param
-    // No team/league selected, show all conversations
-    return allConversations;
-  }, [allConversations, selectedTeamId]);
+    
+    return filtered;
+  }, [allConversations, selectedLeagueId, selectedTeamId]);
 
   // Fetch unread message counts per conversation
   const { data: unreadCountsData } = useQuery<{ unreadCounts: Array<{ conversationId: string; unreadCount: number }> }>({
