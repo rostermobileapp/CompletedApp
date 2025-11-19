@@ -528,16 +528,15 @@ export default function Profile() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Phone:</span>
                 <span>
-                  {(user as any)?.phoneNumber 
-                    ? ((phone: string) => {
-                        const cleaned = phone.replace(/\D/g, '');
-                        if (cleaned.length === 10) {
-                          return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-                        }
-                        return phone;
-                      })((user as any).phoneNumber)
-                    : 'Not specified'
-                  }
+                  {(() => {
+                    const phone = (user as any)?.phoneNumber;
+                    if (!phone) return 'Not specified';
+                    const cleaned = phone.replace(/\D/g, '');
+                    if (cleaned.length === 10) {
+                      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+                    }
+                    return phone;
+                  })()}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -711,8 +710,8 @@ export default function Profile() {
           <div className="space-y-3">
             {userTeams.map((team: any) => {
               const isStandalone = !team.leagueId;
-              const isTeamCreator = team.creatorId === user?.id;
-              const isCaptain = team.captainId === user?.id;
+              const isTeamCreator = team.creatorId === (user as any)?.id;
+              const isCaptain = team.captainId === (user as any)?.id;
               const showJoinLeagueButton = isStandalone && isTeamCreator;
               const showDeleteButton = isCaptain; // Captains can delete teams they manage
               
@@ -860,7 +859,7 @@ export default function Profile() {
                       <strong className="text-destructive">Note: You have an active paid subscription. Please cancel your subscription first before deleting your profile.</strong>
                     </>
                   )}
-                  {userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === user?.id) && (
+                  {userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === (user as any)?.id) && (
                     <>
                       <br /><br />
                       <strong className="text-destructive">Note: You are a commissioner of one or more leagues. Please transfer your commissioner status to another user before deleting your profile.</strong>
@@ -876,7 +875,7 @@ export default function Profile() {
                   disabled={
                     deleteProfileMutation.isPending || 
                     ((user as any)?.stripeSubscriptionId && (user as any)?.role !== 'free_tier') ||
-                    (userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === user?.id))
+                    (userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === (user as any)?.id))
                   }
                   data-testid="button-confirm-delete"
                 >
