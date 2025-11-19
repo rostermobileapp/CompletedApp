@@ -10088,24 +10088,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Tournament not found" });
       }
 
-      // Get teams
+      res.json(tournament);
+    } catch (error) {
+      console.error("Error fetching tournament:", error);
+      res.status(500).json({ message: "Failed to fetch tournament" });
+    }
+  });
+
+  // Get tournament teams
+  app.get('/api/tournaments/:id/teams', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
       const teams = await db
         .select()
         .from(tournamentTeams)
         .where(eq(tournamentTeams.tournamentId, id))
         .orderBy(tournamentTeams.seed);
 
-      // Get matches
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching tournament teams:", error);
+      res.status(500).json({ message: "Failed to fetch tournament teams" });
+    }
+  });
+
+  // Get tournament matches
+  app.get('/api/tournaments/:id/matches', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
       const matches = await db
         .select()
         .from(tournamentMatches)
         .where(eq(tournamentMatches.tournamentId, id))
         .orderBy(tournamentMatches.matchNumber);
 
-      res.json({ ...tournament, teams, matches });
+      res.json(matches);
     } catch (error) {
-      console.error("Error fetching tournament:", error);
-      res.status(500).json({ message: "Failed to fetch tournament" });
+      console.error("Error fetching tournament matches:", error);
+      res.status(500).json({ message: "Failed to fetch tournament matches" });
     }
   });
 
