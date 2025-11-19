@@ -218,17 +218,16 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
 
   const handleComplete = async () => {
     console.log('handleComplete called!');
-    alert('Button clicked!');
     try {
-      console.log('Completing onboarding...', { selectedFacility });
+      console.log('About to call mutation...', { selectedFacility });
       
       // Just mark onboarding as complete, don't change role
       const result = await completeOnboardingMutation.mutateAsync({
         selectedFacilityId: selectedFacility?.id || null,
       });
-      console.log('Onboarding completed successfully', result);
+      console.log('Mutation result:', result);
     } catch (error) {
-      console.error('Error completing onboarding:', error);
+      console.error('Mutation error:', error);
       toast({
         title: 'Error',
         description: 'Failed to complete onboarding. Please try again.',
