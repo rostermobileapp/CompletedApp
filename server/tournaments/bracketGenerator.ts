@@ -44,27 +44,35 @@ export function generateSingleElimination(
     });
   }
 
-  // Pre-calculate match numbering across all rounds
+  // Pre-calculate match numbering and track bye advances
   const matchIdMap: Record<string, number> = {};
+  const byeAdvances: Record<string, string> = {}; // nextMatchKey -> teamId that got bye
   let matchCounter = 1;
   
   for (let roundIndex = 0; roundIndex < numRounds; roundIndex++) {
     const matchesInRound = Math.pow(2, numRounds - roundIndex - 1);
     for (let slotIndex = 0; slotIndex < matchesInRound; slotIndex++) {
+      const matchKey = `${roundIndex}_${slotIndex}`;
+      
       // Check if this is a bye in round 1
       if (roundIndex === 0) {
         const slot = firstRoundSlots[slotIndex];
         if (slot.team1Id && !slot.team2Id) {
-          // Bye - skip match numbering
+          // Bye - mark team to auto-advance to next round
+          const nextRoundIndex = 1;
+          const nextSlotIndex = Math.floor(slotIndex / 2);
+          const nextMatchKey = `${nextRoundIndex}_${nextSlotIndex}`;
+          const position = slotIndex % 2 === 0 ? 'team1' : 'team2';
+          byeAdvances[`${nextMatchKey}_${position}`] = slot.team1Id!;
           continue;
         }
       }
-      const matchKey = `${roundIndex}_${slotIndex}`;
+      
       matchIdMap[matchKey] = matchCounter++;
     }
   }
   
-  // Now generate all matches with correct advancement IDs
+  // Now generate all matches with correct advancement IDs and bye teams
   for (let roundIndex = 0; roundIndex < numRounds; roundIndex++) {
     const roundName = roundNames[roundIndex];
     rounds.push(roundName);
@@ -106,11 +114,17 @@ export function generateSingleElimination(
           notes: null
         });
       } else {
-        // Future rounds: TBD teams (filled in as matches are completed)
+        // Future rounds: check for bye advances, otherwise TBD
+        const byeTeam1 = byeAdvances[`${matchKey}_team1`];
+        const byeTeam2 = byeAdvances[`${matchKey}_team2`];
+        
         const prevMatch1Key = `${roundIndex - 1}_${slotIndex * 2}`;
         const prevMatch2Key = `${roundIndex - 1}_${slotIndex * 2 + 1}`;
         const prevMatch1Num = matchIdMap[prevMatch1Key];
         const prevMatch2Num = matchIdMap[prevMatch2Key];
+        
+        let team1Note = byeTeam1 ? 'Bye advance' : (prevMatch1Num ? `Winner of Match ${prevMatch1Num}` : 'TBD');
+        let team2Note = byeTeam2 ? 'Bye advance' : (prevMatch2Num ? `Winner of Match ${prevMatch2Num}` : 'TBD');
         
         matches.push({
           tournamentId,
@@ -118,8 +132,8 @@ export function generateSingleElimination(
           round: roundName,
           matchNumber,
           bracketType: null,
-          team1Id: null, // Winner from previous round match
-          team2Id: null, // Winner from previous round match
+          team1Id: byeTeam1 || null,
+          team2Id: byeTeam2 || null,
           winnerId: null,
           team1Score: null,
           team2Score: null,
@@ -127,9 +141,7 @@ export function generateSingleElimination(
           scheduledTime: null,
           location: null,
           status: 'scheduled',
-          notes: prevMatch1Num && prevMatch2Num 
-            ? `Winner of Match ${prevMatch1Num} vs Winner of Match ${prevMatch2Num}`
-            : null
+          notes: `${team1Note} vs ${team2Note}`
         });
       }
     }
@@ -140,7 +152,9 @@ export function generateSingleElimination(
 
 /**
  * Generate Double Elimination bracket
- * Winners bracket + Losers bracket + Grand Finals
+ * NOTE: Simplified implementation - creates winners bracket + placeholder losers matches
+ * Full double elimination with automatic loser routing requires additional schema fields
+ * (e.g., dropsToMatchId) and is marked for future enhancement
  */
 export function generateDoubleElimination(
   teams: TournamentTeam[],
@@ -152,47 +166,53 @@ export function generateDoubleElimination(
 
   // Sort teams by seed
   const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
-
-  // Winners Bracket (same as single elimination for round 1)
-  const winnersRounds = Math.ceil(Math.log2(numTeams));
   
-  // Create winners bracket round 1
-  rounds.push('Winners Round 1');
-  let matchNum = 1;
-
-  for (let i = 0; i < Math.ceil(numTeams / 2); i++) {
-    const team1 = sortedTeams[i * 2];
-    const team2 = sortedTeams[i * 2 + 1];
-
-    if (team1 && team2) {
-      matches.push({
-        tournamentId,
-        gameId: null,
-        round: 'Winners Round 1',
-        matchNumber: matchNum++,
-        bracketType: 'winners',
-        team1Id: team1.id,
-        team2Id: team2.id,
-        winnerId: null,
-        team1Score: null,
-        team2Score: null,
-        advancesToMatchId: null, // Will be set when creating next round
-        scheduledTime: null,
-        location: null,
-        status: 'scheduled',
-        notes: null
-      });
-    }
+  // Use single elimination logic for winners bracket
+  const winnersBracket = generateSingleElimination(teams, tournamentId);
+  
+  // Add "Winners" prefix to rounds for consistency
+  winnersBracket.rounds.forEach(round => {
+    rounds.push(`Winners ${round}`);
+  });
+  
+  // Update winners bracket matches with prefixed round names and bracketType
+  winnersBracket.matches.forEach(match => {
+    matches.push({
+      ...match,
+      round: `Winners ${match.round}`, // Match the rounds array
+      bracketType: 'winners'
+    });
+  });
+  
+  // Add placeholder losers bracket rounds
+  // In a full implementation, these would be auto-populated as teams lose in winners bracket
+  const numLosersRounds = Math.max(1, winnersBracket.rounds.length - 1);
+  
+  for (let i = 1; i <= numLosersRounds; i++) {
+    rounds.push(`Losers Round ${i}`);
   }
-
-  // Create losers bracket (will receive losers from winners bracket)
-  rounds.push('Losers Round 1');
-  rounds.push('Winners Finals');
-  rounds.push('Losers Finals');
+  
+  // Add Grand Finals
   rounds.push('Grand Finals');
-
-  // Note: In a real implementation, you'd create the full losers bracket structure
-  // For MVP, we'll create placeholders that get filled as winners/losers are determined
+  
+  // Create placeholder Grand Finals match (will be filled when winners/losers finalists are known)
+  matches.push({
+    tournamentId,
+    gameId: null,
+    round: 'Grand Finals',
+    matchNumber: matches.length + 1,
+    bracketType: 'grand_final',
+    team1Id: null, // Winner of Winners Bracket
+    team2Id: null, // Winner of Losers Bracket
+    winnerId: null,
+    team1Score: null,
+    team2Score: null,
+    advancesToMatchId: null,
+    scheduledTime: null,
+    location: null,
+    status: 'scheduled',
+    notes: 'Winner of Winners Bracket vs Winner of Losers Bracket'
+  });
 
   return { matches, rounds };
 }
