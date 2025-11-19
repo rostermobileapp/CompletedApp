@@ -22,8 +22,11 @@ import type { Team, InsertTournament } from "@shared/schema";
 type FormatRecommendation = {
   format: string;
   recommended: boolean;
-  viable: boolean;
-  note: string;
+  name: string;
+  description: string;
+  pros: string[];
+  cons: string[];
+  estimatedGames: number;
 };
 
 const formSchema = z.object({
@@ -139,16 +142,8 @@ export default function TournamentCreate() {
     
     if (rec.recommended) {
       return <Badge variant="default" className="ml-2">Recommended</Badge>;
-    } else if (rec.viable) {
-      return <Badge variant="outline" className="ml-2">Viable</Badge>;
     }
-    return <Badge variant="secondary" className="ml-2">Not Recommended</Badge>;
-  };
-
-  const getRecommendationNote = (format: string) => {
-    if (!recommendations) return null;
-    const rec = recommendations.find(r => r.format === format);
-    return rec?.note || null;
+    return <Badge variant="outline" className="ml-2">{rec.estimatedGames} games</Badge>;
   };
 
   if (teamsLoading) {
@@ -269,13 +264,19 @@ export default function TournamentCreate() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="single_elimination">Single Elimination</SelectItem>
-                            <SelectItem value="double_elimination">Double Elimination</SelectItem>
+                            <SelectItem value="double_elimination">Double Elimination (Beta)</SelectItem>
                             <SelectItem value="round_robin">Round Robin</SelectItem>
                             <SelectItem value="round_robin_split">Round Robin + Playoffs</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          Choose the format that best fits your tournament structure
+                          {field.value === "double_elimination" ? (
+                            <span className="text-amber-600 dark:text-amber-400">
+                              Note: Double elimination creates winners bracket automatically. Losers bracket requires manual match setup.
+                            </span>
+                          ) : (
+                            "Choose the format that best fits your tournament structure"
+                          )}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -359,25 +360,59 @@ export default function TournamentCreate() {
 
                 {/* Format Recommendations */}
                 {recommendations && recommendations.length > 0 && (
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertDescription>
-                      <p className="font-semibold mb-2">Format Recommendations for {watchedTeamIds.length} teams:</p>
-                      <div className="space-y-1">
-                        {recommendations.map((rec) => (
-                          <div key={rec.format} className="flex items-center gap-2">
-                            <span className={rec.format === watchedFormat ? "font-semibold" : ""}>
-                              {getFormatLabel(rec.format)}:
-                            </span>
-                            {getRecommendationBadge(rec.format)}
-                            {rec.note && (
-                              <span className="text-sm text-muted-foreground">- {rec.note}</span>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Info className="h-4 w-4" />
+                        Format Recommendations ({watchedTeamIds.length} teams)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {recommendations.map((rec) => (
+                        <div
+                          key={rec.format}
+                          className={`p-3 rounded-lg border ${
+                            rec.format === watchedFormat
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold">{rec.name}</span>
+                            <div className="flex items-center gap-2">
+                              {rec.recommended && (
+                                <Badge variant="default">Recommended</Badge>
+                              )}
+                              <Badge variant="outline">{rec.estimatedGames} games</Badge>
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                            {rec.pros.length > 0 && (
+                              <div>
+                                <span className="font-medium text-green-600 dark:text-green-400">Pros:</span>
+                                <ul className="list-disc list-inside text-muted-foreground">
+                                  {rec.pros.slice(0, 2).map((pro, idx) => (
+                                    <li key={idx}>{pro}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {rec.cons.length > 0 && (
+                              <div>
+                                <span className="font-medium text-amber-600 dark:text-amber-400">Cons:</span>
+                                <ul className="list-disc list-inside text-muted-foreground">
+                                  {rec.cons.slice(0, 2).map((con, idx) => (
+                                    <li key={idx}>{con}</li>
+                                  ))}
+                                </ul>
+                              </div>
                             )}
                           </div>
-                        ))}
-                      </div>
-                    </AlertDescription>
-                  </Alert>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
                 )}
               </div>
             )}
