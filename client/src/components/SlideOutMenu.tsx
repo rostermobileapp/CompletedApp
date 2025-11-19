@@ -64,7 +64,7 @@ export function SlideOutMenu() {
     {
       icon: Trophy,
       label: 'Tournaments',
-      path: '/league-list',
+      path: '/tournaments',
       locked: !hasRole('secondary_commissioner'),
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-orange-500/20',

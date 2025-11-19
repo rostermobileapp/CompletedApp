@@ -1523,6 +1523,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get leagues where user can manage tournaments (commissioner, secondary commissioner, or admin)
+  app.get("/api/leagues/manageable", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Get leagues where user is commissioner
+      const commissionerLeagues = await storage.getLeaguesByCommissioner(userId);
+      
+      // Get leagues where user is secondary commissioner
+      const allMemberships = await storage.getUserLeagueMemberships(userId);
+      const secondaryCommissionerLeagueIds = allMemberships
+        .filter(m => m.leagueRole === 'secondary_commissioner')
+        .map(m => m.leagueId);
+      
+      // Fetch the secondary commissioner leagues
+      const secondaryLeaguesResults = await Promise.all(
+        secondaryCommissionerLeagueIds.map(id => storage.getLeague(id))
+      );
+      const secondaryLeagues = secondaryLeaguesResults.filter((league): league is NonNullable<typeof league> => league !== null && league !== undefined);
+      
+      // Combine and deduplicate
+      const allManageableLeagues = [...commissionerLeagues, ...secondaryLeagues];
+      const uniqueLeagues = Array.from(
+        new Map(allManageableLeagues.map(league => [league.id, league])).values()
+      );
+      
+      // Get tournament counts for each league
+      const leaguesWithCounts = await Promise.all(
+        uniqueLeagues.map(async (league) => {
+          try {
+            const tournaments = await storage.getTournamentsByLeagueId(league.id.toString());
+            return {
+              ...league,
+              uniqueLeagueId: league.uniqueLeagueId || (league as any).unique_league_id,
+              tournamentCount: tournaments.length
+            };
+          } catch (error) {
+            // If tournament fetch fails, return league with 0 count
+            return {
+              ...league,
+              uniqueLeagueId: league.uniqueLeagueId || (league as any).unique_league_id,
+              tournamentCount: 0
+            };
+          }
+        })
+      );
+      
+      res.json(leaguesWithCounts);
+    } catch (error) {
+      console.error("Error fetching manageable leagues:", error);
+      res.status(500).json({ message: "Failed to fetch manageable leagues" });
+    }
+  });
+
   app.post("/api/leagues", isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

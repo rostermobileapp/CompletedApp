@@ -48,6 +48,7 @@ import CreateCalendarEvent from "@/pages/CreateCalendarEvent";
 import Privacy from "@/pages/Privacy";
 import StripeAdmin from "@/pages/StripeAdmin";
 import Tournaments from "@/pages/Tournaments";
+import TournamentsLanding from "@/pages/TournamentsLanding";
 import TournamentCreate from "@/pages/TournamentCreate";
 import TournamentDetail from "@/pages/TournamentDetail";
 
@@ -125,6 +126,7 @@ function Router() {
             <Route path="/facilities/:id" component={FacilityDetail} />
             <Route path="/facility-memberships" component={FacilityMemberships} />
             <Route path="/calendar-events/create" component={CreateCalendarEvent} />
+            <Route path="/tournaments" component={TournamentsLanding} />
             <Route path="/leagues/:leagueId/tournaments/create" component={TournamentCreate} />
             <Route path="/leagues/:leagueId/tournaments" component={Tournaments} />
             <Route path="/tournaments/:tournamentId" component={TournamentDetail} />
