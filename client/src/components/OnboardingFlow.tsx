@@ -237,18 +237,20 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
       const result = await response.json();
       console.log('Direct API call result:', result);
       
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/user/onboarding'] });
-      
       // Show success toast
       toast({
         title: isReplay ? 'Profile updated!' : 'Welcome to Roster!',
         description: isReplay ? 'Your information has been updated.' : 'You\'re all set to start using the app.',
       });
       
-      // Close the modal
+      // Close the modal FIRST to prevent infinite loop
       onComplete();
+      
+      // Then invalidate queries after a short delay to allow modal to close
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/user/onboarding'] });
+      }, 100);
     } catch (error) {
       console.error('API call error:', error);
       toast({
