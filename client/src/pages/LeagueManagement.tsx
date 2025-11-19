@@ -2228,6 +2228,11 @@ export default function LeagueManagement() {
                     <div key={member.id} className="flex items-center justify-between p-3 bg-background rounded-lg border">
                       <div className="flex-1" data-testid={`pending-player-${member.user.id}`}>
                         <p className="font-medium">{formatUserName(member.user, member)}</p>
+                        {(member as any).message && (
+                          <p className="text-sm text-muted-foreground mt-1 italic" data-testid={`pending-player-message-${member.user.id}`}>
+                            "{(member as any).message}"
+                          </p>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -2288,7 +2293,7 @@ export default function LeagueManagement() {
                               {request.team.uniqueTeamId}
                             </span>
                           </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
                             <div className="flex items-center gap-1">
                               <Users className="w-4 h-4" />
                               <span>{request.team.memberCount || 0} players</span>
@@ -2298,6 +2303,11 @@ export default function LeagueManagement() {
                               <span>Created by {request.requester.firstName} {request.requester.lastName}</span>
                             </div>
                           </div>
+                          {request.message && (
+                            <p className="text-sm text-muted-foreground italic mt-2" data-testid={`team-request-message-${request.id}`}>
+                              "{request.message}"
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-2">
                           <button

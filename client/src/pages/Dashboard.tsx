@@ -345,7 +345,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                 {member.user?.firstName?.charAt(0) || '?'}
                               </span>
                             </div>
-                            <div>
+                            <div className="flex-1">
                               <p className="font-medium text-[#000000]">
                                 {member.user?.firstName || 'Unknown'} {member.user?.lastName || 'User'}
                               </p>
@@ -355,6 +355,11 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                               {member.assignedTeam && (
                                 <p className="text-sm text-blue-600">
                                   Assigned to: {member.assignedTeam.name}
+                                </p>
+                              )}
+                              {member.message && (
+                                <p className="text-sm text-muted-foreground italic mt-1" data-testid={`pending-member-message-${member.id}`}>
+                                  "{member.message}"
                                 </p>
                               )}
                             </div>
