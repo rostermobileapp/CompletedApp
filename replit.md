@@ -2,7 +2,7 @@
 
 Rosters is a free, comprehensive sports team management platform designed to streamline sports team management for various sports. It offers league and team organization, game scheduling, messaging, and tournament/playoff management functionalities. The platform operates on a freemium model with subscription-gated features, aiming to provide a robust solution for sports enthusiasts and administrators.
 
-## Tournament System (Complete - Nov 19, 2025)
+## Tournament System (Complete with Bracket Visualization - Nov 19, 2025)
 
 The platform now includes a comprehensive tournament/playoff system supporting:
 - **Tournament Types**: Season playoffs and standalone tournaments
@@ -13,16 +13,26 @@ The platform now includes a comprehensive tournament/playoff system supporting:
   - Match scheduling and score tracking infrastructure
   - Format recommendations based on team count (detailed pros/cons/game estimates)
   - Touch-optimized mobile-first design
+  - **SVG-based bracket visualization** with zoom/pan controls (NEW)
 - **Access Control**: Commissioner, Secondary Commissioner, and Admin only
 - **Backend**: Complete and architect-approved ✅
   - Database schema (3 tables: tournaments, tournament_teams, tournament_matches)
   - API routes with full CRUD and permissions (requireLeagueManagement middleware)
   - Bracket generator with canonical seeding and bye auto-advancement
   - Format recommendation engine with detailed pros/cons analysis
-- **Frontend**: Complete and architect-approved ✅
+  - PATCH /api/tournaments/:id for editing draft tournaments with automatic bracket regeneration
+- **Frontend**: Complete with bracket visualization ✅
   - Tournaments Dashboard (/leagues/:leagueId/tournaments) - List view with status badges
   - Tournament Creator (/leagues/:leagueId/tournaments/create) - 3-step wizard with enhanced format recommendations
-  - Tournament Detail (/tournaments/:tournamentId) - Tabbed view (Bracket, Teams, Schedule)
+  - Tournament Edit (/tournaments/:tournamentId/edit) - Multi-step wizard with pre-filled data (draft-only)
+  - Tournament Detail (/tournaments/:tournamentId) - Tabbed view with BracketView component
+  - **BracketView Component**: SVG bracket rendering with:
+    - Stable round ordering algorithm
+    - Horizontal separation of winners/losers brackets (no overlap)
+    - SVG connector paths showing match advancement
+    - Zoom controls (0.3x-3x): buttons, ctrl+scroll, pinch-to-zoom
+    - Pan controls: drag, scroll, touch gestures
+    - Dynamic layout calculation based on bracket size
 - **Navigation**: 
   - Hamburger Menu → "Tournaments" button → Smart landing page (auto-redirects for single league, shows league selector for multiple)
   - Dashboard → Tournaments Card (when league selected) → Tournament List
@@ -31,6 +41,7 @@ The platform now includes a comprehensive tournament/playoff system supporting:
   - Double elimination is beta: Creates winners bracket + grand finals placeholder; losers bracket requires manual match setup
   - Match result recording UI is placeholder (infrastructure exists)
   - Match scheduling/editing buttons are placeholders (future enhancement)
+  - Connector anchoring uses notes-based heuristics rather than explicit slot metadata (visual may vary for complex transitions)
 - **Testing Status**: Manual testing required (automated e2e blocked by auth configuration)
 
 # User Preferences
