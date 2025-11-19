@@ -47,6 +47,7 @@ export default function Profile() {
   const [selectedTeamForLeagueRequest, setSelectedTeamForLeagueRequest] = useState<string | null>(null);
   const [showLeagueRequestDialog, setShowLeagueRequestDialog] = useState(false);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
+  const [teamJoinLeagueMessage, setTeamJoinLeagueMessage] = useState('');
 
   // Fetch full user profile from database (includes displayId)
   const { data: user } = useQuery({
@@ -230,8 +231,8 @@ export default function Profile() {
 
   // Request team to join league mutation
   const requestTeamJoinLeagueMutation = useMutation({
-    mutationFn: async ({ teamId, leagueId }: { teamId: string; leagueId: string }) => {
-      const response = await apiRequest('POST', `/api/teams/${teamId}/join-league`, { leagueId });
+    mutationFn: async ({ teamId, leagueId, message }: { teamId: string; leagueId: string; message?: string }) => {
+      const response = await apiRequest('POST', `/api/teams/${teamId}/join-league`, { leagueId, message });
       return response.json();
     },
     onSuccess: () => {
@@ -242,6 +243,7 @@ export default function Profile() {
       setShowLeagueRequestDialog(false);
       setSelectedTeamForLeagueRequest(null);
       setSelectedLeagueId('');
+      setTeamJoinLeagueMessage('');
       queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
     },
     onError: (error: any) => {
@@ -917,24 +919,40 @@ export default function Profile() {
               Select a league for your team to join. Your request will be sent to the league commissioner for approval.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
-            <label className="text-sm font-medium mb-2 block">Select League</label>
-            <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
-              <SelectTrigger data-testid="select-league">
-                <SelectValue placeholder="Choose a league" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableLeagues && availableLeagues.length > 0 ? (
-                  availableLeagues.map((league: any) => (
-                    <SelectItem key={league.id} value={league.id} data-testid={`option-league-${league.id}`}>
-                      {league.name} - {league.sport}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="none" disabled>No leagues available</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select League</label>
+              <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
+                <SelectTrigger data-testid="select-league">
+                  <SelectValue placeholder="Choose a league" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableLeagues && availableLeagues.length > 0 ? (
+                    availableLeagues.map((league: any) => (
+                      <SelectItem key={league.id} value={league.id} data-testid={`option-league-${league.id}`}>
+                        {league.name} - {league.sport}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>No leagues available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Message (Optional)</label>
+              <textarea
+                value={teamJoinLeagueMessage}
+                onChange={(e) => setTeamJoinLeagueMessage(e.target.value)}
+                placeholder="e.g., Our team is looking for a competitive league to join this season..."
+                className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
+                maxLength={500}
+                data-testid="textarea-team-join-message"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {teamJoinLeagueMessage.length}/500 characters
+              </p>
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel 
@@ -942,6 +960,7 @@ export default function Profile() {
                 setShowLeagueRequestDialog(false);
                 setSelectedTeamForLeagueRequest(null);
                 setSelectedLeagueId('');
+                setTeamJoinLeagueMessage('');
               }}
               data-testid="button-cancel-league-request"
             >
@@ -953,6 +972,7 @@ export default function Profile() {
                   requestTeamJoinLeagueMutation.mutate({
                     teamId: selectedTeamForLeagueRequest,
                     leagueId: selectedLeagueId,
+                    message: teamJoinLeagueMessage.trim() || undefined,
                   });
                 }
               }}
