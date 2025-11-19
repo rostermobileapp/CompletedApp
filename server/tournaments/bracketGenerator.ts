@@ -8,6 +8,7 @@ export interface BracketGeneratorResult {
 /**
  * Generate Single Elimination bracket
  * Works with any number of teams (handles byes for non-power-of-2)
+ * Creates ALL matches upfront with TBD teams, handles byes correctly
  */
 export function generateSingleElimination(
   teams: TournamentTeam[],
@@ -16,116 +17,122 @@ export function generateSingleElimination(
   const numTeams = teams.length;
   const numRounds = Math.ceil(Math.log2(numTeams));
   const bracketSize = Math.pow(2, numRounds);
-  const numByes = bracketSize - numTeams;
 
   const matches: Omit<TournamentMatch, 'id' | 'createdAt' | 'updatedAt'>[] = [];
   const rounds: string[] = [];
 
-  // Round names
-  const roundNames = ['Finals', 'Semifinals', 'Quarterfinals'];
-  for (let i = roundNames.length; i < numRounds; i++) {
-    roundNames.push(`Round ${numRounds - i}`);
+  // Round names (build from finals backwards)
+  const roundNames: string[] = [];
+  if (numRounds >= 1) roundNames.unshift('Finals');
+  if (numRounds >= 2) roundNames.unshift('Semifinals');
+  if (numRounds >= 3) roundNames.unshift('Quarterfinals');
+  for (let i = 4; i <= numRounds; i++) {
+    roundNames.unshift(`Round ${i - numRounds + 1}`);
   }
-  roundNames.reverse();
 
   // Sort teams by seed
   const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
   
-  // Round 1 matchups with byes
-  let currentRoundMatches: Array<{ team1Id: string | null; team2Id: string | null; matchId: string }> = [];
-  let matchNumber = 1;
-
-  // Create first round
+  // Standard bracket pairing (1 vs lowest, 2 vs second-lowest, etc.)
+  const firstRoundSlots: Array<{ team1Id: string | null; team2Id: string | null }> = [];
   for (let i = 0; i < bracketSize / 2; i++) {
-    const team1 = sortedTeams[i];
-    const team2 = sortedTeams[bracketSize - 1 - i];
-    
-    const matchId = `match_r1_${matchNumber}`;
-    
-    if (team1 && team2) {
-      // Regular match
-      currentRoundMatches.push({
-        team1Id: team1.id,
-        team2Id: team2.id,
-        matchId
-      });
-      matchNumber++;
-    } else if (team1) {
-      // Bye - team1 advances automatically
-      currentRoundMatches.push({
-        team1Id: team1.id,
-        team2Id: null,
-        matchId
-      });
-    }
+    const team1 = sortedTeams[i] || null;
+    const team2 = sortedTeams[bracketSize - 1 - i] || null;
+    firstRoundSlots.push({
+      team1Id: team1?.id || null,
+      team2Id: team2?.id || null
+    });
   }
 
-  // Generate all rounds
-  for (let round = 0; round < numRounds; round++) {
-    const roundName = roundNames[round];
+  // Pre-calculate match numbering across all rounds
+  const matchIdMap: Record<string, number> = {};
+  let matchCounter = 1;
+  
+  for (let roundIndex = 0; roundIndex < numRounds; roundIndex++) {
+    const matchesInRound = Math.pow(2, numRounds - roundIndex - 1);
+    for (let slotIndex = 0; slotIndex < matchesInRound; slotIndex++) {
+      // Check if this is a bye in round 1
+      if (roundIndex === 0) {
+        const slot = firstRoundSlots[slotIndex];
+        if (slot.team1Id && !slot.team2Id) {
+          // Bye - skip match numbering
+          continue;
+        }
+      }
+      const matchKey = `${roundIndex}_${slotIndex}`;
+      matchIdMap[matchKey] = matchCounter++;
+    }
+  }
+  
+  // Now generate all matches with correct advancement IDs
+  for (let roundIndex = 0; roundIndex < numRounds; roundIndex++) {
+    const roundName = roundNames[roundIndex];
     rounds.push(roundName);
-
-    const nextRoundMatches: Array<{ team1Id: string | null; team2Id: string | null; matchId: string }> = [];
-
-    for (let i = 0; i < currentRoundMatches.length; i += 2) {
-      const match1 = currentRoundMatches[i];
-      const match2 = currentRoundMatches[i + 1];
-
-      const nextMatchId = round < numRounds - 1 ? `match_r${round + 2}_${Math.floor(i / 2) + 1}` : null;
-
-      // Create match 1
-      if (match1.team2Id) {
+    
+    const matchesInRound = Math.pow(2, numRounds - roundIndex - 1);
+    
+    for (let slotIndex = 0; slotIndex < matchesInRound; slotIndex++) {
+      const matchKey = `${roundIndex}_${slotIndex}`;
+      const matchNumber = matchIdMap[matchKey];
+      
+      if (!matchNumber) continue; // Skip byes
+      
+      // Determine advancement
+      const nextRoundIndex = roundIndex + 1;
+      const nextSlotIndex = Math.floor(slotIndex / 2);
+      const nextMatchKey = `${nextRoundIndex}_${nextSlotIndex}`;
+      const nextMatchNumber = matchIdMap[nextMatchKey];
+      const advancesToMatchId = nextMatchNumber ? `match_${nextMatchNumber}` : null;
+      
+      // First round: use actual teams
+      if (roundIndex === 0) {
+        const slot = firstRoundSlots[slotIndex];
+        
         matches.push({
           tournamentId,
           gameId: null,
           round: roundName,
-          matchNumber: matches.length + 1,
+          matchNumber,
           bracketType: null,
-          team1Id: match1.team1Id,
-          team2Id: match1.team2Id,
+          team1Id: slot.team1Id,
+          team2Id: slot.team2Id,
           winnerId: null,
           team1Score: null,
           team2Score: null,
-          advancesToMatchId: nextMatchId,
+          advancesToMatchId,
           scheduledTime: null,
           location: null,
           status: 'scheduled',
           notes: null
         });
-      }
-
-      // Create match 2 if exists
-      if (match2 && match2.team2Id) {
+      } else {
+        // Future rounds: TBD teams (filled in as matches are completed)
+        const prevMatch1Key = `${roundIndex - 1}_${slotIndex * 2}`;
+        const prevMatch2Key = `${roundIndex - 1}_${slotIndex * 2 + 1}`;
+        const prevMatch1Num = matchIdMap[prevMatch1Key];
+        const prevMatch2Num = matchIdMap[prevMatch2Key];
+        
         matches.push({
           tournamentId,
           gameId: null,
           round: roundName,
-          matchNumber: matches.length + 1,
+          matchNumber,
           bracketType: null,
-          team1Id: match2.team1Id,
-          team2Id: match2.team2Id,
+          team1Id: null, // Winner from previous round match
+          team2Id: null, // Winner from previous round match
           winnerId: null,
           team1Score: null,
           team2Score: null,
-          advancesToMatchId: nextMatchId,
+          advancesToMatchId,
           scheduledTime: null,
           location: null,
           status: 'scheduled',
-          notes: null
-        });
-      }
-
-      // Add to next round
-      if (round < numRounds - 1) {
-        nextRoundMatches.push({
-          team1Id: null, // TBD from match1 winner
-          team2Id: null, // TBD from match2 winner
-          matchId: nextMatchId!
+          notes: prevMatch1Num && prevMatch2Num 
+            ? `Winner of Match ${prevMatch1Num} vs Winner of Match ${prevMatch2Num}`
+            : null
         });
       }
     }
-
-    currentRoundMatches = nextRoundMatches;
   }
 
   return { matches, rounds };
