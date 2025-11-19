@@ -126,15 +126,15 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     return (
       <g key={match.id} transform={`translate(${x}, ${y})`}>
         <foreignObject width={MATCH_WIDTH} height={MATCH_HEIGHT}>
-          <Card className="h-full" data-testid={`card-match-${match.matchNumber}`}>
-            <CardHeader className="p-2">
+          <Card className="h-full border-2 border-primary/40 shadow-lg bg-card" data-testid={`card-match-${match.matchNumber}`}>
+            <CardHeader className="p-2 bg-primary/5">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xs font-medium text-muted-foreground">
+                <CardTitle className="text-xs font-semibold text-primary">
                   Match {match.matchNumber}
                 </CardTitle>
                 <Badge
                   variant={isCompleted ? 'default' : 'outline'}
-                  className="text-xs"
+                  className={`text-xs ${isCompleted ? 'bg-primary' : 'border-primary text-primary'}`}
                 >
                   {match.status}
                 </Badge>
@@ -143,17 +143,17 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
             <CardContent className="p-2 pt-0 space-y-1">
               {/* Team 1 */}
               <div
-                className={`flex items-center justify-between p-1.5 rounded text-sm ${
+                className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors ${
                   team1Wins
-                    ? 'bg-primary/10 border border-primary/20 font-semibold'
-                    : 'bg-muted/30'
+                    ? 'bg-primary text-primary-foreground font-bold shadow-sm'
+                    : 'bg-muted/50 hover:bg-muted'
                 }`}
               >
                 <span className="truncate" data-testid={`text-team1-${match.matchNumber}`}>
                   {getTeamName(match.team1Id)}
                 </span>
                 {match.team1Score !== null && (
-                  <span className="font-bold ml-2" data-testid={`text-score1-${match.matchNumber}`}>
+                  <span className="font-bold ml-2 text-lg" data-testid={`text-score1-${match.matchNumber}`}>
                     {match.team1Score}
                   </span>
                 )}
@@ -161,17 +161,17 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
 
               {/* Team 2 */}
               <div
-                className={`flex items-center justify-between p-1.5 rounded text-sm ${
+                className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors ${
                   team2Wins
-                    ? 'bg-primary/10 border border-primary/20 font-semibold'
-                    : 'bg-muted/30'
+                    ? 'bg-primary text-primary-foreground font-bold shadow-sm'
+                    : 'bg-muted/50 hover:bg-muted'
                 }`}
               >
                 <span className="truncate" data-testid={`text-team2-${match.matchNumber}`}>
                   {getTeamName(match.team2Id)}
                 </span>
                 {match.team2Score !== null && (
-                  <span className="font-bold ml-2" data-testid={`text-score2-${match.matchNumber}`}>
+                  <span className="font-bold ml-2 text-lg" data-testid={`text-score2-${match.matchNumber}`}>
                     {match.team2Score}
                   </span>
                 )}
@@ -179,7 +179,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
 
               {/* Match Notes */}
               {match.notes && (
-                <p className="text-xs text-muted-foreground italic truncate" data-testid={`text-notes-${match.matchNumber}`}>
+                <p className="text-xs text-muted-foreground italic truncate pt-1" data-testid={`text-notes-${match.matchNumber}`}>
                   {match.notes}
                 </p>
               )}
@@ -202,9 +202,9 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       <path
         d={`M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`}
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="2.5"
         fill="none"
-        className="text-muted-foreground/30"
+        className="text-primary/60"
       />
     );
   };
@@ -228,7 +228,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       elements.push(
         <g key={`label-w-${roundName}`} transform={`translate(${labelX}, ${-40})`}>
           <foreignObject width={MATCH_WIDTH} height={30}>
-            <div className="font-semibold text-sm text-muted-foreground bg-card px-2 py-1 rounded">
+            <div className="font-bold text-sm text-primary bg-primary/10 border border-primary/30 px-3 py-1 rounded-md">
               {roundName}
             </div>
           </foreignObject>
@@ -250,7 +250,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       elements.push(
         <g key="losers-title" transform={`translate(${losersXOffset}, ${winnersHeight + 20})`}>
           <foreignObject width={200} height={30}>
-            <div className="font-bold text-base text-muted-foreground">
+            <div className="font-bold text-base text-primary">
               Losers Bracket
             </div>
           </foreignObject>
@@ -272,7 +272,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
         elements.push(
           <g key={`label-l-${roundName}`} transform={`translate(${labelX}, ${labelY})`}>
             <foreignObject width={MATCH_WIDTH} height={30}>
-              <div className="font-semibold text-sm text-muted-foreground bg-card px-2 py-1 rounded">
+              <div className="font-bold text-sm text-primary bg-primary/10 border border-primary/30 px-3 py-1 rounded-md">
                 {roundName}
               </div>
             </foreignObject>
