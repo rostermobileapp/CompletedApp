@@ -6,10 +6,20 @@ Rosters is a free, comprehensive sports team management platform designed to str
 
 The platform now includes a comprehensive tournament/playoff system supporting:
 - **Tournament Types**: Season playoffs and standalone tournaments
-- **Formats**: Single elimination, double elimination, round robin, and round robin with divisions
-- **Features**: Auto-bracket generation, match scheduling, score tracking, format recommendations
+- **Formats**: Single elimination (canonical seeding with bye handling), double elimination (winners bracket), round robin, and split round robin
+- **Features**: 
+  - Canonical bracket generation (1v16, 2v15, etc.) with proper bye distribution
+  - Automatic match creation with advancement pointers
+  - Match scheduling and score tracking
+  - Format recommendations based on team count
+  - Touch-optimized mobile-first design
 - **Access Control**: Commissioner, Secondary Commissioner, and Admin only
-- **Status**: Backend complete, mobile-first web dashboard implemented, creator wizard in progress
+- **Backend Status**: Complete and architect-approved
+  - Database schema (3 tables: tournaments, tournament_teams, tournament_matches)
+  - API routes with full CRUD and permissions
+  - Bracket generator with canonical seeding and bye auto-advancement
+  - Format recommendation engine
+- **Frontend Status**: Dashboard built, creator wizard and bracket viewer in progress
 
 # User Preferences
 
