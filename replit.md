@@ -23,6 +23,9 @@ The platform now includes a comprehensive tournament/playoff system supporting:
   - Tournaments Dashboard (/leagues/:leagueId/tournaments) - List view with status badges
   - Tournament Creator (/leagues/:leagueId/tournaments/create) - 3-step wizard with enhanced format recommendations
   - Tournament Detail (/tournaments/:tournamentId) - Tabbed view (Bracket, Teams, Schedule)
+- **Navigation**: 
+  - Hamburger Menu → "Tournaments" button → League List → Select League → Dashboard Tournaments Card
+  - Dashboard → Tournaments Card (when league selected) → Tournament List
 - **Known Limitations**:
   - Double elimination is beta: Creates winners bracket + grand finals placeholder; losers bracket requires manual match setup
   - Match result recording UI is placeholder (infrastructure exists)
