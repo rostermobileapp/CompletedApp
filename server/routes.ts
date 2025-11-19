@@ -14,7 +14,9 @@ import {
   requireSpecialPermission
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount } from "@shared/schema";
+import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema } from "@shared/schema";
+import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit } from "./tournaments/bracketGenerator";
+import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
 import {
@@ -9969,6 +9971,288 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error checking in participant:", error);
       res.status(500).json({ message: "Failed to check in participant" });
+    }
+  });
+
+  // ==================== TOURNAMENT ROUTES ====================
+
+  // Get format recommendations for a team count
+  app.get('/api/tournaments/format-recommendations', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const numTeams = parseInt(req.query.numTeams as string);
+      
+      if (!numTeams || numTeams < 2) {
+        return res.status(400).json({ message: "Invalid team count" });
+      }
+
+      const recommendations = getFormatRecommendations(numTeams);
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Error getting format recommendations:", error);
+      res.status(500).json({ message: "Failed to get format recommendations" });
+    }
+  });
+
+  // List tournaments for a league
+  app.get('/api/leagues/:leagueId/tournaments', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+
+      const tournamentList = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.leagueId, leagueId))
+        .orderBy(sql`${tournaments.startDate} DESC NULLS LAST, ${tournaments.createdAt} DESC`);
+
+      res.json(tournamentList);
+    } catch (error) {
+      console.error("Error fetching tournaments:", error);
+      res.status(500).json({ message: "Failed to fetch tournaments" });
+    }
+  });
+
+  // Get single tournament with details
+  app.get('/api/tournaments/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, id));
+
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      // Get teams
+      const teams = await db
+        .select()
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.tournamentId, id))
+        .orderBy(tournamentTeams.seed);
+
+      // Get matches
+      const matches = await db
+        .select()
+        .from(tournamentMatches)
+        .where(eq(tournamentMatches.tournamentId, id))
+        .orderBy(tournamentMatches.matchNumber);
+
+      res.json({ ...tournament, teams, matches });
+    } catch (error) {
+      console.error("Error fetching tournament:", error);
+      res.status(500).json({ message: "Failed to fetch tournament" });
+    }
+  });
+
+  // Create tournament
+  app.post('/api/tournaments', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertTournamentSchema.parse({
+        ...req.body,
+        createdBy: userId
+      });
+
+      // Create tournament
+      const [tournament] = await db
+        .insert(tournaments)
+        .values(validatedData)
+        .returning();
+
+      res.status(201).json(tournament);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid tournament data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error creating tournament:", error);
+      res.status(500).json({ message: "Failed to create tournament" });
+    }
+  });
+
+  // Add teams to tournament and generate bracket
+  app.post('/api/tournaments/:id/generate-bracket', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { id: tournamentId } = req.params;
+      const { teams: teamData, format } = req.body;
+
+      // Validate tournament exists and is in draft status
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      if (tournament.status !== 'draft') {
+        return res.status(400).json({ message: "Cannot modify tournament after it has started" });
+      }
+
+      // Clear existing teams and matches
+      await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, tournamentId));
+      await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, tournamentId));
+
+      // Insert teams
+      const insertedTeams = await db
+        .insert(tournamentTeams)
+        .values(teamData.map((team: any) => ({
+          ...team,
+          tournamentId
+        })))
+        .returning();
+
+      // Generate bracket based on format
+      let bracketResult;
+      switch (format) {
+        case 'single_elimination':
+          bracketResult = generateSingleElimination(insertedTeams, tournamentId);
+          break;
+        case 'double_elimination':
+          bracketResult = generateDoubleElimination(insertedTeams, tournamentId);
+          break;
+        case 'round_robin':
+          bracketResult = generateRoundRobin(insertedTeams, tournamentId);
+          break;
+        case 'round_robin_split':
+          bracketResult = generateRoundRobinSplit(insertedTeams, tournamentId);
+          break;
+        default:
+          return res.status(400).json({ message: "Invalid tournament format" });
+      }
+
+      // Insert matches
+      const insertedMatches = await db
+        .insert(tournamentMatches)
+        .values(bracketResult.matches)
+        .returning();
+
+      res.json({ 
+        teams: insertedTeams, 
+        matches: insertedMatches,
+        rounds: bracketResult.rounds
+      });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid bracket data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error generating bracket:", error);
+      res.status(500).json({ message: "Failed to generate bracket" });
+    }
+  });
+
+  // Update tournament match (scheduling, scores, etc.)
+  app.patch('/api/tournament-matches/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+
+      const [updatedMatch] = await db
+        .update(tournamentMatches)
+        .set({
+          ...updates,
+          updatedAt: new Date()
+        })
+        .where(eq(tournamentMatches.id, id))
+        .returning();
+
+      if (!updatedMatch) {
+        return res.status(404).json({ message: "Match not found" });
+      }
+
+      // If this match is completed and has a winner, update wins/losses
+      if (updates.winnerId && updates.status === 'completed') {
+        const loserId = updatedMatch.team1Id === updates.winnerId 
+          ? updatedMatch.team2Id 
+          : updatedMatch.team1Id;
+
+        if (updates.winnerId) {
+          await db
+            .update(tournamentTeams)
+            .set({ wins: sql`${tournamentTeams.wins} + 1` })
+            .where(eq(tournamentTeams.id, updates.winnerId));
+        }
+
+        if (loserId) {
+          await db
+            .update(tournamentTeams)
+            .set({ losses: sql`${tournamentTeams.losses} + 1` })
+            .where(eq(tournamentTeams.id, loserId));
+        }
+      }
+
+      res.json(updatedMatch);
+    } catch (error) {
+      console.error("Error updating match:", error);
+      res.status(500).json({ message: "Failed to update match" });
+    }
+  });
+
+  // Start tournament (lock bracket)
+  app.post('/api/tournaments/:id/start', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
+      const [updated] = await db
+        .update(tournaments)
+        .set({ 
+          status: 'active',
+          updatedAt: new Date()
+        })
+        .where(and(
+          eq(tournaments.id, id),
+          eq(tournaments.status, 'draft')
+        ))
+        .returning();
+
+      if (!updated) {
+        return res.status(400).json({ message: "Tournament not found or already started" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error starting tournament:", error);
+      res.status(500).json({ message: "Failed to start tournament" });
+    }
+  });
+
+  // Delete tournament (draft only)
+  app.delete('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
+      // Only allow deleting draft tournaments
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, id));
+
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      if (tournament.status !== 'draft') {
+        return res.status(400).json({ message: "Cannot delete tournament after it has started" });
+      }
+
+      // Delete cascades to teams, matches, and stats
+      await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
+      await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, id));
+      await db.delete(tournamentStats).where(eq(tournamentStats.tournamentId, id));
+      await db.delete(tournaments).where(eq(tournaments.id, id));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting tournament:", error);
+      res.status(500).json({ message: "Failed to delete tournament" });
     }
   });
 
