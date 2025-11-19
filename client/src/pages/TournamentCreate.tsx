@@ -75,21 +75,55 @@ export default function TournamentCreate() {
   // Create tournament mutation
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const response = await apiRequest('POST', `/api/leagues/${leagueId}/tournaments`, {
+      if (!teams) {
+        throw new Error("Teams data not loaded");
+      }
+
+      // Step 1: Create tournament
+      const response = await apiRequest('POST', `/api/tournaments`, {
         leagueId: leagueId!,
         name: data.name,
         type: data.type,
         format: data.format,
-        description: data.description || null,
-        status: 'draft'
+        description: data.description || null
       });
 
       const tournament = await response.json();
 
-      // Add teams to tournament
-      await apiRequest('POST', `/api/tournaments/${tournament.id}/teams`, {
-        teamIds: data.teamIds
+      // Step 2: Add teams and generate bracket
+      const teamData = data.teamIds.map((teamId, index) => {
+        const team = teams.find(t => t.id === teamId);
+        if (!team) throw new Error(`Team ${teamId} not found`);
+        
+        return {
+          teamId: team.id,
+          teamName: team.name,
+          seed: index + 1,
+          wins: 0,
+          losses: 0
+        };
       });
+
+      try {
+        await apiRequest('POST', `/api/tournaments/${tournament.id}/generate-bracket`, {
+          teams: teamData,
+          format: data.format
+        });
+      } catch (bracketError: any) {
+        // Parse error response
+        let errorMsg = 'Unknown error';
+        try {
+          if (bracketError instanceof Response) {
+            const errorData = await bracketError.json();
+            errorMsg = errorData.message || errorMsg;
+          } else if (bracketError.message) {
+            errorMsg = bracketError.message;
+          }
+        } catch {
+          // Error parsing failed, use default
+        }
+        throw new Error(`Bracket generation failed: ${errorMsg}`);
+      }
 
       return tournament;
     },
@@ -97,14 +131,15 @@ export default function TournamentCreate() {
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'tournaments'] });
       toast({
         title: "Tournament created",
-        description: "Your tournament has been created successfully"
+        description: "Your tournament and bracket have been created successfully"
       });
       setLocation(`/tournaments/${tournament.id}`);
     },
-    onError: () => {
+    onError: (error: any) => {
+      const errorMessage = error?.message || "Failed to create tournament";
       toast({
         title: "Error",
-        description: "Failed to create tournament",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -324,6 +359,22 @@ export default function TournamentCreate() {
                       render={() => (
                         <FormItem>
                           <div className="space-y-2">
+                            <div className="flex items-center space-x-3 pb-3 border-b">
+                              <Checkbox
+                                checked={teams && teams.length > 0 && watchedTeamIds.length === teams.length}
+                                onCheckedChange={(checked) => {
+                                  if (checked && teams) {
+                                    form.setValue('teamIds', teams.map(t => t.id));
+                                  } else {
+                                    form.setValue('teamIds', []);
+                                  }
+                                }}
+                                data-testid="checkbox-select-all-teams"
+                              />
+                              <label className="font-medium cursor-pointer">
+                                Select All Teams
+                              </label>
+                            </div>
                             {teams?.map((team) => (
                               <FormField
                                 key={team.id}
