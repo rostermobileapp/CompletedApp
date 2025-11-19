@@ -1558,11 +1558,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leaguesWithCounts = await Promise.all(
         uniqueLeagues.map(async (league) => {
           try {
-            const tournaments = await storage.getTournamentsByLeagueId(league.id.toString());
+            const tournamentList = await db
+              .select()
+              .from(tournaments)
+              .where(eq(tournaments.leagueId, league.id.toString()));
+            
             return {
               ...league,
               uniqueLeagueId: league.uniqueLeagueId || (league as any).unique_league_id,
-              tournamentCount: tournaments.length
+              tournamentCount: tournamentList.length
             };
           } catch (error) {
             // If tournament fetch fails, return league with 0 count
