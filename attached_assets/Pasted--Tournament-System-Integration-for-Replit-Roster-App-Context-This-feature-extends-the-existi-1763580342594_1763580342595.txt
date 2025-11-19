@@ -1,0 +1,527 @@
+# Tournament System Integration for Replit Roster App
+
+## Context
+This feature extends the existing Replit Roster application by adding tournament/playoff functionality accessible via the hamburger menu. Only **Commissioner-tier users** can create and manage tournaments.
+
+## User Access & Authentication
+- **Feature Gate**: Check user role = "Commissioner" before displaying "Tournaments" menu option
+- **Menu Location**: Add "Tournaments" option in hamburger menu (navigation drawer)
+- **Entry Point**: Clicking opens Tournament Dashboard
+
+---
+
+## Tournament Types
+
+### 1. Season Playoffs
+- **Purpose**: Culmination of an existing season
+- **Team Source**: Pull from existing season roster
+- **Prerequisites**: 
+  - Active or completed season must exist
+  - Teams already registered in season
+- **Seeding Options**:
+  - Import season standings (if available)
+  - Manual seeding by commissioner
+  - Random seeding
+- **Link to Season**: Tournament remains associated with parent season
+
+### 2. Standalone Tournament
+- **Purpose**: Independent competition not tied to a season
+- **Team Source**: Manual entry or invitation
+- **Prerequisites**: None (can be created anytime)
+- **Team Entry Options**:
+  - Import teams from existing roster database
+  - Enter new teams for this tournament only
+  - Invite teams via email/link
+- **Independence**: Standalone entity in app
+
+---
+
+## User Flow
+
+### Step 1: Tournament Dashboard (New Screen)
+**For Commissioners:**
+- Display list of existing tournaments (past and active)
+- **Primary Actions**:
+  - "Create Season Playoff" button (if eligible seasons exist)
+  - "Create Standalone Tournament" button (always available)
+- **Tournament Cards Show**:
+  - Tournament name
+  - Type (Season Playoff / Standalone)
+  - Format
+  - Status (Draft / Active / Completed)
+  - Number of teams
+  - Start date
+  - Quick actions: Edit, View Bracket, Delete
+
+### Step 2: Tournament Type Selection
+User selects:
+- **Season Playoff**: Shows dropdown of eligible seasons → proceeds with season context
+- **Standalone Tournament**: Proceeds to independent setup
+
+### Step 3: Basic Tournament Setup
+User enters:
+- **Tournament Name** (required)
+  - For Season Playoffs: Auto-suggest "[Season Name] Playoffs"
+  - For Standalone: Free text entry
+- **Number of Teams** (required)
+  - For Season Playoffs: Default to season team count, allow reduction (in case some teams don't qualify)
+  - For Standalone: Manual numeric entry (2-128)
+- **Start Date** (optional)
+- **Tournament Description** (optional)
+
+**For Season Playoffs:**
+- Display existing season teams with checkboxes to include/exclude
+- Show seeding options:
+  - Use season standings
+  - Manual seed order (drag-and-drop interface)
+  - Random
+
+**For Standalone Tournaments:**
+- **Team Entry Method**:
+  - Manual entry (text inputs for team names)
+  - Select from existing teams in app database
+  - Generate placeholders (e.g., "Team 1", "Team 2")
+
+### Step 4: Format Recommendation Engine
+**System Analysis:**
+Automatically evaluate number of teams and display:
+- **Recommended Formats** (highlighted with badge)
+- **All Available Formats** (dimmed or in separate section)
+
+**Format Rules Engine:**
+
+| Format | Suitable When | Auto-Recommend If |
+|--------|---------------|-------------------|
+| **Single Elimination** | Any team count | Always available; recommend for 8, 16, 32, 64 teams |
+| **Double Elimination** | Want min 2 games/team | Recommend for 6-32 teams |
+| **Multilevel** | Equal game distribution | Recommend for 8-24 teams |
+| **Straight Round Robin** | Small groups | Recommend ONLY if teams ≤ 12 |
+| **Round Robin Double Split** | Too many for single RR | Recommend if 13-22 teams |
+| **Round Robin Triple Split** | Very large field | Recommend if 23-33 teams |
+| **Round Robin Quadruple Split** | Extremely large field | Show ONLY if teams ≥ 12; recommend if 34+ teams |
+| **Semi-Round Robin** | Uneven divisions | Show when teams % division_count ≠ 0 |
+| **Extended (Ladder/Pyramid)** | Ongoing flexible competition | Never auto-recommend for playoffs; always show as option |
+
+**Format Display Cards:**
+Each format card shows:
+- Format name
+- "RECOMMENDED" badge (if applicable)
+- Description (1-2 sentences)
+- **Pros**: Bullet list (e.g., "Fast", "Fair", "Exciting")
+- **Cons**: Bullet list (e.g., "Single elimination", "Many games required")
+- **Estimated Games**: Calculate and display
+  - Single Elim: `n - 1`
+  - Double Elim: `2n - 2` (approx)
+  - Round Robin: `n(n-1)/2`
+  - Split RR: Calculate per division + playoffs
+- **Visual Preview**: Small bracket/grid thumbnail
+- **Select Format** button
+
+### Step 5: Bracket/Schedule Generation
+Once format selected, system generates:
+
+**For Elimination Formats:**
+- Visual bracket tree (SVG or Canvas)
+- Match pairings with:
+  - Round labels (Round 1, Quarterfinals, Semifinals, Finals)
+  - Team matchups
+  - Empty slots for byes
+  - Winner advancement paths
+- For Double Elimination:
+  - Winners bracket
+  - Losers bracket
+  - Grand finals
+
+**For Round Robin Formats:**
+- Division assignments (if split format)
+- Round-robin grid per division:
+  - Rows/columns = teams
+  - Cells = match-ups
+- Playoff bracket (if applicable for split formats)
+
+**Display Components:**
+- Interactive bracket visualization
+- Match list view (table format):
+  - Match #
+  - Round/Division
+  - Team 1 vs Team 2
+  - Date/Time (editable)
+  - Location (editable)
+  - Status (Scheduled/In Progress/Completed)
+
+### Step 6: Schedule Editing
+**Commissioner Can:**
+- **Assign Game Details** (inline editing or modal):
+  - Date & Time picker
+  - Location dropdown (pull from app's venue database if exists, else text input)
+  - Notes field
+- **Edit Team Names**: Click-to-edit inline
+- **Rearrange Seeding**: Drag-and-drop teams in initial bracket
+- **All changes update bracket in real-time**
+
+**Auto-save**: Changes persist immediately (save to database)
+
+### Step 7: Review & Finalize
+- "Preview Tournament" view showing full bracket/schedule
+- **Action Buttons**:
+  - **"Start Tournament"**: Locks bracket, changes status to Active
+  - **"Save as Draft"**: Saves but keeps editable
+  - **"Choose Different Format"**: Returns to Step 4 (format selection) - preserves team data
+  - **"Cancel"**: Returns to Tournament Dashboard
+
+---
+
+## Data Model Integration
+
+### Database Schema Additions
+
+**`tournaments` Table:**
+```sql
+id (PK)
+season_id (FK, nullable) -- null for standalone
+name (text, required)
+type (enum: 'season_playoff', 'standalone')
+format (enum: 'single_elimination', 'double_elimination', ...)
+status (enum: 'draft', 'active', 'completed')
+num_teams (integer)
+start_date (date, nullable)
+description (text, nullable)
+created_by_user_id (FK)
+created_at (timestamp)
+settings (jsonb) -- seeding method, division count, etc.
+```
+
+**`tournament_teams` Table:**
+```sql
+id (PK)
+tournament_id (FK)
+team_id (FK, nullable) -- null if standalone tournament with new teams
+team_name (text) -- denormalized for standalone tournaments
+seed (integer)
+division (text, nullable) -- for split round robin
+```
+
+**`tournament_matches` Table:**
+```sql
+id (PK)
+tournament_id (FK)
+round (text) -- "Round 1", "Semifinals", "Finals", "Division A Round 1"
+match_number (integer)
+bracket_type (enum: 'winners', 'losers', 'finals') -- for double elim
+team1_id (FK to tournament_teams)
+team2_id (FK to tournament_teams)
+scheduled_time (timestamp, nullable)
+location (text, nullable)
+status (enum: 'scheduled', 'in_progress', 'completed')
+winner_id (FK to tournament_teams, nullable)
+score_team1 (integer, nullable)
+score_team2 (integer, nullable)
+advances_to_match_id (FK, nullable) -- next match for winner
+notes (text, nullable)
+```
+
+**`tournament_bracket_structure` Table:**
+```sql
+id (PK)
+tournament_id (FK)
+bracket_data (jsonb) -- full bracket structure for visualization
+```
+
+### JSON Structure Examples
+
+**Single Elimination Bracket:**
+```json
+{
+  "format": "single_elimination",
+  "teams": [
+    {"id": 1, "name": "Eagles", "seed": 1},
+    {"id": 2, "name": "Hawks", "seed": 2}
+  ],
+  "rounds": [
+    {
+      "name": "Round 1",
+      "matches": [
+        {
+          "id": 1,
+          "team1": 1,
+          "team2": 2,
+          "location": "Rink A",
+          "time": "2025-03-01T18:00:00",
+          "winner_advances_to": 5
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Round Robin Split:**
+```json
+{
+  "format": "round_robin_double_split",
+  "divisions": [
+    {
+      "name": "Division A",
+      "teams": [1, 2, 3, 4],
+      "matches": [...]
+    },
+    {
+      "name": "Division B", 
+      "teams": [5, 6, 7, 8],
+      "matches": [...]
+    }
+  ],
+  "playoffs": {
+    "format": "single_elimination",
+    "qualifiers": 2,
+    "matches": [...]
+  }
+}
+```
+
+---
+
+## Format Generation Logic
+
+### Module Structure
+```
+/logic/tournaments/
+  ├── formatRules.js        # Rules engine for recommendations
+  ├── generators/
+  │   ├── singleElimination.js
+  │   ├── doubleElimination.js
+  │   ├── roundRobin.js
+  │   ├── splitRoundRobin.js
+  │   ├── semiRoundRobin.js
+  │   └── extended.js
+  └── bracketUtils.js       # Common utilities
+
+/components/tournaments/
+  ├── TournamentDashboard.jsx
+  ├── TournamentSetup.jsx
+  ├── FormatSelector.jsx
+  ├── BracketView.jsx
+  ├── MatchEditor.jsx
+  └── ScheduleGrid.jsx
+```
+
+### Key Functions
+
+**Format Rules Engine:**
+```javascript
+function getRecommendedFormats(numTeams) {
+  const recommendations = [];
+  
+  // Logic for each format
+  if (isPowerOfTwo(numTeams)) {
+    recommendations.push('single_elimination');
+  }
+  if (numTeams >= 6 && numTeams <= 32) {
+    recommendations.push('double_elimination');
+  }
+  if (numTeams <= 12) {
+    recommendations.push('straight_round_robin');
+  }
+  // ... etc
+  
+  return recommendations;
+}
+```
+
+**Bracket Generator Template:**
+```javascript
+function generateSingleElimination(teams) {
+  const numRounds = Math.ceil(Math.log2(teams.length));
+  const matches = [];
+  
+  // Create first round matchups
+  // Handle byes if not power of 2
+  // Build advancement tree
+  
+  return {
+    format: 'single_elimination',
+    rounds: [...],
+    matches: [...]
+  };
+}
+```
+
+---
+
+## UI/UX Requirements
+
+### Visual Bracket Rendering
+- Use **react-bracket-tournament** or custom SVG rendering
+- **Interactive Features**:
+  - Click match to edit details
+  - Hover shows full info tooltip
+  - Zoom/pan for large brackets
+  - Mobile-responsive (collapsible rounds)
+
+### Real-time Updates
+- Changes to match details reflect immediately in bracket
+- Use optimistic UI updates
+- WebSocket or polling for multi-user scenarios (optional v2 feature)
+
+### Validation & Error Handling
+- **Pre-submit Validation**:
+  - Team count ≥ 2
+  - No duplicate team names
+  - Format appropriate for team count
+- **Error Messages**:
+  - Friendly, specific (e.g., "Round Robin requires at least 3 teams")
+  - Highlight invalid fields
+- **Confirmation Dialogs**:
+  - Before deleting tournament
+  - Before starting tournament (locks bracket)
+  - When choosing different format (warns about losing edits)
+
+---
+
+## Permission & Role Checks
+
+**Commissioner-Only Actions:**
+- Create tournament
+- Edit tournament settings
+- Assign match details
+- Start/finalize tournament
+- Delete tournament
+
+**Other Users Can:**
+- View active/completed tournaments
+- View brackets and schedules
+- (Future) Register teams for standalone tournaments if invited
+
+**Implementation:**
+```javascript
+// Middleware/Guard
+function requireCommissioner(req, res, next) {
+  if (req.user.role !== 'commissioner') {
+    return res.status(403).json({ error: 'Commissioner access required' });
+  }
+  next();
+}
+```
+
+---
+
+## Export & Sharing (Future Enhancement)
+
+**Phase 2 Features:**
+- Export bracket to PDF
+- Export schedule to CSV
+- Print-friendly view
+- Public share link (read-only)
+- Email schedule to participants
+- Embed bracket on external website
+
+**Design Consideration:**
+Structure code to make these easy to add:
+- Separate rendering logic from data
+- Use standard formats (JSON, HTML table)
+- Add export button placeholders
+
+---
+
+## Success Criteria
+
+A successful implementation allows a Commissioner to:
+1. ✅ Navigate to Tournaments from hamburger menu
+2. ✅ Choose between Season Playoff or Standalone Tournament
+3. ✅ Enter or select teams (with seeding options for playoffs)
+4. ✅ Receive format recommendations based on team count
+5. ✅ Select a tournament format and see it generated
+6. ✅ View an interactive, visual bracket
+7. ✅ Edit game times, locations, and team names inline
+8. ✅ Return to format selection if unsatisfied
+9. ✅ Save tournament as draft or activate it
+10. ✅ Access and manage all tournaments from dashboard
+
+---
+
+## Development Priorities
+
+**Phase 1 (MVP):**
+- Authentication/role check
+- Tournament dashboard
+- Basic setup flow
+- Single Elimination generator
+- Simple bracket visualization
+- Match editing
+- Save/load tournaments
+
+**Phase 2:**
+- Double Elimination
+- Round Robin variants
+- Enhanced bracket UI
+- Seeding from season standings
+
+**Phase 3:**
+- All remaining formats
+- Export features
+- Public sharing
+- Team registration portal
+
+---
+
+## Testing Requirements
+
+**Unit Tests:**
+- Format recommendation logic
+- Bracket generation for each format
+- Bye handling
+- Match advancement logic
+
+**Integration Tests:**
+- Full tournament creation flow
+- Season playoff team import
+- Permission checks
+- Database operations
+
+**User Acceptance:**
+- Commissioner can complete entire flow
+- Bracket displays correctly
+- Edits persist
+- Format switching works without data loss
+
+---
+
+## Notes for Implementation
+
+1. **Start Simple**: Build Single Elimination first, then expand
+2. **Modular Design**: Each format is a separate generator module
+3. **Extensibility**: Use factory pattern for format generators
+4. **State Management**: Consider Zustand or Redux for complex bracket state
+5. **Mobile First**: Ensure brackets are usable on small screens
+6. **Performance**: Lazy-load bracket rendering for large tournaments
+7. **Accessibility**: Ensure keyboard navigation and screen reader support
+
+---
+
+## Example Code Structure
+
+```javascript
+// Route Protection
+<Route path="/tournaments" element={
+  <RequireRole role="commissioner">
+    <TournamentDashboard />
+  </RequireRole>
+} />
+
+// Tournament Creation Flow
+function TournamentSetup() {
+  const [step, setStep] = useState(1);
+  const [tournamentData, setTournamentData] = useState({});
+  
+  return (
+    <>
+      {step === 1 && <TypeSelection onNext={...} />}
+      {step === 2 && <BasicSetup onNext={...} />}
+      {step === 3 && <FormatSelector teams={...} onNext={...} />}
+      {step === 4 && <BracketEditor bracket={...} onSave={...} />}
+    </>
+  );
+}
+```
+
+This comprehensive prompt should give your development team or AI assistant everything needed to build a fully-integrated tournament system for your Replit Roster app!
