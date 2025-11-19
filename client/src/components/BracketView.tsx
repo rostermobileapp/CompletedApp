@@ -120,8 +120,9 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
 
   const renderMatch = (match: TournamentMatch, x: number, y: number) => {
     const isCompleted = match.status === 'completed';
-    const team1Wins = match.winnerId === match.team1Id;
-    const team2Wins = match.winnerId === match.team2Id;
+    // Only highlight if there's an actual winner (avoid null === null bug)
+    const team1Wins = match.winnerId != null && match.winnerId === match.team1Id;
+    const team2Wins = match.winnerId != null && match.winnerId === match.team2Id;
 
     return (
       <g key={match.id} transform={`translate(${x}, ${y})`}>
@@ -190,7 +191,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     );
   };
 
-  const renderConnector = (fromX: number, fromY: number, toX: number, toY: number, fromBottom = false) => {
+  const renderConnector = (fromX: number, fromY: number, toX: number, toY: number, fromBottom = false, isLoserPath = false) => {
     const startX = fromX + MATCH_WIDTH;
     const startY = fromY + (fromBottom ? MATCH_HEIGHT : MATCH_HEIGHT / 2);
     const endX = toX;
@@ -198,13 +199,20 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     
     const midX = (startX + endX) / 2;
     
+    // Different styling for loser paths vs winner paths
+    const strokeClass = isLoserPath ? 'text-destructive/50' : 'text-primary/70';
+    const strokeDash = isLoserPath ? '5,5' : 'none';
+    const markerEnd = isLoserPath ? 'url(#arrowhead-loser)' : 'url(#arrowhead-winner)';
+    
     return (
       <path
         d={`M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`}
         stroke="currentColor"
-        strokeWidth="2.5"
+        strokeWidth="3"
+        strokeDasharray={strokeDash}
         fill="none"
-        className="text-primary/60"
+        className={strokeClass}
+        markerEnd={markerEnd}
       />
     );
   };
@@ -294,7 +302,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
           
           elements.push(
             <g key={`connector-${match.id}`}>
-              {renderConnector(fromPos.x, fromPos.y, toPos.x, toPos.y, isLosersConnection)}
+              {renderConnector(fromPos.x, fromPos.y, toPos.x, toPos.y, isLosersConnection, isLosersConnection)}
             </g>
           );
         }
@@ -421,6 +429,32 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
             transition: isDragging ? 'none' : 'transform 0.1s'
           }}
         >
+          {/* Arrow marker definitions */}
+          <defs>
+            <marker
+              id="arrowhead-winner"
+              markerWidth="10"
+              markerHeight="10"
+              refX="9"
+              refY="3"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--primary))" />
+            </marker>
+            <marker
+              id="arrowhead-loser"
+              markerWidth="10"
+              markerHeight="10"
+              refX="9"
+              refY="3"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--destructive))" />
+            </marker>
+          </defs>
+          
           <g transform={`scale(${zoom})`}>
             <g transform="translate(50, 80)">
               {renderBracket()}
