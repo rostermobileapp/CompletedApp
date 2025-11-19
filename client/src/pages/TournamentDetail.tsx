@@ -170,19 +170,26 @@ export default function TournamentDetail() {
               
               <div className="flex items-center gap-2 flex-shrink-0">
                 {tournament.status === 'draft' && (
-                  <Button 
-                    variant="destructive" 
-                    size="default"
-                    onClick={() => setShowDeleteDialog(true)}
-                    data-testid="button-delete"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="default"
+                      onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
+                      data-testid="button-edit"
+                    >
+                      Edit Settings
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="default"
+                      onClick={() => setShowDeleteDialog(true)}
+                      data-testid="button-delete"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  </>
                 )}
-                <Button variant="outline" size="default" data-testid="button-settings">
-                  Settings
-                </Button>
               </div>
             </div>
 
