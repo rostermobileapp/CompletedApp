@@ -142,54 +142,64 @@ export default function TournamentDetail() {
       {/* Header */}
       <div className="border-b bg-card">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
-          <div className="flex items-start gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setLocation(`/leagues/${tournament.leagueId}/tournaments`)}
-              className="mt-1"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex-1 space-y-3">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                <div className="space-y-2">
-                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="text-tournament-name">
-                    <Trophy className="h-7 w-7 text-primary" />
-                    {tournament.name}
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {getStatusBadge(tournament.status)}
-                    <Badge variant="outline">
-                      {tournament.type === 'season_playoff' ? 'Season Playoff' : 'Standalone'}
-                    </Badge>
-                    <Badge variant="outline">
-                      {getFormatLabel(tournament.format)}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {tournament.status === 'draft' && (
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      onClick={() => setShowDeleteDialog(true)}
-                      data-testid="button-delete"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" data-testid="button-settings">
-                    Settings
-                  </Button>
-                </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation(`/leagues/${tournament.leagueId}/tournaments`)}
+            className="mb-4 -ml-2"
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Tournaments
+          </Button>
+          
+          <div className="space-y-6">
+            {/* Title and Actions */}
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div className="space-y-2">
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center gap-3" data-testid="text-tournament-name">
+                  <Trophy className="h-8 w-8 md:h-9 md:w-9 text-primary" />
+                  {tournament.name}
+                </h1>
+                {tournament.description && (
+                  <p className="text-muted-foreground max-w-2xl" data-testid="text-tournament-description">
+                    {tournament.description}
+                  </p>
+                )}
               </div>
-              {tournament.description && (
-                <p className="text-sm text-muted-foreground" data-testid="text-tournament-description">
-                  {tournament.description}
-                </p>
+              
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {tournament.status === 'draft' && (
+                  <Button 
+                    variant="destructive" 
+                    size="default"
+                    onClick={() => setShowDeleteDialog(true)}
+                    data-testid="button-delete"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                )}
+                <Button variant="outline" size="default" data-testid="button-settings">
+                  Settings
+                </Button>
+              </div>
+            </div>
+
+            {/* Metadata Badges */}
+            <div className="flex flex-wrap items-center gap-3">
+              {getStatusBadge(tournament.status)}
+              <Badge variant="outline" className="font-normal">
+                {tournament.type === 'season_playoff' ? 'Season Playoff' : 'Standalone'}
+              </Badge>
+              <Badge variant="outline" className="font-normal">
+                {getFormatLabel(tournament.format)}
+              </Badge>
+              {teams && teams.length > 0 && (
+                <Badge variant="secondary" className="font-normal">
+                  <Users className="h-3 w-3 mr-1" />
+                  {teams.length} {teams.length === 1 ? 'team' : 'teams'}
+                </Badge>
               )}
             </div>
           </div>
