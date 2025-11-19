@@ -106,6 +106,27 @@ export const gameResultTypeEnum = pgEnum("game_result_type", [
   "shootout"
 ]);
 
+// Tournament type enum
+export const tournamentTypeEnum = pgEnum("tournament_type", [
+  "season_playoff",
+  "standalone"
+]);
+
+// Tournament format enum
+export const tournamentFormatEnum = pgEnum("tournament_format", [
+  "single_elimination",
+  "double_elimination",
+  "round_robin",
+  "round_robin_split"
+]);
+
+// Tournament status enum
+export const tournamentStatusEnum = pgEnum("tournament_status", [
+  "draft",
+  "active",
+  "completed"
+]);
+
 // User role enum
 export const userRoleEnum = pgEnum("user_role", [
   "commissioner",
@@ -371,6 +392,91 @@ export const dutyAssignments = pgTable("duty_assignments", {
   index("idx_duty_assignments_game_id").on(table.gameId),
   index("idx_duty_assignments_user_id").on(table.userId),
   index("idx_duty_assignments_template_id").on(table.dutyTemplateId),
+]);
+
+// Tournaments table
+export const tournaments = pgTable("tournaments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  seasonId: varchar("season_id").references(() => seasons.id), // null for standalone
+  type: tournamentTypeEnum("type").notNull(),
+  format: tournamentFormatEnum("format").notNull(),
+  status: tournamentStatusEnum("status").default("draft").notNull(),
+  numTeams: integer("num_teams").notNull(),
+  startDate: timestamp("start_date"),
+  description: text("description"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  settings: jsonb("settings"), // seeding method, division count, etc.
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_tournaments_league_id").on(table.leagueId),
+  index("idx_tournaments_season_id").on(table.seasonId),
+  index("idx_tournaments_status").on(table.status),
+]);
+
+// Tournament teams table
+export const tournamentTeams = pgTable("tournament_teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tournamentId: varchar("tournament_id").references(() => tournaments.id).notNull(),
+  teamId: varchar("team_id").references(() => teams.id), // null if new team for standalone
+  teamName: varchar("team_name").notNull(), // denormalized for flexibility
+  seed: integer("seed").notNull(),
+  division: varchar("division"), // for split round robin
+  wins: integer("wins").default(0).notNull(),
+  losses: integer("losses").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_tournament_teams_tournament_id").on(table.tournamentId),
+  index("idx_tournament_teams_team_id").on(table.teamId),
+]);
+
+// Tournament matches table  
+export const tournamentMatches = pgTable("tournament_matches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tournamentId: varchar("tournament_id").references(() => tournaments.id).notNull(),
+  gameId: varchar("game_id").references(() => games.id), // link to actual game record for calendar
+  round: varchar("round").notNull(), // "Round 1", "Semifinals", "Finals", "Division A"
+  matchNumber: integer("match_number").notNull(),
+  bracketType: varchar("bracket_type"), // "winners", "losers", "grand_final" for double elim
+  team1Id: varchar("team1_id").references(() => tournamentTeams.id),
+  team2Id: varchar("team2_id").references(() => tournamentTeams.id),
+  winnerId: varchar("winner_id").references(() => tournamentTeams.id),
+  team1Score: integer("team1_score"),
+  team2Score: integer("team2_score"),
+  advancesToMatchId: varchar("advances_to_match_id"), // Self-reference - ID of next match winner advances to
+  scheduledTime: timestamp("scheduled_time"),
+  location: varchar("location"),
+  status: varchar("status").default("scheduled"), // scheduled, in_progress, completed
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_tournament_matches_tournament_id").on(table.tournamentId),
+  index("idx_tournament_matches_game_id").on(table.gameId),
+  index("idx_tournament_matches_team1").on(table.team1Id),
+  index("idx_tournament_matches_team2").on(table.team2Id),
+]);
+
+// Tournament stats table - separate from season stats
+export const tournamentStats = pgTable("tournament_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tournamentId: varchar("tournament_id").references(() => tournaments.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  teamId: varchar("team_id").references(() => tournamentTeams.id).notNull(),
+  gamesPlayed: integer("games_played").default(0).notNull(),
+  goals: integer("goals").default(0).notNull(),
+  assists: integer("assists").default(0).notNull(),
+  points: integer("points").default(0).notNull(),
+  penaltyMinutes: integer("penalty_minutes").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_tournament_user_team_stats").on(table.tournamentId, table.userId, table.teamId),
+  index("idx_tournament_stats_tournament_id").on(table.tournamentId),
+  index("idx_tournament_stats_user_id").on(table.userId),
+  index("idx_tournament_stats_team_id").on(table.teamId),
 ]);
 
 // Personal reminders table
@@ -2548,3 +2654,33 @@ export type EventParticipantWithUser = EventParticipant & {
 export const insertVisitorCountSchema = createInsertSchema(visitorCount);
 export type VisitorCount = typeof visitorCount.$inferSelect;
 export type InsertVisitorCount = z.infer<typeof insertVisitorCountSchema>;
+
+// Tournament schemas
+export const insertTournamentSchema = createInsertSchema(tournaments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTournamentTeamSchema = createInsertSchema(tournamentTeams).omit({ id: true, createdAt: true });
+export const insertTournamentMatchSchema = createInsertSchema(tournamentMatches).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTournamentStatsSchema = createInsertSchema(tournamentStats).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type Tournament = typeof tournaments.$inferSelect;
+export type InsertTournament = z.infer<typeof insertTournamentSchema>;
+export type TournamentTeam = typeof tournamentTeams.$inferSelect;
+export type InsertTournamentTeam = z.infer<typeof insertTournamentTeamSchema>;
+export type TournamentMatch = typeof tournamentMatches.$inferSelect;
+export type InsertTournamentMatch = z.infer<typeof insertTournamentMatchSchema>;
+export type TournamentStats = typeof tournamentStats.$inferSelect;
+export type InsertTournamentStats = z.infer<typeof insertTournamentStatsSchema>;
+
+// Extended tournament types with relationships
+export type TournamentWithDetails = Tournament & {
+  teams: TournamentTeam[];
+  matches: TournamentMatch[];
+  creator: User;
+  league: League;
+  season?: Season;
+};
+
+export type TournamentMatchWithTeams = TournamentMatch & {
+  team1?: TournamentTeam;
+  team2?: TournamentTeam;
+  winner?: TournamentTeam;
+};
