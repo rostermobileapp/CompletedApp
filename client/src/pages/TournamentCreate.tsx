@@ -32,9 +32,19 @@ type FormatRecommendation = {
 const formSchema = z.object({
   name: z.string().min(1, "Tournament name is required"),
   type: z.enum(["season_playoff", "standalone"]),
+  seasonId: z.string().optional(),
   format: z.enum(["single_elimination", "double_elimination", "round_robin", "round_robin_split"]),
   description: z.string().optional(),
   teamIds: z.array(z.string()).min(2, "Select at least 2 teams")
+}).refine((data) => {
+  // Season playoffs require a valid seasonId
+  if (data.type === "season_playoff") {
+    return data.seasonId && data.seasonId.trim() !== "";
+  }
+  return true;
+}, {
+  message: "Please select a season for this playoff tournament",
+  path: ["seasonId"]
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -51,6 +61,7 @@ export default function TournamentCreate() {
     defaultValues: {
       name: "",
       type: "season_playoff",
+      seasonId: undefined,
       format: "single_elimination",
       description: "",
       teamIds: []
@@ -59,10 +70,17 @@ export default function TournamentCreate() {
 
   const watchedTeamIds = form.watch("teamIds");
   const watchedFormat = form.watch("format");
+  const watchedType = form.watch("type");
 
   // Fetch league teams
   const { data: teams, isLoading: teamsLoading } = useQuery<Team[]>({
     queryKey: ['/api/leagues', leagueId, 'teams'],
+    enabled: !!leagueId
+  });
+
+  // Fetch league seasons
+  const { data: seasons } = useQuery<any[]>({
+    queryKey: ['/api/leagues', leagueId, 'seasons'],
     enabled: !!leagueId
   });
 
@@ -84,7 +102,9 @@ export default function TournamentCreate() {
         leagueId: leagueId!,
         name: data.name,
         type: data.type,
+        seasonId: data.type === "season_playoff" ? (data.seasonId || null) : null,
         format: data.format,
+        numTeams: data.teamIds.length,
         description: data.description || null
       });
 
@@ -151,7 +171,7 @@ export default function TournamentCreate() {
 
   const nextStep = async () => {
     const fieldsToValidate = step === 1 
-      ? ["name", "type", "format", "description"] as const
+      ? ["name", "type", "seasonId", "format", "description"] as const
       : ["teamIds"] as const;
     
     const isValid = await form.trigger(fieldsToValidate);
@@ -281,6 +301,43 @@ export default function TournamentCreate() {
                       </FormItem>
                     )}
                   />
+
+                  {watchedType === "season_playoff" && (
+                    <FormField
+                      control={form.control}
+                      name="seasonId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Season</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-tournament-season">
+                                <SelectValue placeholder="Select a season" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {seasons && seasons.length > 0 ? (
+                                seasons.map((season) => (
+                                  <SelectItem key={season.id} value={season.id}>
+                                    {season.name}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="_none" disabled>No seasons available</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Select which season this playoff is for
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   <FormField
                     control={form.control}
