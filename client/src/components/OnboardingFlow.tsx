@@ -148,6 +148,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
   });
 
   const completeOnboardingMutation = useMutation({
+    mutationKey: ['complete-onboarding', Date.now()], // Force unique mutation each time
     mutationFn: async (data: any) => {
       const payload = {
         ...data,
@@ -225,15 +226,31 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
   const handleComplete = async () => {
     console.log('handleComplete called!');
     try {
-      console.log('About to call mutation...', { selectedFacility });
+      console.log('About to make direct API call...', { selectedFacility });
       
-      // Just mark onboarding as complete, don't change role
-      const result = await completeOnboardingMutation.mutateAsync({
+      // Make direct API call instead of using mutation
+      const response = await apiRequest('PATCH', '/api/user/onboarding', {
         selectedFacilityId: selectedFacility?.id || null,
+        onboardingCompleted: true,
       });
-      console.log('Mutation result:', result);
+      
+      const result = await response.json();
+      console.log('Direct API call result:', result);
+      
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/onboarding'] });
+      
+      // Show success toast
+      toast({
+        title: isReplay ? 'Profile updated!' : 'Welcome to Roster!',
+        description: isReplay ? 'Your information has been updated.' : 'You\'re all set to start using the app.',
+      });
+      
+      // Close the modal
+      onComplete();
     } catch (error) {
-      console.error('Mutation error:', error);
+      console.error('API call error:', error);
       toast({
         title: 'Error',
         description: 'Failed to complete onboarding. Please try again.',
