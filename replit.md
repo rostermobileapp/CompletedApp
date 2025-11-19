@@ -1,6 +1,15 @@
 # Overview
 
-Rosters is a free, comprehensive sports team management platform designed to streamline sports team management for various sports. It offers league and team organization, game scheduling, and messaging functionalities. The platform operates on a freemium model with subscription-gated features, aiming to provide a robust solution for sports enthusiasts and administrators.
+Rosters is a free, comprehensive sports team management platform designed to streamline sports team management for various sports. It offers league and team organization, game scheduling, messaging, and tournament/playoff management functionalities. The platform operates on a freemium model with subscription-gated features, aiming to provide a robust solution for sports enthusiasts and administrators.
+
+## Tournament System (In Progress - Nov 2025)
+
+The platform now includes a comprehensive tournament/playoff system supporting:
+- **Tournament Types**: Season playoffs and standalone tournaments
+- **Formats**: Single elimination, double elimination, round robin, and round robin with divisions
+- **Features**: Auto-bracket generation, match scheduling, score tracking, format recommendations
+- **Access Control**: Commissioner, Secondary Commissioner, and Admin only
+- **Status**: Backend complete, mobile-first web dashboard implemented, creator wizard in progress
 
 # User Preferences
 
