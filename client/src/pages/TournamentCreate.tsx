@@ -35,7 +35,8 @@ const formSchema = z.object({
   seasonId: z.string().optional(),
   format: z.enum(["single_elimination", "double_elimination", "round_robin", "round_robin_split"]),
   description: z.string().optional(),
-  teamIds: z.array(z.string()).min(2, "Select at least 2 teams")
+  teamIds: z.array(z.string()).min(2, "Select at least 2 teams"),
+  byePolicy: z.enum(["top_seed_bye", "play_in_game"]).optional()
 }).refine((data) => {
   // Season playoffs require a valid seasonId
   if (data.type === "season_playoff") {
@@ -64,7 +65,8 @@ export default function TournamentCreate() {
       seasonId: undefined,
       format: "single_elimination",
       description: "",
-      teamIds: []
+      teamIds: [],
+      byePolicy: "top_seed_bye"
     }
   });
 
@@ -98,6 +100,11 @@ export default function TournamentCreate() {
       }
 
       // Step 1: Create tournament
+      const settings: any = {};
+      if (data.byePolicy) {
+        settings.byePolicy = data.byePolicy;
+      }
+      
       const response = await apiRequest('POST', `/api/tournaments`, {
         leagueId: leagueId!,
         name: data.name,
@@ -105,7 +112,8 @@ export default function TournamentCreate() {
         seasonId: data.type === "season_playoff" ? (data.seasonId || null) : null,
         format: data.format,
         numTeams: data.teamIds.length,
-        description: data.description || null
+        description: data.description || null,
+        settings: Object.keys(settings).length > 0 ? settings : null
       });
 
       const tournament = await response.json();
@@ -374,6 +382,38 @@ export default function TournamentCreate() {
                       </FormItem>
                     )}
                   />
+
+                  {/* Bye Policy - Only show for elimination formats with odd number of teams */}
+                  {(watchedFormat === "single_elimination" || watchedFormat === "double_elimination") && 
+                   watchedTeamIds.length % 2 === 1 && watchedTeamIds.length > 0 && (
+                    <FormField
+                      control={form.control}
+                      name="byePolicy"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bye Week Policy</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-bye-policy">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="top_seed_bye">Top Seed Gets Bye to Round 2</SelectItem>
+                              <SelectItem value="play_in_game">Bottom 2 Seeds Play Play-In Game</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            With {watchedTeamIds.length} teams, one option is needed. Either the top seed advances automatically or the bottom 2 teams play for the final spot.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   <FormField
                     control={form.control}

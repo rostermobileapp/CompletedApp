@@ -10288,12 +10288,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate bracket based on format
       let bracketResult;
+      const settings = tournament.settings as any || {};
+      
       switch (format) {
         case 'single_elimination':
-          bracketResult = generateSingleElimination(insertedTeams, tournamentId);
+          bracketResult = generateSingleElimination(insertedTeams, tournamentId, settings);
           break;
         case 'double_elimination':
-          bracketResult = generateDoubleElimination(insertedTeams, tournamentId);
+          bracketResult = generateDoubleElimination(insertedTeams, tournamentId, settings);
           break;
         case 'round_robin':
           bracketResult = generateRoundRobin(insertedTeams, tournamentId);
