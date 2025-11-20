@@ -428,6 +428,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
   };
 
   const { width: svgWidth, height: svgHeight } = calculateDimensions();
+  
+  console.log('🔍 SVG Dimensions:', { width: svgWidth, height: svgHeight, hasLosers, losersRounds: losersRounds.length });
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -515,6 +517,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
         <svg
           width={svgWidth * zoom}
           height={svgHeight * zoom}
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          preserveAspectRatio="xMidYMid meet"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px)`,
             transition: isDragging ? 'none' : 'transform 0.1s'
@@ -546,10 +550,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
             </marker>
           </defs>
           
-          <g transform={`scale(${zoom})`}>
-            <g transform="translate(50, 80)">
-              {renderBracket()}
-            </g>
+          <g transform="translate(50, 80)">
+            {renderBracket()}
           </g>
         </svg>
       </div>
