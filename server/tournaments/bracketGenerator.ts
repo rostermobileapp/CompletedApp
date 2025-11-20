@@ -270,14 +270,27 @@ export function generateDoubleElimination(
   
   const losersRounds = (winnersRounds * 2) - 1;
   
-  // Calculate match counts for each winners round using formula
-  // Use Math.ceil to preserve odd-match rounds (e.g., 5→3→2→1)
+  // Calculate match counts for each winners round
   const winnersMatchCounts: number[] = [winnersR1Matches];
-  for (let r = 1; r < winnersRounds; r++) {
-    // For Round 2 with top seed bye, add 1 for the bye slot
-    const prevCount = winnersMatchCounts[r - 1];
-    const byeBonus = (r === 1 && needsBye && byePolicy === 'top_seed_bye') ? 1 : 0;
-    winnersMatchCounts.push(Math.ceil((prevCount + byeBonus) / 2));
+  
+  if (needsBye && byePolicy === 'top_seed_bye') {
+    // Top seed bye: Track advancing teams through rounds
+    // R1: winnersR1Matches winners + 1 (top seed) = winnersR1Matches + 1 teams for R2
+    let teamsInRound = winnersR1Matches + 1; // Winners from R1 + top seed
+    
+    for (let r = 1; r < winnersRounds; r++) {
+      // Each round: floor(teams/2) matches, with ceil(teams/2) advancing (includes byes)
+      const matchesThisRound = Math.floor(teamsInRound / 2);
+      winnersMatchCounts.push(matchesThisRound);
+      // Advancing teams = winners from matches + byes
+      teamsInRound = Math.ceil(teamsInRound / 2);
+    }
+  } else {
+    // Play-in or even teams: Standard halving formula
+    for (let r = 1; r < winnersRounds; r++) {
+      const prevCount = winnersMatchCounts[r - 1];
+      winnersMatchCounts.push(Math.ceil(prevCount / 2));
+    }
   }
   
   // ============ WINNERS BRACKET ============
