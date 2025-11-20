@@ -343,7 +343,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
             <CardHeader className={`p-2 ${headerClass}`}>
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <CardTitle className={`text-xs font-semibold ${titleClass}`}>
+                  <CardTitle className={`text-xs font-semibold text-white`}>
                     {match.round}
                   </CardTitle>
                   <Badge
@@ -353,7 +353,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
                     {match.status}
                   </Badge>
                 </div>
-                <div className={`text-[10px] font-medium ${titleClass} opacity-80 flex items-center gap-1.5`}>
+                <div className={`text-[10px] font-medium text-white opacity-80 flex items-center gap-1.5`}>
                   <span>Match #{match.matchNumber}</span>
                   {match.scheduledTime && (
                     <span className="text-[9px] opacity-70">
@@ -372,11 +372,11 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
                     : 'bg-muted/50 hover:bg-muted'
                 }`}
               >
-                <span className="truncate text-xs" data-testid={`text-team1-${match.matchNumber}`}>
+                <span className="truncate text-xs text-white" data-testid={`text-team1-${match.matchNumber}`}>
                   {getTeamDisplay(match.team1Id, match, 'team1')}
                 </span>
                 {match.team1Score !== null && (
-                  <span className="font-bold ml-2 text-lg" data-testid={`text-score1-${match.matchNumber}`}>
+                  <span className="font-bold ml-2 text-lg text-white" data-testid={`text-score1-${match.matchNumber}`}>
                     {match.team1Score}
                   </span>
                 )}
@@ -390,11 +390,11 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
                     : 'bg-muted/50 hover:bg-muted'
                 }`}
               >
-                <span className="truncate text-xs" data-testid={`text-team2-${match.matchNumber}`}>
+                <span className="truncate text-xs text-white" data-testid={`text-team2-${match.matchNumber}`}>
                   {getTeamDisplay(match.team2Id, match, 'team2')}
                 </span>
                 {match.team2Score !== null && (
-                  <span className="font-bold ml-2 text-lg" data-testid={`text-score2-${match.matchNumber}`}>
+                  <span className="font-bold ml-2 text-lg text-white" data-testid={`text-score2-${match.matchNumber}`}>
                     {match.team2Score}
                   </span>
                 )}
