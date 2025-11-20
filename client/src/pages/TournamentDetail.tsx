@@ -213,9 +213,8 @@ export default function TournamentDetail() {
           </div>
         </div>
       </div>
-
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 pt-[2px] pb-[2px] pl-[8px] pr-[8px]">
         <Tabs defaultValue="bracket" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 md:w-auto">
             <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
@@ -229,7 +228,7 @@ export default function TournamentDetail() {
               <div className="space-y-6">
                 {tournament.format === 'single_elimination' || tournament.format === 'double_elimination' ? (
                   // Bracket visualization for elimination formats
-                  <Card>
+                  (<Card>
                     <CardHeader className="pt-[2px] pb-[2px]">
                       <CardTitle>Tournament Bracket</CardTitle>
                       <CardDescription>
@@ -243,10 +242,10 @@ export default function TournamentDetail() {
                         format={tournament.format}
                       />
                     </CardContent>
-                  </Card>
+                  </Card>)
                 ) : (
                   // Table view for round robin
-                  <Card>
+                  (<Card>
                     <CardHeader>
                       <CardTitle>Round Robin Schedule</CardTitle>
                       <CardDescription>
@@ -285,7 +284,7 @@ export default function TournamentDetail() {
                         ))}
                       </div>
                     </CardContent>
-                  </Card>
+                  </Card>)
                 )}
               </div>
             ) : (
@@ -388,7 +387,6 @@ export default function TournamentDetail() {
           </TabsContent>
         </Tabs>
       </div>
-
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
