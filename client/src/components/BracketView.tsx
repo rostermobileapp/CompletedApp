@@ -166,15 +166,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       verticalGap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
     }
     
-    const winnersHeight = Math.max(...winnersRounds.map((r, idx) => {
-      const roundMatches = winners[r] || [];
-      const multiplier = Math.pow(2, idx);
-      const gap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
-      const offset = (idx > 0) ? gap / 2 : 0;
-      return roundMatches.length * gap + offset;
-    }));
-    
-    const startY = isLosersBracket ? winnersHeight + BRACKET_VERTICAL_GAP : 0;
+    // Both winners and losers brackets start at y=0 for side-by-side layout
+    const startY = 0;
     
     // Center the matches vertically with progressive spacing
     const offset = (roundIndex > 0) ? verticalGap / 2 : 0;
@@ -407,7 +400,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     return elements;
   };
 
-  // Calculate SVG dimensions based on bracket size (with same caps as positioning)
+  // Calculate SVG dimensions based on bracket size (side-by-side layout)
   const calculateDimensions = () => {
     const winnersWidth = winnersRounds.length * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP;
     const losersWidth = hasLosers ? (losersRounds.length * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP) : 0;
@@ -432,7 +425,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       return roundMatches.length * gap + offset + MATCH_HEIGHT;
     })) : 0;
     
-    const height = winnersHeight + losersHeight + (hasLosers ? BRACKET_VERTICAL_GAP + 200 : 200);
+    // Side-by-side layout: height is MAX of both brackets, not sum
+    const height = Math.max(winnersHeight, losersHeight) + 200;
     
     return { width, height };
   };
