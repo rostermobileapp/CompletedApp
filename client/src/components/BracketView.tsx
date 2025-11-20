@@ -460,19 +460,6 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
             elements.push(renderMatch(match, pos.x, pos.y, true));
           }
         });
-
-        // Add round label
-        const labelX = losersXOffset + roundIndex * (MATCH_WIDTH + ROUND_GAP);
-        const labelY = winnersBottomY + 60;
-        elements.push(
-          <g key={`label-l-${roundName}`} transform={`translate(${labelX}, ${labelY})`}>
-            <foreignObject width={MATCH_WIDTH} height={30}>
-              <div className="font-bold text-sm text-destructive bg-destructive/10 border border-destructive/30 px-3 py-1 rounded-md">
-                {roundName}
-              </div>
-            </foreignObject>
-          </g>
-        );
       });
     }
 
