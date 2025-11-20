@@ -140,8 +140,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
   const hasLosers = losersRounds.length > 0;
 
   // Calculate match positions using center-based algorithm
-  const MATCH_WIDTH = 280;
-  const MATCH_HEIGHT = 120;
+  const MATCH_WIDTH = 240; // Reduced by 40px
+  const MATCH_HEIGHT = 140; // Increased to contain both teams
   const ROUND_GAP = 200;
   const MATCH_GAP = 40; // Gap between game cards
   const BASE_VERTICAL_GAP = MATCH_HEIGHT + MATCH_GAP; // Uniform gap for both brackets
