@@ -500,7 +500,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       });
     }
 
-    // Draw connectors for winner advancement (blue solid arrows)
+    // Draw connectors based on advancesToMatchId
     matches.forEach(match => {
       if (match.advancesToMatchId) {
         // Determine if this is a losers bracket connection by checking the notes
@@ -513,37 +513,6 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
               {connector}
             </g>
           );
-        }
-      }
-    });
-
-    // Draw connectors for losers dropping into losers bracket (red dashed arrows)
-    Object.entries(winners).forEach(([roundName, roundMatches]) => {
-      // Find corresponding losers round that receives losers from this round
-      const winnersRoundNum = parseInt(roundName.match(/\d+/)?.[0] || '0');
-      if (winnersRoundNum > 0) {
-        // Losers Round 1 receives from Winners Round 1, etc.
-        const correspondingLosersRound = `Losers Round ${winnersRoundNum}`;
-        const losersRoundMatches = losers[correspondingLosersRound] || [];
-        
-        if (losersRoundMatches.length > 0) {
-          roundMatches.forEach((winnersMatch, winnersMatchIndex) => {
-            // Map winners match index to losers match
-            // Winners matches 0,1 → Losers match 0; Winners matches 2,3 → Losers match 1, etc.
-            const losersMatchIndex = Math.floor(winnersMatchIndex / 2);
-            const losersMatch = losersRoundMatches[losersMatchIndex];
-            
-            if (losersMatch && matchPositions.get(winnersMatch.id) && matchPositions.get(losersMatch.id)) {
-              const connector = renderConnector(winnersMatch.id, losersMatch.id, true);
-              if (connector) {
-                elements.push(
-                  <g key={`connector-loser-${winnersMatch.id}`}>
-                    {connector}
-                  </g>
-                );
-              }
-            }
-          });
         }
       }
     });
