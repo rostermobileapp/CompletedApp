@@ -383,38 +383,6 @@ export default function TournamentCreate() {
                     )}
                   />
 
-                  {/* Bye Policy - Only show for elimination formats with odd number of teams */}
-                  {(watchedFormat === "single_elimination" || watchedFormat === "double_elimination") && 
-                   watchedTeamIds.length % 2 === 1 && watchedTeamIds.length > 0 && (
-                    <FormField
-                      control={form.control}
-                      name="byePolicy"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Bye Week Policy</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-bye-policy">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="top_seed_bye">Top Seed Gets Bye to Round 2</SelectItem>
-                              <SelectItem value="play_in_game">Bottom 2 Seeds Play Play-In Game</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            With {watchedTeamIds.length} teams, one option is needed. Either the top seed advances automatically or the bottom 2 teams play for the final spot.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
                   <FormField
                     control={form.control}
                     name="description"
@@ -505,6 +473,47 @@ export default function TournamentCreate() {
                     />
                   </CardContent>
                 </Card>
+
+                {/* Bye Policy - Only show for elimination formats with odd number of teams */}
+                {(watchedFormat === "single_elimination" || watchedFormat === "double_elimination") && 
+                 watchedTeamIds.length % 2 === 1 && watchedTeamIds.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Bye Week Policy</CardTitle>
+                      <CardDescription>
+                        With {watchedTeamIds.length} teams (odd number), choose how to handle the extra team
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <FormField
+                        control={form.control}
+                        name="byePolicy"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-bye-policy">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="top_seed_bye">Top Seed Gets Bye to Round 2</SelectItem>
+                                <SelectItem value="play_in_game">Bottom 2 Seeds Play Play-In Game</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Either the top seed advances automatically or the bottom 2 teams play for the final spot.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Format Recommendations */}
                 {recommendations && recommendations.length > 0 && (
