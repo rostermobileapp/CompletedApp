@@ -405,7 +405,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       {/* Bracket Container */}
       <div
         ref={containerRef}
-        className="overflow-auto border rounded-lg bg-muted/20"
+        className="overflow-hidden border rounded-lg bg-muted/20"
         style={{ 
           height: '70vh',
           cursor: isDragging ? 'grabbing' : 'grab',
