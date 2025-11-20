@@ -31,6 +31,22 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       return team?.teamName || "TBD";
     }
     
+    // For TBD teams, check notes for source match info (e.g., "Loser of match_2 vs Loser of match_3")
+    if (match.notes && match.notes.includes('match_')) {
+      const matchNumbers = match.notes.match(/match_(\d+)/g);
+      if (matchNumbers) {
+        if (position === 'team1' && matchNumbers.length >= 1) {
+          const num = matchNumbers[0].replace('match_', '');
+          const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
+          return `${prefix} Match ${num}`;
+        } else if (position === 'team2' && matchNumbers.length >= 2) {
+          const num = matchNumbers[1].replace('match_', '');
+          const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
+          return `${prefix} Match ${num}`;
+        }
+      }
+    }
+    
     // For TBD teams, find matches that advance to this match
     const sourceMatches = matches.filter(m => m.advancesToMatchId === `match_${match.matchNumber}`);
     
