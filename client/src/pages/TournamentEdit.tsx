@@ -35,7 +35,8 @@ const formSchema = z.object({
   seasonId: z.string().optional(),
   format: z.enum(["single_elimination", "double_elimination", "round_robin", "round_robin_split"]),
   description: z.string().optional(),
-  teamIds: z.array(z.string()).min(2, "Select at least 2 teams")
+  teamIds: z.array(z.string()).min(2, "Select at least 2 teams"),
+  byePolicy: z.enum(["top_seed_bye", "play_in_game"]).optional()
 }).refine((data) => {
   if (data.type === "season_playoff") {
     return data.seasonId && data.seasonId.trim() !== "";
@@ -83,20 +84,23 @@ export default function TournamentEdit() {
       seasonId: undefined,
       format: "single_elimination",
       description: "",
-      teamIds: []
+      teamIds: [],
+      byePolicy: "top_seed_bye"
     }
   });
 
   // Pre-fill form when data loads
   useEffect(() => {
     if (tournament && currentTeams) {
+      const settings = tournament.settings as any;
       form.reset({
         name: tournament.name,
         type: tournament.type,
         seasonId: tournament.seasonId || undefined,
         format: tournament.format,
         description: tournament.description || "",
-        teamIds: currentTeams.map(t => t.teamId)
+        teamIds: currentTeams.map(t => t.teamId),
+        byePolicy: settings?.byePolicy || "top_seed_bye"
       });
     }
   }, [tournament, currentTeams, form]);
@@ -129,13 +133,19 @@ export default function TournamentEdit() {
         };
       });
 
+      const settings: any = {};
+      if (data.byePolicy) {
+        settings.byePolicy = data.byePolicy;
+      }
+
       const response = await apiRequest('PATCH', `/api/tournaments/${tournamentId}`, {
         name: data.name,
         type: data.type,
         seasonId: data.type === "season_playoff" ? (data.seasonId || null) : null,
         format: data.format,
         description: data.description || null,
-        teams: teamData
+        teams: teamData,
+        settings: Object.keys(settings).length > 0 ? settings : undefined
       });
 
       return await response.json();
@@ -501,6 +511,66 @@ export default function TournamentEdit() {
                       </AlertDescription>
                     </Alert>
                   )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Bye Policy - Show for single elimination (odd teams only) or double elimination (all teams) */}
+            {step === 2 &&
+             ((watchedFormat === "single_elimination" && watchedTeamIds.length % 2 === 1) || 
+              watchedFormat === "double_elimination") && 
+             watchedTeamIds.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    {watchedTeamIds.length % 2 === 1 ? "Bye Week Policy" : "Play-In Game Option"}
+                  </CardTitle>
+                  <CardDescription>
+                    {watchedTeamIds.length % 2 === 1 
+                      ? `With ${watchedTeamIds.length} teams (odd number), choose how to handle the extra team`
+                      : `With ${watchedTeamIds.length} teams, optionally add a play-in game for the lowest 2 seeds`
+                    }
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <FormField
+                    control={form.control}
+                    name="byePolicy"
+                    render={({ field }) => (
+                      <FormItem>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-bye-policy">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {watchedTeamIds.length % 2 === 1 ? (
+                              <>
+                                <SelectItem value="top_seed_bye">Top Seed Gets Bye to Round 2</SelectItem>
+                                <SelectItem value="play_in_game">Bottom 2 Seeds Play Play-In Game</SelectItem>
+                              </>
+                            ) : (
+                              <>
+                                <SelectItem value="top_seed_bye">No Play-In Game (Standard Bracket)</SelectItem>
+                                <SelectItem value="play_in_game">Lowest 2 Seeds Play Play-In Game</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          {watchedTeamIds.length % 2 === 1
+                            ? "Either the top seed advances automatically or the bottom 2 teams play for the final spot."
+                            : "Add an extra game where the bottom 2 seeds compete for entry into the main bracket."
+                          }
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </CardContent>
               </Card>
             )}

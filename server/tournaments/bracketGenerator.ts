@@ -248,12 +248,14 @@ export function generateDoubleElimination(
   // Check bye policy from settings (default to top seed bye)
   const byePolicy = settings.byePolicy || 'top_seed_bye';
   const needsBye = numTeams % 2 === 1;
+  const isEvenWithPlayIn = (numTeams % 2 === 0) && (byePolicy === 'play_in_game');
   
   let matchCounter = 1;
   const matchLookup = new Map<string, number>(); // key -> match number
   
   // Calculate effective team count and rounds
-  const effectiveTeamCount = (needsBye && byePolicy === 'play_in_game') 
+  // For play-in games (odd teams OR even teams with play_in_game option), reduce by 1
+  const effectiveTeamCount = ((needsBye && byePolicy === 'play_in_game') || isEvenWithPlayIn)
     ? numTeams - 1
     : numTeams;
   
@@ -268,11 +270,15 @@ export function generateDoubleElimination(
   // Initialize Round 1 entrants
   let currentRoundEntrants: RoundEntrant[] = [];
   
-  // Handle play-in game if needed
-  if (needsBye && byePolicy === 'play_in_game') {
+  // Handle play-in game if needed (for odd teams OR even teams with play_in_game option)
+  if ((needsBye && byePolicy === 'play_in_game') || isEvenWithPlayIn) {
     rounds.push('Play-In Round');
     const playInMatchNum = matchCounter++;
     matchLookup.set(`PLAY_IN`, playInMatchNum);
+    
+    const noteText = needsBye 
+      ? 'Play-in: Bottom 2 seeds compete for final spot'
+      : 'Play-in: Lowest 2 seeds compete for entry into main bracket';
     
     matches.push({
       tournamentId,
@@ -289,7 +295,7 @@ export function generateDoubleElimination(
       scheduledTime: null,
       location: null,
       status: 'scheduled',
-      notes: 'Play-in: Bottom 2 seeds compete for final spot'
+      notes: noteText
     });
     
     // R1 entrants: Top seeds + play-in winner

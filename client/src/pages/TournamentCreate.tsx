@@ -474,14 +474,20 @@ export default function TournamentCreate() {
                   </CardContent>
                 </Card>
 
-                {/* Bye Policy - Only show for elimination formats with odd number of teams */}
-                {(watchedFormat === "single_elimination" || watchedFormat === "double_elimination") && 
-                 watchedTeamIds.length % 2 === 1 && watchedTeamIds.length > 0 && (
+                {/* Bye Policy - Show for single elimination (odd teams only) or double elimination (all teams) */}
+                {((watchedFormat === "single_elimination" && watchedTeamIds.length % 2 === 1) || 
+                  watchedFormat === "double_elimination") && 
+                 watchedTeamIds.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base">Bye Week Policy</CardTitle>
+                      <CardTitle className="text-base">
+                        {watchedTeamIds.length % 2 === 1 ? "Bye Week Policy" : "Play-In Game Option"}
+                      </CardTitle>
                       <CardDescription>
-                        With {watchedTeamIds.length} teams (odd number), choose how to handle the extra team
+                        {watchedTeamIds.length % 2 === 1 
+                          ? `With ${watchedTeamIds.length} teams (odd number), choose how to handle the extra team`
+                          : `With ${watchedTeamIds.length} teams, optionally add a play-in game for the lowest 2 seeds`
+                        }
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -500,12 +506,24 @@ export default function TournamentCreate() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="top_seed_bye">Top Seed Gets Bye to Round 2</SelectItem>
-                                <SelectItem value="play_in_game">Bottom 2 Seeds Play Play-In Game</SelectItem>
+                                {watchedTeamIds.length % 2 === 1 ? (
+                                  <>
+                                    <SelectItem value="top_seed_bye">Top Seed Gets Bye to Round 2</SelectItem>
+                                    <SelectItem value="play_in_game">Bottom 2 Seeds Play Play-In Game</SelectItem>
+                                  </>
+                                ) : (
+                                  <>
+                                    <SelectItem value="top_seed_bye">No Play-In Game (Standard Bracket)</SelectItem>
+                                    <SelectItem value="play_in_game">Lowest 2 Seeds Play Play-In Game</SelectItem>
+                                  </>
+                                )}
                               </SelectContent>
                             </Select>
                             <FormDescription>
-                              Either the top seed advances automatically or the bottom 2 teams play for the final spot.
+                              {watchedTeamIds.length % 2 === 1
+                                ? "Either the top seed advances automatically or the bottom 2 teams play for the final spot."
+                                : "Add an extra game where the bottom 2 seeds compete for entry into the main bracket."
+                              }
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
