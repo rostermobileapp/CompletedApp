@@ -230,7 +230,7 @@ export default function TournamentDetail() {
                 {tournament.format === 'single_elimination' || tournament.format === 'double_elimination' ? (
                   // Bracket visualization for elimination formats
                   <Card>
-                    <CardHeader>
+                    <CardHeader className="pt-[2px] pb-[2px]">
                       <CardTitle>Tournament Bracket</CardTitle>
                       <CardDescription>
                         {rounds.length} round{rounds.length !== 1 ? 's' : ''} • {matches.length} match{matches.length !== 1 ? 'es' : ''}
