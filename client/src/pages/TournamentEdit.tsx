@@ -99,7 +99,7 @@ export default function TournamentEdit() {
         seasonId: tournament.seasonId || undefined,
         format: tournament.format,
         description: tournament.description || "",
-        teamIds: currentTeams.map(t => t.teamId),
+        teamIds: currentTeams.map(t => t.teamId).filter((id): id is string => id !== null),
         byePolicy: settings?.byePolicy || "top_seed_bye"
       });
     }

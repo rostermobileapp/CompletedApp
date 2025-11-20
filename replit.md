@@ -8,10 +8,15 @@ The platform now includes a comprehensive tournament/playoff system supporting:
 - **Tournament Types**: Season playoffs and standalone tournaments
 - **Formats**: Single elimination (canonical seeding with bye handling), double elimination (universal algorithm complete), round robin, and split round robin
 - **Features**: 
-  - Canonical bracket generation (1v16, 2v15, etc.) with configurable bye policies for odd team counts
-  - **Bye Policy Options** (for odd-numbered teams in elimination formats):
-    - Top Seed Gets Bye to Round 2: Seed #1 automatically advances; remaining teams play in Round 1
-    - Bottom 2 Seeds Play Play-In Game: Separate "Play-In Round" where bottom 2 seeds compete; winner faces #1 seed in Round 1
+  - Canonical bracket generation (1v16, 2v15, etc.) with configurable bye policies
+  - **Bye Policy Options**:
+    - **Single Elimination** (odd teams only):
+      - Top Seed Gets Bye to Round 2: Seed #1 automatically advances; remaining teams play in Round 1
+      - Bottom 2 Seeds Play Play-In Game: Separate "Play-In Round" where bottom 2 seeds compete; winner faces #1 seed in Round 1
+    - **Double Elimination** (ALL team counts):
+      - For odd teams: Same options as single elimination
+      - For even teams: Option to add play-in game for lowest 2 seeds OR run standard bracket
+      - Play-in game reduces effective team count by 1, creating symmetric bracket structure
   - Automatic match creation with advancement pointers
   - Match scheduling and score tracking infrastructure
   - Format recommendations based on team count (detailed pros/cons/game estimates)
@@ -32,8 +37,8 @@ The platform now includes a comprehensive tournament/playoff system supporting:
   - PATCH /api/tournaments/:id for editing draft tournaments with automatic bracket regeneration
 - **Frontend**: Complete with enhanced bracket visualization ✅
   - Tournaments Dashboard (/leagues/:leagueId/tournaments) - List view with status badges
-  - Tournament Creator (/leagues/:leagueId/tournaments/create) - 3-step wizard with enhanced format recommendations and bye policy selector (shown for odd team counts)
-  - Tournament Edit (/tournaments/:tournamentId/edit) - Multi-step wizard with pre-filled data (draft-only)
+  - Tournament Creator (/leagues/:leagueId/tournaments/create) - 3-step wizard with enhanced format recommendations and bye policy selector (shown for all double elimination, odd-team single elimination)
+  - Tournament Edit (/tournaments/:tournamentId/edit) - Multi-step wizard with pre-filled data (draft-only), includes bye policy editing
   - Tournament Detail (/tournaments/:tournamentId) - Tabbed view with BracketView component supporting Play-In Round display
   - **BracketView Component**: SVG bracket rendering with:
     - **Visual Hierarchy**: 4px color-coded borders (blue for winners bracket, red for losers bracket, gold for grand finals)
