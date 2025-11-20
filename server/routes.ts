@@ -10100,13 +10100,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
 
-      const teams = await db
-        .select()
+      const tournamentTeamsList = await db
+        .select({
+          id: tournamentTeams.id,
+          tournamentId: tournamentTeams.tournamentId,
+          teamId: tournamentTeams.teamId,
+          teamName: teams.name,
+          seed: tournamentTeams.seed,
+          division: tournamentTeams.division,
+          wins: tournamentTeams.wins,
+          losses: tournamentTeams.losses,
+          createdAt: tournamentTeams.createdAt
+        })
         .from(tournamentTeams)
+        .leftJoin(teams, eq(tournamentTeams.teamId, teams.id))
         .where(eq(tournamentTeams.tournamentId, id))
         .orderBy(tournamentTeams.seed);
 
-      res.json(teams);
+      res.json(tournamentTeamsList);
     } catch (error) {
       console.error("Error fetching tournament teams:", error);
       res.status(500).json({ message: "Failed to fetch tournament teams" });

@@ -20,7 +20,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
 
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "TBD";
-    const team = teams.find(t => t.teamId === teamId);
+    const team = teams.find(t => t.id === teamId);
     return team?.teamName || "TBD";
   };
 
