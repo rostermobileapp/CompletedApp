@@ -349,11 +349,20 @@ export function generateDoubleElimination(
     const numEntrants = currentRoundEntrants.length;
     const hasOddEntrants = numEntrants % 2 === 1;
     
-    // If odd entrants, best seed gets bye to next round
+    // If odd entrants, best seed (that doesn't already have a bye) gets bye to next round
     let byeEntrant: RoundEntrant | null = null;
     if (hasOddEntrants && roundIdx < winnersRounds - 1) {
-      byeEntrant = currentRoundEntrants[0];
-      currentRoundEntrants = currentRoundEntrants.slice(1); // Remove bye team from pairings
+      // Find the best seed that isn't already marked as having a bye
+      const eligibleForBye = currentRoundEntrants.filter(e => !e.isBye);
+      if (eligibleForBye.length > 0) {
+        byeEntrant = eligibleForBye[0];
+        // Remove bye team from pairings
+        currentRoundEntrants = currentRoundEntrants.filter(e => e !== byeEntrant);
+      } else {
+        // All entrants already have byes (shouldn't happen, but handle gracefully)
+        byeEntrant = currentRoundEntrants[0];
+        currentRoundEntrants = currentRoundEntrants.slice(1);
+      }
     }
     
     // Pair remaining entrants: high vs low (1 vs last, 2 vs 2nd-last, etc.)
