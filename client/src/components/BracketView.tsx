@@ -12,7 +12,7 @@ interface BracketViewProps {
 }
 
 export default function BracketView({ matches, teams, format }: BracketViewProps) {
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -151,21 +151,25 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     const losersXOffset = hasLosers && isLosersBracket ? (winnersRounds.length) * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP : 0;
     const x = roundIndex * (MATCH_WIDTH + ROUND_GAP) + losersXOffset;
     
-    // Universal spacing formulas
+    // Universal spacing formulas with caps to prevent runaway heights
     const BASE_GAP = MATCH_HEIGHT + MATCH_GAP;
+    const MAX_GAP_MULTIPLIER = 8; // Cap maximum gap to prevent excessive heights
     
-    // Winners: gap = baseGap × 2^(roundIndex)
-    // Losers: gap = baseGap × 1.5^(floor(roundIndex/2))
+    // Winners: gap = baseGap × min(2^roundIndex, MAX_GAP_MULTIPLIER)
+    // Losers: gap = baseGap × min(1.5^floor(roundIndex/2), MAX_GAP_MULTIPLIER)
     let verticalGap: number;
     if (isLosersBracket) {
-      verticalGap = BASE_GAP * Math.pow(1.5, Math.floor(roundIndex / 2));
+      const multiplier = Math.pow(1.5, Math.floor(roundIndex / 2));
+      verticalGap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
     } else {
-      verticalGap = BASE_GAP * Math.pow(2, roundIndex);
+      const multiplier = Math.pow(2, roundIndex);
+      verticalGap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
     }
     
     const winnersHeight = Math.max(...winnersRounds.map((r, idx) => {
       const roundMatches = winners[r] || [];
-      const gap = BASE_GAP * Math.pow(2, idx);
+      const multiplier = Math.pow(2, idx);
+      const gap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
       const offset = (idx > 0) ? gap / 2 : 0;
       return roundMatches.length * gap + offset;
     }));
@@ -403,23 +407,29 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     return elements;
   };
 
-  // Calculate SVG dimensions based on bracket size
+  // Calculate SVG dimensions based on bracket size (with same caps as positioning)
   const calculateDimensions = () => {
     const winnersWidth = winnersRounds.length * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP;
     const losersWidth = hasLosers ? (losersRounds.length * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP) : 0;
     const width = winnersWidth + losersWidth + 200;
     
-    const verticalSpacing = MATCH_HEIGHT + MATCH_GAP;
+    const BASE_GAP = MATCH_HEIGHT + MATCH_GAP;
+    const MAX_GAP_MULTIPLIER = 8; // Same cap as in calculateMatchPosition
+    
     const winnersHeight = Math.max(400, ...winnersRounds.map((r, idx) => {
       const roundMatches = winners[r] || [];
-      const offset = (idx > 0) ? verticalSpacing * Math.pow(2, idx - 1) / 2 : 0;
-      return roundMatches.length * verticalSpacing * Math.pow(2, idx) + offset + MATCH_HEIGHT;
+      const multiplier = Math.pow(2, idx);
+      const gap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
+      const offset = (idx > 0) ? gap / 2 : 0;
+      return roundMatches.length * gap + offset + MATCH_HEIGHT;
     }));
     
     const losersHeight = hasLosers ? Math.max(400, ...losersRounds.map((r, idx) => {
       const roundMatches = losers[r] || [];
-      const offset = (idx > 0) ? verticalSpacing * Math.pow(2, idx - 1) / 2 : 0;
-      return roundMatches.length * verticalSpacing * Math.pow(2, idx) + offset + MATCH_HEIGHT;
+      const multiplier = Math.pow(1.5, Math.floor(idx / 2));
+      const gap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
+      const offset = (idx > 0) ? gap / 2 : 0;
+      return roundMatches.length * gap + offset + MATCH_HEIGHT;
     })) : 0;
     
     const height = winnersHeight + losersHeight + (hasLosers ? BRACKET_VERTICAL_GAP + 200 : 200);
@@ -465,7 +475,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
   };
 
   const resetView = () => {
-    setZoom(1);
+    setZoom(0.5);
     setPan({ x: 0, y: 0 });
   };
 
