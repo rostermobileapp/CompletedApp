@@ -196,12 +196,19 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       
       const prevRoundStartY = roundIndex === 1 ? startY : startY + prevRoundGap / 2;
       
-      // Position of the two previous matches this match is between
-      const prevMatch1Y = prevRoundStartY + (matchIndex * 2) * prevRoundGap;
-      const prevMatch2Y = prevRoundStartY + (matchIndex * 2 + 1) * prevRoundGap;
+      // Position of the two previous matches this match is between (top Y positions)
+      const prevMatch1TopY = prevRoundStartY + (matchIndex * 2) * prevRoundGap;
+      const prevMatch2TopY = prevRoundStartY + (matchIndex * 2 + 1) * prevRoundGap;
       
-      // Center between them (middle of the gap + half match height)
-      y = (prevMatch1Y + prevMatch2Y) / 2 + MATCH_HEIGHT / 2;
+      // Calculate CENTER positions of parent matches
+      const prevMatch1CenterY = prevMatch1TopY + MATCH_HEIGHT / 2;
+      const prevMatch2CenterY = prevMatch2TopY + MATCH_HEIGHT / 2;
+      
+      // Find midpoint between the two centers
+      const midpointY = (prevMatch1CenterY + prevMatch2CenterY) / 2;
+      
+      // Position this match so its center is at the midpoint
+      y = midpointY - MATCH_HEIGHT / 2;
     }
     
     return { x, y };
