@@ -144,7 +144,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
   const MATCH_HEIGHT = 120;
   const ROUND_GAP = 200;
   const MATCH_GAP = 40;
-  const BRACKET_VERTICAL_GAP = MATCH_HEIGHT; // Space between winners and losers brackets (one card height)
+  const BRACKET_VERTICAL_GAP = 1; // Space between winners and losers brackets (1px)
 
   // Calculate actual bottom of winners bracket first
   const getWinnersBottomY = () => {
