@@ -70,6 +70,9 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     const winnersMap: { [key: string]: TournamentMatch[] } = {};
     const losersMap: { [key: string]: TournamentMatch[] } = {};
     
+    console.log('🔍 BracketView received matches:', matches.length);
+    console.log('🔍 Match rounds:', matches.map(m => `${m.matchNumber}: ${m.round} (${m.bracketType})`));
+    
     matches.forEach(match => {
       const roundName = match.round;
       const isLosers = roundName.toLowerCase().includes('loser');
@@ -90,6 +93,9 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     
     sortRounds(winnersMap);
     sortRounds(losersMap);
+
+    console.log('🔍 Winners rounds:', Object.keys(winnersMap));
+    console.log('🔍 Losers rounds:', Object.keys(losersMap));
 
     // Create stable round ordering based on typical bracket progression
     const sortRoundNames = (rounds: string[]) => {
