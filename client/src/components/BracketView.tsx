@@ -24,6 +24,37 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     return team?.teamName || "TBD";
   };
 
+  // Helper to get descriptive text for TBD teams
+  const getTeamDisplay = (teamId: string | null, match: TournamentMatch, position: 'team1' | 'team2') => {
+    if (teamId) {
+      const team = teams.find(t => t.id === teamId);
+      return team?.teamName || "TBD";
+    }
+    
+    // For TBD teams, check if there's a source match we can reference
+    // This would need to be tracked in match metadata - for now, show descriptive text
+    if (match.notes) {
+      // Check if notes mention a specific match or source
+      if (match.notes.toLowerCase().includes('play-in')) {
+        return "Winner of Play-In";
+      }
+      if (match.notes.toLowerCase().includes('r1 winner')) {
+        return "Winner from R1";
+      }
+      // Look for patterns like "Winners Round X"
+      const roundMatch = match.notes.match(/Winners Round (\d+)/i);
+      if (roundMatch) {
+        return `Winner from R${roundMatch[1]}`;
+      }
+      const losersRoundMatch = match.notes.match(/Losers Round (\d+)/i);
+      if (losersRoundMatch) {
+        return `Winner from L-R${losersRoundMatch[1]}`;
+      }
+    }
+    
+    return "TBD";
+  };
+
   // Organize matches by round and bracket type with stable ordering
   const organizeMatches = () => {
     const winnersMap: { [key: string]: TournamentMatch[] } = {};
@@ -172,16 +203,21 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
         <foreignObject width={MATCH_WIDTH} height={MATCH_HEIGHT}>
           <Card className={`h-full shadow-lg bg-card ${borderClass}`} data-testid={`card-match-${match.matchNumber}`}>
             <CardHeader className={`p-2 ${headerClass}`}>
-              <div className="flex items-center justify-between">
-                <CardTitle className={`text-xs font-semibold ${titleClass}`}>
-                  Match {match.matchNumber}
-                </CardTitle>
-                <Badge
-                  variant={isCompleted ? 'default' : 'outline'}
-                  className={`text-xs ${badgeClass}`}
-                >
-                  {match.status}
-                </Badge>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <CardTitle className={`text-xs font-semibold ${titleClass}`}>
+                    {match.round}
+                  </CardTitle>
+                  <Badge
+                    variant={isCompleted ? 'default' : 'outline'}
+                    className={`text-xs ${badgeClass}`}
+                  >
+                    {match.status}
+                  </Badge>
+                </div>
+                <div className={`text-[10px] font-medium ${titleClass} opacity-80`}>
+                  Match #{match.matchNumber}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-2 pt-0 space-y-1">
@@ -193,8 +229,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
                     : 'bg-muted/50 hover:bg-muted'
                 }`}
               >
-                <span className="truncate" data-testid={`text-team1-${match.matchNumber}`}>
-                  {getTeamName(match.team1Id)}
+                <span className="truncate text-xs" data-testid={`text-team1-${match.matchNumber}`}>
+                  {getTeamDisplay(match.team1Id, match, 'team1')}
                 </span>
                 {match.team1Score !== null && (
                   <span className="font-bold ml-2 text-lg" data-testid={`text-score1-${match.matchNumber}`}>
@@ -211,8 +247,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
                     : 'bg-muted/50 hover:bg-muted'
                 }`}
               >
-                <span className="truncate" data-testid={`text-team2-${match.matchNumber}`}>
-                  {getTeamName(match.team2Id)}
+                <span className="truncate text-xs" data-testid={`text-team2-${match.matchNumber}`}>
+                  {getTeamDisplay(match.team2Id, match, 'team2')}
                 </span>
                 {match.team2Score !== null && (
                   <span className="font-bold ml-2 text-lg" data-testid={`text-score2-${match.matchNumber}`}>
