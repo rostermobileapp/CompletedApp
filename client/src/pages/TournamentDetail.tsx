@@ -108,10 +108,10 @@ export default function TournamentDetail() {
 
   const rounds = Object.keys(matchesByRound).sort();
 
-  // Get team name by ID
+  // Get team name by ID (teamId here is actually tournamentTeams.id)
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "TBD";
-    const team = teams?.find(t => t.teamId === teamId);
+    const team = teams?.find(t => t.id === teamId);
     return team?.teamName || "TBD";
   };
 
