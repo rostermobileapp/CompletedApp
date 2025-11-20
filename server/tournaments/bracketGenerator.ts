@@ -64,9 +64,10 @@ export function generateSingleElimination(
   }
 
   // Add play-in round if needed
+  let playInMatchNum: number | null = null;
   if (needsPlayIn) {
     rounds.push('Play-In Round');
-    const playInMatchNum = matchCounter++;
+    playInMatchNum = matchCounter++;
     
     matches.push({
       tournamentId,
@@ -112,10 +113,19 @@ export function generateSingleElimination(
     matchNumber: number | null;
   }
 
-  let currentLevel: BracketNode[] = slotTeams.map(team => ({
-    team,
-    matchNumber: null
-  }));
+  let currentLevel: BracketNode[] = slotTeams.map((team, idx) => {
+    // If this slot is the play-in winner (null team with a play-in match available), mark it as coming from play-in
+    if (needsPlayIn && team === null && playInMatchNum !== null) {
+      return {
+        team: null,
+        matchNumber: playInMatchNum
+      };
+    }
+    return {
+      team,
+      matchNumber: null
+    };
+  });
 
   const allMatches: Array<{
     roundIndex: number;
