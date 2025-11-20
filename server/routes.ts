@@ -10596,7 +10596,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delete those games first
       const gameIds = matchesWithGames.map(m => m.gameId).filter((id): id is string => id !== null);
       if (gameIds.length > 0) {
-        await db.delete(games).where(sql`${games.id} IN (${sql.join(gameIds)})`);
+        const { inArray } = require('drizzle-orm');
+        await db.delete(games).where(inArray(games.id, gameIds));
       }
 
       // Delete cascades to teams, matches, and stats
