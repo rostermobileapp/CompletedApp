@@ -101,19 +101,30 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     const losersXOffset = hasLosers && isLosersBracket ? (winnersRounds.length) * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP : 0;
     const x = roundIndex * (MATCH_WIDTH + ROUND_GAP) + losersXOffset;
     
-    // For elimination brackets, space matches vertically based on progression
-    const verticalSpacing = MATCH_HEIGHT + MATCH_GAP;
+    // Universal spacing formulas
+    const BASE_GAP = MATCH_HEIGHT + MATCH_GAP;
+    
+    // Winners: gap = baseGap × 2^(roundIndex)
+    // Losers: gap = baseGap × 1.5^(floor(roundIndex/2))
+    let verticalGap: number;
+    if (isLosersBracket) {
+      verticalGap = BASE_GAP * Math.pow(1.5, Math.floor(roundIndex / 2));
+    } else {
+      verticalGap = BASE_GAP * Math.pow(2, roundIndex);
+    }
+    
     const winnersHeight = Math.max(...winnersRounds.map((r, idx) => {
       const roundMatches = winners[r] || [];
-      const offset = (idx > 0) ? verticalSpacing * Math.pow(2, idx - 1) / 2 : 0;
-      return roundMatches.length * verticalSpacing * Math.pow(2, idx) + offset;
+      const gap = BASE_GAP * Math.pow(2, idx);
+      const offset = (idx > 0) ? gap / 2 : 0;
+      return roundMatches.length * gap + offset;
     }));
     
     const startY = isLosersBracket ? winnersHeight + BRACKET_VERTICAL_GAP : 0;
     
-    // Center the matches vertically with progressive spacing for elimination
-    const offset = (roundIndex > 0) ? verticalSpacing * Math.pow(2, roundIndex - 1) / 2 : 0;
-    const y = startY + matchIndex * verticalSpacing * Math.pow(2, roundIndex) + offset;
+    // Center the matches vertically with progressive spacing
+    const offset = (roundIndex > 0) ? verticalGap / 2 : 0;
+    const y = startY + matchIndex * verticalGap + offset;
     
     return { x, y };
   };
@@ -124,21 +135,50 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     const team1Wins = match.winnerId != null && match.winnerId === match.team1Id;
     const team2Wins = match.winnerId != null && match.winnerId === match.team2Id;
 
-    // Use destructive (red) colors for losers bracket, primary (blue) for winners
-    const accentColor = isLosersBracket ? 'destructive' : 'primary';
+    // Determine bracket type for color coding
+    const isGrandFinal = match.round === 'Grand Finals';
+    const isPlayIn = match.round === 'Play-In Round';
+    
+    // Visual hierarchy with 4px borders
+    // Blue for winners, Red for losers, Gold for grand finals
+    let borderClass: string;
+    let headerClass: string;
+    let titleClass: string;
+    let badgeClass: string;
+    let winnerBgClass: string;
+    
+    if (isGrandFinal) {
+      borderClass = 'border-[4px] border-yellow-500 dark:border-yellow-400';
+      headerClass = 'bg-yellow-500/10';
+      titleClass = 'text-yellow-600 dark:text-yellow-400';
+      badgeClass = isCompleted ? 'bg-yellow-500' : 'border-yellow-500 text-yellow-600 dark:text-yellow-400';
+      winnerBgClass = 'bg-yellow-500 text-white';
+    } else if (isLosersBracket) {
+      borderClass = 'border-[4px] border-red-500 dark:border-red-400';
+      headerClass = 'bg-red-500/10';
+      titleClass = 'text-red-600 dark:text-red-400';
+      badgeClass = isCompleted ? 'bg-red-500' : 'border-red-500 text-red-600 dark:text-red-400';
+      winnerBgClass = 'bg-red-500 text-white';
+    } else {
+      borderClass = 'border-[4px] border-blue-500 dark:border-blue-400';
+      headerClass = 'bg-blue-500/10';
+      titleClass = 'text-blue-600 dark:text-blue-400';
+      badgeClass = isCompleted ? 'bg-blue-500' : 'border-blue-500 text-blue-600 dark:text-blue-400';
+      winnerBgClass = 'bg-blue-500 text-white';
+    }
 
     return (
       <g key={match.id} transform={`translate(${x}, ${y})`}>
         <foreignObject width={MATCH_WIDTH} height={MATCH_HEIGHT}>
-          <Card className={`h-full border-2 shadow-lg bg-card ${isLosersBracket ? 'border-destructive/40' : 'border-primary/40'}`} data-testid={`card-match-${match.matchNumber}`}>
-            <CardHeader className={`p-2 ${isLosersBracket ? 'bg-destructive/5' : 'bg-primary/5'}`}>
+          <Card className={`h-full shadow-lg bg-card ${borderClass}`} data-testid={`card-match-${match.matchNumber}`}>
+            <CardHeader className={`p-2 ${headerClass}`}>
               <div className="flex items-center justify-between">
-                <CardTitle className={`text-xs font-semibold ${isLosersBracket ? 'text-destructive' : 'text-primary'}`}>
+                <CardTitle className={`text-xs font-semibold ${titleClass}`}>
                   Match {match.matchNumber}
                 </CardTitle>
                 <Badge
                   variant={isCompleted ? 'default' : 'outline'}
-                  className={`text-xs ${isCompleted ? (isLosersBracket ? 'bg-destructive' : 'bg-primary') : (isLosersBracket ? 'border-destructive text-destructive' : 'border-primary text-primary')}`}
+                  className={`text-xs ${badgeClass}`}
                 >
                   {match.status}
                 </Badge>
@@ -149,7 +189,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
               <div
                 className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors ${
                   team1Wins
-                    ? `${isLosersBracket ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'} font-bold shadow-sm`
+                    ? `${winnerBgClass} font-bold shadow-sm`
                     : 'bg-muted/50 hover:bg-muted'
                 }`}
               >
@@ -167,7 +207,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
               <div
                 className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors ${
                   team2Wins
-                    ? `${isLosersBracket ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'} font-bold shadow-sm`
+                    ? `${winnerBgClass} font-bold shadow-sm`
                     : 'bg-muted/50 hover:bg-muted'
                 }`}
               >
@@ -195,19 +235,19 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     
     const midX = (startX + endX) / 2;
     
-    // Different styling for loser paths vs winner paths
-    const strokeClass = isLoserPath ? 'text-destructive/50' : 'text-primary/70';
+    // Blue arrows (→) for winner advancement, Red arrows (↓) for loser drops
+    const strokeColor = isLoserPath ? '#ef4444' : '#3b82f6'; // Red for losers, Blue for winners
     const strokeDash = isLoserPath ? '5,5' : 'none';
     const markerEnd = isLoserPath ? 'url(#arrowhead-loser)' : 'url(#arrowhead-winner)';
     
     return (
       <path
         d={`M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`}
-        stroke="currentColor"
+        stroke={strokeColor}
         strokeWidth="3"
         strokeDasharray={strokeDash}
         fill="none"
-        className={strokeClass}
+        opacity="0.7"
         markerEnd={markerEnd}
       />
     );

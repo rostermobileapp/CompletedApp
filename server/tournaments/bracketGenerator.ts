@@ -216,10 +216,16 @@ export function generateSingleElimination(
 }
 
 /**
- * Generate Double Elimination bracket
- * NOTE: Simplified implementation - creates winners bracket + placeholder losers matches
- * Full double elimination with automatic loser routing requires additional schema fields
- * (e.g., dropsToMatchId) and is marked for future enhancement
+ * Generate Double Elimination bracket using universal formulas
+ * Works for ANY team count (4, 8, 9, 16, 32, etc.)
+ * 
+ * Core Formulas:
+ * - Winners Rounds = ceil(log₂(teamCount))
+ * - Winners Round 1 Matches = ceil(teamCount / 2)
+ * - Winners Round N Matches = Round (N-1) Matches / 2
+ * - Losers Rounds = (Winners Rounds × 2) - 1
+ * - Losers alternates: Elimination rounds (odd) receive winners bracket losers
+ *                      Merger rounds (even) combine with previous losers
  */
 export function generateDoubleElimination(
   teams: TournamentTeam[],
@@ -236,88 +242,60 @@ export function generateDoubleElimination(
   // Check bye policy from settings (default to top seed bye)
   const byePolicy = settings.byePolicy || 'top_seed_bye';
   const needsBye = numTeams % 2 === 1;
-  const firstRoundMatchCount = Math.floor(numTeams / 2);
   
   let matchCounter = 1;
-  const matchLookup = new Map<string, number>(); // Round/position key -> match number
+  const matchLookup = new Map<string, number>(); // key -> match number
+  
+  // ============ CORE FORMULAS ============
+  
+  // Calculate effective team count after play-in
+  const effectiveTeamCount = (needsBye && byePolicy === 'play_in_game') 
+    ? numTeams - 1  // Play-in reduces field by 1
+    : numTeams;
+  
+  const winnersRounds = Math.ceil(Math.log2(effectiveTeamCount));
+  
+  // Calculate Round 1 matches based on bye policy
+  let winnersR1Matches: number;
+  if (needsBye && byePolicy === 'top_seed_bye') {
+    // Top seed bye: Only the non-bye teams play in Round 1
+    winnersR1Matches = Math.floor((numTeams - 1) / 2);
+  } else if (needsBye && byePolicy === 'play_in_game') {
+    // Play-in: After consolidating bottom 2, effective field is even
+    winnersR1Matches = Math.floor(effectiveTeamCount / 2);
+  } else {
+    // Even teams: Standard calculation
+    winnersR1Matches = Math.ceil(numTeams / 2);
+  }
+  
+  const losersRounds = (winnersRounds * 2) - 1;
+  
+  // Calculate match counts for each winners round using formula
+  // Use Math.ceil to preserve odd-match rounds (e.g., 5→3→2→1)
+  const winnersMatchCounts: number[] = [winnersR1Matches];
+  for (let r = 1; r < winnersRounds; r++) {
+    // For Round 2 with top seed bye, add 1 for the bye slot
+    const prevCount = winnersMatchCounts[r - 1];
+    const byeBonus = (r === 1 && needsBye && byePolicy === 'top_seed_bye') ? 1 : 0;
+    winnersMatchCounts.push(Math.ceil((prevCount + byeBonus) / 2));
+  }
   
   // ============ WINNERS BRACKET ============
   
-  // Handle play-in game if needed (treated as preliminary round before Winners Round 1)
+  // Handle play-in game if needed
   if (needsBye && byePolicy === 'play_in_game') {
     rounds.push('Play-In Round');
     const playInMatchNum = matchCounter++;
     matchLookup.set(`PLAY_IN`, playInMatchNum);
     
-    // Play-in game: Bottom 2 seeds play for the last spot
     matches.push({
       tournamentId,
       gameId: null,
       round: 'Play-In Round',
       matchNumber: playInMatchNum,
       bracketType: 'winners',
-      team1Id: sortedTeams[numTeams - 2].id, // Second to last seed
-      team2Id: sortedTeams[numTeams - 1].id, // Last seed
-      winnerId: null,
-      team1Score: null,
-      team2Score: null,
-      advancesToMatchId: null, // Will be filled when creating Round 1
-      scheduledTime: null,
-      location: null,
-      status: 'scheduled',
-      notes: 'Play-in game for final spot in Winners Round 1'
-    });
-  }
-  
-  // Winners Round 1: Exactly 4 matches for 9 teams
-  rounds.push('Winners Round 1');
-  
-  const winnersR1Matches: Array<{
-    matchNumber: number;
-    team1: TournamentTeam | null;
-    team2: TournamentTeam | null;
-    position: number;
-  }> = [];
-  
-  for (let i = 0; i < firstRoundMatchCount; i++) {
-    const matchNum = matchCounter++;
-    matchLookup.set(`WR1-${i}`, matchNum);
-    
-    let team1: TournamentTeam | null = null;
-    let team2: TournamentTeam | null = null;
-    
-    if (needsBye && byePolicy === 'play_in_game') {
-      // Play-in scenario: First match is #1 seed vs play-in winner
-      if (i === 0) {
-        team1 = sortedTeams[0]; // Top seed
-        team2 = null; // Play-in winner (TBD)
-      } else {
-        // Pair remaining teams: 2v7, 3v6, 4v5
-        const idx = i - 1;
-        team1 = sortedTeams[idx + 1];
-        team2 = sortedTeams[numTeams - 2 - idx];
-      }
-    } else {
-      // Top seed bye OR even teams: Standard pairing
-      if (needsBye) {
-        // Skip top seed (they get bye to Round 2)
-        team1 = sortedTeams[i + 1];
-        team2 = sortedTeams[numTeams - 1 - i];
-      } else {
-        // Even teams: Normal pairing
-        team1 = sortedTeams[i];
-        team2 = sortedTeams[numTeams - 1 - i];
-      }
-    }
-    
-    matches.push({
-      tournamentId,
-      gameId: null,
-      round: 'Winners Round 1',
-      matchNumber: matchNum,
-      bracketType: 'winners',
-      team1Id: team1?.id || null,
-      team2Id: team2?.id || null,
+      team1Id: sortedTeams[numTeams - 2].id,
+      team2Id: sortedTeams[numTeams - 1].id,
       winnerId: null,
       team1Score: null,
       team2Score: null,
@@ -325,47 +303,63 @@ export function generateDoubleElimination(
       scheduledTime: null,
       location: null,
       status: 'scheduled',
-      notes: null
+      notes: 'Play-in: Bottom 2 seeds compete for final spot'
     });
   }
   
-  // Calculate winners bracket structure
-  const winnersRounds = Math.ceil(Math.log2(numTeams));
-  const winnersMatchCounts = [firstRoundMatchCount];
-  for (let i = 1; i < winnersRounds; i++) {
-    const prevCount = winnersMatchCounts[i - 1];
-    const byeInPrevRound = needsBye && i === 1;
-    winnersMatchCounts.push(Math.ceil((prevCount + (byeInPrevRound ? 1 : 0)) / 2));
-  }
-  
-  // Create remaining winners bracket rounds
-  const winnerRoundNames = ['Winners Round 1'];
-  for (let roundIdx = 1; roundIdx < winnersRounds; roundIdx++) {
+  // Create all winners bracket rounds
+  for (let roundIdx = 0; roundIdx < winnersRounds; roundIdx++) {
     const matchCount = winnersMatchCounts[roundIdx];
     let roundName: string;
     
-    if (winnersRounds - roundIdx === 1) roundName = 'Winners Finals';
+    if (roundIdx === 0) roundName = 'Winners Round 1';
+    else if (winnersRounds - roundIdx === 1) roundName = 'Winners Finals';
     else if (winnersRounds - roundIdx === 2) roundName = 'Winners Semifinals';
     else if (winnersRounds - roundIdx === 3) roundName = 'Winners Quarterfinals';
     else roundName = `Winners Round ${roundIdx + 1}`;
     
     rounds.push(roundName);
-    winnerRoundNames.push(roundName);
     
     for (let matchPos = 0; matchPos < matchCount; matchPos++) {
       const matchNum = matchCounter++;
-      matchLookup.set(`W-R${roundIdx + 1}-${matchPos}`, matchNum);
+      matchLookup.set(`W-R${roundIdx + 1}-M${matchPos + 1}`, matchNum);
       
-      // Determine source teams
+      // Determine initial teams for Round 1
       let team1Id: string | null = null;
       let team2Id: string | null = null;
+      let notes: string | null = null;
       
-      // Handle bye scenarios in round 2
-      if (roundIdx === 1 && needsBye && byePolicy === 'top_seed_bye' && matchPos === 0) {
-        // Top seed bye: Top seed faces winner of first R1 match
-        team1Id = sortedTeams[0].id; // Top seed with bye
+      if (roundIdx === 0) {
+        // Winners Round 1 - seed teams
+        if (needsBye && byePolicy === 'play_in_game') {
+          if (matchPos === 0) {
+            // First match: #1 seed vs play-in winner
+            team1Id = sortedTeams[0].id;
+            team2Id = null; // TBD from play-in
+            notes = 'Top seed vs Play-in winner';
+          } else {
+            // Pair remaining teams (seeds 2 through numTeams-2)
+            // After play-in consolidates bottom 2, we have seeds 2...(numTeams-2)
+            // Pair them: 2 vs (numTeams-2), 3 vs (numTeams-3), etc.
+            const lowSeedIdx = matchPos; // 1 → seed 2, 2 → seed 3, etc.
+            const highSeedIdx = numTeams - 1 - matchPos; // Account for removed bottom 2
+            team1Id = sortedTeams[lowSeedIdx].id;
+            team2Id = sortedTeams[highSeedIdx - 1].id; // -1 to skip the play-in loser
+          }
+        } else if (needsBye && byePolicy === 'top_seed_bye') {
+          // Top seed gets bye - pair others
+          team1Id = sortedTeams[matchPos + 1].id;
+          team2Id = sortedTeams[numTeams - 1 - matchPos].id;
+        } else {
+          // Even teams - canonical pairing
+          team1Id = sortedTeams[matchPos].id;
+          team2Id = sortedTeams[numTeams - 1 - matchPos].id;
+        }
+      } else if (roundIdx === 1 && needsBye && byePolicy === 'top_seed_bye' && matchPos === 0) {
+        // Round 2, first match with top seed bye
+        team1Id = sortedTeams[0].id;
+        notes = 'Top seed (bye) vs R1 winner';
       }
-      // For play-in policy: no byes needed, all teams already matched in Round 1
       
       matches.push({
         tournamentId,
@@ -378,39 +372,47 @@ export function generateDoubleElimination(
         winnerId: null,
         team1Score: null,
         team2Score: null,
-        advancesToMatchId: null,
+        advancesToMatchId: null, // Will be set after all matches created
         scheduledTime: null,
         location: null,
         status: 'scheduled',
-        notes: null
+        notes
       });
     }
   }
   
   // ============ LOSERS BRACKET ============
   
-  // Losers bracket has 2*(winnersRounds - 1) rounds
-  // Pattern: WB R1 losers → LB R1, WB R2 losers meet LB R1 winners → LB R2, etc.
-  const losersRounds = 2 * (winnersRounds - 1);
+  // Losers Rounds = (Winners Rounds × 2) - 1
+  // Alternates between Elimination (odd: 1,3,5...) and Merger (even: 2,4,6...) rounds
   const losersMatchCounts: number[] = [];
   
   for (let losersRoundIdx = 0; losersRoundIdx < losersRounds; losersRoundIdx++) {
-    const roundName = `Losers Round ${losersRoundIdx + 1}`;
+    const roundNumber = losersRoundIdx + 1;
+    const isEliminationRound = roundNumber % 2 === 1; // Odd rounds (1, 3, 5...)
+    
+    let roundName: string;
+    if (losersRoundIdx === losersRounds - 1) {
+      roundName = 'Losers Finals';
+    } else {
+      roundName = `Losers Round ${roundNumber}`;
+    }
+    
     rounds.push(roundName);
     
-    // Determine number of matches in this losers round
-    // Odd-indexed rounds (0,2,4...) receive dropdowns from winners bracket
-    // Even-indexed rounds (1,3,5...) are consolidation rounds
-    const isDropRound = losersRoundIdx % 2 === 0;
-    const winnersSourceRound = Math.floor(losersRoundIdx / 2);
-    
+    // Calculate match count
     let matchCount: number;
-    if (isDropRound) {
-      // Drop round: same as corresponding winners round
-      matchCount = winnersMatchCounts[winnersSourceRound] || 1;
+    if (isEliminationRound) {
+      // Elimination round: receives losers from winners bracket
+      // Number of losers dropping = winners matches played
+      // These losers need to be paired up: ceil(losers / 2)
+      const winnersSourceRoundIdx = Math.floor(losersRoundIdx / 2);
+      const droppingTeams = winnersMatchCounts[winnersSourceRoundIdx] || 1;
+      matchCount = Math.ceil(droppingTeams / 2);
     } else {
-      // Consolidation round: half of previous losers round
-      const prevLosersCount = losersMatchCounts[losersRoundIdx - 1] || firstRoundMatchCount;
+      // Merger round: combines with previous losers round
+      // Use Math.ceil to preserve odd-match rounds
+      const prevLosersCount = losersMatchCounts[losersRoundIdx - 1] || winnersR1Matches;
       matchCount = Math.ceil(prevLosersCount / 2);
     }
     
@@ -418,7 +420,15 @@ export function generateDoubleElimination(
     
     for (let matchPos = 0; matchPos < matchCount; matchPos++) {
       const matchNum = matchCounter++;
-      matchLookup.set(`L-R${losersRoundIdx + 1}-${matchPos}`, matchNum);
+      matchLookup.set(`L-R${roundNumber}-M${matchPos + 1}`, matchNum);
+      
+      let notes: string | null = null;
+      if (isEliminationRound) {
+        const wRound = Math.floor(losersRoundIdx / 2) + 1;
+        notes = `Receives losers from Winners Round ${wRound}`;
+      } else {
+        notes = `Merger round: Previous losers combine`;
+      }
       
       matches.push({
         tournamentId,
@@ -435,7 +445,7 @@ export function generateDoubleElimination(
         scheduledTime: null,
         location: null,
         status: 'scheduled',
-        notes: null
+        notes
       });
     }
   }
@@ -443,11 +453,14 @@ export function generateDoubleElimination(
   // ============ GRAND FINALS ============
   
   rounds.push('Grand Finals');
+  const grandFinalsNum = matchCounter++;
+  matchLookup.set('GRAND_FINALS', grandFinalsNum);
+  
   matches.push({
     tournamentId,
     gameId: null,
     round: 'Grand Finals',
-    matchNumber: matchCounter++,
+    matchNumber: grandFinalsNum,
     bracketType: 'grand_final',
     team1Id: null, // Winner of Winners Finals
     team2Id: null, // Winner of Losers Finals
@@ -460,6 +473,80 @@ export function generateDoubleElimination(
     status: 'scheduled',
     notes: 'Winners Finals winner vs Losers Finals winner'
   });
+
+  // ============ SET ADVANCEMENT POINTERS ============
+  
+  // Winners bracket advancement (blue arrows →)
+  for (let roundIdx = 0; roundIdx < winnersRounds - 1; roundIdx++) {
+    const matchCount = winnersMatchCounts[roundIdx];
+    
+    for (let matchPos = 0; matchPos < matchCount; matchPos++) {
+      const currentMatchNum = matchLookup.get(`W-R${roundIdx + 1}-M${matchPos + 1}`);
+      if (!currentMatchNum) continue;
+      
+      // Winner advances to next round
+      const nextRoundMatchPos = Math.floor(matchPos / 2);
+      const nextMatchNum = matchLookup.get(`W-R${roundIdx + 2}-M${nextRoundMatchPos + 1}`);
+      
+      if (nextMatchNum) {
+        const match = matches.find(m => m.matchNumber === currentMatchNum);
+        if (match) {
+          match.advancesToMatchId = `match_${nextMatchNum}`;
+        }
+      }
+    }
+  }
+  
+  // Winners Finals → Grand Finals
+  const winnersFinalsNum = matchLookup.get(`W-R${winnersRounds}-M1`);
+  if (winnersFinalsNum) {
+    const match = matches.find(m => m.matchNumber === winnersFinalsNum);
+    if (match) {
+      match.advancesToMatchId = `match_${grandFinalsNum}`;
+    }
+  }
+  
+  // Losers bracket advancement
+  for (let roundIdx = 0; roundIdx < losersRounds - 1; roundIdx++) {
+    const matchCount = losersMatchCounts[roundIdx];
+    
+    for (let matchPos = 0; matchPos < matchCount; matchPos++) {
+      const currentMatchNum = matchLookup.get(`L-R${roundIdx + 1}-M${matchPos + 1}`);
+      if (!currentMatchNum) continue;
+      
+      // Winner advances to next losers round
+      const nextRoundMatchPos = Math.floor(matchPos / 2);
+      const nextMatchNum = matchLookup.get(`L-R${roundIdx + 2}-M${nextRoundMatchPos + 1}`);
+      
+      if (nextMatchNum) {
+        const match = matches.find(m => m.matchNumber === currentMatchNum);
+        if (match) {
+          match.advancesToMatchId = `match_${nextMatchNum}`;
+        }
+      }
+    }
+  }
+  
+  // Losers Finals → Grand Finals
+  const losersFinalsNum = matchLookup.get(`L-R${losersRounds}-M1`);
+  if (losersFinalsNum) {
+    const match = matches.find(m => m.matchNumber === losersFinalsNum);
+    if (match) {
+      match.advancesToMatchId = `match_${grandFinalsNum}`;
+    }
+  }
+  
+  // Play-in → Winners R1 M1 (if exists)
+  if (needsBye && byePolicy === 'play_in_game') {
+    const playInNum = matchLookup.get('PLAY_IN');
+    const wr1m1Num = matchLookup.get('W-R1-M1');
+    if (playInNum && wr1m1Num) {
+      const match = matches.find(m => m.matchNumber === playInNum);
+      if (match) {
+        match.advancesToMatchId = `match_${wr1m1Num}`;
+      }
+    }
+  }
 
   return { matches, rounds };
 }
