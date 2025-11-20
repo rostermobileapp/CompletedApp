@@ -215,17 +215,23 @@ export function generateSingleElimination(
   return { matches, rounds };
 }
 
+// Helper type for tracking entrants in each round
+interface RoundEntrant {
+  teamId: string | null;
+  seed: number;
+  sourceMatchId?: number; // Which match this team came from (if not initial seed)
+  isBye?: boolean; // Auto-advanced without playing
+}
+
 /**
- * Generate Double Elimination bracket using universal formulas
+ * Generate Double Elimination bracket using state machine approach
  * Works for ANY team count (4, 8, 9, 16, 32, etc.)
  * 
- * Core Formulas:
- * - Winners Rounds = ceil(log₂(teamCount))
- * - Winners Round 1 Matches = ceil(teamCount / 2)
- * - Winners Round N Matches = Round (N-1) Matches / 2
- * - Losers Rounds = (Winners Rounds × 2) - 1
- * - Losers alternates: Elimination rounds (odd) receive winners bracket losers
- *                      Merger rounds (even) combine with previous losers
+ * Key Design:
+ * - Explicitly track entrants for each round (with seeds and source matches)
+ * - Reseed and pair entrants each round (high vs low)
+ * - Handle odd entrants by giving highest seed a bye to next round
+ * - Only create match objects for actual pairings
  */
 export function generateDoubleElimination(
   teams: TournamentTeam[],
@@ -246,54 +252,21 @@ export function generateDoubleElimination(
   let matchCounter = 1;
   const matchLookup = new Map<string, number>(); // key -> match number
   
-  // ============ CORE FORMULAS ============
-  
-  // Calculate effective team count after play-in
+  // Calculate effective team count and rounds
   const effectiveTeamCount = (needsBye && byePolicy === 'play_in_game') 
-    ? numTeams - 1  // Play-in reduces field by 1
+    ? numTeams - 1
     : numTeams;
   
   const winnersRounds = Math.ceil(Math.log2(effectiveTeamCount));
-  
-  // Calculate Round 1 matches based on bye policy
-  let winnersR1Matches: number;
-  if (needsBye && byePolicy === 'top_seed_bye') {
-    // Top seed bye: Only the non-bye teams play in Round 1
-    winnersR1Matches = Math.floor((numTeams - 1) / 2);
-  } else if (needsBye && byePolicy === 'play_in_game') {
-    // Play-in: After consolidating bottom 2, effective field is even
-    winnersR1Matches = Math.floor(effectiveTeamCount / 2);
-  } else {
-    // Even teams: Standard calculation
-    winnersR1Matches = Math.ceil(numTeams / 2);
-  }
-  
   const losersRounds = (winnersRounds * 2) - 1;
   
-  // Calculate match counts for each winners round
-  const winnersMatchCounts: number[] = [winnersR1Matches];
-  
-  if (needsBye && byePolicy === 'top_seed_bye') {
-    // Top seed bye: Track advancing teams through rounds
-    // R1: winnersR1Matches winners + 1 (top seed) = winnersR1Matches + 1 teams for R2
-    let teamsInRound = winnersR1Matches + 1; // Winners from R1 + top seed
-    
-    for (let r = 1; r < winnersRounds; r++) {
-      // Each round: floor(teams/2) matches, with ceil(teams/2) advancing (includes byes)
-      const matchesThisRound = Math.floor(teamsInRound / 2);
-      winnersMatchCounts.push(matchesThisRound);
-      // Advancing teams = winners from matches + byes
-      teamsInRound = Math.ceil(teamsInRound / 2);
-    }
-  } else {
-    // Play-in or even teams: Standard halving formula
-    for (let r = 1; r < winnersRounds; r++) {
-      const prevCount = winnersMatchCounts[r - 1];
-      winnersMatchCounts.push(Math.ceil(prevCount / 2));
-    }
-  }
+  // Track actual match counts per round (will be built as we go)
+  const winnersMatchCounts: number[] = [];
   
   // ============ WINNERS BRACKET ============
+  
+  // Initialize Round 1 entrants
+  let currentRoundEntrants: RoundEntrant[] = [];
   
   // Handle play-in game if needed
   if (needsBye && byePolicy === 'play_in_game') {
@@ -318,13 +291,41 @@ export function generateDoubleElimination(
       status: 'scheduled',
       notes: 'Play-in: Bottom 2 seeds compete for final spot'
     });
+    
+    // R1 entrants: Top seeds + play-in winner
+    for (let i = 0; i < numTeams - 2; i++) {
+      currentRoundEntrants.push({
+        teamId: sortedTeams[i].id,
+        seed: i + 1
+      });
+    }
+    // Play-in winner (TBD)
+    currentRoundEntrants.push({
+      teamId: null,
+      seed: numTeams - 1, // Use 2nd-to-last seed (winner will be better than last)
+      sourceMatchId: playInMatchNum
+    });
+  } else if (needsBye && byePolicy === 'top_seed_bye') {
+    // Top seed sits out R1, others compete
+    for (let i = 1; i < numTeams; i++) {
+      currentRoundEntrants.push({
+        teamId: sortedTeams[i].id,
+        seed: i + 1
+      });
+    }
+  } else {
+    // Even teams - all compete in R1
+    for (let i = 0; i < numTeams; i++) {
+      currentRoundEntrants.push({
+        teamId: sortedTeams[i].id,
+        seed: i + 1
+      });
+    }
   }
   
-  // Create all winners bracket rounds
+  // Generate winners bracket rounds using state machine
   for (let roundIdx = 0; roundIdx < winnersRounds; roundIdx++) {
-    const matchCount = winnersMatchCounts[roundIdx];
     let roundName: string;
-    
     if (roundIdx === 0) roundName = 'Winners Round 1';
     else if (winnersRounds - roundIdx === 1) roundName = 'Winners Finals';
     else if (winnersRounds - roundIdx === 2) roundName = 'Winners Semifinals';
@@ -333,46 +334,48 @@ export function generateDoubleElimination(
     
     rounds.push(roundName);
     
-    for (let matchPos = 0; matchPos < matchCount; matchPos++) {
+    // For Round 2 with top_seed_bye, add the top seed to entrants
+    if (roundIdx === 1 && needsBye && byePolicy === 'top_seed_bye') {
+      currentRoundEntrants.unshift({
+        teamId: sortedTeams[0].id,
+        seed: 1,
+        isBye: true
+      });
+    }
+    
+    // Sort entrants by seed (best to worst)
+    currentRoundEntrants.sort((a, b) => a.seed - b.seed);
+    
+    const numEntrants = currentRoundEntrants.length;
+    const hasOddEntrants = numEntrants % 2 === 1;
+    
+    // If odd entrants, best seed gets bye to next round
+    let byeEntrant: RoundEntrant | null = null;
+    if (hasOddEntrants && roundIdx < winnersRounds - 1) {
+      byeEntrant = currentRoundEntrants[0];
+      currentRoundEntrants = currentRoundEntrants.slice(1); // Remove bye team from pairings
+    }
+    
+    // Pair remaining entrants: high vs low (1 vs last, 2 vs 2nd-last, etc.)
+    const matchesThisRound = Math.floor(currentRoundEntrants.length / 2);
+    winnersMatchCounts.push(matchesThisRound);
+    
+    const nextRoundEntrants: RoundEntrant[] = [];
+    
+    // Add bye team to next round if exists
+    if (byeEntrant) {
+      nextRoundEntrants.push({
+        ...byeEntrant,
+        isBye: true
+      });
+    }
+    
+    for (let matchPos = 0; matchPos < matchesThisRound; matchPos++) {
       const matchNum = matchCounter++;
       matchLookup.set(`W-R${roundIdx + 1}-M${matchPos + 1}`, matchNum);
       
-      // Determine initial teams for Round 1
-      let team1Id: string | null = null;
-      let team2Id: string | null = null;
-      let notes: string | null = null;
-      
-      if (roundIdx === 0) {
-        // Winners Round 1 - seed teams
-        if (needsBye && byePolicy === 'play_in_game') {
-          if (matchPos === 0) {
-            // First match: #1 seed vs play-in winner
-            team1Id = sortedTeams[0].id;
-            team2Id = null; // TBD from play-in
-            notes = 'Top seed vs Play-in winner';
-          } else {
-            // Pair remaining teams (seeds 2 through numTeams-2)
-            // After play-in consolidates bottom 2, we have seeds 2...(numTeams-2)
-            // Pair them: 2 vs (numTeams-2), 3 vs (numTeams-3), etc.
-            const lowSeedIdx = matchPos; // 1 → seed 2, 2 → seed 3, etc.
-            const highSeedIdx = numTeams - 1 - matchPos; // Account for removed bottom 2
-            team1Id = sortedTeams[lowSeedIdx].id;
-            team2Id = sortedTeams[highSeedIdx - 1].id; // -1 to skip the play-in loser
-          }
-        } else if (needsBye && byePolicy === 'top_seed_bye') {
-          // Top seed gets bye - pair others
-          team1Id = sortedTeams[matchPos + 1].id;
-          team2Id = sortedTeams[numTeams - 1 - matchPos].id;
-        } else {
-          // Even teams - canonical pairing
-          team1Id = sortedTeams[matchPos].id;
-          team2Id = sortedTeams[numTeams - 1 - matchPos].id;
-        }
-      } else if (roundIdx === 1 && needsBye && byePolicy === 'top_seed_bye' && matchPos === 0) {
-        // Round 2, first match with top seed bye
-        team1Id = sortedTeams[0].id;
-        notes = 'Top seed (bye) vs R1 winner';
-      }
+      const highSeedEntrant = currentRoundEntrants[matchPos];
+      const lowSeedEntrant = currentRoundEntrants[currentRoundEntrants.length - 1 - matchPos];
       
       matches.push({
         tournamentId,
@@ -380,8 +383,8 @@ export function generateDoubleElimination(
         round: roundName,
         matchNumber: matchNum,
         bracketType: 'winners',
-        team1Id,
-        team2Id,
+        team1Id: highSeedEntrant.teamId,
+        team2Id: lowSeedEntrant.teamId,
         winnerId: null,
         team1Score: null,
         team2Score: null,
@@ -389,9 +392,20 @@ export function generateDoubleElimination(
         scheduledTime: null,
         location: null,
         status: 'scheduled',
-        notes
+        notes: null
       });
+      
+      // Winner advances to next round (use lower seed number for tracking)
+      if (roundIdx < winnersRounds - 1) {
+        nextRoundEntrants.push({
+          teamId: null,
+          seed: Math.min(highSeedEntrant.seed, lowSeedEntrant.seed),
+          sourceMatchId: matchNum
+        });
+      }
     }
+    
+    currentRoundEntrants = nextRoundEntrants;
   }
   
   // ============ LOSERS BRACKET ============
@@ -425,7 +439,7 @@ export function generateDoubleElimination(
     } else {
       // Merger round: combines with previous losers round
       // Use Math.ceil to preserve odd-match rounds
-      const prevLosersCount = losersMatchCounts[losersRoundIdx - 1] || winnersR1Matches;
+      const prevLosersCount = losersMatchCounts[losersRoundIdx - 1] || winnersMatchCounts[0];
       matchCount = Math.ceil(prevLosersCount / 2);
     }
     
