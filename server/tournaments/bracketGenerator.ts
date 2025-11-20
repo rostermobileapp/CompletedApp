@@ -29,17 +29,54 @@ function buildSeedSlots(bracketSize: number): number[] {
 /**
  * Generate Single Elimination bracket
  * Uses canonical seeding to properly handle byes for any team count
+ * Supports play-in games for odd team counts
  */
 export function generateSingleElimination(
   teams: TournamentTeam[],
-  tournamentId: string
+  tournamentId: string,
+  settings: any = {}
 ): BracketGeneratorResult {
   const numTeams = teams.length;
-  const numRounds = Math.ceil(Math.log2(numTeams));
-  const bracketSize = Math.pow(2, numRounds);
-
   const matches: Omit<TournamentMatch, 'id' | 'createdAt' | 'updatedAt'>[] = [];
   const rounds: string[] = [];
+
+  // Sort teams by seed
+  const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
+
+  let matchCounter = 1;
+  
+  // Check if we need a play-in game (odd teams with play_in_game policy)
+  const byePolicy = settings.byePolicy || 'top_seed_bye';
+  const needsPlayIn = numTeams % 2 === 1 && byePolicy === 'play_in_game';
+  
+  // If we have a play-in game, reduce effective team count by 1
+  const effectiveTeamCount = needsPlayIn ? numTeams - 1 : numTeams;
+  const numRounds = Math.ceil(Math.log2(effectiveTeamCount));
+  const bracketSize = Math.pow(2, numRounds);
+
+  // Add play-in round if needed
+  if (needsPlayIn) {
+    rounds.push('Play-In Round');
+    const playInMatchNum = matchCounter++;
+    
+    matches.push({
+      tournamentId,
+      gameId: null,
+      round: 'Play-In Round',
+      matchNumber: playInMatchNum,
+      bracketType: null,
+      team1Id: sortedTeams[numTeams - 2].id,
+      team2Id: sortedTeams[numTeams - 1].id,
+      winnerId: null,
+      team1Score: null,
+      team2Score: null,
+      advancesToMatchId: null,
+      scheduledTime: null,
+      location: null,
+      status: 'scheduled',
+      notes: 'Play-in: Bottom 2 seeds compete for final spot'
+    });
+  }
 
   // Round names
   const roundNames: string[] = [];
@@ -50,15 +87,24 @@ export function generateSingleElimination(
     roundNames.unshift(`Round ${i - numRounds + 1}`);
   }
 
-  // Sort teams by seed
-  const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
-  
-  // Build canonical seed slots (1 vs bracketSize, 2 vs bracketSize-1, etc.)
+  // Build canonical seed slots for effective team count
   const seedSlots = buildSeedSlots(bracketSize);
   
-  // Map seeds to actual teams (or null for byes beyond numTeams)
+  // Determine which teams enter Round 1
+  let round1Teams: TournamentTeam[] = [];
+  if (needsPlayIn) {
+    // Top (numTeams - 2) seeds + play-in winner (as slot)
+    round1Teams = sortedTeams.slice(0, numTeams - 2);
+    // Add a placeholder for play-in winner
+    const playInPlaceholder = { id: `PLAY_IN_WINNER_${matchCounter - 1}`, seed: numTeams - 1, teamName: 'Play-in Winner' } as TournamentTeam;
+    round1Teams.push(playInPlaceholder);
+  } else {
+    round1Teams = sortedTeams;
+  }
+  
+  // Map seeds to actual teams (or null for byes beyond effective count)
   const slotTeams: Array<TournamentTeam | null> = seedSlots.map(seed => {
-    return seed <= numTeams ? sortedTeams[seed - 1] : null;
+    return seed <= effectiveTeamCount ? round1Teams[seed - 1] : null;
   });
 
   // Build bracket tree bottom-up
