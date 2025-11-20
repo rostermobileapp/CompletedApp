@@ -10587,6 +10587,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot delete tournament after it has started" });
       }
 
+      // Get all games associated with this tournament's matches
+      const matchesWithGames = await db
+        .select({ gameId: tournamentMatches.gameId })
+        .from(tournamentMatches)
+        .where(eq(tournamentMatches.tournamentId, id));
+
+      // Delete those games first
+      const gameIds = matchesWithGames.map(m => m.gameId).filter((id): id is string => id !== null);
+      if (gameIds.length > 0) {
+        await db.delete(games).where(sql`${games.id} IN (${sql.join(gameIds)})`);
+      }
+
       // Delete cascades to teams, matches, and stats
       await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
       await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, id));
