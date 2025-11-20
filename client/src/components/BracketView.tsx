@@ -143,8 +143,9 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
   const MATCH_WIDTH = 280;
   const MATCH_HEIGHT = 120;
   const ROUND_GAP = 200;
-  const BASE_VERTICAL_GAP = MATCH_HEIGHT + 40; // Uniform gap for both brackets
-  const BRACKET_VERTICAL_GAP = 1; // Space between winners and losers brackets (1px)
+  const MATCH_GAP = 40; // Gap between game cards
+  const BASE_VERTICAL_GAP = MATCH_HEIGHT + MATCH_GAP; // Uniform gap for both brackets
+  const BRACKET_VERTICAL_GAP = MATCH_GAP; // Space between winners and losers brackets (same as between game cards)
 
   // Build match maps for parent lookup
   const matchById = new Map<string, TournamentMatch>();
