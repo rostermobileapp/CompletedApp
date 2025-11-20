@@ -273,6 +273,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     // Visual hierarchy with 4px borders
     // Blue for winners, Red for losers, Gold for grand finals
     let borderClass: string;
+    let cardBgClass: string;
     let headerClass: string;
     let titleClass: string;
     let badgeClass: string;
@@ -280,18 +281,21 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     
     if (isGrandFinal) {
       borderClass = 'border-[4px] border-yellow-500 dark:border-yellow-400';
+      cardBgClass = 'bg-yellow-500/50 dark:bg-yellow-400/50';
       headerClass = 'bg-yellow-500/10';
       titleClass = 'text-yellow-600 dark:text-yellow-400';
       badgeClass = isCompleted ? 'bg-yellow-500' : 'border-yellow-500 text-yellow-600 dark:text-yellow-400';
       winnerBgClass = 'bg-yellow-500 text-white';
     } else if (isLosersBracket) {
       borderClass = 'border-[4px] border-red-500 dark:border-red-400';
+      cardBgClass = 'bg-red-500/50 dark:bg-red-400/50';
       headerClass = 'bg-red-500/10';
       titleClass = 'text-red-600 dark:text-red-400';
       badgeClass = isCompleted ? 'bg-red-500' : 'border-red-500 text-red-600 dark:text-red-400';
       winnerBgClass = 'bg-red-500 text-white';
     } else {
       borderClass = 'border-[4px] border-blue-500 dark:border-blue-400';
+      cardBgClass = 'bg-blue-500/50 dark:bg-blue-400/50';
       headerClass = 'bg-blue-500/10';
       titleClass = 'text-blue-600 dark:text-blue-400';
       badgeClass = isCompleted ? 'bg-blue-500' : 'border-blue-500 text-blue-600 dark:text-blue-400';
@@ -301,7 +305,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     return (
       <g key={match.id} transform={`translate(${x}, ${y})`}>
         <foreignObject width={MATCH_WIDTH} height={MATCH_HEIGHT}>
-          <Card className={`h-full shadow-lg bg-card ${borderClass}`} data-testid={`card-match-${match.matchNumber}`}>
+          <Card className={`h-full shadow-lg ${cardBgClass} ${borderClass}`} data-testid={`card-match-${match.matchNumber}`}>
             <CardHeader className={`p-2 ${headerClass}`}>
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
