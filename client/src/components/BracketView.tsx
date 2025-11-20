@@ -118,24 +118,27 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     return { x, y };
   };
 
-  const renderMatch = (match: TournamentMatch, x: number, y: number) => {
+  const renderMatch = (match: TournamentMatch, x: number, y: number, isLosersBracket = false) => {
     const isCompleted = match.status === 'completed';
     // Only highlight if there's an actual winner (avoid null === null bug)
     const team1Wins = match.winnerId != null && match.winnerId === match.team1Id;
     const team2Wins = match.winnerId != null && match.winnerId === match.team2Id;
 
+    // Use destructive (red) colors for losers bracket, primary (blue) for winners
+    const accentColor = isLosersBracket ? 'destructive' : 'primary';
+
     return (
       <g key={match.id} transform={`translate(${x}, ${y})`}>
         <foreignObject width={MATCH_WIDTH} height={MATCH_HEIGHT}>
-          <Card className="h-full border-2 border-primary/40 shadow-lg bg-card" data-testid={`card-match-${match.matchNumber}`}>
-            <CardHeader className="p-2 bg-primary/5">
+          <Card className={`h-full border-2 shadow-lg bg-card ${isLosersBracket ? 'border-destructive/40' : 'border-primary/40'}`} data-testid={`card-match-${match.matchNumber}`}>
+            <CardHeader className={`p-2 ${isLosersBracket ? 'bg-destructive/5' : 'bg-primary/5'}`}>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xs font-semibold text-primary">
+                <CardTitle className={`text-xs font-semibold ${isLosersBracket ? 'text-destructive' : 'text-primary'}`}>
                   Match {match.matchNumber}
                 </CardTitle>
                 <Badge
                   variant={isCompleted ? 'default' : 'outline'}
-                  className={`text-xs ${isCompleted ? 'bg-primary' : 'border-primary text-primary'}`}
+                  className={`text-xs ${isCompleted ? (isLosersBracket ? 'bg-destructive' : 'bg-primary') : (isLosersBracket ? 'border-destructive text-destructive' : 'border-primary text-primary')}`}
                 >
                   {match.status}
                 </Badge>
@@ -146,7 +149,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
               <div
                 className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors ${
                   team1Wins
-                    ? 'bg-primary text-primary-foreground font-bold shadow-sm'
+                    ? `${isLosersBracket ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'} font-bold shadow-sm`
                     : 'bg-muted/50 hover:bg-muted'
                 }`}
               >
@@ -164,7 +167,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
               <div
                 className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors ${
                   team2Wins
-                    ? 'bg-primary text-primary-foreground font-bold shadow-sm'
+                    ? `${isLosersBracket ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'} font-bold shadow-sm`
                     : 'bg-muted/50 hover:bg-muted'
                 }`}
               >
@@ -221,7 +224,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       roundMatches.forEach((match, matchIndex) => {
         const { x, y } = calculateMatchPosition(roundIndex, matchIndex, roundMatches.length, false);
         matchPositions.set(match.id, { x, y });
-        elements.push(renderMatch(match, x, y));
+        elements.push(renderMatch(match, x, y, false));
       });
 
       // Add round label
@@ -251,7 +254,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       elements.push(
         <g key="losers-title" transform={`translate(${losersXOffset}, ${winnersHeight + 20})`}>
           <foreignObject width={200} height={30}>
-            <div className="font-bold text-base text-primary">
+            <div className="font-bold text-base text-destructive">
               Losers Bracket
             </div>
           </foreignObject>
@@ -264,7 +267,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
         roundMatches.forEach((match, matchIndex) => {
           const { x, y } = calculateMatchPosition(roundIndex, matchIndex, roundMatches.length, true);
           matchPositions.set(match.id, { x, y });
-          elements.push(renderMatch(match, x, y));
+          elements.push(renderMatch(match, x, y, true));
         });
 
         // Add round label
@@ -273,7 +276,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
         elements.push(
           <g key={`label-l-${roundName}`} transform={`translate(${labelX}, ${labelY})`}>
             <foreignObject width={MATCH_WIDTH} height={30}>
-              <div className="font-bold text-sm text-primary bg-primary/10 border border-primary/30 px-3 py-1 rounded-md">
+              <div className="font-bold text-sm text-destructive bg-destructive/10 border border-destructive/30 px-3 py-1 rounded-md">
                 {roundName}
               </div>
             </foreignObject>
