@@ -10228,14 +10228,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         team1ActualId: team1Data?.[0]?.teamId,
         team2ActualId: team2Data?.[0]?.teamId,
         hasGameId: !!match.gameId,
-        tournamentExists: !!tournament
+        tournamentExists: !!tournament,
+        hasTeam1: !!team1Data?.[0]?.teamId,
+        hasTeam2: !!team2Data?.[0]?.teamId
       });
 
       // Create or update game record if both teams exist and match has schedule info
       if (team1Data?.[0]?.teamId && team2Data?.[0]?.teamId && tournament) {
+        console.log('✅ All conditions met for game creation/update');
         if (scheduledTime) {
+          console.log('📅 Creating/updating game with scheduledTime:', scheduledTime);
           // Schedule is set - create or update game
           if (match.gameId) {
+            console.log('🔄 Updating existing game:', match.gameId);
             // Update existing game
             await db
               .update(games)
@@ -10247,7 +10252,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 isCompleted: status === 'completed'
               })
               .where(eq(games.id, match.gameId));
+            console.log('✅ Game updated successfully');
           } else {
+            console.log('➕ Creating new game for match:', {
+              leagueId: tournament.leagueId,
+              seasonId: tournament.seasonId,
+              homeTeamId: team1Data[0].teamId,
+              awayTeamId: team2Data[0].teamId,
+              scheduledAt: scheduledTime
+            });
             // Create new game
             const [newGame] = await db
               .insert(games)
@@ -10264,17 +10277,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .returning();
             
+            console.log('✅ Game created with ID:', newGame.id);
             // Link game to tournament match
             updateData.gameId = newGame.id;
           }
         } else if (scheduledTime === null && match.gameId) {
+          console.log('🗑️ Deleting game because schedule was cleared');
           // Schedule cleared - delete the linked game
           await db
             .delete(games)
             .where(eq(games.id, match.gameId));
           
           updateData.gameId = null;
+          console.log('✅ Game deleted');
         }
+      } else {
+        console.log('❌ Skipping game creation - missing requirements:', {
+          hasTeam1: !!team1Data?.[0]?.teamId,
+          hasTeam2: !!team2Data?.[0]?.teamId,
+          hasTournament: !!tournament
+        });
       }
 
       const [updatedMatch] = await db
