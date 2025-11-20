@@ -463,10 +463,6 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
         </svg>
       </div>
 
-      {/* Instructions */}
-      <div className="mt-4 text-sm text-muted-foreground text-center">
-        <p>Scroll to pan • Ctrl/Cmd + Scroll to zoom • Drag to move • Click buttons to zoom</p>
       </div>
-    </div>
   );
 }
