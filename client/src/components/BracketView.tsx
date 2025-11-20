@@ -167,24 +167,36 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     if (roundIndex === 0) {
       centerY = matchIndexInRound * BASE_VERTICAL_GAP + MATCH_HEIGHT / 2;
     } else {
-      // Find parent matches by checking if their advancesToMatchId matches this match's id
-      const parents: TournamentMatch[] = [];
-      matches.forEach(m => {
-        if (m.advancesToMatchId === match.id) {
-          parents.push(m);
+      // For Round 2+: calculate parent positions by index
+      // Each match pairs with 2 matches from previous round
+      // Match 0 in Round 2 has parents at indices 0,1 in Round 1
+      // Match 1 in Round 2 has parents at indices 2,3 in Round 1, etc.
+      const parentRound = roundIndex - 1;
+      const parent1Index = matchIndexInRound * 2;
+      const parent2Index = matchIndexInRound * 2 + 1;
+      
+      // Get the bracket (winners or losers)
+      const roundArray = isLosersBracket ? losersRounds : winnersRounds;
+      const bracketMap = isLosersBracket ? losers : winners;
+      
+      if (roundIndex > 0 && parentRound >= 0 && parentRound < roundArray.length) {
+        const parentRoundName = roundArray[parentRound];
+        const parentMatches = bracketMap[parentRoundName] || [];
+        
+        if (parentMatches[parent1Index] && parentMatches[parent2Index]) {
+          // Both parents found: center between them
+          const parent1Center = getMatchCenter(parentMatches[parent1Index], parentRound, parent1Index, isLosersBracket);
+          const parent2Center = getMatchCenter(parentMatches[parent2Index], parentRound, parent2Index, isLosersBracket);
+          centerY = (parent1Center + parent2Center) / 2;
+        } else if (parentMatches[parent1Index]) {
+          // Only first parent: use its center
+          centerY = getMatchCenter(parentMatches[parent1Index], parentRound, parent1Index, isLosersBracket);
+        } else {
+          // Fallback: evenly spaced
+          centerY = matchIndexInRound * BASE_VERTICAL_GAP + MATCH_HEIGHT / 2;
         }
-      });
-
-      if (parents.length === 2) {
-        // Two parents: center between them
-        const parent1Center = getMatchCenterFromMatch(parents[0]);
-        const parent2Center = getMatchCenterFromMatch(parents[1]);
-        centerY = (parent1Center + parent2Center) / 2;
-      } else if (parents.length === 1) {
-        // Single parent (bye or crossover): inherit center
-        centerY = getMatchCenterFromMatch(parents[0]);
       } else {
-        // No parents found: fallback to evenly spaced
+        // Fallback: evenly spaced
         centerY = matchIndexInRound * BASE_VERTICAL_GAP + MATCH_HEIGHT / 2;
       }
     }
@@ -193,37 +205,6 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     return centerY;
   };
 
-  // Helper to get center of a match by looking it up recursively
-  const getMatchCenterFromMatch = (match: TournamentMatch): number => {
-    // Find which bracket and round this match belongs to
-    let roundIndex = 0;
-    let matchIndexInRound = 0;
-    let isLosersBracket = false;
-
-    // Search in winners bracket
-    winnersRounds.forEach((roundName, rIndex) => {
-      const roundMatches = winners[roundName] || [];
-      const mIndex = roundMatches.findIndex(m => m.id === match.id);
-      if (mIndex !== -1) {
-        roundIndex = rIndex;
-        matchIndexInRound = mIndex;
-        isLosersBracket = false;
-      }
-    });
-
-    // Search in losers bracket
-    losersRounds.forEach((roundName, rIndex) => {
-      const roundMatches = losers[roundName] || [];
-      const mIndex = roundMatches.findIndex(m => m.id === match.id);
-      if (mIndex !== -1) {
-        roundIndex = rIndex;
-        matchIndexInRound = mIndex;
-        isLosersBracket = true;
-      }
-    });
-
-    return getMatchCenter(match, roundIndex, matchIndexInRound, isLosersBracket);
-  };
 
   // Calculate positions for all matches
   const calculateAllPositions = () => {
