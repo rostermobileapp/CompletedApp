@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import type { TournamentMatch, TournamentTeam } from "@shared/schema";
+import { format as formatDate } from "date-fns";
 
 interface BracketViewProps {
   matches: TournamentMatch[];
@@ -352,8 +353,13 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
                     {match.status}
                   </Badge>
                 </div>
-                <div className={`text-[10px] font-medium ${titleClass} opacity-80`}>
-                  Match #{match.matchNumber}
+                <div className={`text-[10px] font-medium ${titleClass} opacity-80 flex items-center gap-1.5`}>
+                  <span>Match #{match.matchNumber}</span>
+                  {match.scheduledTime && (
+                    <span className="text-[9px] opacity-70">
+                      • {formatDate(new Date(match.scheduledTime), "MMM d, h:mm a")}
+                    </span>
+                  )}
                 </div>
               </div>
             </CardHeader>
