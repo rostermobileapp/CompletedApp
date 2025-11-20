@@ -77,30 +77,10 @@ import { sendBulkScrimmageInvites } from "./emails";
 function formatGameForResponse(game: any) {
   if (game && game.scheduledAt) {
     const date = new Date(game.scheduledAt);
-    // Debug logging for Oct 26
-    if (game.scheduledAt.toString().includes('2025-10-26')) {
-      console.log('🔍 DEBUG scheduledAt:', game.scheduledAt);
-      console.log('🔍 Date object:', date);
-      console.log('🔍 UTC Hours:', date.getUTCHours(), 'UTC Minutes:', date.getUTCMinutes());
-      console.log('🔍 Local Hours:', date.getHours(), 'Local Minutes:', date.getMinutes());
-    }
-    
-    // Format as YYYY-MM-DDTHH:mm without timezone to display as local time
-    // Use UTC accessors since database stores in GMT
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-    
-    const formatted = `${year}-${month}-${day}T${hours}:${minutes}`;
-    if (game.scheduledAt.toString().includes('2025-10-26')) {
-      console.log('🔍 Formatted string:', formatted);
-    }
-    
+    // Return ISO string with timezone information so frontend can convert to local time
     return {
       ...game,
-      scheduledAt: formatted
+      scheduledAt: date.toISOString()
     };
   }
   return game;
