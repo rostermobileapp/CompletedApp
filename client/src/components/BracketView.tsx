@@ -35,18 +35,21 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     const sourceMatches = matches.filter(m => m.advancesToMatchId === `match_${match.matchNumber}`);
     
     if (sourceMatches.length === 1) {
-      return `Winner of Match ${sourceMatches[0].matchNumber}`;
+      const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
+      return `${prefix} Match ${sourceMatches[0].matchNumber}`;
     } else if (sourceMatches.length === 2) {
       // Two matches feed into this one (common in brackets)
       // Distinguish based on position or match numbers
+      const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
       if (position === 'team1') {
-        return `Winner of Match ${sourceMatches[0].matchNumber}`;
+        return `${prefix} Match ${sourceMatches[0].matchNumber}`;
       } else {
-        return `Winner of Match ${sourceMatches[1].matchNumber}`;
+        return `${prefix} Match ${sourceMatches[1].matchNumber}`;
       }
     } else if (sourceMatches.length > 0) {
       // Multiple sources - just show first for now
-      return `Winner of Match ${sourceMatches[0].matchNumber}`;
+      const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
+      return `${prefix} Match ${sourceMatches[0].matchNumber}`;
     }
     
     // Fallback to notes-based description
@@ -55,7 +58,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
         return "Winner of Play-In";
       }
       if (match.notes.toLowerCase().includes('winners round')) {
-        return "Winner from Winners";
+        return match.bracketType === 'losers' ? "Loser from Winners" : "Winner from Winners";
       }
       if (match.notes.toLowerCase().includes('losers round')) {
         return "Winner from Losers";
