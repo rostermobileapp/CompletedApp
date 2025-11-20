@@ -146,6 +146,30 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
   const MATCH_GAP = 40;
   const BRACKET_VERTICAL_GAP = MATCH_HEIGHT; // Space between winners and losers brackets (one card height)
 
+  // Calculate actual bottom of winners bracket first
+  const getWinnersBottomY = () => {
+    const BASE_GAP = MATCH_HEIGHT + MATCH_GAP;
+    const MAX_GAP_MULTIPLIER = 8;
+    
+    let maxBottomY = 0;
+    winnersRounds.forEach((roundName, roundIndex) => {
+      const roundMatches = winners[roundName] || [];
+      const multiplier = Math.pow(2, roundIndex);
+      const gap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
+      const offset = (roundIndex > 0) ? gap / 2 : 0;
+      
+      roundMatches.forEach((_, matchIndex) => {
+        const y = matchIndex * gap + offset;
+        const bottomY = y + MATCH_HEIGHT;
+        if (bottomY > maxBottomY) {
+          maxBottomY = bottomY;
+        }
+      });
+    });
+    
+    return maxBottomY;
+  };
+
   const calculateMatchPosition = (roundIndex: number, matchIndex: number, totalMatches: number, isLosersBracket = false) => {
     // Universal spacing formulas with caps to prevent runaway heights
     const BASE_GAP = MATCH_HEIGHT + MATCH_GAP;
@@ -166,17 +190,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       verticalGap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
     }
     
-    // Calculate winners bracket height
-    const winnersHeight = Math.max(...winnersRounds.map((r, idx) => {
-      const roundMatches = winners[r] || [];
-      const multiplier = Math.pow(2, idx);
-      const gap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
-      const offset = (idx > 0) ? gap / 2 : 0;
-      return roundMatches.length * gap + offset;
-    }));
-    
-    // Losers bracket positioned below winners bracket
-    const startY = isLosersBracket ? winnersHeight + BRACKET_VERTICAL_GAP : 0;
+    // Losers bracket positioned below actual bottom of winners bracket
+    const startY = isLosersBracket ? getWinnersBottomY() + BRACKET_VERTICAL_GAP : 0;
     
     // Center the matches vertically with progressive spacing
     const offset = (roundIndex > 0) ? verticalGap / 2 : 0;
