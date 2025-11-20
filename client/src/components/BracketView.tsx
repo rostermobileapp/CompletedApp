@@ -147,13 +147,13 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
   const BRACKET_VERTICAL_GAP = 100; // Space between winners and losers brackets
 
   const calculateMatchPosition = (roundIndex: number, matchIndex: number, totalMatches: number, isLosersBracket = false) => {
-    // For double elimination, offset losers bracket horizontally
-    const losersXOffset = hasLosers && isLosersBracket ? (winnersRounds.length) * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP : 0;
-    const x = roundIndex * (MATCH_WIDTH + ROUND_GAP) + losersXOffset;
-    
     // Universal spacing formulas with caps to prevent runaway heights
     const BASE_GAP = MATCH_HEIGHT + MATCH_GAP;
     const MAX_GAP_MULTIPLIER = 8; // Cap maximum gap to prevent excessive heights
+    
+    // Losers bracket: align with Round 2 of winners bracket (1 round offset)
+    const losersXOffset = isLosersBracket ? (MATCH_WIDTH + ROUND_GAP) : 0;
+    const x = roundIndex * (MATCH_WIDTH + ROUND_GAP) + losersXOffset;
     
     // Winners: gap = baseGap × min(2^roundIndex, MAX_GAP_MULTIPLIER)
     // Losers: gap = baseGap × min(1.5^floor(roundIndex/2), MAX_GAP_MULTIPLIER)
@@ -166,8 +166,17 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       verticalGap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
     }
     
-    // Both winners and losers brackets start at y=0 for side-by-side layout
-    const startY = 0;
+    // Calculate winners bracket height
+    const winnersHeight = Math.max(...winnersRounds.map((r, idx) => {
+      const roundMatches = winners[r] || [];
+      const multiplier = Math.pow(2, idx);
+      const gap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
+      const offset = (idx > 0) ? gap / 2 : 0;
+      return roundMatches.length * gap + offset;
+    }));
+    
+    // Losers bracket positioned below winners bracket
+    const startY = isLosersBracket ? winnersHeight + BRACKET_VERTICAL_GAP : 0;
     
     // Center the matches vertically with progressive spacing
     const offset = (roundIndex > 0) ? verticalGap / 2 : 0;
@@ -400,11 +409,12 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     return elements;
   };
 
-  // Calculate SVG dimensions based on bracket size (side-by-side layout)
+  // Calculate SVG dimensions based on bracket size (vertical stacking layout)
   const calculateDimensions = () => {
+    // Width: Max of winners rounds or (losers rounds + 1 offset for alignment)
     const winnersWidth = winnersRounds.length * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP;
-    const losersWidth = hasLosers ? (losersRounds.length * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP) : 0;
-    const width = winnersWidth + losersWidth + 200;
+    const losersWidth = hasLosers ? (losersRounds.length * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP + (MATCH_WIDTH + ROUND_GAP)) : 0;
+    const width = Math.max(winnersWidth, losersWidth) + 200;
     
     const BASE_GAP = MATCH_HEIGHT + MATCH_GAP;
     const MAX_GAP_MULTIPLIER = 8; // Same cap as in calculateMatchPosition
@@ -425,8 +435,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       return roundMatches.length * gap + offset + MATCH_HEIGHT;
     })) : 0;
     
-    // Side-by-side layout: height is MAX of both brackets, not sum
-    const height = Math.max(winnersHeight, losersHeight) + 200;
+    // Vertical stacking: height is SUM of both brackets
+    const height = winnersHeight + losersHeight + (hasLosers ? BRACKET_VERTICAL_GAP + 200 : 200);
     
     return { width, height };
   };
