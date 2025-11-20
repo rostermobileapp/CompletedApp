@@ -6,26 +6,30 @@ Rosters is a free, comprehensive sports team management platform designed to str
 
 The platform now includes a comprehensive tournament/playoff system supporting:
 - **Tournament Types**: Season playoffs and standalone tournaments
-- **Formats**: Single elimination (canonical seeding with bye handling), double elimination (beta - winners bracket only), round robin, and split round robin
+- **Formats**: Single elimination (canonical seeding with bye handling), double elimination (complete), round robin, and split round robin
 - **Features**: 
-  - Canonical bracket generation (1v16, 2v15, etc.) with proper bye distribution
+  - Canonical bracket generation (1v16, 2v15, etc.) with configurable bye policies for odd team counts
+  - **Bye Policy Options** (for odd-numbered teams in elimination formats):
+    - Top Seed Gets Bye to Round 2: Seed #1 automatically advances; remaining teams play in Round 1
+    - Bottom 2 Seeds Play Play-In Game: Separate "Play-In Round" where bottom 2 seeds compete; winner faces #1 seed in Round 1
   - Automatic match creation with advancement pointers
   - Match scheduling and score tracking infrastructure
   - Format recommendations based on team count (detailed pros/cons/game estimates)
   - Touch-optimized mobile-first design
-  - **SVG-based bracket visualization** with zoom/pan controls (NEW)
+  - **SVG-based bracket visualization** with zoom/pan controls
 - **Access Control**: Commissioner, Secondary Commissioner, and Admin only
 - **Backend**: Complete and architect-approved ✅
   - Database schema (3 tables: tournaments, tournament_teams, tournament_matches)
   - API routes with full CRUD and permissions (requireLeagueManagement middleware)
-  - Bracket generator with canonical seeding and bye auto-advancement
+  - Bracket generator with canonical seeding and configurable bye policies (stored in tournament.settings.byePolicy)
+  - Double elimination generator creates proper match counts (e.g., exactly 4 R1 matches for 9 teams)
   - Format recommendation engine with detailed pros/cons analysis
   - PATCH /api/tournaments/:id for editing draft tournaments with automatic bracket regeneration
 - **Frontend**: Complete with bracket visualization ✅
   - Tournaments Dashboard (/leagues/:leagueId/tournaments) - List view with status badges
-  - Tournament Creator (/leagues/:leagueId/tournaments/create) - 3-step wizard with enhanced format recommendations
+  - Tournament Creator (/leagues/:leagueId/tournaments/create) - 3-step wizard with enhanced format recommendations and bye policy selector (shown for odd team counts)
   - Tournament Edit (/tournaments/:tournamentId/edit) - Multi-step wizard with pre-filled data (draft-only)
-  - Tournament Detail (/tournaments/:tournamentId) - Tabbed view with BracketView component
+  - Tournament Detail (/tournaments/:tournamentId) - Tabbed view with BracketView component supporting Play-In Round display
   - **BracketView Component**: SVG bracket rendering with:
     - Stable round ordering algorithm
     - Horizontal separation of winners/losers brackets (no overlap)
@@ -38,10 +42,10 @@ The platform now includes a comprehensive tournament/playoff system supporting:
   - Dashboard → Tournaments Card (when league selected) → Tournament List
   - New API endpoint: GET /api/leagues/manageable (returns leagues user can manage tournaments for with tournament counts)
 - **Known Limitations**:
-  - Double elimination is beta: Creates winners bracket + grand finals placeholder; losers bracket requires manual match setup
   - Match result recording UI is placeholder (infrastructure exists)
   - Match scheduling/editing buttons are placeholders (future enhancement)
   - Connector anchoring uses notes-based heuristics rather than explicit slot metadata (visual may vary for complex transitions)
+  - Losers bracket routing in double elimination requires manual match result entry to function (automatic advancement exists for winners bracket only)
 - **Testing Status**: Manual testing required (automated e2e blocked by auth configuration)
 
 # User Preferences
