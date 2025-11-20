@@ -10220,6 +10220,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(tournamentTeams.id, match.team2Id))
         .limit(1) : null;
 
+      console.log('🎯 Tournament match update:', {
+        matchId,
+        scheduledTime,
+        team1TournamentId: match.team1Id,
+        team2TournamentId: match.team2Id,
+        team1ActualId: team1Data?.[0]?.teamId,
+        team2ActualId: team2Data?.[0]?.teamId,
+        hasGameId: !!match.gameId,
+        tournamentExists: !!tournament
+      });
+
       // Create or update game record if both teams exist and match has schedule info
       if (team1Data?.[0]?.teamId && team2Data?.[0]?.teamId && tournament) {
         if (scheduledTime) {
