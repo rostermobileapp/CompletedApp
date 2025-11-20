@@ -91,24 +91,19 @@ export function generateSingleElimination(
   const seedSlots = buildSeedSlots(bracketSize);
   
   // Map seeds to teams for Round 1
-  // For play-in: use top (numTeams-2) seeds, then add play-in winner as last seed
-  let round1Teams: TournamentTeam[] = [];
+  // For play-in: use top (numTeams-2) seeds, then add null for play-in winner spot
+  let round1Teams: Array<TournamentTeam | null> = [];
   if (needsPlayIn) {
-    round1Teams = sortedTeams.slice(0, numTeams - 2);
-    // Add placeholder for play-in winner (will be filled by play-in match winner)
-    const playInWinner = { 
-      id: `PLAY_IN_WINNER`, 
-      seed: numTeams - 1, 
-      teamName: 'Play-in Winner' 
-    } as TournamentTeam;
-    round1Teams.push(playInWinner);
+    round1Teams = sortedTeams.slice(0, numTeams - 2) as Array<TournamentTeam | null>;
+    // Add null for play-in winner spot (will be determined after play-in match)
+    round1Teams.push(null);
   } else {
-    round1Teams = sortedTeams;
+    round1Teams = sortedTeams as Array<TournamentTeam | null>;
   }
   
-  // Map seed slots to teams (or null for byes if bracketSize > effectiveTeamCount)
+  // Map seed slots to teams (or null for byes/play-in winner if bracketSize > effectiveTeamCount)
   const slotTeams: Array<TournamentTeam | null> = seedSlots.map(seed => {
-    return seed <= effectiveTeamCount ? round1Teams[seed - 1] : null;
+    return seed <= effectiveTeamCount ? (round1Teams[seed - 1] || null) : null;
   });
 
   // Build bracket tree using canonical seeding
