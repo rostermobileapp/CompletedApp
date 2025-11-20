@@ -2661,12 +2661,25 @@ export const insertTournamentTeamSchema = createInsertSchema(tournamentTeams).om
 export const insertTournamentMatchSchema = createInsertSchema(tournamentMatches).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTournamentStatsSchema = createInsertSchema(tournamentStats).omit({ id: true, createdAt: true, updatedAt: true });
 
+// Update tournament match schema for PATCH operations
+export const updateTournamentMatchSchema = z.object({
+  scheduledTime: z.union([
+    z.string().transform(val => val ? new Date(val) : null),
+    z.null()
+  ]).optional(),
+  location: z.string().nullable().optional(),
+  team1Score: z.number().int().nullable().optional(),
+  team2Score: z.number().int().nullable().optional(),
+  status: z.string().optional(),
+});
+
 export type Tournament = typeof tournaments.$inferSelect;
 export type InsertTournament = z.infer<typeof insertTournamentSchema>;
 export type TournamentTeam = typeof tournamentTeams.$inferSelect;
 export type InsertTournamentTeam = z.infer<typeof insertTournamentTeamSchema>;
 export type TournamentMatch = typeof tournamentMatches.$inferSelect;
 export type InsertTournamentMatch = z.infer<typeof insertTournamentMatchSchema>;
+export type UpdateTournamentMatch = z.infer<typeof updateTournamentMatchSchema>;
 export type TournamentStats = typeof tournamentStats.$inferSelect;
 export type InsertTournamentStats = z.infer<typeof insertTournamentStatsSchema>;
 

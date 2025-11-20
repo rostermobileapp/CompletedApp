@@ -10142,6 +10142,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update tournament match (schedule, location, scores)
+  app.patch('/api/tournaments/:tournamentId/matches/:matchId', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { tournamentId, matchId } = req.params;
+      
+      // Validate request body
+      const validatedData = updateTournamentMatchSchema.parse(req.body);
+      const { scheduledTime, location, team1Score, team2Score, status } = validatedData;
+
+      // Verify match belongs to tournament
+      const [match] = await db
+        .select()
+        .from(tournamentMatches)
+        .where(and(
+          eq(tournamentMatches.id, matchId),
+          eq(tournamentMatches.tournamentId, tournamentId)
+        ));
+
+      if (!match) {
+        return res.status(404).json({ message: "Match not found" });
+      }
+
+      // Build update object with only provided fields
+      const updateData: any = {
+        updatedAt: new Date()
+      };
+
+      if (scheduledTime !== undefined) {
+        // scheduledTime is already transformed to Date | null by Zod schema
+        updateData.scheduledTime = scheduledTime;
+      }
+      if (location !== undefined) {
+        updateData.location = location;
+      }
+      if (team1Score !== undefined) {
+        updateData.team1Score = team1Score;
+      }
+      if (team2Score !== undefined) {
+        updateData.team2Score = team2Score;
+      }
+      if (status !== undefined) {
+        updateData.status = status;
+      }
+
+      // Determine winner if scores are provided
+      if (team1Score !== undefined && team2Score !== undefined) {
+        if (team1Score === null || team2Score === null) {
+          // Scores cleared - clear winner
+          updateData.winnerId = null;
+        } else if (team1Score > team2Score) {
+          updateData.winnerId = match.team1Id;
+        } else if (team2Score > team1Score) {
+          updateData.winnerId = match.team2Id;
+        } else {
+          // Tied - clear winner
+          updateData.winnerId = null;
+        }
+      }
+
+      const [updatedMatch] = await db
+        .update(tournamentMatches)
+        .set(updateData)
+        .where(eq(tournamentMatches.id, matchId))
+        .returning();
+
+      res.json(updatedMatch);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid match data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error updating tournament match:", error);
+      res.status(500).json({ message: "Failed to update tournament match" });
+    }
+  });
+
   // Create tournament
   app.post('/api/tournaments', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {

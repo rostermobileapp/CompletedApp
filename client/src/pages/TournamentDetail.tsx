@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,8 +19,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import BracketView from "@/components/BracketView";
+import MatchEditDialog from "@/components/MatchEditDialog";
 import type { Tournament, TournamentTeam, TournamentMatch } from "@shared/schema";
 import { useState } from "react";
+import { format } from "date-fns";
 
 export default function TournamentDetail() {
   const [, params] = useRoute("/tournaments/:tournamentId");
@@ -28,6 +30,7 @@ export default function TournamentDetail() {
   const tournamentId = params?.tournamentId;
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [editingMatch, setEditingMatch] = useState<TournamentMatch | null>(null);
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
@@ -352,30 +355,63 @@ export default function TournamentDetail() {
                   {matches && matches.length > 0 ? (
                     matches
                       .sort((a, b) => a.matchNumber - b.matchNumber)
-                      .map((match) => (
-                        <Card key={match.id} data-testid={`card-schedule-${match.matchNumber}`}>
-                          <CardContent className="p-4">
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                              <div className="space-y-1">
-                                <div className="font-semibold">
-                                  Match {match.matchNumber} - {match.round}
+                      .map((match) => {
+                        const team1Name = getTeamName(match.team1Id);
+                        const team2Name = getTeamName(match.team2Id);
+                        
+                        return (
+                          <Card key={match.id} data-testid={`card-schedule-${match.matchNumber}`}>
+                            <CardContent className="p-4">
+                              <div className="flex flex-col gap-3">
+                                {/* Header Row */}
+                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                  <div className="space-y-1">
+                                    <div className="font-semibold">
+                                      Match {match.matchNumber} - {match.round}
+                                    </div>
+                                    <div className="text-sm font-medium">
+                                      {team1Name} vs {team2Name}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant={match.status === 'completed' ? 'default' : 'outline'}>
+                                      {match.status}
+                                    </Badge>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      onClick={() => setEditingMatch(match)}
+                                      data-testid={`button-edit-match-${match.matchNumber}`}
+                                    >
+                                      Edit
+                                    </Button>
+                                  </div>
                                 </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {getTeamName(match.team1Id)} vs {getTeamName(match.team2Id)}
+                                
+                                {/* Schedule Info Row */}
+                                <div className="flex flex-col md:flex-row gap-3 text-sm text-muted-foreground">
+                                  <div className="flex items-center gap-1.5">
+                                    <Clock className="h-4 w-4" />
+                                    {match.scheduledTime ? (
+                                      <span data-testid={`text-scheduled-time-${match.matchNumber}`}>
+                                        {format(new Date(match.scheduledTime), "MMM d, yyyy 'at' h:mm a")}
+                                      </span>
+                                    ) : (
+                                      <span className="italic">Not scheduled</span>
+                                    )}
+                                  </div>
+                                  {match.location && (
+                                    <div className="flex items-center gap-1.5">
+                                      <MapPin className="h-4 w-4" />
+                                      <span data-testid={`text-location-${match.matchNumber}`}>{match.location}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Badge variant={match.status === 'completed' ? 'default' : 'outline'}>
-                                  {match.status}
-                                </Badge>
-                                <Button size="sm" variant="outline" data-testid={`button-edit-match-${match.matchNumber}`}>
-                                  Edit
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))
+                            </CardContent>
+                          </Card>
+                        );
+                      })
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       No matches scheduled yet
@@ -410,6 +446,17 @@ export default function TournamentDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Match Edit Dialog */}
+      {editingMatch && (
+        <MatchEditDialog
+          match={editingMatch}
+          open={!!editingMatch}
+          onOpenChange={(open) => !open && setEditingMatch(null)}
+          team1Name={getTeamName(editingMatch.team1Id)}
+          team2Name={getTeamName(editingMatch.team2Id)}
+        />
+      )}
     </div>
   );
 }
