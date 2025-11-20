@@ -516,6 +516,44 @@ export function generateDoubleElimination(
     notes: 'Winners Finals winner vs Losers Finals winner'
   });
 
+  // ============ POPULATE LOSERS BRACKET WITH SOURCE MATCHES ============
+  
+  // For each elimination round in losers bracket, pair up losers from the corresponding winners round
+  for (let losersRoundIdx = 0; losersRoundIdx < losersRounds; losersRoundIdx++) {
+    const roundNumber = losersRoundIdx + 1;
+    const isEliminationRound = roundNumber % 2 === 1; // Odd rounds (1, 3, 5...)
+    
+    if (isEliminationRound) {
+      // This losers round receives losers from a winners round
+      const winnersSourceRoundIdx = Math.floor(losersRoundIdx / 2);
+      const winnersSourceRoundNum = winnersSourceRoundIdx + 1;
+      
+      // Get all winners matches from the source round
+      const winnersSourceMatches: number[] = [];
+      for (let matchPos = 1; matchPos <= winnersMatchCounts[winnersSourceRoundIdx]; matchPos++) {
+        const matchNum = matchLookup.get(`W-R${winnersSourceRoundNum}-M${matchPos}`);
+        if (matchNum) {
+          winnersSourceMatches.push(matchNum);
+        }
+      }
+      
+      // Pair up losers: (M1 loser & M2 loser) → L-M1, (M3 loser & M4 loser) → L-M2, etc.
+      for (let losersMatchIdx = 0; losersMatchIdx < winnersSourceMatches.length / 2; losersMatchIdx++) {
+        const sourceMatch1Num = winnersSourceMatches[losersMatchIdx * 2];
+        const sourceMatch2Num = winnersSourceMatches[losersMatchIdx * 2 + 1];
+        
+        const losersMatchNum = matchLookup.get(`L-R${roundNumber}-M${losersMatchIdx + 1}`);
+        if (losersMatchNum) {
+          const losersMatch = matches.find(m => m.matchNumber === losersMatchNum);
+          if (losersMatch) {
+            // Store source match info in notes for later processing
+            losersMatch.notes = `Loser of match_${sourceMatch1Num} vs Loser of match_${sourceMatch2Num}`;
+          }
+        }
+      }
+    }
+  }
+
   // ============ SET ADVANCEMENT POINTERS ============
   
   // Winners bracket advancement (blue arrows →)
