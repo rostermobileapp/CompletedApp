@@ -2,11 +2,11 @@
 
 Rosters is a free, comprehensive sports team management platform designed to streamline sports team management for various sports. It offers league and team organization, game scheduling, messaging, and tournament/playoff management functionalities. The platform operates on a freemium model with subscription-gated features, aiming to provide a robust solution for sports enthusiasts and administrators.
 
-## Tournament System (Complete with Bracket Visualization - Nov 19, 2025)
+## Tournament System (Nov 20, 2025)
 
 The platform now includes a comprehensive tournament/playoff system supporting:
 - **Tournament Types**: Season playoffs and standalone tournaments
-- **Formats**: Single elimination (canonical seeding with bye handling), double elimination (complete), round robin, and split round robin
+- **Formats**: Single elimination (canonical seeding with bye handling), double elimination (in progress), round robin, and split round robin
 - **Features**: 
   - Canonical bracket generation (1v16, 2v15, etc.) with configurable bye policies for odd team counts
   - **Bye Policy Options** (for odd-numbered teams in elimination formats):
@@ -18,22 +18,24 @@ The platform now includes a comprehensive tournament/playoff system supporting:
   - Touch-optimized mobile-first design
   - **SVG-based bracket visualization** with zoom/pan controls
 - **Access Control**: Commissioner, Secondary Commissioner, and Admin only
-- **Backend**: Complete and architect-approved ✅
+- **Backend**: Complete with active improvements ✅
   - Database schema (3 tables: tournaments, tournament_teams, tournament_matches)
   - API routes with full CRUD and permissions (requireLeagueManagement middleware)
   - Bracket generator with canonical seeding and configurable bye policies (stored in tournament.settings.byePolicy)
-  - Double elimination generator creates proper match counts (e.g., exactly 4 R1 matches for 9 teams)
+  - **Double Elimination Status**: Core formulas implemented with visual hierarchy complete (4px color-coded borders, spacing formulas, blue/red arrows). Advancement logic for odd team counts in active refinement.
   - Format recommendation engine with detailed pros/cons analysis
   - PATCH /api/tournaments/:id for editing draft tournaments with automatic bracket regeneration
-- **Frontend**: Complete with bracket visualization ✅
+- **Frontend**: Complete with enhanced bracket visualization ✅
   - Tournaments Dashboard (/leagues/:leagueId/tournaments) - List view with status badges
   - Tournament Creator (/leagues/:leagueId/tournaments/create) - 3-step wizard with enhanced format recommendations and bye policy selector (shown for odd team counts)
   - Tournament Edit (/tournaments/:tournamentId/edit) - Multi-step wizard with pre-filled data (draft-only)
   - Tournament Detail (/tournaments/:tournamentId) - Tabbed view with BracketView component supporting Play-In Round display
   - **BracketView Component**: SVG bracket rendering with:
+    - **Visual Hierarchy**: 4px color-coded borders (blue for winners bracket, red for losers bracket, gold for grand finals)
+    - **Spacing Formulas**: Winners gap = baseGap × 2^(roundIndex), Losers gap = baseGap × 1.5^(floor(roundIndex/2))
+    - **Connector Arrows**: Blue arrows for winner advancement, red arrows for loser drops to losers bracket
     - Stable round ordering algorithm
     - Horizontal separation of winners/losers brackets (no overlap)
-    - SVG connector paths showing match advancement
     - Zoom controls (0.3x-3x): buttons, ctrl+scroll, pinch-to-zoom
     - Pan controls: drag, scroll, touch gestures
     - Dynamic layout calculation based on bracket size
@@ -42,6 +44,7 @@ The platform now includes a comprehensive tournament/playoff system supporting:
   - Dashboard → Tournaments Card (when league selected) → Tournament List
   - New API endpoint: GET /api/leagues/manageable (returns leagues user can manage tournaments for with tournament counts)
 - **Known Limitations**:
+  - Double elimination odd-team advancement logic under refinement (even team counts fully functional)
   - Match result recording UI is placeholder (infrastructure exists)
   - Match scheduling/editing buttons are placeholders (future enhancement)
   - Connector anchoring uses notes-based heuristics rather than explicit slot metadata (visual may vary for complex transitions)
