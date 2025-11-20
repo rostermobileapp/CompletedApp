@@ -179,23 +179,30 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     const losersXOffset = isLosersBracket ? (MATCH_WIDTH + ROUND_GAP) : 0;
     const x = roundIndex * (MATCH_WIDTH + ROUND_GAP) + losersXOffset;
     
-    // Winners: gap = baseGap × min(2^roundIndex, MAX_GAP_MULTIPLIER)
-    // Losers: gap = baseGap × min(1.5^floor(roundIndex/2), MAX_GAP_MULTIPLIER)
-    let verticalGap: number;
-    if (isLosersBracket) {
-      const multiplier = Math.pow(1.5, Math.floor(roundIndex / 2));
-      verticalGap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
-    } else {
-      const multiplier = Math.pow(2, roundIndex);
-      verticalGap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
-    }
-    
     // Losers bracket positioned below actual bottom of winners bracket
     const startY = isLosersBracket ? getWinnersBottomY() + BRACKET_VERTICAL_GAP : 0;
     
-    // Center the matches vertically with progressive spacing
-    const offset = (roundIndex > 0) ? verticalGap / 2 : 0;
-    const y = startY + matchIndex * verticalGap + offset;
+    // Calculate Y position: each round's matches are centered between previous round's pairs
+    let y: number;
+    if (roundIndex === 0) {
+      // First round: simple stacking
+      y = startY + matchIndex * (MATCH_HEIGHT + MATCH_GAP);
+    } else {
+      // Subsequent rounds: center between pairs from previous round
+      // Each match is fed by 2 matches from the previous round
+      const prevRoundGap = isLosersBracket 
+        ? BASE_GAP * Math.min(Math.pow(1.5, Math.floor((roundIndex - 1) / 2)), MAX_GAP_MULTIPLIER)
+        : BASE_GAP * Math.min(Math.pow(2, roundIndex - 1), MAX_GAP_MULTIPLIER);
+      
+      const prevRoundStartY = roundIndex === 1 ? startY : startY + prevRoundGap / 2;
+      
+      // Position of the two previous matches this match is between
+      const prevMatch1Y = prevRoundStartY + (matchIndex * 2) * prevRoundGap;
+      const prevMatch2Y = prevRoundStartY + (matchIndex * 2 + 1) * prevRoundGap;
+      
+      // Center between them (middle of the gap + half match height)
+      y = (prevMatch1Y + prevMatch2Y) / 2 + MATCH_HEIGHT / 2;
+    }
     
     return { x, y };
   };
