@@ -32,9 +32,10 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     }
     
     // For TBD teams, check notes for source match info (e.g., "Loser of match_2 vs Loser of match_3")
-    if (match.notes && match.notes.includes('match_')) {
+    if (match.notes) {
+      // First try to extract explicit match references from notes
       const matchNumbers = match.notes.match(/match_(\d+)/g);
-      if (matchNumbers) {
+      if (matchNumbers && matchNumbers.length >= 1) {
         if (position === 'team1' && matchNumbers.length >= 1) {
           const num = matchNumbers[0].replace('match_', '');
           const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
@@ -43,6 +44,12 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
           const num = matchNumbers[1].replace('match_', '');
           const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
           return `${prefix} Match ${num}`;
+        } else if (position === 'team2' && matchNumbers.length === 1) {
+          // For losers bracket with single match number in notes, need to calculate second parent
+          const firstNum = parseInt(matchNumbers[0].replace('match_', ''));
+          const secondNum = firstNum + 1; // Assume sequential parents
+          const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
+          return `${prefix} Match ${secondNum}`;
         }
       }
     }
@@ -73,8 +80,34 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       if (match.notes.toLowerCase().includes('play-in')) {
         return "Winner of Play-In";
       }
+      if (match.notes.toLowerCase().includes('winners round') && match.bracketType === 'losers') {
+        // Extract which winners round by looking at match notes
+        const winnersRoundMatch = match.notes.match(/Winners Round (\d+)/);
+        if (winnersRoundMatch) {
+          const winnersRound = parseInt(winnersRoundMatch[1]);
+          // Find all Winners Round matches of that round
+          const winnersRoundMatches = matches.filter(m => m.bracketType === 'winners' && m.round.includes(`Winners Round ${winnersRound}`));
+          
+          // Determine which position this losers match is in its round
+          const losersRoundMatches = matches.filter(m => m.bracketType === 'losers' && m.round === match.round);
+          const matchIndex = losersRoundMatches.findIndex(m => m.id === match.id);
+          
+          if (matchIndex >= 0) {
+            // This losers match pairs winners matches: [matchIndex*2, matchIndex*2+1]
+            const parent1Index = matchIndex * 2;
+            const parent2Index = matchIndex * 2 + 1;
+            
+            if (position === 'team1' && winnersRoundMatches[parent1Index]) {
+              return `Loser of Match ${winnersRoundMatches[parent1Index].matchNumber}`;
+            } else if (position === 'team2' && winnersRoundMatches[parent2Index]) {
+              return `Loser of Match ${winnersRoundMatches[parent2Index].matchNumber}`;
+            }
+          }
+        }
+        return "Loser from Winners";
+      }
       if (match.notes.toLowerCase().includes('winners round')) {
-        return match.bracketType === 'losers' ? "Loser from Winners" : "Winner from Winners";
+        return "Winner from Winners";
       }
       if (match.notes.toLowerCase().includes('losers round')) {
         return "Winner from Losers";
