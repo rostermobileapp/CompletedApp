@@ -75,7 +75,8 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     
     matches.forEach(match => {
       const roundName = match.round;
-      const isLosers = roundName.toLowerCase().includes('loser');
+      // Use bracketType field for accurate categorization
+      const isLosers = match.bracketType === 'losers';
       const targetMap = isLosers ? losersMap : winnersMap;
       
       if (!targetMap[roundName]) {
@@ -100,11 +101,13 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     // Create stable round ordering based on typical bracket progression
     const sortRoundNames = (rounds: string[]) => {
       const roundOrder = [
+        'Play-In Round',
         'Round 1', 'Round 2', 'Round 3', 'Round 4',
         'Quarterfinals', 'Semifinals', 'Finals',
-        'Winners Round 1', 'Winners Round 2', 'Winners Quarterfinals', 
-        'Winners Semifinals', 'Winners Finals',
+        'Winners Round 1', 'Winners Round 2', 'Winners Round 3', 'Winners Round 4',
+        'Winners Quarterfinals', 'Winners Semifinals', 'Winners Finals',
         'Losers Round 1', 'Losers Round 2', 'Losers Round 3', 'Losers Round 4',
+        'Losers Round 5', 'Losers Round 6', 'Losers Round 7', 'Losers Round 8',
         'Losers Quarterfinals', 'Losers Semifinals', 'Losers Finals',
         'Grand Finals'
       ];
