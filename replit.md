@@ -18,7 +18,12 @@ The platform now includes a comprehensive tournament/playoff system supporting:
       - For even teams: Option to add play-in game for lowest 2 seeds OR run standard bracket
       - Play-in game reduces effective team count by 1, creating symmetric bracket structure
   - Automatic match creation with advancement pointers
-  - Match scheduling and score tracking infrastructure
+  - **Match Scheduling System**: Commissioners can set date/time and location for each match
+    - MatchEditDialog component using shadcn useForm pattern with datetime-local input
+    - Schedule tab displays formatted dates (using date-fns) and team names from bracket
+    - PATCH /api/tournaments/:tournamentId/matches/:matchId endpoint with Zod validation
+    - Supports datetime-local format conversion to Date objects via transform
+  - Score tracking infrastructure (result entry UI in place)
   - Format recommendations based on team count (detailed pros/cons/game estimates)
   - Touch-optimized mobile-first design
   - **SVG-based bracket visualization** with zoom/pan controls
@@ -55,7 +60,6 @@ The platform now includes a comprehensive tournament/playoff system supporting:
   - New API endpoint: GET /api/leagues/manageable (returns leagues user can manage tournaments for with tournament counts)
 - **Known Limitations**:
   - Match result recording UI is placeholder (infrastructure exists)
-  - Match scheduling/editing buttons are placeholders (future enhancement)
   - Connector anchoring uses notes-based heuristics rather than explicit slot metadata (visual may vary for complex transitions)
   - Losers bracket routing in double elimination requires manual match result entry to function (automatic advancement exists for winners bracket only)
 - **Testing Status**: Manual testing required (automated e2e blocked by auth configuration)
