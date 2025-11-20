@@ -31,24 +31,34 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       return team?.teamName || "TBD";
     }
     
-    // For TBD teams, check if there's a source match we can reference
-    // This would need to be tracked in match metadata - for now, show descriptive text
+    // For TBD teams, find matches that advance to this match
+    const sourceMatches = matches.filter(m => m.advancesToMatchId === `match_${match.matchNumber}`);
+    
+    if (sourceMatches.length === 1) {
+      return `Winner of Match ${sourceMatches[0].matchNumber}`;
+    } else if (sourceMatches.length === 2) {
+      // Two matches feed into this one (common in brackets)
+      // Distinguish based on position or match numbers
+      if (position === 'team1') {
+        return `Winner of Match ${sourceMatches[0].matchNumber}`;
+      } else {
+        return `Winner of Match ${sourceMatches[1].matchNumber}`;
+      }
+    } else if (sourceMatches.length > 0) {
+      // Multiple sources - just show first for now
+      return `Winner of Match ${sourceMatches[0].matchNumber}`;
+    }
+    
+    // Fallback to notes-based description
     if (match.notes) {
-      // Check if notes mention a specific match or source
       if (match.notes.toLowerCase().includes('play-in')) {
         return "Winner of Play-In";
       }
-      if (match.notes.toLowerCase().includes('r1 winner')) {
-        return "Winner from R1";
+      if (match.notes.toLowerCase().includes('winners round')) {
+        return "Winner from Winners";
       }
-      // Look for patterns like "Winners Round X"
-      const roundMatch = match.notes.match(/Winners Round (\d+)/i);
-      if (roundMatch) {
-        return `Winner from R${roundMatch[1]}`;
-      }
-      const losersRoundMatch = match.notes.match(/Losers Round (\d+)/i);
-      if (losersRoundMatch) {
-        return `Winner from L-R${losersRoundMatch[1]}`;
+      if (match.notes.toLowerCase().includes('losers round')) {
+        return "Winner from Losers";
       }
     }
     

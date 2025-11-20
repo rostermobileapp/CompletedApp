@@ -10313,6 +10313,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .values(bracketResult.matches)
         .returning();
 
+      // DEBUG: Log bracket statistics
+      const winnersMatches = insertedMatches.filter(m => m.bracketType === 'winners');
+      const losersMatches = insertedMatches.filter(m => m.bracketType === 'losers');
+      const grandFinalMatches = insertedMatches.filter(m => m.bracketType === 'grand_final');
+      console.log(`🏆 BRACKET GENERATED - Total: ${insertedMatches.length}, Winners: ${winnersMatches.length}, Losers: ${losersMatches.length}, Grand Finals: ${grandFinalMatches.length}`);
+      console.log(`🏆 Losers rounds:`, losersMatches.map(m => m.round));
+
       res.json({ 
         teams: insertedTeams, 
         matches: insertedMatches,
