@@ -462,7 +462,6 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
           </g>
         </svg>
       </div>
-
-      </div>
+    </div>
   );
 }
