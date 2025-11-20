@@ -177,13 +177,6 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
                   </span>
                 )}
               </div>
-
-              {/* Match Notes */}
-              {match.notes && (
-                <p className="text-xs text-muted-foreground italic truncate pt-1" data-testid={`text-notes-${match.matchNumber}`}>
-                  {match.notes}
-                </p>
-              )}
             </CardContent>
           </Card>
         </foreignObject>
