@@ -146,10 +146,10 @@ export function generateSingleElimination(
       const hasContent1 = node1.team || node1.matchNumber !== null;
       const hasContent2 = node2.team || node2.matchNumber !== null;
       
-      // Bye logic: if one side has content and other doesn't, it's a bye
-      const isBye = (hasContent1 && !hasContent2) || (!hasContent1 && hasContent2);
-      const byeWinner = hasContent1 && !hasContent2 ? (node1.team || null) :
-                        hasContent2 && !hasContent1 ? (node2.team || null) : null;
+      // Bye logic: only true bye if one has DIRECT team (not from match) and other is completely empty
+      const isTrueBye = (node1.team && !hasContent2) || (node2.team && !hasContent1);
+      const byeWinner = node1.team && !hasContent2 ? node1.team :
+                        node2.team && !hasContent1 ? node2.team : null;
       
       if (!hasContent1 && !hasContent2) {
         // Both empty - skip
@@ -165,7 +165,7 @@ export function generateSingleElimination(
           matchNumber,
           team1: node1.team || null,
           team2: node2.team || null,
-          isBye,
+          isBye: isTrueBye,
           byeWinner,
           sourceMatch1: node1.matchNumber,
           sourceMatch2: node2.matchNumber
@@ -173,7 +173,7 @@ export function generateSingleElimination(
         
         // Winner advances to next level
         nextLevel.push({
-          team: isBye ? byeWinner : null,
+          team: isTrueBye ? byeWinner : null,
           matchNumber
         });
       }
