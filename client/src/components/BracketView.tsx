@@ -167,7 +167,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     if (roundIndex === 0) {
       centerY = matchIndexInRound * BASE_VERTICAL_GAP + MATCH_HEIGHT / 2;
     } else {
-      // Find parent matches
+      // Find parent matches by checking if their advancesToMatchId matches this match's id
       const parents: TournamentMatch[] = [];
       matches.forEach(m => {
         if (m.advancesToMatchId === match.id) {
