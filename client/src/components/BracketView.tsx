@@ -518,7 +518,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     });
 
     // Draw connectors for losers dropping into losers bracket (red dashed arrows)
-    winners.forEach((roundMatches, roundName) => {
+    Object.entries(winners).forEach(([roundName, roundMatches]) => {
       // Find corresponding losers round that receives losers from this round
       const winnersRoundNum = parseInt(roundName.match(/\d+/)?.[0] || '0');
       if (winnersRoundNum > 0) {
