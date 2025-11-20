@@ -139,80 +139,125 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
   const { winners, losers, winnersRounds, losersRounds } = organizeMatches();
   const hasLosers = losersRounds.length > 0;
 
-  // Calculate match positions
+  // Calculate match positions using center-based algorithm
   const MATCH_WIDTH = 280;
   const MATCH_HEIGHT = 120;
   const ROUND_GAP = 200;
-  const MATCH_GAP = 40;
+  const BASE_VERTICAL_GAP = MATCH_HEIGHT + 40; // Uniform gap for both brackets
   const BRACKET_VERTICAL_GAP = 1; // Space between winners and losers brackets (1px)
 
-  // Calculate actual bottom of winners bracket first
-  const getWinnersBottomY = () => {
-    const BASE_GAP = MATCH_HEIGHT + MATCH_GAP;
-    const MAX_GAP_MULTIPLIER = 8;
-    
-    let maxBottomY = 0;
+  // Build match maps for parent lookup
+  const matchById = new Map<string, TournamentMatch>();
+  matches.forEach(m => matchById.set(m.id, m));
+
+  // Memoize match centers and positions
+  const matchCenters = new Map<string, number>();
+  const matchPositions = new Map<string, { x: number; y: number }>();
+
+  // Recursively calculate the center Y position of a match
+  const getMatchCenter = (match: TournamentMatch, roundIndex: number, matchIndexInRound: number, isLosersBracket: boolean): number => {
+    if (matchCenters.has(match.id)) {
+      return matchCenters.get(match.id)!;
+    }
+
+    let centerY: number;
+
+    // Base case: first round matches get evenly spaced
+    if (roundIndex === 0) {
+      centerY = matchIndexInRound * BASE_VERTICAL_GAP + MATCH_HEIGHT / 2;
+    } else {
+      // Find parent matches
+      const parents: TournamentMatch[] = [];
+      matches.forEach(m => {
+        if (m.advancesToMatchId === match.id) {
+          parents.push(m);
+        }
+      });
+
+      if (parents.length === 2) {
+        // Two parents: center between them
+        const parent1Center = getMatchCenterFromMatch(parents[0]);
+        const parent2Center = getMatchCenterFromMatch(parents[1]);
+        centerY = (parent1Center + parent2Center) / 2;
+      } else if (parents.length === 1) {
+        // Single parent (bye or crossover): inherit center
+        centerY = getMatchCenterFromMatch(parents[0]);
+      } else {
+        // No parents found: fallback to evenly spaced
+        centerY = matchIndexInRound * BASE_VERTICAL_GAP + MATCH_HEIGHT / 2;
+      }
+    }
+
+    matchCenters.set(match.id, centerY);
+    return centerY;
+  };
+
+  // Helper to get center of a match by looking it up recursively
+  const getMatchCenterFromMatch = (match: TournamentMatch): number => {
+    // Find which bracket and round this match belongs to
+    let roundIndex = 0;
+    let matchIndexInRound = 0;
+    let isLosersBracket = false;
+
+    // Search in winners bracket
+    winnersRounds.forEach((roundName, rIndex) => {
+      const roundMatches = winners[roundName] || [];
+      const mIndex = roundMatches.findIndex(m => m.id === match.id);
+      if (mIndex !== -1) {
+        roundIndex = rIndex;
+        matchIndexInRound = mIndex;
+        isLosersBracket = false;
+      }
+    });
+
+    // Search in losers bracket
+    losersRounds.forEach((roundName, rIndex) => {
+      const roundMatches = losers[roundName] || [];
+      const mIndex = roundMatches.findIndex(m => m.id === match.id);
+      if (mIndex !== -1) {
+        roundIndex = rIndex;
+        matchIndexInRound = mIndex;
+        isLosersBracket = true;
+      }
+    });
+
+    return getMatchCenter(match, roundIndex, matchIndexInRound, isLosersBracket);
+  };
+
+  // Calculate positions for all matches
+  const calculateAllPositions = () => {
+    // Calculate winners bracket positions
+    let winnersBottomY = 0;
     winnersRounds.forEach((roundName, roundIndex) => {
       const roundMatches = winners[roundName] || [];
-      const multiplier = Math.pow(2, roundIndex);
-      const gap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
-      const offset = (roundIndex > 0) ? gap / 2 : 0;
-      
-      roundMatches.forEach((_, matchIndex) => {
-        const y = matchIndex * gap + offset;
+      roundMatches.forEach((match, matchIndex) => {
+        const centerY = getMatchCenter(match, roundIndex, matchIndex, false);
+        const x = roundIndex * (MATCH_WIDTH + ROUND_GAP);
+        const y = centerY - MATCH_HEIGHT / 2;
+        matchPositions.set(match.id, { x, y });
+        
         const bottomY = y + MATCH_HEIGHT;
-        if (bottomY > maxBottomY) {
-          maxBottomY = bottomY;
+        if (bottomY > winnersBottomY) {
+          winnersBottomY = bottomY;
         }
       });
     });
-    
-    return maxBottomY;
+
+    // Calculate losers bracket positions (offset below winners)
+    const losersStartY = winnersBottomY + BRACKET_VERTICAL_GAP;
+    losersRounds.forEach((roundName, roundIndex) => {
+      const roundMatches = losers[roundName] || [];
+      roundMatches.forEach((match, matchIndex) => {
+        const centerY = getMatchCenter(match, roundIndex, matchIndex, true);
+        // Losers bracket: align with Round 2 of winners bracket (1 round offset)
+        const x = (roundIndex + 1) * (MATCH_WIDTH + ROUND_GAP);
+        const y = losersStartY + centerY - MATCH_HEIGHT / 2;
+        matchPositions.set(match.id, { x, y });
+      });
+    });
   };
 
-  const calculateMatchPosition = (roundIndex: number, matchIndex: number, totalMatches: number, isLosersBracket = false) => {
-    // Universal spacing formulas with caps to prevent runaway heights
-    const BASE_GAP = MATCH_HEIGHT + MATCH_GAP;
-    const MAX_GAP_MULTIPLIER = 8; // Cap maximum gap to prevent excessive heights
-    
-    // Losers bracket: align with Round 2 of winners bracket (1 round offset)
-    const losersXOffset = isLosersBracket ? (MATCH_WIDTH + ROUND_GAP) : 0;
-    const x = roundIndex * (MATCH_WIDTH + ROUND_GAP) + losersXOffset;
-    
-    // Losers bracket positioned below actual bottom of winners bracket
-    const startY = isLosersBracket ? getWinnersBottomY() + BRACKET_VERTICAL_GAP : 0;
-    
-    // Calculate Y position: each round's matches are centered between previous round's pairs
-    let y: number;
-    if (roundIndex === 0) {
-      // First round: simple stacking
-      y = startY + matchIndex * (MATCH_HEIGHT + MATCH_GAP);
-    } else {
-      // Subsequent rounds: center between pairs from previous round
-      // Each match is fed by 2 matches from the previous round
-      const prevRoundGap = isLosersBracket 
-        ? BASE_GAP * Math.min(Math.pow(1.5, Math.floor((roundIndex - 1) / 2)), MAX_GAP_MULTIPLIER)
-        : BASE_GAP * Math.min(Math.pow(2, roundIndex - 1), MAX_GAP_MULTIPLIER);
-      
-      const prevRoundStartY = roundIndex === 1 ? startY : startY + prevRoundGap / 2;
-      
-      // Position of the two previous matches this match is between (top Y positions)
-      const prevMatch1TopY = prevRoundStartY + (matchIndex * 2) * prevRoundGap;
-      const prevMatch2TopY = prevRoundStartY + (matchIndex * 2 + 1) * prevRoundGap;
-      
-      // Calculate CENTER positions of parent matches
-      const prevMatch1CenterY = prevMatch1TopY + MATCH_HEIGHT / 2;
-      const prevMatch2CenterY = prevMatch2TopY + MATCH_HEIGHT / 2;
-      
-      // Find midpoint between the two centers
-      const midpointY = (prevMatch1CenterY + prevMatch2CenterY) / 2;
-      
-      // Position this match so its center is at the midpoint
-      y = midpointY - MATCH_HEIGHT / 2;
-    }
-    
-    return { x, y };
-  };
+  calculateAllPositions();
 
   const renderMatch = (match: TournamentMatch, x: number, y: number, isLosersBracket = false) => {
     const isCompleted = match.status === 'completed';
@@ -317,11 +362,19 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     );
   };
 
-  const renderConnector = (fromX: number, fromY: number, toX: number, toY: number, fromBottom = false, isLoserPath = false) => {
-    const startX = fromX + MATCH_WIDTH;
-    const startY = fromY + (fromBottom ? MATCH_HEIGHT : MATCH_HEIGHT / 2);
-    const endX = toX;
-    const endY = toY + MATCH_HEIGHT / 2;
+  const renderConnector = (fromMatchId: string, toMatchId: string, isLoserPath = false) => {
+    const fromPos = matchPositions.get(fromMatchId);
+    const toPos = matchPositions.get(toMatchId);
+    if (!fromPos || !toPos) return null;
+    
+    // Calculate centers from positions
+    const fromCenterY = fromPos.y + MATCH_HEIGHT / 2;
+    const toCenterY = toPos.y + MATCH_HEIGHT / 2;
+    
+    const startX = fromPos.x + MATCH_WIDTH;
+    const startY = fromCenterY;
+    const endX = toPos.x;
+    const endY = toCenterY;
     
     const midX = (startX + endX) / 2;
     
@@ -345,16 +398,16 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
 
   const renderBracket = () => {
     const elements: JSX.Element[] = [];
-    const matchPositions = new Map<string, { x: number; y: number }>();
 
     // Render Winners Bracket
     winnersRounds.forEach((roundName, roundIndex) => {
       const roundMatches = winners[roundName] || [];
       
-      roundMatches.forEach((match, matchIndex) => {
-        const { x, y } = calculateMatchPosition(roundIndex, matchIndex, roundMatches.length, false);
-        matchPositions.set(match.id, { x, y });
-        elements.push(renderMatch(match, x, y, false));
+      roundMatches.forEach((match) => {
+        const pos = matchPositions.get(match.id);
+        if (pos) {
+          elements.push(renderMatch(match, pos.x, pos.y, false));
+        }
       });
 
       // Add round label
@@ -372,17 +425,23 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
 
     // Render Losers Bracket
     if (hasLosers) {
-      const losersXOffset = (winnersRounds.length) * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP;
-      const winnersHeight = Math.max(400, ...winnersRounds.map((r, idx) => {
-        const roundMatches = winners[r] || [];
-        const verticalSpacing = MATCH_HEIGHT + MATCH_GAP;
-        const offset = (idx > 0) ? verticalSpacing * Math.pow(2, idx - 1) / 2 : 0;
-        return roundMatches.length * verticalSpacing * Math.pow(2, idx) + offset;
-      }));
+      // Calculate winners bottom for label placement
+      let winnersBottomY = 0;
+      winnersRounds.forEach((roundName) => {
+        const roundMatches = winners[roundName] || [];
+        roundMatches.forEach((match) => {
+          const pos = matchPositions.get(match.id);
+          if (pos && pos.y + MATCH_HEIGHT > winnersBottomY) {
+            winnersBottomY = pos.y + MATCH_HEIGHT;
+          }
+        });
+      });
+
+      const losersXOffset = (MATCH_WIDTH + ROUND_GAP);
 
       // Add "Losers Bracket" label
       elements.push(
-        <g key="losers-title" transform={`translate(${losersXOffset}, ${winnersHeight + 20})`}>
+        <g key="losers-title" transform={`translate(${losersXOffset}, ${winnersBottomY + 20})`}>
           <foreignObject width={200} height={30}>
             <div className="font-bold text-base text-destructive">
               Losers Bracket
@@ -394,15 +453,16 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
       losersRounds.forEach((roundName, roundIndex) => {
         const roundMatches = losers[roundName] || [];
         
-        roundMatches.forEach((match, matchIndex) => {
-          const { x, y } = calculateMatchPosition(roundIndex, matchIndex, roundMatches.length, true);
-          matchPositions.set(match.id, { x, y });
-          elements.push(renderMatch(match, x, y, true));
+        roundMatches.forEach((match) => {
+          const pos = matchPositions.get(match.id);
+          if (pos) {
+            elements.push(renderMatch(match, pos.x, pos.y, true));
+          }
         });
 
         // Add round label
         const labelX = losersXOffset + roundIndex * (MATCH_WIDTH + ROUND_GAP);
-        const labelY = winnersHeight + 60;
+        const labelY = winnersBottomY + 60;
         elements.push(
           <g key={`label-l-${roundName}`} transform={`translate(${labelX}, ${labelY})`}>
             <foreignObject width={MATCH_WIDTH} height={30}>
@@ -417,18 +477,15 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
 
     // Draw connectors based on advancesToMatchId
     matches.forEach(match => {
-      const fromPos = matchPositions.get(match.id);
-      if (!fromPos) return;
-
       if (match.advancesToMatchId) {
-        const toPos = matchPositions.get(match.advancesToMatchId);
-        if (toPos) {
-          // Determine if this is a losers bracket connection by checking the notes
-          const isLosersConnection = match.notes?.toLowerCase().includes('loser') || false;
-          
+        // Determine if this is a losers bracket connection by checking the notes
+        const isLosersConnection = match.notes?.toLowerCase().includes('loser') || false;
+        
+        const connector = renderConnector(match.id, match.advancesToMatchId, isLosersConnection);
+        if (connector) {
           elements.push(
             <g key={`connector-${match.id}`}>
-              {renderConnector(fromPos.x, fromPos.y, toPos.x, toPos.y, isLosersConnection, isLosersConnection)}
+              {connector}
             </g>
           );
         }
@@ -438,34 +495,24 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
     return elements;
   };
 
-  // Calculate SVG dimensions based on bracket size (vertical stacking layout)
+  // Calculate SVG dimensions based on actual match positions
   const calculateDimensions = () => {
-    // Width: Max of winners rounds or (losers rounds + 1 offset for alignment)
-    const winnersWidth = winnersRounds.length * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP;
-    const losersWidth = hasLosers ? (losersRounds.length * (MATCH_WIDTH + ROUND_GAP) + ROUND_GAP + (MATCH_WIDTH + ROUND_GAP)) : 0;
-    const width = Math.max(winnersWidth, losersWidth) + 200;
+    let maxX = 0;
+    let maxY = 0;
     
-    const BASE_GAP = MATCH_HEIGHT + MATCH_GAP;
-    const MAX_GAP_MULTIPLIER = 8; // Same cap as in calculateMatchPosition
+    // Find the maximum X and Y positions from all matches
+    matchPositions.forEach((pos) => {
+      if (pos.x + MATCH_WIDTH > maxX) {
+        maxX = pos.x + MATCH_WIDTH;
+      }
+      if (pos.y + MATCH_HEIGHT > maxY) {
+        maxY = pos.y + MATCH_HEIGHT;
+      }
+    });
     
-    const winnersHeight = Math.max(400, ...winnersRounds.map((r, idx) => {
-      const roundMatches = winners[r] || [];
-      const multiplier = Math.pow(2, idx);
-      const gap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
-      const offset = (idx > 0) ? gap / 2 : 0;
-      return roundMatches.length * gap + offset + MATCH_HEIGHT;
-    }));
-    
-    const losersHeight = hasLosers ? Math.max(400, ...losersRounds.map((r, idx) => {
-      const roundMatches = losers[r] || [];
-      const multiplier = Math.pow(1.5, Math.floor(idx / 2));
-      const gap = BASE_GAP * Math.min(multiplier, MAX_GAP_MULTIPLIER);
-      const offset = (idx > 0) ? gap / 2 : 0;
-      return roundMatches.length * gap + offset + MATCH_HEIGHT;
-    })) : 0;
-    
-    // Vertical stacking: height is SUM of both brackets
-    const height = winnersHeight + losersHeight + (hasLosers ? BRACKET_VERTICAL_GAP + 200 : 200);
+    // Add padding
+    const width = maxX + 200;
+    const height = maxY + 200;
     
     return { width, height };
   };
