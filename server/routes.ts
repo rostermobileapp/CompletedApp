@@ -17,7 +17,7 @@ import { db } from "./db";
 import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
-import { eq, and, or, ilike, sql } from "drizzle-orm";
+import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
 import {
   insertLeagueSchema,
@@ -10596,7 +10596,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delete those games first
       const gameIds = matchesWithGames.map(m => m.gameId).filter((id): id is string => id !== null);
       if (gameIds.length > 0) {
-        const { inArray } = require('drizzle-orm');
         await db.delete(games).where(inArray(games.id, gameIds));
       }
 
