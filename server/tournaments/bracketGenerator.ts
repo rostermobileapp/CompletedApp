@@ -232,43 +232,182 @@ export function generateDoubleElimination(
   // Sort teams by seed
   const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
   
-  // Use single elimination logic for winners bracket
-  const winnersBracket = generateSingleElimination(teams, tournamentId);
+  // For now, default to giving top seed a bye
+  // TODO: Add byePolicy option to choose between top-seed bye or play-in game
+  const needsBye = numTeams % 2 === 1;
+  const firstRoundMatchCount = Math.floor(numTeams / 2);
   
-  // Add "Winners" prefix to rounds for consistency
-  winnersBracket.rounds.forEach(round => {
-    rounds.push(`Winners ${round}`);
-  });
+  let matchCounter = 1;
+  const matchLookup = new Map<string, number>(); // Round/position key -> match number
   
-  // Update winners bracket matches with prefixed round names and bracketType
-  winnersBracket.matches.forEach(match => {
+  // ============ WINNERS BRACKET ============
+  
+  // Winners Round 1: Pair teams using canonical seeding (lowest vs highest)
+  const winnersR1Matches: Array<{
+    matchNumber: number;
+    team1: TournamentTeam;
+    team2: TournamentTeam;
+    position: number;
+  }> = [];
+  
+  let team1Index = needsBye ? 1 : 0; // Skip top seed if bye needed
+  let team2Index = numTeams - 1;
+  
+  for (let i = 0; i < firstRoundMatchCount; i++) {
+    winnersR1Matches.push({
+      matchNumber: matchCounter++,
+      team1: sortedTeams[team1Index],
+      team2: sortedTeams[team2Index],
+      position: i
+    });
+    matchLookup.set(`WR1-${i}`, winnersR1Matches[winnersR1Matches.length - 1].matchNumber);
+    team1Index++;
+    team2Index--;
+  }
+  
+  rounds.push('Winners Round 1');
+  
+  // Create Winners Round 1 matches
+  winnersR1Matches.forEach(match => {
     matches.push({
-      ...match,
-      round: `Winners ${match.round}`, // Match the rounds array
-      bracketType: 'winners'
+      tournamentId,
+      gameId: null,
+      round: 'Winners Round 1',
+      matchNumber: match.matchNumber,
+      bracketType: 'winners',
+      team1Id: match.team1.id,
+      team2Id: match.team2.id,
+      winnerId: null,
+      team1Score: null,
+      team2Score: null,
+      advancesToMatchId: null, // Will be filled when creating next round
+      scheduledTime: null,
+      location: null,
+      status: 'scheduled',
+      notes: null
     });
   });
   
-  // Add placeholder losers bracket rounds
-  // In a full implementation, these would be auto-populated as teams lose in winners bracket
-  const numLosersRounds = Math.max(1, winnersBracket.rounds.length - 1);
-  
-  for (let i = 1; i <= numLosersRounds; i++) {
-    rounds.push(`Losers Round ${i}`);
+  // Calculate winners bracket structure
+  const winnersRounds = Math.ceil(Math.log2(numTeams));
+  const winnersMatchCounts = [firstRoundMatchCount];
+  for (let i = 1; i < winnersRounds; i++) {
+    const prevCount = winnersMatchCounts[i - 1];
+    const byeInPrevRound = needsBye && i === 1;
+    winnersMatchCounts.push(Math.ceil((prevCount + (byeInPrevRound ? 1 : 0)) / 2));
   }
   
-  // Add Grand Finals
-  rounds.push('Grand Finals');
+  // Create remaining winners bracket rounds
+  const winnerRoundNames = ['Winners Round 1'];
+  for (let roundIdx = 1; roundIdx < winnersRounds; roundIdx++) {
+    const matchCount = winnersMatchCounts[roundIdx];
+    let roundName: string;
+    
+    if (winnersRounds - roundIdx === 1) roundName = 'Winners Finals';
+    else if (winnersRounds - roundIdx === 2) roundName = 'Winners Semifinals';
+    else if (winnersRounds - roundIdx === 3) roundName = 'Winners Quarterfinals';
+    else roundName = `Winners Round ${roundIdx + 1}`;
+    
+    rounds.push(roundName);
+    winnerRoundNames.push(roundName);
+    
+    for (let matchPos = 0; matchPos < matchCount; matchPos++) {
+      const matchNum = matchCounter++;
+      matchLookup.set(`W-R${roundIdx + 1}-${matchPos}`, matchNum);
+      
+      // Determine source teams
+      let team1Id: string | null = null;
+      let team2Id: string | null = null;
+      
+      // First match of round 2 might have the bye team
+      if (roundIdx === 1 && matchPos === 0 && needsBye) {
+        team1Id = sortedTeams[0].id; // Top seed with bye
+      }
+      
+      matches.push({
+        tournamentId,
+        gameId: null,
+        round: roundName,
+        matchNumber: matchNum,
+        bracketType: 'winners',
+        team1Id,
+        team2Id,
+        winnerId: null,
+        team1Score: null,
+        team2Score: null,
+        advancesToMatchId: null,
+        scheduledTime: null,
+        location: null,
+        status: 'scheduled',
+        notes: null
+      });
+    }
+  }
   
-  // Create placeholder Grand Finals match (will be filled when winners/losers finalists are known)
+  // ============ LOSERS BRACKET ============
+  
+  // Losers bracket has 2*(winnersRounds - 1) rounds
+  // Pattern: WB R1 losers → LB R1, WB R2 losers meet LB R1 winners → LB R2, etc.
+  const losersRounds = 2 * (winnersRounds - 1);
+  const losersMatchCounts: number[] = [];
+  
+  for (let losersRoundIdx = 0; losersRoundIdx < losersRounds; losersRoundIdx++) {
+    const roundName = `Losers Round ${losersRoundIdx + 1}`;
+    rounds.push(roundName);
+    
+    // Determine number of matches in this losers round
+    // Odd-indexed rounds (0,2,4...) receive dropdowns from winners bracket
+    // Even-indexed rounds (1,3,5...) are consolidation rounds
+    const isDropRound = losersRoundIdx % 2 === 0;
+    const winnersSourceRound = Math.floor(losersRoundIdx / 2);
+    
+    let matchCount: number;
+    if (isDropRound) {
+      // Drop round: same as corresponding winners round
+      matchCount = winnersMatchCounts[winnersSourceRound] || 1;
+    } else {
+      // Consolidation round: half of previous losers round
+      const prevLosersCount = losersMatchCounts[losersRoundIdx - 1] || firstRoundMatchCount;
+      matchCount = Math.ceil(prevLosersCount / 2);
+    }
+    
+    losersMatchCounts.push(matchCount);
+    
+    for (let matchPos = 0; matchPos < matchCount; matchPos++) {
+      const matchNum = matchCounter++;
+      matchLookup.set(`L-R${losersRoundIdx + 1}-${matchPos}`, matchNum);
+      
+      matches.push({
+        tournamentId,
+        gameId: null,
+        round: roundName,
+        matchNumber: matchNum,
+        bracketType: 'losers',
+        team1Id: null,
+        team2Id: null,
+        winnerId: null,
+        team1Score: null,
+        team2Score: null,
+        advancesToMatchId: null,
+        scheduledTime: null,
+        location: null,
+        status: 'scheduled',
+        notes: null
+      });
+    }
+  }
+  
+  // ============ GRAND FINALS ============
+  
+  rounds.push('Grand Finals');
   matches.push({
     tournamentId,
     gameId: null,
     round: 'Grand Finals',
-    matchNumber: matches.length + 1,
+    matchNumber: matchCounter++,
     bracketType: 'grand_final',
-    team1Id: null, // Winner of Winners Bracket
-    team2Id: null, // Winner of Losers Bracket
+    team1Id: null, // Winner of Winners Finals
+    team2Id: null, // Winner of Losers Finals
     winnerId: null,
     team1Score: null,
     team2Score: null,
@@ -276,7 +415,7 @@ export function generateDoubleElimination(
     scheduledTime: null,
     location: null,
     status: 'scheduled',
-    notes: 'Winner of Winners Bracket vs Winner of Losers Bracket'
+    notes: 'Winners Finals winner vs Losers Finals winner'
   });
 
   return { matches, rounds };
