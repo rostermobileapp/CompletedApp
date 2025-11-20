@@ -144,7 +144,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
   const MATCH_HEIGHT = 120;
   const ROUND_GAP = 200;
   const MATCH_GAP = 40;
-  const BRACKET_VERTICAL_GAP = 100; // Space between winners and losers brackets
+  const BRACKET_VERTICAL_GAP = 50; // Space between winners and losers brackets
 
   const calculateMatchPosition = (roundIndex: number, matchIndex: number, totalMatches: number, isLosersBracket = false) => {
     // Universal spacing formulas with caps to prevent runaway heights
