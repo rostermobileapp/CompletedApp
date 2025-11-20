@@ -54,6 +54,15 @@ export function generateSingleElimination(
   const numRounds = Math.ceil(Math.log2(effectiveTeamCount));
   const bracketSize = Math.pow(2, numRounds);
 
+  // Build round names based on effective team count
+  const roundNames: string[] = [];
+  if (numRounds >= 1) roundNames.unshift('Finals');
+  if (numRounds >= 2) roundNames.unshift('Semifinals');
+  if (numRounds >= 3) roundNames.unshift('Quarterfinals');
+  for (let i = 4; i <= numRounds; i++) {
+    roundNames.unshift(`Round ${i - numRounds + 1}`);
+  }
+
   // Add play-in round if needed
   if (needsPlayIn) {
     rounds.push('Play-In Round');
@@ -78,52 +87,41 @@ export function generateSingleElimination(
     });
   }
 
-  // Round names
-  const roundNames: string[] = [];
-  if (numRounds >= 1) roundNames.unshift('Finals');
-  if (numRounds >= 2) roundNames.unshift('Semifinals');
-  if (numRounds >= 3) roundNames.unshift('Quarterfinals');
-  for (let i = 4; i <= numRounds; i++) {
-    roundNames.unshift(`Round ${i - numRounds + 1}`);
-  }
-
   // Build canonical seed slots for effective team count
   const seedSlots = buildSeedSlots(bracketSize);
   
-  // Determine which teams enter Round 1
+  // Map seeds to teams for Round 1
+  // For play-in: use top (numTeams-2) seeds, then add play-in winner as last seed
   let round1Teams: TournamentTeam[] = [];
   if (needsPlayIn) {
-    // Top (numTeams - 2) seeds + play-in winner (as slot)
     round1Teams = sortedTeams.slice(0, numTeams - 2);
-    // Add a placeholder for play-in winner
-    const playInPlaceholder = { id: `PLAY_IN_WINNER_${matchCounter - 1}`, seed: numTeams - 1, teamName: 'Play-in Winner' } as TournamentTeam;
-    round1Teams.push(playInPlaceholder);
+    // Add placeholder for play-in winner (will be filled by play-in match winner)
+    const playInWinner = { 
+      id: `PLAY_IN_WINNER`, 
+      seed: numTeams - 1, 
+      teamName: 'Play-in Winner' 
+    } as TournamentTeam;
+    round1Teams.push(playInWinner);
   } else {
     round1Teams = sortedTeams;
   }
   
-  // Map seeds to actual teams (or null for byes beyond effective count)
+  // Map seed slots to teams (or null for byes if bracketSize > effectiveTeamCount)
   const slotTeams: Array<TournamentTeam | null> = seedSlots.map(seed => {
     return seed <= effectiveTeamCount ? round1Teams[seed - 1] : null;
   });
 
-  // Build bracket tree bottom-up
+  // Build bracket tree using canonical seeding
   interface BracketNode {
     team: TournamentTeam | null;
     matchNumber: number | null;
-    roundIndex: number;
-    position: number; // position within round
   }
 
-  // Create leaf nodes for all bracket positions
-  let currentLevel: BracketNode[] = slotTeams.map((team, idx) => ({
+  let currentLevel: BracketNode[] = slotTeams.map(team => ({
     team,
-    matchNumber: null,
-    roundIndex: 0,
-    position: idx
+    matchNumber: null
   }));
 
-  let matchCounter = 1;
   const allMatches: Array<{
     roundIndex: number;
     roundName: string;
@@ -131,9 +129,10 @@ export function generateSingleElimination(
     matchNumber: number;
     team1: TournamentTeam | null;
     team2: TournamentTeam | null;
-    advancesToMatchNumber: number | null;
-    node1MatchNumber: number | null;
-    node2MatchNumber: number | null;
+    isBye: boolean;
+    byeWinner: TournamentTeam | null;
+    sourceMatch1: number | null;
+    sourceMatch2: number | null;
   }> = [];
 
   // Build bracket tree level by level
@@ -143,51 +142,44 @@ export function generateSingleElimination(
     
     const nextLevel: BracketNode[] = [];
     
-    // Pair adjacent nodes - ALWAYS create matches, never skip
+    // Pair adjacent teams
     for (let i = 0; i < currentLevel.length; i += 2) {
       const node1 = currentLevel[i];
       const node2 = currentLevel[i + 1];
       const position = Math.floor(i / 2);
       
-      // Check if either slot has content (team or previous match)
-      const hasContent1 = node1.team || node1.matchNumber;
-      const hasContent2 = node2.team || node2.matchNumber;
+      const hasContent1 = node1.team || node1.matchNumber !== null;
+      const hasContent2 = node2.team || node2.matchNumber !== null;
       
-      // Determine if this is a bye (one has a team, other has no content at all)
-      const isBye = (node1.team && !hasContent2) || (node2.team && !hasContent1);
-      const byeWinner = node1.team && !hasContent2 ? node1.team : 
-                        node2.team && !hasContent1 ? node2.team : null;
+      // Bye logic: if one side has content and other doesn't, it's a bye
+      const isBye = (hasContent1 && !hasContent2) || (!hasContent1 && hasContent2);
+      const byeWinner = hasContent1 && !hasContent2 ? (node1.team || null) :
+                        hasContent2 && !hasContent1 ? (node2.team || null) : null;
       
       if (!hasContent1 && !hasContent2) {
-        // Both empty - create TBD placeholder
-        nextLevel.push({
-          team: null,
-          matchNumber: null,
-          roundIndex: roundIndex + 1,
-          position
-        });
+        // Both empty - skip
+        nextLevel.push({ team: null, matchNumber: null });
       } else {
-        // At least one slot has content - create the match
+        // Create match
         const matchNumber = matchCounter++;
-        
-        // If this is a bye, the winner is already known
-        nextLevel.push({
-          team: isBye ? byeWinner : null, // Bye recipient auto-advances
-          matchNumber,
-          roundIndex: roundIndex + 1,
-          position
-        });
         
         allMatches.push({
           roundIndex,
           roundName,
           position,
           matchNumber,
-          team1: node1.team,
-          team2: node2.team,
-          advancesToMatchNumber: null, // Will be set below
-          node1MatchNumber: node1.matchNumber,
-          node2MatchNumber: node2.matchNumber
+          team1: node1.team || null,
+          team2: node2.team || null,
+          isBye,
+          byeWinner,
+          sourceMatch1: node1.matchNumber,
+          sourceMatch2: node2.matchNumber
+        });
+        
+        // Winner advances to next level
+        nextLevel.push({
+          team: isBye ? byeWinner : null,
+          matchNumber
         });
       }
     }
@@ -195,47 +187,27 @@ export function generateSingleElimination(
     currentLevel = nextLevel;
   }
 
-  // Set advancement pointers by walking matches in reverse
+  // Set advancement pointers
   for (let i = 0; i < allMatches.length; i++) {
     const match = allMatches[i];
     const nextRoundIndex = match.roundIndex + 1;
     const nextPosition = Math.floor(match.position / 2);
     
-    // Find the match in the next round that this match feeds into
     const nextMatch = allMatches.find(m => 
       m.roundIndex === nextRoundIndex && m.position === nextPosition
     );
     
-    match.advancesToMatchNumber = nextMatch?.matchNumber || null;
-  }
-
-  // Convert to final match format
-  allMatches.forEach(match => {
-    // Build descriptive notes
+    const advancesTo = nextMatch?.matchNumber || null;
+    
+    // Convert to final format
     let notes: string | null = null;
-    
-    // Build team1 description
-    let team1Desc = '';
-    if (match.team1) {
-      team1Desc = match.team1.teamName;
-    } else if (match.node1MatchNumber) {
-      team1Desc = `Winner of Match ${match.node1MatchNumber}`;
+    if (match.team1 && match.team2) {
+      // Normal match - no notes needed
+    } else if (match.isBye && match.byeWinner) {
+      notes = `${match.byeWinner.teamName} gets a bye`;
     } else {
-      team1Desc = 'TBD';
-    }
-    
-    // Build team2 description
-    let team2Desc = '';
-    if (match.team2) {
-      team2Desc = match.team2.teamName;
-    } else if (match.node2MatchNumber) {
-      team2Desc = `Winner of Match ${match.node2MatchNumber}`;
-    } else {
-      team2Desc = 'TBD';
-    }
-    
-    // Only add notes if there's something meaningful to say
-    if (!match.team1 || !match.team2) {
+      const team1Desc = match.team1?.teamName || (match.sourceMatch1 ? `Winner of Match ${match.sourceMatch1}` : 'TBD');
+      const team2Desc = match.team2?.teamName || (match.sourceMatch2 ? `Winner of Match ${match.sourceMatch2}` : 'TBD');
       notes = `${team1Desc} vs ${team2Desc}`;
     }
     
@@ -250,13 +222,13 @@ export function generateSingleElimination(
       winnerId: null,
       team1Score: null,
       team2Score: null,
-      advancesToMatchId: match.advancesToMatchNumber ? `match_${match.advancesToMatchNumber}` : null,
+      advancesToMatchId: advancesTo ? `match_${advancesTo}` : null,
       scheduledTime: null,
       location: null,
       status: 'scheduled',
       notes
     });
-  });
+  }
 
   return { matches, rounds };
 }
