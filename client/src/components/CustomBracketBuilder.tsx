@@ -552,14 +552,14 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
               {/* Teams */}
               <div className="flex-1 flex flex-col gap-1">
                 <Select
-                  value={matchup.team1}
-                  onValueChange={(value) => updateMatchup(matchup.id, { team1: value })}
+                  value={matchup.team1 || 'unassigned'}
+                  onValueChange={(value) => updateMatchup(matchup.id, { team1: value === 'unassigned' ? '' : value })}
                 >
                   <SelectTrigger className="h-7 text-xs" data-testid={`select-team1-${matchup.id}`}>
                     <SelectValue placeholder="Select Team 1" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {teams.map(team => (
                       <SelectItem key={team.id} value={team.teamName}>
                         {team.teamName}
@@ -569,14 +569,14 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
                 </Select>
                 <div className="text-center text-xs text-muted-foreground">vs</div>
                 <Select
-                  value={matchup.team2}
-                  onValueChange={(value) => updateMatchup(matchup.id, { team2: value })}
+                  value={matchup.team2 || 'unassigned'}
+                  onValueChange={(value) => updateMatchup(matchup.id, { team2: value === 'unassigned' ? '' : value })}
                 >
                   <SelectTrigger className="h-7 text-xs" data-testid={`select-team2-${matchup.id}`}>
                     <SelectValue placeholder="Select Team 2" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {teams.map(team => (
                       <SelectItem key={team.id} value={team.teamName}>
                         {team.teamName}
