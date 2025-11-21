@@ -272,8 +272,12 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
       return;
     }
 
-    // Validate all matchups have teams assigned
-    const invalidMatchups = matchups.filter(m => !m.team1 || !m.team2);
+    // Validate all matchups have teams assigned (including winner references like "winner:Game 1")
+    const invalidMatchups = matchups.filter(m => {
+      const team1Missing = !m.team1 || m.team1 === 'unassigned';
+      const team2Missing = !m.team2 || m.team2 === 'unassigned';
+      return team1Missing || team2Missing;
+    });
     if (invalidMatchups.length > 0) {
       toast({
         title: "Incomplete Matchups",
@@ -565,6 +569,11 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
                         {team.teamName}
                       </SelectItem>
                     ))}
+                    {matchups.filter(m => m.id !== matchup.id).map(m => (
+                      <SelectItem key={`winner-${m.id}`} value={`winner:${m.gameNumber}`}>
+                        Winner of {m.gameNumber}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <div className="text-center text-xs text-muted-foreground">vs</div>
@@ -580,6 +589,11 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
                     {teams.map(team => (
                       <SelectItem key={team.id} value={team.teamName}>
                         {team.teamName}
+                      </SelectItem>
+                    ))}
+                    {matchups.filter(m => m.id !== matchup.id).map(m => (
+                      <SelectItem key={`winner-${m.id}`} value={`winner:${m.gameNumber}`}>
+                        Winner of {m.gameNumber}
                       </SelectItem>
                     ))}
                   </SelectContent>

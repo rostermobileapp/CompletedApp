@@ -14,7 +14,7 @@ import {
   requireSpecialPermission
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
@@ -10802,16 +10802,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get tournament teams
-      const tournamentTeams = await db
+      const tournamentTeamsData = await db
         .select()
         .from(tournamentTeams)
         .where(eq(tournamentTeams.tournamentId, id));
 
-      if (tournamentTeams.length === 0) {
+      if (tournamentTeamsData.length === 0) {
         return res.status(400).json({ message: "No teams found for this tournament" });
       }
 
-      // Validate all matchups have valid teams
+      // Validate all matchups have valid teams or winner references
       const { matchups } = bracketData;
       const errors: string[] = [];
       
@@ -10823,14 +10823,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
 
-        const team1 = tournamentTeams.find(t => t.teamName === matchup.team1);
-        const team2 = tournamentTeams.find(t => t.teamName === matchup.team2);
-
-        if (!team1) {
-          errors.push(`Matchup ${i + 1}: Team "${matchup.team1}" not found in tournament`);
+        // Check if team1 is a winner reference or actual team
+        if (!matchup.team1.startsWith('winner:')) {
+          const team1 = tournamentTeamsData.find((t: any) => t.teamName === matchup.team1);
+          if (!team1) {
+            errors.push(`Matchup ${i + 1}: Team "${matchup.team1}" not found in tournament`);
+          }
         }
-        if (!team2) {
-          errors.push(`Matchup ${i + 1}: Team "${matchup.team2}" not found in tournament`);
+
+        // Check if team2 is a winner reference or actual team
+        if (!matchup.team2.startsWith('winner:')) {
+          const team2 = tournamentTeamsData.find((t: any) => t.teamName === matchup.team2);
+          if (!team2) {
+            errors.push(`Matchup ${i + 1}: Team "${matchup.team2}" not found in tournament`);
+          }
         }
       }
 
@@ -10852,17 +10858,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (let i = 0; i < matchups.length; i++) {
           const matchup = matchups[i];
           
-          // Find team IDs by team name (we already validated these exist)
-          const team1 = tournamentTeams.find(t => t.teamName === matchup.team1)!;
-          const team2 = tournamentTeams.find(t => t.teamName === matchup.team2)!;
+          // Handle team1 - could be actual team or winner reference
+          let team1Id = null;
+          if (matchup.team1.startsWith('winner:')) {
+            // Leave as null - will be filled when the referenced match completes
+            team1Id = null;
+          } else {
+            const team1 = tournamentTeamsData.find((t: any) => t.teamName === matchup.team1);
+            team1Id = team1 ? team1.id : null;
+          }
+
+          // Handle team2 - could be actual team or winner reference
+          let team2Id = null;
+          if (matchup.team2.startsWith('winner:')) {
+            // Leave as null - will be filled when the referenced match completes
+            team2Id = null;
+          } else {
+            const team2 = tournamentTeamsData.find((t: any) => t.teamName === matchup.team2);
+            team2Id = team2 ? team2.id : null;
+          }
 
           matchesToInsert.push({
             tournamentId: id,
             matchNumber: i + 1,
             round: matchup.gameNumber || `Game ${i + 1}`,
             bracketType: matchup.type === 'losers' ? 'losers' : 'winners',
-            team1Id: team1.id,
-            team2Id: team2.id,
+            team1Id,
+            team2Id,
             team1Score: null,
             team2Score: null,
             winnerId: null,
