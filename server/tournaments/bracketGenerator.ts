@@ -88,8 +88,9 @@ export function generateSingleElimination(
   const matches: Omit<TournamentMatch, 'id' | 'createdAt' | 'updatedAt'>[] = [];
   const rounds: string[] = [];
 
-  // Sort teams by seed
-  const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
+  // Apply bracket type (seeded or blind draw)
+  const bracketType = settings.bracketType || 'seeded';
+  const sortedTeams = applyBracketType(teams, bracketType);
 
   let matchCounter = 1;
   
@@ -313,8 +314,9 @@ export function generateDoubleElimination(
   const matches: Omit<TournamentMatch, 'id' | 'createdAt' | 'updatedAt'>[] = [];
   const rounds: string[] = [];
 
-  // Sort teams by seed
-  const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
+  // Apply bracket type (seeded or blind draw)
+  const bracketType = settings.bracketType || 'seeded';
+  const sortedTeams = applyBracketType(teams, bracketType);
   
   // Check bye policy from settings (default to top seed bye)
   const byePolicy = settings.byePolicy || 'top_seed_bye';
