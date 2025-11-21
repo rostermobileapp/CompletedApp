@@ -6,6 +6,7 @@ import { ZoomIn, ZoomOut, Maximize2, Download } from "lucide-react";
 import type { TournamentMatch, TournamentTeam, TournamentSettings } from "@shared/schema";
 import { format as formatDate } from "date-fns";
 import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
 interface BracketViewProps {
   matches: TournamentMatch[];
@@ -772,107 +773,40 @@ export default function BracketView({ matches, teams, format, settings, tourname
         format: [pageWidth, pageHeight]
       });
 
-      // Calculate available space after margins
-      const availableWidth = pageWidth - (2 * margin);
-      const availableHeight = pageHeight - (2 * margin) - 50; // Extra space for title
-      
-      // Get SVG dimensions from viewBox
-      const viewBox = svgRef.current.getAttribute('viewBox');
-      let svgWidth = parseFloat(svgRef.current.getAttribute('width') || '0');
-      let svgHeight = parseFloat(svgRef.current.getAttribute('height') || '0');
-      
-      if (viewBox) {
-        const [, , vbWidth, vbHeight] = viewBox.split(' ').map(Number);
-        svgWidth = vbWidth;
-        svgHeight = vbHeight;
-      }
-      
-      // Calculate scale to fit within available space
-      const scaleX = availableWidth / svgWidth;
-      const scaleY = availableHeight / svgHeight;
-      const scale = Math.min(scaleX, scaleY);
-      
-      const scaledWidth = svgWidth * scale;
-      const scaledHeight = svgHeight * scale;
-      
-      // Center the bracket on the page
-      const xOffset = margin + (availableWidth - scaledWidth) / 2;
-      const yOffset = margin + 50; // Leave space for title
-      
       // Add title
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       const title = tournamentName || 'Tournament Bracket';
       const titleWidth = doc.getTextWidth(title);
       doc.text(title, (pageWidth - titleWidth) / 2, margin + 20);
+
+      // Calculate available space after margins
+      const availableWidth = pageWidth - (2 * margin);
+      const availableHeight = pageHeight - (2 * margin) - 50; // Extra space for title
       
-      // Clone the SVG and inline all computed styles
-      const svgClone = svgRef.current.cloneNode(true) as SVGSVGElement;
-      const originalElements = svgRef.current.querySelectorAll('*');
-      const clonedElements = svgClone.querySelectorAll('*');
-      
-      // Inline computed styles for each element
-      Array.from(originalElements).forEach((el, index) => {
-        const computedStyle = window.getComputedStyle(el);
-        const clonedEl = clonedElements[index] as HTMLElement | SVGElement;
-        if (clonedEl) {
-          // Copy all relevant SVG/CSS properties
-          const styleStr = Array.from(computedStyle).filter(prop => {
-            // Only copy properties that are explicitly set or are SVG-specific
-            const value = computedStyle.getPropertyValue(prop);
-            return value && value !== '' && (
-              prop.includes('fill') ||
-              prop.includes('stroke') ||
-              prop.includes('font') ||
-              prop.includes('color') ||
-              prop.includes('opacity') ||
-              prop.includes('text')
-            );
-          }).map(prop => `${prop}:${computedStyle.getPropertyValue(prop)}`).join(';');
-          
-          if (styleStr) {
-            clonedEl.setAttribute('style', styleStr);
-          }
-          clonedEl.removeAttribute('class');
-        }
+      // Use html2canvas to capture the SVG as it appears on screen
+      const canvas = await html2canvas(svgRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2, // Higher quality
+        logging: false,
+        useCORS: true
       });
       
-      // Remove transform and transition from the SVG itself
-      svgClone.style.transform = '';
-      svgClone.style.transition = '';
+      // Get canvas dimensions
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
       
-      // Convert SVG to canvas then to image
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Could not get canvas context');
+      // Calculate scale to fit within available space
+      const scaleX = availableWidth / canvasWidth;
+      const scaleY = availableHeight / canvasHeight;
+      const scale = Math.min(scaleX, scaleY);
       
-      // Set canvas dimensions with higher DPI for better quality
-      const dpi = 2;
-      canvas.width = svgWidth * dpi;
-      canvas.height = svgHeight * dpi;
-      ctx.scale(dpi, dpi);
+      const scaledWidth = canvasWidth * scale;
+      const scaledHeight = canvasHeight * scale;
       
-      // Serialize the styled SVG
-      const svgData = new XMLSerializer().serializeToString(svgClone);
-      
-      // Create an image from the SVG
-      const img = new Image();
-      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
-      
-      await new Promise((resolve, reject) => {
-        img.onload = () => {
-          // Draw the image onto the canvas
-          ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
-          URL.revokeObjectURL(url);
-          resolve(null);
-        };
-        img.onerror = (err) => {
-          URL.revokeObjectURL(url);
-          reject(new Error('Failed to load SVG image'));
-        };
-        img.src = url;
-      });
+      // Center the bracket on the page
+      const xOffset = margin + (availableWidth - scaledWidth) / 2;
+      const yOffset = margin + 50; // Leave space for title
       
       // Add canvas image to PDF
       const imgData = canvas.toDataURL('image/png');
