@@ -10640,13 +10640,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No playoff matches found" });
       }
 
-      // Check if playoffs are already seeded or in progress (prevent reseeding)
+      // Check if ANY playoff match (all rounds) is already seeded or in progress (prevent reseeding)
       const playoffsInProgress = playoffMatches.some(m => 
         m.team1Id !== null || m.team2Id !== null || m.status !== 'scheduled'
       );
       if (playoffsInProgress) {
+        const seededMatches = playoffMatches.filter(m => m.team1Id !== null || m.team2Id !== null);
         return res.status(409).json({ 
           message: "Playoffs are already seeded or in progress. Cannot reseed once teams have been assigned or matches have started.",
+          seededMatchCount: seededMatches.length,
+          totalPlayoffMatches: playoffMatches.length,
           hint: "Delete and recreate the tournament if you need to change the seeding."
         });
       }
@@ -10677,6 +10680,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expected: expectedFirstRoundMatches,
           actual: firstRoundMatches.length,
           hint: "The bracket may be corrupted. Please recreate the tournament."
+        });
+      }
+
+      // Validate that we have the correct number of playoff teams for the bracket
+      if (playoffTeams.length !== numPlayoffTeams) {
+        return res.status(400).json({ 
+          message: "Playoff team count mismatch",
+          expected: numPlayoffTeams,
+          actual: playoffTeams.length,
+          hint: "Not enough teams qualified for playoffs based on standings. The tournament may need to be reconfigured."
         });
       }
 
