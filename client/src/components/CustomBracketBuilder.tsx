@@ -68,9 +68,22 @@ interface CustomBracketBuilderProps {
   tournamentId?: string;
   tournament?: any;
   onGenerateMatches?: () => void;
+  embeddable?: boolean;
+  locked?: boolean;
+  onSave?: (data: any) => void;
+  onLock?: () => void;
 }
 
-export function CustomBracketBuilder({ teams = [], tournamentId, tournament, onGenerateMatches }: CustomBracketBuilderProps) {
+export function CustomBracketBuilder({ 
+  teams = [], 
+  tournamentId, 
+  tournament, 
+  onGenerateMatches,
+  embeddable = false,
+  locked = false,
+  onSave,
+  onLock
+}: CustomBracketBuilderProps) {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [matchups, setMatchups] = useState<Matchup[]>([]);
@@ -231,12 +244,22 @@ export function CustomBracketBuilder({ teams = [], tournamentId, tournament, onG
       matchups,
       connections,
       zoom,
-      pan
+      pan,
+      locked: false
     };
     localStorage.setItem('customBracket', JSON.stringify(bracketData));
+    
+    if (onSave) {
+      onSave(bracketData);
+    }
+    
+    if (onLock) {
+      onLock();
+    }
+    
     toast({
       title: "Bracket saved",
-      description: "Your custom bracket has been saved locally"
+      description: embeddable ? "Bracket locked. Click Edit to make changes." : "Your custom bracket has been saved"
     });
   };
 
@@ -357,99 +380,108 @@ export function CustomBracketBuilder({ teams = [], tournamentId, tournament, onG
     }
   }, [tournament]);
 
+  const containerClass = embeddable ? "flex flex-col bg-background" : "h-screen flex flex-col bg-background";
+
   return (
-    <div className="h-screen flex flex-col bg-background">
-      {/* Toolbar */}
-      <div className="border-b bg-card p-4 flex items-center gap-4 flex-wrap">
-        <Button
-          onClick={() => addMatchup('standard')}
-          variant="default"
-          className="gap-2"
-          data-testid="button-add-matchup"
-        >
-          <Plus className="h-4 w-4" />
-          Matchup
-        </Button>
-        <Button
-          onClick={() => addMatchup('losers')}
-          variant="destructive"
-          className="gap-2"
-          data-testid="button-add-losers-matchup"
-        >
-          <Plus className="h-4 w-4" />
-          Losers Matchup
-        </Button>
-        <div className="h-6 w-px bg-border" />
-        <Button
-          onClick={handleZoomIn}
-          variant="outline"
-          size="icon"
-          data-testid="button-zoom-in"
-        >
-          <ZoomIn className="h-4 w-4" />
-        </Button>
-        <Button
-          onClick={handleZoomOut}
-          variant="outline"
-          size="icon"
-          data-testid="button-zoom-out"
-        >
-          <ZoomOut className="h-4 w-4" />
-        </Button>
-        <span className="text-sm text-muted-foreground">{Math.round(zoom * 100)}%</span>
-        <div className="h-6 w-px bg-border" />
-        <Button
-          onClick={() => setShowGrid(!showGrid)}
-          variant={showGrid ? "default" : "outline"}
-          size="icon"
-          data-testid="button-toggle-grid"
-        >
-          <Grid3x3 className="h-4 w-4" />
-        </Button>
-        <div className="h-6 w-px bg-border" />
-        <Button
-          onClick={saveBracket}
-          variant="outline"
-          className="gap-2"
-          data-testid="button-save"
-        >
-          <Save className="h-4 w-4" />
-          Save
-        </Button>
-        <Button
-          onClick={loadBracket}
-          variant="outline"
-          className="gap-2"
-          data-testid="button-load"
-        >
-          <Download className="h-4 w-4" />
-          Load
-        </Button>
-        <div className="h-6 w-px bg-border" />
-        <Button
-          onClick={handleGenerateMatches}
-          variant="default"
-          className="gap-2"
-          data-testid="button-generate-matches"
-          disabled={matchups.length === 0 || isGenerating}
-        >
-          <Check className="h-4 w-4" />
-          {isGenerating ? "Generating..." : "Generate Matches"}
-        </Button>
-        <div className="ml-auto text-sm text-muted-foreground">
-          {matchups.length} matchup{matchups.length !== 1 ? 's' : ''}
+    <div className={containerClass}>
+      {/* Toolbar - hidden when locked in embeddable mode */}
+      {!locked && (
+        <div className="border-b bg-card p-4 flex items-center gap-4 flex-wrap">
+          <Button
+            onClick={() => addMatchup('standard')}
+            variant="default"
+            className="gap-2"
+            data-testid="button-add-matchup"
+          >
+            <Plus className="h-4 w-4" />
+            Matchup
+          </Button>
+          <Button
+            onClick={() => addMatchup('losers')}
+            variant="destructive"
+            className="gap-2"
+            data-testid="button-add-losers-matchup"
+          >
+            <Plus className="h-4 w-4" />
+            Losers Matchup
+          </Button>
+          <div className="h-6 w-px bg-border" />
+          <Button
+            onClick={handleZoomIn}
+            variant="outline"
+            size="icon"
+            data-testid="button-zoom-in"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <Button
+            onClick={handleZoomOut}
+            variant="outline"
+            size="icon"
+            data-testid="button-zoom-out"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-muted-foreground">{Math.round(zoom * 100)}%</span>
+          <div className="h-6 w-px bg-border" />
+          <Button
+            onClick={() => setShowGrid(!showGrid)}
+            variant={showGrid ? "default" : "outline"}
+            size="icon"
+            data-testid="button-toggle-grid"
+          >
+            <Grid3x3 className="h-4 w-4" />
+          </Button>
+          {!embeddable && (
+            <>
+              <div className="h-6 w-px bg-border" />
+              <Button
+                onClick={saveBracket}
+                variant="outline"
+                className="gap-2"
+                data-testid="button-save"
+              >
+                <Save className="h-4 w-4" />
+                Save
+              </Button>
+              <Button
+                onClick={loadBracket}
+                variant="outline"
+                className="gap-2"
+                data-testid="button-load"
+              >
+                <Download className="h-4 w-4" />
+                Load
+              </Button>
+            </>
+          )}
+          <div className="h-6 w-px bg-border" />
+          <Button
+            onClick={embeddable ? saveBracket : handleGenerateMatches}
+            variant="default"
+            className="gap-2"
+            data-testid={embeddable ? "button-save-lock" : "button-generate-matches"}
+            disabled={matchups.length === 0 || isGenerating}
+          >
+            <Check className="h-4 w-4" />
+            {embeddable ? "Save & Lock Bracket" : (isGenerating ? "Generating..." : "Generate Matches")}
+          </Button>
+          <div className="ml-auto text-sm text-muted-foreground">
+            {matchups.length} matchup{matchups.length !== 1 ? 's' : ''}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Canvas */}
       <div
         ref={canvasRef}
-        className="flex-1 overflow-hidden relative cursor-move"
-        onMouseDown={handleCanvasMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        className={`flex-1 overflow-hidden relative ${locked ? 'cursor-default' : 'cursor-move'}`}
+        onMouseDown={locked ? undefined : handleCanvasMouseDown}
+        onMouseMove={locked ? undefined : handleMouseMove}
+        onMouseUp={locked ? undefined : handleMouseUp}
+        onMouseLeave={locked ? undefined : handleMouseUp}
         data-testid="canvas"
+        style={embeddable ? { minHeight: '500px' } : undefined}
       >
         {/* Grid Background */}
         {showGrid && (
@@ -527,7 +559,7 @@ export function CustomBracketBuilder({ teams = [], tournamentId, tournament, onG
         {matchups.map(matchup => (
           <Card
             key={matchup.id}
-            className={`absolute cursor-move ${matchup.type === 'losers' ? 'border-destructive' : 'border-primary'} ${draggingMatchup === matchup.id ? 'opacity-50' : ''}`}
+            className={`absolute ${locked ? 'cursor-default' : 'cursor-move'} ${matchup.type === 'losers' ? 'border-destructive' : 'border-primary'} ${draggingMatchup === matchup.id ? 'opacity-50' : ''}`}
             style={{
               width: CARD_WIDTH,
               height: CARD_HEIGHT,
@@ -537,7 +569,7 @@ export function CustomBracketBuilder({ teams = [], tournamentId, tournament, onG
               transformOrigin: 'top left',
               borderWidth: '4px'
             }}
-            onMouseDown={(e) => handleMouseDown(e, matchup.id)}
+            onMouseDown={locked ? undefined : (e) => handleMouseDown(e, matchup.id)}
             data-testid={`matchup-card-${matchup.id}`}
           >
             <div className="h-full p-3 flex flex-col gap-2">
@@ -548,20 +580,23 @@ export function CustomBracketBuilder({ teams = [], tournamentId, tournament, onG
                   onChange={(e) => updateMatchup(matchup.id, { gameNumber: e.target.value })}
                   className="h-6 text-xs font-bold flex-1"
                   placeholder="Game #"
+                  disabled={locked}
                   data-testid={`input-game-number-${matchup.id}`}
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteMatchup(matchup.id);
-                  }}
-                  data-testid={`button-delete-${matchup.id}`}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+                {!locked && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteMatchup(matchup.id);
+                    }}
+                    data-testid={`button-delete-${matchup.id}`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
 
               {/* Teams */}
@@ -569,6 +604,7 @@ export function CustomBracketBuilder({ teams = [], tournamentId, tournament, onG
                 <Select
                   value={matchup.team1 || 'unassigned'}
                   onValueChange={(value) => updateMatchup(matchup.id, { team1: value === 'unassigned' ? '' : value })}
+                  disabled={locked}
                 >
                   <SelectTrigger className="h-7 text-xs" data-testid={`select-team1-${matchup.id}`}>
                     <SelectValue placeholder="Select Team 1" />
@@ -591,6 +627,7 @@ export function CustomBracketBuilder({ teams = [], tournamentId, tournament, onG
                 <Select
                   value={matchup.team2 || 'unassigned'}
                   onValueChange={(value) => updateMatchup(matchup.id, { team2: value === 'unassigned' ? '' : value })}
+                  disabled={locked}
                 >
                   <SelectTrigger className="h-7 text-xs" data-testid={`select-team2-${matchup.id}`}>
                     <SelectValue placeholder="Select Team 2" />
@@ -612,43 +649,45 @@ export function CustomBracketBuilder({ teams = [], tournamentId, tournament, onG
               </div>
 
               {/* Routing Controls */}
-              <div className="flex gap-2 text-xs">
-                <Select
-                  value={matchup.winnerDestination || 'unassigned'}
-                  onValueChange={(value) => setWinnerDestination(matchup.id, value === 'unassigned' ? null : value)}
-                >
-                  <SelectTrigger className="h-6 text-xs flex-1" data-testid={`select-winner-dest-${matchup.id}`}>
-                    <SelectValue placeholder="Winner →" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    <SelectItem value="final">Championship</SelectItem>
-                    {matchups.filter(m => m.id !== matchup.id).map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.gameNumber || m.id.substring(0, 6)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Select
-                  value={matchup.loserDestination || 'unassigned'}
-                  onValueChange={(value) => setLoserDestination(matchup.id, value === 'unassigned' ? null : value)}
-                >
-                  <SelectTrigger className="h-6 text-xs flex-1" data-testid={`select-loser-dest-${matchup.id}`}>
-                    <SelectValue placeholder="Loser →" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    <SelectItem value="eliminated">Eliminated</SelectItem>
-                    {matchups.filter(m => m.id !== matchup.id).map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.gameNumber || m.id.substring(0, 6)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!locked && (
+                <div className="flex gap-2 text-xs">
+                  <Select
+                    value={matchup.winnerDestination || 'unassigned'}
+                    onValueChange={(value) => setWinnerDestination(matchup.id, value === 'unassigned' ? null : value)}
+                  >
+                    <SelectTrigger className="h-6 text-xs flex-1" data-testid={`select-winner-dest-${matchup.id}`}>
+                      <SelectValue placeholder="Winner →" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      <SelectItem value="final">Championship</SelectItem>
+                      {matchups.filter(m => m.id !== matchup.id).map(m => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.gameNumber || m.id.substring(0, 6)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select
+                    value={matchup.loserDestination || 'unassigned'}
+                    onValueChange={(value) => setLoserDestination(matchup.id, value === 'unassigned' ? null : value)}
+                  >
+                    <SelectTrigger className="h-6 text-xs flex-1" data-testid={`select-loser-dest-${matchup.id}`}>
+                      <SelectValue placeholder="Loser →" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      <SelectItem value="eliminated">Eliminated</SelectItem>
+                      {matchups.filter(m => m.id !== matchup.id).map(m => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.gameNumber || m.id.substring(0, 6)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </Card>
         ))}
