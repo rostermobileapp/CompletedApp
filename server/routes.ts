@@ -10759,6 +10759,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { bracketData } = req.body;
 
+      // Validate inputs
+      if (!bracketData || !bracketData.matchups || !Array.isArray(bracketData.matchups)) {
+        return res.status(400).json({ message: "Invalid bracket data: matchups array is required" });
+      }
+
+      if (bracketData.matchups.length === 0) {
+        return res.status(400).json({ message: "No matchups provided in bracket data" });
+      }
+
       // Get tournament
       const [tournament] = await db
         .select()
@@ -10773,87 +10782,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "This endpoint is only for custom bracket tournaments" });
       }
 
-      if (!bracketData || !bracketData.matchups || bracketData.matchups.length === 0) {
-        return res.status(400).json({ message: "Invalid bracket data" });
-      }
-
       // Get tournament teams
       const tournamentTeams = await db
         .select()
         .from(tournamentTeams)
         .where(eq(tournamentTeams.tournamentId, id));
 
-      // Clear existing matches
-      await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
+      if (tournamentTeams.length === 0) {
+        return res.status(400).json({ message: "No teams found for this tournament" });
+      }
 
-      // Create matches from custom bracket
-      const matchesToInsert = [];
+      // Validate all matchups have valid teams
       const { matchups } = bracketData;
-
+      const errors: string[] = [];
+      
       for (let i = 0; i < matchups.length; i++) {
         const matchup = matchups[i];
         
-        // Find team IDs by team name
-        const team1 = tournamentTeams.find(t => t.teamName === matchup.team1);
-        const team2 = tournamentTeams.find(t => t.teamName === matchup.team2);
-
-        if (!team1 || !team2) {
-          console.warn(`Skipping matchup ${i + 1}: team not found (${matchup.team1} vs ${matchup.team2})`);
+        if (!matchup.team1 || !matchup.team2) {
+          errors.push(`Matchup ${i + 1} (${matchup.gameNumber || `Game ${i + 1}`}): Both teams must be assigned`);
           continue;
         }
 
-        matchesToInsert.push({
-          tournamentId: id,
-          matchNumber: i + 1,
-          round: matchup.gameNumber || `Game ${i + 1}`,
-          bracketType: matchup.type === 'losers' ? 'losers' : 'winners',
-          team1Id: team1.id,
-          team2Id: team2.id,
-          team1Score: matchup.score1,
-          team2Score: matchup.score2,
-          winnerId: null,
-          status: 'scheduled',
-          scheduledAt: null,
-          gameId: null, // Will be linked when scheduled
-          parentMatch1Id: null, // Custom brackets don't use automatic advancement
-          parentMatch2Id: null,
-          notes: `Custom bracket position: (${matchup.position.x}, ${matchup.position.y})`
+        const team1 = tournamentTeams.find(t => t.teamName === matchup.team1);
+        const team2 = tournamentTeams.find(t => t.teamName === matchup.team2);
+
+        if (!team1) {
+          errors.push(`Matchup ${i + 1}: Team "${matchup.team1}" not found in tournament`);
+        }
+        if (!team2) {
+          errors.push(`Matchup ${i + 1}: Team "${matchup.team2}" not found in tournament`);
+        }
+      }
+
+      if (errors.length > 0) {
+        return res.status(400).json({ 
+          message: "Invalid matchup data", 
+          errors 
         });
       }
 
-      if (matchesToInsert.length === 0) {
-        return res.status(400).json({ message: "No valid matches to create from bracket data" });
-      }
+      // Use a transaction to ensure atomic operation
+      await db.transaction(async (tx) => {
+        // Clear existing matches for this tournament
+        await tx.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
 
-      // Insert matches
+        // Create matches from custom bracket
+        const matchesToInsert = [];
+
+        for (let i = 0; i < matchups.length; i++) {
+          const matchup = matchups[i];
+          
+          // Find team IDs by team name (we already validated these exist)
+          const team1 = tournamentTeams.find(t => t.teamName === matchup.team1)!;
+          const team2 = tournamentTeams.find(t => t.teamName === matchup.team2)!;
+
+          matchesToInsert.push({
+            tournamentId: id,
+            matchNumber: i + 1,
+            round: matchup.gameNumber || `Game ${i + 1}`,
+            bracketType: matchup.type === 'losers' ? 'losers' : 'winners',
+            team1Id: team1.id,
+            team2Id: team2.id,
+            team1Score: null,
+            team2Score: null,
+            winnerId: null,
+            status: 'scheduled',
+            scheduledTime: null,
+            location: null,
+            gameId: null, // Will be linked when match is scheduled with date/time
+            advancesToMatchId: null, // Custom brackets don't use automatic advancement
+            notes: `Custom bracket: ${matchup.gameNumber || `Game ${i + 1}`}`
+          });
+        }
+
+        // Insert all matches
+        await tx.insert(tournamentMatches).values(matchesToInsert);
+
+        // Save bracket data to tournament settings
+        const updatedSettings = {
+          ...(tournament.settings as any || {}),
+          customBracket: bracketData
+        };
+
+        await tx
+          .update(tournaments)
+          .set({ 
+            settings: updatedSettings,
+            updatedAt: new Date()
+          })
+          .where(eq(tournaments.id, id));
+      });
+
+      // Fetch the inserted matches to return
       const insertedMatches = await db
-        .insert(tournamentMatches)
-        .values(matchesToInsert)
-        .returning();
-
-      // Save bracket data to tournament settings
-      const updatedSettings = {
-        ...(tournament.settings as any || {}),
-        customBracket: bracketData
-      };
-
-      await db
-        .update(tournaments)
-        .set({ 
-          settings: updatedSettings,
-          updatedAt: new Date()
-        })
-        .where(eq(tournaments.id, id));
+        .select()
+        .from(tournamentMatches)
+        .where(eq(tournamentMatches.tournamentId, id))
+        .orderBy(tournamentMatches.matchNumber);
 
       res.json({ 
         success: true,
-        message: "Matches generated from custom bracket",
+        message: `Successfully generated ${insertedMatches.length} match${insertedMatches.length !== 1 ? 'es' : ''} from custom bracket`,
         matchCount: insertedMatches.length,
         matches: insertedMatches
       });
     } catch (error) {
       console.error("Error generating custom matches:", error);
-      res.status(500).json({ message: "Failed to generate matches from custom bracket" });
+      res.status(500).json({ message: "Failed to generate matches from custom bracket", error: String(error) });
     }
   });
 
