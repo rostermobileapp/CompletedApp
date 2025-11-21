@@ -353,14 +353,16 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
                 <CardTitle className={`text-xs font-semibold text-white`}>
                   {match.round}
                 </CardTitle>
-                <div className={`text-[10px] font-medium text-white opacity-80 flex items-center gap-1.5`}>
-                  <span>Match #{match.matchNumber}</span>
-                  {match.scheduledTime && (
-                    <span className="text-[9px] opacity-70">
-                      • {formatDate(new Date(match.scheduledTime), "MMM d, h:mm a")}
-                    </span>
-                  )}
-                </div>
+                {(settings?.showGameNumbers || match.scheduledTime) && (
+                  <div className={`text-[10px] font-medium text-white opacity-80 flex items-center gap-1.5`}>
+                    {settings?.showGameNumbers && <span>Game #{match.matchNumber}</span>}
+                    {match.scheduledTime && (
+                      <span className="text-[9px] opacity-70">
+                        {settings?.showGameNumbers && '• '}{formatDate(new Date(match.scheduledTime), "MMM d, h:mm a")}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent className="p-2 pt-0 space-y-1">
