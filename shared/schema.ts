@@ -2655,6 +2655,16 @@ export const insertVisitorCountSchema = createInsertSchema(visitorCount);
 export type VisitorCount = typeof visitorCount.$inferSelect;
 export type InsertVisitorCount = z.infer<typeof insertVisitorCountSchema>;
 
+// Tournament settings schema
+export const tournamentSettingsSchema = z.object({
+  byePolicy: z.enum(['top_seed_bye', 'play_in_game']).optional(),
+  bracketType: z.enum(['seeded', 'blind_draw']).default('seeded'),
+  showSeedNumbers: z.boolean().default(true),
+  showGameNumbers: z.boolean().default(false),
+}).passthrough(); // Allow additional properties for future expansion
+
+export type TournamentSettings = z.infer<typeof tournamentSettingsSchema>;
+
 // Tournament schemas
 export const insertTournamentSchema = createInsertSchema(tournaments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTournamentTeamSchema = createInsertSchema(tournamentTeams).omit({ id: true, createdAt: true });
