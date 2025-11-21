@@ -10754,10 +10754,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate matches from custom bracket
-  app.post('/api/tournaments/:id/generate-custom-matches', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  app.post('/api/tournaments/:id/generate-custom-matches', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { bracketData } = req.body;
+      const userId = req.user.claims.sub;
 
       // Validate inputs
       if (!bracketData || !bracketData.matchups || !Array.isArray(bracketData.matchups)) {
@@ -10780,6 +10781,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (tournament.format !== 'custom_bracket') {
         return res.status(400).json({ message: "This endpoint is only for custom bracket tournaments" });
+      }
+
+      // Check if user has permissions for this tournament's league
+      const [league] = await db
+        .select()
+        .from(leagues)
+        .where(eq(leagues.id, tournament.leagueId));
+
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      // Check if user is league commissioner
+      const isCommissioner = league.commissionerId === userId;
+      const isSecondaryCommissioner = league.secondaryCommissionerId === userId;
+
+      if (!isCommissioner && !isSecondaryCommissioner) {
+        return res.status(403).json({ message: "Access denied. Only league commissioners can generate tournament matches" });
       }
 
       // Get tournament teams
