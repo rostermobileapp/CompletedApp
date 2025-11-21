@@ -806,6 +806,41 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const titleWidth = doc.getTextWidth(title);
       doc.text(title, (pageWidth - titleWidth) / 2, margin + 20);
       
+      // Clone the SVG and inline all computed styles
+      const svgClone = svgRef.current.cloneNode(true) as SVGSVGElement;
+      const originalElements = svgRef.current.querySelectorAll('*');
+      const clonedElements = svgClone.querySelectorAll('*');
+      
+      // Inline computed styles for each element
+      Array.from(originalElements).forEach((el, index) => {
+        const computedStyle = window.getComputedStyle(el);
+        const clonedEl = clonedElements[index] as HTMLElement | SVGElement;
+        if (clonedEl) {
+          // Copy all relevant SVG/CSS properties
+          const styleStr = Array.from(computedStyle).filter(prop => {
+            // Only copy properties that are explicitly set or are SVG-specific
+            const value = computedStyle.getPropertyValue(prop);
+            return value && value !== '' && (
+              prop.includes('fill') ||
+              prop.includes('stroke') ||
+              prop.includes('font') ||
+              prop.includes('color') ||
+              prop.includes('opacity') ||
+              prop.includes('text')
+            );
+          }).map(prop => `${prop}:${computedStyle.getPropertyValue(prop)}`).join(';');
+          
+          if (styleStr) {
+            clonedEl.setAttribute('style', styleStr);
+          }
+          clonedEl.removeAttribute('class');
+        }
+      });
+      
+      // Remove transform and transition from the SVG itself
+      svgClone.style.transform = '';
+      svgClone.style.transition = '';
+      
       // Convert SVG to canvas then to image
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -815,9 +850,10 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const dpi = 2;
       canvas.width = svgWidth * dpi;
       canvas.height = svgHeight * dpi;
+      ctx.scale(dpi, dpi);
       
-      // Serialize the SVG
-      const svgData = new XMLSerializer().serializeToString(svgRef.current);
+      // Serialize the styled SVG
+      const svgData = new XMLSerializer().serializeToString(svgClone);
       
       // Create an image from the SVG
       const img = new Image();
@@ -826,13 +862,12 @@ export default function BracketView({ matches, teams, format, settings, tourname
       
       await new Promise((resolve, reject) => {
         img.onload = () => {
-          // Draw the image onto the canvas with higher DPI
-          ctx.scale(dpi, dpi);
+          // Draw the image onto the canvas
           ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
           URL.revokeObjectURL(url);
           resolve(null);
         };
-        img.onerror = () => {
+        img.onerror = (err) => {
           URL.revokeObjectURL(url);
           reject(new Error('Failed to load SVG image'));
         };
