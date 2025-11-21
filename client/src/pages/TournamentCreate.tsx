@@ -378,6 +378,10 @@ export default function TournamentCreate() {
                           <SelectContent>
                             <SelectItem value="single_elimination">Single Elimination</SelectItem>
                             <SelectItem value="double_elimination">Double Elimination (Beta)</SelectItem>
+                            <SelectItem value="triple_elimination">Triple Elimination</SelectItem>
+                            <SelectItem value="three_game_guarantee">3-Game Guarantee</SelectItem>
+                            <SelectItem value="consolation">Consolation Tournament</SelectItem>
+                            <SelectItem value="compass_draw">Compass Draw</SelectItem>
                             <SelectItem value="round_robin">Round Robin</SelectItem>
                             <SelectItem value="round_robin_split">Round Robin + Playoffs</SelectItem>
                           </SelectContent>
