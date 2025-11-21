@@ -75,6 +75,10 @@ export default function TournamentDetail() {
     const labels: Record<Tournament['format'], string> = {
       single_elimination: 'Single Elimination',
       double_elimination: 'Double Elimination',
+      triple_elimination: 'Triple Elimination',
+      three_game_guarantee: '3-Game Guarantee',
+      consolation: 'Consolation Tournament',
+      compass_draw: 'Compass Draw',
       round_robin: 'Round Robin',
       round_robin_split: 'Round Robin + Playoffs'
     };
@@ -229,7 +233,12 @@ export default function TournamentDetail() {
           <TabsContent value="bracket" className="space-y-4">
             {matches && matches.length > 0 ? (
               <div className="space-y-6">
-                {tournament.format === 'single_elimination' || tournament.format === 'double_elimination' ? (
+                {(tournament.format === 'single_elimination' || 
+                  tournament.format === 'double_elimination' || 
+                  tournament.format === 'triple_elimination' || 
+                  tournament.format === 'three_game_guarantee' ||
+                  tournament.format === 'consolation' ||
+                  tournament.format === 'compass_draw') ? (
                   // Bracket visualization for elimination formats
                   (<Card>
                     <CardHeader className="pt-[2px] pb-[2px]">
@@ -243,7 +252,7 @@ export default function TournamentDetail() {
                         matches={matches} 
                         teams={teams || []} 
                         format={tournament.format}
-                        settings={tournament.settings || {}}
+                        settings={tournament.settings || { bracketType: 'seeded', showSeedNumbers: true, showGameNumbers: false }}
                       />
                     </CardContent>
                   </Card>)
