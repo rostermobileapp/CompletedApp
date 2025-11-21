@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3 } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import BracketView from "@/components/BracketView";
 import MatchEditDialog from "@/components/MatchEditDialog";
+import { CustomBracketBuilder } from "@/components/CustomBracketBuilder";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -33,6 +34,7 @@ export default function TournamentDetail() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingMatch, setEditingMatch] = useState<TournamentMatch | null>(null);
   const [isExportingSchedule, setIsExportingSchedule] = useState(false);
+  const [isBracketLocked, setIsBracketLocked] = useState(true);
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
@@ -439,65 +441,65 @@ export default function TournamentDetail() {
                 })()}
                 
                 {tournament.format === 'custom_bracket' ? (
-                  // Custom bracket display
+                  // Custom bracket builder embedded
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <div>
                         <CardTitle>Custom Bracket</CardTitle>
                         <CardDescription>
-                          {(tournament.settings as any)?.customBracket ? 'Your custom tournament structure' : 'Design your own tournament bracket structure'}
+                          {isBracketLocked ? 'Your custom tournament structure is locked' : 'Design your own tournament bracket structure'}
                         </CardDescription>
                       </div>
-                      <Button
-                        onClick={() => setLocation(`/tournaments/${tournamentId}/custom-builder`)}
-                        data-testid="button-open-bracket-builder"
-                        variant="outline"
-                        className="gap-2"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                        {(tournament.settings as any)?.customBracket ? 'Edit Bracket' : 'Build Bracket'}
-                      </Button>
+                      {isBracketLocked && (tournament.settings as any)?.customBracket?.matchups?.length > 0 && (
+                        <Button
+                          onClick={() => setIsBracketLocked(false)}
+                          data-testid="button-unlock-bracket"
+                          variant="outline"
+                          className="gap-2"
+                        >
+                          <Edit className="h-4 w-4" />
+                          Edit Bracket
+                        </Button>
+                      )}
                     </CardHeader>
                     <CardContent>
-                      {(tournament.settings as any)?.customBracket?.matchups?.length > 0 ? (
-                        <div className="border rounded-lg p-4 bg-muted/30">
-                          <div className="grid gap-4">
-                            {((tournament.settings as any).customBracket.matchups as any[]).map((matchup: any, index: number) => (
-                              <div key={index} className="border rounded-lg p-4 bg-card">
-                                <div className="font-semibold mb-2">{matchup.gameNumber}</div>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <div className="text-sm mb-1">
-                                      {matchup.team1?.startsWith('winner:') 
-                                        ? <span className="text-muted-foreground italic">{matchup.team1.replace('winner:', 'Winner of ')}</span>
-                                        : <span>{matchup.team1 || 'TBD'}</span>
-                                      }
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">vs</div>
-                                    <div className="text-sm mt-1">
-                                      {matchup.team2?.startsWith('winner:')
-                                        ? <span className="text-muted-foreground italic">{matchup.team2.replace('winner:', 'Winner of ')}</span>
-                                        : <span>{matchup.team2 || 'TBD'}</span>
-                                      }
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-4 text-xs text-muted-foreground text-center">
-                            {(tournament.settings as any).customBracket.matchups.length} matchup{(tournament.settings as any).customBracket.matchups.length !== 1 ? 's' : ''} in bracket
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8">
-                          <Trophy className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-                          <h3 className="text-lg font-semibold mb-2">Build Your Bracket</h3>
-                          <p className="text-muted-foreground mb-6">
-                            Use the custom bracket builder to create your tournament structure
-                          </p>
-                        </div>
-                      )}
+                      <CustomBracketBuilder
+                        teams={teams || []}
+                        tournamentId={tournamentId}
+                        tournament={tournament}
+                        embeddable={true}
+                        locked={isBracketLocked}
+                        onSave={async (bracketData) => {
+                          try {
+                            // Save bracket to backend
+                            const updatedSettings = {
+                              ...(tournament.settings as any || {}),
+                              customBracket: bracketData
+                            };
+                            
+                            await apiRequest('PATCH', `/api/tournaments/${tournamentId}`, {
+                              settings: updatedSettings
+                            });
+                            
+                            // Refresh tournament data
+                            await queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+                            
+                            setIsBracketLocked(true);
+                            
+                            toast({
+                              title: "Bracket saved",
+                              description: "Your custom bracket has been saved and locked"
+                            });
+                          } catch (error) {
+                            toast({
+                              title: "Error",
+                              description: "Failed to save bracket",
+                              variant: "destructive"
+                            });
+                          }
+                        }}
+                        onLock={() => setIsBracketLocked(true)}
+                      />
                     </CardContent>
                   </Card>
                 ) : (tournament.format === 'single_elimination' || 
