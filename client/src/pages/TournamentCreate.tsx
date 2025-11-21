@@ -33,7 +33,7 @@ const formSchema = z.object({
   name: z.string().min(1, "Tournament name is required"),
   type: z.enum(["season_playoff", "standalone"]),
   seasonId: z.string().optional(),
-  format: z.enum(["single_elimination", "double_elimination", "three_game_guarantee", "round_robin", "round_robin_split"]),
+  format: z.enum(["single_elimination", "double_elimination", "three_game_guarantee", "round_robin", "round_robin_split", "custom_bracket"]),
   description: z.string().optional(),
   teamIds: z.array(z.string()).min(3, "Select at least 3 teams").max(128, "Maximum 128 teams allowed"),
   byePolicy: z.enum(["top_seed_bye", "play_in_game"]).optional(),
@@ -203,7 +203,8 @@ export default function TournamentCreate() {
       double_elimination: 'Double Elimination',
       three_game_guarantee: '3-Game Guarantee',
       round_robin: 'Round Robin',
-      round_robin_split: 'Round Robin + Playoffs'
+      round_robin_split: 'Round Robin + Playoffs',
+      custom_bracket: 'Custom Bracket Builder'
     };
     return labels[format] || format;
   };
@@ -378,6 +379,7 @@ export default function TournamentCreate() {
                             <SelectItem value="three_game_guarantee">3-Game Guarantee</SelectItem>
                             <SelectItem value="round_robin">Round Robin</SelectItem>
                             <SelectItem value="round_robin_split">Round Robin + Playoffs</SelectItem>
+                            <SelectItem value="custom_bracket">Custom Bracket Builder</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormDescription>

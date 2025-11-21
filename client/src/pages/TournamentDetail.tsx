@@ -79,7 +79,8 @@ export default function TournamentDetail() {
       double_elimination: 'Double Elimination',
       three_game_guarantee: '3-Game Guarantee',
       round_robin: 'Round Robin',
-      round_robin_split: 'Round Robin + Playoffs'
+      round_robin_split: 'Round Robin + Playoffs',
+      custom_bracket: 'Custom Bracket Builder'
     };
     return labels[format];
   };

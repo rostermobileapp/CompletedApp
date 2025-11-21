@@ -118,7 +118,8 @@ export const tournamentFormatEnum = pgEnum("tournament_format", [
   "double_elimination",
   "round_robin",
   "round_robin_split",
-  "three_game_guarantee"
+  "three_game_guarantee",
+  "custom_bracket"
 ]);
 
 // Tournament status enum
