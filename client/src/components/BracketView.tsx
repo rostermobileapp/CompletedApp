@@ -756,7 +756,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
   };
 
   const exportToPDF = async () => {
-    if (!svgRef.current) return;
+    if (!svgRef.current || !containerRef.current) return;
     
     setIsExporting(true);
     
@@ -784,39 +784,52 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const availableWidth = pageWidth - (2 * margin);
       const availableHeight = pageHeight - (2 * margin) - 50; // Extra space for title
       
-      // Use html2canvas to capture the SVG as it appears on screen
-      const canvas = await html2canvas(svgRef.current, {
-        backgroundColor: '#ffffff',
-        scale: 2, // Higher quality
-        logging: false,
-        useCORS: true
-      });
+      // Temporarily store the current transform
+      const originalTransform = svgRef.current.style.transform;
       
-      // Get canvas dimensions
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
+      // Reset transform to capture at normal scale
+      svgRef.current.style.transform = 'none';
       
-      // Calculate scale to fit within available space
-      const scaleX = availableWidth / canvasWidth;
-      const scaleY = availableHeight / canvasHeight;
-      const scale = Math.min(scaleX, scaleY);
-      
-      const scaledWidth = canvasWidth * scale;
-      const scaledHeight = canvasHeight * scale;
-      
-      // Center the bracket on the page
-      const xOffset = margin + (availableWidth - scaledWidth) / 2;
-      const yOffset = margin + 50; // Leave space for title
-      
-      // Add canvas image to PDF
-      const imgData = canvas.toDataURL('image/png');
-      doc.addImage(imgData, 'PNG', xOffset, yOffset, scaledWidth, scaledHeight);
-      
-      // Save the PDF
-      const filename = tournamentName 
-        ? `${tournamentName.replace(/[^a-z0-9]/gi, '_')}_bracket.pdf`
-        : 'tournament_bracket.pdf';
-      doc.save(filename);
+      try {
+        // Use html2canvas to capture the container (not the SVG directly)
+        const canvas = await html2canvas(containerRef.current, {
+          backgroundColor: '#ffffff',
+          scale: 1, // Use normal scale since we reset transform
+          logging: false,
+          useCORS: true,
+          windowWidth: containerRef.current.scrollWidth,
+          windowHeight: containerRef.current.scrollHeight
+        });
+        
+        // Get canvas dimensions
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        
+        // Calculate scale to fit within available space
+        const scaleX = availableWidth / canvasWidth;
+        const scaleY = availableHeight / canvasHeight;
+        const scale = Math.min(scaleX, scaleY);
+        
+        const scaledWidth = canvasWidth * scale;
+        const scaledHeight = canvasHeight * scale;
+        
+        // Center the bracket on the page
+        const xOffset = margin + (availableWidth - scaledWidth) / 2;
+        const yOffset = margin + 50; // Leave space for title
+        
+        // Add canvas image to PDF
+        const imgData = canvas.toDataURL('image/png');
+        doc.addImage(imgData, 'PNG', xOffset, yOffset, scaledWidth, scaledHeight);
+        
+        // Save the PDF
+        const filename = tournamentName 
+          ? `${tournamentName.replace(/[^a-z0-9]/gi, '_')}_bracket.pdf`
+          : 'tournament_bracket.pdf';
+        doc.save(filename);
+      } finally {
+        // Restore original transform
+        svgRef.current.style.transform = originalTransform;
+      }
       
     } catch (error) {
       console.error('Error exporting PDF:', error);
