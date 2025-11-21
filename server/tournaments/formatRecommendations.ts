@@ -1,5 +1,5 @@
 export interface FormatRecommendation {
-  format: 'single_elimination' | 'double_elimination' | 'three_game_guarantee' | 'consolation' | 'round_robin' | 'round_robin_split';
+  format: 'single_elimination' | 'double_elimination' | 'three_game_guarantee' | 'round_robin' | 'round_robin_split';
   recommended: boolean;
   name: string;
   description: string;
@@ -78,28 +78,6 @@ export function getFormatRecommendations(numTeams: number): FormatRecommendation
         'More scheduling complexity'
       ],
       estimatedGames: threeGameGames
-    });
-  }
-
-  // Consolation Tournament
-  if (numTeams >= 8 && numTeams <= 32) {
-    const consolationGames = (numTeams - 1) + Math.floor(numTeams / 4);
-    recommendations.push({
-      format: 'consolation',
-      recommended: numTeams === 8 || numTeams === 16,
-      name: 'Consolation Tournament',
-      description: 'Championship bracket + consolation bracket for 3rd/5th/7th place',
-      pros: [
-        'Everyone plays multiple games',
-        'Clear placement prizes (1st-8th)',
-        'Keeps eliminated teams engaged'
-      ],
-      cons: [
-        'No second chance at championship',
-        'Some consolation games less meaningful',
-        'Requires more organization'
-      ],
-      estimatedGames: consolationGames
     });
   }
 

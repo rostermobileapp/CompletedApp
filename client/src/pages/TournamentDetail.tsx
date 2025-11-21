@@ -76,7 +76,6 @@ export default function TournamentDetail() {
       single_elimination: 'Single Elimination',
       double_elimination: 'Double Elimination',
       three_game_guarantee: '3-Game Guarantee',
-      consolation: 'Consolation Tournament',
       round_robin: 'Round Robin',
       round_robin_split: 'Round Robin + Playoffs'
     };
@@ -233,8 +232,7 @@ export default function TournamentDetail() {
               <div className="space-y-6">
                 {(tournament.format === 'single_elimination' || 
                   tournament.format === 'double_elimination' || 
-                  tournament.format === 'three_game_guarantee' ||
-                  tournament.format === 'consolation') ? (
+                  tournament.format === 'three_game_guarantee') ? (
                   // Bracket visualization for elimination formats
                   (<Card>
                     <CardHeader className="pt-[2px] pb-[2px]">

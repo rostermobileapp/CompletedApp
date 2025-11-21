@@ -15,7 +15,7 @@ import {
 } from "./permissionMiddleware";
 import { db } from "./db";
 import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games } from "@shared/schema";
-import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateConsolation, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
+import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
@@ -10468,9 +10468,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           break;
         case 'three_game_guarantee':
           bracketResult = generateThreeGameGuarantee(insertedTeams, tournamentId, settings);
-          break;
-        case 'consolation':
-          bracketResult = generateConsolation(insertedTeams, tournamentId, settings);
           break;
         case 'round_robin':
           bracketResult = generateRoundRobin(insertedTeams, tournamentId);

@@ -888,67 +888,6 @@ export function generateRoundRobinSplit(
 }
 
 /**
- * Generate Consolation Tournament bracket
- * Main bracket for championship + consolation bracket for eliminated teams
- * Losers from main bracket compete for 3rd/5th/7th place
- */
-export function generateConsolation(
-  teams: TournamentTeam[],
-  tournamentId: string,
-  settings: any = {}
-): BracketGeneratorResult {
-  const numTeams = teams.length;
-  const matches: Omit<TournamentMatch, 'id' | 'createdAt' | 'updatedAt'>[] = [];
-  const rounds: string[] = [];
-  const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
-  
-  let matchCounter = 1;
-  const numRounds = Math.ceil(Math.log2(numTeams));
-  
-  // Generate main (championship) bracket matches
-  const mainBracketResult = generateSingleElimination(teams, tournamentId, settings);
-  const championshipMatches = mainBracketResult.matches.map(m => ({
-    ...m,
-    matchNumber: matchCounter++,
-    round: m.round.replace('Round', 'Championship Round'),
-    bracketType: 'winners' as const
-  }));
-  
-  matches.push(...championshipMatches);
-  rounds.push(...mainBracketResult.rounds.map(r => r.replace('Round', 'Championship Round')));
-  
-  // Create consolation bracket for teams eliminated in Championship Round 1
-  const round1Matches = championshipMatches.filter(m => m.round === 'Championship Round 1');
-  if (round1Matches.length >= 2) {
-    // Pair up losers from Championship Round 1
-    for (let i = 0; i < round1Matches.length; i += 2) {
-      if (i + 1 < round1Matches.length) {
-        matches.push({
-          tournamentId,
-          gameId: null,
-          round: 'Consolation Bracket',
-          matchNumber: matchCounter++,
-          bracketType: 'losers',
-          team1Id: null,
-          team2Id: null,
-          winnerId: null,
-          team1Score: null,
-          team2Score: null,
-          advancesToMatchId: null,
-          scheduledTime: null,
-          location: null,
-          status: 'scheduled',
-          notes: `Loser of match_${round1Matches[i].matchNumber} vs Loser of match_${round1Matches[i + 1].matchNumber} - Competing for 3rd place`
-        });
-      }
-    }
-    rounds.push('Consolation Bracket');
-  }
-  
-  return { matches, rounds };
-}
-
-/**
  * Helper: Track team records through bracket simulation
  */
 interface TeamRecord {
