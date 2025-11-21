@@ -7,7 +7,7 @@ Rosters is a free, comprehensive sports team management platform designed to str
 The platform now includes a comprehensive tournament/playoff system supporting:
 - **Tournament Types**: Season playoffs and standalone tournaments
 - **Formats** (8 total): 
-  - **Phase 1**: Single elimination, double elimination, round robin, split round robin
+  - **Phase 1**: Single elimination, double elimination, round robin, round robin + playoffs
   - **Phase 2**: Triple elimination, 3-game guarantee, consolation tournament, compass draw
 - **Features**: 
   - Canonical bracket generation (1v16, 2v15, etc.) with configurable bye policies
@@ -46,6 +46,14 @@ The platform now includes a comprehensive tournament/playoff system supporting:
     - **3-Game Guarantee**: Winners + Losers brackets ensuring minimum 3 games per team
     - **Consolation Tournament**: Championship + Consolation brackets (losers compete for 3rd place)
     - **Compass Draw**: East/West divisions for initial placement-based brackets
+  - **Round Robin + Playoffs Implementation** (Nov 21, 2025):
+    - Two-phase tournament: Round Robin followed by single elimination playoffs
+    - Record-based playoff seeding using wins/losses with goals scored as tiebreaker
+    - Lowest seed excluded from playoffs when odd number of teams
+    - POST /api/tournaments/:id/seed-playoffs endpoint with comprehensive server-side guards
+    - Frontend "Seed Playoffs" button appears only when all Round Robin games complete
+    - Bracket display filters out Round Robin matches, showing only playoff bracket
+    - Playoff rounds calculated as log2(playoff teams): 8 teams = 3 rounds (Quarterfinals, Semifinals, Finals)
   - Format recommendation engine with detailed pros/cons analysis for all 8 formats
   - PATCH /api/tournaments/:id for editing draft tournaments with automatic bracket regeneration
 - **Frontend**: Complete with enhanced bracket visualization ✅
