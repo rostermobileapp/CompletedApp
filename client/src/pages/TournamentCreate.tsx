@@ -35,7 +35,7 @@ const formSchema = z.object({
   seasonId: z.string().optional(),
   format: z.enum(["single_elimination", "double_elimination", "round_robin", "round_robin_split"]),
   description: z.string().optional(),
-  teamIds: z.array(z.string()).min(2, "Select at least 2 teams"),
+  teamIds: z.array(z.string()).min(3, "Select at least 3 teams").max(128, "Maximum 128 teams allowed"),
   byePolicy: z.enum(["top_seed_bye", "play_in_game"]).optional(),
   bracketType: z.enum(["seeded", "blind_draw"]).default("seeded"),
   showSeedNumbers: z.boolean().default(true),

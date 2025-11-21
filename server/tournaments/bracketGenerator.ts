@@ -63,15 +63,25 @@ function shuffleArray<T>(array: T[]): T[] {
  * 
  * @param teams - Teams to seed/shuffle
  * @param bracketType - 'seeded' uses canonical seeding, 'blind_draw' randomizes
- * @returns Teams in proper bracket order
+ * @returns Teams in proper bracket order with updated seed numbers
  */
 export function applyBracketType(teams: TournamentTeam[], bracketType: 'seeded' | 'blind_draw' = 'seeded'): TournamentTeam[] {
+  let orderedTeams: TournamentTeam[];
+  
   if (bracketType === 'blind_draw') {
-    return shuffleArray(teams);
+    // Randomize team order
+    orderedTeams = shuffleArray(teams);
+  } else {
+    // For seeded brackets, sort by existing seed numbers
+    orderedTeams = [...teams].sort((a, b) => a.seed - b.seed);
   }
   
-  // For seeded brackets, teams are already sorted by seed
-  return [...teams].sort((a, b) => a.seed - b.seed);
+  // Reassign seed numbers to match the final bracket order (1, 2, 3...)
+  // This ensures seed numbers reflect actual bracket positions after randomization
+  return orderedTeams.map((team, index) => ({
+    ...team,
+    seed: index + 1
+  }));
 }
 
 /**
@@ -88,9 +98,8 @@ export function generateSingleElimination(
   const matches: Omit<TournamentMatch, 'id' | 'createdAt' | 'updatedAt'>[] = [];
   const rounds: string[] = [];
 
-  // Apply bracket type (seeded or blind draw)
-  const bracketType = settings.bracketType || 'seeded';
-  const sortedTeams = applyBracketType(teams, bracketType);
+  // Teams are already ordered by seed (via applyBracketType at route level)
+  const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
 
   let matchCounter = 1;
   
@@ -314,9 +323,8 @@ export function generateDoubleElimination(
   const matches: Omit<TournamentMatch, 'id' | 'createdAt' | 'updatedAt'>[] = [];
   const rounds: string[] = [];
 
-  // Apply bracket type (seeded or blind draw)
-  const bracketType = settings.bracketType || 'seeded';
-  const sortedTeams = applyBracketType(teams, bracketType);
+  // Teams are already ordered by seed (via applyBracketType at route level)
+  const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
   
   // Check bye policy from settings (default to top seed bye)
   const byePolicy = settings.byePolicy || 'top_seed_bye';

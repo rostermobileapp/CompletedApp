@@ -15,7 +15,7 @@ import {
 } from "./permissionMiddleware";
 import { db } from "./db";
 import { leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games } from "@shared/schema";
-import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit } from "./tournaments/bracketGenerator";
+import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
@@ -10429,14 +10429,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot modify tournament after it has started" });
       }
 
+      // Validate team count (3-128 teams)
+      if (!teamData || teamData.length < 3 || teamData.length > 128) {
+        return res.status(400).json({ 
+          message: `Invalid team count. Tournaments must have between 3 and 128 teams (received ${teamData?.length || 0})` 
+        });
+      }
+
       // Clear existing teams and matches
       await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, tournamentId));
       await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, tournamentId));
 
-      // Insert teams
+      // Get tournament settings
+      const settings = tournament.settings as any || {};
+      
+      // Apply bracket type (seeded or blind_draw) to determine team order and seeds
+      const bracketType = settings.bracketType || 'seeded';
+      const orderedTeamData = applyBracketType(teamData, bracketType);
+
+      // Insert teams with updated seeds
       const insertedTeams = await db
         .insert(tournamentTeams)
-        .values(teamData.map((team: any) => ({
+        .values(orderedTeamData.map((team: any) => ({
           ...team,
           tournamentId
         })))
@@ -10444,7 +10458,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate bracket based on format
       let bracketResult;
-      const settings = tournament.settings as any || {};
       
       switch (format) {
         case 'single_elimination':
