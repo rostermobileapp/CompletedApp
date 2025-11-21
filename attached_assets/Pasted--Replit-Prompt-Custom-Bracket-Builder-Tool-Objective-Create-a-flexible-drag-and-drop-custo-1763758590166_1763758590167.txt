@@ -1,0 +1,458 @@
+# Replit Prompt: Custom Bracket Builder Tool
+
+## Objective
+Create a flexible, drag-and-drop custom bracket builder that allows users to design tournament brackets of any structure by manually placing and connecting matchup cards. This tool should maintain our existing visual theme and color design.
+
+---
+
+## Core Features
+
+### 1. Canvas-Based Bracket Builder
+- **Infinite canvas** (or large scrollable workspace) where users can place matchup cards
+- **Grid system** with subtle background grid lines for visual alignment
+- **Snap-to-grid functionality** - matchup cards snap to grid intersections when dragged
+- Grid spacing: Recommended 50px or 100px increments
+- **Zoom controls** - ability to zoom in/out on the canvas
+- **Pan functionality** - click and drag empty space to pan around the canvas
+
+### 2. Matchup Card Creation
+
+#### Add Matchup Buttons
+Create two prominent buttons at the top of the interface:
+- **"+ Matchup"** button - Creates a standard matchup card
+- **"+ Losers Matchup"** button - Creates a losers bracket matchup card (different styling/color)
+
+#### Matchup Card Design
+Each matchup card should include:
+- **Card container** with rounded corners and shadow (maintain existing design theme)
+- **Game number/identifier** (editable text field at top)
+- **Two team slots**:
+  - Team 1 input field (top)
+  - "vs" divider (center)
+  - Team 2 input field (bottom)
+- **Winner indicator** - checkbox or radio buttons to mark which team won
+- **Score fields** (optional) - small input fields next to each team for scores
+- **Routing controls** (see section 3 below)
+- **Delete button** - small X or trash icon to remove the matchup
+- **Drag handle** - visual indicator that card can be dragged (entire card should be draggable)
+
+#### Color Coding
+- **Standard Matchup Cards**: Use primary bracket color from existing theme
+- **Losers Matchup Cards**: Use secondary/alternate color (e.g., orange, red, or darker shade)
+- **Completed matchups** (with winner selected): Slight opacity change or checkmark icon
+- **Hover state**: Subtle highlight when hovering over card
+
+### 3. Winner/Loser Routing System
+
+#### Routing Controls on Each Matchup Card
+Add connection point controls to each matchup:
+
+**Winner Routing:**
+- **"Winner →" dropdown/button** at the right side of the card
+- Clicking opens a menu with options:
+  - "Select Destination Matchup" (opens matchup selector)
+  - "Championship/Final" (marks as tournament end)
+  - "Unassigned" (no connection yet)
+- When destination is selected, draw arrow from this matchup to target matchup
+
+**Loser Routing:**
+- **"Loser →" dropdown/button** at the right side (below winner control)
+- Clicking opens a menu with options:
+  - "Select Destination Matchup" (for losers bracket routing)
+  - "Eliminated" (team is out - no arrow drawn)
+  - "Unassigned" (no connection yet)
+- When destination is selected, draw arrow from this matchup to target matchup
+- If "Eliminated" is selected, show a small "X" or elimination icon, no arrow
+
+#### Connection Drawing
+- **Visual arrows/lines** that connect matchups based on routing
+- **Winner arrows**: Solid lines in primary color
+- **Loser arrows**: Dashed lines in secondary/losers color
+- **Arrows should be curved** (Bezier curves) for better visual flow
+- **Arrow heads** clearly indicate direction
+- **Interactive arrows**: Hovering over arrow highlights both source and destination matchups
+- **Click arrow to edit/remove** connection
+- **Automatic routing**: Arrows should intelligently avoid overlapping with other cards when possible
+
+#### Matchup Selector Modal
+When "Select Destination Matchup" is clicked:
+- Show modal/dropdown with list of all matchups
+- Display matchup identifiers (Game #, team names if filled)
+- Allow user to select destination
+- Highlight already-connected matchups
+- Filter option to show only standard or only losers matchups
+
+### 4. Drag and Drop Functionality
+
+#### Dragging Matchup Cards
+- **Click and hold** anywhere on the matchup card to start dragging
+- **Semi-transparent preview** while dragging
+- **Real-time grid snapping** - card snaps to nearest grid intersection
+- **Collision detection** - prevent overlapping cards (show red outline if invalid position)
+- **Connected arrows update in real-time** as card is dragged
+- **Release to place** - card snaps to final grid position
+
+#### Grid Snapping Behavior
+- Grid intersections should be clearly defined (every 50-100px)
+- Cards should always center on grid intersections
+- Snapping distance: 20-30px (magnetic pull when near grid point)
+- Visual feedback: Subtle highlight on grid point when card will snap there
+
+### 5. Visual Connection System
+
+#### Arrow/Line Rendering
+Implement smart connection lines between matchups:
+
+**Arrow Path Logic:**
+```
+Source Matchup (Winner Exit Point)
+   ↓
+   Curved path (avoid obstacles)
+   ↓
+Destination Matchup (Entry Point)
+```
+
+**Arrow Styling:**
+- **Winner arrows**: 
+  - Solid line, 2-3px width
+  - Primary color (match standard bracket theme)
+  - Arrow head at destination
+  - Label: "W" or winner icon near source
+
+- **Loser arrows**:
+  - Dashed line, 2-3px width
+  - Secondary/losers color (match losers bracket theme)
+  - Arrow head at destination
+  - Label: "L" or loser icon near source
+
+**Arrow Interaction:**
+- **Hover**: Line thickness increases, color brightens
+- **Click arrow**: Show popup menu:
+  - "Edit Connection"
+  - "Remove Connection"
+  - "View Source Matchup"
+  - "View Destination Matchup"
+- **Smart routing**: Use pathfinding algorithm to route around other cards
+
+#### Entry/Exit Points
+- **Winner exit point**: Right side of matchup card, upper position
+- **Loser exit point**: Right side of matchup card, lower position
+- **Entry points**: Left side of matchup card
+- **Visual indicators**: Small circles or connection dots at these points
+
+### 6. Bracket Templates (Optional Quick Start)
+
+Provide quick-start templates:
+- **Blank Canvas** - Start from scratch
+- **8-Team Single Elimination** - Pre-placed, pre-connected cards
+- **16-Team Single Elimination** - Pre-placed, pre-connected cards
+- **8-Team Double Elimination** - Winners + Losers brackets pre-configured
+- **Custom from existing format** - Import structure from other bracket generators
+
+Templates should:
+- Pre-position all matchup cards in logical layout
+- Pre-connect all routing (winner/loser paths)
+- Allow immediate customization after loading
+
+### 7. Toolbar and Controls
+
+#### Top Toolbar
+- **"+ Matchup"** button (prominent, primary color)
+- **"+ Losers Matchup"** button (prominent, losers color)
+- **Clear Canvas** button (with confirmation dialog)
+- **Undo/Redo** buttons
+- **Save Bracket** button (save to local storage or export)
+- **Load Bracket** button (load previously saved bracket)
+- **Export** dropdown:
+  - Export as PDF
+  - Export as PNG image
+  - Export as JSON (bracket structure)
+- **Grid Toggle** - Show/hide background grid
+- **Snap Toggle** - Enable/disable snap-to-grid
+
+#### Side Panel (Optional)
+- **Matchup List** - Scrollable list of all matchups
+  - Click to highlight/focus on canvas
+  - Shows connection status (connected/unconnected)
+  - Shows completion status (winner selected/not selected)
+- **Validation Panel** - Shows errors/warnings:
+  - Unconnected matchups
+  - Multiple matchups feeding into same slot
+  - Circular routing (impossible bracket structure)
+
+### 8. Canvas Interactions
+
+#### Zoom and Pan
+- **Zoom controls**: + and - buttons, or mouse wheel
+- **Zoom levels**: 50%, 75%, 100%, 125%, 150%, 200%
+- **Pan**: Click and drag on empty canvas space
+- **Fit to screen**: Button to auto-zoom to show all matchups
+- **Mini-map** (optional): Small overview in corner showing entire bracket
+
+#### Selection and Multi-Select
+- **Click matchup** to select (highlight border)
+- **Multi-select**: Ctrl+Click to select multiple cards
+- **Drag multiple**: Move several cards together (maintaining relative positions)
+- **Align tools**: When multiple cards selected, show alignment options:
+  - Align left
+  - Align right
+  - Align top
+  - Align bottom
+  - Distribute horizontally
+  - Distribute vertically
+
+### 9. Data Persistence
+
+#### Save/Load System
+- **Auto-save** to browser localStorage every 30 seconds
+- **Manual save** with custom name
+- **Save data structure**:
+```json
+{
+  "bracketName": "My Custom Tournament",
+  "matchups": [
+    {
+      "id": "matchup-1",
+      "type": "standard", // or "losers"
+      "position": { "x": 100, "y": 200 },
+      "gameNumber": "Game 1",
+      "team1": "Team A",
+      "team2": "Team B",
+      "score1": 3,
+      "score2": 1,
+      "winner": "team1",
+      "winnerDestination": "matchup-3",
+      "loserDestination": "eliminated"
+    }
+  ],
+  "connections": [
+    {
+      "source": "matchup-1",
+      "destination": "matchup-3",
+      "type": "winner"
+    }
+  ]
+}
+```
+
+#### Export Options
+- **PDF Export**: Render entire bracket as print-ready PDF
+- **PNG Export**: High-resolution image of bracket
+- **JSON Export**: Bracket structure data (for backup/sharing)
+- **Share Link** (optional): Generate shareable URL
+
+### 10. Validation and Smart Features
+
+#### Bracket Validation
+Real-time validation with visual feedback:
+- **Orphaned matchups**: Matchups with no incoming connections (warning icon)
+- **Dead ends**: Matchups where winner/loser go nowhere (warning)
+- **Circular references**: Impossible routing loops (error)
+- **Multiple sources**: Two matchups feeding same destination slot (error)
+- **Incomplete matchups**: Missing team names or winner selection (info)
+
+#### Smart Suggestions
+- **Auto-numbering**: Suggest game numbers based on bracket flow
+- **Auto-layout**: "Organize Bracket" button to auto-arrange cards in logical flow
+- **Connection suggestions**: When adding new matchup, suggest logical connections
+
+### 11. UI/UX Requirements
+
+#### Maintain Existing Design Theme
+- **CRITICAL**: Use the same color palette, fonts, and styling as existing bracket formats
+- Match button styles, card shadows, and spacing
+- Maintain consistent padding and border radius values
+- Use existing icon set (if applicable)
+
+#### Responsive Design
+- Desktop-first, but should work on tablets
+- Touch-friendly drag and drop
+- Minimum canvas size for visibility
+
+#### Performance
+- Smooth dragging even with 50+ matchup cards
+- Efficient arrow re-rendering during drag operations
+- Debounced auto-save to prevent performance issues
+
+---
+
+## Technical Implementation Notes
+
+### Recommended Libraries
+- **Canvas/SVG Rendering**: 
+  - React + SVG for arrow rendering
+  - HTML5 Canvas for performance (if needed)
+  - Consider: Konva.js, Fabric.js, or Paper.js for advanced canvas manipulation
+
+- **Drag and Drop**:
+  - React DnD
+  - react-grid-layout (for grid snapping)
+  - Custom implementation with mouse events
+
+- **Arrow Drawing**:
+  - SVG paths with Bezier curves
+  - Leader-line.js or react-archer for connection lines
+
+### Data Structures
+
+```javascript
+// Matchup object
+const matchup = {
+  id: string,
+  type: 'standard' | 'losers',
+  position: { x: number, y: number },
+  gameNumber: string,
+  team1: string,
+  team2: string,
+  score1: number,
+  score2: number,
+  winner: 'team1' | 'team2' | null,
+  winnerDestination: string | 'final' | null,
+  loserDestination: string | 'eliminated' | null
+};
+
+// Connection object
+const connection = {
+  id: string,
+  source: string, // matchup id
+  destination: string, // matchup id
+  type: 'winner' | 'loser',
+  path: string // SVG path data
+};
+```
+
+### Grid System
+
+```javascript
+const GRID_SIZE = 100; // pixels
+
+function snapToGrid(x, y) {
+  return {
+    x: Math.round(x / GRID_SIZE) * GRID_SIZE,
+    y: Math.round(y / GRID_SIZE) * GRID_SIZE
+  };
+}
+```
+
+### Arrow Path Calculation
+
+```javascript
+function calculateArrowPath(sourceMatchup, destMatchup) {
+  const start = getExitPoint(sourceMatchup);
+  const end = getEntryPoint(destMatchup);
+  
+  // Calculate Bezier curve control points
+  const controlPoint1 = { 
+    x: start.x + (end.x - start.x) * 0.5, 
+    y: start.y 
+  };
+  const controlPoint2 = { 
+    x: start.x + (end.x - start.x) * 0.5, 
+    y: end.y 
+  };
+  
+  return `M ${start.x} ${start.y} C ${controlPoint1.x} ${controlPoint1.y}, ${controlPoint2.x} ${controlPoint2.y}, ${end.x} ${end.y}`;
+}
+```
+
+---
+
+## User Workflow Example
+
+1. User clicks **"+ Matchup"** button
+2. New matchup card appears in center of screen
+3. User drags card to desired position (snaps to grid)
+4. User fills in team names: "Team A" vs "Team B"
+5. User clicks **"+ Matchup"** again to create second card
+6. User positions second card to the right
+7. User clicks **"Winner →"** on first matchup
+8. Selects second matchup from dropdown
+9. Visual arrow appears connecting the two matchups
+10. User selects winner of first matchup (Team A)
+11. "Team A" automatically appears in Team 1 slot of second matchup
+12. User continues building bracket structure
+13. Clicks **"Save Bracket"** when complete
+
+---
+
+## Testing Checklist
+
+- [ ] Can add standard matchup cards
+- [ ] Can add losers matchup cards
+- [ ] Cards snap to grid correctly
+- [ ] Cards can be dragged smoothly
+- [ ] Winner routing works and draws arrows
+- [ ] Loser routing works and draws arrows
+- [ ] "Eliminated" option shows no arrow
+- [ ] Arrows update in real-time when cards are moved
+- [ ] Multiple cards can be selected and moved together
+- [ ] Bracket can be saved to localStorage
+- [ ] Bracket can be exported as PDF/PNG
+- [ ] Validation warnings appear for incomplete brackets
+- [ ] Undo/Redo functionality works
+- [ ] Grid toggle shows/hides background grid
+- [ ] Zoom controls work properly
+- [ ] Pan functionality works smoothly
+- [ ] Touch/mobile drag and drop works (if applicable)
+- [ ] Maintains existing color theme and design
+- [ ] Performance is smooth with 50+ matchup cards
+
+---
+
+## Priority Implementation Order
+
+### Phase 1: Core Functionality
+1. Canvas with grid background
+2. Add matchup button functionality
+3. Basic matchup card design
+4. Drag and drop with grid snapping
+5. Team name input fields
+
+### Phase 2: Connections
+6. Winner/Loser routing controls
+7. Arrow rendering system
+8. Connection drawing (straight lines first)
+9. Curved arrow paths
+10. Arrow interaction (hover, click)
+
+### Phase 3: Advanced Features
+11. Save/Load functionality
+12. Undo/Redo system
+13. Validation system
+14. Multi-select and alignment tools
+15. Export to PDF/PNG
+
+### Phase 4: Polish
+16. Smart arrow routing (avoid obstacles)
+17. Auto-layout feature
+18. Templates system
+19. Mini-map
+20. Performance optimization
+
+---
+
+## Visual Design Guidelines
+
+### Matchup Card Dimensions
+- Width: 250-300px
+- Height: 120-150px
+- Border radius: 8-12px
+- Shadow: 0 2px 8px rgba(0,0,0,0.1)
+
+### Color Scheme (Use Existing Theme)
+- Standard matchup: Primary bracket color
+- Losers matchup: Secondary/accent color
+- Winner arrow: Primary color (solid)
+- Loser arrow: Secondary color (dashed)
+- Grid lines: Light gray, 1px, 20% opacity
+- Selection highlight: Blue glow or thick border
+
+### Typography
+- Game number: Bold, 14px
+- Team names: Regular, 16px
+- Score: Bold, 14px
+- Labels: Regular, 12px
+
+---
+
+This custom bracket builder will give users complete flexibility to create any tournament structure while maintaining visual clarity through the arrow/routing system!
