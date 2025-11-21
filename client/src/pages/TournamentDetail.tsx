@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import BracketView from "@/components/BracketView";
 import MatchEditDialog from "@/components/MatchEditDialog";
-import type { Tournament, TournamentTeam, TournamentMatch } from "@shared/schema";
+import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
 import { useState } from "react";
 import { format } from "date-fns";
 
@@ -230,15 +230,71 @@ export default function TournamentDetail() {
           <TabsContent value="bracket" className="space-y-4">
             {matches && matches.length > 0 ? (
               <div className="space-y-6">
+                {/* Round Robin + Playoffs Seeding Button */}
+                {tournament.format === 'round_robin_split' && (() => {
+                  const roundRobinMatches = matches.filter(m => m.round === 'Round Robin');
+                  const playoffMatches = matches.filter(m => m.round !== 'Round Robin');
+                  const playoffsSeeded = playoffMatches.some(m => m.team1Id !== null && m.team2Id !== null);
+                  const allRRCompleted = roundRobinMatches.length > 0 && roundRobinMatches.every(m => m.status === 'completed');
+                  
+                  return !playoffsSeeded && allRRCompleted && (
+                    <Card className="border-primary/50">
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Trophy className="h-5 w-5 text-primary" />
+                          Seed Playoffs
+                        </CardTitle>
+                        <CardDescription>
+                          All Round Robin games are complete. Seed the playoff bracket based on standings (wins/losses, with goals scored as tiebreaker).
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button 
+                          onClick={async () => {
+                            try {
+                              await apiRequest('POST', `/api/tournaments/${tournamentId}/seed-playoffs`);
+                              // Invalidate cache to refresh matches
+                              queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'matches'] });
+                              queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+                              toast({
+                                title: "Success",
+                                description: "Playoffs seeded successfully based on Round Robin standings"
+                              });
+                            } catch (error) {
+                              console.error('Failed to seed playoffs:', error);
+                              toast({
+                                title: "Error",
+                                description: "Failed to seed playoffs. Make sure Round Robin matches are completed.",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          data-testid="button-seed-playoffs"
+                        >
+                          Seed Playoff Bracket Now
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+                
                 {(tournament.format === 'single_elimination' || 
                   tournament.format === 'double_elimination' || 
-                  tournament.format === 'three_game_guarantee') ? (
-                  // Bracket visualization for elimination formats
+                  tournament.format === 'three_game_guarantee' ||
+                  tournament.format === 'round_robin_split') ? (
+                  // Bracket visualization for elimination formats and Round Robin + Playoffs
                   (<Card>
                     <CardHeader className="pt-[2px] pb-[2px]">
-                      <CardTitle>Tournament Bracket</CardTitle>
+                      <CardTitle>
+                        {tournament.format === 'round_robin_split' ? 'Round Robin + Playoff Bracket' : 'Tournament Bracket'}
+                      </CardTitle>
                       <CardDescription>
                         {rounds.length} round{rounds.length !== 1 ? 's' : ''} • {matches.length} match{matches.length !== 1 ? 'es' : ''}
+                        {tournament.format === 'round_robin_split' && (
+                          <span className="block mt-1 text-xs">
+                            Playoff seeding based on Round Robin record (wins/losses) with goals scored as tiebreaker
+                          </span>
+                        )}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -246,12 +302,12 @@ export default function TournamentDetail() {
                         matches={matches} 
                         teams={teams || []} 
                         format={tournament.format}
-                        settings={tournament.settings || { bracketType: 'seeded', showSeedNumbers: true, showGameNumbers: false }}
+                        settings={tournament.settings as TournamentSettings | undefined}
                       />
                     </CardContent>
                   </Card>)
                 ) : (
-                  // Table view for round robin
+                  // Table view for pure round robin
                   (<Card>
                     <CardHeader>
                       <CardTitle>Round Robin Schedule</CardTitle>

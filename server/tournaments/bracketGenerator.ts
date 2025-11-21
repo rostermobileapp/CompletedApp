@@ -5,6 +5,80 @@ export interface BracketGeneratorResult {
   rounds: string[];
 }
 
+// Helper interface for Round Robin standings
+export interface TeamStanding {
+  teamId: string;
+  teamName: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifferential: number;
+}
+
+/**
+ * Calculate team standings from completed Round Robin matches
+ * Returns teams sorted by record (wins DESC), then by goals scored (goalsFor DESC)
+ */
+export function calculateStandings(
+  matches: TournamentMatch[],
+  teams: TournamentTeam[]
+): TeamStanding[] {
+  const standings = new Map<string, TeamStanding>();
+  
+  // Initialize standings for all teams
+  teams.forEach(team => {
+    standings.set(team.id, {
+      teamId: team.id,
+      teamName: team.teamName,
+      wins: 0,
+      losses: 0,
+      ties: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      goalDifferential: 0
+    });
+  });
+  
+  // Calculate standings from completed matches
+  matches.forEach(match => {
+    if (match.status === 'completed' && match.team1Id && match.team2Id && 
+        match.team1Score !== null && match.team2Score !== null) {
+      const team1 = standings.get(match.team1Id);
+      const team2 = standings.get(match.team2Id);
+      
+      if (team1 && team2) {
+        team1.goalsFor += match.team1Score;
+        team1.goalsAgainst += match.team2Score;
+        team2.goalsFor += match.team2Score;
+        team2.goalsAgainst += match.team1Score;
+        
+        if (match.winnerId === match.team1Id) {
+          team1.wins++;
+          team2.losses++;
+        } else if (match.winnerId === match.team2Id) {
+          team2.wins++;
+          team1.losses++;
+        } else {
+          // Tie
+          team1.ties++;
+          team2.ties++;
+        }
+        
+        team1.goalDifferential = team1.goalsFor - team1.goalsAgainst;
+        team2.goalDifferential = team2.goalsFor - team2.goalsAgainst;
+      }
+    }
+  });
+  
+  // Sort by wins (DESC), then by goals scored (DESC)
+  return Array.from(standings.values()).sort((a, b) => {
+    if (a.wins !== b.wins) return b.wins - a.wins;
+    return b.goalsFor - a.goalsFor; // Tiebreaker: goals scored
+  });
+}
+
 /**
  * Build canonical seed slots using recursive pairing
  * Returns array of seed positions in bracket order (1 vs 16, 8 vs 9, etc.)
@@ -772,117 +846,135 @@ export function generateRoundRobin(
 }
 
 /**
- * Generate Round Robin with divisions (split)
- * Divide teams into divisions, round robin within divisions, then playoffs
+ * Generate Round Robin + Playoffs format
+ * All teams play round robin, then top teams advance to single elimination playoffs
+ * Seeding based on record (wins/losses), with goals scored as tiebreaker
+ * If odd number of teams, lowest seed does not make playoffs
  */
 export function generateRoundRobinSplit(
   teams: TournamentTeam[],
-  tournamentId: string,
-  numDivisions: number = 2
+  tournamentId: string
 ): BracketGeneratorResult {
+  const numTeams = teams.length;
   const matches: Omit<TournamentMatch, 'id' | 'createdAt' | 'updatedAt'>[] = [];
   const rounds: string[] = [];
 
-  // Divide teams into divisions based on seed
-  const divisions: TournamentTeam[][] = Array.from({ length: numDivisions }, () => []);
-  const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
-
-  // Snake draft style division assignment for fairness
-  sortedTeams.forEach((team, index) => {
-    const divisionIndex = Math.floor(index / Math.ceil(teams.length / numDivisions)) % numDivisions;
-    divisions[divisionIndex].push(team);
-  });
-
   let matchNum = 1;
 
-  // Generate round robin for each division
-  divisions.forEach((divisionTeams, divIndex) => {
-    const divisionName = String.fromCharCode(65 + divIndex); // A, B, C, etc.
-    const roundName = `Division ${divisionName}`;
-    rounds.push(roundName);
+  // Phase 1: Round Robin for all teams
+  const roundRobinRound = 'Round Robin';
+  rounds.push(roundRobinRound);
 
-    // Round robin within division
-    for (let i = 0; i < divisionTeams.length; i++) {
-      for (let j = i + 1; j < divisionTeams.length; j++) {
-        matches.push({
-          tournamentId,
-          gameId: null,
-          round: roundName,
-          matchNumber: matchNum++,
-          bracketType: 'main',
-          team1Id: divisionTeams[i].id,
-          team2Id: divisionTeams[j].id,
-          winnerId: null,
-          team1Score: null,
-          team2Score: null,
-          advancesToMatchId: null,
-          scheduledTime: null,
-          location: null,
-          status: 'scheduled',
-          notes: null
-        });
-      }
+  // Generate all possible matchups in round robin
+  for (let i = 0; i < numTeams; i++) {
+    for (let j = i + 1; j < numTeams; j++) {
+      matches.push({
+        tournamentId,
+        gameId: null,
+        round: roundRobinRound,
+        matchNumber: matchNum++,
+        bracketType: 'main',
+        team1Id: teams[i].id,
+        team2Id: teams[j].id,
+        winnerId: null,
+        team1Score: null,
+        team2Score: null,
+        advancesToMatchId: null,
+        scheduledTime: null,
+        location: null,
+        status: 'scheduled',
+        notes: null
+      });
     }
-  });
+  }
 
-  // Add playoff rounds (top teams from each division)
-  rounds.push('Semifinals');
-  rounds.push('Finals');
+  // Phase 2: Single Elimination Playoffs
+  // Determine number of playoff teams (even number, exclude lowest seed if odd)
+  let numPlayoffTeams = numTeams;
+  if (numPlayoffTeams % 2 === 1) {
+    numPlayoffTeams = numTeams - 1; // Exclude lowest seed
+  }
 
-  // Placeholder playoff matches (will be populated after division play)
-  matches.push({
-    tournamentId,
-    gameId: null,
-    round: 'Semifinals',
-    matchNumber: matchNum++,
-    bracketType: 'main',
-    team1Id: null, // Division A winner
-    team2Id: null, // Division B runner-up
-    winnerId: null,
-    team1Score: null,
-    team2Score: null,
-    advancesToMatchId: `finals_match`,
-    scheduledTime: null,
-    location: null,
-    status: 'scheduled',
-    notes: 'Division A Winner vs Division B Runner-up'
-  });
+  // Generate playoff bracket rounds
+  const numPlayoffRounds = Math.ceil(Math.log2(numPlayoffTeams));
+  const playoffRoundNames: string[] = [];
+  
+  for (let i = numPlayoffRounds; i >= 1; i--) {
+    if (i === 1) {
+      playoffRoundNames.push('Finals');
+    } else if (i === 2) {
+      playoffRoundNames.push('Semifinals');
+    } else if (i === 3) {
+      playoffRoundNames.push('Quarterfinals');
+    } else {
+      playoffRoundNames.push(`Playoff Round ${numPlayoffRounds - i + 1}`);
+    }
+  }
+  
+  rounds.push(...playoffRoundNames);
 
-  matches.push({
-    tournamentId,
-    gameId: null,
-    round: 'Semifinals',
-    matchNumber: matchNum++,
-    bracketType: 'main',
-    team1Id: null, // Division B winner
-    team2Id: null, // Division A runner-up
-    winnerId: null,
-    team1Score: null,
-    team2Score: null,
-    advancesToMatchId: `finals_match`,
-    scheduledTime: null,
-    location: null,
-    status: 'scheduled',
-    notes: 'Division B Winner vs Division A Runner-up'
-  });
+  // Generate playoff matches as TBD (to be determined after round robin)
+  // Teams will be seeded 1 to numPlayoffTeams based on their round robin record
+  const playoffMatches: Omit<TournamentMatch, 'id' | 'createdAt' | 'updatedAt'>[] = [];
+  
+  // Round 1 of playoffs
+  const round1Matches = Math.floor(numPlayoffTeams / 2);
+  const hasRound1Bye = numPlayoffTeams % 2 === 1;
+  
+  for (let i = 0; i < round1Matches; i++) {
+    const highSeed = i + 1;
+    const lowSeed = numPlayoffTeams - i;
+    
+    playoffMatches.push({
+      tournamentId,
+      gameId: null,
+      round: playoffRoundNames[0],
+      matchNumber: matchNum++,
+      bracketType: 'main',
+      team1Id: null,
+      team2Id: null,
+      winnerId: null,
+      team1Score: null,
+      team2Score: null,
+      advancesToMatchId: null, // Will be set later
+      scheduledTime: null,
+      location: null,
+      status: 'scheduled',
+      notes: `Seed #${highSeed} vs Seed #${lowSeed} (based on Round Robin record)`
+    });
+  }
 
-  matches.push({
-    tournamentId,
-    gameId: null,
-    round: 'Finals',
-    matchNumber: matchNum++,
-    bracketType: 'main',
-    team1Id: null, // Semifinal 1 winner
-    team2Id: null, // Semifinal 2 winner
-    winnerId: null,
-    team1Score: null,
-    team2Score: null,
-    advancesToMatchId: null,
-    scheduledTime: null,
-    location: null,
-    status: 'scheduled',
-    notes: null
-  });
+  // Generate subsequent playoff rounds
+  let currentRoundSize = round1Matches;
+  for (let round = 1; round < numPlayoffRounds; round++) {
+    const nextRoundSize = Math.ceil(currentRoundSize / 2);
+    
+    for (let i = 0; i < nextRoundSize; i++) {
+      playoffMatches.push({
+        tournamentId,
+        gameId: null,
+        round: playoffRoundNames[round],
+        matchNumber: matchNum++,
+        bracketType: 'main',
+        team1Id: null,
+        team2Id: null,
+        winnerId: null,
+        team1Score: null,
+        team2Score: null,
+        advancesToMatchId: null,
+        scheduledTime: null,
+        location: null,
+        status: 'scheduled',
+        notes: playoffRoundNames[round] === 'Finals' 
+          ? 'Championship Game - Winner of previous round' 
+          : 'Winner of previous round'
+      });
+    }
+    
+    currentRoundSize = nextRoundSize;
+  }
+
+  matches.push(...playoffMatches);
 
   return { matches, rounds };
 }

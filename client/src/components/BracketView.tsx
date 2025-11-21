@@ -40,9 +40,22 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
       return teamName;
     }
     
-    // For TBD teams, check notes for source match info (e.g., "Loser of match_2 vs Loser of match_3")
+    // For TBD teams, check notes for source match info
     if (match.notes) {
-      // First try to extract explicit match references from notes
+      // Check for Round Robin + Playoffs seeding pattern (e.g., "Seed #1 vs Seed #2 (based on Round Robin record)")
+      const seedPattern = /Seed #(\d+) vs Seed #(\d+)/;
+      const seedMatch = match.notes.match(seedPattern);
+      if (seedMatch) {
+        const seed1 = seedMatch[1];
+        const seed2 = seedMatch[2];
+        if (position === 'team1') {
+          return `Seed #${seed1}`;
+        } else {
+          return `Seed #${seed2}`;
+        }
+      }
+      
+      // Try to extract explicit match references from notes
       const matchNumbers = match.notes.match(/match_(\d+)/g);
       if (matchNumbers && matchNumbers.length >= 1) {
         if (position === 'team1' && matchNumbers.length >= 1) {
@@ -160,7 +173,9 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
     // Create stable round ordering based on typical bracket progression
     const sortRoundNames = (rounds: string[]) => {
       const roundOrder = [
+        'Round Robin',
         'Play-In Round',
+        'Playoff Round 1', 'Playoff Round 2', 'Playoff Round 3', 'Playoff Round 4',
         'Round 1', 'Round 2', 'Round 3', 'Round 4', 'Round 5',
         'Quarterfinals', 'Semifinals', 'Finals',
         'Winners Round 1', 'Winners Round 2', 'Winners Round 3', 'Winners Round 4',
@@ -314,7 +329,9 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
   const calculateAllPositions = () => {
     const sortRoundNames = (rounds: string[]) => {
       const roundOrder = [
+        'Round Robin',
         'Play-In Round',
+        'Playoff Round 1', 'Playoff Round 2', 'Playoff Round 3', 'Playoff Round 4',
         'Round 1', 'Round 2', 'Round 3', 'Round 4', 'Round 5',
         'Quarterfinals', 'Semifinals', 'Finals',
         'Winners Round 1', 'Winners Round 2', 'Winners Round 3', 'Winners Round 4',

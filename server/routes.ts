@@ -10584,6 +10584,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Seed playoffs for Round Robin + Playoffs tournament
+  app.post('/api/tournaments/:id/seed-playoffs', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
+      // Get tournament
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, id));
+
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      if (tournament.format !== 'round_robin_split') {
+        return res.status(400).json({ message: "This endpoint is only for Round Robin + Playoffs tournaments" });
+      }
+
+      // Get all teams and matches
+      const allTeams = await db
+        .select()
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.tournamentId, id));
+
+      const allMatches = await db
+        .select()
+        .from(tournamentMatches)
+        .where(eq(tournamentMatches.tournamentId, id));
+
+      // Get Round Robin matches
+      const roundRobinMatches = allMatches.filter(m => m.round === 'Round Robin');
+
+      // Validate that all Round Robin matches are completed
+      if (roundRobinMatches.length === 0) {
+        return res.status(400).json({ message: "No Round Robin matches found" });
+      }
+
+      const allRRCompleted = roundRobinMatches.every(m => m.status === 'completed');
+      if (!allRRCompleted) {
+        return res.status(400).json({ 
+          message: "All Round Robin matches must be completed before seeding playoffs",
+          completedMatches: roundRobinMatches.filter(m => m.status === 'completed').length,
+          totalMatches: roundRobinMatches.length
+        });
+      }
+
+      // Get playoff matches (sorted by match number for proper seeding)
+      const playoffMatches = allMatches
+        .filter(m => m.round !== 'Round Robin')
+        .sort((a, b) => a.matchNumber - b.matchNumber);
+
+      if (playoffMatches.length === 0) {
+        return res.status(400).json({ message: "No playoff matches found" });
+      }
+
+      // Check if playoffs are already seeded or in progress (prevent reseeding)
+      const playoffsInProgress = playoffMatches.some(m => 
+        m.team1Id !== null || m.team2Id !== null || m.status !== 'scheduled'
+      );
+      if (playoffsInProgress) {
+        return res.status(409).json({ 
+          message: "Playoffs are already seeded or in progress. Cannot reseed once teams have been assigned or matches have started.",
+          hint: "Delete and recreate the tournament if you need to change the seeding."
+        });
+      }
+
+      // Calculate standings from completed Round Robin matches
+      const { calculateStandings } = await import("./tournaments/bracketGenerator");
+      const standings = calculateStandings(roundRobinMatches, allTeams);
+
+      // Determine playoff teams (exclude lowest seed if odd number)
+      let numPlayoffTeams = allTeams.length;
+      if (numPlayoffTeams % 2 === 1) {
+        numPlayoffTeams = allTeams.length - 1; // Exclude lowest seed
+      }
+
+      const playoffTeams = standings.slice(0, numPlayoffTeams);
+
+      // Seed the first round of playoffs using standard tournament seeding
+      // 1 vs numPlayoffTeams, 2 vs (numPlayoffTeams-1), etc.
+      const firstRoundMatches = playoffMatches.filter(m => 
+        m.round === playoffMatches[0].round // First playoff round
+      );
+
+      // Validate playoff bracket structure matches seeding expectations
+      const expectedFirstRoundMatches = Math.floor(numPlayoffTeams / 2);
+      if (firstRoundMatches.length !== expectedFirstRoundMatches) {
+        return res.status(400).json({ 
+          message: "Playoff bracket structure mismatch",
+          expected: expectedFirstRoundMatches,
+          actual: firstRoundMatches.length,
+          hint: "The bracket may be corrupted. Please recreate the tournament."
+        });
+      }
+
+      const updates = [];
+      for (let i = 0; i < firstRoundMatches.length; i++) {
+        const highSeed = i;
+        const lowSeed = numPlayoffTeams - 1 - i;
+
+        const match = firstRoundMatches[i];
+        const team1Standing = playoffTeams[highSeed];
+        const team2Standing = playoffTeams[lowSeed];
+
+        if (team1Standing && team2Standing) {
+          // Find the actual tournament team records by their ID (standings use tournament team ID)
+          const team1 = allTeams.find(t => t.id === team1Standing.teamId);
+          const team2 = allTeams.find(t => t.id === team2Standing.teamId);
+
+          if (team1 && team2) {
+            updates.push(
+              db.update(tournamentMatches)
+                .set({
+                  team1Id: team1.id, // Tournament team ID from standings
+                  team2Id: team2.id, // Tournament team ID from standings
+                  notes: `Seed #${highSeed + 1} (${team1Standing.teamName}) vs Seed #${lowSeed + 1} (${team2Standing.teamName}) - Based on Round Robin standings`,
+                  updatedAt: new Date()
+                })
+                .where(eq(tournamentMatches.id, match.id))
+            );
+          }
+        }
+      }
+
+      // Execute all updates
+      await Promise.all(updates);
+
+      // Return updated matches
+      const updatedMatches = await db
+        .select()
+        .from(tournamentMatches)
+        .where(eq(tournamentMatches.tournamentId, id));
+
+      res.json({ 
+        success: true, 
+        message: "Playoffs seeded successfully",
+        standings,
+        playoffTeams: playoffTeams.map((t, i) => ({ ...t, seed: i + 1 })),
+        matches: updatedMatches
+      });
+    } catch (error) {
+      console.error("Error seeding playoffs:", error);
+      res.status(500).json({ message: "Failed to seed playoffs" });
+    }
+  });
+
   // Delete tournament (draft only)
   app.delete('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
