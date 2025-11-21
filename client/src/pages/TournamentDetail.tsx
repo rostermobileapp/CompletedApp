@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3 } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -438,7 +438,32 @@ export default function TournamentDetail() {
                   );
                 })()}
                 
-                {(tournament.format === 'single_elimination' || 
+                {tournament.format === 'custom_bracket' ? (
+                  // Custom bracket builder
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Custom Bracket</CardTitle>
+                      <CardDescription>
+                        Design your own tournament bracket structure
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center py-8">
+                      <Trophy className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">Build Your Bracket</h3>
+                      <p className="text-muted-foreground mb-6">
+                        Use the custom bracket builder to create your tournament structure
+                      </p>
+                      <Button
+                        onClick={() => setLocation(`/tournaments/${tournamentId}/custom-builder`)}
+                        data-testid="button-open-bracket-builder"
+                        className="gap-2"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                        Open Bracket Builder
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (tournament.format === 'single_elimination' || 
                   tournament.format === 'double_elimination' || 
                   tournament.format === 'three_game_guarantee' ||
                   tournament.format === 'round_robin_split') ? (
