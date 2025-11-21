@@ -314,6 +314,7 @@ export default function TournamentDetail() {
                             teams={teams || []} 
                             format={tournament.format}
                             settings={tournament.settings as TournamentSettings | undefined}
+                            tournamentName={tournament.name}
                           />
                         </CardContent>
                       </Card>

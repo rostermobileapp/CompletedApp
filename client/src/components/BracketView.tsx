@@ -2,23 +2,28 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Download } from "lucide-react";
 import type { TournamentMatch, TournamentTeam, TournamentSettings } from "@shared/schema";
 import { format as formatDate } from "date-fns";
+import { jsPDF } from "jspdf";
+import "svg2pdf.js";
 
 interface BracketViewProps {
   matches: TournamentMatch[];
   teams: TournamentTeam[];
   format: string;
   settings?: TournamentSettings;
+  tournamentName?: string;
 }
 
-export default function BracketView({ matches, teams, format, settings }: BracketViewProps) {
+export default function BracketView({ matches, teams, format, settings, tournamentName }: BracketViewProps) {
   const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isExporting, setIsExporting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "TBD";
@@ -750,10 +755,90 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
     setPan({ x: 0, y: 0 });
   };
 
+  const exportToPDF = async () => {
+    if (!svgRef.current) return;
+    
+    setIsExporting(true);
+    
+    try {
+      // Create PDF in landscape mode, 8.5x11 inches
+      // jsPDF uses points (72 points = 1 inch)
+      const pageWidth = 11 * 72; // 11 inches in points
+      const pageHeight = 8.5 * 72; // 8.5 inches in points
+      const margin = 0.5 * 72; // 0.5 inch margins in points
+      
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'pt',
+        format: [pageWidth, pageHeight]
+      });
+
+      // Calculate available space after margins
+      const availableWidth = pageWidth - (2 * margin);
+      const availableHeight = pageHeight - (2 * margin) - 50; // Extra space for title
+      
+      // Clone the SVG to avoid modifying the original
+      const svgClone = svgRef.current.cloneNode(true) as SVGElement;
+      
+      // Get SVG dimensions
+      const svgWidth = parseFloat(svgClone.getAttribute('width') || '0');
+      const svgHeight = parseFloat(svgClone.getAttribute('height') || '0');
+      
+      // Calculate scale to fit within available space
+      const scaleX = availableWidth / svgWidth;
+      const scaleY = availableHeight / svgHeight;
+      const scale = Math.min(scaleX, scaleY);
+      
+      const scaledWidth = svgWidth * scale;
+      const scaledHeight = svgHeight * scale;
+      
+      // Center the bracket on the page
+      const xOffset = margin + (availableWidth - scaledWidth) / 2;
+      const yOffset = margin + 50; // Leave space for title
+      
+      // Add title
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      const title = tournamentName || 'Tournament Bracket';
+      const titleWidth = doc.getTextWidth(title);
+      doc.text(title, (pageWidth - titleWidth) / 2, margin + 20);
+      
+      // Convert SVG to PDF
+      await doc.svg(svgClone, {
+        x: xOffset,
+        y: yOffset,
+        width: scaledWidth,
+        height: scaledHeight
+      });
+      
+      // Save the PDF
+      const filename = tournamentName 
+        ? `${tournamentName.replace(/[^a-z0-9]/gi, '_')}_bracket.pdf`
+        : 'tournament_bracket.pdf';
+      doc.save(filename);
+      
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      alert('Failed to export PDF. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="relative">
       {/* Controls */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={exportToPDF}
+          disabled={isExporting}
+          data-testid="button-download-pdf"
+        >
+          <Download className="h-4 w-4 mr-1" />
+          {isExporting ? 'Exporting...' : 'Download PDF'}
+        </Button>
         <Button
           size="sm"
           variant="outline"
@@ -796,6 +881,7 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
         onMouseLeave={handleMouseUp}
       >
         <svg
+          ref={svgRef}
           width={svgWidth * zoom}
           height={svgHeight * zoom}
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
