@@ -736,7 +736,7 @@ export function generateRoundRobin(
         gameId: null,
         round: roundName,
         matchNumber: matchNum++,
-        bracketType: null,
+        bracketType: 'main',
         team1Id: teams[i].id,
         team2Id: teams[j].id,
         winnerId: null,
@@ -792,7 +792,7 @@ export function generateRoundRobinSplit(
           gameId: null,
           round: roundName,
           matchNumber: matchNum++,
-          bracketType: null,
+          bracketType: 'main',
           team1Id: divisionTeams[i].id,
           team2Id: divisionTeams[j].id,
           winnerId: null,
@@ -818,7 +818,7 @@ export function generateRoundRobinSplit(
     gameId: null,
     round: 'Semifinals',
     matchNumber: matchNum++,
-    bracketType: null,
+    bracketType: 'main',
     team1Id: null, // Division A winner
     team2Id: null, // Division B runner-up
     winnerId: null,
@@ -836,7 +836,7 @@ export function generateRoundRobinSplit(
     gameId: null,
     round: 'Semifinals',
     matchNumber: matchNum++,
-    bracketType: null,
+    bracketType: 'main',
     team1Id: null, // Division B winner
     team2Id: null, // Division A runner-up
     winnerId: null,
@@ -854,7 +854,7 @@ export function generateRoundRobinSplit(
     gameId: null,
     round: 'Finals',
     matchNumber: matchNum++,
-    bracketType: null,
+    bracketType: 'main',
     team1Id: null, // Semifinal 1 winner
     team2Id: null, // Semifinal 2 winner
     winnerId: null,
