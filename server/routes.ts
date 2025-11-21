@@ -10456,6 +10456,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })))
         .returning();
 
+      // For custom brackets, just return teams without generating matches
+      if (format === 'custom_bracket') {
+        return res.json({ 
+          teams: insertedTeams, 
+          matches: [],
+          rounds: []
+        });
+      }
+
       // Generate bracket based on format
       let bracketResult;
       

@@ -127,59 +127,39 @@ export default function TournamentCreate() {
 
       const tournament = await response.json();
 
-      // Step 2: Add teams and generate bracket (skip for custom bracket)
-      if (data.format === 'custom_bracket') {
-        // For custom brackets, just add teams without generating matches
-        const teamData = data.teamIds.map((teamId, index) => {
-          const team = teams.find(t => t.id === teamId);
-          if (!team) throw new Error(`Team ${teamId} not found`);
-          
-          return {
-            teamId: team.id,
-            teamName: team.name,
-            seed: index + 1,
-            wins: 0,
-            losses: 0
-          };
-        });
+      // Step 2: Add teams and generate bracket
+      const teamData = data.teamIds.map((teamId, index) => {
+        const team = teams.find(t => t.id === teamId);
+        if (!team) throw new Error(`Team ${teamId} not found`);
+        
+        return {
+          teamId: team.id,
+          teamName: team.name,
+          seed: index + 1,
+          wins: 0,
+          losses: 0
+        };
+      });
 
-        // Add teams to tournament
-        await apiRequest('POST', `/api/tournaments/${tournament.id}/teams`, teamData);
-      } else {
-        // For other formats, generate bracket automatically
-        const teamData = data.teamIds.map((teamId, index) => {
-          const team = teams.find(t => t.id === teamId);
-          if (!team) throw new Error(`Team ${teamId} not found`);
-          
-          return {
-            teamId: team.id,
-            teamName: team.name,
-            seed: index + 1,
-            wins: 0,
-            losses: 0
-          };
+      try {
+        await apiRequest('POST', `/api/tournaments/${tournament.id}/generate-bracket`, {
+          teams: teamData,
+          format: data.format
         });
-
+      } catch (bracketError: any) {
+        // Parse error response
+        let errorMsg = 'Unknown error';
         try {
-          await apiRequest('POST', `/api/tournaments/${tournament.id}/generate-bracket`, {
-            teams: teamData,
-            format: data.format
-          });
-        } catch (bracketError: any) {
-          // Parse error response
-          let errorMsg = 'Unknown error';
-          try {
-            if (bracketError instanceof Response) {
-              const errorData = await bracketError.json();
-              errorMsg = errorData.message || errorMsg;
-            } else if (bracketError.message) {
-              errorMsg = bracketError.message;
-            }
-          } catch {
-            // Error parsing failed, use default
+          if (bracketError instanceof Response) {
+            const errorData = await bracketError.json();
+            errorMsg = errorData.message || errorMsg;
+          } else if (bracketError.message) {
+            errorMsg = bracketError.message;
           }
-          throw new Error(`Bracket generation failed: ${errorMsg}`);
+        } catch {
+          // Error parsing failed, use default
         }
+        throw new Error(`Bracket generation failed: ${errorMsg}`);
       }
 
       return tournament;
