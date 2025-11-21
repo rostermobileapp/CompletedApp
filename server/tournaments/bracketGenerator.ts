@@ -949,25 +949,130 @@ export function generateConsolation(
 }
 
 /**
- * Helper: Simulate double-elimination bracket flow to count teams reaching 0-2
- * Returns z = number of teams that lose twice without winning (go 0-2)
+ * Helper: Track team records through bracket simulation
+ */
+interface TeamRecord {
+  teamId: string;
+  seed: number;
+  wins: number;
+  losses: number;
+}
+
+/**
+ * Simulate complete double-elimination bracket flow with full losers bracket
+ * Returns z = number of teams that reach 0-2 (two losses before any wins)
+ * Adapted from generateDoubleElimination state machine
  */
 function simulateBracketForZeroTwoCount(numTeams: number): number {
-  // In a double-elim bracket:
-  // - WR1 produces (floor(n/2)) losers who drop to losers bracket (0-1 record)
-  // - Those 0-1 teams play in LR1, producing (floor(floor(n/2)/2)) losers who are now 0-2
-  // - Additional 0-2 teams come from later losers rounds
+  // Track team records (wins/losses) using seed-based deterministic outcomes
+  const teamRecords = new Map<number, TeamRecord>();
+  for (let seed = 1; seed <= numTeams; seed++) {
+    teamRecords.set(seed, {
+      teamId: `team${seed}`,
+      seed,
+      wins: 0,
+      losses: 0
+    });
+  }
   
-  const wr1Matches = Math.floor(numTeams / 2);
-  const wr1Losers = wr1Matches; // Each match produces 1 loser
+  let zeroTwoCount = 0;
+  const flaggedAsZeroTwo = new Set<number>();
   
-  // LR1: Pair up WR1 losers
-  const lr1Matches = Math.floor(wr1Losers / 2);
-  const lr1Losers = lr1Matches; // These are 0-2
+  const checkZeroTwo = (seed: number) => {
+    const rec = teamRecords.get(seed)!;
+    if (rec.losses === 2 && rec.wins === 0 && !flaggedAsZeroTwo.has(seed)) {
+      zeroTwoCount++;
+      flaggedAsZeroTwo.add(seed);
+    }
+  };
   
-  // For simplicity, approximate total 0-2 teams as all teams minus top performers
-  // This gives us the right ballpark: for 9 teams, z≈8
-  return numTeams - 1;
+  // Simulate Winners Bracket
+  const winnersRounds = Math.ceil(Math.log2(numTeams));
+  let currentWinners: number[] = Array.from({length: numTeams}, (_, i) => i + 1);
+  const winnersMatchCounts: number[] = [];
+  const winnersLosersPerRound: number[][] = []; // Track losers from each winners round
+  
+  for (let round = 0; round < winnersRounds; round++) {
+    currentWinners.sort((a, b) => a - b);
+    
+    let byeSeed: number | null = null;
+    if (currentWinners.length % 2 === 1 && round < winnersRounds - 1) {
+      byeSeed = currentWinners[0];
+      currentWinners = currentWinners.slice(1);
+    }
+    
+    const nextWinners: number[] = [];
+    if (byeSeed !== null) nextWinners.push(byeSeed);
+    
+    const matchCount = Math.floor(currentWinners.length / 2);
+    winnersMatchCounts.push(matchCount);
+    const roundLosers: number[] = [];
+    
+    for (let i = 0; i < matchCount; i++) {
+      const highSeed = currentWinners[i];
+      const lowSeed = currentWinners[currentWinners.length - 1 - i];
+      
+      const winner = highSeed;
+      const loser = lowSeed;
+      
+      teamRecords.get(winner)!.wins++;
+      teamRecords.get(loser)!.losses++;
+      
+      nextWinners.push(winner);
+      roundLosers.push(loser);
+      
+      checkZeroTwo(loser);
+    }
+    
+    winnersLosersPerRound.push(roundLosers);
+    currentWinners = nextWinners;
+  }
+  
+  // Simulate Losers Bracket (alternating elimination/merger rounds)
+  const losersRounds = (winnersRounds * 2) - 1;
+  let losersPool: number[] = [];
+  
+  for (let losersRoundIdx = 0; losersRoundIdx < losersRounds; losersRoundIdx++) {
+    const roundNumber = losersRoundIdx + 1;
+    const isEliminationRound = roundNumber % 2 === 1;
+    
+    if (isEliminationRound) {
+      // Elimination round: receives losers from winners bracket
+      const winnersSourceRoundIdx = Math.floor(losersRoundIdx / 2);
+      const droppingTeams = winnersLosersPerRound[winnersSourceRoundIdx] || [];
+      losersPool.push(...droppingTeams);
+    }
+    
+    // Pair up teams in losers pool
+    losersPool.sort((a, b) => a - b);
+    const matchCount = Math.floor(losersPool.length / 2);
+    const nextLosersPool: number[] = [];
+    
+    // Handle bye if odd
+    if (losersPool.length % 2 === 1) {
+      nextLosersPool.push(losersPool[0]);
+      losersPool = losersPool.slice(1);
+    }
+    
+    for (let i = 0; i < matchCount; i++) {
+      const highSeed = losersPool[i];
+      const lowSeed = losersPool[losersPool.length - 1 - i];
+      
+      const winner = highSeed;
+      const loser = lowSeed;
+      
+      teamRecords.get(winner)!.wins++;
+      teamRecords.get(loser)!.losses++;
+      
+      nextLosersPool.push(winner);
+      
+      checkZeroTwo(loser);
+    }
+    
+    losersPool = nextLosersPool;
+  }
+  
+  return zeroTwoCount;
 }
 
 /**
