@@ -1,0 +1,197 @@
+# Replit Agent Prompt: Comprehensive Tournament Bracket Generator Enhancement
+
+## Objective
+Enhance our existing tournament bracket creation tool to match the comprehensive functionality of PrintYourBrackets.com while maintaining our current visual theme, design language, and formatting style.
+
+## Core Requirements - Preserve Existing Design
+- **CRITICAL**: Keep all existing UI components, color schemes, typography, layout patterns, and visual styling
+- Maintain current user experience flow and interface structure
+- Preserve any branding elements, logos, or custom design elements
+- Extend functionality without redesigning the visual interface
+
+## New Features to Implement
+
+### 1. Expanded Team Capacity
+- Support tournaments from **3 to 128 teams**
+- Dynamically adjust bracket size based on user input
+- Automatically calculate and place byes for non-power-of-2 team counts
+
+### 2. Bracket Type Selection
+Add dropdown/toggle options for:
+- **Blind Draw** (no seed numbers shown)
+- **Seeded** (with seed numbers 1, 2, 3, etc.)
+
+When Seeded is selected:
+- Display seed numbers on bracket positions
+- Use standard seeding algorithm:
+  - For 16 teams: 1v16, 8v9, 5v12, 4v13, 3v14, 6v11, 7v10, 2v15
+  - Scale appropriately for other bracket sizes
+  - Ensure top seeds are distributed to prevent early matchups
+
+### 3. Bracket Direction/Layout Options
+Provide user selection for:
+- **Left-to-Right (Horizontal)**: Traditional flow from left side to championship on right
+- **Bidirectional (Center-Meeting)**: Starts from top and bottom, converges at center for finals
+- **Portrait vs Landscape**: Orientation options for printing
+
+### 4. Tournament Format Support
+Add format selection dropdown with these options:
+
+#### **Single Elimination**
+- Current standard format
+- One loss = elimination
+- Total games = (number of teams - 1)
+
+#### **Double Elimination**
+- Winner's Bracket and Loser's Bracket
+- Teams drop to Loser's Bracket after first loss
+- Must lose twice to be eliminated
+- Championship: Loser's Bracket winner must beat Winner's Bracket winner twice
+
+#### **Triple Elimination**
+- Winner's Bracket, Loser's Bracket 1, Loser's Bracket 2
+- Must lose three times to be eliminated
+- Teams cascade down through brackets
+
+#### **3 Game Guarantee**
+- Similar to double elimination
+- Special rule: Teams losing first two games get extra game in loser's bracket
+- Ensures minimum 3 games per team
+
+#### **Consolation Tournament**
+- First-round winners stay in Championship Bracket
+- First-round losers move to Consolation Bracket
+- Two separate championship tracks
+
+#### **Round Robin**
+- Every team plays every other team
+- Generate schedule/matrix format
+- Track wins/losses for standings
+
+#### **Compass Draw**
+- Create sub-brackets labeled: North, South, East, West, Northeast, Northwest, Southeast, Southwest
+- Losers move to different compass brackets
+- Winners advance within their current bracket
+- Automatically pairs similar skill levels as tournament progresses
+
+### 5. Game Numbering System
+- Add sequential game numbers (1, 2, 3...) showing order of play
+- Make this optional with toggle "Show Game Numbers"
+- Position numbers clearly near each matchup line
+
+### 6. Enhanced Customization Options
+Add input fields for:
+- **Tournament Title** (already may exist)
+- **Subtitle/Date**
+- **Location**
+- **Team Names** (if seeded, allow assignment to specific seeds)
+- **Game Times/Dates** (optional per matchup)
+- **Court/Field Locations** (optional per matchup)
+
+### 7. Export and Print Options
+- **PDF Export**: High-quality, print-ready output
+- **Fillable Version**: Editable fields for team names and scores
+- **Print Layouts**: Optimize for standard paper sizes (Letter, A4) and poster sizes
+- **Save/Load**: Allow users to save bracket configurations and reload them later
+
+### 8. Bye Calculation Algorithm
+For non-power-of-2 team counts:
+- Calculate number of byes needed
+- Place byes strategically (typically for top seeds)
+- For example, 24 teams = 8 byes in Round 1
+- Ensure bracket balances properly
+
+### 9. User Interface Flow
+Suggested step-by-step wizard:
+1. **Select Format**: Single Elim, Double Elim, Triple Elim, etc.
+2. **Number of Teams**: Input or dropdown (3-128)
+3. **Bracket Type**: Seeded or Blind Draw
+4. **Layout Direction**: Left-to-Right or Bidirectional
+5. **Orientation**: Portrait or Landscape
+6. **Customization**: Title, teams, dates, locations
+7. **Generate & Preview**: Show bracket before finalizing
+8. **Export Options**: Print, PDF, Save
+
+### 10. Advanced Features (Optional Enhancements)
+- **Live Bracket Updates**: If using fillable version, update bracket in real-time as results are entered
+- **Automatic Advancement**: When winner is selected, auto-populate next round
+- **Score Tracking**: Input scores for each game
+- **Statistics Dashboard**: Show tournament progress, games remaining
+- **Responsive Design**: Ensure mobile-friendly interface
+- **Share Link**: Generate shareable URL for bracket viewing
+
+## Technical Implementation Notes
+
+### Bracket Layout Calculations
+```
+For single elimination:
+- Rounds = log2(next_power_of_2(teams))
+- Games per round decreases by half each round
+- Position byes in first round for top seeds
+
+For double elimination:
+- Winner's bracket = standard single elimination
+- Loser's bracket = more complex (receives losers from winner's bracket)
+- Loser's bracket has additional rounds
+
+Seeding algorithm (standard):
+- Round 1: seed[i] vs seed[bracket_size - i + 1]
+- Ensures 1 vs lowest seed, 2 vs 2nd lowest, etc.
+```
+
+### Data Structure Suggestions
+```javascript
+bracket = {
+  format: 'single-elimination',
+  teams: 16,
+  type: 'seeded',
+  direction: 'left-to-right',
+  orientation: 'landscape',
+  title: 'Tournament Name',
+  rounds: [
+    {
+      roundNumber: 1,
+      games: [
+        { gameNumber: 1, team1: 'Team A', team2: 'Team B', seed1: 1, seed2: 16 }
+      ]
+    }
+  ]
+}
+```
+
+## Testing Requirements
+- Test all team counts from 3 to 128
+- Verify seeding algorithms work correctly for all bracket sizes
+- Ensure both layout directions render properly
+- Test all tournament formats independently
+- Verify byes are placed correctly
+- Check print layouts across different paper sizes
+- Test fillable fields work in exported PDFs
+
+## Deliverables
+1. Enhanced bracket generator with all features above
+2. Maintain existing visual design and theme
+3. Intuitive user interface with clear options
+4. Responsive and performant rendering
+5. Clean, documented code
+6. Print-optimized output
+
+## Notes
+- Prioritize clean, readable bracket layouts
+- Ensure text scales appropriately for different team counts
+- Use existing color palette and fonts
+- Keep performance smooth even for 128-team brackets
+- Make all new features optional/toggleable where appropriate
+
+---
+
+**Implementation Priority Order:**
+1. Expand team capacity (3-128)
+2. Add seeded vs blind draw toggle
+3. Implement standard seeding algorithm
+4. Add game numbering
+5. Create layout direction options
+6. Build out tournament format variations
+7. Add customization fields
+8. Implement export/print features
+9. Add advanced features

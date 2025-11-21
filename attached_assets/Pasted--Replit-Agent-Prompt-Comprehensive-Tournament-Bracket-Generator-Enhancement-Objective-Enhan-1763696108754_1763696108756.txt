@@ -1,0 +1,832 @@
+# Replit Agent Prompt: Comprehensive Tournament Bracket Generator Enhancement
+
+## Objective
+Enhance our existing tournament bracket creation tool to match the comprehensive functionality of PrintYourBrackets.com while maintaining our current visual theme, design language, and formatting style.
+
+## Core Requirements - Preserve Existing Design
+- **CRITICAL**: Keep all existing UI components, color schemes, typography, layout patterns, and visual styling
+- Maintain current user experience flow and interface structure
+- Preserve any branding elements, logos, or custom design elements
+- Extend functionality without redesigning the visual interface
+
+---
+
+# DETAILED BRACKET TYPE LOGIC
+
+## 1. SINGLE ELIMINATION BRACKET
+
+### Core Logic
+```javascript
+function generateSingleElimination(teams, isSeeded) {
+  // Calculate bracket structure
+  const bracketSize = Math.pow(2, Math.ceil(Math.log2(teams)));
+  const rounds = Math.log2(bracketSize);
+  const byes = bracketSize - teams;
+  
+  // Initialize bracket
+  const bracket = {
+    rounds: [],
+    totalGames: teams - 1
+  };
+  
+  // Generate seeding order
+  const seedOrder = isSeeded ? generateSeeds(bracketSize) : shuffleTeams(teams);
+  
+  // Place byes (byes go to top seeds)
+  const firstRoundMatchups = [];
+  for (let i = 0; i < bracketSize; i += 2) {
+    const team1 = seedOrder[i];
+    const team2 = seedOrder[i + 1];
+    
+    if (team1 && team2) {
+      // Both teams present - create matchup
+      firstRoundMatchups.push({
+        team1: team1,
+        team2: team2,
+        seed1: i + 1,
+        seed2: i + 2,
+        hasBye: false
+      });
+    } else if (team1 && !team2) {
+      // Team 1 gets bye
+      firstRoundMatchups.push({
+        team1: team1,
+        team2: null,
+        seed1: i + 1,
+        seed2: null,
+        hasBye: true,
+        winner: team1 // Auto-advance
+      });
+    }
+  }
+  
+  // Build remaining rounds
+  let currentRound = firstRoundMatchups;
+  let gameNumber = 1;
+  
+  for (let round = 1; round <= rounds; round++) {
+    bracket.rounds.push({
+      roundNumber: round,
+      roundName: getRoundName(round, rounds),
+      games: currentRound.map(game => ({
+        ...game,
+        gameNumber: game.hasBye ? null : gameNumber++
+      }))
+    });
+    
+    // Prepare next round
+    if (round < rounds) {
+      currentRound = prepareNextRound(currentRound);
+    }
+  }
+  
+  return bracket;
+}
+
+function generateSeeds(bracketSize) {
+  // Standard seeding pattern ensures top seeds don't meet early
+  // For 16: [1,16,8,9,5,12,4,13,3,14,6,11,7,10,2,15]
+  const seeds = [1];
+  let currentSize = 2;
+  
+  while (currentSize <= bracketSize) {
+    const newSeeds = [];
+    for (let seed of seeds) {
+      newSeeds.push(seed);
+      newSeeds.push(currentSize + 1 - seed);
+    }
+    seeds.length = 0;
+    seeds.push(...newSeeds);
+    currentSize *= 2;
+  }
+  
+  return seeds;
+}
+
+function getRoundName(round, totalRounds) {
+  const remaining = totalRounds - round + 1;
+  if (remaining === 1) return "Championship";
+  if (remaining === 2) return "Finals";
+  if (remaining === 3) return "Semi-Finals";
+  if (remaining === 4) return "Quarter-Finals";
+  return `Round ${round}`;
+}
+```
+
+### Key Features
+- One loss eliminates team
+- Total games = teams - 1
+- Byes automatically placed for top seeds
+- Standard bracket progression
+
+---
+
+## 2. DOUBLE ELIMINATION BRACKET
+
+### Core Logic
+```javascript
+function generateDoubleElimination(teams, isSeeded) {
+  const bracketSize = Math.pow(2, Math.ceil(Math.log2(teams)));
+  const byes = bracketSize - teams;
+  
+  const bracket = {
+    winnersbracket: [],
+    losersbracket: [],
+    championship: null
+  };
+  
+  // WINNERS BRACKET - Same as single elimination
+  bracket.winnersbracket = generateSingleEliminationStructure(teams, isSeeded);
+  
+  // LOSERS BRACKET - Complex structure
+  // Receives losers from winners bracket
+  // Has approximately 2x rounds - 2
+  const winnersRounds = bracket.winnersbracket.length;
+  const losersRounds = (2 * winnersRounds) - 2;
+  
+  let gameNumber = bracket.winnersbracket[bracket.winnersbracket.length - 1].games[0].gameNumber + 1;
+  
+  // Build losers bracket structure
+  for (let round = 1; round <= losersRounds; round++) {
+    const isEliminationRound = round % 2 === 1; // Odd rounds eliminate teams
+    
+    bracket.losersbracket.push({
+      roundNumber: round,
+      roundName: `Losers Round ${round}`,
+      games: [],
+      receivesFrom: getLoserSource(round, winnersRounds),
+      isEliminationRound: isEliminationRound
+    });
+  }
+  
+  // CHAMPIONSHIP SERIES
+  // Winner of losers bracket vs winner of winners bracket
+  // If losers bracket wins, play second game
+  bracket.championship = {
+    game1: {
+      gameNumber: gameNumber++,
+      team1Source: "Winners Bracket Champion",
+      team2Source: "Losers Bracket Champion",
+      description: "Championship Game 1"
+    },
+    game2: {
+      gameNumber: gameNumber++,
+      team1Source: "Game 1 Winner (if from losers)",
+      team2Source: "Game 1 Winner (if from winners - no game needed)",
+      description: "Championship Game 2 (if necessary)",
+      conditional: true
+    }
+  };
+  
+  return bracket;
+}
+
+function getLoserSource(losersRound, winnersRounds) {
+  // Odd rounds receive losers from winners bracket
+  // Even rounds are losers bracket internal matches
+  if (losersRound % 2 === 1) {
+    const winnersRoundSource = Math.ceil(losersRound / 2);
+    return { type: 'winners', round: winnersRoundSource };
+  } else {
+    return { type: 'losers', round: losersRound - 1 };
+  }
+}
+```
+
+### Key Features
+- Two separate brackets: Winners and Losers
+- Losers from winners bracket drop to losers bracket
+- Must lose twice to be eliminated
+- Losers bracket has ~2x rounds of winners bracket
+- Championship requires losers bracket winner to win twice against winners bracket champion
+
+### Visual Layout
+```
+Winners Bracket (Top)
+├─ Round 1 → Round 2 → Semi-Finals → Finals
+│
+Losers Bracket (Bottom)
+├─ LR1 (from WR1) → LR2 (internal) → LR3 (from WR2) → LR4 (internal) → ... → LB Finals
+│
+Championship (Center)
+└─ WB Champion vs LB Champion (up to 2 games)
+```
+
+---
+
+## 3. TRIPLE ELIMINATION BRACKET
+
+### Core Logic
+```javascript
+function generateTripleElimination(teams, isSeeded) {
+  const bracket = {
+    winnersbracket: [],
+    losersBracket1: [],
+    losersBracket2: [],
+    championship: null
+  };
+  
+  // WINNERS BRACKET
+  bracket.winnersbracket = generateSingleEliminationStructure(teams, isSeeded);
+  
+  // LOSERS BRACKET 1
+  // Receives first-time losers from winners bracket
+  const lb1Rounds = bracket.winnersbracket.length * 2 - 2;
+  bracket.losersBracket1 = generateLosersBracketStructure(lb1Rounds, "LB1");
+  
+  // LOSERS BRACKET 2
+  // Receives losers from Losers Bracket 1
+  const lb2Rounds = bracket.losersBracket1.length;
+  bracket.losersBracket2 = generateLosersBracketStructure(lb2Rounds, "LB2");
+  
+  // CHAMPIONSHIP SERIES
+  // Complex rules - winners can come from any bracket
+  bracket.championship = {
+    scenarios: [
+      {
+        condition: "WB Champion has 0 losses",
+        games: "Must lose 3 times total - could take up to 3 games"
+      },
+      {
+        condition: "LB1 Champion has 1 loss",
+        games: "Must lose 2 more times"
+      },
+      {
+        condition: "LB2 Champion has 2 losses",
+        games: "Must lose 1 more time"
+      }
+    ]
+  };
+  
+  return bracket;
+}
+```
+
+### Key Features
+- Three separate brackets
+- First loss → Losers Bracket 1
+- Second loss → Losers Bracket 2
+- Third loss → Elimination
+- Championship complexity depends on which bracket champions come from
+
+### Visual Layout
+```
+Winners Bracket (Top)
+├─ WR1 → WR2 → WR3 → WR Finals
+│
+Losers Bracket 1 (Middle)
+├─ LB1-R1 → LB1-R2 → ... → LB1 Finals
+│  ↑ receives from Winners Bracket
+│
+Losers Bracket 2 (Bottom)
+├─ LB2-R1 → LB2-R2 → ... → LB2 Finals
+│  ↑ receives from Losers Bracket 1
+│
+Championship
+└─ Multi-game series based on loss count
+```
+
+---
+
+## 4. THREE GAME GUARANTEE
+
+### Core Logic
+```javascript
+function generateThreeGameGuarantee(teams, isSeeded) {
+  const bracket = {
+    winnersbracket: [],
+    losersbracket: [],
+    guaranteeGames: [],
+    championship: null
+  };
+  
+  // WINNERS BRACKET - Standard
+  bracket.winnersbracket = generateSingleEliminationStructure(teams, isSeeded);
+  
+  // LOSERS BRACKET - Modified double elimination
+  // Special rule: Track teams with 0 wins
+  bracket.losersbracket = generateLosersBracketWithTracking(teams);
+  
+  // GUARANTEE GAMES
+  // Teams that lose first 2 games (0-2 record) get extra game
+  bracket.guaranteeGames = {
+    description: "Extra games for 0-2 teams to guarantee 3 games minimum",
+    games: []
+  };
+  
+  // Identify teams that lost Round 1 of Winners AND Round 1 of Losers
+  const zeroWinTeams = identifyZeroWinTeams(bracket);
+  
+  // Create consolation games for these teams
+  for (let i = 0; i < zeroWinTeams.length; i += 2) {
+    bracket.guaranteeGames.games.push({
+      team1: zeroWinTeams[i],
+      team2: zeroWinTeams[i + 1],
+      description: "Game 3 Guarantee Match",
+      isForPlacement: true
+    });
+  }
+  
+  // CHAMPIONSHIP - Same as double elimination
+  bracket.championship = generateDoubleElimChampionship();
+  
+  return bracket;
+}
+
+function identifyZeroWinTeams(bracket) {
+  // Find teams that lost:
+  // 1. Round 1 of Winners Bracket
+  // 2. Round 1 of Losers Bracket
+  const round1WinnersLosers = bracket.winnersbracket[0].games
+    .map(g => g.loser)
+    .filter(Boolean);
+    
+  const round1LosersLosers = bracket.losersbracket[0].games
+    .map(g => g.loser)
+    .filter(Boolean);
+    
+  return round1WinnersLosers.filter(team => 
+    round1LosersLosers.includes(team)
+  );
+}
+```
+
+### Key Features
+- Based on double elimination structure
+- Special tracking for teams with 0-2 record
+- Automatic creation of "guarantee games" for 0-2 teams
+- Ensures every team plays minimum 3 games
+- Popular for travel tournaments
+
+---
+
+## 5. CONSOLATION BRACKET
+
+### Core Logic
+```javascript
+function generateConsolationBracket(teams, isSeeded) {
+  const bracket = {
+    championshipBracket: [],
+    consolationBracket: [],
+    split: "after_round_1" // or "after_round_2" for variations
+  };
+  
+  // ROUND 1 - Everyone plays
+  const firstRound = generateFirstRound(teams, isSeeded);
+  
+  // SPLIT AFTER ROUND 1
+  const round1Winners = firstRound.games.map(g => g.winner);
+  const round1Losers = firstRound.games.map(g => g.loser);
+  
+  // CHAMPIONSHIP BRACKET
+  // Only Round 1 winners - compete for main championship
+  bracket.championshipBracket = generateSingleEliminationFromList(
+    round1Winners,
+    "Championship Bracket"
+  );
+  
+  // CONSOLATION BRACKET
+  // Only Round 1 losers - compete for consolation championship
+  bracket.consolationBracket = generateSingleEliminationFromList(
+    round1Losers,
+    "Consolation Bracket"
+  );
+  
+  // Final Games
+  bracket.finals = {
+    championship: {
+      description: "Championship Final",
+      participants: "Top 2 from Championship Bracket"
+    },
+    consolation: {
+      description: "Consolation Final",
+      participants: "Top 2 from Consolation Bracket"
+    }
+  };
+  
+  return bracket;
+}
+
+// VARIATION: Modified Consolation (Wrestling style)
+function generateModifiedConsolation(teams, isSeeded, dropRound = 2) {
+  // Similar to above, but losers from later rounds can drop to consolation
+  const bracket = generateConsolationBracket(teams, isSeeded);
+  
+  // Add drop-downs from championship bracket
+  for (let round = 2; round <= dropRound; round++) {
+    const losers = bracket.championshipBracket[round - 1].games.map(g => g.loser);
+    // Insert these losers into appropriate consolation round
+    insertIntoConsolationBracket(bracket.consolationBracket, losers, round);
+  }
+  
+  return bracket;
+}
+```
+
+### Key Features
+- Two completely separate brackets after Round 1
+- Winners stay in Championship Bracket (cannot be eliminated)
+- Losers go to Consolation Bracket (cannot win main championship)
+- Two separate championship games
+- Variation: Later round losers can drop to consolation
+
+### Visual Layout
+```
+Round 1 (All Teams)
+├─ Game 1: A vs B
+├─ Game 2: C vs D
+├─ Game 3: E vs F
+└─ Game 4: G vs H
+
+         ↓ SPLIT ↓
+
+Championship Bracket        Consolation Bracket
+(Winners: A,C,E,G)         (Losers: B,D,F,H)
+├─ A vs C → Winner1        ├─ B vs D → CW1
+└─ E vs G → Winner2        └─ F vs H → CW2
+    ↓                           ↓
+Championship Final         Consolation Final
+Winner1 vs Winner2         CW1 vs CW2
+```
+
+---
+
+## 6. ROUND ROBIN
+
+### Core Logic
+```javascript
+function generateRoundRobin(teams) {
+  const bracket = {
+    format: "round_robin",
+    schedule: [],
+    standings: [],
+    totalRounds: teams % 2 === 0 ? teams - 1 : teams,
+    gamesPerRound: Math.floor(teams / 2)
+  };
+  
+  // Handle odd number of teams (one bye per round)
+  const teamList = teams % 2 === 0 ? [...teams] : [...teams, "BYE"];
+  const totalTeams = teamList.length;
+  
+  // Generate matchups using round-robin algorithm
+  for (let round = 0; round < totalTeams - 1; round++) {
+    const roundGames = [];
+    
+    for (let i = 0; i < totalTeams / 2; i++) {
+      const home = (round + i) % (totalTeams - 1);
+      const away = (totalTeams - 1 - i + round) % (totalTeams - 1);
+      
+      // Fix one team (last team) to reduce complexity
+      const homeTeam = home === 0 ? totalTeams - 1 : home - 1;
+      const awayTeam = away === 0 ? totalTeams - 1 : away - 1;
+      
+      if (teamList[homeTeam] !== "BYE" && teamList[awayTeam] !== "BYE") {
+        roundGames.push({
+          gameNumber: bracket.schedule.length + roundGames.length + 1,
+          team1: teamList[homeTeam],
+          team2: teamList[awayTeam],
+          round: round + 1
+        });
+      }
+    }
+    
+    bracket.schedule.push({
+      roundNumber: round + 1,
+      games: roundGames
+    });
+  }
+  
+  // Initialize standings
+  bracket.standings = teams.map(team => ({
+    team: team,
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    points: 0
+  }));
+  
+  return bracket;
+}
+
+// Alternative: Generate matrix view
+function generateRoundRobinMatrix(teams) {
+  const matrix = {
+    teams: teams,
+    grid: []
+  };
+  
+  // Create grid where matrix[i][j] represents game between team i and team j
+  for (let i = 0; i < teams.length; i++) {
+    const row = [];
+    for (let j = 0; j < teams.length; j++) {
+      if (i === j) {
+        row.push({ type: "self", display: "---" });
+      } else if (i < j) {
+        row.push({ 
+          type: "game",
+          team1: teams[i],
+          team2: teams[j],
+          gameNumber: calculateGameNumber(i, j, teams.length)
+        });
+      } else {
+        row.push({ type: "mirror", display: "↔" });
+      }
+    }
+    matrix.grid.push(row);
+  }
+  
+  return matrix;
+}
+```
+
+### Key Features
+- Every team plays every other team exactly once
+- Total games = n(n-1)/2 where n = number of teams
+- Total rounds = n-1 for even teams, n for odd teams
+- One team gets bye per round if odd number of teams
+- Can display as schedule or matrix
+- Standings track wins/losses/ties
+
+### Visual Formats
+
+**Schedule Format:**
+```
+Round 1:
+  Game 1: Team A vs Team B
+  Game 2: Team C vs Team D
+Round 2:
+  Game 3: Team A vs Team C
+  Game 4: Team B vs Team D
+...
+```
+
+**Matrix Format:**
+```
+       A    B    C    D
+A     ---   1    2    3
+B      ↔   ---   4    5
+C      ↔    ↔   ---   6
+D      ↔    ↔    ↔   ---
+```
+
+---
+
+## 7. COMPASS DRAW
+
+### Core Logic
+```javascript
+function generateCompassDraw(teams, isSeeded) {
+  const bracket = {
+    format: "compass_draw",
+    mainBracket: null,
+    compassBrackets: {
+      North: [],
+      South: [],
+      East: [],
+      West: [],
+      Northeast: [],
+      Northwest: [],
+      Southeast: [],
+      Southwest: []
+    }
+  };
+  
+  // MAIN BRACKET (North)
+  // Initial single elimination bracket
+  bracket.mainBracket = generateSingleEliminationStructure(teams, isSeeded);
+  bracket.compassBrackets.North = bracket.mainBracket;
+  
+  // COMPASS ROUTING RULES
+  const routingRules = {
+    // Round 1 losers
+    round1: {
+      topHalf: "East",
+      bottomHalf: "West"
+    },
+    // Round 2 losers
+    round2: {
+      fromTopHalf: "Northeast",
+      fromBottomHalf: "Northwest"
+    },
+    // East bracket losers
+    east: {
+      winners: "Continue in East",
+      losers: "Southeast"
+    },
+    // West bracket losers
+    west: {
+      winners: "Continue in West",
+      losers: "Southwest"
+    }
+  };
+  
+  // Build East Bracket (receives top-half Round 1 losers)
+  const round1TopLosers = getTopHalfLosers(bracket.mainBracket[0]);
+  bracket.compassBrackets.East = generateSingleEliminationFromList(
+    round1TopLosers,
+    "East Bracket"
+  );
+  
+  // Build West Bracket (receives bottom-half Round 1 losers)
+  const round1BottomLosers = getBottomHalfLosers(bracket.mainBracket[0]);
+  bracket.compassBrackets.West = generateSingleEliminationFromList(
+    round1BottomLosers,
+    "West Bracket"
+  );
+  
+  // Build Northeast (receives Round 2 top-half losers + East losers)
+  const round2TopLosers = getTopHalfLosers(bracket.mainBracket[1]);
+  bracket.compassBrackets.Northeast = generateSingleEliminationFromList(
+    round2TopLosers,
+    "Northeast Bracket"
+  );
+  
+  // Build Northwest (receives Round 2 bottom-half losers + West losers)
+  const round2BottomLosers = getBottomHalfLosers(bracket.mainBracket[1]);
+  bracket.compassBrackets.Northwest = generateSingleEliminationFromList(
+    round2BottomLosers,
+    "Northwest Bracket"
+  );
+  
+  // Build Southeast (receives East bracket losers)
+  const eastLosers = collectAllLosers(bracket.compassBrackets.East);
+  bracket.compassBrackets.Southeast = generateSingleEliminationFromList(
+    eastLosers,
+    "Southeast Bracket"
+  );
+  
+  // Build Southwest (receives West bracket losers)
+  const westLosers = collectAllLosers(bracket.compassBrackets.West);
+  bracket.compassBrackets.Southwest = generateSingleEliminationFromList(
+    westLosers,
+    "Southwest Bracket"
+  );
+  
+  // Build South (receives all remaining losers)
+  const finalLosers = [
+    ...collectAllLosers(bracket.compassBrackets.Northeast),
+    ...collectAllLosers(bracket.compassBrackets.Northwest),
+    ...collectAllLosers(bracket.compassBrackets.Southeast),
+    ...collectAllLosers(bracket.compassBrackets.Southwest)
+  ];
+  bracket.compassBrackets.South = generateSingleEliminationFromList(
+    finalLosers,
+    "South Bracket"
+  );
+  
+  return bracket;
+}
+
+function getTopHalfLosers(round) {
+  const midpoint = Math.floor(round.games.length / 2);
+  return round.games.slice(0, midpoint).map(g => g.loser);
+}
+
+function getBottomHalfLosers(round) {
+  const midpoint = Math.floor(round.games.length / 2);
+  return round.games.slice(midpoint).map(g => g.loser);
+}
+```
+
+### Key Features
+- Multiple sub-brackets organized by compass directions
+- Winners stay in current bracket and advance
+- Losers drop to different compass bracket
+- Automatically pairs similar skill levels as tournament progresses
+- Maximum participation - teams play many games
+- Popular in Tennis and Pickleball
+
+### Visual Layout
+```
+              NORTH (Main)
+               ↙     ↘
+         NORTHEAST   NORTHWEST
+         ↙         ↘
+      EAST           WEST
+         ↘         ↙
+         SOUTHEAST   SOUTHWEST
+               ↘     ↙
+               SOUTH
+
+Routing Example:
+- Lose in North Round 1 Top → East
+- Lose in North Round 1 Bottom → West
+- Lose in East → Southeast
+- Lose in West → Southwest
+- Continue losing → Eventually South
+```
+
+---
+
+# COMMON HELPER FUNCTIONS
+
+```javascript
+// Calculate total games for any tournament
+function calculateTotalGames(teams, format) {
+  switch(format) {
+    case 'single-elimination':
+      return teams - 1;
+    case 'double-elimination':
+      return (teams * 2) - 2; // Approximate
+    case 'triple-elimination':
+      return (teams * 3) - 3; // Approximate
+    case 'round-robin':
+      return (teams * (teams - 1)) / 2;
+    default:
+      return 0;
+  }
+}
+
+// Prepare next round from current round results
+function prepareNextRound(currentRound) {
+  const nextRound = [];
+  for (let i = 0; i < currentRound.length; i += 2) {
+    nextRound.push({
+      team1: currentRound[i].winner || null,
+      team2: currentRound[i + 1].winner || null,
+      seed1: currentRound[i].winnerSeed || null,
+      seed2: currentRound[i + 1].winnerSeed || null,
+      hasBye: false
+    });
+  }
+  return nextRound;
+}
+
+// Generate bracket for list of teams
+function generateSingleEliminationFromList(teamList, bracketName) {
+  return generateSingleElimination(teamList.length, false);
+}
+```
+
+---
+
+# IMPLEMENTATION CHECKLIST
+
+## Phase 1: Single Elimination
+- [ ] Implement seeding algorithm
+- [ ] Calculate byes correctly
+- [ ] Generate round names
+- [ ] Number games sequentially
+- [ ] Test with 3-128 teams
+
+## Phase 2: Double Elimination
+- [ ] Build winners bracket
+- [ ] Build losers bracket with proper routing
+- [ ] Implement championship series logic
+- [ ] Handle if-necessary games
+- [ ] Test bracket integrity
+
+## Phase 3: Round Robin
+- [ ] Implement round-robin algorithm
+- [ ] Handle odd number of teams (byes)
+- [ ] Generate both schedule and matrix views
+- [ ] Create standings tracker
+- [ ] Test with various team counts
+
+## Phase 4: Advanced Brackets
+- [ ] Triple elimination with 3 brackets
+- [ ] Three game guarantee with tracking
+- [ ] Consolation with split logic
+- [ ] Compass draw with routing rules
+
+## Phase 5: Polish
+- [ ] Add game numbering to all formats
+- [ ] Implement layout direction options
+- [ ] Add export functionality
+- [ ] Create print-optimized views
+- [ ] Add validation for all bracket types
+
+---
+
+# DATA VALIDATION RULES
+
+```javascript
+function validateBracket(bracket, format) {
+  const validations = {
+    'single-elimination': {
+      totalGames: teams => teams - 1,
+      maxRounds: teams => Math.ceil(Math.log2(teams)),
+      requiresByes: teams => !isPowerOfTwo(teams)
+    },
+    'double-elimination': {
+      totalGames: teams => (teams * 2) - 2,
+      hasWinnersBracket: true,
+      hasLosersBracket: true,
+      hasChampionship: true
+    },
+    'round-robin': {
+      totalGames: teams => (teams * (teams - 1)) / 2,
+      allTeamsPlayEachOther: true
+    }
+  };
+  
+  // Run validation checks
+  return validateAgainstRules(bracket, validations[format]);
+}
+
+function isPowerOfTwo(n) {
+  return n > 0 && (n & (n - 1)) === 0;
+}
+```
+
+This comprehensive breakdown provides clear implementation logic for each bracket type with working algorithms, data structures, and validation rules.
