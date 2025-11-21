@@ -443,7 +443,7 @@ export const tournamentMatches = pgTable("tournament_matches", {
   gameId: varchar("game_id").references(() => games.id), // link to actual game record for calendar
   round: varchar("round").notNull(), // "Round 1", "Semifinals", "Finals", "Division A"
   matchNumber: integer("match_number").notNull(),
-  bracketType: varchar("bracket_type"), // "winners", "losers", "grand_final" for double elim
+  bracketType: varchar("bracket_type"), // "winners", "losers", "losers1", "losers2", "guarantee", "grand_final", "main", "championship", "consolation" etc.
   team1Id: varchar("team1_id").references(() => tournamentTeams.id),
   team2Id: varchar("team2_id").references(() => tournamentTeams.id),
   winnerId: varchar("winner_id").references(() => tournamentTeams.id),

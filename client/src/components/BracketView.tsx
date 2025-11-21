@@ -168,6 +168,7 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
         'Losers Round 1', 'Losers Round 2', 'Losers Round 3', 'Losers Round 4',
         'Losers Round 5', 'Losers Round 6', 'Losers Round 7', 'Losers Round 8',
         'Losers Quarterfinals', 'Losers Semifinals', 'Losers Finals',
+        '3-Game Guarantee Round',
         'Losers1 Round 1', 'Losers1 Round 2', 'Losers1 Finals',
         'Losers2 Round 1', 'Losers2 Round 2', 'Losers2 Finals',
         'Consolation Round 1', 'Consolation Semifinals', 'Consolation Finals',
@@ -321,6 +322,7 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
         'Losers Round 1', 'Losers Round 2', 'Losers Round 3', 'Losers Round 4',
         'Losers Round 5', 'Losers Round 6', 'Losers Round 7', 'Losers Round 8',
         'Losers Quarterfinals', 'Losers Semifinals', 'Losers Finals',
+        '3-Game Guarantee Round',
         'Losers1 Round 1', 'Losers1 Round 2', 'Losers1 Finals',
         'Losers2 Round 1', 'Losers2 Round 2', 'Losers2 Finals',
         'Consolation Round 1', 'Consolation Semifinals', 'Consolation Finals',
@@ -443,6 +445,14 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
       titleClass = 'text-orange-600 dark:text-orange-400';
       badgeClass = isCompleted ? 'bg-orange-500' : 'border-orange-500 text-orange-600 dark:text-orange-400';
       winnerBgClass = 'bg-orange-500 text-white';
+    } else if (bracketType === 'guarantee') {
+      // Cyan/aqua for guarantee bracket
+      borderClass = 'border-[4px] border-cyan-500 dark:border-cyan-400';
+      cardBgClass = 'bg-cyan-500/50 dark:bg-cyan-400/50';
+      headerClass = 'bg-cyan-500/10';
+      titleClass = 'text-cyan-600 dark:text-cyan-400';
+      badgeClass = isCompleted ? 'bg-cyan-500' : 'border-cyan-500 text-cyan-600 dark:text-cyan-400';
+      winnerBgClass = 'bg-cyan-500 text-white';
     } else if (bracketType.includes('east') || bracketType.includes('west')) {
       borderClass = 'border-[4px] border-green-500 dark:border-green-400';
       cardBgClass = 'bg-green-500/50 dark:bg-green-400/50';
@@ -572,6 +582,7 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
     const bracketLabels: { [key: string]: string } = {
       'winners': 'Winners Bracket',
       'losers': 'Losers Bracket',
+      'guarantee': '3-Game Guarantee Round',
       'losers1': 'Losers 1 Bracket',
       'losers2': 'Losers 2 Bracket',
       'championship': 'Championship Bracket',

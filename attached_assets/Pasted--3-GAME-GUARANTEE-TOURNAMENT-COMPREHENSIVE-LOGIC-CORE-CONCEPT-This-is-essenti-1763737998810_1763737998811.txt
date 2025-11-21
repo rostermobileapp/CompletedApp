@@ -1,0 +1,512 @@
+/**
+ * 3 GAME GUARANTEE TOURNAMENT - COMPREHENSIVE LOGIC
+ * 
+ * CORE CONCEPT:
+ * This is essentially a MODIFIED DOUBLE ELIMINATION tournament with a special rule:
+ * ANY team that loses their first TWO games gets a guaranteed THIRD game.
+ * 
+ * STRUCTURE:
+ * 1. Winners Bracket (standard single elimination)
+ * 2. Losers Bracket (receives losers from Winners Bracket)
+ * 3. Guarantee Round (extra games for 0-2 teams)
+ * 4. Championship (standard double elim championship)
+ */
+
+class ThreeGameGuarantee {
+  constructor(teams, isSeeded = false) {
+    this.teams = teams;
+    this.isSeeded = isSeeded;
+    this.bracketSize = Math.pow(2, Math.ceil(Math.log2(teams)));
+    this.byes = this.bracketSize - teams;
+    
+    // Track each team's record
+    this.teamRecords = new Map();
+    teams.forEach(team => {
+      this.teamRecords.set(team, { wins: 0, losses: 0, games: [] });
+    });
+    
+    this.bracket = {
+      winnersBracket: [],
+      losersBracket: [],
+      guaranteeRound: [],
+      championship: null,
+      allGames: []
+    };
+    
+    this.gameNumber = 1;
+  }
+  
+  generate() {
+    // Step 1: Generate Winners Bracket (standard single elimination)
+    this.generateWinnersBracket();
+    
+    // Step 2: Generate Losers Bracket structure
+    this.generateLosersBracket();
+    
+    // Step 3: Generate Guarantee Round
+    this.generateGuaranteeRound();
+    
+    // Step 4: Generate Championship
+    this.generateChampionship();
+    
+    return this.bracket;
+  }
+  
+  // ============================================
+  // STEP 1: WINNERS BRACKET
+  // ============================================
+  generateWinnersBracket() {
+    const seedOrder = this.isSeeded ? this.generateSeeds() : this.teams;
+    const rounds = Math.log2(this.bracketSize);
+    
+    // Round 1 of Winners Bracket
+    let currentRound = [];
+    for (let i = 0; i < this.bracketSize; i += 2) {
+      const team1 = seedOrder[i] || null;
+      const team2 = seedOrder[i + 1] || null;
+      
+      if (team1 && team2) {
+        // Regular matchup
+        currentRound.push({
+          gameNumber: this.gameNumber++,
+          team1: team1,
+          team2: team2,
+          seed1: this.isSeeded ? i + 1 : null,
+          seed2: this.isSeeded ? i + 2 : null,
+          winner: null,
+          loser: null,
+          bracket: 'winners',
+          round: 1
+        });
+      } else if (team1) {
+        // Bye - team1 auto-advances
+        currentRound.push({
+          gameNumber: null,
+          team1: team1,
+          team2: 'BYE',
+          seed1: this.isSeeded ? i + 1 : null,
+          seed2: null,
+          winner: team1,
+          loser: null,
+          bracket: 'winners',
+          round: 1,
+          isBye: true
+        });
+        // Bye counts as a game played but not a loss
+        this.updateRecord(team1, true, false);
+      }
+    }
+    
+    this.bracket.winnersBracket.push({
+      roundNumber: 1,
+      roundName: 'Winners Round 1',
+      games: currentRound
+    });
+    
+    // Subsequent Winners Bracket rounds
+    for (let round = 2; round <= rounds; round++) {
+      const nextRound = [];
+      const prevRound = this.bracket.winnersBracket[round - 2].games;
+      
+      for (let i = 0; i < prevRound.length; i += 2) {
+        nextRound.push({
+          gameNumber: this.gameNumber++,
+          team1: null, // Will be filled by winner of prevRound[i]
+          team2: null, // Will be filled by winner of prevRound[i+1]
+          team1Source: `WR${round-1} Game ${prevRound[i].gameNumber}`,
+          team2Source: `WR${round-1} Game ${prevRound[i+1].gameNumber}`,
+          winner: null,
+          loser: null,
+          bracket: 'winners',
+          round: round
+        });
+      }
+      
+      const roundName = this.getRoundName(round, rounds, 'Winners');
+      this.bracket.winnersBracket.push({
+        roundNumber: round,
+        roundName: roundName,
+        games: nextRound
+      });
+    }
+  }
+  
+  // ============================================
+  // STEP 2: LOSERS BRACKET
+  // ============================================
+  generateLosersBracket() {
+    const winnersRounds = this.bracket.winnersBracket.length;
+    
+    // Losers bracket has approximately (2 * winnersRounds - 2) rounds
+    // But we need to be careful about the guarantee round
+    
+    let losersRoundNumber = 1;
+    
+    // Losers Round 1: Receives losers from Winners Round 1
+    const wr1 = this.bracket.winnersBracket[0].games;
+    const wr1Losers = wr1.filter(g => !g.isBye); // Don't include byes
+    
+    const lr1Games = [];
+    for (let i = 0; i < wr1Losers.length; i += 2) {
+      if (i + 1 < wr1Losers.length) {
+        lr1Games.push({
+          gameNumber: this.gameNumber++,
+          team1: null, // Loser from WR1
+          team2: null, // Loser from WR1
+          team1Source: `WR1 Game ${wr1Losers[i].gameNumber} Loser`,
+          team2Source: `WR1 Game ${wr1Losers[i + 1].gameNumber} Loser`,
+          winner: null,
+          loser: null, // This loser is 0-2 and needs guarantee game
+          bracket: 'losers',
+          round: losersRoundNumber
+        });
+      }
+    }
+    
+    this.bracket.losersBracket.push({
+      roundNumber: losersRoundNumber,
+      roundName: `Losers Round ${losersRoundNumber}`,
+      games: lr1Games,
+      receivesFrom: 'Winners Round 1',
+      feedsGuaranteeRound: true // Losers here go to guarantee round
+    });
+    
+    losersRoundNumber++;
+    
+    // Continue building losers bracket
+    // Pattern alternates:
+    // - Odd rounds: receive new losers from winners bracket
+    // - Even rounds: internal losers bracket games
+    
+    for (let wr = 2; wr < winnersRounds; wr++) {
+      // Odd losers round: receives from winners + advances from previous losers
+      const lrOddGames = [];
+      const winnersLosersCount = Math.floor(this.bracket.winnersBracket[wr - 1].games.length);
+      const prevLosersWinnersCount = this.bracket.losersBracket[losersRoundNumber - 2].games.length;
+      
+      for (let i = 0; i < Math.max(winnersLosersCount, prevLosersWinnersCount); i++) {
+        lrOddGames.push({
+          gameNumber: this.gameNumber++,
+          team1: null,
+          team2: null,
+          team1Source: `WR${wr} Loser`,
+          team2Source: `LR${losersRoundNumber - 1} Winner`,
+          winner: null,
+          loser: null,
+          bracket: 'losers',
+          round: losersRoundNumber
+        });
+      }
+      
+      this.bracket.losersBracket.push({
+        roundNumber: losersRoundNumber,
+        roundName: `Losers Round ${losersRoundNumber}`,
+        games: lrOddGames,
+        receivesFrom: `Winners Round ${wr} + Losers Round ${losersRoundNumber - 1}`
+      });
+      
+      losersRoundNumber++;
+      
+      // Even losers round: internal games
+      if (losersRoundNumber < (2 * winnersRounds - 2)) {
+        const lrEvenGames = [];
+        const prevRoundGames = this.bracket.losersBracket[losersRoundNumber - 2].games;
+        
+        for (let i = 0; i < prevRoundGames.length; i += 2) {
+          if (i + 1 < prevRoundGames.length) {
+            lrEvenGames.push({
+              gameNumber: this.gameNumber++,
+              team1: null,
+              team2: null,
+              team1Source: `LR${losersRoundNumber - 1} Game ${prevRoundGames[i].gameNumber} Winner`,
+              team2Source: `LR${losersRoundNumber - 1} Game ${prevRoundGames[i + 1].gameNumber} Winner`,
+              winner: null,
+              loser: null,
+              bracket: 'losers',
+              round: losersRoundNumber
+            });
+          }
+        }
+        
+        if (lrEvenGames.length > 0) {
+          this.bracket.losersBracket.push({
+            roundNumber: losersRoundNumber,
+            roundName: `Losers Round ${losersRoundNumber}`,
+            games: lrEvenGames,
+            receivesFrom: `Losers Round ${losersRoundNumber - 1}`
+          });
+          
+          losersRoundNumber++;
+        }
+      }
+    }
+  }
+  
+  // ============================================
+  // STEP 3: GUARANTEE ROUND
+  // ============================================
+  generateGuaranteeRound() {
+    // The guarantee round consists of games between teams that:
+    // 1. Lost in Winners Round 1
+    // 2. Lost in Losers Round 1
+    // These are the 0-2 teams
+    
+    // In a properly structured bracket, Losers Round 1 losers are 0-2
+    const lr1 = this.bracket.losersBracket[0];
+    const guaranteeGames = [];
+    
+    // Each loser from LR1 needs a 3rd game
+    // Pair them up for their guarantee games
+    const zeroTwoTeams = lr1.games.length; // Number of games = number of potential 0-2 teams
+    
+    for (let i = 0; i < lr1.games.length; i += 2) {
+      if (i + 1 < lr1.games.length) {
+        guaranteeGames.push({
+          gameNumber: this.gameNumber++,
+          team1: null,
+          team2: null,
+          team1Source: `LR1 Game ${lr1.games[i].gameNumber} Loser`,
+          team2Source: `LR1 Game ${lr1.games[i + 1].gameNumber} Loser`,
+          winner: null,
+          loser: null,
+          bracket: 'guarantee',
+          round: 1,
+          isGuaranteeGame: true,
+          description: 'Game 3 Guarantee'
+        });
+      }
+    }
+    
+    // Handle odd number of 0-2 teams (one team plays alone or gets placement)
+    if (lr1.games.length % 2 === 1) {
+      guaranteeGames.push({
+        gameNumber: this.gameNumber++,
+        team1: null,
+        team1Source: `LR1 Game ${lr1.games[lr1.games.length - 1].gameNumber} Loser`,
+        team2: 'BYE',
+        winner: null,
+        loser: null,
+        bracket: 'guarantee',
+        round: 1,
+        isGuaranteeGame: true,
+        description: 'Game 3 Guarantee (Bye)'
+      });
+    }
+    
+    this.bracket.guaranteeRound.push({
+      roundNumber: 1,
+      roundName: '3-Game Guarantee Round',
+      games: guaranteeGames,
+      description: 'Teams with 0-2 record play their 3rd game'
+    });
+  }
+  
+  // ============================================
+  // STEP 4: CHAMPIONSHIP
+  // ============================================
+  generateChampionship() {
+    // Standard double elimination championship
+    // Winners Bracket champion vs Losers Bracket champion
+    
+    this.bracket.championship = {
+      game1: {
+        gameNumber: this.gameNumber++,
+        team1: null,
+        team2: null,
+        team1Source: 'Winners Bracket Champion',
+        team2Source: 'Losers Bracket Champion',
+        winner: null,
+        loser: null,
+        description: 'Championship Game 1'
+      },
+      game2: {
+        gameNumber: this.gameNumber++,
+        team1: null,
+        team2: null,
+        team1Source: 'Championship Game 1 Winner',
+        team2Source: 'Championship Game 1 Loser',
+        winner: null,
+        loser: null,
+        description: 'Championship Game 2 (if necessary)',
+        conditional: true,
+        condition: 'Only played if Losers Bracket champion wins Game 1'
+      }
+    };
+  }
+  
+  // ============================================
+  // HELPER FUNCTIONS
+  // ============================================
+  
+  generateSeeds() {
+    // Standard seeding pattern
+    const seeds = [1];
+    let currentSize = 2;
+    
+    while (currentSize <= this.bracketSize) {
+      const newSeeds = [];
+      for (let seed of seeds) {
+        newSeeds.push(seed);
+        newSeeds.push(currentSize + 1 - seed);
+      }
+      seeds.length = 0;
+      seeds.push(...newSeeds);
+      currentSize *= 2;
+    }
+    
+    // Map seed numbers to actual teams
+    return seeds.slice(0, this.teams.length).map((seed, idx) => this.teams[idx]);
+  }
+  
+  getRoundName(round, totalRounds, bracket = '') {
+    const remaining = totalRounds - round + 1;
+    const prefix = bracket ? `${bracket} ` : '';
+    
+    if (remaining === 1) return `${prefix}Finals`;
+    if (remaining === 2) return `${prefix}Semi-Finals`;
+    if (remaining === 3) return `${prefix}Quarter-Finals`;
+    return `${prefix}Round ${round}`;
+  }
+  
+  updateRecord(team, isWin, countAsGame = true) {
+    const record = this.teamRecords.get(team);
+    if (isWin) {
+      record.wins++;
+    } else {
+      record.losses++;
+    }
+    if (countAsGame) {
+      record.games.push(this.gameNumber - 1);
+    }
+  }
+  
+  // ============================================
+  // SIMULATION HELPER (for testing)
+  // ============================================
+  
+  simulateGameResult(gameRef, winner) {
+    // Update game with winner/loser
+    gameRef.winner = winner;
+    gameRef.loser = gameRef.team1 === winner ? gameRef.team2 : gameRef.team1;
+    
+    // Update team records
+    this.updateRecord(winner, true);
+    this.updateRecord(gameRef.loser, false);
+    
+    // Check if loser is now 0-2
+    const loserRecord = this.teamRecords.get(gameRef.loser);
+    if (loserRecord.losses === 2 && loserRecord.wins === 0) {
+      console.log(`${gameRef.loser} is now 0-2 and needs guarantee game`);
+    }
+  }
+  
+  // ============================================
+  // VALIDATION
+  // ============================================
+  
+  validateGuarantee() {
+    // After tournament, verify every team played at least 3 games
+    const violations = [];
+    
+    for (let [team, record] of this.teamRecords) {
+      const totalGames = record.wins + record.losses;
+      if (totalGames < 3) {
+        violations.push({
+          team: team,
+          games: totalGames,
+          record: `${record.wins}-${record.losses}`
+        });
+      }
+    }
+    
+    if (violations.length > 0) {
+      console.error('3-GAME GUARANTEE VIOLATED:', violations);
+      return false;
+    }
+    
+    console.log('✓ All teams played at least 3 games');
+    return true;
+  }
+}
+
+// ============================================
+// USAGE EXAMPLE
+// ============================================
+
+// Example with 12 teams
+const teams = [
+  'Team A', 'Team B', 'Team C', 'Team D',
+  'Team E', 'Team F', 'Team G', 'Team H',
+  'Team I', 'Team J', 'Team K', 'Team L'
+];
+
+const tournament = new ThreeGameGuarantee(teams, true);
+const bracket = tournament.generate();
+
+console.log('=== 3 GAME GUARANTEE TOURNAMENT ===');
+console.log('Total Teams:', teams.length);
+console.log('Bracket Size:', tournament.bracketSize);
+console.log('Byes:', tournament.byes);
+console.log('\nWinners Bracket Rounds:', bracket.winnersBracket.length);
+console.log('Losers Bracket Rounds:', bracket.losersBracket.length);
+console.log('Guarantee Round Games:', bracket.guaranteeRound[0]?.games.length || 0);
+console.log('\nTotal Games:', tournament.gameNumber - 1);
+
+// Print structure
+console.log('\n=== BRACKET STRUCTURE ===');
+
+console.log('\n--- WINNERS BRACKET ---');
+bracket.winnersBracket.forEach(round => {
+  console.log(`\n${round.roundName}:`);
+  round.games.forEach(game => {
+    if (game.isBye) {
+      console.log(`  ${game.team1} (BYE)`);
+    } else {
+      console.log(`  Game ${game.gameNumber}: ${game.team1Source || game.team1} vs ${game.team2Source || game.team2}`);
+    }
+  });
+});
+
+console.log('\n--- LOSERS BRACKET ---');
+bracket.losersBracket.forEach(round => {
+  console.log(`\n${round.roundName}:`);
+  if (round.feedsGuaranteeRound) {
+    console.log('  *** LOSERS HERE GO TO GUARANTEE ROUND ***');
+  }
+  round.games.forEach(game => {
+    console.log(`  Game ${game.gameNumber}: ${game.team1Source} vs ${game.team2Source}`);
+  });
+});
+
+console.log('\n--- GUARANTEE ROUND ---');
+bracket.guaranteeRound.forEach(round => {
+  console.log(`\n${round.roundName} (${round.description}):`);
+  round.games.forEach(game => {
+    console.log(`  Game ${game.gameNumber}: ${game.team1Source} vs ${game.team2Source}`);
+  });
+});
+
+console.log('\n--- CHAMPIONSHIP ---');
+console.log(`Game ${bracket.championship.game1.gameNumber}: ${bracket.championship.game1.description}`);
+console.log(`  ${bracket.championship.game1.team1Source} vs ${bracket.championship.game1.team2Source}`);
+console.log(`Game ${bracket.championship.game2.gameNumber}: ${bracket.championship.game2.description}`);
+console.log(`  Condition: ${bracket.championship.game2.condition}`);
+
+/**
+ * KEY DIFFERENCES FROM STANDARD DOUBLE ELIMINATION:
+ * 
+ * 1. GUARANTEE ROUND exists specifically for 0-2 teams
+ * 2. Losers from Losers Round 1 feed into Guarantee Round
+ * 3. Every team is guaranteed 3 games minimum
+ * 4. Structure is identical to double elim except for guarantee games
+ * 
+ * FLOW FOR 0-2 TEAMS:
+ * Round 1: Team loses in Winners Bracket → Record: 0-1
+ * Round 2: Team loses in Losers Round 1 → Record: 0-2
+ * Round 3: Team plays in Guarantee Round → Record: 0-3 or 1-2
+ * 
+ * VALIDATION:
+ * - Count total games for each team
+ * - Ensure minimum 3 games
+ * - Verify 0-2 teams all received guarantee game
+ */
