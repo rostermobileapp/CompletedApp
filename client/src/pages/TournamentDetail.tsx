@@ -243,6 +243,7 @@ export default function TournamentDetail() {
                         matches={matches} 
                         teams={teams || []} 
                         format={tournament.format}
+                        settings={tournament.settings || {}}
                       />
                     </CardContent>
                   </Card>)

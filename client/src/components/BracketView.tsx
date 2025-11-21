@@ -3,16 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
-import type { TournamentMatch, TournamentTeam } from "@shared/schema";
+import type { TournamentMatch, TournamentTeam, TournamentSettings } from "@shared/schema";
 import { format as formatDate } from "date-fns";
 
 interface BracketViewProps {
   matches: TournamentMatch[];
   teams: TournamentTeam[];
   format: string;
+  settings?: TournamentSettings;
 }
 
-export default function BracketView({ matches, teams, format }: BracketViewProps) {
+export default function BracketView({ matches, teams, format, settings }: BracketViewProps) {
   const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -29,7 +30,14 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
   const getTeamDisplay = (teamId: string | null, match: TournamentMatch, position: 'team1' | 'team2') => {
     if (teamId) {
       const team = teams.find(t => t.id === teamId);
-      return team?.teamName || "TBD";
+      const teamName = team?.teamName || "TBD";
+      
+      // Show seed numbers if enabled in settings
+      if (settings?.showSeedNumbers && team?.seed) {
+        return `#${team.seed} ${teamName}`;
+      }
+      
+      return teamName;
     }
     
     // For TBD teams, check notes for source match info (e.g., "Loser of match_2 vs Loser of match_3")
