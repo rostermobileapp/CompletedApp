@@ -6,15 +6,27 @@ import { CustomBracketBuilder } from "@/components/CustomBracketBuilder";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Tournament } from "@shared/schema";
 
+interface TournamentTeam {
+  id: string;
+  teamName: string;
+}
+
 export default function CustomBracketBuilderPage() {
   const [, params] = useRoute("/tournaments/:tournamentId/custom-builder");
   const [, setLocation] = useLocation();
   const tournamentId = params?.tournamentId;
 
-  const { data: tournament, isLoading } = useQuery<Tournament>({
+  const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
     enabled: !!tournamentId
   });
+
+  const { data: teams, isLoading: teamsLoading } = useQuery<TournamentTeam[]>({
+    queryKey: ['/api/tournaments', tournamentId, 'teams'],
+    enabled: !!tournamentId
+  });
+
+  const isLoading = tournamentLoading || teamsLoading;
 
   if (isLoading) {
     return (
@@ -55,7 +67,10 @@ export default function CustomBracketBuilderPage() {
 
       {/* Builder */}
       <div className="flex-1">
-        <CustomBracketBuilder />
+        <CustomBracketBuilder 
+          teams={teams || []}
+          tournamentId={tournamentId}
+        />
       </div>
     </div>
   );

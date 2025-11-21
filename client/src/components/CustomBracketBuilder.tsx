@@ -1,11 +1,16 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, Trash2, ZoomIn, ZoomOut, Grid3x3, Move, Save, Download } from "lucide-react";
+import { Plus, Trash2, ZoomIn, ZoomOut, Grid3x3, Move, Save, Download, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { nanoid } from "nanoid";
+
+interface TournamentTeam {
+  id: string;
+  teamName: string;
+}
 
 const GRID_SIZE = 100;
 const CARD_WIDTH = 280;
@@ -57,7 +62,13 @@ function calculateConnectionPath(
   return `M ${sourceX} ${sourceY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${destX} ${destY}`;
 }
 
-export function CustomBracketBuilder() {
+interface CustomBracketBuilderProps {
+  teams?: TournamentTeam[];
+  tournamentId?: string;
+  onGenerateMatches?: () => void;
+}
+
+export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatches }: CustomBracketBuilderProps) {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [matchups, setMatchups] = useState<Matchup[]>([]);
@@ -453,21 +464,39 @@ export function CustomBracketBuilder() {
 
               {/* Teams */}
               <div className="flex-1 flex flex-col gap-1">
-                <Input
+                <Select
                   value={matchup.team1}
-                  onChange={(e) => updateMatchup(matchup.id, { team1: e.target.value })}
-                  className="h-7 text-xs"
-                  placeholder="Team 1"
-                  data-testid={`input-team1-${matchup.id}`}
-                />
+                  onValueChange={(value) => updateMatchup(matchup.id, { team1: value })}
+                >
+                  <SelectTrigger className="h-7 text-xs" data-testid={`select-team1-${matchup.id}`}>
+                    <SelectValue placeholder="Select Team 1" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Unassigned</SelectItem>
+                    {teams.map(team => (
+                      <SelectItem key={team.id} value={team.teamName}>
+                        {team.teamName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <div className="text-center text-xs text-muted-foreground">vs</div>
-                <Input
+                <Select
                   value={matchup.team2}
-                  onChange={(e) => updateMatchup(matchup.id, { team2: e.target.value })}
-                  className="h-7 text-xs"
-                  placeholder="Team 2"
-                  data-testid={`input-team2-${matchup.id}`}
-                />
+                  onValueChange={(value) => updateMatchup(matchup.id, { team2: value })}
+                >
+                  <SelectTrigger className="h-7 text-xs" data-testid={`select-team2-${matchup.id}`}>
+                    <SelectValue placeholder="Select Team 2" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Unassigned</SelectItem>
+                    {teams.map(team => (
+                      <SelectItem key={team.id} value={team.teamName}>
+                        {team.teamName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Routing Controls */}
