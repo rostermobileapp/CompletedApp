@@ -34,12 +34,17 @@ export default function TournamentDetail() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingMatch, setEditingMatch] = useState<TournamentMatch | null>(null);
   const [isExportingSchedule, setIsExportingSchedule] = useState(false);
-  const [isBracketLocked, setIsBracketLocked] = useState(true);
+  const [isEditingBracket, setIsEditingBracket] = useState(false);
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
     enabled: !!tournamentId
   });
+  
+  // Derive locked state from tournament data - default to unlocked if no bracket exists yet
+  const isBracketLocked = tournament?.format === 'custom_bracket' 
+    ? ((tournament.settings as any)?.customBracket?.locked ?? false)
+    : false;
 
   const { data: teams, isLoading: teamsLoading } = useQuery<TournamentTeam[]>({
     queryKey: ['/api/tournaments', tournamentId, 'teams'],
@@ -447,12 +452,12 @@ export default function TournamentDetail() {
                       <div>
                         <CardTitle>Custom Bracket</CardTitle>
                         <CardDescription>
-                          {isBracketLocked ? 'Your custom tournament structure is locked' : 'Design your own tournament bracket structure'}
+                          {isBracketLocked && !isEditingBracket ? 'Your custom tournament structure is locked' : 'Design your own tournament bracket structure'}
                         </CardDescription>
                       </div>
-                      {isBracketLocked && (tournament.settings as any)?.customBracket?.matchups?.length > 0 && (
+                      {isBracketLocked && !isEditingBracket && (tournament.settings as any)?.customBracket?.matchups?.length > 0 && (
                         <Button
-                          onClick={() => setIsBracketLocked(false)}
+                          onClick={() => setIsEditingBracket(true)}
                           data-testid="button-unlock-bracket"
                           variant="outline"
                           className="gap-2"
@@ -468,13 +473,19 @@ export default function TournamentDetail() {
                         tournamentId={tournamentId}
                         tournament={tournament}
                         embeddable={true}
-                        locked={isBracketLocked}
+                        locked={isBracketLocked && !isEditingBracket}
                         onSave={async (bracketData) => {
                           try {
+                            // Set locked to true when saving
+                            const bracketWithLock = {
+                              ...bracketData,
+                              locked: true
+                            };
+                            
                             // Save bracket to backend
                             const updatedSettings = {
                               ...(tournament.settings as any || {}),
-                              customBracket: bracketData
+                              customBracket: bracketWithLock
                             };
                             
                             await apiRequest('PATCH', `/api/tournaments/${tournamentId}`, {
@@ -484,7 +495,7 @@ export default function TournamentDetail() {
                             // Refresh tournament data
                             await queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
                             
-                            setIsBracketLocked(true);
+                            setIsEditingBracket(false);
                             
                             toast({
                               title: "Bracket saved",
@@ -498,7 +509,7 @@ export default function TournamentDetail() {
                             });
                           }
                         }}
-                        onLock={() => setIsBracketLocked(true)}
+                        onLock={() => setIsEditingBracket(false)}
                       />
                     </CardContent>
                   </Card>

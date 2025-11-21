@@ -244,12 +244,12 @@ export function CustomBracketBuilder({
       matchups,
       connections,
       zoom,
-      pan,
-      locked: false
+      pan
     };
     localStorage.setItem('customBracket', JSON.stringify(bracketData));
     
     if (onSave) {
+      // Parent will add locked: true when saving
       onSave(bracketData);
     }
     
@@ -257,10 +257,12 @@ export function CustomBracketBuilder({
       onLock();
     }
     
-    toast({
-      title: "Bracket saved",
-      description: embeddable ? "Bracket locked. Click Edit to make changes." : "Your custom bracket has been saved"
-    });
+    if (!embeddable) {
+      toast({
+        title: "Bracket saved",
+        description: "Your custom bracket has been saved"
+      });
+    }
   };
 
   const loadBracket = () => {
