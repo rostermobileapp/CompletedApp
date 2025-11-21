@@ -52,6 +52,7 @@ import TournamentsLanding from "@/pages/TournamentsLanding";
 import TournamentCreate from "@/pages/TournamentCreate";
 import TournamentDetail from "@/pages/TournamentDetail";
 import TournamentEdit from "@/pages/TournamentEdit";
+import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -131,6 +132,7 @@ function Router() {
             <Route path="/leagues/:leagueId/tournaments/create" component={TournamentCreate} />
             <Route path="/leagues/:leagueId/tournaments" component={Tournaments} />
             <Route path="/tournaments/:tournamentId/edit" component={TournamentEdit} />
+            <Route path="/tournaments/:tournamentId/custom-builder" component={CustomBracketBuilderPage} />
             <Route path="/tournaments/:tournamentId" component={TournamentDetail} />
             <Route path="/privacy" component={Privacy} />
             <Route path="/admin/stripe" component={StripeAdmin} />
