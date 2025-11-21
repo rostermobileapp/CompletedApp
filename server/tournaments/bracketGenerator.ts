@@ -952,6 +952,9 @@ export function generateConsolation(
  * Generate 3-Game Guarantee Tournament bracket
  * Structure: Winners Bracket + Losers Bracket + Guarantee Round for 0-2 teams
  * Key Feature: EVERY team plays minimum 3 games
+ * 
+ * Formula: Total Matches = (n-1) + (n-2) + ceil(z/2) + 2
+ * Where z = number of 0-2 teams (computed structurally from bracket)
  */
 export function generateThreeGameGuarantee(
   teams: TournamentTeam[],
@@ -969,110 +972,119 @@ export function generateThreeGameGuarantee(
   const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
   let matchCounter = 1;
   
-  // Build winners bracket using canonical seeding (1v16, 2v15, etc.)
+  // ===== WINNERS BRACKET (n-1 matches) =====
+  // Generate full winners bracket like standard single-elimination
+  let winnersMatchesCreated = 0;
+  const targetWinnersMatches = numTeams - 1;
   const winnersRounds: (typeof matches)[] = [];
-  const wr1Matches: typeof matches = [];
-  const wr1Count = Math.floor(numTeams / 2);
   
-  // Create WR1 matches with canonical seeding
-  for (let i = 0; i < wr1Count; i++) {
-    const team1Idx = i;
-    const team2Idx = numTeams - 1 - i;
+  // Build winners bracket layer by layer
+  let currentWinnersRoundTeams = numTeams;
+  let winnersRoundNum = 1;
+  
+  while (winnersMatchesCreated < targetWinnersMatches) {
+    const roundMatches: typeof matches = [];
+    const roundName = winnersRoundNum === 1 ? 'Winners Round 1' : 
+                      getEliminationRoundName(winnersRoundNum, Math.ceil(Math.log2(numTeams)) + 1, 'Winners');
     
-    wr1Matches.push({
-      tournamentId,
-      gameId: null,
-      round: 'Winners Round 1',
-      matchNumber: matchCounter++,
-      bracketType: 'winners',
-      team1Id: sortedTeams[team1Idx].id,
-      team2Id: sortedTeams[team2Idx].id,
-      winnerId: null,
-      team1Score: null,
-      team2Score: null,
-      advancesToMatchId: null,
-      scheduledTime: null,
-      location: null,
-      status: 'scheduled',
-      notes: `Seed ${team1Idx + 1} vs Seed ${team2Idx + 1}`
-    });
+    if (winnersRoundNum === 1) {
+      // Round 1: Pair teams with canonical seeding
+      const matchesInRound = Math.floor(numTeams / 2);
+      for (let i = 0; i < matchesInRound; i++) {
+        roundMatches.push({
+          tournamentId,
+          gameId: null,
+          round: roundName,
+          matchNumber: matchCounter++,
+          bracketType: 'winners',
+          team1Id: sortedTeams[i].id,
+          team2Id: sortedTeams[numTeams - 1 - i].id,
+          winnerId: null,
+          team1Score: null,
+          team2Score: null,
+          advancesToMatchId: null,
+          scheduledTime: null,
+          location: null,
+          status: 'scheduled',
+          notes: `Seed ${i + 1} vs Seed ${numTeams - i}`
+        });
+        winnersMatchesCreated++;
+      }
+      currentWinnersRoundTeams = matchesInRound + (numTeams % 2); // Winners + possible bye team
+    } else {
+      // Subsequent rounds: Pair winners from previous round
+      const matchesInRound = Math.floor(currentWinnersRoundTeams / 2);
+      for (let i = 0; i < matchesInRound; i++) {
+        roundMatches.push({
+          tournamentId,
+          gameId: null,
+          round: roundName,
+          matchNumber: matchCounter++,
+          bracketType: 'winners',
+          team1Id: null,
+          team2Id: null,
+          winnerId: null,
+          team1Score: null,
+          team2Score: null,
+          advancesToMatchId: null,
+          scheduledTime: null,
+          location: null,
+          status: 'scheduled',
+          notes: `Winners Round ${winnersRoundNum}`
+        });
+        winnersMatchesCreated++;
+      }
+      currentWinnersRoundTeams = matchesInRound + (currentWinnersRoundTeams % 2); // Winners + possible bye
+    }
+    
+    if (roundMatches.length > 0) {
+      matches.push(...roundMatches);
+      rounds.push(roundName);
+      winnersRounds.push(roundMatches);
+    }
+    
+    winnersRoundNum++;
+    if (currentWinnersRoundTeams <= 1) break;
   }
   
-  matches.push(...wr1Matches);
-  rounds.push('Winners Round 1');
-  winnersRounds.push(wr1Matches);
+  // ===== LOSERS BRACKET (n-2 matches) =====
+  // Build losers bracket similar to double elimination
+  let losersMatchesCreated = 0;
+  const targetLosersMatches = numTeams - 2;
+  const losersRounds: (typeof matches)[] = [];
   
-  // Build complete winners bracket (standard single-elimination)
-  let currentWinnersRound = wr1Matches;
-  let winnersRoundNum = 2;
+  // Track the current state of losers bracket
+  let currentLosersTeams = winnersRounds[0].length; // WR1 losers
+  let losersRoundNum = 1;
+  let winnersFeederIdx = 1; // Start feeding from WR2 onwards
   
-  while (currentWinnersRound.length > 1) {
-    const nextRound: typeof matches = [];
-    const roundName = getEliminationRoundName(winnersRoundNum, Math.ceil(Math.log2(numTeams)) + 1, 'Winners');
+  while (losersMatchesCreated < targetLosersMatches) {
+    const roundMatches: typeof matches = [];
+    const roundName = `Losers Round ${losersRoundNum}`;
     
-    for (let i = 0; i < currentWinnersRound.length; i += 2) {
-      if (i + 1 < currentWinnersRound.length) {
-        nextRound.push({
-          tournamentId,
-          gameId: null,
-          round: roundName,
-          matchNumber: matchCounter++,
-          bracketType: 'winners',
-          team1Id: null,
-          team2Id: null,
-          winnerId: null,
-          team1Score: null,
-          team2Score: null,
-          advancesToMatchId: null,
-          scheduledTime: null,
-          location: null,
-          status: 'scheduled',
-          notes: `Winner of match_${currentWinnersRound[i].matchNumber} vs Winner of match_${currentWinnersRound[i + 1].matchNumber}`
-        });
+    // Determine how many matches in this round
+    let matchesInRound: number;
+    
+    if (losersRoundNum === 1) {
+      // LR1: Pair up all WR1 losers
+      matchesInRound = Math.floor(currentLosersTeams / 2);
+    } else {
+      // LR2+: Merge LR winners + WR losers
+      const lrWinners = Math.floor(currentLosersTeams / 2) + (currentLosersTeams % 2);
+      if (winnersFeederIdx < winnersRounds.length) {
+        const wrLosers = winnersRounds[winnersFeederIdx].length;
+        matchesInRound = Math.floor((lrWinners + wrLosers) / 2);
+        winnersFeederIdx++;
       } else {
-        // Odd number - team advances automatically (bye)
-        nextRound.push({
-          tournamentId,
-          gameId: null,
-          round: roundName,
-          matchNumber: matchCounter++,
-          bracketType: 'winners',
-          team1Id: null,
-          team2Id: null,
-          winnerId: null,
-          team1Score: null,
-          team2Score: null,
-          advancesToMatchId: null,
-          scheduledTime: null,
-          location: null,
-          status: 'scheduled',
-          notes: `Bye - Winner of match_${currentWinnersRound[i].matchNumber} advances`
-        });
+        matchesInRound = Math.floor(lrWinners / 2);
       }
     }
     
-    if (nextRound.length > 0) {
-      matches.push(...nextRound);
-      rounds.push(roundName);
-      winnersRounds.push(nextRound);
-      currentWinnersRound = nextRound;
-      winnersRoundNum++;
-    } else {
-      break;
-    }
-  }
-  
-  // ===== LOSERS BRACKET with proper WR loser routing =====
-  const losersRounds: (typeof matches)[] = [];
-  
-  // LR1: Pair up WR1 losers
-  const lr1Matches: typeof matches = [];
-  for (let i = 0; i < wr1Matches.length; i += 2) {
-    if (i + 1 < wr1Matches.length) {
-      lr1Matches.push({
+    for (let i = 0; i < matchesInRound && losersMatchesCreated < targetLosersMatches; i++) {
+      roundMatches.push({
         tournamentId,
         gameId: null,
-        round: 'Losers Round 1',
+        round: roundName,
         matchNumber: matchCounter++,
         bracketType: 'losers',
         team1Id: null,
@@ -1084,67 +1096,33 @@ export function generateThreeGameGuarantee(
         scheduledTime: null,
         location: null,
         status: 'scheduled',
-        notes: `Loser of WR1 match_${wr1Matches[i].matchNumber} vs Loser of WR1 match_${wr1Matches[i + 1].matchNumber}`
+        notes: `Losers Round ${losersRoundNum}`
       });
-    } else {
-      // Odd WR1 loser gets bye to LR2
-      lr1Matches.push({
-        tournamentId,
-        gameId: null,
-        round: 'Losers Round 1',
-        matchNumber: matchCounter++,
-        bracketType: 'losers',
-        team1Id: null,
-        team2Id: null,
-        winnerId: null,
-        team1Score: null,
-        team2Score: null,
-        advancesToMatchId: null,
-        scheduledTime: null,
-        location: null,
-        status: 'scheduled',
-        notes: `Loser of WR1 match_${wr1Matches[i].matchNumber} (bye to LR2)`
-      });
+      losersMatchesCreated++;
     }
-  }
-  
-  if (lr1Matches.length > 0) {
-    matches.push(...lr1Matches);
-    rounds.push('Losers Round 1');
-    losersRounds.push(lr1Matches);
-  }
-  
-  // ===== GUARANTEE ROUND =====
-  // Collect all 0-2 teams (teams that lost WR1 AND lost LR1)
-  const guaranteeMatches: typeof matches = [];
-  const numGuaranteeMatches = Math.floor(lr1Matches.length / 2);
-  
-  for (let i = 0; i < numGuaranteeMatches; i++) {
-    const lr1Match1 = lr1Matches[i * 2];
-    const lr1Match2 = lr1Matches[i * 2 + 1];
     
-    guaranteeMatches.push({
-      tournamentId,
-      gameId: null,
-      round: '3-Game Guarantee Round',
-      matchNumber: matchCounter++,
-      bracketType: 'guarantee',
-      team1Id: null,
-      team2Id: null,
-      winnerId: null,
-      team1Score: null,
-      team2Score: null,
-      advancesToMatchId: null,
-      scheduledTime: null,
-      location: null,
-      status: 'scheduled',
-      notes: `Loser of LR1 match_${lr1Match1.matchNumber} vs Loser of LR1 match_${lr1Match2.matchNumber} (0-2 teams, 3rd game)`
-    });
+    if (roundMatches.length > 0) {
+      matches.push(...roundMatches);
+      if (!rounds.includes(roundName)) rounds.push(roundName);
+      losersRounds.push(roundMatches);
+    }
+    
+    currentLosersTeams = roundMatches.length + (roundMatches.length % 2);
+    losersRoundNum++;
+    
+    if (currentLosersTeams <= 1) break;
   }
   
-  // Handle odd number of LR1 matches
-  if (lr1Matches.length % 2 === 1) {
-    const lastLR1Match = lr1Matches[lr1Matches.length - 1];
+  // ===== GUARANTEE ROUND (ceil(z/2) matches) =====
+  // Structurally count 0-2 teams: teams that lose in WR1 and then lose in LR1
+  const wr1Losers = winnersRounds[0].length; // All WR1 matches produce losers
+  const lr1Matches = losersRounds.length > 0 ? losersRounds[0].length : 0;
+  const lr1Losers = lr1Matches; // All LR1 matches produce losers (these are 0-2 teams)
+  const zeroTwoTeams = lr1Losers;
+  const guaranteeMatchCount = Math.ceil(zeroTwoTeams / 2);
+  
+  const guaranteeMatches: typeof matches = [];
+  for (let i = 0; i < guaranteeMatchCount; i++) {
     guaranteeMatches.push({
       tournamentId,
       gameId: null,
@@ -1160,7 +1138,7 @@ export function generateThreeGameGuarantee(
       scheduledTime: null,
       location: null,
       status: 'scheduled',
-      notes: `Loser of LR1 match_${lastLR1Match.matchNumber} (0-2 team, placement match)`
+      notes: `0-2 teams (3rd game guarantee)`
     });
   }
   
@@ -1169,86 +1147,28 @@ export function generateThreeGameGuarantee(
     rounds.push('3-Game Guarantee Round');
   }
   
-  // Continue losers bracket: LR1 winners + WR2+ losers
-  let currentLosersRound = lr1Matches;
-  let losersRoundNum = 2;
-  let winnersFeederIdx = 1; // Start with WR2 (index 1 in winnersRounds array)
+  // ===== CHAMPIONSHIP (2 matches) =====
+  // Losers Bracket Finals
+  matches.push({
+    tournamentId,
+    gameId: null,
+    round: 'Losers Finals',
+    matchNumber: matchCounter++,
+    bracketType: 'losers',
+    team1Id: null,
+    team2Id: null,
+    winnerId: null,
+    team1Score: null,
+    team2Score: null,
+    advancesToMatchId: null,
+    scheduledTime: null,
+    location: null,
+    status: 'scheduled',
+    notes: 'Losers Bracket Finals - Winner advances to Grand Finals'
+  });
+  rounds.push('Losers Finals');
   
-  while (currentLosersRound.length > 0) {
-    const nextLosersRound: typeof matches = [];
-    const lr1Winners = currentLosersRound.length; // Number of winners advancing from previous LR
-    
-    // Check if we need to merge WR losers
-    const needsWRFeed = winnersFeederIdx < winnersRounds.length;
-    
-    if (needsWRFeed) {
-      // Merge round: LR winners + new WR losers
-      const wrLosersRound = winnersRounds[winnersFeederIdx];
-      const numWRLosers = wrLosersRound.length;
-      const totalEntrants = lr1Winners + numWRLosers;
-      const numMatches = Math.floor(totalEntrants / 2);
-      
-      for (let i = 0; i < numMatches; i++) {
-        nextLosersRound.push({
-          tournamentId,
-          gameId: null,
-          round: `Losers Round ${losersRoundNum}`,
-          matchNumber: matchCounter++,
-          bracketType: 'losers',
-          team1Id: null,
-          team2Id: null,
-          winnerId: null,
-          team1Score: null,
-          team2Score: null,
-          advancesToMatchId: null,
-          scheduledTime: null,
-          location: null,
-          status: 'scheduled',
-          notes: `LR${losersRoundNum - 1} winner vs WR${winnersFeederIdx + 1} loser`
-        });
-      }
-      
-      winnersFeederIdx++;
-    } else {
-      // No more WR losers - just pair LR winners
-      const numMatches = Math.floor(lr1Winners / 2);
-      
-      for (let i = 0; i < numMatches; i++) {
-        nextLosersRound.push({
-          tournamentId,
-          gameId: null,
-          round: `Losers Round ${losersRoundNum}`,
-          matchNumber: matchCounter++,
-          bracketType: 'losers',
-          team1Id: null,
-          team2Id: null,
-          winnerId: null,
-          team1Score: null,
-          team2Score: null,
-          advancesToMatchId: null,
-          scheduledTime: null,
-          location: null,
-          status: 'scheduled',
-          notes: `LR${losersRoundNum - 1} winner vs LR${losersRoundNum - 1} winner`
-        });
-      }
-    }
-    
-    if (nextLosersRound.length > 0) {
-      matches.push(...nextLosersRound);
-      rounds.push(`Losers Round ${losersRoundNum}`);
-      losersRounds.push(nextLosersRound);
-      currentLosersRound = nextLosersRound;
-      losersRoundNum++;
-    } else {
-      break;
-    }
-    
-    // Stop when we have a single LB champion
-    if (currentLosersRound.length === 1) break;
-  }
-  
-  // ===== GRAND FINALS =====
+  // Grand Finals
   matches.push({
     tournamentId,
     gameId: null,
@@ -1269,12 +1189,12 @@ export function generateThreeGameGuarantee(
   rounds.push('Grand Finals');
   
   // ===== VALIDATION =====
-  const minMatches = Math.ceil((numTeams * 3) / 2);
-  if (matches.length < minMatches) {
-    throw new Error(`3-Game Guarantee validation failed: Generated ${matches.length} matches but need minimum ${minMatches} for ${numTeams} teams`);
-  }
+  const expectedTotal = (numTeams - 1) + (numTeams - 2) + guaranteeMatchCount + 2;
+  console.log(`🏆 3-GAME GUARANTEE GENERATED - Total: ${matches.length}, Expected: ${expectedTotal}, Winners: ${winnersMatchesCreated}, Losers: ${losersMatchesCreated}, Guarantee: ${guaranteeMatchCount}, 0-2 teams: ${zeroTwoTeams}, Championship: 2`);
   
-  console.log(`🏆 3-GAME GUARANTEE GENERATED - Total: ${matches.length}, Winners: ${matches.filter(m => m.bracketType === 'winners').length}, Losers: ${matches.filter(m => m.bracketType === 'losers').length}, Guarantee: ${matches.filter(m => m.bracketType === 'guarantee').length}, Grand Finals: ${matches.filter(m => m.bracketType === 'grand_final').length}`);
+  if (matches.length < expectedTotal) {
+    throw new Error(`3-Game Guarantee validation failed: Generated ${matches.length} matches but expected ${expectedTotal} for ${numTeams} teams`);
+  }
   
   return { matches, rounds };
 }
