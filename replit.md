@@ -2,11 +2,13 @@
 
 Rosters is a free, comprehensive sports team management platform designed to streamline sports team management for various sports. It offers league and team organization, game scheduling, messaging, and tournament/playoff management functionalities. The platform operates on a freemium model with subscription-gated features, aiming to provide a robust solution for sports enthusiasts and administrators.
 
-## Tournament System (Nov 20, 2025)
+## Tournament System (Nov 20-21, 2025)
 
 The platform now includes a comprehensive tournament/playoff system supporting:
 - **Tournament Types**: Season playoffs and standalone tournaments
-- **Formats**: Single elimination (canonical seeding with bye handling), double elimination (universal algorithm complete), round robin, and split round robin
+- **Formats** (8 total): 
+  - **Phase 1**: Single elimination, double elimination, round robin, split round robin
+  - **Phase 2**: Triple elimination, 3-game guarantee, consolation tournament, compass draw
 - **Features**: 
   - Canonical bracket generation (1v16, 2v15, etc.) with configurable bye policies
   - **Bye Policy Options**:
@@ -30,6 +32,7 @@ The platform now includes a comprehensive tournament/playoff system supporting:
 - **Access Control**: Commissioner, Secondary Commissioner, and Admin only
 - **Backend**: Complete ✅
   - Database schema (3 tables: tournaments, tournament_teams, tournament_matches)
+  - Tournament format enum updated with all 8 formats via Drizzle ORM migration
   - API routes with full CRUD and permissions (requireLeagueManagement middleware)
   - Bracket generator with canonical seeding and configurable bye policies (stored in tournament.settings.byePolicy)
   - **Double Elimination Algorithm**: Universal state machine approach working for ANY team count
@@ -38,7 +41,12 @@ The platform now includes a comprehensive tournament/playoff system supporting:
     - Correct match counts for odd teams: 9 teams top_seed_bye = [4,2,1,1], play_in_game = [4,2,1]
     - Losers bracket sizing correctly derived from winners match counts
     - Validated for 4, 8, 9, 11, 13, 16, 32+ team scenarios
-  - Format recommendation engine with detailed pros/cons analysis
+  - **Phase 2 Bracket Generators** (all formats functional):
+    - **Triple Elimination**: Winners + Losers1 + Losers2 brackets (3 losses to eliminate)
+    - **3-Game Guarantee**: Winners + Losers brackets ensuring minimum 3 games per team
+    - **Consolation Tournament**: Championship + Consolation brackets (losers compete for 3rd place)
+    - **Compass Draw**: East/West divisions for initial placement-based brackets
+  - Format recommendation engine with detailed pros/cons analysis for all 8 formats
   - PATCH /api/tournaments/:id for editing draft tournaments with automatic bracket regeneration
 - **Frontend**: Complete with enhanced bracket visualization ✅
   - Tournaments Dashboard (/leagues/:leagueId/tournaments) - List view with status badges
@@ -46,11 +54,17 @@ The platform now includes a comprehensive tournament/playoff system supporting:
   - Tournament Edit (/tournaments/:tournamentId/edit) - Multi-step wizard with pre-filled data (draft-only), includes bye policy editing
   - Tournament Detail (/tournaments/:tournamentId) - Tabbed view with BracketView component supporting Play-In Round display
   - **BracketView Component**: SVG bracket rendering with:
-    - **Visual Hierarchy**: 4px color-coded borders (blue for winners bracket, red for losers bracket, gold for grand finals)
+    - **Visual Hierarchy**: 4px color-coded borders (blue for winners/championship, red for losers/consolation, purple for losers1, orange for losers2, gold for grand finals, green/teal for compass divisions)
+    - **Bracket-Specific Positioning**: Each bracket type (winners, losers, losers1, losers2, championship, consolation, compass divisions) uses its own geometry for accurate parent-child alignment
+    - **Multi-Bracket Layouts**: 
+      - Double Elimination: 2 brackets stacked (winners + losers)
+      - Triple Elimination: 3 brackets stacked (winners + losers1 + losers2)
+      - Consolation: 2 brackets stacked (championship + consolation)
+      - Compass Draw: 8 divisions in 2x4 grid
     - **Spacing Formulas**: Winners gap = baseGap × 2^(roundIndex), Losers gap = baseGap × 1.5^(floor(roundIndex/2))
     - **Connector Arrows**: Blue arrows for winner advancement, red arrows for loser drops to losers bracket
+    - Bracket labels for multi-bracket formats
     - Stable round ordering algorithm
-    - Horizontal separation of winners/losers brackets (no overlap)
     - Zoom controls (0.3x-3x): buttons, ctrl+scroll, pinch-to-zoom
     - Pan controls: drag, scroll, touch gestures
     - Dynamic layout calculation based on bracket size
@@ -62,7 +76,12 @@ The platform now includes a comprehensive tournament/playoff system supporting:
   - Match result recording UI is placeholder (infrastructure exists)
   - Connector anchoring uses notes-based heuristics rather than explicit slot metadata (visual may vary for complex transitions)
   - Losers bracket routing in double elimination requires manual match result entry to function (automatic advancement exists for winners bracket only)
-- **Testing Status**: Manual testing required (automated e2e blocked by auth configuration)
+  - tournament_matches.game_id field never populated during bracket generation (pending future implementation for league game integration)
+- **Testing Status**: 
+  - Phase 1 formats (single/double elimination, round robin, split round robin): Architect-reviewed ✅
+  - Phase 2 formats (triple elimination, 3-game guarantee, consolation, compass draw): Architect-reviewed ✅
+  - BracketView bracket-specific positioning refactoring: Architect-approved ✅
+  - Manual UI testing recommended for visual verification
 
 # User Preferences
 
