@@ -932,24 +932,66 @@ export default function BracketView({ matches, teams, format, settings, tourname
         calculateBracketPositions(main, mainRounds, startX, startY);
       }
 
-      // Add bracket labels
+      // Calculate total height needed and determine if we need multiple pages
+      const maxY = Math.max(...Array.from(matchPositions.values()).map(pos => pos.y + matchHeight));
+      const maxPageY = pageHeight - margin;
+      const needsMultiplePages = maxY > maxPageY;
+      
+      // Track current page and Y offset
+      let currentPage = 1;
+      let pageYOffset = 0;
+      
+      // Helper to add new page and reset title
+      const addNewPage = () => {
+        doc.addPage();
+        currentPage++;
+        pageYOffset = (currentPage - 1) * (pageHeight - margin - startY);
+        
+        // Add title on new page
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        const pageTitle = `${tournamentName || 'Tournament Bracket'} (Page ${currentPage})`;
+        const pageTitleWidth = doc.getTextWidth(pageTitle);
+        doc.text(pageTitle, (pageWidth - pageTitleWidth) / 2, margin + 20);
+      };
+      
+      // Helper to get adjusted Y for current page
+      const getPageY = (originalY: number): number => {
+        return originalY - pageYOffset;
+      };
+      
+      // Helper to check if element fits on current page
+      const fitsOnCurrentPage = (y: number, height: number = matchHeight): boolean => {
+        const adjustedY = getPageY(y);
+        return adjustedY >= startY && (adjustedY + height) <= maxPageY;
+      };
+      
+      // Add bracket labels for winners
       if (winnersRounds.length > 0) {
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(59, 130, 246); // Blue
+        doc.setTextColor(59, 130, 246);
         doc.text('Winners Bracket', startX, startY - 20);
       }
       
+      // Add bracket labels for losers
       if (losersRounds.length > 0) {
         const winnersBottomY = calculateBracketPositions(winners, winnersRounds, startX, startY);
         const losersStartY = winnersBottomY + bracketGap;
+        
+        // Check if losers label fits on current page, if not add new page
+        if (!fitsOnCurrentPage(losersStartY - 20)) {
+          addNewPage();
+        }
+        
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(220, 38, 38); // Red
-        doc.text('Losers Bracket', startX, losersStartY - 20);
+        doc.setTextColor(220, 38, 38);
+        doc.text('Losers Bracket', startX, getPageY(losersStartY - 20));
       }
       
-      // Draw all matches
+      // Draw all matches with multi-page support
       matches.forEach((match) => {
         const pos = matchPositions.get(match.id);
         if (!pos) return;
@@ -957,15 +999,22 @@ export default function BracketView({ matches, teams, format, settings, tourname
         const matchX = pos.x;
         const matchY = pos.y;
         
+        // Check if match fits on current page, if not add new page
+        if (!fitsOnCurrentPage(matchY, matchHeight)) {
+          addNewPage();
+        }
+        
+        const adjustedY = getPageY(matchY);
+        
         // Draw match box
         doc.setFillColor(255, 255, 255);
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(1);
-        doc.rect(matchX, matchY, matchWidth, matchHeight, 'FD');
+        doc.rect(matchX, adjustedY, matchWidth, matchHeight, 'FD');
         
         // Blue accent bar
         doc.setFillColor(59, 130, 246);
-        doc.rect(matchX, matchY, matchWidth, 3, 'F');
+        doc.rect(matchX, adjustedY, matchWidth, 3, 'F');
         
         // Team names
         doc.setFontSize(9);
@@ -975,25 +1024,25 @@ export default function BracketView({ matches, teams, format, settings, tourname
         const team1 = getTeamDisplay(match.team1Id, match, 'team1');
         const team2 = getTeamDisplay(match.team2Id, match, 'team2');
         
-        doc.text(team1.substring(0, 18), matchX + 5, matchY + 18);
+        doc.text(team1.substring(0, 18), matchX + 5, adjustedY + 18);
         doc.setTextColor(150, 150, 150);
         doc.setFontSize(8);
-        doc.text('vs', matchX + matchWidth / 2 - 5, matchY + matchHeight / 2 + 2);
+        doc.text('vs', matchX + matchWidth / 2 - 5, adjustedY + matchHeight / 2 + 2);
         doc.setFontSize(9);
         doc.setTextColor(0, 0, 0);
-        doc.text(team2.substring(0, 18), matchX + 5, matchY + 38);
+        doc.text(team2.substring(0, 18), matchX + 5, adjustedY + 38);
         
-        // Draw connector to next match
+        // Draw connector to next match (only if both matches are on same page)
         if (match.advancesToMatchId) {
           const nextPos = matchPositions.get(match.advancesToMatchId);
-          if (nextPos) {
+          if (nextPos && fitsOnCurrentPage(nextPos.y, matchHeight)) {
             doc.setDrawColor(200, 200, 200);
             doc.setLineWidth(0.5);
             
             const x1 = matchX + matchWidth;
-            const y1 = matchY + matchHeight / 2;
+            const y1 = adjustedY + matchHeight / 2;
             const x2 = nextPos.x;
-            const y2 = nextPos.y + matchHeight / 2;
+            const y2 = getPageY(nextPos.y) + matchHeight / 2;
             
             // Draw L-shaped connector
             doc.line(x1, y1, x1 + 15, y1);
