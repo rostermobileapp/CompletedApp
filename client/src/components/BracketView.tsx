@@ -6,7 +6,6 @@ import { ZoomIn, ZoomOut, Maximize2, Download } from "lucide-react";
 import type { TournamentMatch, TournamentTeam, TournamentSettings } from "@shared/schema";
 import { format as formatDate } from "date-fns";
 import { jsPDF } from "jspdf";
-import "svg2pdf.js";
 
 interface BracketViewProps {
   matches: TournamentMatch[];
@@ -755,43 +754,6 @@ export default function BracketView({ matches, teams, format, settings, tourname
     setPan({ x: 0, y: 0 });
   };
 
-  const inlineStyles = (svgClone: SVGElement, svgOriginal: SVGElement) => {
-    // Get all elements from both SVGs
-    const cloneElements = svgClone.querySelectorAll('*');
-    const originalElements = svgOriginal.querySelectorAll('*');
-    
-    // Inline computed styles for each element
-    cloneElements.forEach((cloneEl, index) => {
-      const originalEl = originalElements[index];
-      if (originalEl) {
-        const computedStyle = window.getComputedStyle(originalEl);
-        
-        // Key SVG properties to inline
-        const propertiesToInline = [
-          'fill', 'stroke', 'stroke-width', 'stroke-dasharray',
-          'font-family', 'font-size', 'font-weight', 'text-anchor',
-          'opacity', 'fill-opacity', 'stroke-opacity'
-        ];
-        
-        propertiesToInline.forEach(prop => {
-          const value = computedStyle.getPropertyValue(prop);
-          if (value && value !== 'none') {
-            (cloneEl as HTMLElement).style.setProperty(prop, value);
-          }
-        });
-      }
-    });
-    
-    // Remove any class attributes and transform styles
-    svgClone.querySelectorAll('*').forEach(el => {
-      el.removeAttribute('class');
-    });
-    
-    // Reset the SVG element's transform
-    svgClone.style.transform = '';
-    svgClone.style.transition = '';
-  };
-
   const exportToPDF = async () => {
     if (!svgRef.current) return;
     
@@ -814,27 +776,16 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const availableWidth = pageWidth - (2 * margin);
       const availableHeight = pageHeight - (2 * margin) - 50; // Extra space for title
       
-      // Clone the SVG to avoid modifying the original
-      const svgClone = svgRef.current.cloneNode(true) as SVGElement;
+      // Get SVG dimensions from viewBox
+      const viewBox = svgRef.current.getAttribute('viewBox');
+      let svgWidth = parseFloat(svgRef.current.getAttribute('width') || '0');
+      let svgHeight = parseFloat(svgRef.current.getAttribute('height') || '0');
       
-      // Inline all styles for PDF export
-      inlineStyles(svgClone, svgRef.current);
-      
-      // Get SVG dimensions from viewBox for accuracy
-      const viewBox = svgClone.getAttribute('viewBox');
-      let svgWidth = parseFloat(svgClone.getAttribute('width') || '0');
-      let svgHeight = parseFloat(svgClone.getAttribute('height') || '0');
-      
-      // If viewBox exists, use it for dimensions
       if (viewBox) {
         const [, , vbWidth, vbHeight] = viewBox.split(' ').map(Number);
         svgWidth = vbWidth;
         svgHeight = vbHeight;
       }
-      
-      // Reset width/height on clone to use viewBox
-      svgClone.setAttribute('width', svgWidth.toString());
-      svgClone.setAttribute('height', svgHeight.toString());
       
       // Calculate scale to fit within available space
       const scaleX = availableWidth / svgWidth;
@@ -855,13 +806,42 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const titleWidth = doc.getTextWidth(title);
       doc.text(title, (pageWidth - titleWidth) / 2, margin + 20);
       
-      // Convert SVG to PDF
-      await doc.svg(svgClone, {
-        x: xOffset,
-        y: yOffset,
-        width: scaledWidth,
-        height: scaledHeight
+      // Convert SVG to canvas then to image
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Could not get canvas context');
+      
+      // Set canvas dimensions with higher DPI for better quality
+      const dpi = 2;
+      canvas.width = svgWidth * dpi;
+      canvas.height = svgHeight * dpi;
+      
+      // Serialize the SVG
+      const svgData = new XMLSerializer().serializeToString(svgRef.current);
+      
+      // Create an image from the SVG
+      const img = new Image();
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      
+      await new Promise((resolve, reject) => {
+        img.onload = () => {
+          // Draw the image onto the canvas with higher DPI
+          ctx.scale(dpi, dpi);
+          ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
+          URL.revokeObjectURL(url);
+          resolve(null);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('Failed to load SVG image'));
+        };
+        img.src = url;
       });
+      
+      // Add canvas image to PDF
+      const imgData = canvas.toDataURL('image/png');
+      doc.addImage(imgData, 'PNG', xOffset, yOffset, scaledWidth, scaledHeight);
       
       // Save the PDF
       const filename = tournamentName 
