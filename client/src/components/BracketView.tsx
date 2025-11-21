@@ -756,16 +756,14 @@ export default function BracketView({ matches, teams, format, settings, tourname
   };
 
   const exportToPDF = async () => {
-    if (!svgRef.current) return;
-    
     setIsExporting(true);
     
     try {
       // Create PDF in landscape mode, 8.5x11 inches
       // jsPDF uses points (72 points = 1 inch)
-      const pageWidth = 11 * 72; // 11 inches in points
-      const pageHeight = 8.5 * 72; // 8.5 inches in points
-      const margin = 0.5 * 72; // 0.5 inch margins in points
+      const pageWidth = 11 * 72; // 792 points
+      const pageHeight = 8.5 * 72; // 612 points
+      const margin = 0.5 * 72; // 36 points
       
       const doc = new jsPDF({
         orientation: 'landscape',
@@ -781,64 +779,101 @@ export default function BracketView({ matches, teams, format, settings, tourname
       doc.text(title, (pageWidth - titleWidth) / 2, margin + 20);
 
       // Calculate available space after margins
-      const availableWidth = pageWidth - (2 * margin);
-      const availableHeight = pageHeight - (2 * margin) - 50; // Extra space for title
+      const availableWidth = pageWidth - (2 * margin); // 720pt
+      const availableHeight = pageHeight - (2 * margin) - 60; // 516pt (leave space for title)
       
-      // Create a temporary div to hold a clean copy of the SVG for export
-      const tempDiv = document.createElement('div');
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-10000px';
-      tempDiv.style.top = '-10000px';
-      tempDiv.style.width = `${svgWidth}px`;
-      tempDiv.style.height = `${svgHeight}px`;
-      tempDiv.style.backgroundColor = '#ffffff';
-      document.body.appendChild(tempDiv);
+      // Organize matches by round
+      const roundsMap = new Map<string, TournamentMatch[]>();
+      matches.forEach(match => {
+        const round = match.roundName || 'Unknown';
+        if (!roundsMap.has(round)) {
+          roundsMap.set(round, []);
+        }
+        roundsMap.get(round)!.push(match);
+      });
+
+      // Get unique rounds in order
+      const rounds = Array.from(new Set(matches.map(m => m.roundName || 'Unknown')));
+      const numRounds = rounds.length;
       
-      try {
-        // Clone the SVG without transforms
-        const svgClone = svgRef.current.cloneNode(true) as SVGSVGElement;
-        svgClone.setAttribute('width', String(svgWidth));
-        svgClone.setAttribute('height', String(svgHeight));
-        svgClone.style.transform = 'none';
-        svgClone.style.transition = 'none';
-        tempDiv.appendChild(svgClone);
+      // Calculate layout
+      const matchHeight = 50; // Height of each match box
+      const matchWidth = Math.min(140, availableWidth / numRounds - 20); // Width of each match box
+      const roundSpacing = availableWidth / (numRounds + 1); // Space between rounds
+      
+      // Starting position
+      const startX = margin + roundSpacing / 2;
+      const startY = margin + 80; // After title
+
+      // Draw each round
+      rounds.forEach((round, roundIndex) => {
+        const roundMatches = roundsMap.get(round) || [];
+        const numMatches = roundMatches.length;
+        const verticalSpacing = Math.min(matchHeight * 2.5, availableHeight / numMatches);
         
-        // Capture the temporary div with html2canvas
-        const canvas = await html2canvas(tempDiv, {
-          backgroundColor: '#ffffff',
-          scale: 2, // Higher quality
-          logging: false
+        const roundX = startX + roundIndex * roundSpacing;
+        
+        // Draw round label
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(100, 100, 100);
+        doc.text(round, roundX, startY - 10);
+        
+        // Draw each match in this round
+        roundMatches.forEach((match, matchIndex) => {
+          const matchY = startY + matchIndex * verticalSpacing;
+          
+          // Draw match box with border (similar to game cards)
+          doc.setFillColor(255, 255, 255); // White background
+          doc.setDrawColor(200, 200, 200); // Light gray border
+          doc.setLineWidth(1);
+          doc.rect(roundX, matchY, matchWidth, matchHeight, 'FD'); // Fill and Draw
+          
+          // Add colored top border accent (blue)
+          doc.setFillColor(59, 130, 246); // Blue accent
+          doc.rect(roundX, matchY, matchWidth, 3, 'F');
+          
+          // Draw team names
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(0, 0, 0);
+          
+          const team1 = getTeamDisplay(match.team1Id, match, 'team1');
+          const team2 = getTeamDisplay(match.team2Id, match, 'team2');
+          
+          // Team 1
+          doc.text(team1.substring(0, 18), roundX + 5, matchY + 18);
+          
+          // vs
+          doc.setTextColor(150, 150, 150);
+          doc.setFontSize(8);
+          doc.text('vs', roundX + matchWidth / 2 - 5, matchY + matchHeight / 2 + 2);
+          
+          // Team 2
+          doc.setFontSize(9);
+          doc.setTextColor(0, 0, 0);
+          doc.text(team2.substring(0, 18), roundX + 5, matchY + 38);
+          
+          // Draw connectors to next round
+          if (roundIndex < numRounds - 1) {
+            const nextRoundX = startX + (roundIndex + 1) * roundSpacing;
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.line(
+              roundX + matchWidth,
+              matchY + matchHeight / 2,
+              nextRoundX,
+              matchY + matchHeight / 2
+            );
+          }
         });
-        
-        // Get canvas dimensions
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        
-        // Calculate scale to fit within available space
-        const scaleX = availableWidth / canvasWidth;
-        const scaleY = availableHeight / canvasHeight;
-        const scale = Math.min(scaleX, scaleY);
-        
-        const scaledWidth = canvasWidth * scale;
-        const scaledHeight = canvasHeight * scale;
-        
-        // Center the bracket on the page
-        const xOffset = margin + (availableWidth - scaledWidth) / 2;
-        const yOffset = margin + 50; // Leave space for title
-        
-        // Add canvas image to PDF
-        const imgData = canvas.toDataURL('image/png');
-        doc.addImage(imgData, 'PNG', xOffset, yOffset, scaledWidth, scaledHeight);
-        
-        // Save the PDF
-        const filename = tournamentName 
-          ? `${tournamentName.replace(/[^a-z0-9]/gi, '_')}_bracket.pdf`
-          : 'tournament_bracket.pdf';
-        doc.save(filename);
-      } finally {
-        // Clean up temporary element
-        document.body.removeChild(tempDiv);
-      }
+      });
+      
+      // Save the PDF
+      const filename = tournamentName 
+        ? `${tournamentName.replace(/[^a-z0-9]/gi, '_')}_bracket.pdf`
+        : 'tournament_bracket.pdf';
+      doc.save(filename);
       
     } catch (error) {
       console.error('Error exporting PDF:', error);
