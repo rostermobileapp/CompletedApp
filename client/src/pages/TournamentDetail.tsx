@@ -439,28 +439,65 @@ export default function TournamentDetail() {
                 })()}
                 
                 {tournament.format === 'custom_bracket' ? (
-                  // Custom bracket builder
+                  // Custom bracket display
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Custom Bracket</CardTitle>
-                      <CardDescription>
-                        Design your own tournament bracket structure
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center py-8">
-                      <Trophy className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Build Your Bracket</h3>
-                      <p className="text-muted-foreground mb-6">
-                        Use the custom bracket builder to create your tournament structure
-                      </p>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <div>
+                        <CardTitle>Custom Bracket</CardTitle>
+                        <CardDescription>
+                          {(tournament.settings as any)?.customBracket ? 'Your custom tournament structure' : 'Design your own tournament bracket structure'}
+                        </CardDescription>
+                      </div>
                       <Button
                         onClick={() => setLocation(`/tournaments/${tournamentId}/custom-builder`)}
                         data-testid="button-open-bracket-builder"
+                        variant="outline"
                         className="gap-2"
                       >
                         <Edit3 className="h-4 w-4" />
-                        Open Bracket Builder
+                        {(tournament.settings as any)?.customBracket ? 'Edit Bracket' : 'Build Bracket'}
                       </Button>
+                    </CardHeader>
+                    <CardContent>
+                      {(tournament.settings as any)?.customBracket?.matchups?.length > 0 ? (
+                        <div className="border rounded-lg p-4 bg-muted/30">
+                          <div className="grid gap-4">
+                            {((tournament.settings as any).customBracket.matchups as any[]).map((matchup: any, index: number) => (
+                              <div key={index} className="border rounded-lg p-4 bg-card">
+                                <div className="font-semibold mb-2">{matchup.gameNumber}</div>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <div className="text-sm mb-1">
+                                      {matchup.team1?.startsWith('winner:') 
+                                        ? <span className="text-muted-foreground italic">{matchup.team1.replace('winner:', 'Winner of ')}</span>
+                                        : <span>{matchup.team1 || 'TBD'}</span>
+                                      }
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">vs</div>
+                                    <div className="text-sm mt-1">
+                                      {matchup.team2?.startsWith('winner:')
+                                        ? <span className="text-muted-foreground italic">{matchup.team2.replace('winner:', 'Winner of ')}</span>
+                                        : <span>{matchup.team2 || 'TBD'}</span>
+                                      }
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-4 text-xs text-muted-foreground text-center">
+                            {(tournament.settings as any).customBracket.matchups.length} matchup{(tournament.settings as any).customBracket.matchups.length !== 1 ? 's' : ''} in bracket
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Trophy className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">Build Your Bracket</h3>
+                          <p className="text-muted-foreground mb-6">
+                            Use the custom bracket builder to create your tournament structure
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ) : (tournament.format === 'single_elimination' || 
