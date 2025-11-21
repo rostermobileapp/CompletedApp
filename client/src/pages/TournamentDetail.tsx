@@ -1,6 +1,7 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download } from "lucide-react";
+import jsPDF from 'jspdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ export default function TournamentDetail() {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingMatch, setEditingMatch] = useState<TournamentMatch | null>(null);
+  const [isExportingSchedule, setIsExportingSchedule] = useState(false);
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
@@ -114,6 +116,163 @@ export default function TournamentDetail() {
     if (!teamId) return "TBD";
     const team = teams?.find(t => t.id === teamId);
     return team?.teamName || "TBD";
+  };
+
+  // Export schedule to PDF
+  const exportScheduleToPDF = async () => {
+    if (!matches || matches.length === 0) {
+      toast({
+        title: "No matches",
+        description: "There are no matches to export",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsExportingSchedule(true);
+    
+    try {
+      // Create PDF in portrait mode, 8.5x11 inches
+      const pageWidth = 8.5 * 72; // 612 points
+      const pageHeight = 11 * 72; // 792 points
+      const margin = 0.5 * 72; // 36 points
+      
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: [pageWidth, pageHeight]
+      });
+
+      // Title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      const title = `${tournament?.name || 'Tournament'} - Schedule`;
+      const titleWidth = doc.getTextWidth(title);
+      doc.text(title, (pageWidth - titleWidth) / 2, margin + 20);
+
+      // Subtitle with format
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      const subtitle = getFormatLabel(tournament?.format || 'single_elimination');
+      const subtitleWidth = doc.getTextWidth(subtitle);
+      doc.text(subtitle, (pageWidth - subtitleWidth) / 2, margin + 35);
+
+      const availableWidth = pageWidth - (2 * margin);
+      const maxPageY = pageHeight - margin;
+      let currentY = margin + 60;
+      let currentPage = 1;
+
+      // Helper to add new page
+      const addNewPage = () => {
+        doc.addPage();
+        currentPage++;
+        currentY = margin + 20;
+        
+        // Add page number
+        doc.setFontSize(9);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${currentPage}`, pageWidth - margin - 40, margin + 10);
+        
+        currentY = margin + 30;
+      };
+
+      // Helper to check if content fits on page
+      const fitsOnPage = (height: number): boolean => {
+        return (currentY + height) <= maxPageY;
+      };
+
+      // Sort matches by match number
+      const sortedMatches = [...matches].sort((a, b) => a.matchNumber - b.matchNumber);
+
+      // Draw each match
+      sortedMatches.forEach((match, index) => {
+        const matchHeight = 70; // Approximate height for match card
+        
+        // Check if we need a new page
+        if (!fitsOnPage(matchHeight + 10)) {
+          addNewPage();
+        }
+
+        const team1Name = getTeamName(match.team1Id);
+        const team2Name = getTeamName(match.team2Id);
+
+        // Match card background
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(1);
+        doc.rect(margin, currentY, availableWidth, matchHeight, 'FD');
+
+        // Blue accent bar
+        doc.setFillColor(59, 130, 246);
+        doc.rect(margin, currentY, availableWidth, 3, 'F');
+
+        // Match number and round
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Match ${match.matchNumber} - ${match.round}`, margin + 10, currentY + 20);
+
+        // Teams
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${team1Name} vs ${team2Name}`, margin + 10, currentY + 38);
+
+        // Date/Time
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        if (match.scheduledTime) {
+          const dateStr = format(new Date(match.scheduledTime), "MMM d, yyyy 'at' h:mm a");
+          doc.text(`⏰ ${dateStr}`, margin + 10, currentY + 52);
+        } else {
+          doc.text('⏰ Not scheduled', margin + 10, currentY + 52);
+        }
+
+        // Location
+        if (match.location) {
+          doc.text(`📍 ${match.location}`, margin + 10, currentY + 64);
+        }
+
+        // Status badge (top right)
+        const statusX = pageWidth - margin - 80;
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        
+        if (match.status === 'completed') {
+          doc.setTextColor(34, 197, 94); // green
+          doc.text('COMPLETED', statusX, currentY + 20);
+        } else if (match.status === 'pending') {
+          doc.setTextColor(250, 204, 21); // yellow
+          doc.text('PENDING', statusX, currentY + 20);
+        } else {
+          doc.setTextColor(100, 100, 100); // gray
+          doc.text('SCHEDULED', statusX, currentY + 20);
+        }
+
+        currentY += matchHeight + 8; // Add spacing between matches
+      });
+
+      // Save PDF
+      const filename = tournament?.name 
+        ? `${tournament.name.replace(/[^a-z0-9]/gi, '_')}_schedule.pdf`
+        : 'tournament_schedule.pdf';
+      doc.save(filename);
+      
+      toast({
+        title: "PDF exported",
+        description: "Schedule has been downloaded successfully"
+      });
+      
+    } catch (error) {
+      console.error('Error exporting schedule PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to export PDF. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExportingSchedule(false);
+    }
   };
 
   if (isLoading) {
@@ -416,13 +575,27 @@ export default function TournamentDetail() {
           <TabsContent value="schedule">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Match Schedule
-                </CardTitle>
-                <CardDescription>
-                  View and manage all tournament matches
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5" />
+                      Match Schedule
+                    </CardTitle>
+                    <CardDescription>
+                      View and manage all tournament matches
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => exportScheduleToPDF()}
+                    disabled={isExportingSchedule}
+                    data-testid="button-download-schedule-pdf"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    {isExportingSchedule ? 'Exporting...' : 'Download PDF'}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
