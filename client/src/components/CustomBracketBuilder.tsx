@@ -80,6 +80,7 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const addMatchup = (type: MatchupType) => {
     const centerX = -pan.x / zoom + 400;
@@ -252,6 +253,81 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
     }
   };
 
+  const handleGenerateMatches = async () => {
+    if (!tournamentId) {
+      toast({
+        title: "Error",
+        description: "Tournament ID not found",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (matchups.length === 0) {
+      toast({
+        title: "Error",
+        description: "No matchups to generate. Add matchups first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate all matchups have teams assigned
+    const invalidMatchups = matchups.filter(m => !m.team1 || !m.team2);
+    if (invalidMatchups.length > 0) {
+      toast({
+        title: "Incomplete Matchups",
+        description: `${invalidMatchups.length} matchup(s) don't have both teams assigned. Please assign teams to all matchups.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      
+      // Save bracket structure to tournament settings
+      const bracketData = {
+        matchups,
+        connections,
+        zoom,
+        pan
+      };
+
+      const response = await fetch(`/api/tournaments/${tournamentId}/generate-custom-matches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bracketData })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to generate matches');
+      }
+
+      toast({
+        title: "Matches Generated!",
+        description: "Your custom bracket has been converted to tournament matches"
+      });
+
+      // Clear localStorage after successful generation
+      localStorage.removeItem('customBracket');
+
+      // Call callback if provided
+      if (onGenerateMatches) {
+        onGenerateMatches();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate matches",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   useEffect(() => {
     // Auto-load on mount
     const saved = localStorage.getItem('customBracket');
@@ -333,6 +409,17 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
         >
           <Download className="h-4 w-4" />
           Load
+        </Button>
+        <div className="h-6 w-px bg-border" />
+        <Button
+          onClick={handleGenerateMatches}
+          variant="default"
+          className="gap-2"
+          data-testid="button-generate-matches"
+          disabled={matchups.length === 0 || isGenerating}
+        >
+          <Check className="h-4 w-4" />
+          {isGenerating ? "Generating..." : "Generate Matches"}
         </Button>
         <div className="ml-auto text-sm text-muted-foreground">
           {matchups.length} matchup{matchups.length !== 1 ? 's' : ''}
