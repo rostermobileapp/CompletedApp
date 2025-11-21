@@ -96,6 +96,7 @@ export function CustomBracketBuilder({
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const addMatchup = (type: MatchupType) => {
     const centerX = -pan.x / zoom + 400;
@@ -239,7 +240,7 @@ export function CustomBracketBuilder({
     }
   };
 
-  const saveBracket = () => {
+  const saveBracket = async () => {
     const bracketData = {
       matchups,
       connections,
@@ -249,15 +250,22 @@ export function CustomBracketBuilder({
     localStorage.setItem('customBracket', JSON.stringify(bracketData));
     
     if (onSave) {
-      // Parent will add locked: true when saving
-      onSave(bracketData);
-    }
-    
-    if (onLock) {
-      onLock();
-    }
-    
-    if (!embeddable) {
+      setIsSaving(true);
+      try {
+        // Parent will add locked: true when saving
+        await onSave(bracketData);
+        
+        // Only lock if save succeeded
+        if (onLock) {
+          onLock();
+        }
+      } catch (error) {
+        // Error is already shown by parent's toast, keep bracket unlocked
+        console.error('Failed to save bracket:', error);
+      } finally {
+        setIsSaving(false);
+      }
+    } else if (!embeddable) {
       toast({
         title: "Bracket saved",
         description: "Your custom bracket has been saved"
@@ -463,10 +471,13 @@ export function CustomBracketBuilder({
             variant="default"
             className="gap-2"
             data-testid={embeddable ? "button-save-lock" : "button-generate-matches"}
-            disabled={matchups.length === 0 || isGenerating}
+            disabled={matchups.length === 0 || isGenerating || isSaving}
           >
             <Check className="h-4 w-4" />
-            {embeddable ? "Save & Lock Bracket" : (isGenerating ? "Generating..." : "Generate Matches")}
+            {embeddable 
+              ? (isSaving ? "Saving..." : "Save & Lock Bracket")
+              : (isGenerating ? "Generating..." : "Generate Matches")
+            }
           </Button>
           <div className="ml-auto text-sm text-muted-foreground">
             {matchups.length} matchup{matchups.length !== 1 ? 's' : ''}

@@ -507,6 +507,7 @@ export default function TournamentDetail() {
                               description: "Failed to save bracket",
                               variant: "destructive"
                             });
+                            throw error; // Rethrow so CustomBracketBuilder knows save failed
                           }
                         }}
                         onLock={() => setIsEditingBracket(false)}
