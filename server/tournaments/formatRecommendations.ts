@@ -1,5 +1,5 @@
 export interface FormatRecommendation {
-  format: 'single_elimination' | 'double_elimination' | 'three_game_guarantee' | 'consolation' | 'compass_draw' | 'round_robin' | 'round_robin_split';
+  format: 'single_elimination' | 'double_elimination' | 'three_game_guarantee' | 'consolation' | 'round_robin' | 'round_robin_split';
   recommended: boolean;
   name: string;
   description: string;
@@ -100,28 +100,6 @@ export function getFormatRecommendations(numTeams: number): FormatRecommendation
         'Requires more organization'
       ],
       estimatedGames: consolationGames
-    });
-  }
-
-  // Compass Draw
-  if (numTeams >= 16 && numTeams <= 32) {
-    const compassGames = numTeams * 5; // Minimum 5 games per team
-    recommendations.push({
-      format: 'compass_draw',
-      recommended: numTeams === 16 || numTeams === 32,
-      name: 'Compass Draw',
-      description: '8-division system with skill-based progression - guarantees 5+ games',
-      pros: [
-        'Guaranteed 5+ games for all teams',
-        'Fair matchups (similar skill levels)',
-        'Great for racquet sports/tennis'
-      ],
-      cons: [
-        'Very long format (5+ rounds)',
-        'Complex 8-bracket structure',
-        'Best for experienced organizers'
-      ],
-      estimatedGames: compassGames
     });
   }
 
