@@ -760,7 +760,6 @@ export default function BracketView({ matches, teams, format, settings, tourname
     
     try {
       // Create PDF in landscape mode, 8.5x11 inches
-      // jsPDF uses points (72 points = 1 inch)
       const pageWidth = 11 * 72; // 792 points
       const pageHeight = 8.5 * 72; // 612 points
       const margin = 0.5 * 72; // 36 points
@@ -778,39 +777,81 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const titleWidth = doc.getTextWidth(title);
       doc.text(title, (pageWidth - titleWidth) / 2, margin + 20);
 
-      // Calculate available space after margins
-      const availableWidth = pageWidth - (2 * margin); // 720pt
-      const availableHeight = pageHeight - (2 * margin) - 60; // 516pt (leave space for title)
+      const availableWidth = pageWidth - (2 * margin);
+      const availableHeight = pageHeight - (2 * margin) - 60;
       
-      // Organize matches by round
+      // Organize matches by round and sort
       const roundsMap = new Map<string, TournamentMatch[]>();
       matches.forEach(match => {
-        const round = match.roundName || 'Unknown';
+        const round = match.round || 'Unknown';
         if (!roundsMap.has(round)) {
           roundsMap.set(round, []);
         }
         roundsMap.get(round)!.push(match);
       });
 
-      // Get unique rounds in order
-      const rounds = Array.from(new Set(matches.map(m => m.roundName || 'Unknown')));
+      // Get rounds in proper order
+      const rounds = Array.from(new Set(matches.map(m => m.round || 'Unknown')));
       const numRounds = rounds.length;
       
-      // Calculate layout
-      const matchHeight = 50; // Height of each match box
-      const matchWidth = Math.min(140, availableWidth / numRounds - 20); // Width of each match box
-      const roundSpacing = availableWidth / (numRounds + 1); // Space between rounds
-      
-      // Starting position
+      const matchHeight = 50;
+      const matchWidth = Math.min(140, availableWidth / numRounds - 30);
+      const roundSpacing = availableWidth / (numRounds + 1);
       const startX = margin + roundSpacing / 2;
-      const startY = margin + 80; // After title
+      const startY = margin + 80;
 
-      // Draw each round
+      // Calculate positions for each match using bracket tree logic
+      const matchPositions = new Map<string, { x: number; y: number }>();
+      
+      // First pass: position first round matches evenly
+      const firstRound = rounds[0];
+      const firstRoundMatches = roundsMap.get(firstRound) || [];
+      const baseSpacing = availableHeight / firstRoundMatches.length;
+      
+      firstRoundMatches.forEach((match, index) => {
+        matchPositions.set(match.id, {
+          x: startX,
+          y: startY + index * baseSpacing
+        });
+      });
+      
+      // Subsequent rounds: position between parent matches
+      for (let roundIndex = 1; roundIndex < numRounds; roundIndex++) {
+        const round = rounds[roundIndex];
+        const roundMatches = roundsMap.get(round) || [];
+        const roundX = startX + roundIndex * roundSpacing;
+        
+        roundMatches.forEach((match) => {
+          // Find parent matches (matches that feed into this one)
+          const parentMatches = matches.filter(m => 
+            m.advancesToMatchId === match.id
+          );
+          
+          if (parentMatches.length > 0) {
+            // Position this match between its parent matches
+            const parentPositions = parentMatches
+              .map(p => matchPositions.get(p.id))
+              .filter(p => p !== undefined);
+            
+            if (parentPositions.length > 0) {
+              const avgY = parentPositions.reduce((sum, pos) => sum + pos!.y, 0) / parentPositions.length;
+              matchPositions.set(match.id, { x: roundX, y: avgY });
+            } else {
+              // Fallback: evenly space if no parent positions found
+              const roundY = startY + (roundMatches.indexOf(match) * availableHeight / roundMatches.length);
+              matchPositions.set(match.id, { x: roundX, y: roundY });
+            }
+          } else {
+            // Fallback: evenly space
+            const roundY = startY + (roundMatches.indexOf(match) * availableHeight / roundMatches.length);
+            matchPositions.set(match.id, { x: roundX, y: roundY });
+          }
+        });
+      }
+
+      // Draw rounds
       rounds.forEach((round, roundIndex) => {
         const roundMatches = roundsMap.get(round) || [];
-        const numMatches = roundMatches.length;
-        const verticalSpacing = Math.min(matchHeight * 2.5, availableHeight / numMatches);
-        
         const roundX = startX + roundIndex * roundSpacing;
         
         // Draw round label
@@ -819,21 +860,24 @@ export default function BracketView({ matches, teams, format, settings, tourname
         doc.setTextColor(100, 100, 100);
         doc.text(round, roundX, startY - 10);
         
-        // Draw each match in this round
-        roundMatches.forEach((match, matchIndex) => {
-          const matchY = startY + matchIndex * verticalSpacing;
+        // Draw matches
+        roundMatches.forEach((match) => {
+          const pos = matchPositions.get(match.id);
+          if (!pos) return;
           
-          // Draw match box with border (similar to game cards)
-          doc.setFillColor(255, 255, 255); // White background
-          doc.setDrawColor(200, 200, 200); // Light gray border
+          const matchY = pos.y;
+          
+          // Draw match box
+          doc.setFillColor(255, 255, 255);
+          doc.setDrawColor(200, 200, 200);
           doc.setLineWidth(1);
-          doc.rect(roundX, matchY, matchWidth, matchHeight, 'FD'); // Fill and Draw
+          doc.rect(roundX, matchY, matchWidth, matchHeight, 'FD');
           
-          // Add colored top border accent (blue)
-          doc.setFillColor(59, 130, 246); // Blue accent
+          // Blue accent bar
+          doc.setFillColor(59, 130, 246);
           doc.rect(roundX, matchY, matchWidth, 3, 'F');
           
-          // Draw team names
+          // Team names
           doc.setFontSize(9);
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(0, 0, 0);
@@ -841,35 +885,36 @@ export default function BracketView({ matches, teams, format, settings, tourname
           const team1 = getTeamDisplay(match.team1Id, match, 'team1');
           const team2 = getTeamDisplay(match.team2Id, match, 'team2');
           
-          // Team 1
           doc.text(team1.substring(0, 18), roundX + 5, matchY + 18);
-          
-          // vs
           doc.setTextColor(150, 150, 150);
           doc.setFontSize(8);
           doc.text('vs', roundX + matchWidth / 2 - 5, matchY + matchHeight / 2 + 2);
-          
-          // Team 2
           doc.setFontSize(9);
           doc.setTextColor(0, 0, 0);
           doc.text(team2.substring(0, 18), roundX + 5, matchY + 38);
           
-          // Draw connectors to next round
-          if (roundIndex < numRounds - 1) {
-            const nextRoundX = startX + (roundIndex + 1) * roundSpacing;
-            doc.setDrawColor(200, 200, 200);
-            doc.setLineWidth(0.5);
-            doc.line(
-              roundX + matchWidth,
-              matchY + matchHeight / 2,
-              nextRoundX,
-              matchY + matchHeight / 2
-            );
+          // Draw connector to next match
+          if (match.advancesToMatchId) {
+            const nextPos = matchPositions.get(match.advancesToMatchId);
+            if (nextPos) {
+              doc.setDrawColor(200, 200, 200);
+              doc.setLineWidth(0.5);
+              
+              const x1 = roundX + matchWidth;
+              const y1 = matchY + matchHeight / 2;
+              const x2 = nextPos.x;
+              const y2 = nextPos.y + matchHeight / 2;
+              
+              // Draw L-shaped connector
+              doc.line(x1, y1, x1 + 15, y1);
+              doc.line(x1 + 15, y1, x1 + 15, y2);
+              doc.line(x1 + 15, y2, x2, y2);
+            }
           }
         });
       });
       
-      // Save the PDF
+      // Save PDF
       const filename = tournamentName 
         ? `${tournamentName.replace(/[^a-z0-9]/gi, '_')}_bracket.pdf`
         : 'tournament_bracket.pdf';
