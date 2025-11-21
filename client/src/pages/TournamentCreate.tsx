@@ -36,7 +36,10 @@ const formSchema = z.object({
   format: z.enum(["single_elimination", "double_elimination", "round_robin", "round_robin_split"]),
   description: z.string().optional(),
   teamIds: z.array(z.string()).min(2, "Select at least 2 teams"),
-  byePolicy: z.enum(["top_seed_bye", "play_in_game"]).optional()
+  byePolicy: z.enum(["top_seed_bye", "play_in_game"]).optional(),
+  bracketType: z.enum(["seeded", "blind_draw"]).default("seeded"),
+  showSeedNumbers: z.boolean().default(true),
+  showGameNumbers: z.boolean().default(false)
 }).refine((data) => {
   // Season playoffs require a valid seasonId
   if (data.type === "season_playoff") {
@@ -66,7 +69,10 @@ export default function TournamentCreate() {
       format: "single_elimination",
       description: "",
       teamIds: [],
-      byePolicy: "top_seed_bye"
+      byePolicy: "top_seed_bye",
+      bracketType: "seeded",
+      showSeedNumbers: true,
+      showGameNumbers: false
     }
   });
 
@@ -104,6 +110,9 @@ export default function TournamentCreate() {
       if (data.byePolicy) {
         settings.byePolicy = data.byePolicy;
       }
+      settings.bracketType = data.bracketType;
+      settings.showSeedNumbers = data.showSeedNumbers;
+      settings.showGameNumbers = data.showGameNumbers;
       
       const response = await apiRequest('POST', `/api/tournaments`, {
         leagueId: leagueId!,
@@ -473,6 +482,95 @@ export default function TournamentCreate() {
                     />
                   </CardContent>
                 </Card>
+
+                {/* Bracket Display Settings - Show for elimination formats */}
+                {(watchedFormat === "single_elimination" || watchedFormat === "double_elimination") && watchedTeamIds.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Bracket Display Settings</CardTitle>
+                      <CardDescription>
+                        Customize how your bracket is displayed and seeded
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="bracketType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bracket Type</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-bracket-type">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="seeded">Seeded (1 vs 16, 8 vs 9, etc.)</SelectItem>
+                                <SelectItem value="blind_draw">Blind Draw (Random Order)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Seeded brackets use canonical matchups (top seed vs bottom seed). Blind draw randomizes team placement.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex items-center justify-between space-x-2 border rounded-lg p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel>Show Seed Numbers</FormLabel>
+                          <FormDescription>
+                            Display seed numbers (#1, #2, etc.) next to team names in the bracket
+                          </FormDescription>
+                        </div>
+                        <FormField
+                          control={form.control}
+                          name="showSeedNumbers"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="checkbox-show-seed-numbers"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between space-x-2 border rounded-lg p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel>Show Game Numbers</FormLabel>
+                          <FormDescription>
+                            Display sequential game numbers (Game 1, Game 2, etc.) showing order of play
+                          </FormDescription>
+                        </div>
+                        <FormField
+                          control={form.control}
+                          name="showGameNumbers"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="checkbox-show-game-numbers"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Bye Policy - Show for single elimination (odd teams only) or double elimination (all teams) */}
                 {((watchedFormat === "single_elimination" && watchedTeamIds.length % 2 === 1) || 
