@@ -128,22 +128,24 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
 
   // Organize matches by round and bracket type with stable ordering
   const organizeMatches = () => {
-    const winnersMap: { [key: string]: TournamentMatch[] } = {};
-    const losersMap: { [key: string]: TournamentMatch[] } = {};
+    // Dynamic bracket organization: group by bracketType
+    const bracketMaps: { [bracketType: string]: { [key: string]: TournamentMatch[] } } = {};
     
     console.log('🔍 BracketView received matches:', matches.length);
     console.log('🔍 Match rounds:', matches.map(m => `${m.matchNumber}: ${m.round} (${m.bracketType})`));
     
     matches.forEach(match => {
       const roundName = match.round;
-      // Use bracketType field for accurate categorization
-      const isLosers = match.bracketType === 'losers';
-      const targetMap = isLosers ? losersMap : winnersMap;
+      const bracketType = match.bracketType || 'main';
       
-      if (!targetMap[roundName]) {
-        targetMap[roundName] = [];
+      if (!bracketMaps[bracketType]) {
+        bracketMaps[bracketType] = {};
       }
-      targetMap[roundName].push(match);
+      
+      if (!bracketMaps[bracketType][roundName]) {
+        bracketMaps[bracketType][roundName] = [];
+      }
+      bracketMaps[bracketType][roundName].push(match);
     });
 
     // Sort matches within each round by match number
@@ -153,24 +155,24 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
       });
     };
     
-    sortRounds(winnersMap);
-    sortRounds(losersMap);
-
-    console.log('🔍 Winners rounds:', Object.keys(winnersMap));
-    console.log('🔍 Losers rounds:', Object.keys(losersMap));
+    Object.values(bracketMaps).forEach(sortRounds);
 
     // Create stable round ordering based on typical bracket progression
     const sortRoundNames = (rounds: string[]) => {
       const roundOrder = [
         'Play-In Round',
-        'Round 1', 'Round 2', 'Round 3', 'Round 4',
+        'Round 1', 'Round 2', 'Round 3', 'Round 4', 'Round 5',
         'Quarterfinals', 'Semifinals', 'Finals',
         'Winners Round 1', 'Winners Round 2', 'Winners Round 3', 'Winners Round 4',
         'Winners Quarterfinals', 'Winners Semifinals', 'Winners Finals',
         'Losers Round 1', 'Losers Round 2', 'Losers Round 3', 'Losers Round 4',
         'Losers Round 5', 'Losers Round 6', 'Losers Round 7', 'Losers Round 8',
         'Losers Quarterfinals', 'Losers Semifinals', 'Losers Finals',
-        'Grand Finals'
+        'Losers1 Round 1', 'Losers1 Round 2', 'Losers1 Finals',
+        'Losers2 Round 1', 'Losers2 Round 2', 'Losers2 Finals',
+        'Consolation Round 1', 'Consolation Semifinals', 'Consolation Finals',
+        'Championship Round 1', 'Championship Semifinals', 'Championship Finals',
+        'Grand Finals', 'True Finals'
       ];
       
       return rounds.sort((a, b) => {
@@ -189,7 +191,16 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
       });
     };
 
+    // For backward compatibility, map to winners/losers
+    const winnersMap = bracketMaps['winners'] || bracketMaps['championship'] || bracketMaps['main'] || {};
+    const losersMap = bracketMaps['losers'] || bracketMaps['consolation'] || {};
+
+    console.log('🔍 Bracket types found:', Object.keys(bracketMaps));
+    console.log('🔍 Winners rounds:', Object.keys(winnersMap));
+    console.log('🔍 Losers rounds:', Object.keys(losersMap));
+
     return {
+      bracketMaps,
       winners: winnersMap,
       losers: losersMap,
       winnersRounds: sortRoundNames(Object.keys(winnersMap)),
@@ -197,8 +208,9 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
     };
   };
 
-  const { winners, losers, winnersRounds, losersRounds } = organizeMatches();
+  const { bracketMaps, winners, losers, winnersRounds, losersRounds } = organizeMatches();
   const hasLosers = losersRounds.length > 0;
+  const bracketTypes = Object.keys(bracketMaps);
 
   // Calculate match positions using center-based algorithm
   const MATCH_WIDTH = 240; // Reduced by 40px
@@ -217,7 +229,13 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
   const matchPositions = new Map<string, { x: number; y: number }>();
 
   // Recursively calculate the center Y position of a match
-  const getMatchCenter = (match: TournamentMatch, roundIndex: number, matchIndexInRound: number, isLosersBracket: boolean): number => {
+  const getMatchCenter = (
+    match: TournamentMatch, 
+    roundIndex: number, 
+    matchIndexInRound: number, 
+    bracketMap: { [key: string]: TournamentMatch[] },
+    roundNames: string[]
+  ): number => {
     if (matchCenters.has(match.id)) {
       return matchCenters.get(match.id)!;
     }
@@ -236,22 +254,18 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
       const parent1Index = matchIndexInRound * 2;
       const parent2Index = matchIndexInRound * 2 + 1;
       
-      // Get the bracket (winners or losers)
-      const roundArray = isLosersBracket ? losersRounds : winnersRounds;
-      const bracketMap = isLosersBracket ? losers : winners;
-      
-      if (roundIndex > 0 && parentRound >= 0 && parentRound < roundArray.length) {
-        const parentRoundName = roundArray[parentRound];
+      if (roundIndex > 0 && parentRound >= 0 && parentRound < roundNames.length) {
+        const parentRoundName = roundNames[parentRound];
         const parentMatches = bracketMap[parentRoundName] || [];
         
         if (parentMatches[parent1Index] && parentMatches[parent2Index]) {
           // Both parents found: center between them
-          const parent1Center = getMatchCenter(parentMatches[parent1Index], parentRound, parent1Index, isLosersBracket);
-          const parent2Center = getMatchCenter(parentMatches[parent2Index], parentRound, parent2Index, isLosersBracket);
+          const parent1Center = getMatchCenter(parentMatches[parent1Index], parentRound, parent1Index, bracketMap, roundNames);
+          const parent2Center = getMatchCenter(parentMatches[parent2Index], parentRound, parent2Index, bracketMap, roundNames);
           centerY = (parent1Center + parent2Center) / 2;
         } else if (parentMatches[parent1Index]) {
           // Only first parent: use its center
-          centerY = getMatchCenter(parentMatches[parent1Index], parentRound, parent1Index, isLosersBracket);
+          centerY = getMatchCenter(parentMatches[parent1Index], parentRound, parent1Index, bracketMap, roundNames);
         } else {
           // Fallback: evenly spaced
           centerY = matchIndexInRound * BASE_VERTICAL_GAP + MATCH_HEIGHT / 2;
@@ -267,53 +281,133 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
   };
 
 
-  // Calculate positions for all matches
-  const calculateAllPositions = () => {
-    // Calculate winners bracket positions
-    let winnersBottomY = 0;
-    winnersRounds.forEach((roundName, roundIndex) => {
-      const roundMatches = winners[roundName] || [];
+  // Helper to calculate positions for a single bracket
+  const calculateBracketPositions = (
+    bracketMap: { [key: string]: TournamentMatch[] },
+    roundNames: string[],
+    startY: number,
+    xOffset: number = 0
+  ): number => {
+    let maxBottomY = startY;
+    
+    roundNames.forEach((roundName, roundIndex) => {
+      const roundMatches = bracketMap[roundName] || [];
       roundMatches.forEach((match, matchIndex) => {
-        const centerY = getMatchCenter(match, roundIndex, matchIndex, false);
-        const x = roundIndex * (MATCH_WIDTH + ROUND_GAP);
-        const y = centerY - MATCH_HEIGHT / 2;
+        // Pass bracket-specific map and round names to getMatchCenter
+        const centerY = getMatchCenter(match, roundIndex, matchIndex, bracketMap, roundNames);
+        const x = xOffset + (roundIndex * (MATCH_WIDTH + ROUND_GAP));
+        const y = startY + centerY - MATCH_HEIGHT / 2;
         matchPositions.set(match.id, { x, y });
         
         const bottomY = y + MATCH_HEIGHT;
-        if (bottomY > winnersBottomY) {
-          winnersBottomY = bottomY;
+        if (bottomY > maxBottomY) {
+          maxBottomY = bottomY;
         }
       });
     });
+    
+    return maxBottomY;
+  };
 
-    // Calculate losers bracket positions (offset below winners)
-    const losersStartY = winnersBottomY + BRACKET_VERTICAL_GAP;
-    losersRounds.forEach((roundName, roundIndex) => {
-      const roundMatches = losers[roundName] || [];
-      roundMatches.forEach((match, matchIndex) => {
-        const centerY = getMatchCenter(match, roundIndex, matchIndex, true);
-        // Losers bracket: align with Round 2 of winners bracket (1 round offset)
-        const x = (roundIndex + 1) * (MATCH_WIDTH + ROUND_GAP);
-        const y = losersStartY + centerY - MATCH_HEIGHT / 2;
-        matchPositions.set(match.id, { x, y });
+  // Calculate positions for all matches - dynamically handle all bracket types
+  const calculateAllPositions = () => {
+    const sortRoundNames = (rounds: string[]) => {
+      const roundOrder = [
+        'Play-In Round',
+        'Round 1', 'Round 2', 'Round 3', 'Round 4', 'Round 5',
+        'Quarterfinals', 'Semifinals', 'Finals',
+        'Winners Round 1', 'Winners Round 2', 'Winners Round 3', 'Winners Round 4',
+        'Winners Quarterfinals', 'Winners Semifinals', 'Winners Finals',
+        'Losers Round 1', 'Losers Round 2', 'Losers Round 3', 'Losers Round 4',
+        'Losers Round 5', 'Losers Round 6', 'Losers Round 7', 'Losers Round 8',
+        'Losers Quarterfinals', 'Losers Semifinals', 'Losers Finals',
+        'Losers1 Round 1', 'Losers1 Round 2', 'Losers1 Finals',
+        'Losers2 Round 1', 'Losers2 Round 2', 'Losers2 Finals',
+        'Consolation Round 1', 'Consolation Semifinals', 'Consolation Finals',
+        'Championship Round 1', 'Championship Semifinals', 'Championship Finals',
+        'Grand Finals', 'True Finals'
+      ];
+      
+      return rounds.sort((a, b) => {
+        const aIndex = roundOrder.indexOf(a);
+        const bIndex = roundOrder.indexOf(b);
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
+        return a.localeCompare(b);
       });
-    });
+    };
+    
+    let currentY = 0;
+    
+    // Handle different formats
+    const bracketNames = Object.keys(bracketMaps).sort();
+    
+    // Special handling for known multi-bracket formats
+    if (bracketNames.includes('winners') && bracketNames.includes('losers') && !bracketNames.includes('losers1')) {
+      // Standard Double Elimination or 3-Game Guarantee
+      const winnersBottomY = calculateBracketPositions(winners, winnersRounds, 0, 0);
+      const losersStartY = winnersBottomY + BRACKET_VERTICAL_GAP;
+      const losersXOffset = (MATCH_WIDTH + ROUND_GAP); // Align losers with Round 2 of winners
+      calculateBracketPositions(losers, losersRounds, losersStartY, losersXOffset);
+    } else if (bracketNames.includes('winners') && bracketNames.includes('losers1') && bracketNames.includes('losers2')) {
+      // Triple Elimination - 3 brackets stacked vertically
+      const winnersBottomY = calculateBracketPositions(winners, winnersRounds, 0, 0);
+      
+      const losers1Rounds = sortRoundNames(Object.keys(bracketMaps['losers1'] || {}));
+      const losers1StartY = winnersBottomY + BRACKET_VERTICAL_GAP;
+      const losers1BottomY = calculateBracketPositions(bracketMaps['losers1'], losers1Rounds, losers1StartY, 0);
+      
+      const losers2Rounds = sortRoundNames(Object.keys(bracketMaps['losers2'] || {}));
+      const losers2StartY = losers1BottomY + BRACKET_VERTICAL_GAP;
+      calculateBracketPositions(bracketMaps['losers2'], losers2Rounds, losers2StartY, 0);
+    } else if (bracketNames.includes('championship') && bracketNames.includes('consolation')) {
+      // Consolation Tournament - championship + consolation brackets
+      const championshipRounds = sortRoundNames(Object.keys(bracketMaps['championship'] || {}));
+      const championshipBottomY = calculateBracketPositions(bracketMaps['championship'], championshipRounds, 0, 0);
+      
+      const consolationRounds = sortRoundNames(Object.keys(bracketMaps['consolation'] || {}));
+      const consolationStartY = championshipBottomY + BRACKET_VERTICAL_GAP;
+      calculateBracketPositions(bracketMaps['consolation'], consolationRounds, consolationStartY, 0);
+    } else if (bracketNames.some(name => name.includes('east') || name.includes('west') || name.includes('north') || name.includes('south'))) {
+      // Compass Draw - 8 divisions in a grid (2 rows x 4 columns)
+      const compassBrackets = ['east', 'northeast', 'north', 'northwest', 'west', 'southwest', 'south', 'southeast'];
+      const foundCompassBrackets = compassBrackets.filter(name => bracketNames.includes(name));
+      
+      // Arrange in 2 rows x 4 columns
+      foundCompassBrackets.forEach((bracketName, index) => {
+        const row = Math.floor(index / 4);
+        const col = index % 4;
+        const startY = row * (MATCH_HEIGHT * 4 + BRACKET_VERTICAL_GAP);
+        const xOffset = col * (MATCH_WIDTH * 2 + ROUND_GAP * 3);
+        
+        const bracketRounds = sortRoundNames(Object.keys(bracketMaps[bracketName] || {}));
+        calculateBracketPositions(bracketMaps[bracketName], bracketRounds, startY, xOffset);
+      });
+    } else {
+      // Fallback: Single Elimination or unknown format - use main/winners bracket
+      const mainBracket = bracketMaps['main'] || bracketMaps['winners'] || bracketMaps['championship'] || {};
+      const mainRounds = sortRoundNames(Object.keys(mainBracket));
+      calculateBracketPositions(mainBracket, mainRounds, 0, 0);
+    }
   };
 
   calculateAllPositions();
 
-  const renderMatch = (match: TournamentMatch, x: number, y: number, isLosersBracket = false) => {
+  const renderMatch = (match: TournamentMatch, x: number, y: number, bracketColorType?: string) => {
     const isCompleted = match.status === 'completed';
     // Only highlight if there's an actual winner (avoid null === null bug)
     const team1Wins = match.winnerId != null && match.winnerId === match.team1Id;
     const team2Wins = match.winnerId != null && match.winnerId === match.team2Id;
 
     // Determine bracket type for color coding
-    const isGrandFinal = match.round === 'Grand Finals';
-    const isPlayIn = match.round === 'Play-In Round';
+    const isGrandFinal = match.round === 'Grand Finals' || match.round === 'True Finals';
+    const bracketType = bracketColorType || match.bracketType || 'main';
     
     // Visual hierarchy with 4px borders
-    // Blue for winners, Red for losers, Gold for grand finals
+    // Blue for winners/championship/main, Red for losers/consolation, 
+    // Purple for losers1, Orange for losers2, Gold for grand finals,
+    // Green/Teal/Indigo/Pink for compass directions
     let borderClass: string;
     let cardBgClass: string;
     let headerClass: string;
@@ -328,14 +422,43 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
       titleClass = 'text-yellow-600 dark:text-yellow-400';
       badgeClass = isCompleted ? 'bg-yellow-500' : 'border-yellow-500 text-yellow-600 dark:text-yellow-400';
       winnerBgClass = 'bg-yellow-500 text-white';
-    } else if (isLosersBracket) {
+    } else if (bracketType === 'losers' || bracketType === 'consolation') {
       borderClass = 'border-[4px] border-red-500 dark:border-red-400';
       cardBgClass = 'bg-red-500/50 dark:bg-red-400/50';
       headerClass = 'bg-red-500/10';
       titleClass = 'text-red-600 dark:text-red-400';
       badgeClass = isCompleted ? 'bg-red-500' : 'border-red-500 text-red-600 dark:text-red-400';
       winnerBgClass = 'bg-red-500 text-white';
+    } else if (bracketType === 'losers1') {
+      borderClass = 'border-[4px] border-purple-500 dark:border-purple-400';
+      cardBgClass = 'bg-purple-500/50 dark:bg-purple-400/50';
+      headerClass = 'bg-purple-500/10';
+      titleClass = 'text-purple-600 dark:text-purple-400';
+      badgeClass = isCompleted ? 'bg-purple-500' : 'border-purple-500 text-purple-600 dark:text-purple-400';
+      winnerBgClass = 'bg-purple-500 text-white';
+    } else if (bracketType === 'losers2') {
+      borderClass = 'border-[4px] border-orange-500 dark:border-orange-400';
+      cardBgClass = 'bg-orange-500/50 dark:bg-orange-400/50';
+      headerClass = 'bg-orange-500/10';
+      titleClass = 'text-orange-600 dark:text-orange-400';
+      badgeClass = isCompleted ? 'bg-orange-500' : 'border-orange-500 text-orange-600 dark:text-orange-400';
+      winnerBgClass = 'bg-orange-500 text-white';
+    } else if (bracketType.includes('east') || bracketType.includes('west')) {
+      borderClass = 'border-[4px] border-green-500 dark:border-green-400';
+      cardBgClass = 'bg-green-500/50 dark:bg-green-400/50';
+      headerClass = 'bg-green-500/10';
+      titleClass = 'text-green-600 dark:text-green-400';
+      badgeClass = isCompleted ? 'bg-green-500' : 'border-green-500 text-green-600 dark:text-green-400';
+      winnerBgClass = 'bg-green-500 text-white';
+    } else if (bracketType.includes('north') || bracketType.includes('south')) {
+      borderClass = 'border-[4px] border-teal-500 dark:border-teal-400';
+      cardBgClass = 'bg-teal-500/50 dark:bg-teal-400/50';
+      headerClass = 'bg-teal-500/10';
+      titleClass = 'text-teal-600 dark:text-teal-400';
+      badgeClass = isCompleted ? 'bg-teal-500' : 'border-teal-500 text-teal-600 dark:text-teal-400';
+      winnerBgClass = 'bg-teal-500 text-white';
     } else {
+      // Default: winners/championship/main
       borderClass = 'border-[4px] border-blue-500 dark:border-blue-400';
       cardBgClass = 'bg-blue-500/50 dark:bg-blue-400/50';
       headerClass = 'bg-blue-500/10';
@@ -445,68 +568,75 @@ export default function BracketView({ matches, teams, format, settings }: Bracke
   const renderBracket = () => {
     const elements: JSX.Element[] = [];
 
-    // Render Winners Bracket
-    winnersRounds.forEach((roundName, roundIndex) => {
-      const roundMatches = winners[roundName] || [];
-      
-      roundMatches.forEach((match) => {
-        const pos = matchPositions.get(match.id);
-        if (pos) {
-          elements.push(renderMatch(match, pos.x, pos.y, false));
-        }
-      });
+    // Get bracket label mappings
+    const bracketLabels: { [key: string]: string } = {
+      'winners': 'Winners Bracket',
+      'losers': 'Losers Bracket',
+      'losers1': 'Losers 1 Bracket',
+      'losers2': 'Losers 2 Bracket',
+      'championship': 'Championship Bracket',
+      'consolation': 'Consolation Bracket',
+      'east': 'East Division',
+      'northeast': 'Northeast Division',
+      'north': 'North Division',
+      'northwest': 'Northwest Division',
+      'west': 'West Division',
+      'southwest': 'Southwest Division',
+      'south': 'South Division',
+      'southeast': 'Southeast Division'
+    };
 
-      // Add round label
-      const labelX = roundIndex * (MATCH_WIDTH + ROUND_GAP);
-      elements.push(
-        <g key={`label-w-${roundName}`} transform={`translate(${labelX}, ${-40})`}>
-          <foreignObject width={MATCH_WIDTH} height={30}>
-            <div className="font-bold text-sm text-primary bg-primary/10 border border-primary/30 px-3 py-1 rounded-md">
-              {roundName}
-            </div>
-          </foreignObject>
-        </g>
-      );
+    // Render all matches (they've been positioned by calculateAllPositions)
+    matches.forEach((match) => {
+      const pos = matchPositions.get(match.id);
+      if (pos) {
+        elements.push(renderMatch(match, pos.x, pos.y, match.bracketType || undefined));
+      }
     });
 
-    // Render Losers Bracket
-    if (hasLosers) {
-      // Calculate winners bottom for label placement
-      let winnersBottomY = 0;
-      winnersRounds.forEach((roundName) => {
-        const roundMatches = winners[roundName] || [];
-        roundMatches.forEach((match) => {
-          const pos = matchPositions.get(match.id);
-          if (pos && pos.y + MATCH_HEIGHT > winnersBottomY) {
-            winnersBottomY = pos.y + MATCH_HEIGHT;
-          }
-        });
-      });
-
-      const losersXOffset = (MATCH_WIDTH + ROUND_GAP);
-
-      // Add "Losers Bracket" label
-      elements.push(
-        <g key="losers-title" transform={`translate(${losersXOffset}, ${winnersBottomY + 20})`}>
-          <foreignObject width={200} height={30}>
-            <div className="font-bold text-base text-destructive">
-              Losers Bracket
-            </div>
-          </foreignObject>
-        </g>
-      );
-
-      losersRounds.forEach((roundName, roundIndex) => {
-        const roundMatches = losers[roundName] || [];
-        
+    // Add bracket labels for multi-bracket formats
+    Object.keys(bracketMaps).forEach((bracketType, bracketIndex) => {
+      const bracketRounds = Object.keys(bracketMaps[bracketType]);
+      if (bracketRounds.length === 0) return;
+      
+      // Find the top-left position of this bracket
+      let minY = Infinity;
+      let minX = Infinity;
+      
+      bracketRounds.forEach((roundName) => {
+        const roundMatches = bracketMaps[bracketType][roundName] || [];
         roundMatches.forEach((match) => {
           const pos = matchPositions.get(match.id);
           if (pos) {
-            elements.push(renderMatch(match, pos.x, pos.y, true));
+            if (pos.y < minY) minY = pos.y;
+            if (pos.x < minX) minX = pos.x;
           }
         });
       });
-    }
+      
+      // Only show bracket label for non-main brackets or when there are multiple brackets
+      const showLabel = Object.keys(bracketMaps).length > 1 && bracketType !== 'main';
+      
+      if (showLabel && minY !== Infinity && minX !== Infinity) {
+        const labelY = minY - 60;
+        const labelText = bracketLabels[bracketType] || bracketType;
+        
+        elements.push(
+          <g key={`label-bracket-${bracketType}`} transform={`translate(${minX}, ${labelY})`}>
+            <foreignObject width={250} height={40}>
+              <div className={`font-bold text-lg ${
+                bracketType === 'losers' || bracketType === 'consolation' ? 'text-destructive' : 
+                bracketType === 'losers1' ? 'text-purple-600 dark:text-purple-400' :
+                bracketType === 'losers2' ? 'text-orange-600 dark:text-orange-400' :
+                'text-primary'
+              }`}>
+                {labelText}
+              </div>
+            </foreignObject>
+          </g>
+        );
+      }
+    });
 
     // Draw connectors based on advancesToMatchId
     matches.forEach(match => {
