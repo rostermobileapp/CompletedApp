@@ -369,7 +369,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
                 className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors ${
                   team1Wins
                     ? `${winnerBgClass} font-bold shadow-sm`
-                    : 'bg-muted/50 hover:bg-muted'
+                    : 'bg-muted'
                 }`}
               >
                 <span className="truncate text-xs text-white" data-testid={`text-team1-${match.matchNumber}`}>
@@ -387,7 +387,7 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
                 className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors ${
                   team2Wins
                     ? `${winnerBgClass} font-bold shadow-sm`
-                    : 'bg-muted/50 hover:bg-muted'
+                    : 'bg-muted'
                 }`}
               >
                 <span className="truncate text-xs text-white" data-testid={`text-team2-${match.matchNumber}`}>
