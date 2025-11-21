@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { nanoid } from "nanoid";
 
 interface TournamentTeam {
@@ -298,11 +299,7 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
         pan
       };
 
-      const response = await fetch(`/api/tournaments/${tournamentId}/generate-custom-matches`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bracketData })
-      });
+      const response = await apiRequest('POST', `/api/tournaments/${tournamentId}/generate-custom-matches`, { bracketData });
 
       if (!response.ok) {
         const error = await response.json();
