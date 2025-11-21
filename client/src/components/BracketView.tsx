@@ -798,7 +798,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
       
       // Add title
       doc.setFontSize(18);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       const title = tournamentName || 'Tournament Bracket';
       const titleWidth = doc.getTextWidth(title);
       doc.text(title, (pageWidth - titleWidth) / 2, margin + 20);
