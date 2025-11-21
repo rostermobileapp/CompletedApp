@@ -118,7 +118,6 @@ export const tournamentFormatEnum = pgEnum("tournament_format", [
   "double_elimination",
   "round_robin",
   "round_robin_split",
-  "triple_elimination",
   "three_game_guarantee",
   "consolation",
   "compass_draw"

@@ -33,7 +33,7 @@ const formSchema = z.object({
   name: z.string().min(1, "Tournament name is required"),
   type: z.enum(["season_playoff", "standalone"]),
   seasonId: z.string().optional(),
-  format: z.enum(["single_elimination", "double_elimination", "triple_elimination", "three_game_guarantee", "consolation", "compass_draw", "round_robin", "round_robin_split"]),
+  format: z.enum(["single_elimination", "double_elimination", "three_game_guarantee", "consolation", "compass_draw", "round_robin", "round_robin_split"]),
   description: z.string().optional(),
   teamIds: z.array(z.string()).min(3, "Select at least 3 teams").max(128, "Maximum 128 teams allowed"),
   byePolicy: z.enum(["top_seed_bye", "play_in_game"]).optional(),
@@ -201,7 +201,6 @@ export default function TournamentCreate() {
     const labels: Record<string, string> = {
       single_elimination: 'Single Elimination',
       double_elimination: 'Double Elimination',
-      triple_elimination: 'Triple Elimination',
       three_game_guarantee: '3-Game Guarantee',
       consolation: 'Consolation Tournament',
       compass_draw: 'Compass Draw',
@@ -378,7 +377,6 @@ export default function TournamentCreate() {
                           <SelectContent>
                             <SelectItem value="single_elimination">Single Elimination</SelectItem>
                             <SelectItem value="double_elimination">Double Elimination (Beta)</SelectItem>
-                            <SelectItem value="triple_elimination">Triple Elimination</SelectItem>
                             <SelectItem value="three_game_guarantee">3-Game Guarantee</SelectItem>
                             <SelectItem value="consolation">Consolation Tournament</SelectItem>
                             <SelectItem value="compass_draw">Compass Draw</SelectItem>

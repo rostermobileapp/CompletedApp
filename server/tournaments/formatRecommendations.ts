@@ -1,5 +1,5 @@
 export interface FormatRecommendation {
-  format: 'single_elimination' | 'double_elimination' | 'triple_elimination' | 'three_game_guarantee' | 'consolation' | 'compass_draw' | 'round_robin' | 'round_robin_split';
+  format: 'single_elimination' | 'double_elimination' | 'three_game_guarantee' | 'consolation' | 'compass_draw' | 'round_robin' | 'round_robin_split';
   recommended: boolean;
   name: string;
   description: string;
@@ -56,28 +56,6 @@ export function getFormatRecommendations(numTeams: number): FormatRecommendation
         'Requires more games'
       ],
       estimatedGames: doubleElimGames
-    });
-  }
-
-  // Triple Elimination
-  if (numTeams >= 8 && numTeams <= 16) {
-    const tripleElimGames = Math.ceil((numTeams * 3) - 3);
-    recommendations.push({
-      format: 'triple_elimination',
-      recommended: false, // Rarely recommended due to length
-      name: 'Triple Elimination',
-      description: 'Teams must lose three times to be eliminated - maximum games per team',
-      pros: [
-        'Maximum playing time (3+ games guaranteed)',
-        'Most forgiving format',
-        'Great for multi-day tournaments'
-      ],
-      cons: [
-        'Very long tournament duration',
-        'Complex three-bracket structure',
-        'Significant time commitment required'
-      ],
-      estimatedGames: tripleElimGames
     });
   }
 

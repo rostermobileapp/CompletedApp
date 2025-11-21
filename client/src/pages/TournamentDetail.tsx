@@ -75,7 +75,6 @@ export default function TournamentDetail() {
     const labels: Record<Tournament['format'], string> = {
       single_elimination: 'Single Elimination',
       double_elimination: 'Double Elimination',
-      triple_elimination: 'Triple Elimination',
       three_game_guarantee: '3-Game Guarantee',
       consolation: 'Consolation Tournament',
       compass_draw: 'Compass Draw',
@@ -235,7 +234,6 @@ export default function TournamentDetail() {
               <div className="space-y-6">
                 {(tournament.format === 'single_elimination' || 
                   tournament.format === 'double_elimination' || 
-                  tournament.format === 'triple_elimination' || 
                   tournament.format === 'three_game_guarantee' ||
                   tournament.format === 'consolation' ||
                   tournament.format === 'compass_draw') ? (
