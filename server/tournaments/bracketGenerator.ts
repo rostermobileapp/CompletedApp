@@ -8,6 +8,11 @@ export interface BracketGeneratorResult {
 /**
  * Build canonical seed slots using recursive pairing
  * Returns array of seed positions in bracket order (1 vs 16, 8 vs 9, etc.)
+ * 
+ * Examples:
+ * - bracketSize 4: [1, 4, 2, 3]
+ * - bracketSize 8: [1, 8, 4, 5, 2, 7, 3, 6]
+ * - bracketSize 16: [1, 16, 8, 9, 5, 12, 4, 13, 3, 14, 6, 11, 7, 10, 2, 15]
  */
 function buildSeedSlots(bracketSize: number): number[] {
   if (bracketSize === 1) return [1];
@@ -24,6 +29,49 @@ function buildSeedSlots(bracketSize: number): number[] {
   }
   
   return slots;
+}
+
+/**
+ * Generate canonical seeding order for a given bracket size
+ * Exported for use in UI and other components
+ * 
+ * @param bracketSize - Must be a power of 2 (4, 8, 16, 32, 64, 128)
+ * @returns Array of seed numbers in proper bracket order
+ */
+export function generateSeeds(bracketSize: number): number[] {
+  if (bracketSize < 2 || !Number.isInteger(Math.log2(bracketSize))) {
+    throw new Error('Bracket size must be a power of 2');
+  }
+  return buildSeedSlots(bracketSize);
+}
+
+/**
+ * Shuffle array randomly (Fisher-Yates algorithm)
+ * Used for "blind draw" tournaments
+ */
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+/**
+ * Apply seeding or blind draw to teams based on bracket type
+ * 
+ * @param teams - Teams to seed/shuffle
+ * @param bracketType - 'seeded' uses canonical seeding, 'blind_draw' randomizes
+ * @returns Teams in proper bracket order
+ */
+export function applyBracketType(teams: TournamentTeam[], bracketType: 'seeded' | 'blind_draw' = 'seeded'): TournamentTeam[] {
+  if (bracketType === 'blind_draw') {
+    return shuffleArray(teams);
+  }
+  
+  // For seeded brackets, teams are already sorted by seed
+  return [...teams].sort((a, b) => a.seed - b.seed);
 }
 
 /**
@@ -157,7 +205,7 @@ export function generateSingleElimination(
       const hasContent2 = node2.team || node2.matchNumber !== null;
       
       // Bye logic: only true bye if one has DIRECT team (not from match) and other is completely empty
-      const isTrueBye = (node1.team && !hasContent2) || (node2.team && !hasContent1);
+      const isTrueBye = !!((node1.team && !hasContent2) || (node2.team && !hasContent1));
       const byeWinner = node1.team && !hasContent2 ? node1.team :
                         node2.team && !hasContent1 ? node2.team : null;
       
