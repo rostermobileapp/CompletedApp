@@ -780,7 +780,25 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const availableWidth = pageWidth - (2 * margin);
       const availableHeight = pageHeight - (2 * margin) - 60;
       
-      // Organize matches by round and sort
+      // Helper to sort rounds properly
+      const sortRoundNames = (rounds: string[]) => {
+        const roundOrder = [
+          'Play-In Round',
+          'Round 1', 'Round 2', 'Round 3', 'Round 4', 'Round 5',
+          'Quarterfinals', 'Semifinals', 'Finals',
+        ];
+        
+        return rounds.sort((a, b) => {
+          const aIndex = roundOrder.indexOf(a);
+          const bIndex = roundOrder.indexOf(b);
+          if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+          if (aIndex !== -1) return -1;
+          if (bIndex !== -1) return 1;
+          return a.localeCompare(b);
+        });
+      };
+      
+      // Organize matches by round
       const roundsMap = new Map<string, TournamentMatch[]>();
       matches.forEach(match => {
         const round = match.round || 'Unknown';
@@ -791,7 +809,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
       });
 
       // Get rounds in proper order
-      const rounds = Array.from(new Set(matches.map(m => m.round || 'Unknown')));
+      const uniqueRounds = Array.from(new Set(matches.map(m => m.round || 'Unknown')));
+      const rounds = sortRoundNames(uniqueRounds);
       const numRounds = rounds.length;
       
       const matchHeight = 50;
@@ -800,54 +819,65 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const startX = margin + roundSpacing / 2;
       const startY = margin + 80;
 
-      // Calculate positions for each match using bracket tree logic
+      // Calculate positions using index-based parent matching (like SVG rendering)
       const matchPositions = new Map<string, { x: number; y: number }>();
+      const matchCenters = new Map<string, number>();
       
-      // First pass: position first round matches evenly
-      const firstRound = rounds[0];
-      const firstRoundMatches = roundsMap.get(firstRound) || [];
-      const baseSpacing = availableHeight / firstRoundMatches.length;
-      
-      firstRoundMatches.forEach((match, index) => {
-        matchPositions.set(match.id, {
-          x: startX,
-          y: startY + index * baseSpacing
-        });
-      });
-      
-      // Subsequent rounds: position between parent matches
-      for (let roundIndex = 1; roundIndex < numRounds; roundIndex++) {
+      // Calculate center Y for a match recursively
+      const getMatchCenter = (roundIndex: number, matchIndex: number): number => {
         const round = rounds[roundIndex];
+        const roundMatches = roundsMap.get(round) || [];
+        const match = roundMatches[matchIndex];
+        
+        if (!match) return 0;
+        
+        const cacheKey = `${roundIndex}-${matchIndex}`;
+        if (matchCenters.has(cacheKey)) {
+          return matchCenters.get(cacheKey)!;
+        }
+        
+        let centerY: number;
+        
+        // First round: evenly spaced
+        if (roundIndex === 0) {
+          const baseSpacing = availableHeight / roundMatches.length;
+          centerY = matchIndex * baseSpacing + matchHeight / 2;
+        } else {
+          // Later rounds: position between parent matches
+          const parent1Index = matchIndex * 2;
+          const parent2Index = matchIndex * 2 + 1;
+          const prevRoundMatches = roundsMap.get(rounds[roundIndex - 1]) || [];
+          
+          if (prevRoundMatches[parent1Index] && prevRoundMatches[parent2Index]) {
+            // Both parents exist: center between them
+            const parent1Center = getMatchCenter(roundIndex - 1, parent1Index);
+            const parent2Center = getMatchCenter(roundIndex - 1, parent2Index);
+            centerY = (parent1Center + parent2Center) / 2;
+          } else if (prevRoundMatches[parent1Index]) {
+            // Only first parent: use its center
+            centerY = getMatchCenter(roundIndex - 1, parent1Index);
+          } else {
+            // Fallback: evenly spaced
+            const baseSpacing = availableHeight / roundMatches.length;
+            centerY = matchIndex * baseSpacing + matchHeight / 2;
+          }
+        }
+        
+        matchCenters.set(cacheKey, centerY);
+        return centerY;
+      };
+      
+      // Calculate positions for all matches
+      rounds.forEach((round, roundIndex) => {
         const roundMatches = roundsMap.get(round) || [];
         const roundX = startX + roundIndex * roundSpacing;
         
-        roundMatches.forEach((match) => {
-          // Find parent matches (matches that feed into this one)
-          const parentMatches = matches.filter(m => 
-            m.advancesToMatchId === match.id
-          );
-          
-          if (parentMatches.length > 0) {
-            // Position this match between its parent matches
-            const parentPositions = parentMatches
-              .map(p => matchPositions.get(p.id))
-              .filter(p => p !== undefined);
-            
-            if (parentPositions.length > 0) {
-              const avgY = parentPositions.reduce((sum, pos) => sum + pos!.y, 0) / parentPositions.length;
-              matchPositions.set(match.id, { x: roundX, y: avgY });
-            } else {
-              // Fallback: evenly space if no parent positions found
-              const roundY = startY + (roundMatches.indexOf(match) * availableHeight / roundMatches.length);
-              matchPositions.set(match.id, { x: roundX, y: roundY });
-            }
-          } else {
-            // Fallback: evenly space
-            const roundY = startY + (roundMatches.indexOf(match) * availableHeight / roundMatches.length);
-            matchPositions.set(match.id, { x: roundX, y: roundY });
-          }
+        roundMatches.forEach((match, matchIndex) => {
+          const centerY = getMatchCenter(roundIndex, matchIndex);
+          const y = startY + centerY - matchHeight / 2;
+          matchPositions.set(match.id, { x: roundX, y });
         });
-      }
+      });
 
       // Draw rounds
       rounds.forEach((round, roundIndex) => {
