@@ -10795,9 +10795,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is league commissioner
       const isCommissioner = league.commissionerId === userId;
-      const isSecondaryCommissioner = league.secondaryCommissionerId === userId;
 
-      if (!isCommissioner && !isSecondaryCommissioner) {
+      if (!isCommissioner) {
         return res.status(403).json({ message: "Access denied. Only league commissioners can generate tournament matches" });
       }
 
