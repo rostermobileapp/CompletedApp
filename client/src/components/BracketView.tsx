@@ -756,7 +756,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
   };
 
   const exportToPDF = async () => {
-    if (!svgRef.current || !containerRef.current) return;
+    if (!svgRef.current) return;
     
     setIsExporting(true);
     
@@ -784,21 +784,30 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const availableWidth = pageWidth - (2 * margin);
       const availableHeight = pageHeight - (2 * margin) - 50; // Extra space for title
       
-      // Temporarily store the current transform
-      const originalTransform = svgRef.current.style.transform;
-      
-      // Reset transform to capture at normal scale
-      svgRef.current.style.transform = 'none';
+      // Create a temporary div to hold a clean copy of the SVG for export
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-10000px';
+      tempDiv.style.top = '-10000px';
+      tempDiv.style.width = `${svgWidth}px`;
+      tempDiv.style.height = `${svgHeight}px`;
+      tempDiv.style.backgroundColor = '#ffffff';
+      document.body.appendChild(tempDiv);
       
       try {
-        // Use html2canvas to capture the container (not the SVG directly)
-        const canvas = await html2canvas(containerRef.current, {
+        // Clone the SVG without transforms
+        const svgClone = svgRef.current.cloneNode(true) as SVGSVGElement;
+        svgClone.setAttribute('width', String(svgWidth));
+        svgClone.setAttribute('height', String(svgHeight));
+        svgClone.style.transform = 'none';
+        svgClone.style.transition = 'none';
+        tempDiv.appendChild(svgClone);
+        
+        // Capture the temporary div with html2canvas
+        const canvas = await html2canvas(tempDiv, {
           backgroundColor: '#ffffff',
-          scale: 1, // Use normal scale since we reset transform
-          logging: false,
-          useCORS: true,
-          windowWidth: containerRef.current.scrollWidth,
-          windowHeight: containerRef.current.scrollHeight
+          scale: 2, // Higher quality
+          logging: false
         });
         
         // Get canvas dimensions
@@ -827,8 +836,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
           : 'tournament_bracket.pdf';
         doc.save(filename);
       } finally {
-        // Restore original transform
-        svgRef.current.style.transform = originalTransform;
+        // Clean up temporary element
+        document.body.removeChild(tempDiv);
       }
       
     } catch (error) {
