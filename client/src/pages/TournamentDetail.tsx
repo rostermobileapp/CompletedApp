@@ -283,29 +283,42 @@ export default function TournamentDetail() {
                   tournament.format === 'three_game_guarantee' ||
                   tournament.format === 'round_robin_split') ? (
                   // Bracket visualization for elimination formats and Round Robin + Playoffs
-                  (<Card>
-                    <CardHeader className="pt-[2px] pb-[2px]">
-                      <CardTitle>
-                        {tournament.format === 'round_robin_split' ? 'Round Robin + Playoff Bracket' : 'Tournament Bracket'}
-                      </CardTitle>
-                      <CardDescription>
-                        {rounds.length} round{rounds.length !== 1 ? 's' : ''} • {matches.length} match{matches.length !== 1 ? 'es' : ''}
-                        {tournament.format === 'round_robin_split' && (
-                          <span className="block mt-1 text-xs">
-                            Playoff seeding based on Round Robin record (wins/losses) with goals scored as tiebreaker
-                          </span>
-                        )}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <BracketView 
-                        matches={matches} 
-                        teams={teams || []} 
-                        format={tournament.format}
-                        settings={tournament.settings as TournamentSettings | undefined}
-                      />
-                    </CardContent>
-                  </Card>)
+                  (() => {
+                    // For Round Robin + Playoffs, only show playoff matches in the bracket
+                    const bracketMatches = tournament.format === 'round_robin_split' 
+                      ? matches.filter(m => m.round !== 'Round Robin')
+                      : matches;
+                    
+                    const playoffRounds = tournament.format === 'round_robin_split'
+                      ? rounds.filter(r => r !== 'Round Robin')
+                      : rounds;
+
+                    return (
+                      <Card>
+                        <CardHeader className="pt-[2px] pb-[2px]">
+                          <CardTitle>
+                            {tournament.format === 'round_robin_split' ? 'Playoff Bracket' : 'Tournament Bracket'}
+                          </CardTitle>
+                          <CardDescription>
+                            {playoffRounds.length} round{playoffRounds.length !== 1 ? 's' : ''} • {bracketMatches.length} match{bracketMatches.length !== 1 ? 'es' : ''}
+                            {tournament.format === 'round_robin_split' && (
+                              <span className="block mt-1 text-xs">
+                                Playoff seeding based on Round Robin record (wins/losses) with goals scored as tiebreaker
+                              </span>
+                            )}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <BracketView 
+                            matches={bracketMatches} 
+                            teams={teams || []} 
+                            format={tournament.format}
+                            settings={tournament.settings as TournamentSettings | undefined}
+                          />
+                        </CardContent>
+                      </Card>
+                    );
+                  })()
                 ) : (
                   // Table view for pure round robin
                   (<Card>
