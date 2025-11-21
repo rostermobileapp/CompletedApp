@@ -342,17 +342,9 @@ export default function BracketView({ matches, teams, format }: BracketViewProps
           <Card className={`h-full shadow-lg ${cardBgClass} ${borderClass}`} data-testid={`card-match-${match.matchNumber}`}>
             <CardHeader className={`p-2 ${headerClass}`}>
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <CardTitle className={`text-xs font-semibold text-white`}>
-                    {match.round}
-                  </CardTitle>
-                  <Badge
-                    variant={isCompleted ? 'default' : 'outline'}
-                    className={`text-xs ${badgeClass}`}
-                  >
-                    {match.status}
-                  </Badge>
-                </div>
+                <CardTitle className={`text-xs font-semibold text-white`}>
+                  {match.round}
+                </CardTitle>
                 <div className={`text-[10px] font-medium text-white opacity-80 flex items-center gap-1.5`}>
                   <span>Match #{match.matchNumber}</span>
                   {match.scheduledTime && (
