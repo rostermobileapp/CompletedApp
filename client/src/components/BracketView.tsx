@@ -755,6 +755,43 @@ export default function BracketView({ matches, teams, format, settings, tourname
     setPan({ x: 0, y: 0 });
   };
 
+  const inlineStyles = (svgClone: SVGElement, svgOriginal: SVGElement) => {
+    // Get all elements from both SVGs
+    const cloneElements = svgClone.querySelectorAll('*');
+    const originalElements = svgOriginal.querySelectorAll('*');
+    
+    // Inline computed styles for each element
+    cloneElements.forEach((cloneEl, index) => {
+      const originalEl = originalElements[index];
+      if (originalEl) {
+        const computedStyle = window.getComputedStyle(originalEl);
+        
+        // Key SVG properties to inline
+        const propertiesToInline = [
+          'fill', 'stroke', 'stroke-width', 'stroke-dasharray',
+          'font-family', 'font-size', 'font-weight', 'text-anchor',
+          'opacity', 'fill-opacity', 'stroke-opacity'
+        ];
+        
+        propertiesToInline.forEach(prop => {
+          const value = computedStyle.getPropertyValue(prop);
+          if (value && value !== 'none') {
+            (cloneEl as HTMLElement).style.setProperty(prop, value);
+          }
+        });
+      }
+    });
+    
+    // Remove any class attributes and transform styles
+    svgClone.querySelectorAll('*').forEach(el => {
+      el.removeAttribute('class');
+    });
+    
+    // Reset the SVG element's transform
+    svgClone.style.transform = '';
+    svgClone.style.transition = '';
+  };
+
   const exportToPDF = async () => {
     if (!svgRef.current) return;
     
@@ -780,9 +817,24 @@ export default function BracketView({ matches, teams, format, settings, tourname
       // Clone the SVG to avoid modifying the original
       const svgClone = svgRef.current.cloneNode(true) as SVGElement;
       
-      // Get SVG dimensions
-      const svgWidth = parseFloat(svgClone.getAttribute('width') || '0');
-      const svgHeight = parseFloat(svgClone.getAttribute('height') || '0');
+      // Inline all styles for PDF export
+      inlineStyles(svgClone, svgRef.current);
+      
+      // Get SVG dimensions from viewBox for accuracy
+      const viewBox = svgClone.getAttribute('viewBox');
+      let svgWidth = parseFloat(svgClone.getAttribute('width') || '0');
+      let svgHeight = parseFloat(svgClone.getAttribute('height') || '0');
+      
+      // If viewBox exists, use it for dimensions
+      if (viewBox) {
+        const [, , vbWidth, vbHeight] = viewBox.split(' ').map(Number);
+        svgWidth = vbWidth;
+        svgHeight = vbHeight;
+      }
+      
+      // Reset width/height on clone to use viewBox
+      svgClone.setAttribute('width', svgWidth.toString());
+      svgClone.setAttribute('height', svgHeight.toString());
       
       // Calculate scale to fit within available space
       const scaleX = availableWidth / svgWidth;
