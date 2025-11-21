@@ -780,12 +780,25 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const availableWidth = pageWidth - (2 * margin);
       const availableHeight = pageHeight - (2 * margin) - 60;
       
+      // Sizing constants
+      const matchHeight = 50;
+      const matchWidth = 120;
+      const roundSpacing = 160;
+      const matchGap = 10;
+      const bracketGap = 40;
+      
       // Helper to sort rounds properly
       const sortRoundNames = (rounds: string[]) => {
         const roundOrder = [
           'Play-In Round',
           'Round 1', 'Round 2', 'Round 3', 'Round 4', 'Round 5',
           'Quarterfinals', 'Semifinals', 'Finals',
+          'Winners Round 1', 'Winners Round 2', 'Winners Round 3', 'Winners Round 4',
+          'Winners Quarterfinals', 'Winners Semifinals', 'Winners Finals',
+          'Losers Round 1', 'Losers Round 2', 'Losers Round 3', 'Losers Round 4',
+          'Losers Round 5', 'Losers Round 6', 'Losers Round 7', 'Losers Round 8',
+          'Losers Quarterfinals', 'Losers Semifinals', 'Losers Finals',
+          'Grand Finals', 'True Finals'
         ];
         
         return rounds.sort((a, b) => {
@@ -798,68 +811,76 @@ export default function BracketView({ matches, teams, format, settings, tourname
         });
       };
       
-      // Organize matches by round
-      const roundsMap = new Map<string, TournamentMatch[]>();
+      // Organize matches by bracket type
+      const bracketMaps: { [key: string]: { [key: string]: TournamentMatch[] } } = {};
+      
       matches.forEach(match => {
+        const bracketType = match.bracketType || 'main';
         const round = match.round || 'Unknown';
-        if (!roundsMap.has(round)) {
-          roundsMap.set(round, []);
+        
+        if (!bracketMaps[bracketType]) {
+          bracketMaps[bracketType] = {};
         }
-        roundsMap.get(round)!.push(match);
+        if (!bracketMaps[bracketType][round]) {
+          bracketMaps[bracketType][round] = [];
+        }
+        bracketMaps[bracketType][round].push(match);
       });
 
-      // Get rounds in proper order
-      const uniqueRounds = Array.from(new Set(matches.map(m => m.round || 'Unknown')));
-      const rounds = sortRoundNames(uniqueRounds);
-      const numRounds = rounds.length;
+      // Extract bracket-specific rounds
+      const winners = bracketMaps['winners'] || {};
+      const losers = bracketMaps['losers'] || {};
+      const main = bracketMaps['main'] || {};
       
-      const matchHeight = 50;
-      const matchWidth = Math.min(140, availableWidth / numRounds - 30);
-      const roundSpacing = availableWidth / (numRounds + 1);
-      const startX = margin + roundSpacing / 2;
-      const startY = margin + 80;
+      const winnersRounds = sortRoundNames(Object.keys(winners));
+      const losersRounds = sortRoundNames(Object.keys(losers));
+      const mainRounds = sortRoundNames(Object.keys(main));
 
-      // Calculate positions using index-based parent matching (like SVG rendering)
+      // Calculate positions using index-based parent matching
       const matchPositions = new Map<string, { x: number; y: number }>();
       const matchCenters = new Map<string, number>();
       
       // Calculate center Y for a match recursively
-      const getMatchCenter = (roundIndex: number, matchIndex: number): number => {
+      const getMatchCenter = (
+        roundIndex: number, 
+        matchIndex: number,
+        bracketMap: { [key: string]: TournamentMatch[] },
+        rounds: string[]
+      ): number => {
         const round = rounds[roundIndex];
-        const roundMatches = roundsMap.get(round) || [];
+        const roundMatches = bracketMap[round] || [];
         const match = roundMatches[matchIndex];
         
         if (!match) return 0;
         
-        const cacheKey = `${roundIndex}-${matchIndex}`;
+        const cacheKey = `${match.id}-${roundIndex}-${matchIndex}`;
         if (matchCenters.has(cacheKey)) {
           return matchCenters.get(cacheKey)!;
         }
         
         let centerY: number;
+        const baseVerticalGap = matchHeight + matchGap;
         
         // First round: evenly spaced
         if (roundIndex === 0) {
-          const baseSpacing = availableHeight / roundMatches.length;
-          centerY = matchIndex * baseSpacing + matchHeight / 2;
+          centerY = matchIndex * baseVerticalGap + matchHeight / 2;
         } else {
           // Later rounds: position between parent matches
           const parent1Index = matchIndex * 2;
           const parent2Index = matchIndex * 2 + 1;
-          const prevRoundMatches = roundsMap.get(rounds[roundIndex - 1]) || [];
+          const prevRoundMatches = bracketMap[rounds[roundIndex - 1]] || [];
           
           if (prevRoundMatches[parent1Index] && prevRoundMatches[parent2Index]) {
             // Both parents exist: center between them
-            const parent1Center = getMatchCenter(roundIndex - 1, parent1Index);
-            const parent2Center = getMatchCenter(roundIndex - 1, parent2Index);
+            const parent1Center = getMatchCenter(roundIndex - 1, parent1Index, bracketMap, rounds);
+            const parent2Center = getMatchCenter(roundIndex - 1, parent2Index, bracketMap, rounds);
             centerY = (parent1Center + parent2Center) / 2;
           } else if (prevRoundMatches[parent1Index]) {
             // Only first parent: use its center
-            centerY = getMatchCenter(roundIndex - 1, parent1Index);
+            centerY = getMatchCenter(roundIndex - 1, parent1Index, bracketMap, rounds);
           } else {
             // Fallback: evenly spaced
-            const baseSpacing = availableHeight / roundMatches.length;
-            centerY = matchIndex * baseSpacing + matchHeight / 2;
+            centerY = matchIndex * baseVerticalGap + matchHeight / 2;
           }
         }
         
@@ -867,81 +888,119 @@ export default function BracketView({ matches, teams, format, settings, tourname
         return centerY;
       };
       
-      // Calculate positions for all matches
-      rounds.forEach((round, roundIndex) => {
-        const roundMatches = roundsMap.get(round) || [];
-        const roundX = startX + roundIndex * roundSpacing;
+      // Helper to calculate positions for a bracket
+      const calculateBracketPositions = (
+        bracketMap: { [key: string]: TournamentMatch[] },
+        rounds: string[],
+        startX: number,
+        startY: number,
+        xOffset: number = 0
+      ): number => {
+        let maxBottomY = startY;
         
-        roundMatches.forEach((match, matchIndex) => {
-          const centerY = getMatchCenter(roundIndex, matchIndex);
-          const y = startY + centerY - matchHeight / 2;
-          matchPositions.set(match.id, { x: roundX, y });
-        });
-      });
-
-      // Draw rounds
-      rounds.forEach((round, roundIndex) => {
-        const roundMatches = roundsMap.get(round) || [];
-        const roundX = startX + roundIndex * roundSpacing;
-        
-        // Draw round label
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(100, 100, 100);
-        doc.text(round, roundX, startY - 10);
-        
-        // Draw matches
-        roundMatches.forEach((match) => {
-          const pos = matchPositions.get(match.id);
-          if (!pos) return;
+        rounds.forEach((round, roundIndex) => {
+          const roundMatches = bracketMap[round] || [];
+          const roundX = startX + xOffset + (roundIndex * roundSpacing);
           
-          const matchY = pos.y;
-          
-          // Draw match box
-          doc.setFillColor(255, 255, 255);
-          doc.setDrawColor(200, 200, 200);
-          doc.setLineWidth(1);
-          doc.rect(roundX, matchY, matchWidth, matchHeight, 'FD');
-          
-          // Blue accent bar
-          doc.setFillColor(59, 130, 246);
-          doc.rect(roundX, matchY, matchWidth, 3, 'F');
-          
-          // Team names
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(0, 0, 0);
-          
-          const team1 = getTeamDisplay(match.team1Id, match, 'team1');
-          const team2 = getTeamDisplay(match.team2Id, match, 'team2');
-          
-          doc.text(team1.substring(0, 18), roundX + 5, matchY + 18);
-          doc.setTextColor(150, 150, 150);
-          doc.setFontSize(8);
-          doc.text('vs', roundX + matchWidth / 2 - 5, matchY + matchHeight / 2 + 2);
-          doc.setFontSize(9);
-          doc.setTextColor(0, 0, 0);
-          doc.text(team2.substring(0, 18), roundX + 5, matchY + 38);
-          
-          // Draw connector to next match
-          if (match.advancesToMatchId) {
-            const nextPos = matchPositions.get(match.advancesToMatchId);
-            if (nextPos) {
-              doc.setDrawColor(200, 200, 200);
-              doc.setLineWidth(0.5);
-              
-              const x1 = roundX + matchWidth;
-              const y1 = matchY + matchHeight / 2;
-              const x2 = nextPos.x;
-              const y2 = nextPos.y + matchHeight / 2;
-              
-              // Draw L-shaped connector
-              doc.line(x1, y1, x1 + 15, y1);
-              doc.line(x1 + 15, y1, x1 + 15, y2);
-              doc.line(x1 + 15, y2, x2, y2);
+          roundMatches.forEach((match, matchIndex) => {
+            const centerY = getMatchCenter(roundIndex, matchIndex, bracketMap, rounds);
+            const y = startY + centerY - matchHeight / 2;
+            matchPositions.set(match.id, { x: roundX, y });
+            
+            const bottomY = y + matchHeight;
+            if (bottomY > maxBottomY) {
+              maxBottomY = bottomY;
             }
-          }
+          });
         });
+        
+        return maxBottomY;
+      };
+      
+      // Calculate positions based on bracket type
+      const startX = margin + 40;
+      const startY = margin + 80;
+      
+      if (winnersRounds.length > 0 && losersRounds.length > 0) {
+        // Double elimination layout
+        const winnersBottomY = calculateBracketPositions(winners, winnersRounds, startX, startY);
+        const losersStartY = winnersBottomY + bracketGap;
+        const losersXOffset = roundSpacing; // Offset losers to align with Winners Round 2
+        calculateBracketPositions(losers, losersRounds, startX, losersStartY, losersXOffset);
+      } else if (mainRounds.length > 0) {
+        // Single elimination or other single-bracket format
+        calculateBracketPositions(main, mainRounds, startX, startY);
+      }
+
+      // Add bracket labels
+      if (winnersRounds.length > 0) {
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(59, 130, 246); // Blue
+        doc.text('Winners Bracket', startX, startY - 20);
+      }
+      
+      if (losersRounds.length > 0) {
+        const winnersBottomY = calculateBracketPositions(winners, winnersRounds, startX, startY);
+        const losersStartY = winnersBottomY + bracketGap;
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(220, 38, 38); // Red
+        doc.text('Losers Bracket', startX, losersStartY - 20);
+      }
+      
+      // Draw all matches
+      matches.forEach((match) => {
+        const pos = matchPositions.get(match.id);
+        if (!pos) return;
+        
+        const matchX = pos.x;
+        const matchY = pos.y;
+        
+        // Draw match box
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(1);
+        doc.rect(matchX, matchY, matchWidth, matchHeight, 'FD');
+        
+        // Blue accent bar
+        doc.setFillColor(59, 130, 246);
+        doc.rect(matchX, matchY, matchWidth, 3, 'F');
+        
+        // Team names
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        
+        const team1 = getTeamDisplay(match.team1Id, match, 'team1');
+        const team2 = getTeamDisplay(match.team2Id, match, 'team2');
+        
+        doc.text(team1.substring(0, 18), matchX + 5, matchY + 18);
+        doc.setTextColor(150, 150, 150);
+        doc.setFontSize(8);
+        doc.text('vs', matchX + matchWidth / 2 - 5, matchY + matchHeight / 2 + 2);
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        doc.text(team2.substring(0, 18), matchX + 5, matchY + 38);
+        
+        // Draw connector to next match
+        if (match.advancesToMatchId) {
+          const nextPos = matchPositions.get(match.advancesToMatchId);
+          if (nextPos) {
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            
+            const x1 = matchX + matchWidth;
+            const y1 = matchY + matchHeight / 2;
+            const x2 = nextPos.x;
+            const y2 = nextPos.y + matchHeight / 2;
+            
+            // Draw L-shaped connector
+            doc.line(x1, y1, x1 + 15, y1);
+            doc.line(x1 + 15, y1, x1 + 15, y2);
+            doc.line(x1 + 15, y2, x2, y2);
+          }
+        }
       });
       
       // Save PDF
