@@ -70,6 +70,7 @@ export default function CustomBracketBuilderPage() {
         <CustomBracketBuilder 
           teams={teams || []}
           tournamentId={tournamentId}
+          tournament={tournament}
           onGenerateMatches={() => {
             // Navigate back to tournament detail page after generating matches
             setLocation(`/tournaments/${tournamentId}`);

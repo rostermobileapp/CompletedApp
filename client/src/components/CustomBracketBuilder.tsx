@@ -66,10 +66,11 @@ function calculateConnectionPath(
 interface CustomBracketBuilderProps {
   teams?: TournamentTeam[];
   tournamentId?: string;
+  tournament?: any;
   onGenerateMatches?: () => void;
 }
 
-export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatches }: CustomBracketBuilderProps) {
+export function CustomBracketBuilder({ teams = [], tournamentId, tournament, onGenerateMatches }: CustomBracketBuilderProps) {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [matchups, setMatchups] = useState<Matchup[]>([]);
@@ -311,8 +312,7 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
         description: "Your custom bracket has been converted to tournament matches"
       });
 
-      // Clear localStorage after successful generation
-      localStorage.removeItem('customBracket');
+      // Keep bracket in localStorage for quick access (it's also saved to backend)
 
       // Call callback if provided
       if (onGenerateMatches) {
@@ -330,7 +330,21 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
   };
 
   useEffect(() => {
-    // Auto-load on mount
+    // Load bracket from tournament settings first (source of truth), then fall back to localStorage
+    if (tournament?.settings?.customBracket) {
+      const data = tournament.settings.customBracket;
+      if (data.matchups && data.matchups.length > 0) {
+        setMatchups(data.matchups);
+        setConnections(data.connections || []);
+        setZoom(data.zoom || 1);
+        setPan(data.pan || { x: 0, y: 0 });
+        // Also sync to localStorage for offline editing
+        localStorage.setItem('customBracket', JSON.stringify(data));
+        return;
+      }
+    }
+
+    // Fall back to localStorage if no tournament settings
     const saved = localStorage.getItem('customBracket');
     if (saved) {
       const data = JSON.parse(saved);
@@ -341,7 +355,7 @@ export function CustomBracketBuilder({ teams = [], tournamentId, onGenerateMatch
         setPan(data.pan || { x: 0, y: 0 });
       }
     }
-  }, []);
+  }, [tournament]);
 
   return (
     <div className="h-screen flex flex-col bg-background">
