@@ -62,56 +62,16 @@ export default function TournamentsLanding() {
             </p>
           </div>
 
-          <div className="grid gap-4 mb-6">
-            <Card className="border-2 border-primary/50">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Trophy className="h-8 w-8 text-primary" />
-                  <div>
-                    <CardTitle>Create Standalone Tournament</CardTitle>
-                    <CardDescription>
-                      Create a tournament without a league. Perfect for one-time events!
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  onClick={() => navigate('/tournaments/create-standalone')}
-                  data-testid="button-create-standalone-tournament"
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Standalone Tournament
-                </Button>
-              </CardContent>
-            </Card>
-
-            {(role === 'commissioner' || role === 'secondary_commissioner') && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <Trophy className="h-8 w-8 text-muted-foreground" />
-                    <div>
-                      <CardTitle>League Tournaments</CardTitle>
-                      <CardDescription>
-                        Create a new league to manage league tournaments.
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    onClick={() => navigate('/create-league')}
-                    data-testid="button-create-league"
-                    variant="outline"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create a League
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+          <div className="mb-6">
+            <Button
+              onClick={() => navigate('/tournaments/create')}
+              data-testid="button-create-tournament"
+              size="lg"
+              className="w-full sm:w-auto"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Create Tournament
+            </Button>
           </div>
         </div>
       </div>
@@ -146,27 +106,17 @@ export default function TournamentsLanding() {
           </p>
         </div>
 
-        {/* Standalone Tournament Option */}
-        <Card className="mb-6 border-2 border-primary/50">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Trophy className="h-8 w-8 text-primary" />
-              <div className="flex-1">
-                <CardTitle>Create Standalone Tournament</CardTitle>
-                <CardDescription>
-                  Create a tournament without a league. Perfect for one-time events!
-                </CardDescription>
-              </div>
-              <Button
-                onClick={() => navigate('/tournaments/create-standalone')}
-                data-testid="button-create-standalone-tournament"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
+        {/* Create Tournament Button */}
+        <div className="mb-6">
+          <Button
+            onClick={() => navigate('/tournaments/create')}
+            data-testid="button-create-tournament"
+            size="lg"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Create Tournament
+          </Button>
+        </div>
 
         <div className="mb-4">
           <h2 className="text-xl font-semibold">League Tournaments</h2>

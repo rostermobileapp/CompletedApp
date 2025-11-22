@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,12 +16,25 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import Papa from "papaparse";
 
 const formSchema = z.object({
+  type: z.enum(["season_playoff", "standalone"]),
+  leagueId: z.string().optional(),
+  seasonId: z.string().optional(),
   name: z.string().min(1, "Tournament name is required"),
   format: z.enum(["single_elimination", "double_elimination", "three_game_guarantee", "round_robin", "round_robin_split", "custom_bracket"]),
   description: z.string().optional(),
   teams: z.array(z.object({
     name: z.string().min(1, "Team name is required")
-  })).min(3, "At least 3 teams required").max(128, "Maximum 128 teams allowed")
+  })).min(3, "At least 3 teams required").max(128, "Maximum 128 teams allowed"),
+  teamIds: z.array(z.string()).optional()
+}).refine((data) => {
+  // Season playoffs require leagueId and seasonId
+  if (data.type === "season_playoff") {
+    return data.leagueId && data.seasonId;
+  }
+  return true;
+}, {
+  message: "Please select a league and season for playoff tournaments",
+  path: ["leagueId"]
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -40,26 +53,56 @@ export default function TournamentCreateStandalone() {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      type: "standalone",
+      leagueId: undefined,
+      seasonId: undefined,
       name: "",
       format: "single_elimination",
       description: "",
-      teams: []
+      teams: [],
+      teamIds: []
     }
   });
 
+  const watchedType = form.watch("type");
+  const watchedLeagueId = form.watch("leagueId");
   const watchedFormat = form.watch("format");
+
+  // Fetch leagues the user can manage (for season playoffs)
+  const { data: leagues } = useQuery<any[]>({
+    queryKey: ['/api/leagues/manageable'],
+    enabled: watchedType === "season_playoff"
+  });
+
+  // Fetch seasons for selected league
+  const { data: seasons } = useQuery<any[]>({
+    queryKey: ['/api/leagues', watchedLeagueId, 'seasons'],
+    enabled: !!watchedLeagueId && watchedType === "season_playoff"
+  });
+
+  // Fetch teams for selected league
+  const { data: leagueTeams } = useQuery<any[]>({
+    queryKey: ['/api/leagues', watchedLeagueId, 'teams'],
+    enabled: !!watchedLeagueId && watchedType === "season_playoff"
+  });
 
   // Create tournament mutation
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      // Step 1: Create tournament (without leagueId)
+      // Determine team count and prepare payload
+      const isSeasonPlayoff = data.type === "season_playoff";
+      const numTeams = isSeasonPlayoff 
+        ? (data.teamIds?.length || 0)
+        : data.teams.length;
+
+      // Step 1: Create tournament
       const response = await apiRequest('POST', `/api/tournaments`, {
-        leagueId: null,
+        leagueId: isSeasonPlayoff ? (data.leagueId || null) : null,
         name: data.name,
-        type: "standalone",
-        seasonId: null,
+        type: data.type,
+        seasonId: isSeasonPlayoff ? (data.seasonId || null) : null,
         format: data.format,
-        numTeams: data.teams.length,
+        numTeams: numTeams,
         description: data.description || null,
         settings: {
           bracketType: "seeded",
@@ -71,12 +114,28 @@ export default function TournamentCreateStandalone() {
       const tournament = await response.json();
 
       // Step 2: Add teams and generate bracket
-      const teamData = data.teams.map((team, index) => ({
-        teamName: team.name,
-        seed: index + 1,
-        wins: 0,
-        losses: 0
-      }));
+      let teamData;
+      if (isSeasonPlayoff && data.teamIds && leagueTeams) {
+        // Season playoff: use selected team IDs from league
+        teamData = data.teamIds.map((teamId, index) => {
+          const team = leagueTeams.find((t: any) => t.id === teamId);
+          return {
+            teamId: team?.id,
+            teamName: team?.name,
+            seed: index + 1,
+            wins: 0,
+            losses: 0
+          };
+        });
+      } else {
+        // Standalone: use manually entered teams
+        teamData = data.teams.map((team, index) => ({
+          teamName: team.name,
+          seed: index + 1,
+          wins: 0,
+          losses: 0
+        }));
+      }
 
       try {
         await apiRequest('POST', `/api/tournaments/${tournament.id}/generate-bracket`, {
@@ -273,10 +332,114 @@ export default function TournamentCreateStandalone() {
                     Tournament Details
                   </CardTitle>
                   <CardDescription>
-                    Set up the basic information for your standalone tournament
+                    Set up the basic information for your tournament
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tournament Type</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-tournament-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="standalone">Standalone Tournament</SelectItem>
+                            <SelectItem value="season_playoff">Season Playoff</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Season playoffs are tied to your league season, standalone tournaments are independent events
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {watchedType === "season_playoff" && (
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="leagueId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>League</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-league">
+                                  <SelectValue placeholder="Select a league" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {leagues && leagues.length > 0 ? (
+                                  leagues.map((league: any) => (
+                                    <SelectItem key={league.id} value={league.id.toString()}>
+                                      {league.name}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="_none" disabled>No leagues available</SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Select which league this tournament is for
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {watchedLeagueId && (
+                        <FormField
+                          control={form.control}
+                          name="seasonId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Season</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-season">
+                                    <SelectValue placeholder="Select a season" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {seasons && seasons.length > 0 ? (
+                                    seasons.map((season: any) => (
+                                      <SelectItem key={season.id} value={season.id}>
+                                        {season.name}
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <SelectItem value="_none" disabled>No seasons available</SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                Select which season this playoff is for
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </>
+                  )}
+
                   <FormField
                     control={form.control}
                     name="name"
@@ -355,80 +518,141 @@ export default function TournamentCreateStandalone() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5" />
-                      Add Teams
+                      {watchedType === "season_playoff" ? "Select Teams" : "Add Teams"}
                     </CardTitle>
                     <CardDescription>
-                      Add teams manually or import via CSV ({teams.length} teams added)
+                      {watchedType === "season_playoff" 
+                        ? "Select teams from your league to participate in the tournament"
+                        : `Add teams manually or import via CSV (${teams.length} teams added)`
+                      }
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* CSV Upload */}
-                    <div className="border rounded-lg p-4 bg-muted/50">
-                      <h3 className="font-medium mb-2 flex items-center gap-2">
-                        <Upload className="h-4 w-4" />
-                        Import from CSV
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Upload a CSV with column: Team Name (unique team names will be extracted)
-                      </p>
-                      <input
-                        type="file"
-                        accept=".csv"
-                        onChange={handleCsvUpload}
-                        className="hidden"
-                        id="csv-upload"
-                        data-testid="input-csv-upload"
+                    {watchedType === "season_playoff" ? (
+                      /* League Team Selection */
+                      <FormField
+                        control={form.control}
+                        name="teamIds"
+                        render={() => (
+                          <FormItem>
+                            <FormLabel>Select Teams</FormLabel>
+                            <FormDescription>
+                              Choose which teams will participate in this tournament (minimum 3 teams)
+                            </FormDescription>
+                            {leagueTeams && leagueTeams.length > 0 ? (
+                              <div className="space-y-2 border rounded-lg p-4">
+                                {leagueTeams.map((team: any) => (
+                                  <FormField
+                                    key={team.id}
+                                    control={form.control}
+                                    name="teamIds"
+                                    render={({ field }) => {
+                                      const teamIds = field.value || [];
+                                      return (
+                                        <FormItem
+                                          key={team.id}
+                                          className="flex flex-row items-start space-x-3 space-y-0 p-2 hover:bg-muted rounded"
+                                        >
+                                          <FormControl>
+                                            <input
+                                              type="checkbox"
+                                              checked={teamIds.includes(team.id)}
+                                              onChange={(checked) => {
+                                                const newValue = checked.target.checked
+                                                  ? [...teamIds, team.id]
+                                                  : teamIds.filter((id: string) => id !== team.id);
+                                                field.onChange(newValue);
+                                              }}
+                                              className="h-4 w-4"
+                                              data-testid={`checkbox-team-${team.id}`}
+                                            />
+                                          </FormControl>
+                                          <FormLabel className="font-normal cursor-pointer flex-1">
+                                            {team.name}
+                                          </FormLabel>
+                                        </FormItem>
+                                      );
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No teams available in this league</p>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      <label htmlFor="csv-upload">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => document.getElementById('csv-upload')?.click()}
-                          data-testid="button-csv-upload"
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload CSV
-                        </Button>
-                      </label>
-                    </div>
-
-                    {/* Manual Team Entry */}
-                    <div className="border rounded-lg p-4">
-                      <h3 className="font-medium mb-2 flex items-center gap-2">
-                        <Plus className="h-4 w-4" />
-                        Add Team Manually
-                      </h3>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Team name"
-                          value={newTeamName}
-                          onChange={(e) => setNewTeamName(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTeam())}
-                          data-testid="input-new-team-name"
-                        />
-                        <Button
-                          type="button"
-                          onClick={addTeam}
-                          data-testid="button-add-team"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Teams List */}
-                    {teams.length > 0 && (
-                      <div className="space-y-2">
-                        <h3 className="font-medium">Teams ({teams.length})</h3>
-                        <div className="grid gap-2">
-                          {teams.map((team, teamIndex) => (
-                            <div
-                              key={teamIndex}
-                              className="flex items-center justify-between p-3 border rounded-lg bg-card"
-                              data-testid={`team-${teamIndex}`}
+                    ) : (
+                      /* Standalone Team Entry */
+                      <>
+                        {/* CSV Upload */}
+                        <div className="border rounded-lg p-4 bg-muted/50">
+                          <h3 className="font-medium mb-2 flex items-center gap-2">
+                            <Upload className="h-4 w-4" />
+                            Import from CSV
+                          </h3>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            Upload a CSV with column: Team Name (unique team names will be extracted)
+                          </p>
+                          <input
+                            type="file"
+                            accept=".csv"
+                            onChange={handleCsvUpload}
+                            className="hidden"
+                            id="csv-upload"
+                            data-testid="input-csv-upload"
+                          />
+                          <label htmlFor="csv-upload">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => document.getElementById('csv-upload')?.click()}
+                              data-testid="button-csv-upload"
                             >
-                              <span className="font-medium">{team.name}</span>
-                              <Button
+                              <Upload className="h-4 w-4 mr-2" />
+                              Upload CSV
+                            </Button>
+                          </label>
+                        </div>
+
+                        {/* Manual Team Entry */}
+                        <div className="border rounded-lg p-4">
+                          <h3 className="font-medium mb-2 flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            Add Team Manually
+                          </h3>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Team name"
+                              value={newTeamName}
+                              onChange={(e) => setNewTeamName(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTeam())}
+                              data-testid="input-new-team-name"
+                            />
+                            <Button
+                              type="button"
+                              onClick={addTeam}
+                              data-testid="button-add-team"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Teams List */}
+                        {teams.length > 0 && (
+                          <div className="space-y-2">
+                            <h3 className="font-medium">Teams ({teams.length})</h3>
+                            <div className="grid gap-2">
+                              {teams.map((team, teamIndex) => (
+                                <div
+                                  key={teamIndex}
+                                  className="flex items-center justify-between p-3 border rounded-lg bg-card"
+                                  data-testid={`team-${teamIndex}`}
+                                >
+                                  <span className="font-medium">{team.name}</span>
+                                  <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
@@ -445,9 +669,14 @@ export default function TournamentCreateStandalone() {
                         </p>
                       </div>
                     )}
+                      </>
+                    )}
 
-                    {form.formState.errors.teams && (
+                    {form.formState.errors.teams && watchedType !== "season_playoff" && (
                       <p className="text-sm text-destructive">{form.formState.errors.teams.message}</p>
+                    )}
+                    {form.formState.errors.teamIds && watchedType === "season_playoff" && (
+                      <p className="text-sm text-destructive">{form.formState.errors.teamIds.message}</p>
                     )}
                   </CardContent>
                 </Card>
