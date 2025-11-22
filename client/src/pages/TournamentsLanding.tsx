@@ -17,7 +17,7 @@ type League = {
 
 export default function TournamentsLanding() {
   const [, navigate] = useLocation();
-  const { hasRole } = usePermissions();
+  const { role } = usePermissions();
 
   // Fetch leagues the user can manage
   const { data: leagues, isLoading } = useQuery<League[]>({
@@ -87,7 +87,7 @@ export default function TournamentsLanding() {
               </CardContent>
             </Card>
 
-            {hasRole('commissioner') && (
+            {(role === 'commissioner' || role === 'secondary_commissioner') && (
               <Card>
                 <CardHeader>
                   <div className="flex items-center gap-3">
