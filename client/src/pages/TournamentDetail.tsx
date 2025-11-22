@@ -551,6 +551,8 @@ export default function TournamentDetail() {
                             format={tournament.format}
                             settings={tournament.settings as TournamentSettings | undefined}
                             tournamentName={tournament.name}
+                            tournamentId={tournamentId}
+                            isCommissioner={isLeagueCommissioner}
                           />
                         </CardContent>
                       </Card>

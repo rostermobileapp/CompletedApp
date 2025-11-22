@@ -10122,6 +10122,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single tournament match with player rosters and stats
+  app.get('/api/tournaments/:tournamentId/matches/:matchId/details', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tournamentId, matchId } = req.params;
+
+      // Get the match
+      const [match] = await db
+        .select()
+        .from(tournamentMatches)
+        .where(and(
+          eq(tournamentMatches.id, matchId),
+          eq(tournamentMatches.tournamentId, tournamentId)
+        ));
+
+      if (!match) {
+        return res.status(404).json({ message: "Match not found" });
+      }
+
+      // Get team1 details and roster
+      let team1Roster: any[] = [];
+      let team1Name = 'TBD';
+      if (match.team1Id) {
+        const [team1] = await db
+          .select()
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.id, match.team1Id));
+        
+        if (team1) {
+          team1Name = team1.teamName;
+          
+          // Get roster from regular team if teamId exists
+          if (team1.teamId) {
+            const members = await storage.getTeamMembers(team1.teamId);
+            team1Roster = members.map(m => ({
+              userId: m.user.id,
+              firstName: m.user.firstName,
+              lastName: m.user.lastName,
+              email: m.user.email,
+              profileImageUrl: m.user.profileImageUrl,
+              jerseyNumber: m.jerseyNumber,
+              position: m.position
+            }));
+          }
+        }
+      }
+
+      // Get team2 details and roster
+      let team2Roster: any[] = [];
+      let team2Name = 'TBD';
+      if (match.team2Id) {
+        const [team2] = await db
+          .select()
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.id, match.team2Id));
+        
+        if (team2) {
+          team2Name = team2.teamName;
+          
+          // Get roster from regular team if teamId exists
+          if (team2.teamId) {
+            const members = await storage.getTeamMembers(team2.teamId);
+            team2Roster = members.map(m => ({
+              userId: m.user.id,
+              firstName: m.user.firstName,
+              lastName: m.user.lastName,
+              email: m.user.email,
+              profileImageUrl: m.user.profileImageUrl,
+              jerseyNumber: m.jerseyNumber,
+              position: m.position
+            }));
+          }
+        }
+      }
+
+      // Get existing tournament stats for all players
+      const allPlayerIds = [...team1Roster, ...team2Roster].map(p => p.userId);
+      const existingStats = allPlayerIds.length > 0 ? await db
+        .select()
+        .from(tournamentStats)
+        .where(and(
+          eq(tournamentStats.tournamentId, tournamentId),
+          inArray(tournamentStats.userId, allPlayerIds)
+        )) : [];
+
+      res.json({
+        match,
+        team1: {
+          id: match.team1Id,
+          name: team1Name,
+          roster: team1Roster
+        },
+        team2: {
+          id: match.team2Id,
+          name: team2Name,
+          roster: team2Roster
+        },
+        existingStats
+      });
+    } catch (error) {
+      console.error("Error fetching match details:", error);
+      res.status(500).json({ message: "Failed to fetch match details" });
+    }
+  });
+
   // Update tournament match (schedule, location, scores)
   app.patch('/api/tournaments/:tournamentId/matches/:matchId', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
@@ -10295,6 +10399,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error updating tournament match:", error);
       res.status(500).json({ message: "Failed to update tournament match" });
+    }
+  });
+
+  // Update tournament match scores with player stats
+  app.post('/api/tournaments/:tournamentId/matches/:matchId/score', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { tournamentId, matchId } = req.params;
+      const { team1Score, team2Score, playerStats } = req.body;
+
+      // Validate both scores are provided and are numbers
+      if (team1Score === null || team1Score === undefined || team2Score === null || team2Score === undefined) {
+        return res.status(400).json({ message: "Both team scores are required" });
+      }
+
+      if (typeof team1Score !== 'number' || typeof team2Score !== 'number') {
+        return res.status(400).json({ message: "Scores must be numbers" });
+      }
+
+      // Use transaction for data consistency
+      const result = await db.transaction(async (tx) => {
+        // Verify match exists and get current state
+        const [match] = await tx
+          .select()
+          .from(tournamentMatches)
+          .where(and(
+            eq(tournamentMatches.id, matchId),
+            eq(tournamentMatches.tournamentId, tournamentId)
+          ));
+
+        if (!match) {
+          throw new Error("Match not found");
+        }
+
+        if (!match.team1Id || !match.team2Id) {
+          throw new Error("Match does not have both teams assigned");
+        }
+
+        // Determine winner
+        let winnerId = null;
+        if (team1Score > team2Score) {
+          winnerId = match.team1Id;
+        } else if (team2Score > team1Score) {
+          winnerId = match.team2Id;
+        }
+
+        const previousWinnerId = match.winnerId;
+
+        // Update match scores and winner
+        const [updatedMatch] = await tx
+          .update(tournamentMatches)
+          .set({
+            team1Score,
+            team2Score,
+            winnerId,
+            status: 'completed',
+            updatedAt: new Date()
+          })
+          .where(eq(tournamentMatches.id, matchId))
+          .returning();
+
+        // Recalculate ALL team records from tournament matches (ensures consistency)
+        const allMatches = await tx
+          .select()
+          .from(tournamentMatches)
+          .where(eq(tournamentMatches.tournamentId, tournamentId));
+
+        // Reset all team records to 0
+        await tx
+          .update(tournamentTeams)
+          .set({ wins: 0, losses: 0 })
+          .where(eq(tournamentTeams.tournamentId, tournamentId));
+
+        // Count wins and losses from all completed matches
+        const teamRecords = new Map<string, { wins: number; losses: number }>();
+        for (const m of allMatches) {
+          if (m.winnerId && m.team1Id && m.team2Id) {
+            const winner = teamRecords.get(m.winnerId) || { wins: 0, losses: 0 };
+            winner.wins += 1;
+            teamRecords.set(m.winnerId, winner);
+
+            const loserId = m.winnerId === m.team1Id ? m.team2Id : m.team1Id;
+            const loser = teamRecords.get(loserId) || { wins: 0, losses: 0 };
+            loser.losses += 1;
+            teamRecords.set(loserId, loser);
+          }
+        }
+
+        // Update team records
+        for (const [teamId, record] of teamRecords.entries()) {
+          await tx
+            .update(tournamentTeams)
+            .set(record)
+            .where(eq(tournamentTeams.id, teamId));
+        }
+
+        // Handle winner advancement
+        if (match.advancesToMatchId) {
+          const [nextMatch] = await tx
+            .select()
+            .from(tournamentMatches)
+            .where(eq(tournamentMatches.id, match.advancesToMatchId));
+
+          if (nextMatch) {
+            const updateSlot: any = {};
+            
+            // Replace previous winner if they were in the next match
+            if (previousWinnerId && previousWinnerId !== winnerId) {
+              if (nextMatch.team1Id === previousWinnerId) {
+                updateSlot.team1Id = winnerId;
+              } else if (nextMatch.team2Id === previousWinnerId) {
+                updateSlot.team2Id = winnerId;
+              }
+            }
+            
+            // Or fill first empty slot if no replacement needed
+            if (Object.keys(updateSlot).length === 0 && winnerId) {
+              if (!nextMatch.team1Id) {
+                updateSlot.team1Id = winnerId;
+              } else if (!nextMatch.team2Id) {
+                updateSlot.team2Id = winnerId;
+              }
+            }
+
+            if (Object.keys(updateSlot).length > 0) {
+              await tx
+                .update(tournamentMatches)
+                .set(updateSlot)
+                .where(eq(tournamentMatches.id, match.advancesToMatchId));
+            }
+          }
+        }
+
+        // Handle player stats - simple accumulation
+        if (playerStats && Array.isArray(playerStats) && playerStats.length > 0) {
+          for (const stat of playerStats) {
+            const { userId, teamId, goals, assists, penaltyMinutes } = stat;
+
+            // Skip zero stats
+            if (goals === 0 && assists === 0 && penaltyMinutes === 0) continue;
+
+            const [existing] = await tx
+              .select()
+              .from(tournamentStats)
+              .where(and(
+                eq(tournamentStats.tournamentId, tournamentId),
+                eq(tournamentStats.userId, userId),
+                eq(tournamentStats.teamId, teamId)
+              ));
+
+            if (existing) {
+              await tx
+                .update(tournamentStats)
+                .set({
+                  goals: sql`${tournamentStats.goals} + ${goals}`,
+                  assists: sql`${tournamentStats.assists} + ${assists}`,
+                  points: sql`${tournamentStats.points} + ${goals + assists}`,
+                  penaltyMinutes: sql`${tournamentStats.penaltyMinutes} + ${penaltyMinutes}`,
+                  gamesPlayed: sql`${tournamentStats.gamesPlayed} + 1`,
+                  updatedAt: new Date()
+                })
+                .where(eq(tournamentStats.id, existing.id));
+            } else {
+              await tx
+                .insert(tournamentStats)
+                .values({
+                  tournamentId,
+                  userId,
+                  teamId,
+                  goals,
+                  assists,
+                  points: goals + assists,
+                  penaltyMinutes,
+                  gamesPlayed: 1
+                });
+            }
+          }
+        }
+
+        return updatedMatch;
+      });
+
+      res.json({ 
+        match: result,
+        message: "Match scored successfully"
+      });
+    } catch (error) {
+      console.error("Error scoring match:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to score match";
+      res.status(500).json({ message: errorMessage });
     }
   });
 

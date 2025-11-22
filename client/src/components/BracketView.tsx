@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import type { TournamentMatch, TournamentTeam, TournamentSettings } from "@shared/schema";
 import { format as formatDate } from "date-fns";
+import TournamentMatchScoreModal from "./TournamentMatchScoreModal";
 
 interface BracketViewProps {
   matches: TournamentMatch[];
@@ -12,13 +13,16 @@ interface BracketViewProps {
   format: string;
   settings?: TournamentSettings;
   tournamentName?: string;
+  tournamentId: string;
+  isCommissioner?: boolean;
 }
 
-export default function BracketView({ matches, teams, format, settings, tournamentName }: BracketViewProps) {
+export default function BracketView({ matches, teams, format, settings, tournamentName, tournamentId, isCommissioner = false }: BracketViewProps) {
   const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -499,7 +503,11 @@ export default function BracketView({ matches, teams, format, settings, tourname
     return (
       <g key={match.id} transform={`translate(${x}, ${y})`}>
         <foreignObject width={MATCH_WIDTH} height={MATCH_HEIGHT}>
-          <Card className={`h-full shadow-lg ${cardBgClass} ${borderClass}`} data-testid={`card-match-${match.matchNumber}`}>
+          <Card 
+            className={`h-full shadow-lg ${cardBgClass} ${borderClass} cursor-pointer hover:opacity-90 transition-opacity`} 
+            data-testid={`card-match-${match.matchNumber}`}
+            onClick={() => setSelectedMatchId(match.id)}
+          >
             <CardHeader className={`p-2 ${headerClass}`}>
               <div className="space-y-1">
                 <CardTitle className={`text-xs font-semibold text-white`}>
@@ -839,6 +847,17 @@ export default function BracketView({ matches, teams, format, settings, tourname
           </g>
         </svg>
       </div>
+
+      {/* Score Modal */}
+      {selectedMatchId && (
+        <TournamentMatchScoreModal
+          tournamentId={tournamentId}
+          matchId={selectedMatchId}
+          open={!!selectedMatchId}
+          onOpenChange={(open) => !open && setSelectedMatchId(null)}
+          isCommissioner={isCommissioner}
+        />
+      )}
     </div>
   );
 }
