@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,8 @@ export default function TournamentDetail() {
   const [isExportingSchedule, setIsExportingSchedule] = useState(false);
   const [isEditingBracket, setIsEditingBracket] = useState(false);
   const [copiedTournamentId, setCopiedTournamentId] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [isUploadingCsv, setIsUploadingCsv] = useState(false);
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
@@ -59,6 +61,11 @@ export default function TournamentDetail() {
   const { data: matches, isLoading: matchesLoading } = useQuery<TournamentMatch[]>({
     queryKey: ['/api/tournaments', tournamentId, 'matches'],
     enabled: !!tournamentId
+  });
+
+  const { data: pendingParticipants } = useQuery<any[]>({
+    queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'],
+    enabled: !!tournamentId && canManageLeagueSpecific(tournament?.leagueId || '')
   });
 
   const deleteMutation = useMutation({
@@ -96,6 +103,46 @@ export default function TournamentDetail() {
       toast({
         title: "Error",
         description: error?.message || "Failed to initiate payment",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const approveParticipantMutation = useMutation({
+    mutationFn: async ({ participantId, tournamentTeamId }: { participantId: string; tournamentTeamId?: string }) => {
+      return await apiRequest('PATCH', `/api/tournament-participants/${participantId}/approve`, { tournamentTeamId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'] });
+      toast({
+        title: "Participant approved",
+        description: "The participant has been approved successfully"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to approve participant",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const rejectParticipantMutation = useMutation({
+    mutationFn: async (participantId: string) => {
+      return await apiRequest('PATCH', `/api/tournament-participants/${participantId}/reject`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'] });
+      toast({
+        title: "Participant rejected",
+        description: "The participant request has been rejected"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to reject participant",
         variant: "destructive"
       });
     }
@@ -303,6 +350,50 @@ export default function TournamentDetail() {
       });
     } finally {
       setIsExportingSchedule(false);
+    }
+  };
+
+  const handleCsvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingCsv(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`/api/tournaments/${tournamentId}/players/import`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to upload CSV');
+      }
+
+      const result = await response.json();
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
+      
+      toast({
+        title: "CSV imported successfully",
+        description: `Imported ${result.teamsCreated || 0} teams and ${result.playersImported || 0} players`
+      });
+
+      // Reset file input
+      event.target.value = '';
+      setCsvFile(null);
+    } catch (error: any) {
+      toast({
+        title: "Import failed",
+        description: error?.message || "Failed to import CSV",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploadingCsv(false);
     }
   };
 
@@ -732,7 +823,116 @@ export default function TournamentDetail() {
           </TabsContent>
 
           {/* Teams Tab */}
-          <TabsContent value="teams">
+          <TabsContent value="teams" className="space-y-6">
+            {/* CSV Upload Section - Commissioner Only */}
+            {tournament && canManageLeagueSpecific(tournament.leagueId) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Upload className="h-5 w-5" />
+                    Import Teams & Players
+                  </CardTitle>
+                  <CardDescription>
+                    Upload a CSV file to add teams and players to the tournament
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleCsvUpload}
+                      disabled={isUploadingCsv}
+                      className="hidden"
+                      id="csv-upload"
+                      data-testid="input-csv-upload"
+                    />
+                    <label htmlFor="csv-upload">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isUploadingCsv}
+                        onClick={() => document.getElementById('csv-upload')?.click()}
+                        data-testid="button-csv-upload"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {isUploadingCsv ? 'Uploading...' : 'Upload CSV'}
+                      </Button>
+                    </label>
+                    <p className="text-sm text-muted-foreground">
+                      Format: Team Name, Player Name, Email
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Pending Participants - Commissioner Only */}
+            {tournament && canManageLeagueSpecific(tournament.leagueId) && pendingParticipants && pendingParticipants.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserPlus className="h-5 w-5" />
+                    Pending Join Requests
+                  </CardTitle>
+                  <CardDescription>
+                    {pendingParticipants.length} player{pendingParticipants.length !== 1 ? 's' : ''} waiting for approval
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {pendingParticipants.map((participant: any) => (
+                      <Card key={participant.id} data-testid={`card-participant-${participant.id}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="font-medium" data-testid={`text-participant-name-${participant.id}`}>
+                                {participant.user.firstName} {participant.user.lastName}
+                              </div>
+                              <div className="text-sm text-muted-foreground" data-testid={`text-participant-email-${participant.id}`}>
+                                {participant.user.email}
+                              </div>
+                              {participant.message && (
+                                <div className="text-sm text-muted-foreground mt-2">
+                                  Message: {participant.message}
+                                </div>
+                              )}
+                              <div className="text-xs text-muted-foreground">
+                                Requested {format(new Date(participant.joinedAt), 'MMM d, yyyy')}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => approveParticipantMutation.mutate({ participantId: participant.id })}
+                                disabled={approveParticipantMutation.isPending}
+                                data-testid={`button-approve-${participant.id}`}
+                              >
+                                <UserCheck className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => rejectParticipantMutation.mutate(participant.id)}
+                                disabled={rejectParticipantMutation.isPending}
+                                data-testid={`button-reject-${participant.id}`}
+                              >
+                                <UserX className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Teams List */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -744,24 +944,34 @@ export default function TournamentDetail() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  {teams?.map((team, index) => (
-                    <Card key={team.id} data-testid={`card-team-${team.id}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
-                              {team.seed || index + 1}
+                {teams && teams.length > 0 ? (
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    {teams.map((team, index) => (
+                      <Card key={team.id} data-testid={`card-team-${team.id}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
+                                {team.seed || index + 1}
+                              </div>
+                              <span className="font-medium" data-testid={`text-team-name-${team.id}`}>
+                                {team.teamName}
+                              </span>
                             </div>
-                            <span className="font-medium" data-testid={`text-team-name-${team.id}`}>
-                              {team.teamName}
-                            </span>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No teams added yet</p>
+                    {tournament && canManageLeagueSpecific(tournament.leagueId) && (
+                      <p className="text-sm mt-1">Upload a CSV file to add teams and players</p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
