@@ -348,7 +348,7 @@ export default function TournamentCreateStandalone() {
                         >
                           <FormControl>
                             <SelectTrigger data-testid="select-tournament-type">
-                              <SelectValue />
+                              <SelectValue placeholder="Select tournament type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
