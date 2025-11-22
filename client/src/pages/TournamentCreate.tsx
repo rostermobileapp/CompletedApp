@@ -31,8 +31,8 @@ type FormatRecommendation = {
 
 const formSchema = z.object({
   name: z.string().min(1, "Tournament name is required"),
-  type: z.enum(["season_playoff", "standalone"]),
-  seasonId: z.string().optional(),
+  type: z.literal("season_playoff"),
+  seasonId: z.string().min(1, "Please select a season for this playoff tournament"),
   format: z.enum(["single_elimination", "double_elimination", "three_game_guarantee", "round_robin", "round_robin_split", "custom_bracket"]),
   description: z.string().optional(),
   teamIds: z.array(z.string()).min(3, "Select at least 3 teams").max(128, "Maximum 128 teams allowed"),
@@ -40,15 +40,6 @@ const formSchema = z.object({
   bracketType: z.enum(["seeded", "blind_draw"]).default("seeded"),
   showSeedNumbers: z.boolean().default(true),
   showGameNumbers: z.boolean().default(false)
-}).refine((data) => {
-  // Season playoffs require a valid seasonId
-  if (data.type === "season_playoff") {
-    return data.seasonId && data.seasonId.trim() !== "";
-  }
-  return true;
-}, {
-  message: "Please select a season for this playoff tournament",
-  path: ["seasonId"]
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -76,9 +67,9 @@ export default function TournamentCreate() {
     }
   });
 
+
   const watchedTeamIds = form.watch("teamIds");
   const watchedFormat = form.watch("format");
-  const watchedType = form.watch("type");
 
   // Fetch league teams
   const { data: teams, isLoading: teamsLoading } = useQuery<Team[]>({
@@ -117,8 +108,8 @@ export default function TournamentCreate() {
       const response = await apiRequest('POST', `/api/tournaments`, {
         leagueId: leagueId!,
         name: data.name,
-        type: data.type,
-        seasonId: data.type === "season_playoff" ? (data.seasonId || null) : null,
+        type: "season_playoff",
+        seasonId: data.seasonId,
         format: data.format,
         numTeams: data.teamIds.length,
         description: data.description || null,
@@ -304,68 +295,38 @@ export default function TournamentCreate() {
 
                   <FormField
                     control={form.control}
-                    name="type"
+                    name="seasonId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tournament Type</FormLabel>
+                        <FormLabel>Season</FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           defaultValue={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger data-testid="select-tournament-type">
-                              <SelectValue />
+                            <SelectTrigger data-testid="select-tournament-season">
+                              <SelectValue placeholder="Select a season" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="season_playoff">Season Playoff</SelectItem>
-                            <SelectItem value="standalone">Standalone Tournament</SelectItem>
+                            {seasons && seasons.length > 0 ? (
+                              seasons.map((season) => (
+                                <SelectItem key={season.id} value={season.id}>
+                                  {season.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="_none" disabled>No seasons available</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          Season playoffs are tied to your league season, standalone tournaments are independent
+                          Select which season this playoff is for
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-
-                  {watchedType === "season_playoff" && (
-                    <FormField
-                      control={form.control}
-                      name="seasonId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Season</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-tournament-season">
-                                <SelectValue placeholder="Select a season" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {seasons && seasons.length > 0 ? (
-                                seasons.map((season) => (
-                                  <SelectItem key={season.id} value={season.id}>
-                                    {season.name}
-                                  </SelectItem>
-                                ))
-                              ) : (
-                                <SelectItem value="_none" disabled>No seasons available</SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Select which season this playoff is for
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
 
                   <FormField
                     control={form.control}
