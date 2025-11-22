@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Edit } from "lucide-react";
 import type { TournamentMatch, TournamentTeam, TournamentSettings } from "@shared/schema";
 import { format as formatDate } from "date-fns";
 import TournamentMatchScoreModal from "./TournamentMatchScoreModal";
@@ -504,10 +504,16 @@ export default function BracketView({ matches, teams, format, settings, tourname
       <g key={match.id} transform={`translate(${x}, ${y})`}>
         <foreignObject width={MATCH_WIDTH} height={MATCH_HEIGHT}>
           <Card 
-            className={`h-full shadow-lg ${cardBgClass} ${borderClass} cursor-pointer hover:opacity-90 transition-opacity`} 
+            className={`h-full shadow-lg ${cardBgClass} ${borderClass} cursor-pointer hover:opacity-90 transition-opacity relative group`} 
             data-testid={`card-match-${match.matchNumber}`}
             onClick={() => setSelectedMatchId(match.id)}
           >
+            {/* Edit Icon - Always visible for commissioners */}
+            {isCommissioner && (
+              <div className="absolute top-1 right-1 z-10 bg-white dark:bg-gray-800 rounded-full p-1.5 shadow-md opacity-80 group-hover:opacity-100 transition-opacity">
+                <Edit className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" data-testid={`icon-edit-${match.matchNumber}`} />
+              </div>
+            )}
             <CardHeader className={`p-2 ${headerClass}`}>
               <div className="space-y-1">
                 <CardTitle className={`text-xs font-semibold text-white`}>

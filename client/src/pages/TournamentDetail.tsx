@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import BracketView from "@/components/BracketView";
 import MatchEditDialog from "@/components/MatchEditDialog";
+import TournamentMatchScoreModal from "@/components/TournamentMatchScoreModal";
 import { CustomBracketBuilder } from "@/components/CustomBracketBuilder";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
 import { useState } from "react";
@@ -35,6 +36,7 @@ export default function TournamentDetail() {
   const { canManageLeagueSpecific } = usePermissions();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingMatch, setEditingMatch] = useState<TournamentMatch | null>(null);
+  const [scoringMatchId, setScoringMatchId] = useState<string | null>(null);
   const [isExportingSchedule, setIsExportingSchedule] = useState(false);
   const [isEditingBracket, setIsEditingBracket] = useState(false);
 
@@ -705,6 +707,17 @@ export default function TournamentDetail() {
                                     <Badge variant={match.status === 'completed' ? 'default' : 'outline'}>
                                       {match.status}
                                     </Badge>
+                                    {tournament?.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
+                                      <Button 
+                                        size="sm" 
+                                        variant="default" 
+                                        onClick={() => setScoringMatchId(match.id)}
+                                        data-testid={`button-score-match-${match.matchNumber}`}
+                                      >
+                                        <Edit3 className="h-3.5 w-3.5 mr-1" />
+                                        Score
+                                      </Button>
+                                    )}
                                     <Button 
                                       size="sm" 
                                       variant="outline" 
@@ -783,6 +796,17 @@ export default function TournamentDetail() {
           onOpenChange={(open) => !open && setEditingMatch(null)}
           team1Name={getTeamName(editingMatch.team1Id)}
           team2Name={getTeamName(editingMatch.team2Id)}
+        />
+      )}
+
+      {/* Tournament Match Score Modal */}
+      {scoringMatchId && tournamentId && (
+        <TournamentMatchScoreModal
+          tournamentId={tournamentId}
+          matchId={scoringMatchId}
+          open={!!scoringMatchId}
+          onOpenChange={(open) => !open && setScoringMatchId(null)}
+          isCommissioner={tournament?.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
         />
       )}
     </div>

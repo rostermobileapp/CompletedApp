@@ -249,7 +249,7 @@ export default function TournamentMatchScoreModal({
                     name="team1Score"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Score</FormLabel>
+                        <FormLabel className="text-sm font-semibold">Score</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -258,8 +258,8 @@ export default function TournamentMatchScoreModal({
                             value={field.value ?? ''}
                             onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
                             disabled={!isCommissioner}
-                            className="text-2xl font-bold text-center"
-                            placeholder="-"
+                            className="text-3xl font-bold text-center h-16 bg-background border-2"
+                            placeholder="0"
                             data-testid="input-team1-score"
                           />
                         </FormControl>
@@ -280,7 +280,7 @@ export default function TournamentMatchScoreModal({
                     name="team2Score"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Score</FormLabel>
+                        <FormLabel className="text-sm font-semibold">Score</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -289,8 +289,8 @@ export default function TournamentMatchScoreModal({
                             value={field.value ?? ''}
                             onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
                             disabled={!isCommissioner}
-                            className="text-2xl font-bold text-center"
-                            placeholder="-"
+                            className="text-3xl font-bold text-center h-16 bg-background border-2"
+                            placeholder="0"
                             data-testid="input-team2-score"
                           />
                         </FormControl>
