@@ -421,7 +421,7 @@ export const dutyAssignments = pgTable("duty_assignments", {
 export const tournaments = pgTable("tournaments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
-  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id), // null for standalone tournaments
   seasonId: varchar("season_id").references(() => seasons.id), // null for standalone
   type: tournamentTypeEnum("type").notNull(),
   format: tournamentFormatEnum("format").notNull(),
