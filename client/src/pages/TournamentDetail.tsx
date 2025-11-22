@@ -63,9 +63,22 @@ export default function TournamentDetail() {
     enabled: !!tournamentId
   });
 
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ['/api/user']
+  });
+
+  // Check if user can manage this tournament (creator for standalone OR league commissioner for playoffs)
+  // Define this before hooks that use it
+  const canManageTournament = () => {
+    if (!tournament || !currentUser) return false;
+    if (tournament.type === 'standalone' && tournament.createdBy === currentUser.id) return true;
+    if (tournament.type === 'season_playoff' && canManageLeagueSpecific(tournament.leagueId)) return true;
+    return false;
+  };
+
   const { data: pendingParticipants } = useQuery<any[]>({
     queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'],
-    enabled: !!tournamentId && !!tournament && canManageLeagueSpecific(tournament.leagueId)
+    enabled: !!tournamentId && !!tournament && !!currentUser && canManageTournament()
   });
 
   const deleteMutation = useMutation({
@@ -824,8 +837,8 @@ export default function TournamentDetail() {
 
           {/* Teams Tab */}
           <TabsContent value="teams" className="space-y-6">
-            {/* CSV Upload Section - Commissioner Only */}
-            {tournament && canManageLeagueSpecific(tournament.leagueId) && (
+            {/* CSV Upload Section - Tournament Manager Only */}
+            {tournament && canManageTournament() && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -833,11 +846,33 @@ export default function TournamentDetail() {
                     Import Teams & Players
                   </CardTitle>
                   <CardDescription>
-                    Upload a CSV file to add teams and players to the tournament
+                    Upload a CSV file to bulk import teams and players to the tournament
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2">
+                <CardContent className="space-y-4">
+                  <div className="bg-muted p-4 rounded-md">
+                    <p className="text-sm font-medium mb-2">CSV Template Format:</p>
+                    <p className="text-sm text-muted-foreground mb-1">
+                      <span className="font-medium">Required:</span> Player Full Name, Team Name
+                    </p>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      <span className="font-medium">Optional:</span> Email, Phone Number, Jersey #, Position, Skill Level, Player Type (Goalie/Skater)
+                    </p>
+                    <p className="text-xs text-muted-foreground italic mb-3">
+                      Teams will be auto-created if they don't exist. User accounts will be created for players with emails.
+                    </p>
+                    <a
+                      href="/player-import-template.csv"
+                      download="player-import-template.csv"
+                      className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                      data-testid="link-download-template"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download CSV Template
+                    </a>
+                  </div>
+
+                  <div className="space-y-3">
                     <input
                       type="file"
                       accept=".csv"
@@ -854,21 +889,24 @@ export default function TournamentDetail() {
                         disabled={isUploadingCsv}
                         onClick={() => document.getElementById('csv-upload')?.click()}
                         data-testid="button-csv-upload"
+                        className="w-full"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         {isUploadingCsv ? 'Uploading...' : 'Upload CSV'}
                       </Button>
                     </label>
-                    <p className="text-sm text-muted-foreground">
-                      Format: Team Name, Player Name, Email
-                    </p>
+                    {csvFile && (
+                      <p className="text-sm text-muted-foreground">
+                        Selected: {csvFile.name}
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Pending Participants - Commissioner Only */}
-            {tournament && canManageLeagueSpecific(tournament.leagueId) && pendingParticipants && pendingParticipants.length > 0 && (
+            {/* Pending Participants - Tournament Manager Only */}
+            {tournament && canManageTournament() && pendingParticipants && pendingParticipants.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -967,7 +1005,7 @@ export default function TournamentDetail() {
                   <div className="text-center py-8 text-muted-foreground">
                     <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
                     <p>No teams added yet</p>
-                    {tournament && canManageLeagueSpecific(tournament.leagueId) && (
+                    {tournament && canManageTournament() && (
                       <p className="text-sm mt-1">Upload a CSV file to add teams and players</p>
                     )}
                   </div>

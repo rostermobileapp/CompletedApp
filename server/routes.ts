@@ -11565,7 +11565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Import tournament players from CSV
-  app.post('/api/tournaments/:tournamentId/players/import', isAuthenticated, loadUserPermissions, requireLeagueManagement, (req: any, res, next) => {
+  app.post('/api/tournaments/:tournamentId/players/import', isAuthenticated, loadUserPermissions, (req: any, res, next) => {
     upload.single('playerFile')(req, res, (err) => {
       if (err) {
         console.error('Multer error:', err);
@@ -11599,14 +11599,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Tournament not found' });
       }
 
-      // Get league and verify commissioner access
-      const [league] = await db
-        .select()
-        .from(leagues)
-        .where(eq(leagues.id, tournament.leagueId));
+      // Check permissions: either tournament creator (for standalone) OR league management permissions (for season playoffs)
+      const userWithPermissions = req.userWithPermissions;
+      if (!userWithPermissions) {
+        return res.status(401).json({ message: 'User permissions not loaded' });
+      }
 
-      if (!league || league.commissionerId !== userId) {
-        return res.status(403).json({ message: 'Only commissioners can import players' });
+      let hasPermission = false;
+      
+      if (tournament.type === 'standalone') {
+        // For standalone tournaments, check if user is the creator
+        if (tournament.createdBy === userId) {
+          hasPermission = true;
+        }
+      } else if (tournament.type === 'season_playoff' && tournament.leagueId) {
+        // For season playoffs, use the same permission logic as requireLeagueManagementSpecific
+        const { canManageLeagueSpecific } = await import('./permissionMiddleware');
+        hasPermission = await canManageLeagueSpecific(userWithPermissions, tournament.leagueId);
+      }
+
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Only tournament creators or league commissioners can import players' });
       }
 
       // Read and parse the CSV file
@@ -11624,17 +11637,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transformHeader: (header: string) => {
           const normalized = header.toLowerCase().trim().replace(/\*/g, '');
           const mapping: Record<string, string> = {
+            // Player name fields
             'player full name': 'fullName',
             'full name': 'fullName',
             'name': 'fullName',
+            'player': 'fullName',
+            'player name': 'fullName',
+            // Team fields
             'team': 'teamName',
             'team name': 'teamName',
+            // Contact fields
             'email': 'email',
+            'phone': 'phoneNumber',
+            'phone number': 'phoneNumber',
+            // Jersey and position
             'jersey #': 'jerseyNumber',
             'jersey number': 'jerseyNumber',
+            'jersey': 'jerseyNumber',
+            'position': 'position',
+            // Skill level
+            'skill level': 'skillLevel',
+            'skill rating': 'skillLevel',
+            'rating': 'skillLevel',
+            // Player type (goalie/skater)
+            'player type': 'playerType',
+            'type': 'playerType',
+            'role': 'playerType',
+            // Legacy support
             'first name': 'firstName',
+            'firstname': 'firstName',
             'last name': 'lastName',
-            'position': 'position'
+            'lastname': 'lastName',
+            'notes': 'notes'
           };
           return mapping[normalized] || header;
         }
@@ -11676,6 +11710,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return { firstName: nameParts.slice(0, -1).join(' '), lastName: nameParts[nameParts.length - 1] };
       };
 
+      const normalizePlayerType = (type: string | null | undefined): boolean => {
+        if (!type) return false;
+        const normalized = type.toLowerCase().trim();
+        return normalized === 'goalie' || normalized === 'g';
+      };
+
       // Process data
       const teamsToCreate: Set<string> = new Set();
       const playersToImport: any[] = [];
@@ -11696,8 +11736,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName = row.lastName?.trim() || '';
         }
 
-        if (!firstName || !lastName) {
-          errors.push(`Row ${index + 1}: Missing name`);
+        if (!firstName) {
+          errors.push(`Row ${index + 1}: Player Full Name is required but missing`);
           return;
         }
 
@@ -11713,6 +11753,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
 
+        // Parse jersey number
+        let jerseyNumber = null;
+        if (row.jerseyNumber) {
+          const parsed = parseInt(row.jerseyNumber.toString().trim());
+          if (!isNaN(parsed)) {
+            jerseyNumber = parsed;
+          }
+        }
+
+        // Normalize player type (Skater or Goalie)
+        const isGoalie = normalizePlayerType(row.playerType);
+
         // Track teams that need to be created
         const teamKey = teamName.toLowerCase().trim();
         if (!teamLookup.has(teamKey)) {
@@ -11724,24 +11776,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName,
           email,
           teamName,
-          jerseyNumber: row.jerseyNumber ? parseInt(row.jerseyNumber) : null,
-          position: row.position?.trim() || null
+          jerseyNumber,
+          position: row.position?.trim() || null,
+          skillLevel: row.skillLevel?.trim() || null,
+          phoneNumber: row.phoneNumber?.trim() || null,
+          notes: row.notes?.trim() || null,
+          isGoalie
         });
       });
 
-      // Create missing teams
+      // Create missing teams with auto-incrementing seeds
+      // Assign one seed per unique team (not per player)
+      const currentMaxSeed = existingTeams.length > 0 
+        ? Math.max(...existingTeams.map(t => t.seed || 0))
+        : 0;
+      const teamSeedMap = new Map<string, number>();
+      let nextSeed = currentMaxSeed + 1;
+      
       for (const teamName of teamsToCreate) {
+        const teamKey = teamName.toLowerCase().trim();
+        
+        // Assign seed once per unique team
+        if (!teamSeedMap.has(teamKey)) {
+          teamSeedMap.set(teamKey, nextSeed++);
+        }
+        
         const [newTeam] = await db
           .insert(tournamentTeams)
           .values({
             tournamentId,
             teamName,
-            seed: null
+            seed: teamSeedMap.get(teamKey)!
           })
           .returning();
         
-        teamLookup.set(teamName.toLowerCase().trim(), newTeam.id);
-        console.log(`Created tournament team: ${teamName}`);
+        teamLookup.set(teamKey, newTeam.id);
+        console.log(`Created tournament team: ${teamName} with seed ${newTeam.seed}`);
       }
 
       // Import players
@@ -11749,36 +11819,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let placeholderCount = 0;
 
       for (const player of playersToImport) {
-        const teamId = teamLookup.get(player.teamName.toLowerCase().trim());
-        if (!teamId) continue;
+        const tournamentTeamId = teamLookup.get(player.teamName.toLowerCase().trim());
+        if (!tournamentTeamId) continue;
 
         // Check if user exists
         let user = player.email ? await storage.getUserByEmail(player.email) : null;
         let userId: string;
 
         if (user) {
-          userId = user.id;
-        } else {
-          // Create placeholder player
-          const [placeholderPlayer] = await db
-            .insert(importedPlayers)
-            .values({
-              leagueId: tournament.leagueId,
-              firstName: player.firstName,
-              lastName: player.lastName,
-              email: player.email,
-              teamId: null,
-              status: 'pending_merge'
-            })
-            .returning();
-          
-          userId = placeholderPlayer.id;
-          placeholderCount++;
-        }
+          // User exists - check if already a participant
+          const [existing] = await db
+            .select()
+            .from(tournamentParticipants)
+            .where(and(
+              eq(tournamentParticipants.tournamentId, tournamentId),
+              eq(tournamentParticipants.userId, user.id)
+            ));
 
-        // Create tournament team membership (we'll reuse the league memberships table structure concept)
-        // For now, we'll just track this in the importedPlayers table with reference to tournament
-        successCount++;
+          if (existing) {
+            // Update team assignment
+            await db
+              .update(tournamentParticipants)
+              .set({ tournamentTeamId })
+              .where(eq(tournamentParticipants.id, existing.id));
+          } else {
+            // Create new participant
+            await db
+              .insert(tournamentParticipants)
+              .values({
+                tournamentId,
+                userId: user.id,
+                tournamentTeamId,
+                role: player.isGoalie ? 'player' : 'player',
+                status: 'approved',
+                expiresAt: tournament.accessEndDate || null
+              });
+          }
+          successCount++;
+        } else {
+          // Create or find placeholder user account with imported player data
+          try {
+            let userId: string;
+            const normalizedFirstName = player.firstName.toLowerCase().trim();
+            const normalizedLastName = player.lastName.toLowerCase().trim();
+            
+            // First, check if a participant with this name + team already exists in this tournament
+            // This prevents duplicates when email is missing
+            const existingParticipantsWithName = await db
+              .select({
+                participantId: tournamentParticipants.id,
+                userId: tournamentParticipants.userId,
+                user: users
+              })
+              .from(tournamentParticipants)
+              .innerJoin(users, eq(tournamentParticipants.userId, users.id))
+              .where(and(
+                eq(tournamentParticipants.tournamentId, tournamentId),
+                eq(tournamentParticipants.tournamentTeamId, tournamentTeamId),
+                sql`LOWER(TRIM(${users.firstName})) = ${normalizedFirstName}`,
+                sql`LOWER(TRIM(${users.lastName})) = ${normalizedLastName}`
+              ));
+
+            if (existingParticipantsWithName.length > 0) {
+              // Participant with this name already exists on this team - skip
+              console.log(`Skipping duplicate: ${player.firstName} ${player.lastName} already on team ${player.teamName}`);
+              continue;
+            }
+            
+            if (player.email) {
+              // Case-insensitive email lookup
+              const normalizedEmail = player.email.toLowerCase().trim();
+              const [existingUser] = await db
+                .select()
+                .from(users)
+                .where(sql`LOWER(TRIM(${users.email})) = ${normalizedEmail}`);
+
+              if (existingUser) {
+                userId = existingUser.id;
+              } else {
+                // Create new user with email
+                const [newUser] = await db
+                  .insert(users)
+                  .values({
+                    firstName: player.firstName,
+                    lastName: player.lastName,
+                    email: normalizedEmail,
+                    role: 'free_tier'
+                  })
+                  .returning();
+                userId = newUser.id;
+                placeholderCount++;
+              }
+            } else {
+              // No email - try to find existing user by name
+              const [existingUserByName] = await db
+                .select()
+                .from(users)
+                .where(and(
+                  sql`LOWER(TRIM(${users.firstName})) = ${normalizedFirstName}`,
+                  sql`LOWER(TRIM(${users.lastName})) = ${normalizedLastName}`
+                ))
+                .limit(1);
+
+              if (existingUserByName) {
+                userId = existingUserByName.id;
+              } else {
+                // Create placeholder with generated email
+                const placeholderEmail = `placeholder_${normalizedFirstName}_${normalizedLastName}_${Date.now()}@pending.local`;
+                const [newUser] = await db
+                  .insert(users)
+                  .values({
+                    firstName: player.firstName,
+                    lastName: player.lastName,
+                    email: placeholderEmail,
+                    role: 'free_tier'
+                  })
+                  .returning();
+                userId = newUser.id;
+                placeholderCount++;
+              }
+            }
+
+            // Check if participant already exists for this tournament (by userId)
+            const [existingParticipant] = await db
+              .select()
+              .from(tournamentParticipants)
+              .where(and(
+                eq(tournamentParticipants.tournamentId, tournamentId),
+                eq(tournamentParticipants.userId, userId)
+              ));
+
+            if (existingParticipant) {
+              // Update team assignment if different
+              if (existingParticipant.tournamentTeamId !== tournamentTeamId) {
+                await db
+                  .update(tournamentParticipants)
+                  .set({ tournamentTeamId })
+                  .where(eq(tournamentParticipants.id, existingParticipant.id));
+              }
+            } else {
+              // Create new tournament participant
+              await db
+                .insert(tournamentParticipants)
+                .values({
+                  tournamentId,
+                  userId,
+                  tournamentTeamId,
+                  role: 'player',
+                  status: 'pending',
+                  expiresAt: tournament.accessEndDate || null
+                });
+            }
+
+            successCount++;
+          } catch (error) {
+            console.error(`Error creating placeholder for ${player.firstName} ${player.lastName}:`, error);
+            errors.push(`Failed to create user for ${player.firstName} ${player.lastName}`);
+          }
+        }
       }
 
       // Clean up file
