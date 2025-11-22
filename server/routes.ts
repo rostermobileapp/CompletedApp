@@ -11,7 +11,8 @@ import {
   requireStatsManagement, 
   requireUserManagement,
   requirePremiumFeatures,
-  requireSpecialPermission
+  requireSpecialPermission,
+  roleHierarchy
 } from "./permissionMiddleware";
 import { db } from "./db";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games } from "@shared/schema";
@@ -10783,9 +10784,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Create tournament
-  app.post('/api/tournaments', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  app.post('/api/tournaments', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const { type } = req.body;
+      
+      // For league tournaments, require league management permissions
+      // For standalone tournaments, allow any authenticated user
+      if (type !== 'standalone') {
+        const user = req.userWithPermissions;
+        if (!user) {
+          return res.status(401).json({ message: "User permissions not loaded" });
+        }
+
+        const userRole = user.role || 'free_tier';
+        const hasAdmin = user.specialPermissions && user.specialPermissions.includes('admin');
+        
+        // Check if user has global permissions or is a commissioner of any league
+        const hasGlobalPermissions = user.isPrimaryCommissioner || hasAdmin || (roleHierarchy[userRole] >= roleHierarchy['secondary_commissioner']);
+        let isCommissioner = false;
+        
+        if (!hasGlobalPermissions) {
+          try {
+            const userLeagues = await storage.getLeaguesByCommissioner(user.id);
+            isCommissioner = userLeagues && userLeagues.length > 0;
+          } catch (error) {
+            console.error("Error checking league commissioner status:", error);
+          }
+        }
+
+        if (!hasGlobalPermissions && !isCommissioner) {
+          return res.status(403).json({ 
+            message: "Access denied. League tournament creation requires commissioner or admin permissions" 
+          });
+        }
+      }
       
       // Generate unique tournament ID
       const uniqueTournamentId = await generateUniqueTournamentId();
@@ -10926,10 +10959,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add teams to tournament and generate bracket
-  app.post('/api/tournaments/:id/generate-bracket', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  app.post('/api/tournaments/:id/generate-bracket', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const { id: tournamentId } = req.params;
       const { teams: teamData, format } = req.body;
+      const userId = req.user.claims.sub;
 
       // Validate tournament exists and is in draft status
       const [tournament] = await db
@@ -10943,6 +10977,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (tournament.status !== 'draft') {
         return res.status(400).json({ message: "Cannot modify tournament after it has started" });
+      }
+
+      // For league tournaments, require league management permissions
+      // For standalone tournaments, allow the creator only
+      if (tournament.type !== 'standalone') {
+        const user = req.userWithPermissions;
+        if (!user) {
+          return res.status(401).json({ message: "User permissions not loaded" });
+        }
+
+        const userRole = user.role || 'free_tier';
+        const hasAdmin = user.specialPermissions && user.specialPermissions.includes('admin');
+        
+        const hasGlobalPermissions = user.isPrimaryCommissioner || hasAdmin || (roleHierarchy[userRole] >= roleHierarchy['secondary_commissioner']);
+        let isCommissioner = false;
+        
+        if (!hasGlobalPermissions) {
+          try {
+            const userLeagues = await storage.getLeaguesByCommissioner(user.id);
+            isCommissioner = userLeagues && userLeagues.length > 0;
+          } catch (error) {
+            console.error("Error checking league commissioner status:", error);
+          }
+        }
+
+        if (!hasGlobalPermissions && !isCommissioner) {
+          return res.status(403).json({ 
+            message: "Access denied. League tournament modification requires commissioner or admin permissions" 
+          });
+        }
+      } else {
+        // For standalone tournaments, only the creator can modify
+        if (tournament.createdBy !== userId) {
+          return res.status(403).json({ 
+            message: "Access denied. Only the tournament creator can modify this tournament" 
+          });
+        }
       }
 
       // Validate team count (3-128 teams)

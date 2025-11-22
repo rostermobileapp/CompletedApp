@@ -96,7 +96,7 @@ interface UserWithPermissions extends User {
 }
 
 // Role hierarchy for permission checking (higher number = more access)
-const roleHierarchy: Record<UserRole, number> = {
+export const roleHierarchy: Record<UserRole, number> = {
   free_tier: 0,
   player_pro: 1,
   secondary_commissioner: 2,

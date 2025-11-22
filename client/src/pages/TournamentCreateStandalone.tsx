@@ -1,0 +1,666 @@
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { ArrowLeft, ArrowRight, CheckCircle, Trophy, Users, Info, Upload, Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import Papa from "papaparse";
+
+const formSchema = z.object({
+  name: z.string().min(1, "Tournament name is required"),
+  format: z.enum(["single_elimination", "double_elimination", "three_game_guarantee", "round_robin", "round_robin_split", "custom_bracket"]),
+  description: z.string().optional(),
+  teams: z.array(z.object({
+    name: z.string().min(1, "Team name is required"),
+    players: z.array(z.object({
+      firstName: z.string(),
+      lastName: z.string(),
+      email: z.string().optional()
+    }))
+  })).min(3, "At least 3 teams required").max(128, "Maximum 128 teams allowed")
+});
+
+type FormData = z.infer<typeof formSchema>;
+
+type Team = {
+  name: string;
+  players: Array<{ firstName: string; lastName: string; email?: string }>;
+};
+
+export default function TournamentCreateStandalone() {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [step, setStep] = useState(1);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [newPlayerFirstName, setNewPlayerFirstName] = useState("");
+  const [newPlayerLastName, setNewPlayerLastName] = useState("");
+  const [newPlayerEmail, setNewPlayerEmail] = useState("");
+  const [currentTeamIndex, setCurrentTeamIndex] = useState<number | null>(null);
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      format: "single_elimination",
+      description: "",
+      teams: []
+    }
+  });
+
+  const watchedFormat = form.watch("format");
+
+  // Create tournament mutation
+  const createMutation = useMutation({
+    mutationFn: async (data: FormData) => {
+      // Step 1: Create tournament (without leagueId)
+      const response = await apiRequest('POST', `/api/tournaments`, {
+        leagueId: null,
+        name: data.name,
+        type: "standalone",
+        seasonId: null,
+        format: data.format,
+        numTeams: data.teams.length,
+        description: data.description || null,
+        settings: {
+          bracketType: "seeded",
+          showSeedNumbers: true,
+          showGameNumbers: false
+        }
+      });
+
+      const tournament = await response.json();
+
+      // Step 2: Add teams and generate bracket
+      const teamData = data.teams.map((team, index) => ({
+        teamName: team.name,
+        seed: index + 1,
+        wins: 0,
+        losses: 0
+      }));
+
+      try {
+        await apiRequest('POST', `/api/tournaments/${tournament.id}/generate-bracket`, {
+          teams: teamData,
+          format: data.format
+        });
+      } catch (bracketError: any) {
+        let errorMsg = 'Unknown error';
+        try {
+          if (bracketError instanceof Response) {
+            const errorData = await bracketError.json();
+            errorMsg = errorData.message || errorMsg;
+          } else if (bracketError.message) {
+            errorMsg = bracketError.message;
+          }
+        } catch {
+          // Error parsing failed, use default
+        }
+        throw new Error(`Bracket generation failed: ${errorMsg}`);
+      }
+
+      return tournament;
+    },
+    onSuccess: (tournament, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+      
+      if (variables.format === 'custom_bracket') {
+        toast({
+          title: "Tournament created",
+          description: "Now you can build your custom bracket"
+        });
+        setLocation(`/tournaments/${tournament.id}/custom-builder`);
+      } else {
+        toast({
+          title: "Tournament created",
+          description: "Your tournament has been created successfully"
+        });
+        setLocation(`/tournaments/${tournament.id}`);
+      }
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.message || "Failed to create tournament";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const onSubmit = (data: FormData) => {
+    createMutation.mutate(data);
+  };
+
+  const nextStep = async () => {
+    const fieldsToValidate = step === 1 
+      ? ["name", "format", "description"] as const
+      : ["teams"] as const;
+    
+    const isValid = await form.trigger(fieldsToValidate);
+    if (isValid) {
+      setStep(step + 1);
+    }
+  };
+
+  const getFormatLabel = (format: string) => {
+    const labels: Record<string, string> = {
+      single_elimination: 'Single Elimination',
+      double_elimination: 'Double Elimination',
+      three_game_guarantee: '3-Game Guarantee',
+      round_robin: 'Round Robin',
+      round_robin_split: 'Round Robin + Playoffs',
+      custom_bracket: 'Custom Bracket Builder'
+    };
+    return labels[format] || format;
+  };
+
+  // CSV Upload Handler
+  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const parsedTeams: Team[] = [];
+        const teamMap = new Map<string, Team>();
+
+        results.data.forEach((row: any) => {
+          const teamName = row['Team Name'] || row['team_name'] || row['TeamName'] || '';
+          const firstName = row['First Name'] || row['first_name'] || row['FirstName'] || '';
+          const lastName = row['Last Name'] || row['last_name'] || row['LastName'] || '';
+          const email = row['Email'] || row['email'] || '';
+
+          if (!teamName || (!firstName && !lastName)) {
+            return; // Skip invalid rows
+          }
+
+          if (!teamMap.has(teamName)) {
+            teamMap.set(teamName, { name: teamName, players: [] });
+          }
+
+          const team = teamMap.get(teamName)!;
+          if (firstName || lastName) {
+            team.players.push({ firstName, lastName, email: email || undefined });
+          }
+        });
+
+        const newTeams = Array.from(teamMap.values());
+        setTeams(newTeams);
+        form.setValue('teams', newTeams);
+
+        toast({
+          title: "CSV imported",
+          description: `Successfully imported ${newTeams.length} teams`
+        });
+
+        // Reset file input
+        event.target.value = '';
+      },
+      error: (error) => {
+        toast({
+          title: "Import failed",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    });
+  };
+
+  // Manual Team Addition
+  const addTeam = () => {
+    if (!newTeamName.trim()) {
+      toast({
+        title: "Team name required",
+        description: "Please enter a team name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newTeam: Team = { name: newTeamName.trim(), players: [] };
+    const updatedTeams = [...teams, newTeam];
+    setTeams(updatedTeams);
+    form.setValue('teams', updatedTeams);
+    setNewTeamName("");
+
+    toast({
+      title: "Team added",
+      description: `${newTeam.name} has been added`
+    });
+  };
+
+  const removeTeam = (index: number) => {
+    const updatedTeams = teams.filter((_, i) => i !== index);
+    setTeams(updatedTeams);
+    form.setValue('teams', updatedTeams);
+  };
+
+  const addPlayer = () => {
+    if (currentTeamIndex === null) return;
+    
+    if (!newPlayerFirstName.trim() && !newPlayerLastName.trim()) {
+      toast({
+        title: "Player name required",
+        description: "Please enter at least a first or last name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const updatedTeams = [...teams];
+    updatedTeams[currentTeamIndex].players.push({
+      firstName: newPlayerFirstName.trim(),
+      lastName: newPlayerLastName.trim(),
+      email: newPlayerEmail.trim() || undefined
+    });
+
+    setTeams(updatedTeams);
+    form.setValue('teams', updatedTeams);
+    setNewPlayerFirstName("");
+    setNewPlayerLastName("");
+    setNewPlayerEmail("");
+  };
+
+  const removePlayer = (teamIndex: number, playerIndex: number) => {
+    const updatedTeams = [...teams];
+    updatedTeams[teamIndex].players = updatedTeams[teamIndex].players.filter((_, i) => i !== playerIndex);
+    setTeams(updatedTeams);
+    form.setValue('teams', updatedTeams);
+  };
+
+  return (
+    <div className="min-h-screen bg-background pb-24">
+      {/* Header */}
+      <div className="border-b bg-card">
+        <div className="max-w-4xl mx-auto px-4 md:px-8 py-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation(`/tournaments`)}
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="space-y-1">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="text-page-title">
+                <Trophy className="h-7 w-7 text-primary" />
+                Create Standalone Tournament
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Step {step} of 3
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-4xl mx-auto px-4 md:px-8 py-8">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Step 1: Basic Information */}
+            {step === 1 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Info className="h-5 w-5" />
+                    Tournament Details
+                  </CardTitle>
+                  <CardDescription>
+                    Set up the basic information for your standalone tournament
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tournament Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., Summer Showdown 2025"
+                            {...field}
+                            data-testid="input-tournament-name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="format"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tournament Format</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-tournament-format">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="single_elimination">Single Elimination</SelectItem>
+                            <SelectItem value="double_elimination">Double Elimination</SelectItem>
+                            <SelectItem value="three_game_guarantee">3-Game Guarantee</SelectItem>
+                            <SelectItem value="round_robin">Round Robin</SelectItem>
+                            <SelectItem value="round_robin_split">Round Robin + Playoffs</SelectItem>
+                            <SelectItem value="custom_bracket">Custom Bracket Builder</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Choose the format for your tournament bracket
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Add details about your tournament..."
+                            {...field}
+                            data-testid="input-tournament-description"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Step 2: Create/Import Teams */}
+            {step === 2 && (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Add Teams
+                    </CardTitle>
+                    <CardDescription>
+                      Add teams manually or import via CSV ({teams.length} teams added)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* CSV Upload */}
+                    <div className="border rounded-lg p-4 bg-muted/50">
+                      <h3 className="font-medium mb-2 flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        Import from CSV
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Upload a CSV with columns: Team Name, First Name, Last Name, Email
+                      </p>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleCsvUpload}
+                        className="hidden"
+                        id="csv-upload"
+                        data-testid="input-csv-upload"
+                      />
+                      <label htmlFor="csv-upload">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => document.getElementById('csv-upload')?.click()}
+                          data-testid="button-csv-upload"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload CSV
+                        </Button>
+                      </label>
+                    </div>
+
+                    {/* Manual Team Entry */}
+                    <div className="border rounded-lg p-4">
+                      <h3 className="font-medium mb-2 flex items-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        Add Team Manually
+                      </h3>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Team name"
+                          value={newTeamName}
+                          onChange={(e) => setNewTeamName(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTeam())}
+                          data-testid="input-new-team-name"
+                        />
+                        <Button
+                          type="button"
+                          onClick={addTeam}
+                          data-testid="button-add-team"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Teams List */}
+                    {teams.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="font-medium">Teams</h3>
+                        {teams.map((team, teamIndex) => (
+                          <Card key={teamIndex}>
+                            <CardHeader className="pb-3">
+                              <div className="flex items-center justify-between">
+                                <CardTitle className="text-base">{team.name}</CardTitle>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeTeam(teamIndex)}
+                                  data-testid={`button-remove-team-${teamIndex}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              <CardDescription>
+                                {team.players.length} player{team.players.length !== 1 ? 's' : ''}
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                              {/* Add Player Form */}
+                              {currentTeamIndex === teamIndex ? (
+                                <div className="border rounded-lg p-3 bg-muted/50 space-y-2">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <Input
+                                      placeholder="First name"
+                                      value={newPlayerFirstName}
+                                      onChange={(e) => setNewPlayerFirstName(e.target.value)}
+                                      data-testid={`input-player-firstname-${teamIndex}`}
+                                    />
+                                    <Input
+                                      placeholder="Last name"
+                                      value={newPlayerLastName}
+                                      onChange={(e) => setNewPlayerLastName(e.target.value)}
+                                      data-testid={`input-player-lastname-${teamIndex}`}
+                                    />
+                                  </div>
+                                  <Input
+                                    placeholder="Email (optional)"
+                                    value={newPlayerEmail}
+                                    onChange={(e) => setNewPlayerEmail(e.target.value)}
+                                    data-testid={`input-player-email-${teamIndex}`}
+                                  />
+                                  <div className="flex gap-2">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      onClick={addPlayer}
+                                      data-testid={`button-add-player-${teamIndex}`}
+                                    >
+                                      Add Player
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setCurrentTeamIndex(null)}
+                                      data-testid={`button-cancel-add-player-${teamIndex}`}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setCurrentTeamIndex(teamIndex)}
+                                  data-testid={`button-show-add-player-${teamIndex}`}
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Add Player
+                                </Button>
+                              )}
+
+                              {/* Players List */}
+                              {team.players.length > 0 && (
+                                <div className="space-y-1 mt-2">
+                                  {team.players.map((player, playerIndex) => (
+                                    <div
+                                      key={playerIndex}
+                                      className="flex items-center justify-between p-2 bg-muted rounded text-sm"
+                                      data-testid={`player-${teamIndex}-${playerIndex}`}
+                                    >
+                                      <span>
+                                        {player.firstName} {player.lastName}
+                                        {player.email && <span className="text-muted-foreground ml-2">({player.email})</span>}
+                                      </span>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removePlayer(teamIndex, playerIndex)}
+                                        data-testid={`button-remove-player-${teamIndex}-${playerIndex}`}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+
+                    {form.formState.errors.teams && (
+                      <p className="text-sm text-destructive">{form.formState.errors.teams.message}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Step 3: Review */}
+            {step === 3 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5" />
+                    Review & Create
+                  </CardTitle>
+                  <CardDescription>
+                    Review your tournament settings before creating
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Tournament Name</p>
+                      <p className="text-lg font-semibold" data-testid="text-review-name">{form.getValues("name")}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Format</p>
+                      <p className="text-lg font-semibold" data-testid="text-review-format">
+                        {getFormatLabel(watchedFormat)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Teams</p>
+                      <p className="text-lg font-semibold" data-testid="text-review-teams">
+                        {teams.length} teams
+                      </p>
+                    </div>
+                    {form.getValues("description") && (
+                      <div className="md:col-span-2">
+                        <p className="text-sm font-medium text-muted-foreground">Description</p>
+                        <p className="text-sm" data-testid="text-review-description">{form.getValues("description")}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Navigation */}
+            <div className="flex justify-between">
+              {step > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStep(step - 1)}
+                  data-testid="button-previous"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Previous
+                </Button>
+              )}
+              <div className="ml-auto">
+                {step < 3 ? (
+                  <Button
+                    type="button"
+                    onClick={nextStep}
+                    data-testid="button-next"
+                  >
+                    Next
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    disabled={createMutation.isPending}
+                    data-testid="button-create-tournament"
+                  >
+                    {createMutation.isPending ? "Creating..." : "Create Tournament"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </form>
+        </Form>
+      </div>
+    </div>
+  );
+}
