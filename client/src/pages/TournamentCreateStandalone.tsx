@@ -253,14 +253,32 @@ export default function TournamentCreateStandalone() {
         const playersData: any[] = [];
         let hasPlayerData = false;
 
-        // Check if CSV contains player information columns
+        // Get headers and find the team name column
         const headers = results.meta.fields || [];
+        
+        // Find team name column (case-insensitive, flexible matching)
+        const teamColumn = headers.find(h => 
+          h && h.toLowerCase().replace(/[_\s]/g, '').includes('team')
+        );
+
+        // Check if CSV contains player information columns
         const hasPlayerColumns = headers.some(h => 
           h && (h.toLowerCase().includes('player') || h.toLowerCase().includes('email') || h.toLowerCase().includes('jersey'))
         );
 
+        console.log('CSV Headers:', headers);
+        console.log('Team Column:', teamColumn);
+
         results.data.forEach((row: any) => {
-          const teamName = row['Team Name'] || row['team_name'] || row['TeamName'] || '';
+          // Try to find team name from any column containing "team"
+          let teamName = '';
+          if (teamColumn) {
+            teamName = row[teamColumn] || '';
+          } else {
+            // Fallback: try common variations
+            teamName = row['Team Name'] || row['team_name'] || row['TeamName'] || row['Team'] || row['team'] || '';
+          }
+
           if (teamName && teamName.trim()) {
             teamNamesSet.add(teamName.trim());
           }
