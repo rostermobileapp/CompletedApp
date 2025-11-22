@@ -498,3 +498,113 @@ export const requireLeagueManagementSpecific: RequestHandler = async (req, res, 
     message: "Access denied. League management requires league-specific commissioner or admin permissions" 
   });
 };
+
+/**
+ * Check if a user has valid tournament participant access
+ */
+export async function hasValidTournamentAccess(userId: string, tournamentId: string): Promise<boolean> {
+  try {
+    const { db } = await import("./db");
+    const { tournamentParticipants, tournaments } = await import("@shared/schema");
+    const { eq, and } = await import("drizzle-orm");
+
+    // Check if user is a participant
+    const [participant] = await db
+      .select()
+      .from(tournamentParticipants)
+      .where(and(
+        eq(tournamentParticipants.tournamentId, tournamentId),
+        eq(tournamentParticipants.userId, userId)
+      ));
+
+    if (!participant) {
+      return false;
+    }
+
+    // Check if participant is approved
+    if (participant.status !== 'approved') {
+      return false;
+    }
+
+    // Check if access has expired
+    if (participant.expiresAt && new Date(participant.expiresAt) < new Date()) {
+      return false;
+    }
+
+    // Get tournament to check access window
+    const [tournament] = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId));
+
+    if (!tournament) {
+      return false;
+    }
+
+    // Check if we're within the access window
+    const now = new Date();
+    if (tournament.accessStartDate && new Date(tournament.accessStartDate) > now) {
+      return false; // Access hasn't started yet
+    }
+
+    if (tournament.accessEndDate && new Date(tournament.accessEndDate) < now) {
+      return false; // Access has ended
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error checking tournament access:', error);
+    return false;
+  }
+}
+
+/**
+ * Middleware to require valid tournament participant access
+ */
+export const requireTournamentParticipant: RequestHandler = async (req, res, next) => {
+  try {
+    const userId = (req.user as any)?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ message: "User ID not found in session" });
+    }
+
+    const tournamentId = req.params.tournamentId || req.params.id;
+    if (!tournamentId) {
+      return res.status(400).json({ message: "Tournament ID required" });
+    }
+
+    // Check if user is a league commissioner (they always have access)
+    const { db } = await import("./db");
+    const { tournaments, leagues } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const [tournament] = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId));
+
+    if (tournament) {
+      const [league] = await db
+        .select()
+        .from(leagues)
+        .where(eq(leagues.id, tournament.leagueId));
+
+      if (league && league.commissionerId === userId) {
+        return next(); // Commissioner always has access
+      }
+    }
+
+    // Check participant access
+    const hasAccess = await hasValidTournamentAccess(userId, tournamentId);
+    if (!hasAccess) {
+      return res.status(403).json({ 
+        message: "Access denied. You don't have valid tournament participant access or your access has expired." 
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("Error checking tournament participant access:", error);
+    res.status(500).json({ message: "Failed to verify tournament access" });
+  }
+};
