@@ -194,6 +194,22 @@ export default function TournamentCreate() {
     const isValid = await form.trigger(fieldsToValidate);
     if (isValid) {
       setStep(step + 1);
+    } else {
+      // Show validation errors
+      const errors = form.formState.errors;
+      if (errors.teamIds) {
+        toast({
+          title: "Validation Error",
+          description: errors.teamIds.message || "Please select at least 3 teams",
+          variant: "destructive"
+        });
+      } else if (errors.seasonId) {
+        toast({
+          title: "Validation Error",
+          description: "Please select a season",
+          variant: "destructive"
+        });
+      }
     }
   };
 
