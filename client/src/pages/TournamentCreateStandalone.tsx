@@ -309,7 +309,7 @@ export default function TournamentCreateStandalone() {
             <div className="space-y-1">
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="text-page-title">
                 <Trophy className="h-7 w-7 text-primary" />
-                Create Standalone Tournament
+                Create Tournament
               </h1>
               <p className="text-sm text-muted-foreground">
                 Step {step} of 3
