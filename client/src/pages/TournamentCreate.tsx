@@ -417,59 +417,67 @@ export default function TournamentCreate() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <FormField
-                      control={form.control}
-                      name="teamIds"
-                      render={() => (
-                        <FormItem>
-                          <div className="space-y-2">
-                            <div className="flex items-center space-x-3 pb-3 border-b">
-                              <Checkbox
-                                checked={teams && teams.length > 0 && watchedTeamIds.length === teams.length}
-                                onCheckedChange={(checked) => {
-                                  if (checked && teams) {
-                                    form.setValue('teamIds', teams.map(t => t.id));
-                                  } else {
-                                    form.setValue('teamIds', []);
-                                  }
-                                }}
-                                data-testid="checkbox-select-all-teams"
-                              />
-                              <label className="font-medium cursor-pointer">
-                                Select All Teams
-                              </label>
+                    {/* Select All checkbox - outside FormField so it's always visible */}
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-3 pb-3 border-b">
+                        <Checkbox
+                          checked={teams && teams.length > 0 && watchedTeamIds.length === teams.length}
+                          onCheckedChange={(checked) => {
+                            // Convert to boolean to handle indeterminate state
+                            const isChecked = checked === true;
+                            if (isChecked && teams) {
+                              form.setValue('teamIds', teams.map(t => t.id), { shouldValidate: true });
+                            } else {
+                              form.setValue('teamIds', [], { shouldValidate: true });
+                            }
+                          }}
+                          data-testid="checkbox-select-all-teams"
+                        />
+                        <label className="font-medium cursor-pointer">
+                          Select All Teams
+                        </label>
+                      </div>
+                      
+                      <FormField
+                        control={form.control}
+                        name="teamIds"
+                        render={() => (
+                          <FormItem>
+                            <div className="space-y-2">
+                              {teams?.map((team) => (
+                                <FormField
+                                  key={team.id}
+                                  control={form.control}
+                                  name="teamIds"
+                                  render={({ field }) => (
+                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                      <FormControl>
+                                        <Checkbox
+                                          checked={field.value?.includes(team.id)}
+                                          onCheckedChange={(checked) => {
+                                            // Convert to boolean to handle indeterminate state
+                                            const isChecked = checked === true;
+                                            const newValue = isChecked
+                                              ? [...field.value, team.id]
+                                              : field.value.filter((id: string) => id !== team.id);
+                                            field.onChange(newValue);
+                                          }}
+                                          data-testid={`checkbox-team-${team.id}`}
+                                        />
+                                      </FormControl>
+                                      <FormLabel className="font-normal cursor-pointer flex-1">
+                                        {team.name}
+                                      </FormLabel>
+                                    </FormItem>
+                                  )}
+                                />
+                              ))}
                             </div>
-                            {teams?.map((team) => (
-                              <FormField
-                                key={team.id}
-                                control={form.control}
-                                name="teamIds"
-                                render={({ field }) => (
-                                  <FormItem className="flex items-center space-x-3 space-y-0">
-                                    <FormControl>
-                                      <Checkbox
-                                        checked={field.value?.includes(team.id)}
-                                        onCheckedChange={(checked) => {
-                                          const newValue = checked
-                                            ? [...field.value, team.id]
-                                            : field.value.filter((id: string) => id !== team.id);
-                                          field.onChange(newValue);
-                                        }}
-                                        data-testid={`checkbox-team-${team.id}`}
-                                      />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer flex-1">
-                                      {team.name}
-                                    </FormLabel>
-                                  </FormItem>
-                                )}
-                              />
-                            ))}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 
