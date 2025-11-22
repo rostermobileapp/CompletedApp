@@ -25,12 +25,14 @@ import { CustomBracketBuilder } from "@/components/CustomBracketBuilder";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
 import { useState } from "react";
 import { format } from "date-fns";
+import { usePermissions } from "@/context/SubscriptionContext";
 
 export default function TournamentDetail() {
   const [, params] = useRoute("/tournaments/:tournamentId");
   const [, setLocation] = useLocation();
   const tournamentId = params?.tournamentId;
   const { toast } = useToast();
+  const { canManageLeagueSpecific } = usePermissions();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingMatch, setEditingMatch] = useState<TournamentMatch | null>(null);
   const [isExportingSchedule, setIsExportingSchedule] = useState(false);
@@ -551,8 +553,8 @@ export default function TournamentDetail() {
                             format={tournament.format}
                             settings={tournament.settings as TournamentSettings | undefined}
                             tournamentName={tournament.name}
-                            tournamentId={tournamentId}
-                            isCommissioner={isLeagueCommissioner}
+                            tournamentId={tournamentId || ''}
+                            isCommissioner={tournament?.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
                           />
                         </CardContent>
                       </Card>
