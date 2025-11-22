@@ -121,7 +121,7 @@ export function SlideOutMenu() {
           side="right" 
           className="w-[85%] sm:w-[400px] h-screen border-l border-border bg-background flex flex-col [&>button]:hidden"
         >
-          <SheetHeader className="flex-shrink-0 pt-8 pb-6 px-6">
+          <SheetHeader className="flex-shrink-0 px-6 pt-[4px] pb-[4px]">
             <div className="flex items-center justify-between">
               <SheetTitle className="text-2xl font-bold">Menu</SheetTitle>
               <SheetClose asChild>
