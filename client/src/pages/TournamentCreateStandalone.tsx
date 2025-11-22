@@ -141,7 +141,10 @@ export default function TournamentCreateStandalone() {
       try {
         await apiRequest('POST', `/api/tournaments/${tournament.id}/generate-bracket`, {
           teams: teamData,
-          format: data.format
+          format: data.format,
+          settings: {
+            byePolicy: numTeams % 2 === 1 ? 'play_in_game' : 'top_seed_bye'
+          }
         });
       } catch (bracketError: any) {
         let errorMsg = 'Unknown error';
