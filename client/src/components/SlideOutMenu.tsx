@@ -119,7 +119,7 @@ export function SlideOutMenu() {
         </SheetTrigger>
         <SheetContent 
           side="right" 
-          className="w-[85%] sm:w-[400px] border-l border-border bg-background flex flex-col [&>button]:hidden"
+          className="w-[85%] sm:w-[400px] h-screen border-l border-border bg-background flex flex-col [&>button]:hidden"
         >
           <SheetHeader className="flex-shrink-0 pt-8 pb-6 px-6">
             <div className="flex items-center justify-between">
@@ -135,27 +135,25 @@ export function SlideOutMenu() {
             </div>
           </SheetHeader>
           
-          <div className="flex-1 overflow-y-auto px-6 pb-6">
-            <div className="space-y-3">
-              {menuItems.map((item) => (
-                <button
-                  key={item.path}
-                  onClick={() => handleNavigate(item.path, item.locked)}
-                  className="w-full bg-card border border-border rounded-lg p-4 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50"
-                  data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl ${item.bgColor}`}>
-                      <item.icon className={`w-6 h-6 ${item.iconColor}`} />
-                    </div>
-                    <span className="text-lg font-semibold text-left text-foreground">
-                      {item.label}
-                    </span>
+          <div className="flex-1 flex flex-col justify-evenly px-6 pb-6">
+            {menuItems.map((item) => (
+              <button
+                key={item.path}
+                onClick={() => handleNavigate(item.path, item.locked)}
+                className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50"
+                data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${item.bgColor}`}>
+                    <item.icon className={`w-5 h-5 ${item.iconColor}`} />
                   </div>
-                  <div className="text-muted-foreground text-lg">→</div>
-                </button>
-              ))}
-            </div>
+                  <span className="text-base font-semibold text-left text-foreground">
+                    {item.label}
+                  </span>
+                </div>
+                <div className="text-muted-foreground text-base">→</div>
+              </button>
+            ))}
           </div>
         </SheetContent>
       </Sheet>
