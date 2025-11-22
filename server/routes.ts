@@ -11848,6 +11848,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get current user's participation status for a tournament
+  app.get('/api/tournaments/:tournamentId/my-participation', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tournamentId } = req.params;
+
+      const [participant] = await db
+        .select()
+        .from(tournamentParticipants)
+        .where(and(
+          eq(tournamentParticipants.tournamentId, tournamentId),
+          eq(tournamentParticipants.userId, userId)
+        ));
+
+      if (!participant) {
+        return res.status(404).json({ message: "No participation record found" });
+      }
+
+      res.json(participant);
+    } catch (error) {
+      console.error("Error fetching participation:", error);
+      res.status(500).json({ message: "Failed to fetch participation status" });
+    }
+  });
+
   // Get pending participants for a tournament (commissioner only)
   app.get('/api/tournaments/:tournamentId/participants/pending', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
