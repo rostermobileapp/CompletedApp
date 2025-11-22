@@ -599,6 +599,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create checkout session for tournament payment
+  app.post('/api/tournaments/:tournamentId/create-checkout', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tournamentId } = req.params;
+
+      // Get tournament
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      // Check if already paid
+      if (tournament.paymentStatus === 'paid') {
+        return res.status(400).json({ message: 'Tournament payment already completed' });
+      }
+
+      // Get user
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      let customerId = user.stripeCustomerId;
+
+      // Create Stripe customer if they don't have one
+      if (!customerId) {
+        console.log('[Stripe] Creating new customer for tournament payment:', userId);
+        const customer = await stripe.customers.create({
+          email: user.email || undefined,
+          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+          metadata: {
+            userId: userId,
+          },
+        });
+        
+        customerId = customer.id;
+        await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
+        console.log('[Stripe] Created customer:', customerId);
+      } else {
+        // Update existing customer's email to match current profile
+        console.log('[Stripe] Updating customer email for tournament checkout:', customerId);
+        await stripe.customers.update(customerId, {
+          email: user.email || undefined,
+          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+        });
+      }
+
+      // Build URL from request
+      const protocol = req.protocol || 'https';
+      const host = req.get('host') || (process.env.REPLIT_DOMAINS 
+        ? `${process.env.REPLIT_DOMAINS}` 
+        : 'localhost:5000');
+      const appUrl = `${protocol}://${host}`;
+
+      // Calculate payment amount in cents
+      const amountInCents = Math.round((tournament.paymentAmount || 0) * 100);
+
+      // Create checkout session
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `Tournament: ${tournament.name}`,
+                description: `Access for ${tournament.name} (ID: ${tournament.uniqueTournamentId})`,
+              },
+              unit_amount: amountInCents,
+            },
+            quantity: 1,
+          },
+        ],
+        success_url: `${appUrl}/tournament/${tournamentId}?payment=success`,
+        cancel_url: `${appUrl}/tournament/${tournamentId}?payment=cancelled`,
+        client_reference_id: userId,
+        metadata: {
+          userId: userId,
+          tournamentId: tournamentId,
+          type: 'tournament_payment'
+        },
+      });
+
+      // Update tournament with session ID
+      await db
+        .update(tournaments)
+        .set({
+          stripeSessionId: session.id,
+          updatedAt: new Date()
+        })
+        .where(eq(tournaments.id, tournamentId));
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error('[Stripe] Error creating tournament checkout session:', error);
+      res.status(500).json({ message: 'Failed to create tournament checkout session' });
+    }
+  });
+
   // Create billing portal session - creates customer in Stripe if needed
   app.post('/api/stripe/create-portal-session', isAuthenticated, async (req: any, res) => {
     try {
@@ -1066,7 +1172,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const session = event.data.object as Stripe.Checkout.Session;
           console.log('[Webhook] Checkout session completed:', session.id);
           
-          if (session.subscription && session.customer) {
+          // Check if this is a tournament payment
+          if (session.metadata?.type === 'tournament_payment') {
+            const tournamentId = session.metadata.tournamentId;
+            console.log('[Webhook] Tournament payment completed for tournament:', tournamentId);
+            
+            if (tournamentId && session.payment_status === 'paid') {
+              await db
+                .update(tournaments)
+                .set({
+                  paymentStatus: 'paid',
+                  stripePaymentIntentId: session.payment_intent as string || null,
+                  paidAt: new Date(),
+                  updatedAt: new Date()
+                })
+                .where(eq(tournaments.id, tournamentId));
+              
+              console.log('[Webhook] Tournament', tournamentId, 'marked as paid');
+            }
+          } 
+          // Handle subscription checkout
+          else if (session.subscription && session.customer) {
             const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
             const users = await storage.getAllUsers();
             let user = users.find(u => u.stripeCustomerId === session.customer);
