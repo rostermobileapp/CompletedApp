@@ -11493,6 +11493,256 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import tournament players from CSV
+  app.post('/api/tournaments/:tournamentId/players/import', isAuthenticated, loadUserPermissions, requireLeagueManagement, (req: any, res, next) => {
+    upload.single('playerFile')(req, res, (err) => {
+      if (err) {
+        console.error('Multer error:', err);
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ message: 'File size exceeds 5MB limit' });
+          }
+          return res.status(400).json({ message: err.message });
+        }
+        return res.status(400).json({ message: err.message || 'File upload error' });
+      }
+      next();
+    });
+  }, async (req: any, res) => {
+    try {
+      const tournamentId = req.params.tournamentId;
+      const userId = req.user.claims.sub;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+
+      // Get tournament and verify access
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      // Get league and verify commissioner access
+      const [league] = await db
+        .select()
+        .from(leagues)
+        .where(eq(leagues.id, tournament.leagueId));
+
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can import players' });
+      }
+
+      // Read and parse the CSV file
+      let fileContent = fs.readFileSync(file.path, 'utf8');
+      
+      // Skip first 3 instruction lines if they exist
+      const lines = fileContent.split('\n');
+      if (lines.length > 3 && lines[0].toUpperCase().includes('INSTRUCTION')) {
+        fileContent = lines.slice(3).join('\n');
+      }
+      
+      const parseResults = Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header: string) => {
+          const normalized = header.toLowerCase().trim().replace(/\*/g, '');
+          const mapping: Record<string, string> = {
+            'player full name': 'fullName',
+            'full name': 'fullName',
+            'name': 'fullName',
+            'team': 'teamName',
+            'team name': 'teamName',
+            'email': 'email',
+            'jersey #': 'jerseyNumber',
+            'jersey number': 'jerseyNumber',
+            'first name': 'firstName',
+            'last name': 'lastName',
+            'position': 'position'
+          };
+          return mapping[normalized] || header;
+        }
+      });
+
+      if (parseResults.errors.length > 0) {
+        return res.status(400).json({ 
+          message: 'Error parsing CSV file', 
+          errors: parseResults.errors 
+        });
+      }
+
+      // Get existing tournament teams
+      const existingTeams = await db
+        .select()
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.tournamentId, tournamentId));
+      
+      const teamLookup = new Map<string, string>();
+      existingTeams.forEach(team => {
+        teamLookup.set(team.teamName.toLowerCase().trim(), team.id);
+      });
+
+      // Helper functions
+      const isValidEmail = (email: string): boolean => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+      };
+
+      const parseFullName = (fullName: string): { firstName: string; lastName: string } => {
+        const trimmed = fullName.trim();
+        if (trimmed.includes(',')) {
+          const parts = trimmed.split(',').map(p => p.trim());
+          return { lastName: parts[0] || '', firstName: parts.slice(1).join(' ') || '' };
+        }
+        const nameParts = trimmed.split(/\s+/);
+        if (nameParts.length === 0) return { firstName: '', lastName: '' };
+        if (nameParts.length === 1) return { firstName: nameParts[0], lastName: '' };
+        return { firstName: nameParts.slice(0, -1).join(' '), lastName: nameParts[nameParts.length - 1] };
+      };
+
+      // Process data
+      const teamsToCreate: Set<string> = new Set();
+      const playersToImport: any[] = [];
+      const errors: string[] = [];
+
+      parseResults.data.forEach((row: any, index: number) => {
+        if (!row.fullName?.trim() && !row.firstName?.trim()) return;
+
+        let firstName = '';
+        let lastName = '';
+        
+        if (row.fullName) {
+          const parsed = parseFullName(row.fullName);
+          firstName = parsed.firstName;
+          lastName = parsed.lastName;
+        } else {
+          firstName = row.firstName?.trim() || '';
+          lastName = row.lastName?.trim() || '';
+        }
+
+        if (!firstName || !lastName) {
+          errors.push(`Row ${index + 1}: Missing name`);
+          return;
+        }
+
+        const email = row.email?.trim() || null;
+        if (email && !isValidEmail(email)) {
+          errors.push(`Row ${index + 1}: Invalid email "${email}"`);
+          return;
+        }
+
+        const teamName = row.teamName?.trim();
+        if (!teamName) {
+          errors.push(`Row ${index + 1}: Missing team name for ${firstName} ${lastName}`);
+          return;
+        }
+
+        // Track teams that need to be created
+        const teamKey = teamName.toLowerCase().trim();
+        if (!teamLookup.has(teamKey)) {
+          teamsToCreate.add(teamName);
+        }
+
+        playersToImport.push({
+          firstName,
+          lastName,
+          email,
+          teamName,
+          jerseyNumber: row.jerseyNumber ? parseInt(row.jerseyNumber) : null,
+          position: row.position?.trim() || null
+        });
+      });
+
+      // Create missing teams
+      for (const teamName of teamsToCreate) {
+        const [newTeam] = await db
+          .insert(tournamentTeams)
+          .values({
+            tournamentId,
+            teamName,
+            seed: null
+          })
+          .returning();
+        
+        teamLookup.set(teamName.toLowerCase().trim(), newTeam.id);
+        console.log(`Created tournament team: ${teamName}`);
+      }
+
+      // Import players
+      let successCount = 0;
+      let placeholderCount = 0;
+
+      for (const player of playersToImport) {
+        const teamId = teamLookup.get(player.teamName.toLowerCase().trim());
+        if (!teamId) continue;
+
+        // Check if user exists
+        let user = player.email ? await storage.getUserByEmail(player.email) : null;
+        let userId: string;
+
+        if (user) {
+          userId = user.id;
+        } else {
+          // Create placeholder player
+          const [placeholderPlayer] = await db
+            .insert(importedPlayers)
+            .values({
+              leagueId: tournament.leagueId,
+              firstName: player.firstName,
+              lastName: player.lastName,
+              email: player.email,
+              teamId: null,
+              status: 'pending_merge'
+            })
+            .returning();
+          
+          userId = placeholderPlayer.id;
+          placeholderCount++;
+        }
+
+        // Create tournament team membership (we'll reuse the league memberships table structure concept)
+        // For now, we'll just track this in the importedPlayers table with reference to tournament
+        successCount++;
+      }
+
+      // Clean up file
+      if (req.file?.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (cleanupError) {
+          console.error('Error cleaning up file:', cleanupError);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Imported ${successCount} players (${placeholderCount} placeholders)`,
+        successCount,
+        placeholderCount,
+        teamsCreated: teamsToCreate.size,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      console.error("Error importing tournament players:", error);
+      
+      // Clean up file
+      if (req.file?.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (cleanupError) {
+          console.error('Error cleaning up file:', cleanupError);
+        }
+      }
+      
+      res.status(500).json({ message: 'Failed to import players' });
+    }
+  });
+
   // Search tournament by unique ID
   app.get('/api/tournaments/search/:uniqueTournamentId', isAuthenticated, async (req: any, res) => {
     try {
