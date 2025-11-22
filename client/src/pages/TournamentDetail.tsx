@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,7 @@ export default function TournamentDetail() {
   const [scoringMatchId, setScoringMatchId] = useState<string | null>(null);
   const [isExportingSchedule, setIsExportingSchedule] = useState(false);
   const [isEditingBracket, setIsEditingBracket] = useState(false);
+  const [copiedTournamentId, setCopiedTournamentId] = useState(false);
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
@@ -77,6 +78,24 @@ export default function TournamentDetail() {
       toast({
         title: "Error",
         description: error?.message || "Failed to delete tournament",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const paymentMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/tournaments/${tournamentId}/create-checkout`);
+      return response as { url: string };
+    },
+    onSuccess: (data) => {
+      // Redirect to Stripe checkout
+      window.location.href = data.url;
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to initiate payment",
         variant: "destructive"
       });
     }
@@ -388,6 +407,99 @@ export default function TournamentDetail() {
           </div>
         </div>
       </div>
+
+      {/* Payment Status Section - Commissioner Only */}
+      {tournament && canManageLeagueSpecific(tournament.leagueId) && (
+        <div className="max-w-7xl mx-auto px-4 md:px-8 pb-6">
+          <Card className={tournament.paymentStatus === 'paid' ? 'border-green-500/50' : 'border-amber-500/50'}>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Tournament Payment
+                  </CardTitle>
+                  <CardDescription>
+                    {tournament.paymentStatus === 'paid' 
+                      ? 'Payment completed - players can now access this tournament'
+                      : 'Complete payment to enable player access'}
+                  </CardDescription>
+                </div>
+                {tournament.paymentStatus === 'paid' ? (
+                  <Badge variant="default" className="bg-green-600 flex items-center gap-1" data-testid="badge-payment-paid">
+                    <CheckCheck className="h-3 w-3" />
+                    Paid
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-amber-500 text-amber-600 flex items-center gap-1" data-testid="badge-payment-pending">
+                    <Clock className="h-3 w-3" />
+                    Pending
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Tournament ID</p>
+                    <p className="text-lg font-semibold font-mono" data-testid="text-tournament-id">{tournament.uniqueTournamentId}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(tournament.uniqueTournamentId || '');
+                      setCopiedTournamentId(true);
+                      setTimeout(() => setCopiedTournamentId(false), 2000);
+                      toast({
+                        title: "Copied!",
+                        description: "Tournament ID copied to clipboard"
+                      });
+                    }}
+                    data-testid="button-copy-id"
+                  >
+                    {copiedTournamentId ? <CheckCheck className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Teams</p>
+                    <p className="text-lg font-semibold" data-testid="text-team-count">{teams?.length || 0}</p>
+                  </div>
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Payment Amount</p>
+                    <p className="text-lg font-semibold" data-testid="text-payment-amount">
+                      ${((tournament.paymentAmount || 0) / 100).toFixed(2)}
+                    </p>
+                  </div>
+                  <DollarSign className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </div>
+
+              {tournament.paymentStatus !== 'paid' && (
+                <div className="pt-2">
+                  <Button
+                    onClick={() => paymentMutation.mutate()}
+                    disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
+                    className="w-full md:w-auto"
+                    data-testid="button-pay-now"
+                  >
+                    {paymentMutation.isPending ? 'Processing...' : `Pay $${((tournament.paymentAmount || 0) / 100).toFixed(2)} Now`}
+                  </Button>
+                  {(teams?.length || 0) === 0 && (
+                    <p className="text-sm text-muted-foreground mt-2">Add teams to calculate payment amount</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 pt-[2px] pb-[2px] pl-[8px] pr-[8px]">
         <Tabs defaultValue="bracket" className="space-y-6">
