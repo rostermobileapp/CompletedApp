@@ -53,6 +53,7 @@ import TournamentCreate from "@/pages/TournamentCreate";
 import TournamentDetail from "@/pages/TournamentDetail";
 import TournamentEdit from "@/pages/TournamentEdit";
 import TournamentSearch from "@/pages/TournamentSearch";
+import LeagueTournamentSearch from "@/pages/LeagueTournamentSearch";
 import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 
 function Router() {
@@ -96,6 +97,7 @@ function Router() {
         <PageTransition>
           <Switch>
             <Route path="/" component={Dashboard} />
+            <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
             <Route path="/league-search" component={LeagueSearch} />
             <Route path="/team-search" component={TeamSearch} />
             <Route path="/teams" component={Teams} />

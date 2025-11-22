@@ -2038,7 +2038,7 @@ export default function Dashboard() {
       {/* Find a League/Team Section - Bottom */}
       <div className="px-6 flex gap-2">
         <button
-          onClick={() => navigate('/league-search')}
+          onClick={() => navigate('/league-tournament-search')}
           className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
           data-testid="button-find-league"
         >Find a League / Tournament</button>
