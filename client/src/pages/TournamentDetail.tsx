@@ -65,7 +65,7 @@ export default function TournamentDetail() {
 
   const { data: pendingParticipants } = useQuery<any[]>({
     queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'],
-    enabled: !!tournamentId && canManageLeagueSpecific(tournament?.leagueId || '')
+    enabled: !!tournamentId && !!tournament && canManageLeagueSpecific(tournament.leagueId)
   });
 
   const deleteMutation = useMutation({
@@ -759,7 +759,7 @@ export default function TournamentDetail() {
                             settings={tournament.settings as TournamentSettings | undefined}
                             tournamentName={tournament.name}
                             tournamentId={tournamentId || ''}
-                            isCommissioner={tournament?.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
+                            isCommissioner={canManageLeagueSpecific(tournament.leagueId)}
                           />
                         </CardContent>
                       </Card>
@@ -1029,7 +1029,7 @@ export default function TournamentDetail() {
                                     <Badge variant={match.status === 'completed' ? 'default' : 'outline'}>
                                       {match.status}
                                     </Badge>
-                                    {tournament?.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
+                                    {tournament && canManageLeagueSpecific(tournament.leagueId) && (
                                       <Button 
                                         size="sm" 
                                         variant="default" 
@@ -1128,7 +1128,7 @@ export default function TournamentDetail() {
           matchId={scoringMatchId}
           open={!!scoringMatchId}
           onOpenChange={(open) => !open && setScoringMatchId(null)}
-          isCommissioner={tournament?.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
+          isCommissioner={!!tournament && canManageLeagueSpecific(tournament.leagueId)}
         />
       )}
     </div>

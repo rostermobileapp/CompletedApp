@@ -30,6 +30,18 @@ Supabase Authentication manages user authentication via email/password and JWT t
 
 The tournament system supports various formats with a universal state machine approach for double elimination that handles any team count and intelligent bye handling. Phase 2 bracket generators for triple elimination, 3-game guarantee, consolation, and compass draw are fully functional. Round Robin + Playoffs functionality is integrated, supporting record-based playoff seeding. The frontend features a `BracketView` component for SVG bracket rendering with visual hierarchy, bracket-specific positioning for multi-bracket layouts, dynamic spacing formulas, and connector arrows, along with zoom and pan controls. A custom bracket builder provides a drag-and-drop interface for designing tournament structures with matchup cards and routing controls.
 
+### Tournament Payment and Access Control
+
+Standalone tournaments operate on a commissioner-pays model where league commissioners pay $10 per team via Stripe checkout. Players receive free, time-limited access (30 days before tournament start to 7 days after final game) to tournament-specific features only: Home, My Team, Messages, Profile, and Payments. League-related features (leagues, scrimmages, standalone team creation) are hidden from tournament-only users.
+
+Key components:
+- **Unique Tournament IDs**: 8-character nanoid for easy sharing and tournament discovery
+- **Payment Processing**: Stripe integration with one-time payment (amount calculated as team count × 1000 cents)
+- **Access Windows**: Automatically calculated based on first match start date and last match end date
+- **Participant Management**: Join request workflow with commissioner approval, CSV import for bulk team/player addition
+- **Tournament Search**: Dedicated `/tournament-search` page for players to find and join tournaments using unique IDs
+- **Payment Status Tracking**: Visual indicators (Paid/Pending badges), payment amount display, and checkout button on tournament detail page
+
 ## Feature Specifications
 
 Key features include a subscription-gating system, payment management, a universal "Needs Attention" notification system, team captain announcements, CSV import for players and schedules, bulk delete operations, facility linking, recurring scrimmages, substitute game display, and automation for finalizing scrimmages and invoicing. Additional features include standalone team creation, player management, league migration requests, a "Your Teams" section for users, automatic scroll to first unread messages, dashboard enhancements with localStorage persistence, profile career stats, team-scoped messages and payments, calendar team filtering, email notifications for scrimmage invites, and automatic chat synchronization for teams and captains. A 3-star awards system for hockey leagues is also implemented.
