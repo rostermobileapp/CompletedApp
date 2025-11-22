@@ -49,6 +49,7 @@ export default function TournamentCreateStandalone() {
   const [step, setStep] = useState(1);
   const [teams, setTeams] = useState<Team[]>([]);
   const [newTeamName, setNewTeamName] = useState("");
+  const [csvPlayerData, setCsvPlayerData] = useState<any[] | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -157,6 +158,32 @@ export default function TournamentCreateStandalone() {
         throw new Error(`Bracket generation failed: ${errorMsg}`);
       }
 
+      // Step 3: Import players if CSV data was uploaded (standalone only)
+      if (csvPlayerData && csvPlayerData.length > 0 && !isSeasonPlayoff) {
+        try {
+          // Convert CSV data back to CSV format for upload
+          const csvContent = Papa.unparse(csvPlayerData);
+          const blob = new Blob([csvContent], { type: 'text/csv' });
+          const formData = new FormData();
+          formData.append('playerFile', blob, 'players.csv');
+
+          const response = await fetch(`/api/tournaments/${tournament.id}/players/import`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Player import failed:', errorData);
+            // Don't throw - tournament was created successfully, just log the error
+          }
+        } catch (playerImportError) {
+          console.error('Player import error:', playerImportError);
+          // Don't throw - tournament was created successfully
+        }
+      }
+
       return tournament;
     },
     onSuccess: (tournament, variables) => {
@@ -223,11 +250,28 @@ export default function TournamentCreateStandalone() {
       skipEmptyLines: true,
       complete: (results) => {
         const teamNamesSet = new Set<string>();
+        const playersData: any[] = [];
+        let hasPlayerData = false;
+
+        // Check if CSV contains player information columns
+        const headers = results.meta.fields || [];
+        const hasPlayerColumns = headers.some(h => 
+          h && (h.toLowerCase().includes('player') || h.toLowerCase().includes('email') || h.toLowerCase().includes('jersey'))
+        );
 
         results.data.forEach((row: any) => {
           const teamName = row['Team Name'] || row['team_name'] || row['TeamName'] || '';
           if (teamName && teamName.trim()) {
             teamNamesSet.add(teamName.trim());
+          }
+
+          // If player data exists, store it
+          if (hasPlayerColumns) {
+            const playerName = row['Player Full Name'] || row['player_full_name'] || row['PlayerFullName'] || '';
+            if (playerName && playerName.trim()) {
+              hasPlayerData = true;
+              playersData.push(row);
+            }
           }
         });
 
@@ -235,10 +279,20 @@ export default function TournamentCreateStandalone() {
         setTeams(newTeams);
         form.setValue('teams', newTeams);
 
-        toast({
-          title: "CSV imported",
-          description: `Successfully imported ${newTeams.length} unique teams`
-        });
+        // Store player data if present
+        if (hasPlayerData && playersData.length > 0) {
+          setCsvPlayerData(playersData);
+          toast({
+            title: "CSV imported",
+            description: `Successfully imported ${newTeams.length} unique teams and ${playersData.length} players`
+          });
+        } else {
+          setCsvPlayerData(null);
+          toast({
+            title: "CSV imported",
+            description: `Successfully imported ${newTeams.length} unique teams`
+          });
+        }
 
         // Reset file input
         event.target.value = '';
@@ -592,8 +646,13 @@ export default function TournamentCreateStandalone() {
                             <Upload className="h-4 w-4" />
                             Import from CSV
                           </h3>
-                          <p className="text-sm text-muted-foreground mb-3">
-                            Upload a CSV with column: Team Name (unique team names will be extracted)
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Upload a CSV with teams and optionally include player information
+                          </p>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            <span className="font-medium">Required:</span> Team Name
+                            <br />
+                            <span className="font-medium">Optional:</span> Player Full Name, Email, Phone Number, Jersey #, Position, Skill Level, Player Type (Goalie/Skater)
                           </p>
                           <input
                             type="file"

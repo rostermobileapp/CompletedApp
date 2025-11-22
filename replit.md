@@ -50,15 +50,18 @@ Free tier users can now create standalone tournaments without league management 
 - **TournamentsLanding.tsx**: Shows "Create Standalone Tournament" button to all authenticated users
 - **TournamentCreateStandalone.tsx**: Multi-step creation wizard with three stages:
   1. Tournament Details (name, format, description)
-  2. Add Teams (manual entry or CSV upload)
+  2. Add Teams and Players (manual entry or CSV upload)
   3. Review & Create
 
 **CSV Import Format:**
-- Column header: `Team Name` (only team names are extracted during creation)
+The CSV import during tournament creation (Step 2) now supports uploading both teams and players in a single file:
+- **Required Column**: `Team Name`
+- **Optional Player Columns**: `Player Full Name`, `Email`, `Phone Number`, `Jersey #`, `Position`, `Skill Level`, `Player Type` (Goalie/Skater)
 - Flexible header detection (supports variations like `team_name`, `TeamName`, etc.)
 - Automatically de-duplicates team names
 - Minimum 3 teams, maximum 128 teams required
-- Players can be added after tournament creation via CSV import on the tournament detail page
+- Player data is automatically imported after tournament creation
+- Players can also be added later via CSV import on the tournament detail page
 
 **Backend Authorization:**
 - Standalone tournament creation (`POST /api/tournaments` with type="standalone") is open to all authenticated users
