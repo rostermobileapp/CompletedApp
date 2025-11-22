@@ -20,12 +20,7 @@ const formSchema = z.object({
   format: z.enum(["single_elimination", "double_elimination", "three_game_guarantee", "round_robin", "round_robin_split", "custom_bracket"]),
   description: z.string().optional(),
   teams: z.array(z.object({
-    name: z.string().min(1, "Team name is required"),
-    players: z.array(z.object({
-      firstName: z.string(),
-      lastName: z.string(),
-      email: z.string().optional()
-    }))
+    name: z.string().min(1, "Team name is required")
   })).min(3, "At least 3 teams required").max(128, "Maximum 128 teams allowed")
 });
 
@@ -33,7 +28,6 @@ type FormData = z.infer<typeof formSchema>;
 
 type Team = {
   name: string;
-  players: Array<{ firstName: string; lastName: string; email?: string }>;
 };
 
 export default function TournamentCreateStandalone() {
@@ -42,10 +36,6 @@ export default function TournamentCreateStandalone() {
   const [step, setStep] = useState(1);
   const [teams, setTeams] = useState<Team[]>([]);
   const [newTeamName, setNewTeamName] = useState("");
-  const [newPlayerFirstName, setNewPlayerFirstName] = useState("");
-  const [newPlayerLastName, setNewPlayerLastName] = useState("");
-  const [newPlayerEmail, setNewPlayerEmail] = useState("");
-  const [currentTeamIndex, setCurrentTeamIndex] = useState<number | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -173,36 +163,22 @@ export default function TournamentCreateStandalone() {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const parsedTeams: Team[] = [];
-        const teamMap = new Map<string, Team>();
+        const teamNamesSet = new Set<string>();
 
         results.data.forEach((row: any) => {
           const teamName = row['Team Name'] || row['team_name'] || row['TeamName'] || '';
-          const firstName = row['First Name'] || row['first_name'] || row['FirstName'] || '';
-          const lastName = row['Last Name'] || row['last_name'] || row['LastName'] || '';
-          const email = row['Email'] || row['email'] || '';
-
-          if (!teamName || (!firstName && !lastName)) {
-            return; // Skip invalid rows
-          }
-
-          if (!teamMap.has(teamName)) {
-            teamMap.set(teamName, { name: teamName, players: [] });
-          }
-
-          const team = teamMap.get(teamName)!;
-          if (firstName || lastName) {
-            team.players.push({ firstName, lastName, email: email || undefined });
+          if (teamName && teamName.trim()) {
+            teamNamesSet.add(teamName.trim());
           }
         });
 
-        const newTeams = Array.from(teamMap.values());
+        const newTeams = Array.from(teamNamesSet).map(name => ({ name }));
         setTeams(newTeams);
         form.setValue('teams', newTeams);
 
         toast({
           title: "CSV imported",
-          description: `Successfully imported ${newTeams.length} teams`
+          description: `Successfully imported ${newTeams.length} unique teams`
         });
 
         // Reset file input
@@ -229,7 +205,17 @@ export default function TournamentCreateStandalone() {
       return;
     }
 
-    const newTeam: Team = { name: newTeamName.trim(), players: [] };
+    // Check for duplicates
+    if (teams.some(t => t.name.toLowerCase() === newTeamName.trim().toLowerCase())) {
+      toast({
+        title: "Duplicate team",
+        description: "A team with this name already exists",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newTeam: Team = { name: newTeamName.trim() };
     const updatedTeams = [...teams, newTeam];
     setTeams(updatedTeams);
     form.setValue('teams', updatedTeams);
@@ -243,39 +229,6 @@ export default function TournamentCreateStandalone() {
 
   const removeTeam = (index: number) => {
     const updatedTeams = teams.filter((_, i) => i !== index);
-    setTeams(updatedTeams);
-    form.setValue('teams', updatedTeams);
-  };
-
-  const addPlayer = () => {
-    if (currentTeamIndex === null) return;
-    
-    if (!newPlayerFirstName.trim() && !newPlayerLastName.trim()) {
-      toast({
-        title: "Player name required",
-        description: "Please enter at least a first or last name",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const updatedTeams = [...teams];
-    updatedTeams[currentTeamIndex].players.push({
-      firstName: newPlayerFirstName.trim(),
-      lastName: newPlayerLastName.trim(),
-      email: newPlayerEmail.trim() || undefined
-    });
-
-    setTeams(updatedTeams);
-    form.setValue('teams', updatedTeams);
-    setNewPlayerFirstName("");
-    setNewPlayerLastName("");
-    setNewPlayerEmail("");
-  };
-
-  const removePlayer = (teamIndex: number, playerIndex: number) => {
-    const updatedTeams = [...teams];
-    updatedTeams[teamIndex].players = updatedTeams[teamIndex].players.filter((_, i) => i !== playerIndex);
     setTeams(updatedTeams);
     form.setValue('teams', updatedTeams);
   };
@@ -416,7 +369,7 @@ export default function TournamentCreateStandalone() {
                         Import from CSV
                       </h3>
                       <p className="text-sm text-muted-foreground mb-3">
-                        Upload a CSV with columns: Team Name, First Name, Last Name, Email
+                        Upload a CSV with column: Team Name (unique team names will be extracted)
                       </p>
                       <input
                         type="file"
@@ -466,112 +419,30 @@ export default function TournamentCreateStandalone() {
                     {/* Teams List */}
                     {teams.length > 0 && (
                       <div className="space-y-2">
-                        <h3 className="font-medium">Teams</h3>
-                        {teams.map((team, teamIndex) => (
-                          <Card key={teamIndex}>
-                            <CardHeader className="pb-3">
-                              <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">{team.name}</CardTitle>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeTeam(teamIndex)}
-                                  data-testid={`button-remove-team-${teamIndex}`}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              <CardDescription>
-                                {team.players.length} player{team.players.length !== 1 ? 's' : ''}
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                              {/* Add Player Form */}
-                              {currentTeamIndex === teamIndex ? (
-                                <div className="border rounded-lg p-3 bg-muted/50 space-y-2">
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <Input
-                                      placeholder="First name"
-                                      value={newPlayerFirstName}
-                                      onChange={(e) => setNewPlayerFirstName(e.target.value)}
-                                      data-testid={`input-player-firstname-${teamIndex}`}
-                                    />
-                                    <Input
-                                      placeholder="Last name"
-                                      value={newPlayerLastName}
-                                      onChange={(e) => setNewPlayerLastName(e.target.value)}
-                                      data-testid={`input-player-lastname-${teamIndex}`}
-                                    />
-                                  </div>
-                                  <Input
-                                    placeholder="Email (optional)"
-                                    value={newPlayerEmail}
-                                    onChange={(e) => setNewPlayerEmail(e.target.value)}
-                                    data-testid={`input-player-email-${teamIndex}`}
-                                  />
-                                  <div className="flex gap-2">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      onClick={addPlayer}
-                                      data-testid={`button-add-player-${teamIndex}`}
-                                    >
-                                      Add Player
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => setCurrentTeamIndex(null)}
-                                      data-testid={`button-cancel-add-player-${teamIndex}`}
-                                    >
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setCurrentTeamIndex(teamIndex)}
-                                  data-testid={`button-show-add-player-${teamIndex}`}
-                                >
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  Add Player
-                                </Button>
-                              )}
-
-                              {/* Players List */}
-                              {team.players.length > 0 && (
-                                <div className="space-y-1 mt-2">
-                                  {team.players.map((player, playerIndex) => (
-                                    <div
-                                      key={playerIndex}
-                                      className="flex items-center justify-between p-2 bg-muted rounded text-sm"
-                                      data-testid={`player-${teamIndex}-${playerIndex}`}
-                                    >
-                                      <span>
-                                        {player.firstName} {player.lastName}
-                                        {player.email && <span className="text-muted-foreground ml-2">({player.email})</span>}
-                                      </span>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => removePlayer(teamIndex, playerIndex)}
-                                        data-testid={`button-remove-player-${teamIndex}-${playerIndex}`}
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
-                        ))}
+                        <h3 className="font-medium">Teams ({teams.length})</h3>
+                        <div className="grid gap-2">
+                          {teams.map((team, teamIndex) => (
+                            <div
+                              key={teamIndex}
+                              className="flex items-center justify-between p-3 border rounded-lg bg-card"
+                              data-testid={`team-${teamIndex}`}
+                            >
+                              <span className="font-medium">{team.name}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeTeam(teamIndex)}
+                                data-testid={`button-remove-team-${teamIndex}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          After creating the tournament, you can add players via CSV import on the tournament details page.
+                        </p>
                       </div>
                     )}
 

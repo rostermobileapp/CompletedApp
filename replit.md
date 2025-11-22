@@ -42,6 +42,30 @@ Key components:
 - **Tournament Search**: Dedicated `/tournament-search` page for players to find and join tournaments using unique IDs
 - **Payment Status Tracking**: Visual indicators (Paid/Pending badges), payment amount display, and checkout button on tournament detail page
 
+### Standalone Tournament Creation
+
+Free tier users can now create standalone tournaments without league management permissions. The creation flow includes:
+
+**Frontend Components:**
+- **TournamentsLanding.tsx**: Shows "Create Standalone Tournament" button to all authenticated users
+- **TournamentCreateStandalone.tsx**: Multi-step creation wizard with three stages:
+  1. Tournament Details (name, format, description)
+  2. Add Teams (manual entry or CSV upload)
+  3. Review & Create
+
+**CSV Import Format:**
+- Column header: `Team Name` (only team names are extracted during creation)
+- Flexible header detection (supports variations like `team_name`, `TeamName`, etc.)
+- Automatically de-duplicates team names
+- Minimum 3 teams, maximum 128 teams required
+- Players can be added after tournament creation via CSV import on the tournament detail page
+
+**Backend Authorization:**
+- Standalone tournament creation (`POST /api/tournaments` with type="standalone") is open to all authenticated users
+- League tournament creation requires commissioner permissions
+- Tournament creators have full modification rights to their standalone tournaments
+- Payment enforcement occurs at tournament finalization, not creation
+
 ## Feature Specifications
 
 Key features include a subscription-gating system, payment management, a universal "Needs Attention" notification system, team captain announcements, CSV import for players and schedules, bulk delete operations, facility linking, recurring scrimmages, substitute game display, and automation for finalizing scrimmages and invoicing. Additional features include standalone team creation, player management, league migration requests, a "Your Teams" section for users, automatic scroll to first unread messages, dashboard enhancements with localStorage persistence, profile career stats, team-scoped messages and payments, calendar team filtering, email notifications for scrimmage invites, and automatic chat synchronization for teams and captains. A 3-star awards system for hockey leagues is also implemented.
