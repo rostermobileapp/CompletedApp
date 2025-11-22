@@ -5,6 +5,7 @@ import { Trophy, ArrowRight, Plus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePermissions } from '@/context/SubscriptionContext';
 
 type League = {
   id: number;
@@ -16,6 +17,7 @@ type League = {
 
 export default function TournamentsLanding() {
   const [, navigate] = useLocation();
+  const { hasRole } = usePermissions();
 
   // Fetch leagues the user can manage
   const { data: leagues, isLoading } = useQuery<League[]>({
@@ -85,29 +87,31 @@ export default function TournamentsLanding() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Trophy className="h-8 w-8 text-muted-foreground" />
-                  <div>
-                    <CardTitle>League Tournaments</CardTitle>
-                    <CardDescription>
-                      You need to be a commissioner of a league to manage league tournaments.
-                    </CardDescription>
+            {hasRole('commissioner') && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <Trophy className="h-8 w-8 text-muted-foreground" />
+                    <div>
+                      <CardTitle>League Tournaments</CardTitle>
+                      <CardDescription>
+                        Create a new league to manage league tournaments.
+                      </CardDescription>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  onClick={() => navigate('/create-league')}
-                  data-testid="button-create-league"
-                  variant="outline"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create a League
-                </Button>
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() => navigate('/create-league')}
+                    data-testid="button-create-league"
+                    variant="outline"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create a League
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
