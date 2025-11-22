@@ -14,7 +14,7 @@ import {
   requireSpecialPermission
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
@@ -10591,13 +10591,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to generate unique tournament ID
+  async function generateUniqueTournamentId(): Promise<string> {
+    let uniqueId: string;
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    do {
+      uniqueId = nanoid(8).toUpperCase();
+      const [existing] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.uniqueTournamentId, uniqueId))
+        .limit(1);
+      
+      if (!existing) {
+        return uniqueId;
+      }
+      
+      attempts++;
+    } while (attempts < maxAttempts);
+    
+    throw new Error('Unable to generate unique tournament ID');
+  }
+
+  // Helper function to calculate tournament access windows
+  function calculateAccessWindows(matches: any[]) {
+    if (!matches || matches.length === 0) {
+      return { accessStartDate: null, accessEndDate: null };
+    }
+
+    const matchDates = matches
+      .filter(m => m.scheduledTime)
+      .map(m => new Date(m.scheduledTime))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    if (matchDates.length === 0) {
+      return { accessStartDate: null, accessEndDate: null };
+    }
+
+    const firstMatchDate = matchDates[0];
+    const lastMatchDate = matchDates[matchDates.length - 1];
+
+    // Access starts 30 days before first match
+    const accessStartDate = new Date(firstMatchDate);
+    accessStartDate.setDate(accessStartDate.getDate() - 30);
+
+    // Access ends 7 days after last match
+    const accessEndDate = new Date(lastMatchDate);
+    accessEndDate.setDate(accessEndDate.getDate() + 7);
+
+    return { accessStartDate, accessEndDate };
+  }
+
+  // Helper function to calculate tournament payment amount
+  async function calculateTournamentPayment(tournamentId: string): Promise<number> {
+    const teamCount = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(tournamentTeams)
+      .where(eq(tournamentTeams.tournamentId, tournamentId));
+    
+    const count = Number(teamCount[0]?.count || 0);
+    // $10 per team = 1000 cents
+    return count * 1000;
+  }
+
   // Create tournament
   app.post('/api/tournaments', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      
+      // Generate unique tournament ID
+      const uniqueTournamentId = await generateUniqueTournamentId();
+      
       const validatedData = insertTournamentSchema.parse({
         ...req.body,
-        createdBy: userId
+        createdBy: userId,
+        uniqueTournamentId,
+        paymentStatus: 'unpaid',
+        paymentAmount: 0 // Will be updated when teams are added
       });
 
       // Create tournament
@@ -10692,6 +10764,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Insert generated matches
         if (bracketResult.matches.length > 0) {
           await db.insert(tournamentMatches).values(bracketResult.matches);
+          
+          // Calculate access windows based on match dates
+          const accessWindows = calculateAccessWindows(bracketResult.matches);
+          
+          // Calculate payment amount based on team count
+          const paymentAmount = await calculateTournamentPayment(id);
+          
+          // Update tournament with access windows and payment amount
+          await db
+            .update(tournaments)
+            .set({
+              accessStartDate: accessWindows.accessStartDate,
+              accessEndDate: accessWindows.accessEndDate,
+              paymentAmount,
+              updatedAt: new Date()
+            })
+            .where(eq(tournaments.id, id));
+          
+          // Fetch updated tournament to return
+          const [finalUpdated] = await db
+            .select()
+            .from(tournaments)
+            .where(eq(tournaments.id, id));
+          
+          return res.json(finalUpdated);
         }
       }
 
@@ -11267,6 +11364,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting tournament:", error);
       res.status(500).json({ message: "Failed to delete tournament" });
+    }
+  });
+
+  // Search tournament by unique ID
+  app.get('/api/tournaments/search/:uniqueTournamentId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { uniqueTournamentId } = req.params;
+      
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.uniqueTournamentId, uniqueTournamentId.toUpperCase()));
+      
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      // Get team count
+      const teamCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.tournamentId, tournament.id));
+      
+      // Get league info
+      const [league] = await db
+        .select()
+        .from(leagues)
+        .where(eq(leagues.id, tournament.leagueId));
+
+      res.json({
+        ...tournament,
+        teamCount: Number(teamCount[0]?.count || 0),
+        leagueName: league?.name,
+        sport: league?.sport
+      });
+    } catch (error) {
+      console.error("Error searching tournament:", error);
+      res.status(500).json({ message: "Failed to search tournament" });
+    }
+  });
+
+  // Request to join tournament
+  app.post('/api/tournaments/:tournamentId/join', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tournamentId } = req.params;
+      const { message } = req.body;
+
+      // Validate tournament exists
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      // Check if user is already a participant
+      const [existingParticipant] = await db
+        .select()
+        .from(tournamentParticipants)
+        .where(and(
+          eq(tournamentParticipants.tournamentId, tournamentId),
+          eq(tournamentParticipants.userId, userId)
+        ));
+
+      if (existingParticipant) {
+        if (existingParticipant.status === 'approved') {
+          return res.status(400).json({ message: "You are already a participant in this tournament" });
+        }
+        if (existingParticipant.status === 'pending') {
+          return res.status(400).json({ message: "You already have a pending request for this tournament" });
+        }
+        // If rejected or expired, allow re-request by updating status
+        const [updated] = await db
+          .update(tournamentParticipants)
+          .set({
+            status: 'pending',
+            message: message || null,
+            joinedAt: new Date()
+          })
+          .where(eq(tournamentParticipants.id, existingParticipant.id))
+          .returning();
+
+        return res.json(updated);
+      }
+
+      // Create new participant request
+      const [participant] = await db
+        .insert(tournamentParticipants)
+        .values({
+          tournamentId,
+          userId,
+          role: 'player',
+          status: 'pending',
+          message: message || null,
+          expiresAt: tournament.accessEndDate || null
+        })
+        .returning();
+
+      res.status(201).json(participant);
+    } catch (error) {
+      console.error("Error joining tournament:", error);
+      res.status(500).json({ message: "Failed to join tournament" });
+    }
+  });
+
+  // Get pending participants for a tournament (commissioner only)
+  app.get('/api/tournaments/:tournamentId/participants/pending', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+
+      const participants = await db
+        .select({
+          participant: tournamentParticipants,
+          user: users
+        })
+        .from(tournamentParticipants)
+        .innerJoin(users, eq(tournamentParticipants.userId, users.id))
+        .where(and(
+          eq(tournamentParticipants.tournamentId, tournamentId),
+          eq(tournamentParticipants.status, 'pending')
+        ));
+
+      res.json(participants.map(p => ({
+        ...p.participant,
+        user: {
+          id: p.user.id,
+          firstName: p.user.firstName,
+          lastName: p.user.lastName,
+          email: p.user.email
+        }
+      })));
+    } catch (error) {
+      console.error("Error fetching pending participants:", error);
+      res.status(500).json({ message: "Failed to fetch pending participants" });
+    }
+  });
+
+  // Approve participant (commissioner only)
+  app.patch('/api/tournament-participants/:id/approve', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: participantId } = req.params;
+      const { tournamentTeamId } = req.body;
+
+      const [updated] = await db
+        .update(tournamentParticipants)
+        .set({
+          status: 'approved',
+          approvedBy: userId,
+          approvedAt: new Date(),
+          tournamentTeamId: tournamentTeamId || null
+        })
+        .where(eq(tournamentParticipants.id, participantId))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Participant not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error approving participant:", error);
+      res.status(500).json({ message: "Failed to approve participant" });
+    }
+  });
+
+  // Reject participant (commissioner only)
+  app.patch('/api/tournament-participants/:id/reject', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { id: participantId } = req.params;
+
+      const [updated] = await db
+        .update(tournamentParticipants)
+        .set({
+          status: 'rejected'
+        })
+        .where(eq(tournamentParticipants.id, participantId))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Participant not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error rejecting participant:", error);
+      res.status(500).json({ message: "Failed to reject participant" });
     }
   });
 
