@@ -222,13 +222,40 @@ export default function TournamentCreateStandalone() {
   };
 
   const nextStep = async () => {
-    const fieldsToValidate = step === 1 
-      ? ["name", "format", "description"] as const
-      : ["teams"] as const;
+    let fieldsToValidate: readonly string[];
     
-    const isValid = await form.trigger(fieldsToValidate);
+    if (step === 1) {
+      fieldsToValidate = ["name", "format", "description"] as const;
+    } else if (step === 2) {
+      // Step 2: Validate teams based on tournament type
+      if (watchedType === "season_playoff") {
+        fieldsToValidate = ["teamIds"] as const;
+      } else {
+        fieldsToValidate = ["teams"] as const;
+      }
+    } else {
+      fieldsToValidate = [];
+    }
+    
+    const isValid = await form.trigger(fieldsToValidate as any);
     if (isValid) {
       setStep(step + 1);
+    } else {
+      // Show validation error
+      const errors = form.formState.errors;
+      if (errors.teamIds) {
+        toast({
+          title: "Validation Error",
+          description: errors.teamIds.message || "Please select at least 3 teams",
+          variant: "destructive"
+        });
+      } else if (errors.teams) {
+        toast({
+          title: "Validation Error",
+          description: errors.teams.message || "Please add at least 3 teams",
+          variant: "destructive"
+        });
+      }
     }
   };
 
