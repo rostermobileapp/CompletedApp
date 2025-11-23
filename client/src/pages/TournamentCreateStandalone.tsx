@@ -850,7 +850,10 @@ export default function TournamentCreateStandalone() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Teams</p>
                       <p className="text-lg font-semibold" data-testid="text-review-teams">
-                        {teams.length} teams
+                        {watchedType === "season_playoff" 
+                          ? `${form.watch("teamIds")?.length || 0} teams`
+                          : `${teams.length} teams`
+                        }
                       </p>
                     </div>
                     {form.getValues("description") && (
