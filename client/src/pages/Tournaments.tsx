@@ -72,10 +72,10 @@ export default function Tournaments() {
                 Create and manage playoffs and standalone tournaments
               </p>
             </div>
-            <Link href={`/leagues/${leagueId}/tournaments/create`}>
+            <Link href="/tournaments/create">
               <Button size="lg" className="w-full md:w-auto" data-testid="button-create-tournament">
                 <Plus className="h-5 w-5 mr-2" />
-                Create League Tournament
+                Create Tournament
               </Button>
             </Link>
           </div>
@@ -92,10 +92,10 @@ export default function Tournaments() {
               <p className="text-muted-foreground mb-6 max-w-md">
                 Create your first tournament to organize playoffs or a standalone competition
               </p>
-              <Link href={`/leagues/${leagueId}/tournaments/create`}>
+              <Link href="/tournaments/create">
                 <Button data-testid="button-create-first-tournament">
                   <Plus className="h-5 w-5 mr-2" />
-                  Create Your First League Tournament
+                  Create Your First Tournament
                 </Button>
               </Link>
             </CardContent>

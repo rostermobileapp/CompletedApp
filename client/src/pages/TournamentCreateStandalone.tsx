@@ -11,6 +11,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import Papa from "papaparse";
@@ -605,59 +606,91 @@ export default function TournamentCreateStandalone() {
                   <CardContent className="space-y-4">
                     {watchedType === "season_playoff" ? (
                       /* League Team Selection */
-                      <FormField
-                        control={form.control}
-                        name="teamIds"
-                        render={() => (
-                          <FormItem>
+                      <div className="space-y-4">
+                        <div>
+                          <div className="mb-2">
                             <FormLabel>Select Teams</FormLabel>
-                            <FormDescription>
-                              Choose which teams will participate in this tournament (minimum 3 teams)
-                            </FormDescription>
-                            {leagueTeams && leagueTeams.length > 0 ? (
-                              <div className="space-y-2 border rounded-lg p-4">
-                                {leagueTeams.map((team: any) => (
-                                  <FormField
-                                    key={team.id}
-                                    control={form.control}
-                                    name="teamIds"
-                                    render={({ field }) => {
-                                      const teamIds = field.value || [];
-                                      return (
-                                        <FormItem
-                                          key={team.id}
-                                          className="flex flex-row items-start space-x-3 space-y-0 p-2 hover:bg-muted rounded"
-                                        >
-                                          <FormControl>
-                                            <input
-                                              type="checkbox"
-                                              checked={teamIds.includes(team.id)}
-                                              onChange={(checked) => {
-                                                const newValue = checked.target.checked
-                                                  ? [...teamIds, team.id]
-                                                  : teamIds.filter((id: string) => id !== team.id);
-                                                field.onChange(newValue);
-                                              }}
-                                              className="h-4 w-4"
-                                              data-testid={`checkbox-team-${team.id}`}
-                                            />
-                                          </FormControl>
-                                          <FormLabel className="font-normal cursor-pointer flex-1">
-                                            {team.name}
-                                          </FormLabel>
-                                        </FormItem>
-                                      );
-                                    }}
-                                  />
-                                ))}
+                          </div>
+                          <FormDescription className="mb-4">
+                            Choose which teams will participate in this tournament (minimum 3 teams)
+                          </FormDescription>
+                          
+                          {leagueTeams && leagueTeams.length > 0 ? (
+                            <div className="space-y-2 border rounded-lg p-4">
+                              {/* Select All Teams checkbox - outside FormField so it's always visible */}
+                              <div className="flex items-center space-x-3 pb-3 border-b">
+                                <Checkbox
+                                  checked={(() => {
+                                    const teamIds = form.watch("teamIds") || [];
+                                    return leagueTeams.length > 0 && teamIds.length === leagueTeams.length;
+                                  })()}
+                                  onCheckedChange={(checked) => {
+                                    // Convert to boolean to handle indeterminate state
+                                    const isChecked = checked === true;
+                                    if (isChecked && leagueTeams) {
+                                      form.setValue('teamIds', leagueTeams.map((t: any) => t.id), { shouldValidate: true });
+                                    } else {
+                                      form.setValue('teamIds', [], { shouldValidate: true });
+                                    }
+                                  }}
+                                  data-testid="checkbox-select-all-teams"
+                                />
+                                <label className="font-medium cursor-pointer">
+                                  Select All Teams
+                                </label>
                               </div>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">No teams available in this league</p>
-                            )}
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+
+                              <FormField
+                                control={form.control}
+                                name="teamIds"
+                                render={() => (
+                                  <FormItem>
+                                    <div className="space-y-2">
+                                      {leagueTeams.map((team: any) => (
+                                        <FormField
+                                          key={team.id}
+                                          control={form.control}
+                                          name="teamIds"
+                                          render={({ field }) => {
+                                            const teamIds = field.value || [];
+                                            return (
+                                              <FormItem
+                                                key={team.id}
+                                                className="flex flex-row items-start space-x-3 space-y-0 p-2 hover:bg-muted rounded"
+                                              >
+                                                <FormControl>
+                                                  <Checkbox
+                                                    checked={teamIds.includes(team.id)}
+                                                    onCheckedChange={(checked) => {
+                                                      // Convert to boolean to handle indeterminate state
+                                                      const isChecked = checked === true;
+                                                      const newValue = isChecked
+                                                        ? [...teamIds, team.id]
+                                                        : teamIds.filter((id: string) => id !== team.id);
+                                                      field.onChange(newValue);
+                                                    }}
+                                                    data-testid={`checkbox-team-${team.id}`}
+                                                  />
+                                                </FormControl>
+                                                <FormLabel className="font-normal cursor-pointer flex-1">
+                                                  {team.name}
+                                                </FormLabel>
+                                              </FormItem>
+                                            );
+                                          }}
+                                        />
+                                      ))}
+                                    </div>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">No teams available in this league</p>
+                          )}
+                        </div>
+                      </div>
                     ) : (
                       /* Standalone Team Entry */
                       <>
