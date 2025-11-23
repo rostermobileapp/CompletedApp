@@ -10962,7 +10962,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/tournaments/:id/generate-bracket', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const { id: tournamentId } = req.params;
-      const { teams: teamData, format } = req.body;
+      const { teams: teamData, format, settings: requestSettings } = req.body;
       const userId = req.user.claims.sub;
 
       // Validate tournament exists and is in draft status
@@ -11027,8 +11027,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, tournamentId));
       await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, tournamentId));
 
-      // Get tournament settings
-      const settings = tournament.settings as any || {};
+      // Merge tournament settings with request settings (request settings take precedence)
+      const settings = { ...(tournament.settings as any || {}), ...(requestSettings || {}) };
       
       // Apply bracket type (seeded or blind_draw) to determine team order and seeds
       const bracketType = settings.bracketType || 'seeded';
