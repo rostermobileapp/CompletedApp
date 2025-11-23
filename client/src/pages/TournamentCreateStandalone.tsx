@@ -25,7 +25,7 @@ const formSchema = z.object({
   description: z.string().optional(),
   teams: z.array(z.object({
     name: z.string().min(1, "Team name is required")
-  })).min(3, "At least 3 teams required").max(128, "Maximum 128 teams allowed"),
+  })).optional(),
   teamIds: z.array(z.string()).optional()
 }).refine((data) => {
   // Season playoffs require leagueId and seasonId
@@ -36,6 +36,18 @@ const formSchema = z.object({
 }, {
   message: "Please select a league and season for playoff tournaments",
   path: ["leagueId"]
+}).refine((data) => {
+  // Validate teams based on type
+  if (data.type === "season_playoff") {
+    // For season playoffs, need teamIds with min 3
+    return data.teamIds && data.teamIds.length >= 3 && data.teamIds.length <= 128;
+  } else {
+    // For standalone, need teams with min 3
+    return data.teams && data.teams.length >= 3 && data.teams.length <= 128;
+  }
+}, {
+  message: "Please select at least 3 teams (maximum 128)",
+  path: ["teams"]
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -95,7 +107,7 @@ export default function TournamentCreateStandalone() {
       const isSeasonPlayoff = data.type === "season_playoff";
       const numTeams = isSeasonPlayoff 
         ? (data.teamIds?.length || 0)
-        : data.teams.length;
+        : (data.teams?.length || 0);
 
       // Step 1: Create tournament
       const response = await apiRequest('POST', `/api/tournaments`, {
@@ -131,7 +143,7 @@ export default function TournamentCreateStandalone() {
         });
       } else {
         // Standalone: use manually entered teams
-        teamData = data.teams.map((team, index) => ({
+        teamData = (data.teams || []).map((team, index) => ({
           teamName: team.name,
           seed: index + 1,
           wins: 0,
