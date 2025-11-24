@@ -8,11 +8,11 @@ The platform now includes a sophisticated tournament system supporting diverse f
 
 ## November 24, 2025 - Standalone Tournament Visibility & Dropdown Fixes
 
-### Standalone Tournaments Now Visible
+### Unified Tournaments Landing Page
 - **Issue**: Standalone tournaments were being saved to the database but had no UI to view them after creation
-- **Fix**: Added "My Standalone Tournaments" section to TournamentsLanding.tsx
-- **Implementation**: Created `/api/tournaments/standalone` endpoint that fetches standalone tournaments created by the current user
-- **User Impact**: Users can now see and access their standalone tournaments from the tournaments landing page
+- **Fix**: Completely redesigned TournamentsLanding.tsx to show all tournaments in one unified list
+- **Implementation**: Created `/api/tournaments/all` endpoint that fetches both standalone tournaments and league tournaments where the user is a commissioner
+- **User Impact**: All tournaments now appear together on one landing page with league name badges to distinguish league tournaments from standalone ones
 
 ### Bracket Dropdown Logic Fixed
 - **Issue**: Team selection dropdowns not showing for play-in round winners in standalone tournament brackets
@@ -64,7 +64,7 @@ Key components:
 Free tier users can now create standalone tournaments without league management permissions. The creation flow includes:
 
 **Frontend Components:**
-- **TournamentsLanding.tsx**: Shows "Create Standalone Tournament" button to all authenticated users and displays "My Standalone Tournaments" section listing all standalone tournaments created by the user
+- **TournamentsLanding.tsx**: Unified landing page showing all tournaments (both standalone and league-based) in one list with league name badges to distinguish tournament types
 - **TournamentCreateStandalone.tsx**: Multi-step creation wizard with three stages:
   1. Tournament Details (name, format, description)
   2. Add Teams and Players (manual entry or CSV upload)

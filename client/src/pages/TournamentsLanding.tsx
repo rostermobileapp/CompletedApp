@@ -1,50 +1,31 @@
-import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { Trophy, ArrowRight, Plus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePermissions } from '@/context/SubscriptionContext';
+import { Badge } from '@/components/ui/badge';
 
-type League = {
-  id: number;
-  name: string;
-  sport: string;
-  logoUrl?: string;
-  tournamentCount?: number;
-};
-
-type StandaloneTournament = {
+type Tournament = {
   id: string;
   name: string;
   format: string;
   status: string;
-  teamCount?: number;
+  type: 'standalone' | 'season_playoff';
+  leagueId: string | null;
+  leagueName: string | null;
+  teamCount: number;
 };
 
 export default function TournamentsLanding() {
   const [, navigate] = useLocation();
-  const { role } = usePermissions();
 
-  // Fetch leagues the user can manage
-  const { data: leagues, isLoading } = useQuery<League[]>({
-    queryKey: ['/api/leagues/manageable'],
+  // Fetch all tournaments for the user
+  const { data: tournaments, isLoading } = useQuery<Tournament[]>({
+    queryKey: ['/api/tournaments/all'],
   });
 
-  // Fetch standalone tournaments the user created
-  const { data: standaloneTournaments, isLoading: standaloneLoading } = useQuery<StandaloneTournament[]>({
-    queryKey: ['/api/tournaments/standalone'],
-  });
-
-  // Auto-redirect if user only manages one league
-  useEffect(() => {
-    if (leagues && leagues.length === 1) {
-      navigate(`/leagues/${leagues[0].id}/tournaments`);
-    }
-  }, [leagues, navigate]);
-
-  if (isLoading || standaloneLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-4 md:p-8">
         <div className="max-w-6xl mx-auto">
@@ -62,92 +43,6 @@ export default function TournamentsLanding() {
     );
   }
 
-  if (!leagues || leagues.length === 0) {
-    return (
-      <div className="min-h-screen bg-background p-4 md:p-8 pb-24">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2" data-testid="text-page-title">
-              Tournaments
-            </h1>
-            <p className="text-muted-foreground">
-              Create standalone tournaments or manage tournaments for your leagues
-            </p>
-          </div>
-
-          <div className="mb-6">
-            <Button
-              onClick={() => navigate('/tournaments/create')}
-              data-testid="button-create-tournament"
-              size="lg"
-              className="w-full sm:w-auto"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Create Tournament
-            </Button>
-          </div>
-
-          {/* Show standalone tournaments if any */}
-          {standaloneTournaments && standaloneTournaments.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-4">My Standalone Tournaments</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {standaloneTournaments.map((tournament) => (
-                  <Card
-                    key={tournament.id}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => navigate(`/tournaments/${tournament.id}`)}
-                    data-testid={`card-tournament-${tournament.id}`}
-                  >
-                    <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Trophy className="h-6 w-6 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-lg truncate">
-                            {tournament.name}
-                          </CardTitle>
-                          <CardDescription className="capitalize">
-                            {tournament.format.replace(/_/g, ' ')}
-                          </CardDescription>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm text-muted-foreground">
-                          {tournament.teamCount || 0} teams
-                        </div>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // If only one league, the useEffect will redirect
-  // This should rarely render, but we'll show it anyway
-  if (leagues.length === 1) {
-    return (
-      <div className="min-h-screen bg-background p-4 md:p-8">
-        <div className="max-w-6xl mx-auto flex items-center justify-center">
-          <div className="text-center">
-            <Trophy className="h-12 w-12 text-primary mx-auto mb-4 animate-pulse" />
-            <p className="text-muted-foreground">Redirecting to tournaments...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Multiple leagues - show selector
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 pb-24">
       <div className="max-w-6xl mx-auto">
@@ -156,7 +51,7 @@ export default function TournamentsLanding() {
             Tournaments
           </h1>
           <p className="text-muted-foreground">
-            Create standalone tournaments or select a league to manage its tournaments
+            Manage all your tournaments in one place
           </p>
         </div>
 
@@ -164,7 +59,7 @@ export default function TournamentsLanding() {
         <div className="mb-6">
           <Button
             onClick={() => navigate('/tournaments/create')}
-            data-testid="create-standalone-tournament-btn"
+            data-testid="create-tournament-btn"
             size="lg"
           >
             <Plus className="h-5 w-5 mr-2" />
@@ -172,104 +67,60 @@ export default function TournamentsLanding() {
           </Button>
         </div>
 
-        {/* Show standalone tournaments if any */}
-        {standaloneTournaments && standaloneTournaments.length > 0 && (
-          <>
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold">My Standalone Tournaments</h2>
-              <p className="text-sm text-muted-foreground">Tournaments you created</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-              {standaloneTournaments.map((tournament) => (
-                <Card
-                  key={tournament.id}
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => navigate(`/tournaments/${tournament.id}`)}
-                  data-testid={`card-tournament-${tournament.id}`}
-                >
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Trophy className="h-6 w-6 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg truncate">
-                          {tournament.name}
-                        </CardTitle>
-                        <CardDescription className="capitalize">
-                          {tournament.format.replace(/_/g, ' ')}
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        {tournament.teamCount || 0} teams
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </>
-        )}
-
-        <div className="mb-4">
-          <h2 className="text-xl font-semibold">League Tournaments</h2>
-          <p className="text-sm text-muted-foreground">Select a league to manage its tournaments</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {leagues.map((league) => (
-            <Card
-              key={league.id}
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => navigate(`/leagues/${league.id}/tournaments`)}
-              data-testid={`card-league-${league.id}`}
-            >
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  {league.logoUrl ? (
-                    <img
-                      src={league.logoUrl}
-                      alt={league.name}
-                      className="w-12 h-12 rounded-lg object-cover"
-                    />
-                  ) : (
+        {/* Show all tournaments */}
+        {tournaments && tournaments.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {tournaments.map((tournament) => (
+              <Card
+                key={tournament.id}
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => navigate(`/tournaments/${tournament.id}`)}
+                data-testid={`card-tournament-${tournament.id}`}
+              >
+                <CardHeader>
+                  <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                       <Trophy className="h-6 w-6 text-primary" />
                     </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg truncate">
-                      {league.name}
-                    </CardTitle>
-                    <CardDescription className="capitalize">
-                      {league.sport}
-                    </CardDescription>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CardTitle className="text-lg truncate">
+                          {tournament.name}
+                        </CardTitle>
+                      </div>
+                      <CardDescription className="capitalize">
+                        {tournament.format.replace(/_/g, ' ')}
+                      </CardDescription>
+                      {tournament.leagueName && (
+                        <div className="mt-1">
+                          <Badge variant="secondary" className="text-xs">
+                            {tournament.leagueName}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    {league.tournamentCount !== undefined ? (
-                      <>
-                        {league.tournamentCount} tournament{league.tournamentCount !== 1 ? 's' : ''}
-                      </>
-                    ) : (
-                      'View tournaments'
-                    )}
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      {tournament.teamCount || 0} teams
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <Trophy className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No tournaments yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Create your first tournament to get started
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
