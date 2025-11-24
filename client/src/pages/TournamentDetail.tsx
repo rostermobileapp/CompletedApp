@@ -118,7 +118,8 @@ export default function TournamentDetail() {
   const paymentMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', `/api/tournaments/${tournamentId}/create-checkout`);
-      return response as { url: string };
+      const data = await response.json();
+      return data as { url: string };
     },
     onSuccess: (data) => {
       console.log('💳 Stripe checkout response:', data);
