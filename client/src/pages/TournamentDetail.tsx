@@ -629,24 +629,23 @@ export default function TournamentDetail() {
                       ${((tournament.paymentAmount || 0) / 100).toFixed(2)}
                     </p>
                   </div>
-                  <DollarSign className="h-5 w-5 text-muted-foreground" />
+                  {tournament.paymentStatus !== 'paid' ? (
+                    <Button
+                      onClick={() => paymentMutation.mutate()}
+                      disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
+                      size="sm"
+                      data-testid="button-pay-now"
+                    >
+                      {paymentMutation.isPending ? 'Processing...' : 'Pay Now'}
+                    </Button>
+                  ) : (
+                    <DollarSign className="h-5 w-5 text-muted-foreground" />
+                  )}
                 </div>
               </div>
 
-              {tournament.paymentStatus !== 'paid' && (
-                <div className="pt-2">
-                  <Button
-                    onClick={() => paymentMutation.mutate()}
-                    disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
-                    className="w-full md:w-auto"
-                    data-testid="button-pay-now"
-                  >
-                    {paymentMutation.isPending ? 'Processing...' : `Pay $${((tournament.paymentAmount || 0) / 100).toFixed(2)} Now`}
-                  </Button>
-                  {(teams?.length || 0) === 0 && (
-                    <p className="text-sm text-muted-foreground mt-2">Add teams to calculate payment amount</p>
-                  )}
-                </div>
+              {tournament.paymentStatus !== 'paid' && (teams?.length || 0) === 0 && (
+                <p className="text-sm text-muted-foreground mt-2">Add teams to calculate payment amount</p>
               )}
             </CardContent>
           </Card>
