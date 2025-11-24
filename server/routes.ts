@@ -10163,6 +10163,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get standalone tournaments created by the current user
+  app.get('/api/tournaments/standalone', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+
+      const standaloneTournamentsList = await db
+        .select({
+          id: tournaments.id,
+          name: tournaments.name,
+          format: tournaments.format,
+          status: tournaments.status,
+          teamCount: sql<number>`(SELECT COUNT(*) FROM ${tournamentTeams} WHERE ${tournamentTeams.tournamentId} = ${tournaments.id})`
+        })
+        .from(tournaments)
+        .where(and(
+          eq(tournaments.type, 'standalone'),
+          eq(tournaments.createdBy, userId)
+        ))
+        .orderBy(sql`${tournaments.createdAt} DESC`);
+
+      res.json(standaloneTournamentsList);
+    } catch (error) {
+      console.error("Error fetching standalone tournaments:", error);
+      res.status(500).json({ message: "Failed to fetch standalone tournaments" });
+    }
+  });
+
   // List tournaments for a league
   app.get('/api/leagues/:leagueId/tournaments', isAuthenticated, async (req: any, res) => {
     try {

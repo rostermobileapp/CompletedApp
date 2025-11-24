@@ -4,6 +4,23 @@ Rosters is a comprehensive, free sports team management platform designed to str
 
 The platform now includes a sophisticated tournament system supporting diverse formats like single elimination, double elimination, round robin, triple elimination, 3-game guarantee, consolation, compass draw, and a custom bracket builder. This system features canonical bracket generation with configurable bye policies, automatic match creation, scheduling, score tracking, format recommendations, and touch-optimized SVG-based bracket visualization with zoom/pan controls.
 
+# Recent Changes
+
+## November 24, 2025 - Standalone Tournament Visibility & Dropdown Fixes
+
+### Standalone Tournaments Now Visible
+- **Issue**: Standalone tournaments were being saved to the database but had no UI to view them after creation
+- **Fix**: Added "My Standalone Tournaments" section to TournamentsLanding.tsx
+- **Implementation**: Created `/api/tournaments/standalone` endpoint that fetches standalone tournaments created by the current user
+- **User Impact**: Users can now see and access their standalone tournaments from the tournaments landing page
+
+### Bracket Dropdown Logic Fixed
+- **Issue**: Team selection dropdowns not showing for play-in round winners in standalone tournament brackets
+- **Root Cause**: Play-in matches weren't properly linked to their destination matches via `advancesToMatchId`
+- **Fix**: Modified `generateSingleElimination()` in bracketGenerator.ts to link play-in matches to the matches they feed into
+- **Implementation**: Added logic after bracket generation to find destination match using sourceMatch tracking and set `advancesToMatchId` accordingly
+- **User Impact**: Dropdowns now correctly appear for team slots that need manual assignment, while slots receiving teams from prior matches show "Winner of Match X" labels
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -47,11 +64,12 @@ Key components:
 Free tier users can now create standalone tournaments without league management permissions. The creation flow includes:
 
 **Frontend Components:**
-- **TournamentsLanding.tsx**: Shows "Create Standalone Tournament" button to all authenticated users
+- **TournamentsLanding.tsx**: Shows "Create Standalone Tournament" button to all authenticated users and displays "My Standalone Tournaments" section listing all standalone tournaments created by the user
 - **TournamentCreateStandalone.tsx**: Multi-step creation wizard with three stages:
   1. Tournament Details (name, format, description)
   2. Add Teams and Players (manual entry or CSV upload)
   3. Review & Create
+- **BracketView.tsx**: Implements slot-level dropdown logic - each team position is independently evaluated using `hasUpstreamMatch()` to determine if it should show a dropdown for manual team selection or display the upstream match reference
 
 **CSV Import Format:**
 The CSV import during tournament creation (Step 2) now supports uploading both teams and players in a single file:

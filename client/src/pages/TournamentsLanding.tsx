@@ -15,6 +15,14 @@ type League = {
   tournamentCount?: number;
 };
 
+type StandaloneTournament = {
+  id: string;
+  name: string;
+  format: string;
+  status: string;
+  teamCount?: number;
+};
+
 export default function TournamentsLanding() {
   const [, navigate] = useLocation();
   const { role } = usePermissions();
@@ -24,6 +32,11 @@ export default function TournamentsLanding() {
     queryKey: ['/api/leagues/manageable'],
   });
 
+  // Fetch standalone tournaments the user created
+  const { data: standaloneTournaments, isLoading: standaloneLoading } = useQuery<StandaloneTournament[]>({
+    queryKey: ['/api/tournaments/standalone'],
+  });
+
   // Auto-redirect if user only manages one league
   useEffect(() => {
     if (leagues && leagues.length === 1) {
@@ -31,7 +44,7 @@ export default function TournamentsLanding() {
     }
   }, [leagues, navigate]);
 
-  if (isLoading) {
+  if (isLoading || standaloneLoading) {
     return (
       <div className="min-h-screen bg-background p-4 md:p-8">
         <div className="max-w-6xl mx-auto">
@@ -73,6 +86,47 @@ export default function TournamentsLanding() {
               Create Tournament
             </Button>
           </div>
+
+          {/* Show standalone tournaments if any */}
+          {standaloneTournaments && standaloneTournaments.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold mb-4">My Standalone Tournaments</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {standaloneTournaments.map((tournament) => (
+                  <Card
+                    key={tournament.id}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => navigate(`/tournaments/${tournament.id}`)}
+                    data-testid={`card-tournament-${tournament.id}`}
+                  >
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Trophy className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-lg truncate">
+                            {tournament.name}
+                          </CardTitle>
+                          <CardDescription className="capitalize">
+                            {tournament.format.replace(/_/g, ' ')}
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-muted-foreground">
+                          {tournament.teamCount || 0} teams
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -110,13 +164,58 @@ export default function TournamentsLanding() {
         <div className="mb-6">
           <Button
             onClick={() => navigate('/tournaments/create')}
-            data-testid="button-create-tournament"
+            data-testid="create-standalone-tournament-btn"
             size="lg"
           >
             <Plus className="h-5 w-5 mr-2" />
             Create Tournament
           </Button>
         </div>
+
+        {/* Show standalone tournaments if any */}
+        {standaloneTournaments && standaloneTournaments.length > 0 && (
+          <>
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">My Standalone Tournaments</h2>
+              <p className="text-sm text-muted-foreground">Tournaments you created</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+              {standaloneTournaments.map((tournament) => (
+                <Card
+                  key={tournament.id}
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => navigate(`/tournaments/${tournament.id}`)}
+                  data-testid={`card-tournament-${tournament.id}`}
+                >
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Trophy className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg truncate">
+                          {tournament.name}
+                        </CardTitle>
+                        <CardDescription className="capitalize">
+                          {tournament.format.replace(/_/g, ' ')}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        {tournament.teamCount || 0} teams
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="mb-4">
           <h2 className="text-xl font-semibold">League Tournaments</h2>

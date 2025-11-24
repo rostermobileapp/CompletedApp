@@ -384,6 +384,21 @@ export function generateSingleElimination(
     });
   }
 
+  // Link play-in match to its destination match
+  if (needsPlayIn && playInMatchNum !== null) {
+    // Find the match that receives the play-in winner
+    const destinationMatch = allMatches.find(m => 
+      m.sourceMatch1 === playInMatchNum || m.sourceMatch2 === playInMatchNum
+    );
+    
+    if (destinationMatch) {
+      const playInMatch = matches.find(m => m.matchNumber === playInMatchNum);
+      if (playInMatch) {
+        playInMatch.advancesToMatchId = `match_${destinationMatch.matchNumber}`;
+      }
+    }
+  }
+
   return { matches, rounds };
 }
 
