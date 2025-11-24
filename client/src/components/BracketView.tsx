@@ -640,49 +640,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
       }
     });
 
-    // Add bracket labels for multi-bracket formats
-    Object.keys(bracketMaps).forEach((bracketType, bracketIndex) => {
-      const bracketRounds = Object.keys(bracketMaps[bracketType]);
-      if (bracketRounds.length === 0) return;
-      
-      // Find the top-left position of this bracket
-      let minY = Infinity;
-      let minX = Infinity;
-      
-      bracketRounds.forEach((roundName) => {
-        const roundMatches = bracketMaps[bracketType][roundName] || [];
-        roundMatches.forEach((match) => {
-          const pos = matchPositions.get(match.id);
-          if (pos) {
-            if (pos.y < minY) minY = pos.y;
-            if (pos.x < minX) minX = pos.x;
-          }
-        });
-      });
-      
-      // Only show bracket label for non-main brackets or when there are multiple brackets
-      const showLabel = Object.keys(bracketMaps).length > 1 && bracketType !== 'main';
-      
-      if (showLabel && minY !== Infinity && minX !== Infinity) {
-        const labelY = minY - 60;
-        const labelText = bracketLabels[bracketType] || bracketType;
-        
-        elements.push(
-          <g key={`label-bracket-${bracketType}`} transform={`translate(${minX}, ${labelY})`}>
-            <foreignObject width={250} height={40}>
-              <div className={`font-bold text-lg ${
-                bracketType === 'losers' || bracketType === 'consolation' ? 'text-destructive' : 
-                bracketType === 'losers1' ? 'text-purple-600 dark:text-purple-400' :
-                bracketType === 'losers2' ? 'text-orange-600 dark:text-orange-400' :
-                'text-primary'
-              }`}>
-                {labelText}
-              </div>
-            </foreignObject>
-          </g>
-        );
-      }
-    });
+    
 
     // Draw connectors based on advancesToMatchId
     matches.forEach(match => {
