@@ -11856,10 +11856,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.delete(games).where(inArray(games.id, gameIds));
       }
 
-      // 3. Delete other related data
+      // 3. Delete other related data (must delete participants before teams due to FK)
+      await db.delete(tournamentParticipants).where(eq(tournamentParticipants.tournamentId, id));
       await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, id));
       await db.delete(tournamentStats).where(eq(tournamentStats.tournamentId, id));
-      await db.delete(tournamentParticipants).where(eq(tournamentParticipants.tournamentId, id));
       
       // 4. Finally delete the tournament itself
       await db.delete(tournaments).where(eq(tournaments.id, id));

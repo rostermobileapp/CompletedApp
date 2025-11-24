@@ -227,6 +227,7 @@ export default function TournamentCreateStandalone() {
       return tournament;
     },
     onSuccess: (tournament, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/all'] });
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
       
       if (variables.format === 'custom_bracket') {
