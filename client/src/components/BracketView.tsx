@@ -102,6 +102,45 @@ export default function BracketView({ matches, teams, format, settings, tourname
     return team?.teamName || "TBD";
   };
 
+  // Helper to check if notes contain inbound references (teams coming FROM other matches)
+  // Returns true ONLY if notes reference a DIFFERENT match number in an inbound pattern
+  const hasInboundReferences = (match: TournamentMatch): boolean => {
+    if (!match.notes) return false;
+    
+    // Check for "Winner/Loser of/from Match X" patterns
+    // Only count as inbound if X is DIFFERENT from current match number
+    const matchRefPattern = /(winner|loser)\s+(of|from)\s+match[\s_]*(\d+)/gi;
+    const matchRefs = Array.from(match.notes.matchAll(matchRefPattern));
+    for (const ref of matchRefs) {
+      const refMatchNum = parseInt(ref[3]);
+      if (refMatchNum !== match.matchNumber) {
+        // Reference to a different match - this is inbound
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  // Helper to determine if a match is in a primary round (needs manual team selection)
+  // Primary rounds have no source matches feeding into them
+  const isPrimaryRound = (match: TournamentMatch): boolean => {
+    // Check if any match advances to this match (winner advancement)
+    // Support both UUID format and match_X format for backwards compatibility
+    const hasWinnerParent = matches.some(m => 
+      m.advancesToMatchId === match.id || 
+      m.advancesToMatchId === `match_${match.matchNumber}`
+    );
+    
+    if (hasWinnerParent) return false;
+    
+    // Check if match has notes indicating it receives teams from other matches
+    if (hasInboundReferences(match)) return false;
+    
+    // If no parent matches found, this is a primary round
+    return true;
+  };
+
   // Helper to get descriptive text for TBD teams
   const getTeamDisplay = (teamId: string | null, match: TournamentMatch, position: 'team1' | 'team2') => {
     if (teamId) {
@@ -131,29 +170,37 @@ export default function BracketView({ matches, teams, format, settings, tourname
         }
       }
       
-      // Try to extract explicit match references from notes
-      const matchNumbers = match.notes.match(/match_(\d+)/g);
-      if (matchNumbers && matchNumbers.length >= 1) {
-        if (position === 'team1' && matchNumbers.length >= 1) {
-          const num = matchNumbers[0].replace('match_', '');
-          const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
-          return `${prefix} Match ${num}`;
-        } else if (position === 'team2' && matchNumbers.length >= 2) {
-          const num = matchNumbers[1].replace('match_', '');
-          const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
-          return `${prefix} Match ${num}`;
-        } else if (position === 'team2' && matchNumbers.length === 1) {
-          // For losers bracket with single match number in notes, need to calculate second parent
-          const firstNum = parseInt(matchNumbers[0].replace('match_', ''));
-          const secondNum = firstNum + 1; // Assume sequential parents
-          const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
-          return `${prefix} Match ${secondNum}`;
+      // Try to extract explicit inbound match references from notes
+      // Only extract references to OTHER matches (not current match)
+      const matchRefPattern = /(winner|loser)\s+(of|from)\s+match[\s_]*(\d+)/gi;
+      const matchRefs = Array.from(match.notes.matchAll(matchRefPattern));
+      // Filter to only include references to different matches
+      const inboundMatchRefs = matchRefs.filter(ref => parseInt(ref[3]) !== match.matchNumber);
+      
+      if (inboundMatchRefs.length >= 1) {
+        if (position === 'team1' && inboundMatchRefs[0]) {
+          const prefix = inboundMatchRefs[0][1];
+          const matchNum = inboundMatchRefs[0][3];
+          return `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} of Match ${matchNum}`;
+        } else if (position === 'team2' && inboundMatchRefs[1]) {
+          const prefix = inboundMatchRefs[1][1];
+          const matchNum = inboundMatchRefs[1][3];
+          return `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} of Match ${matchNum}`;
+        } else if (position === 'team2' && inboundMatchRefs.length === 1) {
+          // Only one inbound reference - derive second from first
+          const prefix = inboundMatchRefs[0][1];
+          const matchNum = parseInt(inboundMatchRefs[0][3]) + 1;
+          return `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} of Match ${matchNum}`;
         }
       }
     }
     
     // For TBD teams, find matches that advance to this match
-    const sourceMatches = matches.filter(m => m.advancesToMatchId === `match_${match.matchNumber}`);
+    // Support both UUID format and match_X format for backwards compatibility
+    const sourceMatches = matches.filter(m => 
+      m.advancesToMatchId === match.id || 
+      m.advancesToMatchId === `match_${match.matchNumber}`
+    );
     
     if (sourceMatches.length === 1) {
       const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
@@ -611,7 +658,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                 }`}
                 onClick={(e) => e.stopPropagation()}
               >
-                {tournamentType === 'standalone' && !match.team1Id ? (
+                {tournamentType === 'standalone' && !match.team1Id && isPrimaryRound(match) ? (
                   <Select
                     value={match.team1Id || ""}
                     onValueChange={(value) => handleTeamSelect(match.id, 'team1', value, match)}
@@ -649,7 +696,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                 }`}
                 onClick={(e) => e.stopPropagation()}
               >
-                {tournamentType === 'standalone' && !match.team2Id ? (
+                {tournamentType === 'standalone' && !match.team2Id && isPrimaryRound(match) ? (
                   <Select
                     value={match.team2Id || ""}
                     onValueChange={(value) => handleTeamSelect(match.id, 'team2', value, match)}
