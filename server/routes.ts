@@ -10260,6 +10260,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get tournament participants (players) by tournament team
+  app.get('/api/tournaments/:tournamentId/teams/:teamId/players', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tournamentId, teamId } = req.params;
+
+      const participants = await db
+        .select({
+          id: tournamentParticipants.id,
+          userId: tournamentParticipants.userId,
+          tournamentTeamId: tournamentParticipants.tournamentTeamId,
+          role: tournamentParticipants.role,
+          status: tournamentParticipants.status,
+          joinedAt: tournamentParticipants.joinedAt,
+          fullName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+          email: users.email,
+          profileImageUrl: users.profileImageUrl,
+          firstName: users.firstName,
+          lastName: users.lastName
+        })
+        .from(tournamentParticipants)
+        .leftJoin(users, eq(tournamentParticipants.userId, users.id))
+        .where(and(
+          eq(tournamentParticipants.tournamentId, tournamentId),
+          eq(tournamentParticipants.tournamentTeamId, teamId),
+          eq(tournamentParticipants.status, 'approved')
+        ))
+        .orderBy(sql`${users.lastName}, ${users.firstName}`);
+
+      res.json(participants);
+    } catch (error) {
+      console.error("Error fetching tournament team players:", error);
+      res.status(500).json({ message: "Failed to fetch tournament team players" });
+    }
+  });
+
   // Get tournament matches
   app.get('/api/tournaments/:id/matches', isAuthenticated, async (req: any, res) => {
     try {

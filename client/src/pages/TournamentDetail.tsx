@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX, User, ArrowRight } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +42,7 @@ export default function TournamentDetail() {
   const [copiedTournamentId, setCopiedTournamentId] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isUploadingCsv, setIsUploadingCsv] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<TournamentTeam | null>(null);
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
@@ -65,6 +66,12 @@ export default function TournamentDetail() {
 
   const { data: currentUser } = useQuery<any>({
     queryKey: ['/api/user']
+  });
+
+  // Fetch team players when a team is selected
+  const { data: teamPlayers, isLoading: teamPlayersLoading, error: teamPlayersError } = useQuery<any[]>({
+    queryKey: selectedTeam ? ['/api/tournaments', tournamentId, 'teams', selectedTeam.id, 'players'] : ['no-team-selected'],
+    enabled: !!tournamentId && !!selectedTeam?.id,
   });
 
   // Check if user can manage this tournament (creator for standalone OR league commissioner for playoffs)
@@ -974,42 +981,134 @@ export default function TournamentDetail() {
             {/* Teams List */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Participating Teams
-                </CardTitle>
-                <CardDescription>
-                  {teams?.length || 0} team{teams?.length !== 1 ? 's' : ''} registered
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      {selectedTeam ? selectedTeam.teamName : 'Participating Teams'}
+                    </CardTitle>
+                    <CardDescription>
+                      {selectedTeam 
+                        ? `${teamPlayers?.length || 0} player${teamPlayers?.length !== 1 ? 's' : ''}`
+                        : `${teams?.length || 0} team${teams?.length !== 1 ? 's' : ''} registered`
+                      }
+                    </CardDescription>
+                  </div>
+                  {selectedTeam && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedTeam(null)}
+                      data-testid="button-back-to-teams"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      Back to Teams
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                {teams && teams.length > 0 ? (
-                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    {teams.map((team, index) => (
-                      <Card key={team.id} data-testid={`card-team-${team.id}`}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
-                                {team.seed || index + 1}
+                {!selectedTeam ? (
+                  // Teams List View
+                  teams && teams.length > 0 ? (
+                    <div className="space-y-3">
+                      {teams.map((team, index) => {
+                        // Count players for this team (we don't have this data in teams list, but we can show seed)
+                        return (
+                          <div
+                            key={team.id}
+                            className="flex items-center justify-between p-4 rounded-lg border bg-background hover:bg-muted/50 cursor-pointer transition-colors"
+                            onClick={() => setSelectedTeam(team)}
+                            data-testid={`team-${team.id}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2">
+                                <p className="font-medium text-base" data-testid={`text-team-name-${team.id}`}>
+                                  {team.teamName}
+                                </p>
                               </div>
-                              <span className="font-medium" data-testid={`text-team-name-${team.id}`}>
-                                {team.teamName}
-                              </span>
+                              <div className="text-sm text-muted-foreground space-y-1">
+                                <p>Seed: #{team.seed || index + 1}</p>
+                                <p>Click to view players</p>
+                              </div>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>No teams added yet</p>
+                      {tournament && canManageTournament() && (
+                        <p className="text-sm mt-1">Upload a CSV file to add teams and players</p>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  // Team Detail View - Show Players in Selected Team
+                  teamPlayersLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                        <p className="text-sm text-muted-foreground">Loading players...</p>
+                      </div>
+                    </div>
+                  ) : teamPlayersError ? (
+                    <div className="text-center py-8">
+                      <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+                      <p className="text-destructive font-medium">Error loading players</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {(teamPlayersError as any)?.message || "Failed to fetch team players"}
+                      </p>
+                    </div>
+                  ) : teamPlayers && teamPlayers.length > 0 ? (
+                    <div className="space-y-3">
+                      {teamPlayers.map((player: any) => (
+                        <div
+                          key={player.id}
+                          className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-muted/50 transition-colors"
+                          data-testid={`team-player-${player.userId}`}
+                        >
+                          <div className="flex items-center gap-3 flex-1">
+                            {/* Profile Picture */}
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
+                              {player.profileImageUrl ? (
+                                <img
+                                  src={player.profileImageUrl}
+                                  alt={`${player.lastName}, ${player.firstName}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <User className="w-6 h-6 text-muted-foreground" />
+                              )}
+                            </div>
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">
+                                  {player.lastName && player.firstName 
+                                    ? `${player.lastName}, ${player.firstName}`
+                                    : player.fullName || player.email
+                                  }
+                                </p>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                <p>{player.email}</p>
+                              </div>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No teams added yet</p>
-                    {tournament && canManageTournament() && (
-                      <p className="text-sm mt-1">Upload a CSV file to add teams and players</p>
-                    )}
-                  </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No players assigned to this team yet</p>
+                      <p className="text-sm text-muted-foreground mt-2">Players will appear here once they join the tournament</p>
+                    </div>
+                  )
                 )}
               </CardContent>
             </Card>
