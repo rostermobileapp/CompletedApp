@@ -121,10 +121,25 @@ export default function TournamentDetail() {
       return response as { url: string };
     },
     onSuccess: (data) => {
+      console.log('💳 Stripe checkout response:', data);
+      
+      // Validate the URL before redirecting
+      if (!data || !data.url) {
+        console.error('❌ Invalid checkout response:', data);
+        toast({
+          title: "Error",
+          description: "Invalid checkout session URL received",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      console.log('✅ Redirecting to Stripe checkout:', data.url);
       // Redirect to Stripe checkout
       window.location.href = data.url;
     },
     onError: (error: any) => {
+      console.error('❌ Payment mutation error:', error);
       toast({
         title: "Error",
         description: error?.message || "Failed to initiate payment",
