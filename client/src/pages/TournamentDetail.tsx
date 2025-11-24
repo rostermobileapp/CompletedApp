@@ -591,7 +591,7 @@ export default function TournamentDetail() {
                 )}
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-6 space-y-4 pt-[4px] pb-[4px]">
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
                   <div>
