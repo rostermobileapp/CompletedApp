@@ -85,6 +85,16 @@ export default function BracketView({ matches, teams, format, settings, tourname
 
   // Handle team selection
   const handleTeamSelect = (matchId: string, position: 'team1' | 'team2', teamId: string, currentMatch: TournamentMatch) => {
+    // Handle clear selection
+    if (teamId === '__clear__') {
+      if (position === 'team1') {
+        updateMatchTeamMutation.mutate({ matchId, team1Id: null });
+      } else {
+        updateMatchTeamMutation.mutate({ matchId, team2Id: null });
+      }
+      return;
+    }
+
     // Check if team is being selected for the other slot in the same match
     const otherSlotTeamId = position === 'team1' ? currentMatch.team2Id : currentMatch.team1Id;
     if (otherSlotTeamId === teamId) {
@@ -689,16 +699,23 @@ export default function BracketView({ matches, teams, format, settings, tourname
                 }`}
                 onClick={(e) => e.stopPropagation()}
               >
-                {tournamentType === 'standalone' && !match.team1Id && !hasUpstreamMatch(match, 'team1') ? (
+                {tournamentType === 'standalone' && !hasUpstreamMatch(match, 'team1') ? (
                   <Select
                     value={match.team1Id || ""}
                     onValueChange={(value) => handleTeamSelect(match.id, 'team1', value, match)}
                     disabled={updateMatchTeamMutation.isPending}
                   >
                     <SelectTrigger className="h-7 text-xs bg-white dark:bg-gray-800" data-testid={`select-team1-${match.matchNumber}`}>
-                      <SelectValue placeholder="Select Team" />
+                      <SelectValue placeholder="Select Team">
+                        {match.team1Id ? getTeamName(match.team1Id) : "Select Team"}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
+                      {match.team1Id && (
+                        <SelectItem value="__clear__" className="text-red-600 dark:text-red-400 font-medium">
+                          ✕ Clear Selection
+                        </SelectItem>
+                      )}
                       {getAvailableTeams(match, 'team1').map((team) => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.teamName}
@@ -727,16 +744,23 @@ export default function BracketView({ matches, teams, format, settings, tourname
                 }`}
                 onClick={(e) => e.stopPropagation()}
               >
-                {tournamentType === 'standalone' && !match.team2Id && !hasUpstreamMatch(match, 'team2') ? (
+                {tournamentType === 'standalone' && !hasUpstreamMatch(match, 'team2') ? (
                   <Select
                     value={match.team2Id || ""}
                     onValueChange={(value) => handleTeamSelect(match.id, 'team2', value, match)}
                     disabled={updateMatchTeamMutation.isPending}
                   >
                     <SelectTrigger className="h-7 text-xs bg-white dark:bg-gray-800" data-testid={`select-team2-${match.matchNumber}`}>
-                      <SelectValue placeholder="Select Team" />
+                      <SelectValue placeholder="Select Team">
+                        {match.team2Id ? getTeamName(match.team2Id) : "Select Team"}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
+                      {match.team2Id && (
+                        <SelectItem value="__clear__" className="text-red-600 dark:text-red-400 font-medium">
+                          ✕ Clear Selection
+                        </SelectItem>
+                      )}
                       {getAvailableTeams(match, 'team2').map((team) => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.teamName}
