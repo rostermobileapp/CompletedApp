@@ -326,6 +326,11 @@ export default function TournamentCreateStandalone() {
           if (teamName && teamName.trim()) {
             const normalizedTeamName = teamName.trim();
             
+            // Always ensure team exists in the map
+            if (!teamPlayerCount.has(normalizedTeamName)) {
+              teamPlayerCount.set(normalizedTeamName, 0);
+            }
+            
             // If player data exists, store it and count it
             if (hasPlayerColumns) {
               const playerName = row['Player Full Name'] || row['player_full_name'] || row['PlayerFullName'] || '';
@@ -333,12 +338,7 @@ export default function TournamentCreateStandalone() {
                 hasPlayerData = true;
                 playersData.push(row);
                 // Increment player count for this team
-                teamPlayerCount.set(normalizedTeamName, (teamPlayerCount.get(normalizedTeamName) || 0) + 1);
-              }
-            } else {
-              // No player data, just track the team
-              if (!teamPlayerCount.has(normalizedTeamName)) {
-                teamPlayerCount.set(normalizedTeamName, 0);
+                teamPlayerCount.set(normalizedTeamName, teamPlayerCount.get(normalizedTeamName)! + 1);
               }
             }
           }
