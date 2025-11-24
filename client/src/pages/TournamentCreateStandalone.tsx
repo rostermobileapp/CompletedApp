@@ -345,7 +345,12 @@ export default function TournamentCreateStandalone() {
             
             // If player data exists, store it and count it
             if (hasPlayerColumns) {
-              const playerName = row['Player Full Name'] || row['player_full_name'] || row['PlayerFullName'] || '';
+              // Find player name column (flexible matching with asterisk support)
+              const playerNameColumn = headers.find(h => 
+                h && h.toLowerCase().replace(/[_\s*]/g, '').includes('playerfullname')
+              );
+              const playerName = playerNameColumn ? (row[playerNameColumn] || '') : '';
+              
               if (playerName && playerName.trim()) {
                 hasPlayerData = true;
                 playersData.push(row);
