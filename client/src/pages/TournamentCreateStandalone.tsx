@@ -176,8 +176,16 @@ export default function TournamentCreateStandalone() {
       }
 
       // Step 3: Import players if CSV data was uploaded (standalone only)
+      console.log('🔍 Player import check:', {
+        csvPlayerData,
+        hasData: csvPlayerData && csvPlayerData.length > 0,
+        isSeasonPlayoff
+      });
+      
       if (csvPlayerData && csvPlayerData.length > 0 && !isSeasonPlayoff) {
         try {
+          console.log('📤 Starting player import for', csvPlayerData.length, 'players');
+          
           // Convert CSV data back to CSV format for upload
           const csvContent = Papa.unparse(csvPlayerData);
           const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -192,13 +200,17 @@ export default function TournamentCreateStandalone() {
 
           if (!response.ok) {
             const errorData = await response.json();
-            console.error('Player import failed:', errorData);
+            console.error('❌ Player import failed:', errorData);
             // Don't throw - tournament was created successfully, just log the error
+          } else {
+            console.log('✅ Player import succeeded');
           }
         } catch (playerImportError) {
-          console.error('Player import error:', playerImportError);
+          console.error('❌ Player import error:', playerImportError);
           // Don't throw - tournament was created successfully
         }
+      } else {
+        console.log('⏭️ Skipping player import');
       }
 
       return tournament;
