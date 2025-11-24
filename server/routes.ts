@@ -667,6 +667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customer: customerId,
         mode: 'payment',
         payment_method_types: ['card'],
+        allow_promotion_codes: true,
         line_items: [
           {
             price_data: {
