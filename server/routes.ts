@@ -18,7 +18,7 @@ import { db } from "./db";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
-import { eq, and, or, ilike, sql, inArray, exists } from "drizzle-orm";
+import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
 import {
   insertLeagueSchema,
@@ -10168,7 +10168,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
 
-      const allTournamentsList = await db
+      // Get standalone tournaments created by user
+      const standaloneTournaments = await db
+        .select({
+          id: tournaments.id,
+          name: tournaments.name,
+          format: tournaments.format,
+          status: tournaments.status,
+          type: tournaments.type,
+          leagueId: tournaments.leagueId,
+          leagueName: sql<string | null>`NULL`,
+          teamCount: sql<number>`(SELECT COUNT(*) FROM ${tournamentTeams} WHERE ${tournamentTeams.tournamentId} = ${tournaments.id})`
+        })
+        .from(tournaments)
+        .where(and(
+          eq(tournaments.type, 'standalone'),
+          eq(tournaments.createdBy, userId)
+        ));
+
+      // Get league tournaments where user is a commissioner
+      const leagueTournaments = await db
         .select({
           id: tournaments.id,
           name: tournaments.name,
@@ -10180,36 +10199,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           teamCount: sql<number>`(SELECT COUNT(*) FROM ${tournamentTeams} WHERE ${tournamentTeams.tournamentId} = ${tournaments.id})`
         })
         .from(tournaments)
-        .leftJoin(leagues, eq(tournaments.leagueId, leagues.id))
-        .where(
+        .innerJoin(leagues, eq(tournaments.leagueId, leagues.id))
+        .innerJoin(leagueMemberships, eq(leagueMemberships.leagueId, leagues.id))
+        .where(and(
+          eq(tournaments.type, 'season_playoff'),
+          eq(leagueMemberships.userId, userId),
           or(
-            // Standalone tournaments created by user
-            and(
-              eq(tournaments.type, 'standalone'),
-              eq(tournaments.createdBy, userId)
-            ),
-            // League tournaments where user is a commissioner
-            and(
-              eq(tournaments.type, 'season_playoff'),
-              exists(
-                db
-                  .select({ id: leagueMemberships.id })
-                  .from(leagueMemberships)
-                  .where(
-                    and(
-                      eq(leagueMemberships.leagueId, tournaments.leagueId),
-                      eq(leagueMemberships.userId, userId),
-                      or(
-                        eq(leagueMemberships.leagueRole, 'commissioner'),
-                        eq(leagueMemberships.leagueRole, 'secondary_commissioner')
-                      )
-                    )
-                  )
-              )
-            )
+            eq(leagueMemberships.leagueRole, 'commissioner'),
+            eq(leagueMemberships.leagueRole, 'secondary_commissioner')
           )
-        )
-        .orderBy(sql`${tournaments.createdAt} DESC`);
+        ));
+
+      // Combine and sort by creation date
+      const allTournamentsList = [...standaloneTournaments, ...leagueTournaments]
+        .sort((a, b) => {
+          // Sort by id (which includes timestamp) descending - newest first
+          return b.id.localeCompare(a.id);
+        });
 
       res.json(allTournamentsList);
     } catch (error) {
