@@ -659,8 +659,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : 'localhost:5000');
       const appUrl = `${protocol}://${host}`;
 
-      // Calculate payment amount in cents
-      const amountInCents = Math.round((tournament.paymentAmount || 0) * 100);
+      // Payment amount is already stored in cents
+      const amountInCents = Math.round(tournament.paymentAmount || 0);
 
       // Create checkout session
       const session = await stripe.checkout.sessions.create({
@@ -11074,8 +11074,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(eq(tournamentTeams.tournamentId, tournamentId));
     
     const count = Number(teamCount[0]?.count || 0);
-    // $10 per team (stored as dollars, will be converted to cents at checkout)
-    return count * 10;
+    // $10 per team = 1000 cents (stored as cents for frontend display)
+    return count * 1000;
   }
 
   // Create tournament
@@ -12291,14 +12291,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(tournamentTeams.tournamentId, tournamentId));
         
         const teamCount = Number(totalTeams[0]?.count || 0);
-        const paymentAmount = teamCount * 10; // $10 per team
+        const paymentAmount = teamCount * 1000; // $10 per team = 1000 cents
         
         await db
           .update(tournaments)
           .set({ paymentAmount })
           .where(eq(tournaments.id, tournamentId));
         
-        console.log(`Updated tournament payment amount: ${teamCount} teams × $10 = $${paymentAmount}`);
+        console.log(`Updated tournament payment amount: ${teamCount} teams × 1000 cents = ${paymentAmount} cents ($${paymentAmount / 100})`);
       }
 
       // Clean up file
