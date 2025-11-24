@@ -218,14 +218,18 @@ export function generateSingleElimination(
     rounds.push('Play-In Round');
     playInMatchNum = matchCounter++;
     
+    // For standalone tournaments, leave teams null so commissioner can manually assign
+    // For league tournaments, auto-assign the bottom 2 seeds
+    const isStandalone = settings.tournamentType === 'standalone';
+    
     matches.push({
       tournamentId,
       gameId: null,
       round: 'Play-In Round',
       matchNumber: playInMatchNum,
       bracketType: null,
-      team1Id: sortedTeams[numTeams - 2].id,
-      team2Id: sortedTeams[numTeams - 1].id,
+      team1Id: isStandalone ? null : sortedTeams[numTeams - 2].id,
+      team2Id: isStandalone ? null : sortedTeams[numTeams - 1].id,
       winnerId: null,
       team1Score: null,
       team2Score: null,
@@ -467,14 +471,18 @@ export function generateDoubleElimination(
       ? 'Play-in: Bottom 2 seeds compete for final spot'
       : 'Play-in: Lowest 2 seeds compete for entry into main bracket';
     
+    // For standalone tournaments, leave teams null so commissioner can manually assign
+    // For league tournaments, auto-assign the bottom 2 seeds
+    const isStandalone = settings.tournamentType === 'standalone';
+    
     matches.push({
       tournamentId,
       gameId: null,
       round: 'Play-In Round',
       matchNumber: playInMatchNum,
       bracketType: 'winners',
-      team1Id: sortedTeams[numTeams - 2].id,
-      team2Id: sortedTeams[numTeams - 1].id,
+      team1Id: isStandalone ? null : sortedTeams[numTeams - 2].id,
+      team2Id: isStandalone ? null : sortedTeams[numTeams - 1].id,
       winnerId: null,
       team1Score: null,
       team2Score: null,

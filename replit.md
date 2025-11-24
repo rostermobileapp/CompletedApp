@@ -6,20 +6,23 @@ The platform now includes a sophisticated tournament system supporting diverse f
 
 # Recent Changes
 
-## November 24, 2025 - Standalone Tournament Visibility & Dropdown Fixes
+## November 24, 2025 - Standalone Tournament Visibility & Team Assignment
 
 ### Unified Tournaments Landing Page
 - **Issue**: Standalone tournaments were being saved to the database but had no UI to view them after creation
 - **Fix**: Completely redesigned TournamentsLanding.tsx to show all tournaments in one unified list
 - **Implementation**: Created `/api/tournaments/all` endpoint that fetches both standalone tournaments and league tournaments where the user is a commissioner
+- **Authentication Fix**: Changed `/api/tournaments/all` to use `req.user.claims.sub` instead of `req.user.id` for proper user identification
 - **User Impact**: All tournaments now appear together on one landing page with league name badges to distinguish league tournaments from standalone ones
 
-### Bracket Dropdown Logic Fixed
-- **Issue**: Team selection dropdowns not showing for play-in round winners in standalone tournament brackets
-- **Root Cause**: Play-in matches weren't properly linked to their destination matches via `advancesToMatchId`
-- **Fix**: Modified `generateSingleElimination()` in bracketGenerator.ts to link play-in matches to the matches they feed into
-- **Implementation**: Added logic after bracket generation to find destination match using sourceMatch tracking and set `advancesToMatchId` accordingly
-- **User Impact**: Dropdowns now correctly appear for team slots that need manual assignment, while slots receiving teams from prior matches show "Winner of Match X" labels
+### Play-In Round Team Assignment for Standalone Tournaments
+- **Issue**: Play-in round matches in standalone tournaments were auto-assigned the bottom 2 seed teams instead of showing dropdowns for manual selection
+- **Root Cause**: Bracket generator (`generateSingleElimination()` and `generateDoubleElimination()`) automatically assigned teams to play-in matches regardless of tournament type
+- **Fix**: 
+  - Modified `/api/tournaments/:id/generate-bracket` endpoint to pass `tournamentType` in settings to bracket generator
+  - Updated bracket generators to check `settings.tournamentType === 'standalone'` and leave play-in match teams as `null` instead of auto-assigning
+  - BracketView component already had correct dropdown logic that shows dropdowns when `!match.team1Id && !hasUpstreamMatch()`
+- **User Impact**: For standalone tournaments, play-in round matches now show team selection dropdowns, allowing commissioners to manually assign teams. For league tournaments, teams are still auto-assigned based on seeding.
 
 # User Preferences
 

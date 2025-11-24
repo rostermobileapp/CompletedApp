@@ -11057,7 +11057,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, tournamentId));
 
       // Merge tournament settings with request settings (request settings take precedence)
-      const settings = { ...(tournament.settings as any || {}), ...(requestSettings || {}) };
+      // Also include tournament type so bracket generator knows if this is standalone
+      const settings = { 
+        ...(tournament.settings as any || {}), 
+        ...(requestSettings || {}),
+        tournamentType: tournament.type  // Pass tournament type to bracket generator
+      };
       
       // Apply bracket type (seeded or blind_draw) to determine team order and seeds
       const bracketType = settings.bracketType || 'seeded';
