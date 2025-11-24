@@ -117,15 +117,32 @@ export default function BracketView({ matches, teams, format, settings, tourname
       return true;
     }
     
-    // If there's 1 parent match, we need to figure out which slot it feeds
-    // For now, if ANY parent exists, consider it secondary to be safe
-    // This prevents dropdowns from showing in later rounds
-    if (parentMatches.length === 1) {
-      return true;
+    // If there's 1 parent match, determine which slot it feeds
+    // Check notes to see which position receives the upstream match
+    if (parentMatches.length === 1 && match.notes) {
+      const parentMatchNum = parentMatches[0].matchNumber;
+      const matchRefPattern = new RegExp(`(winner|loser)\\s+(?:of|from)\\s+match[_\\s]?${parentMatchNum}`, 'i');
+      const noteMatch = match.notes.match(matchRefPattern);
+      
+      // If the note mentions the parent match, check which position it's in
+      // Typically the first mention is team1, second mention is team2
+      if (noteMatch) {
+        const firstMention = match.notes.indexOf(noteMatch[0]);
+        const remainingNotes = match.notes.substring(firstMention + noteMatch[0].length);
+        const hasSecondMention = remainingNotes.match(matchRefPattern);
+        
+        // If only one mention, it's typically for team1 position
+        if (!hasSecondMention && position === 'team1') {
+          return true;
+        }
+        // If there's a second mention in the remaining notes, team2 position
+        if (hasSecondMention && position === 'team2') {
+          return true;
+        }
+      }
     }
     
-    // No structural parent matches found
-    // Ignore notes - they're just descriptive, not indicative of automatic advancement
+    // No structural parent matches found for this position
     return false;
   };
 
@@ -634,16 +651,14 @@ export default function BracketView({ matches, teams, format, settings, tourname
                 <CardTitle className={`text-xs font-semibold text-white`}>
                   {match.round}
                 </CardTitle>
-                {(settings?.showGameNumbers || match.scheduledTime) && (
-                  <div className={`text-[10px] font-medium text-white opacity-80 flex items-center gap-1.5`}>
-                    {settings?.showGameNumbers && <span>Game #{match.matchNumber}</span>}
-                    {match.scheduledTime && (
-                      <span className="text-[9px] opacity-70">
-                        {settings?.showGameNumbers && '• '}{formatDate(new Date(match.scheduledTime), "MMM d, h:mm a")}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <div className={`text-[10px] font-medium text-white opacity-80 flex items-center gap-1.5`}>
+                  <span data-testid={`label-match-${match.matchNumber}`}>Match #{match.matchNumber}</span>
+                  {match.scheduledTime && (
+                    <span className="text-[9px] opacity-70">
+                      • {formatDate(new Date(match.scheduledTime), "MMM d, h:mm a")}
+                    </span>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-2 pt-0 space-y-1">
