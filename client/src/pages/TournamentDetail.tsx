@@ -385,7 +385,7 @@ export default function TournamentDetail() {
     setIsUploadingCsv(true);
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('playerFile', file);
 
       const response = await fetch(`/api/tournaments/${tournamentId}/players/import`, {
         method: 'POST',
