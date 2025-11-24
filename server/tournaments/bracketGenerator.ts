@@ -245,13 +245,21 @@ export function generateSingleElimination(
   const seedSlots = buildSeedSlots(bracketSize);
   
   // Map seeds to teams for Round 1
-  // For play-in: use top (numTeams-2) seeds, then add null for play-in winner spot
+  // For standalone tournaments, leave all teams null for manual assignment
+  // For league tournaments with play-in: use top (numTeams-2) seeds, then add null for play-in winner spot
+  // For league tournaments without play-in: use all teams
+  const isStandalone = settings.tournamentType === 'standalone';
+  
   let round1Teams: Array<TournamentTeam | null> = [];
-  if (needsPlayIn) {
+  if (isStandalone) {
+    // Standalone: all slots are null for manual assignment
+    round1Teams = new Array(effectiveTeamCount).fill(null);
+  } else if (needsPlayIn) {
+    // League with play-in: use top seeds, add null for play-in winner
     round1Teams = sortedTeams.slice(0, numTeams - 2) as Array<TournamentTeam | null>;
-    // Add null for play-in winner spot (will be determined after play-in match)
     round1Teams.push(null);
   } else {
+    // League without play-in: use all teams
     round1Teams = sortedTeams as Array<TournamentTeam | null>;
   }
   
@@ -494,9 +502,10 @@ export function generateDoubleElimination(
     });
     
     // R1 entrants: Top seeds + play-in winner
+    // For standalone tournaments, set all teamIds to null for manual assignment
     for (let i = 0; i < numTeams - 2; i++) {
       currentRoundEntrants.push({
-        teamId: sortedTeams[i].id,
+        teamId: isStandalone ? null : sortedTeams[i].id,
         seed: i + 1
       });
     }
@@ -508,17 +517,21 @@ export function generateDoubleElimination(
     });
   } else if (needsBye && byePolicy === 'top_seed_bye') {
     // Top seed sits out R1, others compete
+    // For standalone tournaments, set all teamIds to null for manual assignment
+    const isStandalone = settings.tournamentType === 'standalone';
     for (let i = 1; i < numTeams; i++) {
       currentRoundEntrants.push({
-        teamId: sortedTeams[i].id,
+        teamId: isStandalone ? null : sortedTeams[i].id,
         seed: i + 1
       });
     }
   } else {
     // Even teams - all compete in R1
+    // For standalone tournaments, set all teamIds to null for manual assignment
+    const isStandalone = settings.tournamentType === 'standalone';
     for (let i = 0; i < numTeams; i++) {
       currentRoundEntrants.push({
-        teamId: sortedTeams[i].id,
+        teamId: isStandalone ? null : sortedTeams[i].id,
         seed: i + 1
       });
     }
@@ -537,8 +550,9 @@ export function generateDoubleElimination(
     
     // For Round 2 with top_seed_bye, add the top seed to entrants
     if (roundIdx === 1 && needsBye && byePolicy === 'top_seed_bye') {
+      const isStandalone = settings.tournamentType === 'standalone';
       currentRoundEntrants.unshift({
-        teamId: sortedTeams[0].id,
+        teamId: isStandalone ? null : sortedTeams[0].id,
         seed: 1,
         isBye: true
       });
