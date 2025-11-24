@@ -699,6 +699,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(tournaments.id, tournamentId));
 
+      console.log('[Stripe] Tournament checkout session created:', {
+        sessionId: session.id,
+        sessionUrl: session.url,
+        hasUrl: !!session.url
+      });
+
+      if (!session.url) {
+        console.error('[Stripe] Session created but URL is missing!', session);
+        return res.status(500).json({ message: 'Stripe session URL missing' });
+      }
+
       res.json({ url: session.url });
     } catch (error: any) {
       console.error('[Stripe] Error creating tournament checkout session:', error);
