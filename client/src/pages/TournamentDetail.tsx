@@ -478,7 +478,23 @@ export default function TournamentDetail() {
                   {tournament.name}
                 </h1>
                 <div className="flex flex-wrap items-center gap-2">
-                  {getStatusBadge(tournament.status)}
+                  <Badge 
+                    variant="outline" 
+                    className="font-mono font-semibold text-xs cursor-pointer hover:bg-muted"
+                    onClick={() => {
+                      navigator.clipboard.writeText(tournament.uniqueTournamentId || '');
+                      setCopiedTournamentId(true);
+                      setTimeout(() => setCopiedTournamentId(false), 2000);
+                      toast({
+                        title: "Copied!",
+                        description: "Tournament ID copied to clipboard"
+                      });
+                    }}
+                    data-testid="badge-tournament-id"
+                  >
+                    {copiedTournamentId ? <CheckCheck className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                    ID: {tournament.uniqueTournamentId}
+                  </Badge>
                   <Badge variant="outline" className="font-normal text-xs">
                     {tournament.type === 'season_playoff' ? 'Season Playoff' : 'Standalone'}
                   </Badge>
