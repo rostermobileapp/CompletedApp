@@ -67,7 +67,9 @@ export default function BracketView({ matches, teams, format, settings, tourname
 
   // Get available teams for a specific match slot (excluding teams already in this round)
   const getAvailableTeams = (currentMatch: TournamentMatch): TournamentTeam[] => {
-    return teams.filter(team => !isTeamAlreadyInRound(team.id, currentMatch));
+    const available = teams.filter(team => !isTeamAlreadyInRound(team.id, currentMatch));
+    console.log('🔍 Available teams for match:', currentMatch.matchNumber, available.map(t => ({ id: t.id, name: t.teamName, seed: t.seed })));
+    return available;
   };
 
   // Handle team selection
