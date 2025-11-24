@@ -565,7 +565,7 @@ export default function TournamentDetail() {
       {tournament && canManageTournament() && (
         <div className="max-w-7xl mx-auto px-4 md:px-8 pb-6">
           <Card className={tournament.paymentStatus === 'paid' ? 'border-green-500/50' : 'border-amber-500/50'}>
-            <CardHeader>
+            <CardHeader className="flex flex-col space-y-1.5 p-6 pt-[4px] pb-[4px]">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <CardTitle className="flex items-center gap-2">
