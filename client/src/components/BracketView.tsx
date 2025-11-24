@@ -102,48 +102,31 @@ export default function BracketView({ matches, teams, format, settings, tourname
     return team?.teamName || "TBD";
   };
 
-  // Helper to check if notes contain inbound references (teams coming FROM other matches)
-  // Returns true if notes indicate teams come from other matches/rounds
-  const hasInboundReferences = (match: TournamentMatch): boolean => {
-    if (!match.notes) return false;
-    
-    // Check for explicit match references: "Winner/Loser of/from match_X" or "Winner/Loser of/from Match X"
-    // Only count as inbound if X is DIFFERENT from current match number (filter self-references)
-    const matchRefPattern = /(winner|loser)\s+(?:of|from)\s+match[_\s]?(\d+)/gi;
-    const matchRefs = Array.from(match.notes.matchAll(matchRefPattern));
-    for (const ref of matchRefs) {
-      const refMatchNum = parseInt(ref[2]);
-      if (refMatchNum !== match.matchNumber) {
-        return true; // Reference to a different match
-      }
-    }
-    
-    // Check for losers bracket patterns that indicate inbound teams from winners bracket
-    // "Receives losers from Winners Round X" or "Merger round: Previous losers combine"
-    if (/(receives\s+losers\s+from|merger\s+round|previous\s+losers)/i.test(match.notes)) {
-      return true;
-    }
-    
-    return false;
-  };
-
-  // Helper to determine if a match is in a primary round (needs manual team selection)
-  // Primary rounds have no source matches feeding into them
-  const isPrimaryRound = (match: TournamentMatch): boolean => {
-    // Check if any match advances to this match (winner advancement)
-    // Support both UUID format and match_X format for backwards compatibility
-    const hasWinnerParent = matches.some(m => 
+  // Helper to check if a specific team slot receives a team from another match
+  // Returns true ONLY if there's an actual advancement relationship (advancesToMatchId)
+  const hasUpstreamMatch = (match: TournamentMatch, position: 'team1' | 'team2'): boolean => {
+    // Check if any match has advancesToMatchId pointing to this match
+    // This indicates an actual structural relationship, not just descriptive notes
+    const parentMatches = matches.filter(m => 
       m.advancesToMatchId === match.id || 
       m.advancesToMatchId === `match_${match.matchNumber}`
     );
     
-    if (hasWinnerParent) return false;
+    // If there are 2 parent matches, both slots have upstream matches
+    if (parentMatches.length >= 2) {
+      return true;
+    }
     
-    // Check if match has notes indicating it receives teams from other matches
-    if (hasInboundReferences(match)) return false;
+    // If there's 1 parent match, we need to figure out which slot it feeds
+    // For now, if ANY parent exists, consider it secondary to be safe
+    // This prevents dropdowns from showing in later rounds
+    if (parentMatches.length === 1) {
+      return true;
+    }
     
-    // If no parent matches found, this is a primary round
-    return true;
+    // No structural parent matches found
+    // Ignore notes - they're just descriptive, not indicative of automatic advancement
+    return false;
   };
 
   // Helper to get descriptive text for TBD teams
@@ -673,7 +656,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                 }`}
                 onClick={(e) => e.stopPropagation()}
               >
-                {tournamentType === 'standalone' && !match.team1Id && isPrimaryRound(match) ? (
+                {tournamentType === 'standalone' && !match.team1Id && !hasUpstreamMatch(match, 'team1') ? (
                   <Select
                     value={match.team1Id || ""}
                     onValueChange={(value) => handleTeamSelect(match.id, 'team1', value, match)}
@@ -711,7 +694,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                 }`}
                 onClick={(e) => e.stopPropagation()}
               >
-                {tournamentType === 'standalone' && !match.team2Id && isPrimaryRound(match) ? (
+                {tournamentType === 'standalone' && !match.team2Id && !hasUpstreamMatch(match, 'team2') ? (
                   <Select
                     value={match.team2Id || ""}
                     onValueChange={(value) => handleTeamSelect(match.id, 'team2', value, match)}
