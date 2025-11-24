@@ -95,11 +95,16 @@ export default function TournamentDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', tournament?.leagueId, 'tournaments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/all'] });
       toast({
         title: "Tournament deleted",
         description: "The tournament has been deleted successfully"
       });
-      setLocation(`/leagues/${tournament?.leagueId}/tournaments`);
+      // Navigate to appropriate tournaments page based on tournament type
+      const redirectPath = tournament?.leagueId 
+        ? `/leagues/${tournament.leagueId}/tournaments`
+        : '/tournaments';
+      setLocation(redirectPath);
     },
     onError: (error: any) => {
       toast({
@@ -451,7 +456,12 @@ export default function TournamentDetail() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setLocation(`/leagues/${tournament.leagueId}/tournaments`)}
+            onClick={() => {
+              const path = tournament.leagueId 
+                ? `/leagues/${tournament.leagueId}/tournaments`
+                : '/tournaments';
+              setLocation(path);
+            }}
             className="mb-2 -ml-2"
             data-testid="button-back"
           >
