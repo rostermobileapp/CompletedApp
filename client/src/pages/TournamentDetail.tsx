@@ -546,7 +546,7 @@ export default function TournamentDetail() {
       </div>
 
       {/* Payment Status Section - Commissioner Only */}
-      {tournament && tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
+      {tournament && canManageTournament() && (
         <div className="max-w-7xl mx-auto px-4 md:px-8 pb-6">
           <Card className={tournament.paymentStatus === 'paid' ? 'border-green-500/50' : 'border-amber-500/50'}>
             <CardHeader>
