@@ -103,20 +103,25 @@ export default function BracketView({ matches, teams, format, settings, tourname
   };
 
   // Helper to check if notes contain inbound references (teams coming FROM other matches)
-  // Returns true ONLY if notes reference a DIFFERENT match number in an inbound pattern
+  // Returns true if notes indicate teams come from other matches/rounds
   const hasInboundReferences = (match: TournamentMatch): boolean => {
     if (!match.notes) return false;
     
-    // Check for "Winner/Loser of/from Match X" patterns
-    // Only count as inbound if X is DIFFERENT from current match number
-    const matchRefPattern = /(winner|loser)\s+(of|from)\s+match[\s_]*(\d+)/gi;
+    // Check for explicit match references: "Winner/Loser of/from match_X" or "Winner/Loser of/from Match X"
+    // Only count as inbound if X is DIFFERENT from current match number (filter self-references)
+    const matchRefPattern = /(winner|loser)\s+(?:of|from)\s+match[_\s]?(\d+)/gi;
     const matchRefs = Array.from(match.notes.matchAll(matchRefPattern));
     for (const ref of matchRefs) {
-      const refMatchNum = parseInt(ref[3]);
+      const refMatchNum = parseInt(ref[2]);
       if (refMatchNum !== match.matchNumber) {
-        // Reference to a different match - this is inbound
-        return true;
+        return true; // Reference to a different match
       }
+    }
+    
+    // Check for losers bracket patterns that indicate inbound teams from winners bracket
+    // "Receives losers from Winners Round X" or "Merger round: Previous losers combine"
+    if (/(receives\s+losers\s+from|merger\s+round|previous\s+losers)/i.test(match.notes)) {
+      return true;
     }
     
     return false;
@@ -172,26 +177,36 @@ export default function BracketView({ matches, teams, format, settings, tourname
       
       // Try to extract explicit inbound match references from notes
       // Only extract references to OTHER matches (not current match)
-      const matchRefPattern = /(winner|loser)\s+(of|from)\s+match[\s_]*(\d+)/gi;
+      const matchRefPattern = /(winner|loser)\s+(?:of|from)\s+match[_\s]?(\d+)/gi;
       const matchRefs = Array.from(match.notes.matchAll(matchRefPattern));
       // Filter to only include references to different matches
-      const inboundMatchRefs = matchRefs.filter(ref => parseInt(ref[3]) !== match.matchNumber);
+      const inboundMatchRefs = matchRefs.filter(ref => parseInt(ref[2]) !== match.matchNumber);
       
       if (inboundMatchRefs.length >= 1) {
         if (position === 'team1' && inboundMatchRefs[0]) {
           const prefix = inboundMatchRefs[0][1];
-          const matchNum = inboundMatchRefs[0][3];
+          const matchNum = inboundMatchRefs[0][2];
           return `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} of Match ${matchNum}`;
         } else if (position === 'team2' && inboundMatchRefs[1]) {
           const prefix = inboundMatchRefs[1][1];
-          const matchNum = inboundMatchRefs[1][3];
+          const matchNum = inboundMatchRefs[1][2];
           return `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} of Match ${matchNum}`;
         } else if (position === 'team2' && inboundMatchRefs.length === 1) {
           // Only one inbound reference - derive second from first
           const prefix = inboundMatchRefs[0][1];
-          const matchNum = parseInt(inboundMatchRefs[0][3]) + 1;
+          const matchNum = parseInt(inboundMatchRefs[0][2]) + 1;
           return `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} of Match ${matchNum}`;
         }
+      }
+      
+      // Check for losers bracket patterns
+      const losersRoundMatch = match.notes.match(/receives\s+losers\s+from\s+winners\s+round\s+(\d+)/i);
+      if (losersRoundMatch) {
+        return position === 'team1' ? `Loser from WR ${losersRoundMatch[1]}` : `Loser from WR ${losersRoundMatch[1]}`;
+      }
+      
+      if (/merger\s+round|previous\s+losers/i.test(match.notes)) {
+        return 'TBD';
       }
     }
     
