@@ -23,6 +23,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
+  const [initialZoom, setInitialZoom] = useState<number>(0.5);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -761,6 +763,13 @@ export default function BracketView({ matches, teams, format, settings, tourname
     setIsDragging(false);
   };
 
+  // Helper function to calculate distance between two touch points
+  const getTouchDistance = (touch1: React.Touch, touch2: React.Touch) => {
+    const dx = touch1.clientX - touch2.clientX;
+    const dy = touch1.clientY - touch2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
   // Touch event handlers for mobile support
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
@@ -768,6 +777,14 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const touch = e.touches[0];
       setIsDragging(true);
       setDragStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y });
+      // Reset pinch state
+      setInitialPinchDistance(null);
+    } else if (e.touches.length === 2) {
+      // Two fingers for pinch-to-zoom
+      setIsDragging(false);
+      const distance = getTouchDistance(e.touches[0], e.touches[1]);
+      setInitialPinchDistance(distance);
+      setInitialZoom(zoom);
     }
   };
 
@@ -779,11 +796,18 @@ export default function BracketView({ matches, teams, format, settings, tourname
         x: touch.clientX - dragStart.x,
         y: touch.clientY - dragStart.y
       });
+    } else if (e.touches.length === 2 && initialPinchDistance !== null) {
+      // Two fingers for pinch-to-zoom
+      const currentDistance = getTouchDistance(e.touches[0], e.touches[1]);
+      const scale = currentDistance / initialPinchDistance;
+      const newZoom = Math.min(Math.max(0.3, initialZoom * scale), 3);
+      setZoom(newZoom);
     }
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
+    setInitialPinchDistance(null);
   };
 
   const resetView = () => {
