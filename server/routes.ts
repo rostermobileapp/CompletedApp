@@ -10167,6 +10167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/tournaments/all', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      console.log('Fetching tournaments for user:', userId);
 
       // Get all tournaments created by the user (both standalone and league)
       const allTournamentsList = await db
@@ -10185,6 +10186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(tournaments.createdBy, userId))
         .orderBy(sql`${tournaments.createdAt} DESC`);
 
+      console.log('Found tournaments:', allTournamentsList.length);
       res.json(allTournamentsList);
     } catch (error) {
       console.error("Error fetching all tournaments:", error);
