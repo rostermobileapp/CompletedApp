@@ -54,6 +54,7 @@ type FormData = z.infer<typeof formSchema>;
 
 type Team = {
   name: string;
+  playerCount?: number;
 };
 
 export default function TournamentCreateStandalone() {
@@ -292,7 +293,7 @@ export default function TournamentCreateStandalone() {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const teamNamesSet = new Set<string>();
+        const teamPlayerCount = new Map<string, number>();
         const playersData: any[] = [];
         let hasPlayerData = false;
 
@@ -323,20 +324,32 @@ export default function TournamentCreateStandalone() {
           }
 
           if (teamName && teamName.trim()) {
-            teamNamesSet.add(teamName.trim());
-          }
-
-          // If player data exists, store it
-          if (hasPlayerColumns) {
-            const playerName = row['Player Full Name'] || row['player_full_name'] || row['PlayerFullName'] || '';
-            if (playerName && playerName.trim()) {
-              hasPlayerData = true;
-              playersData.push(row);
+            const normalizedTeamName = teamName.trim();
+            
+            // If player data exists, store it and count it
+            if (hasPlayerColumns) {
+              const playerName = row['Player Full Name'] || row['player_full_name'] || row['PlayerFullName'] || '';
+              if (playerName && playerName.trim()) {
+                hasPlayerData = true;
+                playersData.push(row);
+                // Increment player count for this team
+                teamPlayerCount.set(normalizedTeamName, (teamPlayerCount.get(normalizedTeamName) || 0) + 1);
+              }
+            } else {
+              // No player data, just track the team
+              if (!teamPlayerCount.has(normalizedTeamName)) {
+                teamPlayerCount.set(normalizedTeamName, 0);
+              }
             }
           }
         });
 
-        const newTeams = Array.from(teamNamesSet).map(name => ({ name }));
+        // Create teams with player counts
+        const newTeams = Array.from(teamPlayerCount.entries()).map(([name, playerCount]) => ({
+          name,
+          playerCount
+        }));
+        
         setTeams(newTeams);
         form.setValue('teams', newTeams);
 
@@ -803,7 +816,14 @@ export default function TournamentCreateStandalone() {
                                   className="flex items-center justify-between p-3 border rounded-lg bg-card"
                                   data-testid={`team-${teamIndex}`}
                                 >
-                                  <span className="font-medium">{team.name}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{team.name}</span>
+                                    {team.playerCount !== undefined && team.playerCount > 0 && (
+                                      <span className="text-sm text-muted-foreground">
+                                        ({team.playerCount} {team.playerCount === 1 ? 'player' : 'players'})
+                                      </span>
+                                    )}
+                                  </div>
                                   <Button
                                 type="button"
                                 variant="ghost"
@@ -816,9 +836,11 @@ export default function TournamentCreateStandalone() {
                             </div>
                           ))}
                         </div>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          After creating the tournament, you can add players via CSV import on the tournament details page.
-                        </p>
+                        {csvPlayerData && csvPlayerData.length > 0 && (
+                          <p className="text-sm text-green-600 dark:text-green-400 mt-2">
+                            ✓ {csvPlayerData.length} players ready to be imported after tournament creation
+                          </p>
+                        )}
                       </div>
                     )}
                       </>
