@@ -12270,7 +12270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   userId,
                   tournamentTeamId,
                   role: 'player',
-                  status: 'pending',
+                  status: 'approved',
                   expiresAt: tournament.accessEndDate || null
                 });
             }
