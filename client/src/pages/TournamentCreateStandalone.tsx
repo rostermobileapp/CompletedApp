@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { supabase } from "@/lib/supabase";
 import Papa from "papaparse";
 
 const formSchema = z.object({
@@ -186,6 +187,13 @@ export default function TournamentCreateStandalone() {
         try {
           console.log('📤 Starting player import for', csvPlayerData.length, 'players');
           
+          // Get auth token
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.access_token) {
+            console.error('❌ No authentication token available');
+            throw new Error('Not authenticated');
+          }
+          
           // Convert CSV data back to CSV format for upload
           const csvContent = Papa.unparse(csvPlayerData);
           const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -194,6 +202,9 @@ export default function TournamentCreateStandalone() {
 
           const response = await fetch(`/api/tournaments/${tournament.id}/players/import`, {
             method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            },
             body: formData,
             credentials: 'include'
           });
