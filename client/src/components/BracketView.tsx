@@ -65,6 +65,11 @@ export default function BracketView({ matches, teams, format, settings, tourname
     return matchesInRound.some(m => m.team1Id === teamId || m.team2Id === teamId);
   };
 
+  // Get available teams for a specific match slot (excluding teams already in this round)
+  const getAvailableTeams = (currentMatch: TournamentMatch): TournamentTeam[] => {
+    return teams.filter(team => !isTeamAlreadyInRound(team.id, currentMatch));
+  };
+
   // Handle team selection
   const handleTeamSelect = (matchId: string, position: 'team1' | 'team2', teamId: string, currentMatch: TournamentMatch) => {
     // Check if team is being selected for the other slot in the same match
@@ -681,7 +686,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       <SelectValue placeholder="Select Team" />
                     </SelectTrigger>
                     <SelectContent>
-                      {teams.map((team) => (
+                      {getAvailableTeams(match).map((team) => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.teamName}
                         </SelectItem>
@@ -719,7 +724,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       <SelectValue placeholder="Select Team" />
                     </SelectTrigger>
                     <SelectContent>
-                      {teams.map((team) => (
+                      {getAvailableTeams(match).map((team) => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.teamName}
                         </SelectItem>
