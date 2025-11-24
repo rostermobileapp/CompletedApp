@@ -10168,26 +10168,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
 
-      // Get standalone tournaments created by user
-      const standaloneTournaments = await db
-        .select({
-          id: tournaments.id,
-          name: tournaments.name,
-          format: tournaments.format,
-          status: tournaments.status,
-          type: tournaments.type,
-          leagueId: tournaments.leagueId,
-          leagueName: sql<string | null>`NULL`,
-          teamCount: sql<number>`(SELECT COUNT(*) FROM ${tournamentTeams} WHERE ${tournamentTeams.tournamentId} = ${tournaments.id})`
-        })
-        .from(tournaments)
-        .where(and(
-          eq(tournaments.type, 'standalone'),
-          eq(tournaments.createdBy, userId)
-        ));
-
-      // Get league tournaments where user is a commissioner
-      const leagueTournaments = await db
+      // Get all tournaments created by the user (both standalone and league)
+      const allTournamentsList = await db
         .select({
           id: tournaments.id,
           name: tournaments.name,
@@ -10199,23 +10181,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           teamCount: sql<number>`(SELECT COUNT(*) FROM ${tournamentTeams} WHERE ${tournamentTeams.tournamentId} = ${tournaments.id})`
         })
         .from(tournaments)
-        .innerJoin(leagues, eq(tournaments.leagueId, leagues.id))
-        .innerJoin(leagueMemberships, eq(leagueMemberships.leagueId, leagues.id))
-        .where(and(
-          eq(tournaments.type, 'season_playoff'),
-          eq(leagueMemberships.userId, userId),
-          or(
-            eq(leagueMemberships.leagueRole, 'commissioner'),
-            eq(leagueMemberships.leagueRole, 'secondary_commissioner')
-          )
-        ));
-
-      // Combine and sort by creation date
-      const allTournamentsList = [...standaloneTournaments, ...leagueTournaments]
-        .sort((a, b) => {
-          // Sort by id (which includes timestamp) descending - newest first
-          return b.id.localeCompare(a.id);
-        });
+        .leftJoin(leagues, eq(tournaments.leagueId, leagues.id))
+        .where(eq(tournaments.createdBy, userId))
+        .orderBy(sql`${tournaments.createdAt} DESC`);
 
       res.json(allTournamentsList);
     } catch (error) {
