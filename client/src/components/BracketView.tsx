@@ -65,10 +65,21 @@ export default function BracketView({ matches, teams, format, settings, tourname
     return matchesInRound.some(m => m.team1Id === teamId || m.team2Id === teamId);
   };
 
-  // Get available teams for a specific match slot (excluding teams already in this round)
-  const getAvailableTeams = (currentMatch: TournamentMatch): TournamentTeam[] => {
-    const available = teams.filter(team => !isTeamAlreadyInRound(team.id, currentMatch));
-    console.log('🔍 Available teams for match:', currentMatch.matchNumber, available.map(t => ({ id: t.id, name: t.teamName, seed: t.seed })));
+  // Get available teams for a specific match slot (excluding teams already in this round or same match)
+  const getAvailableTeams = (currentMatch: TournamentMatch, position: 'team1' | 'team2'): TournamentTeam[] => {
+    // Get the team ID in the other slot of the same match
+    const otherSlotTeamId = position === 'team1' ? currentMatch.team2Id : currentMatch.team1Id;
+    
+    const available = teams.filter(team => {
+      // Exclude if team is in the other slot of this match
+      if (otherSlotTeamId && team.id === otherSlotTeamId) {
+        return false;
+      }
+      // Exclude if team is already in another match in this round
+      return !isTeamAlreadyInRound(team.id, currentMatch);
+    });
+    
+    console.log('🔍 Available teams for match:', currentMatch.matchNumber, 'position:', position, available.map(t => ({ id: t.id, name: t.teamName, seed: t.seed })));
     return available;
   };
 
@@ -688,7 +699,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       <SelectValue placeholder="Select Team" />
                     </SelectTrigger>
                     <SelectContent>
-                      {getAvailableTeams(match).map((team) => (
+                      {getAvailableTeams(match, 'team1').map((team) => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.teamName}
                         </SelectItem>
@@ -726,7 +737,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       <SelectValue placeholder="Select Team" />
                     </SelectTrigger>
                     <SelectContent>
-                      {getAvailableTeams(match).map((team) => (
+                      {getAvailableTeams(match, 'team2').map((team) => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.teamName}
                         </SelectItem>
