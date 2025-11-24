@@ -11845,16 +11845,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(tournamentMatches)
         .where(eq(tournamentMatches.tournamentId, id));
 
-      // Delete those games first
       const gameIds = matchesWithGames.map(m => m.gameId).filter((id): id is string => id !== null);
+
+      // IMPORTANT: Delete in correct order to respect foreign key constraints
+      // 1. Delete tournament_matches first (they reference games)
+      await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
+      
+      // 2. Now delete the games (no longer referenced by tournament_matches)
       if (gameIds.length > 0) {
         await db.delete(games).where(inArray(games.id, gameIds));
       }
 
-      // Delete cascades to teams, matches, and stats
-      await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
+      // 3. Delete other related data
       await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, id));
       await db.delete(tournamentStats).where(eq(tournamentStats.tournamentId, id));
+      await db.delete(tournamentParticipants).where(eq(tournamentParticipants.tournamentId, id));
+      
+      // 4. Finally delete the tournament itself
       await db.delete(tournaments).where(eq(tournaments.id, id));
 
       res.json({ success: true });
