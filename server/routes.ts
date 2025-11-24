@@ -10260,6 +10260,237 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Tournament CSV import endpoint
+  app.post('/api/tournaments/:tournamentId/import-csv', isAuthenticated, (req: any, res, next) => {
+    upload.single('playerFile')(req, res, (err) => {
+      if (err) {
+        console.error('Multer error:', err);
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ message: 'File size exceeds 5MB limit' });
+          }
+          return res.status(400).json({ message: err.message });
+        }
+        return res.status(400).json({ message: err.message || 'File upload error' });
+      }
+      next();
+    });
+  }, async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+      const userId = req.user.claims.sub;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+
+      // Check if user can manage this tournament
+      const tournament = await db.query.tournaments.findFirst({
+        where: eq(tournaments.id, tournamentId)
+      });
+
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      // Check permissions - must be creator for standalone or commissioner for league tournaments
+      if (tournament.type === 'standalone' && tournament.createdBy !== userId) {
+        return res.status(403).json({ message: 'Only the tournament creator can import players' });
+      }
+      
+      if (tournament.type === 'league' && tournament.leagueId) {
+        const league = await db.query.leagues.findFirst({
+          where: eq(leagues.id, tournament.leagueId)
+        });
+        if (!league || league.commissionerId !== userId) {
+          return res.status(403).json({ message: 'Only league commissioners can import players' });
+        }
+      }
+
+      // Read and parse the CSV file
+      const fileContent = fs.readFileSync(file.path, 'utf8');
+      const parseResults = Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header: string) => {
+          const normalized = header.toLowerCase().trim().replace(/\*/g, '');
+          const mapping: Record<string, string> = {
+            'player full name': 'fullName',
+            'full name': 'fullName',
+            'name': 'fullName',
+            'player': 'fullName',
+            'player name': 'fullName',
+            'team': 'teamName',
+            'team name': 'teamName',
+            'email': 'email',
+            'jersey #': 'jerseyNumber',
+            'jersey number': 'jerseyNumber',
+            'phone': 'phoneNumber',
+            'phone number': 'phoneNumber',
+            'position': 'position',
+            'skill level': 'skillLevel',
+            'player type': 'playerType'
+          };
+          return mapping[normalized] || header;
+        }
+      });
+
+      if (parseResults.errors.length > 0) {
+        return res.status(400).json({ 
+          message: 'Error parsing CSV file', 
+          errors: parseResults.errors 
+        });
+      }
+
+      // Helper function for email validation
+      const isValidEmail = (email: string): boolean => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+      };
+
+      // Helper function for enhanced name parsing
+      const parseFullName = (fullName: string): { firstName: string; lastName: string } => {
+        const trimmed = fullName.trim();
+        
+        if (trimmed.includes(',')) {
+          const parts = trimmed.split(',').map(p => p.trim());
+          return {
+            lastName: parts[0] || '',
+            firstName: parts.slice(1).join(' ') || ''
+          };
+        }
+        
+        const nameParts = trimmed.split(/\s+/);
+        if (nameParts.length === 0) {
+          return { firstName: '', lastName: '' };
+        } else if (nameParts.length === 1) {
+          return { firstName: nameParts[0], lastName: '' };
+        } else {
+          const lastName = nameParts[nameParts.length - 1];
+          const firstName = nameParts.slice(0, -1).join(' ');
+          return { firstName, lastName };
+        }
+      };
+
+      // Get existing tournament teams
+      const existingTeams = await db.query.tournamentTeams.findMany({
+        where: eq(tournamentTeams.tournamentId, tournamentId)
+      });
+      
+      const teamLookup = new Map<string, string>(); // teamName -> teamId
+      existingTeams.forEach(team => {
+        if (team.teamName) {
+          teamLookup.set(team.teamName.toLowerCase().trim(), team.id);
+        }
+      });
+
+      let teamsCreated = 0;
+      let playersImported = 0;
+      const errors: string[] = [];
+
+      // Process each row in the CSV
+      for (const row of parseResults.data) {
+        try {
+          const teamName = (row as any).teamName?.trim();
+          if (!teamName) {
+            errors.push(`Row missing team name`);
+            continue;
+          }
+
+          // Get or create tournament team
+          let teamId = teamLookup.get(teamName.toLowerCase());
+          if (!teamId) {
+            const [newTeam] = await db.insert(tournamentTeams).values({
+              id: nanoid(),
+              tournamentId,
+              teamName,
+              seed: existingTeams.length + teamsCreated + 1
+            }).returning();
+            teamId = newTeam.id;
+            teamLookup.set(teamName.toLowerCase(), teamId);
+            teamsCreated++;
+          }
+
+          // Process player data
+          const fullName = (row as any).fullName?.trim();
+          const email = (row as any).email?.trim();
+
+          if (!fullName && !email) {
+            continue; // Skip rows with no player data
+          }
+
+          let playerUserId: string | null = null;
+
+          // If email is provided, create/find user account
+          if (email && isValidEmail(email)) {
+            const existingUser = await db.query.users.findFirst({
+              where: eq(users.email, email)
+            });
+
+            if (existingUser) {
+              playerUserId = existingUser.id;
+            } else if (fullName) {
+              // Create new user account
+              const { firstName, lastName } = parseFullName(fullName);
+              const [newUser] = await db.insert(users).values({
+                id: nanoid(),
+                email,
+                firstName,
+                lastName,
+                displayName: fullName,
+                role: 'free_tier'
+              }).returning();
+              playerUserId = newUser.id;
+            }
+          }
+
+          // Create tournament participant entry if we have a user
+          if (playerUserId && teamId) {
+            // Check if participant already exists
+            const existingParticipant = await db.query.tournamentParticipants.findFirst({
+              where: and(
+                eq(tournamentParticipants.tournamentId, tournamentId),
+                eq(tournamentParticipants.userId, playerUserId),
+                eq(tournamentParticipants.tournamentTeamId, teamId)
+              )
+            });
+
+            if (!existingParticipant) {
+              await db.insert(tournamentParticipants).values({
+                id: nanoid(),
+                tournamentId,
+                userId: playerUserId,
+                tournamentTeamId: teamId,
+                role: 'player',
+                status: 'approved', // Auto-approve CSV imports
+                joinedAt: new Date()
+              });
+              playersImported++;
+            }
+          }
+        } catch (error) {
+          console.error('Error processing row:', error);
+          errors.push(`Error processing row: ${JSON.stringify(row)}`);
+        }
+      }
+
+      // Clean up the uploaded file
+      fs.unlinkSync(file.path);
+
+      res.json({
+        message: 'CSV import completed',
+        teamsCreated,
+        playersImported,
+        errors: errors.length > 0 ? errors : undefined
+      });
+
+    } catch (error) {
+      console.error("Error importing CSV:", error);
+      res.status(500).json({ message: "Failed to import CSV" });
+    }
+  });
+
   // Get tournament participants (players) by tournament team
   app.get('/api/tournaments/:tournamentId/teams/:teamId/players', isAuthenticated, async (req: any, res) => {
     try {
