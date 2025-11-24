@@ -11872,7 +11872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Import tournament players from CSV
-  app.post('/api/tournaments/:tournamentId/players/import', isAuthenticated, loadUserPermissions, (req: any, res, next) => {
+  app.post('/api/tournaments/:tournamentId/players/import', isAuthenticated, (req: any, res, next) => {
     upload.single('playerFile')(req, res, (err) => {
       if (err) {
         console.error('Multer error:', err);
@@ -11906,23 +11906,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Tournament not found' });
       }
 
-      // Check permissions: either tournament creator (for standalone) OR league management permissions (for season playoffs)
-      const userWithPermissions = req.userWithPermissions;
-      if (!userWithPermissions) {
-        return res.status(401).json({ message: 'User permissions not loaded' });
-      }
-
+      // Check permissions
       let hasPermission = false;
       
       if (tournament.type === 'standalone') {
         // For standalone tournaments, check if user is the creator
-        if (tournament.createdBy === userId) {
-          hasPermission = true;
-        }
+        hasPermission = tournament.createdBy === userId;
       } else if (tournament.type === 'season_playoff' && tournament.leagueId) {
-        // For season playoffs, use the same permission logic as requireLeagueManagementSpecific
-        const { canManageLeagueSpecific } = await import('./permissionMiddleware');
-        hasPermission = await canManageLeagueSpecific(userWithPermissions, tournament.leagueId);
+        // For league tournaments, check league management permissions
+        // Load user data first
+        const user = await storage.getUser(userId);
+        if (user) {
+          const { canManageLeagueSpecific } = await import('./permissionMiddleware');
+          hasPermission = await canManageLeagueSpecific(user, tournament.leagueId);
+        }
       }
 
       if (!hasPermission) {
