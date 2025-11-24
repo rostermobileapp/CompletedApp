@@ -72,7 +72,7 @@ export default function TournamentDetail() {
   const canManageTournament = () => {
     if (!tournament || !currentUser) return false;
     if (tournament.type === 'standalone' && tournament.createdBy === currentUser.id) return true;
-    if (tournament.type === 'season_playoff' && canManageLeagueSpecific(tournament.leagueId)) return true;
+    if (tournament.type === 'season_playoff' && tournament.leagueId && canManageLeagueSpecific(tournament.leagueId)) return true;
     return false;
   };
 
@@ -513,7 +513,7 @@ export default function TournamentDetail() {
       </div>
 
       {/* Payment Status Section - Commissioner Only */}
-      {tournament && canManageLeagueSpecific(tournament.leagueId) && (
+      {tournament && tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
         <div className="max-w-7xl mx-auto px-4 md:px-8 pb-6">
           <Card className={tournament.paymentStatus === 'paid' ? 'border-green-500/50' : 'border-amber-500/50'}>
             <CardHeader>
@@ -772,7 +772,8 @@ export default function TournamentDetail() {
                             settings={tournament.settings as TournamentSettings | undefined}
                             tournamentName={tournament.name}
                             tournamentId={tournamentId || ''}
-                            isCommissioner={canManageLeagueSpecific(tournament.leagueId)}
+                            isCommissioner={tournament.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
+                            tournamentType={tournament.type}
                           />
                         </CardContent>
                       </Card>
@@ -1067,7 +1068,7 @@ export default function TournamentDetail() {
                                     <Badge variant={match.status === 'completed' ? 'default' : 'outline'}>
                                       {match.status}
                                     </Badge>
-                                    {tournament && canManageLeagueSpecific(tournament.leagueId) && (
+                                    {tournament && tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
                                       <Button 
                                         size="sm" 
                                         variant="default" 
@@ -1166,7 +1167,7 @@ export default function TournamentDetail() {
           matchId={scoringMatchId}
           open={!!scoringMatchId}
           onOpenChange={(open) => !open && setScoringMatchId(null)}
-          isCommissioner={!!tournament && canManageLeagueSpecific(tournament.leagueId)}
+          isCommissioner={!!tournament && !!tournament.leagueId && canManageLeagueSpecific(tournament.leagueId)}
         />
       )}
     </div>

@@ -6,6 +6,10 @@ import { ZoomIn, ZoomOut, Maximize2, Edit } from "lucide-react";
 import type { TournamentMatch, TournamentTeam, TournamentSettings } from "@shared/schema";
 import { format as formatDate } from "date-fns";
 import TournamentMatchScoreModal from "./TournamentMatchScoreModal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface BracketViewProps {
   matches: TournamentMatch[];
@@ -15,9 +19,10 @@ interface BracketViewProps {
   tournamentName?: string;
   tournamentId: string;
   isCommissioner?: boolean;
+  tournamentType?: 'standalone' | 'season_playoff';
 }
 
-export default function BracketView({ matches, teams, format, settings, tournamentName, tournamentId, isCommissioner = false }: BracketViewProps) {
+export default function BracketView({ matches, teams, format, settings, tournamentName, tournamentId, isCommissioner = false, tournamentType }: BracketViewProps) {
   const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -27,6 +32,69 @@ export default function BracketView({ matches, teams, format, settings, tourname
   const [initialZoom, setInitialZoom] = useState<number>(0.5);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const { toast } = useToast();
+
+  // Mutation to update match team assignments
+  const updateMatchTeamMutation = useMutation({
+    mutationFn: async ({ matchId, team1Id, team2Id }: { matchId: string; team1Id?: string | null; team2Id?: string | null }) => {
+      const updates: any = {};
+      if (team1Id !== undefined) updates.team1Id = team1Id;
+      if (team2Id !== undefined) updates.team2Id = team2Id;
+      
+      return await apiRequest('PATCH', `/api/tournament-matches/${matchId}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'matches'] });
+      toast({
+        title: "Team assigned",
+        description: "The team has been successfully assigned to this match.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign team to match.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Check if a team is already selected in the same round
+  const isTeamAlreadyInRound = (teamId: string, currentMatch: TournamentMatch): boolean => {
+    const matchesInRound = matches.filter(m => m.round === currentMatch.round && m.id !== currentMatch.id);
+    return matchesInRound.some(m => m.team1Id === teamId || m.team2Id === teamId);
+  };
+
+  // Handle team selection
+  const handleTeamSelect = (matchId: string, position: 'team1' | 'team2', teamId: string, currentMatch: TournamentMatch) => {
+    // Check if team is being selected for the other slot in the same match
+    const otherSlotTeamId = position === 'team1' ? currentMatch.team2Id : currentMatch.team1Id;
+    if (otherSlotTeamId === teamId) {
+      toast({
+        title: "Team already scheduled",
+        description: "This team has already been scheduled in this round.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if team is already in this round
+    if (isTeamAlreadyInRound(teamId, currentMatch)) {
+      toast({
+        title: "Team already scheduled",
+        description: "This team has already been scheduled in this round.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Update the match
+    if (position === 'team1') {
+      updateMatchTeamMutation.mutate({ matchId, team1Id: teamId });
+    } else {
+      updateMatchTeamMutation.mutate({ matchId, team2Id: teamId });
+    }
+  };
 
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "TBD";
@@ -541,10 +609,30 @@ export default function BracketView({ matches, teams, format, settings, tourname
                     ? `${winnerBgClass} font-bold shadow-sm`
                     : 'bg-muted'
                 }`}
+                onClick={(e) => e.stopPropagation()}
               >
-                <span className="truncate text-xs text-white" data-testid={`text-team1-${match.matchNumber}`}>
-                  {getTeamDisplay(match.team1Id, match, 'team1')}
-                </span>
+                {tournamentType === 'standalone' && !match.team1Id ? (
+                  <Select
+                    value={match.team1Id || ""}
+                    onValueChange={(value) => handleTeamSelect(match.id, 'team1', value, match)}
+                    disabled={updateMatchTeamMutation.isPending}
+                  >
+                    <SelectTrigger className="h-7 text-xs bg-white dark:bg-gray-800" data-testid={`select-team1-${match.matchNumber}`}>
+                      <SelectValue placeholder="Select Team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.teamName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="truncate text-xs text-white" data-testid={`text-team1-${match.matchNumber}`}>
+                    {getTeamDisplay(match.team1Id, match, 'team1')}
+                  </span>
+                )}
                 {match.team1Score !== null && (
                   <span className="font-bold ml-2 text-lg text-white" data-testid={`text-score1-${match.matchNumber}`}>
                     {match.team1Score}
@@ -559,10 +647,30 @@ export default function BracketView({ matches, teams, format, settings, tourname
                     ? `${winnerBgClass} font-bold shadow-sm`
                     : 'bg-muted'
                 }`}
+                onClick={(e) => e.stopPropagation()}
               >
-                <span className="truncate text-xs text-white" data-testid={`text-team2-${match.matchNumber}`}>
-                  {getTeamDisplay(match.team2Id, match, 'team2')}
-                </span>
+                {tournamentType === 'standalone' && !match.team2Id ? (
+                  <Select
+                    value={match.team2Id || ""}
+                    onValueChange={(value) => handleTeamSelect(match.id, 'team2', value, match)}
+                    disabled={updateMatchTeamMutation.isPending}
+                  >
+                    <SelectTrigger className="h-7 text-xs bg-white dark:bg-gray-800" data-testid={`select-team2-${match.matchNumber}`}>
+                      <SelectValue placeholder="Select Team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.teamName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="truncate text-xs text-white" data-testid={`text-team2-${match.matchNumber}`}>
+                    {getTeamDisplay(match.team2Id, match, 'team2')}
+                  </span>
+                )}
                 {match.team2Score !== null && (
                   <span className="font-bold ml-2 text-lg text-white" data-testid={`text-score2-${match.matchNumber}`}>
                     {match.team2Score}
