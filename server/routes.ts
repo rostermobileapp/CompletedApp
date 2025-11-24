@@ -10241,7 +10241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: tournamentTeams.id,
           tournamentId: tournamentTeams.tournamentId,
           teamId: tournamentTeams.teamId,
-          teamName: teams.name,
+          teamName: tournamentTeams.teamName,  // Use teamName from tournamentTeams, not teams table
           seed: tournamentTeams.seed,
           division: tournamentTeams.division,
           wins: tournamentTeams.wins,
