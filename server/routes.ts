@@ -11074,8 +11074,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(eq(tournamentTeams.tournamentId, tournamentId));
     
     const count = Number(teamCount[0]?.count || 0);
-    // $10 per team = 1000 cents
-    return count * 1000;
+    // $10 per team (stored as dollars, will be converted to cents at checkout)
+    return count * 10;
   }
 
   // Create tournament
@@ -12281,6 +12281,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             errors.push(`Failed to create user for ${player.firstName} ${player.lastName}`);
           }
         }
+      }
+
+      // Update payment amount for standalone tournaments ($10 per team)
+      if (tournament.type === 'standalone') {
+        const totalTeams = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.tournamentId, tournamentId));
+        
+        const teamCount = Number(totalTeams[0]?.count || 0);
+        const paymentAmount = teamCount * 10; // $10 per team
+        
+        await db
+          .update(tournaments)
+          .set({ paymentAmount })
+          .where(eq(tournaments.id, tournamentId));
+        
+        console.log(`Updated tournament payment amount: ${teamCount} teams × $10 = $${paymentAmount}`);
       }
 
       // Clean up file
