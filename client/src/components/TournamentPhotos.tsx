@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Upload, Download, Trash2, Loader2, Camera, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,44 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+// Wrapper component that auto-triggers the file picker
+function AutoOpenMediaUploader({ 
+  onClose, 
+  ...props 
+}: { 
+  onClose: () => void;
+  maxFiles?: number;
+  maxFileSize?: number;
+  acceptedTypes?: string[];
+  onFilesSelected: (files: any[]) => void;
+}) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  
+  useEffect(() => {
+    // Auto-click the trigger button when component mounts
+    const timer = setTimeout(() => {
+      triggerRef.current?.click();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  const handleFilesSelected = (files: any[]) => {
+    props.onFilesSelected(files);
+    onClose();
+  };
+  
+  return (
+    <EnhancedMediaUploader {...props} onFilesSelected={handleFilesSelected}>
+      <button 
+        ref={triggerRef} 
+        style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
+        aria-hidden="true"
+      />
+    </EnhancedMediaUploader>
+  );
+}
 
 interface MediaFile {
   file: File;
@@ -67,6 +105,17 @@ export function TournamentPhotos({
   // Use external show uploader state if provided, otherwise use internal
   const showUploader = externalShowUploader !== undefined ? externalShowUploader : internalShowUploader;
   const setShowUploader = onShowUploaderChange || setInternalShowUploader;
+  
+  // Track if we should auto-trigger file picker
+  const [shouldAutoTrigger, setShouldAutoTrigger] = useState(false);
+  
+  useEffect(() => {
+    if (showUploader && !shouldAutoTrigger) {
+      setShouldAutoTrigger(true);
+    } else if (!showUploader && shouldAutoTrigger) {
+      setShouldAutoTrigger(false);
+    }
+  }, [showUploader]);
 
   const { data: photos = [], isLoading } = useQuery<TournamentPhoto[]>({
     queryKey: [`/api/tournament-photos/${tournamentId}`],
@@ -286,14 +335,13 @@ export function TournamentPhotos({
 
       {/* Media Uploader Dialog */}
       {showUploader && (
-        <EnhancedMediaUploader
+        <AutoOpenMediaUploader
           maxFiles={10}
           maxFileSize={10 * 1024 * 1024}
           acceptedTypes={['image/*']}
           onFilesSelected={handleFilesSelected}
-        >
-          <div />
-        </EnhancedMediaUploader>
+          onClose={() => setShowUploader(false)}
+        />
       )}
 
       {/* Photo Viewer */}
