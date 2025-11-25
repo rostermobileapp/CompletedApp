@@ -87,6 +87,35 @@ function formatGameForResponse(game: any) {
   return game;
 }
 
+// Helper function to check if user has scorekeeper permission
+async function checkScorekeeperPermission(userId: string, game: { leagueId?: string | null }): Promise<boolean> {
+  // If no league, only the user's own stats can be managed
+  if (!game.leagueId) {
+    return false;
+  }
+
+  // Check if user is the commissioner of the league
+  const league = await storage.getLeague(game.leagueId);
+  if (league && league.commissionerId === userId) {
+    return true;
+  }
+
+  // Check global stat_manager permission
+  const user = await storage.getUser(userId);
+  if (user?.specialPermissions?.includes('stat_manager')) {
+    return true;
+  }
+
+  // Check league-specific stat_manager permission
+  const leaguePermissions = await storage.getUserLeaguePermissions(userId, game.leagueId);
+  if (leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager')) {
+    return true;
+  }
+
+  return false;
+}
+
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -4499,6 +4528,362 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching user RSVP:', error);
       res.status(500).json({ message: 'Failed to fetch RSVP' });
+    }
+  });
+
+  // Scorekeeper Dashboard Routes - Game Goals
+  app.get('/api/games/:gameId/goals', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const goals = await storage.getGameGoals(gameId);
+      res.json(goals);
+    } catch (error) {
+      console.error('Error fetching game goals:', error);
+      res.status(500).json({ message: 'Failed to fetch game goals' });
+    }
+  });
+
+  app.post('/api/games/:gameId/goals', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Check if user has scorekeeper permission
+      const hasPermission = await checkScorekeeperPermission(userId, game);
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      const { teamId, scorerId, primaryAssistId, secondaryAssistId, period, timestamp } = req.body;
+      
+      // Get the current goal count for this game to set the goal number
+      const existingGoals = await storage.getGameGoals(gameId);
+      const goalNumber = existingGoals.length + 1;
+
+      const goal = await storage.createGameGoal({
+        gameId,
+        teamId,
+        scorerId,
+        primaryAssistId: primaryAssistId || null,
+        secondaryAssistId: secondaryAssistId || null,
+        goalNumber,
+        period: period || 1,
+        timestamp: timestamp || null,
+      });
+
+      res.json(goal);
+    } catch (error) {
+      console.error('Error creating game goal:', error);
+      res.status(500).json({ message: 'Failed to create game goal' });
+    }
+  });
+
+  app.patch('/api/games/:gameId/goals/:goalId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId, goalId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Check if user has scorekeeper permission
+      const hasPermission = await checkScorekeeperPermission(userId, game);
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      const updates = req.body;
+      const goal = await storage.updateGameGoal(goalId, updates);
+      res.json(goal);
+    } catch (error) {
+      console.error('Error updating game goal:', error);
+      res.status(500).json({ message: 'Failed to update game goal' });
+    }
+  });
+
+  app.delete('/api/games/:gameId/goals/:goalId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId, goalId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Check if user has scorekeeper permission
+      const hasPermission = await checkScorekeeperPermission(userId, game);
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      await storage.deleteGameGoal(goalId);
+      res.json({ message: 'Goal deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting game goal:', error);
+      res.status(500).json({ message: 'Failed to delete game goal' });
+    }
+  });
+
+  // Scorekeeper Dashboard Routes - Game Penalties
+  app.get('/api/games/:gameId/penalties', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const penalties = await storage.getGamePenalties(gameId);
+      res.json(penalties);
+    } catch (error) {
+      console.error('Error fetching game penalties:', error);
+      res.status(500).json({ message: 'Failed to fetch game penalties' });
+    }
+  });
+
+  app.post('/api/games/:gameId/penalties', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Check if user has scorekeeper permission
+      const hasPermission = await checkScorekeeperPermission(userId, game);
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      const { teamId, playerId, minutes, penaltyType, period, timestamp } = req.body;
+      
+      // Get the current penalty count for this game to set the penalty number
+      const existingPenalties = await storage.getGamePenalties(gameId);
+      const penaltyNumber = existingPenalties.length + 1;
+
+      const penalty = await storage.createGamePenalty({
+        gameId,
+        teamId,
+        playerId,
+        penaltyNumber,
+        minutes: minutes || 2,
+        penaltyType: penaltyType || null,
+        period: period || 1,
+        timestamp: timestamp || null,
+      });
+
+      res.json(penalty);
+    } catch (error) {
+      console.error('Error creating game penalty:', error);
+      res.status(500).json({ message: 'Failed to create game penalty' });
+    }
+  });
+
+  app.patch('/api/games/:gameId/penalties/:penaltyId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId, penaltyId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Check if user has scorekeeper permission
+      const hasPermission = await checkScorekeeperPermission(userId, game);
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      const updates = req.body;
+      const penalty = await storage.updateGamePenalty(penaltyId, updates);
+      res.json(penalty);
+    } catch (error) {
+      console.error('Error updating game penalty:', error);
+      res.status(500).json({ message: 'Failed to update game penalty' });
+    }
+  });
+
+  app.delete('/api/games/:gameId/penalties/:penaltyId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId, penaltyId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Check if user has scorekeeper permission
+      const hasPermission = await checkScorekeeperPermission(userId, game);
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      await storage.deleteGamePenalty(penaltyId);
+      res.json({ message: 'Penalty deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting game penalty:', error);
+      res.status(500).json({ message: 'Failed to delete game penalty' });
+    }
+  });
+
+  // Scorekeeper Dashboard - Finalize game and update stats
+  app.post('/api/games/:gameId/finalize', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Check if user has scorekeeper permission
+      const hasPermission = await checkScorekeeperPermission(userId, game);
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      // Submit all goals and penalties
+      await storage.submitGameGoals(gameId);
+      await storage.submitGamePenalties(gameId);
+
+      // Get all goals and penalties for this game
+      const goals = await storage.getGameGoals(gameId);
+      const penalties = await storage.getGamePenalties(gameId);
+
+      // Update player stats if this is a league game
+      if (game.leagueId) {
+        // Build stats updates from goals
+        const statsMap = new Map<string, { goals: number; assists: number; penaltyMinutes: number }>();
+
+        for (const goal of goals) {
+          // Update scorer
+          const scorerStats = statsMap.get(goal.scorerId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
+          scorerStats.goals += 1;
+          statsMap.set(goal.scorerId, scorerStats);
+
+          // Update primary assist
+          if (goal.primaryAssistId) {
+            const assistStats = statsMap.get(goal.primaryAssistId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
+            assistStats.assists += 1;
+            statsMap.set(goal.primaryAssistId, assistStats);
+          }
+
+          // Update secondary assist
+          if (goal.secondaryAssistId) {
+            const assistStats = statsMap.get(goal.secondaryAssistId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
+            assistStats.assists += 1;
+            statsMap.set(goal.secondaryAssistId, assistStats);
+          }
+        }
+
+        // Add penalty minutes
+        for (const penalty of penalties) {
+          const playerStats = statsMap.get(penalty.playerId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
+          playerStats.penaltyMinutes += penalty.minutes || 0;
+          statsMap.set(penalty.playerId, playerStats);
+        }
+
+        // Update player stats in bulk
+        const statsUpdates = Array.from(statsMap.entries()).map(([playerId, stats]) => ({
+          userId: playerId,
+          updates: stats
+        }));
+
+        if (statsUpdates.length > 0) {
+          await storage.bulkUpdatePlayerStats(game.leagueId, statsUpdates, 'increment');
+        }
+      }
+
+      // Finalize the game
+      const updatedGame = await storage.finalizeGame(gameId);
+      
+      res.json({ 
+        message: 'Game finalized successfully', 
+        game: updatedGame,
+        goalsCount: goals.length,
+        penaltiesCount: penalties.length
+      });
+    } catch (error) {
+      console.error('Error finalizing game:', error);
+      res.status(500).json({ message: 'Failed to finalize game' });
+    }
+  });
+
+  // Scorekeeper Dashboard - Update game scores live
+  app.patch('/api/games/:gameId/scores', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const userId = req.user.claims.sub;
+      const { homeScore, awayScore } = req.body;
+      
+      // Verify game exists
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Check if user has scorekeeper permission
+      const hasPermission = await checkScorekeeperPermission(userId, game);
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      const updatedGame = await storage.updateGameScores(gameId, homeScore, awayScore);
+      res.json(updatedGame);
+    } catch (error) {
+      console.error('Error updating game scores:', error);
+      res.status(500).json({ message: 'Failed to update game scores' });
+    }
+  });
+
+  // Scorekeeper Dashboard - Get games for scorekeeper
+  app.get('/api/scorekeeper/games', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId } = req.query;
+      
+      if (!leagueId) {
+        return res.status(400).json({ message: 'League ID is required' });
+      }
+
+      // Check if user has scorekeeper permission for this league
+      const league = await storage.getLeague(leagueId as string);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      const user = await storage.getUser(userId);
+      const isCommissioner = league.commissionerId === userId;
+      const hasStatManager = user?.specialPermissions?.includes('stat_manager') || false;
+      
+      // Also check league-specific permissions
+      const leaguePermissions = await storage.getUserLeaguePermissions(userId, leagueId as string);
+      const hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager') || false;
+
+      if (!isCommissioner && !hasStatManager && !hasLeagueStatManager) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      const games = await storage.getGamesByLeague(leagueId as string);
+      res.json(games);
+    } catch (error) {
+      console.error('Error fetching scorekeeper games:', error);
+      res.status(500).json({ message: 'Failed to fetch games' });
     }
   });
 
