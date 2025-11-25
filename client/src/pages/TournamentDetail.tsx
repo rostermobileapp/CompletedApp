@@ -824,10 +824,15 @@ function TournamentAnnouncementCard({
 
 export default function TournamentDetail() {
   const [, params] = useRoute("/tournaments/:tournamentId");
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const tournamentId = params?.tournamentId;
   const { toast } = useToast();
   const { canManageLeagueSpecific } = usePermissions();
+  
+  // Read tab from URL query parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabFromUrl = urlParams.get('tab');
+  const defaultTab = (tabFromUrl && ['bracket', 'teams', 'schedule', 'photos'].includes(tabFromUrl)) ? tabFromUrl : 'bracket';
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingMatch, setEditingMatch] = useState<TournamentMatch | null>(null);
   const [scoringMatchId, setScoringMatchId] = useState<string | null>(null);
@@ -1567,7 +1572,7 @@ export default function TournamentDetail() {
       )}
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 pt-[2px] pb-[2px] pl-[8px] pr-[8px]">
-        <Tabs defaultValue="bracket" className="space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 md:w-auto">
             <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
             <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
