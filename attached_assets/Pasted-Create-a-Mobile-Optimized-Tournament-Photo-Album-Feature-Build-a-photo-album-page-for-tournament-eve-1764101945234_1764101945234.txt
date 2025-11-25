@@ -1,0 +1,136 @@
+Create a Mobile-Optimized Tournament Photo Album Feature
+Build a photo album page for tournament events with mobile-first design and future mobile app compatibility:
+Navigation Integration:
+
+Photo album replaces the "Stats" button in the tournament interface
+Button label: "Photos" or "Album" with photo gallery icon
+Tapping this button navigates to the tournament's photo album page
+Maintain consistent navigation patterns with other tournament sections
+
+Layout & Design:
+
+Responsive grid layout optimized for mobile (2-3 columns on mobile, 4-6 on desktop)
+Photos displayed as square thumbnails with consistent sizing
+Touch-friendly tap targets (minimum 44x44px)
+Smooth scrolling with momentum
+Design with React Native compatibility in mind for future mobile app migration
+
+Top Navigation Bar (Fixed):
+
+Back button/arrow to return to tournament view
+Tournament title/name in center (truncate if too long on mobile)
+"+" button (large, easy to tap - 44x44px minimum)
+"Download All" button (icon-based on mobile, text+icon on desktop)
+Fixed position bar with backdrop blur for modern feel
+Safe area insets support for notched devices (iOS/Android)
+
+Mobile-Optimized Photo Viewer:
+
+Tap photo thumbnail to open full-screen viewer
+Swipe left/right gestures to navigate between photos (critical feature)
+Swipe down to close/dismiss viewer
+Pinch-to-zoom functionality in viewer
+Smooth, native-feeling transitions and animations
+Photo counter display (e.g., "3 / 24")
+Minimal UI that auto-hides after 3 seconds, tap to show/hide controls
+
+Photo Upload Functionality:
+
+Tap "+" to open native file picker or camera
+Support camera capture directly from the upload button
+Multiple photo selection support
+Show thumbnail previews before confirming upload
+Progress indicator with cancel option
+Compress/optimize photos before upload to save bandwidth on mobile
+Support for HEIC, JPG, PNG formats
+Handle device rotation during upload
+
+Photo Display:
+
+Lazy loading with intersection observer
+Progressive image loading (blur-up technique)
+Pull-to-refresh gesture to check for new photos
+Optimized thumbnail sizes for mobile data usage
+Cache images locally for faster repeat viewing
+Show upload date in relative format ("2 hours ago")
+Empty state message when no photos exist yet: "No photos yet. Tap + to add photos!"
+
+Mobile Interactions:
+
+Long-press on photo for additional options (share, download single photo, delete if owner)
+Haptic feedback on interactions (if supported)
+Smooth 60fps animations
+Native-feeling scroll behavior
+Bottom sheet/action sheet for mobile-appropriate menus
+
+Access Control:
+
+Token-based authentication compatible with mobile apps
+Only tournament participants/approved members can view and upload
+Biometric authentication support ready (Face ID, Touch ID, fingerprint)
+Secure session management
+Tournament membership verification via existing tournament participant system
+
+Download Feature:
+
+On mobile: Option to download individual photos or all photos
+Show storage space warning if download is large
+Background download support with notifications
+Share functionality (iOS share sheet / Android share menu)
+ZIP file named as: "{TournamentName}Photos{Date}.zip"
+
+Technical Implementation:
+
+Use React with mobile-first CSS (Tailwind recommended)
+Structure components to be React Native compatible
+Use touch event libraries (e.g., react-swipeable, react-spring)
+Implement proper touch gesture handling (prevent default scroll during swipe)
+Service Worker for offline capability
+Cloud storage with CDN (Cloudinary, AWS S3 + CloudFront)
+WebP format with fallbacks for better compression
+Responsive images with srcset for different screen densities
+Photos associated with tournament ID in database
+
+Database Schema:
+Tournament_Photos table:
+- id (primary key)
+- tournament_id (foreign key)
+- photo_url
+- thumbnail_url
+- uploaded_by (user_id)
+- uploaded_at (timestamp)
+- file_size
+- dimensions (width x height)
+Mobile-Specific Features:
+
+Install as PWA (Progressive Web App) capability
+Offline viewing of previously loaded photos
+Push notifications for new photo uploads (optional)
+Share photos directly to social media
+"Open in app" functionality if native app exists
+Proper viewport meta tags for mobile
+
+Gesture Controls (Critical for Mobile):
+
+Horizontal swipe in viewer = navigate photos
+Vertical swipe down = close viewer
+Pinch = zoom in/out
+Double tap = zoom to fit/actual size
+Pull down on grid = refresh
+
+Performance Optimizations:
+
+Virtual scrolling for large albums (1000+ photos)
+Request Animation Frame for smooth gestures
+Throttled/debounced scroll handlers
+Preload adjacent photos when viewing (preload next 2 images)
+Automatic image format detection (WebP, AVIF support)
+Thumbnail generation on upload (store multiple sizes)
+
+Additional Features:
+
+Photo count badge on the tournament's "Photos" button showing total photos
+New photo indicator if photos uploaded since last visit
+Optional: Basic photo reactions/likes from participants
+
+Use modern, clean UI with iOS/Android design patterns. Prioritize smooth 60fps performance and native-feeling interactions. Ensure seamless integration with existing tournament navigation and participant management system.
