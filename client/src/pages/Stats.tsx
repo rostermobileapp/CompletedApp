@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getImageUrl } from '@/lib/queryClient';
+import { getImageUrl, apiRequest } from '@/lib/queryClient';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
@@ -86,7 +86,7 @@ export default function Stats() {
   // Fetch player stats for the league
   const { data: playerStats, isLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'stats', { seasonId: selectedSeason, playerType }],
-    queryFn: () => {
+    queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedSeason && selectedSeason !== 'all') {
         params.append('seasonId', selectedSeason);
@@ -95,7 +95,8 @@ export default function Stats() {
         params.append('playerType', playerType);
       }
       const query = params.toString();
-      return fetch(`/api/leagues/${leagueId}/stats${query ? `?${query}` : ''}`).then(res => res.json());
+      const res = await apiRequest('GET', `/api/leagues/${leagueId}/stats${query ? `?${query}` : ''}`);
+      return res.json();
     },
     enabled: !!leagueId,
   });
