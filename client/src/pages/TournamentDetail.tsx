@@ -24,7 +24,7 @@ import MatchEditDialog from "@/components/MatchEditDialog";
 import TournamentMatchScoreModal from "@/components/TournamentMatchScoreModal";
 import { CustomBracketBuilder } from "@/components/CustomBracketBuilder";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
 
@@ -93,6 +93,41 @@ export default function TournamentDetail() {
     queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'],
     enabled: !!tournamentId && !!tournament && !!currentUser && canManageTournament()
   });
+
+  // Handle payment success callback from Stripe
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('payment');
+    const isAdditional = params.get('additional');
+    
+    if (paymentStatus === 'success' && tournamentId) {
+      // Show success message
+      toast({
+        title: "Payment successful!",
+        description: isAdditional 
+          ? "Your additional team payment has been processed. It may take a moment for the balance to update."
+          : "Your tournament payment has been processed successfully. It may take a moment for the payment status to update.",
+      });
+      
+      // Refresh tournament data to show updated payment status
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
+      
+      // Clean up the URL by removing the payment parameter
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    } else if (paymentStatus === 'cancelled') {
+      toast({
+        title: "Payment cancelled",
+        description: "Your payment was cancelled. You can try again when ready.",
+        variant: "destructive"
+      });
+      
+      // Clean up the URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [tournamentId, toast]);
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
