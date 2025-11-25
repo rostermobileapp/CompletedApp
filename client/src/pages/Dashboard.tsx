@@ -625,13 +625,16 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
 }
 
 // Standings Modal Component
-function StandingsModal({ isOpen, onClose, leagueId }: { 
+function StandingsModal({ isOpen, onClose, leagueId, tournamentId }: { 
   isOpen: boolean; 
   onClose: () => void; 
-  leagueId: string | null; 
+  leagueId?: string | null; 
+  tournamentId?: string | null;
 }) {
   const { canAccessPremiumFeatures } = usePermissions();
-  const { data: standings = [], isLoading } = useQuery({
+  
+  // Fetch league standings
+  const { data: leagueStandings = [], isLoading: isLoadingLeague } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'standings'],
     queryFn: async () => {
       if (!leagueId) return [];
@@ -640,6 +643,94 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
     },
     enabled: !!leagueId && isOpen,
   });
+  
+  // Fetch tournament teams for standings
+  const { data: tournamentTeams = [], isLoading: isLoadingTournament } = useQuery({
+    queryKey: ['/api/tournaments', tournamentId, 'teams'],
+    queryFn: async () => {
+      if (!tournamentId) return [];
+      const response = await apiRequest('GET', `/api/tournaments/${tournamentId}/teams`);
+      return response.json();
+    },
+    enabled: !!tournamentId && isOpen,
+  });
+  
+  // Fetch tournament matches for calculating standings
+  const { data: tournamentMatches = [] } = useQuery({
+    queryKey: ['/api/tournaments', tournamentId, 'matches'],
+    queryFn: async () => {
+      if (!tournamentId) return [];
+      const response = await apiRequest('GET', `/api/tournaments/${tournamentId}/matches`);
+      return response.json();
+    },
+    enabled: !!tournamentId && isOpen,
+  });
+  
+  // Calculate tournament standings from teams and matches
+  const tournamentStandings = React.useMemo(() => {
+    if (!tournamentId || !Array.isArray(tournamentTeams)) return [];
+    
+    const standings = tournamentTeams.map((team: any) => {
+      let gamesPlayed = 0;
+      let wins = 0;
+      let losses = 0;
+      let ties = 0;
+      let shootoutLosses = 0;
+      let goalsFor = 0;
+      let goalsAgainst = 0;
+      
+      // Calculate stats from matches
+      if (Array.isArray(tournamentMatches)) {
+        tournamentMatches.forEach((match: any) => {
+          if (match.team1Id === team.id || match.team2Id === team.id) {
+            // Only count completed matches
+            if (match.status === 'completed' && match.team1Score !== null && match.team2Score !== null) {
+              gamesPlayed++;
+              
+              const isTeam1 = match.team1Id === team.id;
+              const teamScore = isTeam1 ? match.team1Score : match.team2Score;
+              const opponentScore = isTeam1 ? match.team2Score : match.team1Score;
+              
+              goalsFor += teamScore;
+              goalsAgainst += opponentScore;
+              
+              if (teamScore > opponentScore) {
+                wins++;
+              } else if (teamScore < opponentScore) {
+                losses++;
+              } else {
+                ties++;
+              }
+            }
+          }
+        });
+      }
+      
+      const points = (wins * 2) + (ties * 1);
+      
+      return {
+        teamId: team.id,
+        teamName: team.teamName,
+        gamesPlayed,
+        wins,
+        losses,
+        ties,
+        shootoutLosses,
+        points,
+        goalsFor,
+        goalsAgainst
+      };
+    });
+    
+    // Sort by points (descending), then by goal differential
+    return standings.sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      return (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
+    });
+  }, [tournamentId, tournamentTeams, tournamentMatches]);
+  
+  const standings = tournamentId ? tournamentStandings : leagueStandings;
+  const isLoading = tournamentId ? isLoadingTournament : isLoadingLeague;
 
   if (!isOpen) return null;
 
@@ -648,7 +739,9 @@ function StandingsModal({ isOpen, onClose, leagueId }: {
       <div className="bg-card rounded-lg border border-border w-full max-w-6xl h-[90vh] flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-border relative">
-          <h2 className="text-2xl font-semibold text-center">League Standings</h2>
+          <h2 className="text-2xl font-semibold text-center">
+            {tournamentId ? 'Tournament Standings' : 'League Standings'}
+          </h2>
           <button
             onClick={onClose}
             className="absolute top-6 right-6 w-10 h-10 bg-red-600 hover:bg-red-700 rounded flex items-center justify-center transition-colors"
@@ -1753,7 +1846,13 @@ export default function Dashboard() {
           <div 
             className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-announcements"
-            onClick={() => navigate('/announcements')}
+            onClick={() => {
+              if (selectedType === 'tournament' && selectedId) {
+                navigate(`/tournament/${selectedId}`);
+              } else {
+                navigate('/announcements');
+              }
+            }}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <Megaphone className="w-8 h-8 text-blue-500 mb-3" />
@@ -1763,39 +1862,44 @@ export default function Dashboard() {
           </div>
 
           {/* Stats Card */}
-          <div 
-            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
-            data-testid="card-stats"
-            onClick={() => {
-              if (selectedType === 'tournament' && selectedId) {
-                // Navigate to tournament detail page for tournament stats/bracket
-                navigate(`/tournament/${selectedId}`);
-              } else if (selectedType === 'team' && selectedId) {
-                navigate(`/stats?team=${selectedId}`);
-              } else if (selectedType === 'league' && selectedLeagueId) {
-                navigate(`/stats?league=${selectedLeagueId}`);
-              } else {
-                navigate('/stats');
-              }
-            }}
-          >
-            <div className="h-full flex flex-col items-center justify-center">
-              <BarChart3 className="w-8 h-8 text-blue-500 mb-3" />
-              <p className="text-xs font-medium">Stats</p>
+          {selectedType === 'tournament' ? (
+            <div 
+              className="rounded-xl border border-border p-5 min-h-[72px] bg-[#e2e2e2] dark:bg-[#212121] opacity-50" 
+              data-testid="card-stats"
+            >
+              <div className="h-full flex flex-col items-center justify-center">
+                <BarChart3 className="w-8 h-8 text-muted-foreground mb-3" />
+                <p className="text-xs font-medium text-muted-foreground">Stats</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Coming Soon</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div 
+              className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
+              data-testid="card-stats"
+              onClick={() => {
+                if (selectedType === 'team' && selectedId) {
+                  navigate(`/stats?team=${selectedId}`);
+                } else if (selectedType === 'league' && selectedLeagueId) {
+                  navigate(`/stats?league=${selectedLeagueId}`);
+                } else {
+                  navigate('/stats');
+                }
+              }}
+            >
+              <div className="h-full flex flex-col items-center justify-center">
+                <BarChart3 className="w-8 h-8 text-blue-500 mb-3" />
+                <p className="text-xs font-medium">Stats</p>
+              </div>
+            </div>
+          )}
 
           {/* Standings Card */}
           <div 
             className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-standings"
             onClick={() => {
-              if (selectedType === 'tournament' && selectedId) {
-                // Navigate to tournament detail page for tournament bracket/standings
-                navigate(`/tournament/${selectedId}`);
-              } else {
-                setShowStandingsModal(true);
-              }
+              setShowStandingsModal(true);
             }}
           >
             <div className="h-full flex flex-col items-center justify-center">
@@ -2262,7 +2366,8 @@ export default function Dashboard() {
       <StandingsModal
         isOpen={showStandingsModal}
         onClose={() => setShowStandingsModal(false)}
-        leagueId={effectiveLeagueId}
+        leagueId={selectedType === 'tournament' ? null : effectiveLeagueId}
+        tournamentId={selectedType === 'tournament' ? selectedId : null}
       />
       {/* Needs Attention Modal */}
       <NeedsAttentionModal 
