@@ -902,9 +902,10 @@ export default function Dashboard() {
   // Create personal reminder mutation
   const createReminderMutation = useMutation({
     mutationFn: async (data: z.infer<typeof personalReminderSchema>) => {
+      // Send datetime-local string directly without timezone conversion
       await apiRequest("POST", "/api/personal-reminders", {
         ...data,
-        scheduledAt: new Date(data.scheduledAt).toISOString(),
+        scheduledAt: data.scheduledAt,
       });
     },
     onSuccess: () => {
@@ -949,11 +950,12 @@ export default function Dashboard() {
   // Create team game mutation
   const createGameMutation = useMutation({
     mutationFn: async (data: z.infer<typeof teamGameSchema>) => {
+      // Send datetime-local string directly without timezone conversion
       await apiRequest("POST", "/api/games", {
         homeTeamId: data.teamId,
         awayTeamId: null,
         opponentName: data.opponentName,
-        scheduledAt: new Date(data.scheduledAt).toISOString(),
+        scheduledAt: data.scheduledAt,
         venue: data.venue || null,
         notes: data.notes || null,
         leagueId: null,

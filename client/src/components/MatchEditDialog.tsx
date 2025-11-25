@@ -95,17 +95,10 @@ export default function MatchEditDialog({
   });
 
   const onSubmit = (values: FormValues) => {
-    // Convert datetime-local string to ISO string with timezone
-    let scheduledTimeISO: string | null = null;
-    if (values.scheduledTime) {
-      // datetime-local gives us "2025-11-21T18:00" in LOCAL time
-      // We need to convert this to a proper ISO string with timezone offset
-      const localDate = new Date(values.scheduledTime);
-      scheduledTimeISO = localDate.toISOString();
-    }
-    
+    // Send datetime-local string directly without timezone conversion
+    // The backend will treat this as local time
     updateMutation.mutate({
-      scheduledTime: scheduledTimeISO,
+      scheduledTime: values.scheduledTime || null,
       location: values.location?.trim() || null
     });
   };

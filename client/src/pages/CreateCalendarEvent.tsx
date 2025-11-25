@@ -83,17 +83,15 @@ export default function CreateCalendarEvent() {
 
   const createEventMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      const startDateTime = new Date(`${data.startDate}T${data.startTime}`);
-      const endDateTime = new Date(`${data.endDate}T${data.endTime}`);
-
+      // Send datetime strings directly without timezone conversion
       const payload = {
         title: data.title,
         description: data.description || undefined,
         facilityId: data.facilityId,
         sportId: data.sportId,
         eventType: data.eventType,
-        startTime: startDateTime.toISOString(),
-        endTime: endDateTime.toISOString(),
+        startTime: `${data.startDate}T${data.startTime}`,
+        endTime: `${data.endDate}T${data.endTime}`,
         maxParticipants: data.maxParticipants || undefined,
         requiresMembership: data.requiresMembership,
         requiresTeamRoster: data.requiresTeamRoster || false,
