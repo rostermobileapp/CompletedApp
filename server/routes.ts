@@ -2002,9 +2002,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "League ID is required" });
       }
 
-      // Get user info to check subscription
+      // Get user info to check if they have paid access (player_pro) or are a commissioner
       const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-      if (!user || user.length === 0 || user[0].role === 'free_tier') {
+      if (!user || user.length === 0) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      // Allow access for: player_pro (paid), commissioner, or secondary_commissioner
+      const hasAccess = user[0].role === 'player_pro' || 
+                        user[0].role === 'commissioner' || 
+                        user[0].role === 'secondary_commissioner';
+
+      if (!hasAccess) {
         return res.status(403).json({ error: "League photos require a paid subscription" });
       }
 
@@ -2072,12 +2081,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      // Get user info to check subscription
-      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-      if (!user || user.length === 0 || user[0].role === 'free_tier') {
-        return res.status(403).json({ error: "League photos require a paid subscription" });
-      }
-
       // Check if user is an approved member of the league
       const membership = await db
         .select()
@@ -2093,6 +2096,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!membership || membership.length === 0) {
         return res.status(403).json({ error: "Only approved league members can upload photos" });
+      }
+
+      // Get user info to check if they have paid access (player_pro) or are a commissioner
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || user.length === 0) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      // Allow access for: player_pro (paid), commissioner, or secondary_commissioner
+      const hasAccess = user[0].role === 'player_pro' || 
+                        user[0].role === 'commissioner' || 
+                        user[0].role === 'secondary_commissioner';
+
+      if (!hasAccess) {
+        return res.status(403).json({ error: "League photos require a paid subscription" });
       }
 
       const { SupabaseStorageService } = await import('./supabaseStorage');
@@ -2121,12 +2139,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { leagueId } = req.params;
 
-      // Get user info to check subscription
-      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-      if (!user || user.length === 0 || user[0].role === 'free_tier') {
-        return res.status(403).json({ error: "League photos require a paid subscription" });
-      }
-
       // Check if user is an approved member of the league
       const membership = await db
         .select()
@@ -2142,6 +2154,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!membership || membership.length === 0) {
         return res.status(403).json({ error: "Only approved league members can view photos" });
+      }
+
+      // Get user info to check if they have paid access (player_pro) or are a commissioner
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || user.length === 0) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      // Allow access for: player_pro (paid), commissioner, or secondary_commissioner
+      const hasAccess = user[0].role === 'player_pro' || 
+                        user[0].role === 'commissioner' || 
+                        user[0].role === 'secondary_commissioner';
+
+      if (!hasAccess) {
+        return res.status(403).json({ error: "League photos require a paid subscription" });
       }
 
       const photos = await storage.getLeaguePhotos(leagueId);
@@ -2167,12 +2194,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Unauthorized to delete this photo" });
       }
 
-      // Get user info to check subscription
-      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-      if (!user || user.length === 0 || user[0].role === 'free_tier') {
-        return res.status(403).json({ error: "League photos require a paid subscription" });
-      }
-
       // Check if user is still an approved member of the league
       const membership = await db
         .select()
@@ -2188,6 +2209,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!membership || membership.length === 0) {
         return res.status(403).json({ error: "Only approved league members can delete photos" });
+      }
+
+      // Get user info to check if they have paid access (player_pro) or are a commissioner
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || user.length === 0) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      // Allow access for: player_pro (paid), commissioner, or secondary_commissioner
+      const hasAccess = user[0].role === 'player_pro' || 
+                        user[0].role === 'commissioner' || 
+                        user[0].role === 'secondary_commissioner';
+
+      if (!hasAccess) {
+        return res.status(403).json({ error: "League photos require a paid subscription" });
       }
 
       const { SupabaseStorageService } = await import('./supabaseStorage');
@@ -2207,12 +2243,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { leagueId } = req.params;
 
-      // Get user info to check subscription
-      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-      if (!user || user.length === 0 || user[0].role === 'free_tier') {
-        return res.status(403).json({ error: "League photos require a paid subscription" });
-      }
-
       // Check if user is an approved member of the league
       const membership = await db
         .select()
@@ -2228,6 +2258,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!membership || membership.length === 0) {
         return res.status(403).json({ error: "Only approved league members can download photos" });
+      }
+
+      // Get user info to check if they have paid access (player_pro) or are a commissioner
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || user.length === 0) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      // Allow access for: player_pro (paid), commissioner, or secondary_commissioner
+      const hasAccess = user[0].role === 'player_pro' || 
+                        user[0].role === 'commissioner' || 
+                        user[0].role === 'secondary_commissioner';
+
+      if (!hasAccess) {
+        return res.status(403).json({ error: "League photos require a paid subscription" });
       }
 
       const photos = await storage.getLeaguePhotos(leagueId);
