@@ -1785,6 +1785,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tournament photo routes
   app.post("/api/tournament-photos/upload", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const { tournamentId, fileType, fileSize } = req.body;
+
+      if (!tournamentId) {
+        return res.status(400).json({ error: "Tournament ID is required" });
+      }
+
+      // Validate file type (only images allowed)
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!fileType || !allowedTypes.includes(fileType.toLowerCase())) {
+        return res.status(400).json({ error: "Invalid file type. Only images (JPEG, PNG, GIF, WebP) are allowed" });
+      }
+
+      // Validate file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024;
+      if (!fileSize || fileSize > maxSize) {
+        return res.status(400).json({ error: "File size exceeds maximum of 10MB" });
+      }
+
+      // Check if user is an approved participant in the tournament
+      const participant = await db
+        .select()
+        .from(tournamentParticipants)
+        .where(
+          and(
+            eq(tournamentParticipants.tournamentId, tournamentId),
+            eq(tournamentParticipants.userId, userId),
+            eq(tournamentParticipants.status, 'approved')
+          )
+        )
+        .limit(1);
+
+      if (!participant || participant.length === 0) {
+        return res.status(403).json({ error: "Only approved tournament participants can upload photos" });
+      }
+
       const { SupabaseStorageService } = await import('./supabaseStorage');
       const supabaseStorageService = new SupabaseStorageService();
       const { uploadURL, path } = await supabaseStorageService.getTournamentPhotoUploadURL();
@@ -1820,10 +1856,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
+      // Check if user is an approved participant in the tournament
+      const participant = await db
+        .select()
+        .from(tournamentParticipants)
+        .where(
+          and(
+            eq(tournamentParticipants.tournamentId, tournamentId),
+            eq(tournamentParticipants.userId, userId),
+            eq(tournamentParticipants.status, 'approved')
+          )
+        )
+        .limit(1);
+
+      if (!participant || participant.length === 0) {
+        return res.status(403).json({ error: "Only approved tournament participants can upload photos" });
+      }
+
       const { SupabaseStorageService } = await import('./supabaseStorage');
       const supabaseStorageService = new SupabaseStorageService();
       const normalizedPath = supabaseStorageService.normalizeTournamentPhotoPath(fileUrl);
 
+      // Always set uploadedBy to the authenticated user (prevent spoofing)
       const photo = await storage.createTournamentPhoto({
         tournamentId,
         uploadedBy: userId,

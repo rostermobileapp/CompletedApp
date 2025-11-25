@@ -57,6 +57,16 @@ export function TournamentPhotos({ tournamentId, currentUserId }: TournamentPhot
     queryKey: [`/api/tournament-photos/${tournamentId}`],
   });
 
+  // Check if current user is an approved participant
+  const { data: participants = [] } = useQuery<any[]>({
+    queryKey: [`/api/tournaments/${tournamentId}/participants`],
+    enabled: !!currentUserId,
+  });
+
+  const isParticipant = currentUserId && participants.some(
+    (p) => p.userId === currentUserId && p.status === 'approved'
+  );
+
   const uploadPhotoMutation = useMutation({
     mutationFn: async (data: { fileUrl: string; fileName: string; fileSize: number }) => {
       const response = await apiRequest('POST', '/api/tournament-photos', {
@@ -91,15 +101,35 @@ export function TournamentPhotos({ tournamentId, currentUserId }: TournamentPhot
   });
 
   const handleFilesSelected = async (mediaFiles: MediaFile[]) => {
+    if (!isParticipant) {
+      toast({ 
+        title: 'Permission denied', 
+        description: 'Only approved tournament participants can upload photos',
+        variant: 'destructive' 
+      });
+      return;
+    }
+
     setIsUploading(true);
     setShowUploader(false);
 
     try {
       for (const mediaFile of mediaFiles) {
-        const uploadResponse = await apiRequest('POST', '/api/tournament-photos/upload');
-        const { uploadURL, path } = await uploadResponse.json();
-
         const fileToUpload = mediaFile.compressed || mediaFile.file;
+        
+        // Request upload URL with file validation
+        const uploadResponse = await apiRequest('POST', '/api/tournament-photos/upload', {
+          tournamentId,
+          fileType: fileToUpload.type,
+          fileSize: fileToUpload.size,
+        });
+        
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.json();
+          throw new Error(error.error || 'Failed to get upload URL');
+        }
+        
+        const { uploadURL, path } = await uploadResponse.json();
 
         const uploadResult = await fetch(uploadURL, {
           method: 'PUT',
@@ -168,23 +198,25 @@ export function TournamentPhotos({ tournamentId, currentUserId }: TournamentPhot
     <div className="space-y-4">
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-2 justify-between items-center">
-        <Button
-          onClick={() => setShowUploader(true)}
-          disabled={isUploading}
-          data-testid="button-upload-photos"
-        >
-          {isUploading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Uploading...
-            </>
-          ) : (
-            <>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Photos
-            </>
-          )}
-        </Button>
+        {isParticipant && (
+          <Button
+            onClick={() => setShowUploader(true)}
+            disabled={isUploading}
+            data-testid="button-upload-photos"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Photos
+              </>
+            )}
+          </Button>
+        )}
 
         {photos.length > 0 && (
           <Button

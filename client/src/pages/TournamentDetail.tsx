@@ -877,6 +877,11 @@ export default function TournamentDetail() {
     queryKey: ['/api/user']
   });
 
+  const { data: photos = [] } = useQuery<any[]>({
+    queryKey: [`/api/tournament-photos/${tournamentId}`],
+    enabled: !!tournamentId
+  });
+
   // Fetch team players when a team is selected
   const { data: teamPlayers, isLoading: teamPlayersLoading, error: teamPlayersError } = useQuery<any[]>({
     queryKey: selectedTeam ? ['/api/tournaments', tournamentId, 'teams', selectedTeam.id, 'players'] : ['no-team-selected'],
@@ -1567,7 +1572,16 @@ export default function TournamentDetail() {
             <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
             <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
             <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
-            <TabsTrigger value="photos" data-testid="tab-photos">Photos</TabsTrigger>
+            <TabsTrigger value="photos" data-testid="tab-photos">
+              <span className="flex items-center gap-2">
+                Photos
+                {photos.length > 0 && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                    {photos.length}
+                  </Badge>
+                )}
+              </span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Bracket Tab */}
