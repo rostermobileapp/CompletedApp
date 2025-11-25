@@ -121,15 +121,13 @@ export function LeaguePhotos({
     queryKey: [`/api/league-photos/${leagueId}`],
   });
 
-  // Check if current user is an approved participant
+  // Check if current user is an approved league member
   const { data: membership } = useQuery<any>({
     queryKey: [`/api/leagues/${leagueId}/membership`],
     enabled: !!currentUserId,
   });
 
-  const isParticipant = currentUserId && membership?.status === 'approved';(
-    (p) => p.userId === currentUserId && p.status === 'approved'
-  );
+  const isParticipant = currentUserId && membership?.status === 'approved';
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async (data: { fileUrl: string; fileName: string; fileSize: number }) => {

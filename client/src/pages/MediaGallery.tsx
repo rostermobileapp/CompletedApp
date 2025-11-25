@@ -123,16 +123,7 @@ export default function MediaGalleryPage() {
           />
         )}
         {entityType === 'league' && entityId && (
-          hasPaidAccess ? (
-            <LeaguePhotos 
-              leagueId={entityId} 
-              currentUserId={currentUser?.id}
-              showUploader={showUploader}
-              onShowUploaderChange={setShowUploader}
-              onUploadStart={() => setIsUploading(true)}
-              onUploadComplete={() => setIsUploading(false)}
-            />
-          ) : (
+          !hasPaidAccess ? (
             <div className="p-12 text-center max-w-md mx-auto">
               <div className="rounded-full bg-muted w-20 h-20 flex items-center justify-center mx-auto mb-4">
                 <Lock className="w-10 h-10 text-muted-foreground" />
@@ -144,10 +135,36 @@ export default function MediaGalleryPage() {
               <Button 
                 onClick={() => navigate('/payments')}
                 className="bg-primary hover:bg-primary/90"
+                data-testid="button-upgrade-now"
               >
                 Upgrade Now
               </Button>
             </div>
+          ) : !isLeagueMember ? (
+            <div className="p-12 text-center max-w-md mx-auto">
+              <div className="rounded-full bg-muted w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
+              <p className="text-muted-foreground mb-6">
+                You must be an approved member of this league to access its photo gallery.
+              </p>
+              <Button 
+                onClick={() => navigate('/')}
+                data-testid="button-go-home"
+              >
+                Go Home
+              </Button>
+            </div>
+          ) : (
+            <LeaguePhotos 
+              leagueId={entityId} 
+              currentUserId={currentUser?.id}
+              showUploader={showUploader}
+              onShowUploaderChange={setShowUploader}
+              onUploadStart={() => setIsUploading(true)}
+              onUploadComplete={() => setIsUploading(false)}
+            />
           )
         )}
       </div>
