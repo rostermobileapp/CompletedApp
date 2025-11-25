@@ -393,6 +393,7 @@ export interface IStorage {
   // Announcement operations
   createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
   getLeagueAnnouncements(leagueId: string, options?: { limit?: number; offset?: number; orderBy?: string; orderDirection?: 'asc' | 'desc' }, userId?: string): Promise<{ announcements: (Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]; total: number }>;
+  getTournamentAnnouncements(tournamentId: string, options?: { limit?: number; offset?: number; orderBy?: string; orderDirection?: 'asc' | 'desc' }, userId?: string): Promise<{ announcements: (Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]; total: number }>;
   getAnnouncement(id: string): Promise<(Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] }) | undefined>;
   updateAnnouncement(id: string, updates: Partial<Announcement>): Promise<Announcement>;
   deleteAnnouncement(id: string): Promise<void>;
@@ -408,6 +409,7 @@ export interface IStorage {
   // Announcement read status operations
   markAnnouncementAsRead(announcementId: string, userId: string): Promise<void>;
   getUnreadAnnouncementCount(leagueId: string, userId: string): Promise<number>;
+  getUnreadTournamentAnnouncementCount(tournamentId: string, userId: string): Promise<number>;
   
   // Announcement poll operations
   createAnnouncementPoll(poll: InsertAnnouncementPoll): Promise<AnnouncementPoll>;
@@ -5755,6 +5757,149 @@ export class DatabaseStorage implements IStorage {
           eq(announcements.leagueId, leagueId),
           isNull(announcementReadStatus.id),
           visibilityFilter
+        )
+      );
+
+    return result.count;
+  }
+
+  async getTournamentAnnouncements(tournamentId: string, options?: { limit?: number; offset?: number; orderBy?: string; orderDirection?: 'asc' | 'desc' }, userId?: string): Promise<{ announcements: (Announcement & { author: User; attachments: AnnouncementAttachment[]; reactions: (AnnouncementReaction & { user: User })[]; polls: (AnnouncementPoll & { votes: (AnnouncementPollVote & { user: User })[] })[] })[]; total: number }> {
+    // Build visibility filter condition
+    // Logic: Show announcements that either have no visibility restrictions OR user is explicitly allowed
+    const visibilityFilter = userId ? sql`(
+      NOT EXISTS (
+        SELECT 1 FROM ${announcementVisibility} av 
+        WHERE av.announcement_id = ${announcements.id}
+      )
+      OR 
+      EXISTS (
+        SELECT 1 FROM ${announcementVisibility} av 
+        WHERE av.announcement_id = ${announcements.id} AND av.user_id = ${userId}
+      )
+    )` : sql`1=1`; // If no userId provided, show all (for commissioner access)
+
+    // Build team-based filter condition for tournaments
+    // Logic: Show tournament organizer posts (teamId is null) to everyone, and team captain posts only to their team members or the captain themselves
+    const teamFilter = userId ? sql`(
+      ${announcements.teamId} IS NULL
+      OR 
+      EXISTS (
+        SELECT 1 FROM ${tournamentTeams} tt
+        INNER JOIN ${teamMemberships} tm ON tm.team_id = tt.team_id
+        WHERE tt.id = ${announcements.teamId}
+        AND tm.user_id = ${userId}
+        AND tm.status = 'approved'
+      )
+      OR
+      EXISTS (
+        SELECT 1 FROM ${tournamentTeams} tt
+        INNER JOIN ${teams} t ON t.id = tt.team_id
+        WHERE tt.id = ${announcements.teamId}
+        AND t.captain_id = ${userId}
+      )
+    )` : sql`1=1`; // If no userId provided, show all (for commissioner access)
+
+    // First get the total count with visibility and team filtering
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(announcements)
+      .where(and(
+        eq(announcements.tournamentId, tournamentId),
+        visibilityFilter,
+        teamFilter
+      ));
+    
+    const total = countResult.count;
+    
+    // Build paginated announcement query
+    const baseQuery = db
+      .select()
+      .from(announcements)
+      .where(and(
+        eq(announcements.tournamentId, tournamentId),
+        visibilityFilter,
+        teamFilter
+      ))
+      .orderBy(
+        desc(announcements.isPinned),
+        options?.orderDirection === 'asc' ? asc(announcements.createdAt) : desc(announcements.createdAt)
+      );
+    
+    // Apply pagination conditionally
+    let tournamentAnnouncements;
+    if (options?.limit && options?.offset) {
+      tournamentAnnouncements = await baseQuery.limit(options.limit).offset(options.offset);
+    } else if (options?.limit) {
+      tournamentAnnouncements = await baseQuery.limit(options.limit);
+    } else if (options?.offset) {
+      tournamentAnnouncements = await baseQuery.limit(1000).offset(options.offset);
+    } else {
+      tournamentAnnouncements = await baseQuery;
+    }
+
+    const result = [];
+    for (const announcement of tournamentAnnouncements) {
+      const enrichedAnnouncement = await this.getAnnouncement(announcement.id);
+      if (enrichedAnnouncement) {
+        result.push(enrichedAnnouncement);
+      }
+    }
+    return { announcements: result, total };
+  }
+
+  async getUnreadTournamentAnnouncementCount(tournamentId: string, userId: string): Promise<number> {
+    // Build visibility filter condition
+    const visibilityFilter = sql`(
+      NOT EXISTS (
+        SELECT 1 FROM ${announcementVisibility} av 
+        WHERE av.announcement_id = ${announcements.id}
+      )
+      OR 
+      EXISTS (
+        SELECT 1 FROM ${announcementVisibility} av 
+        WHERE av.announcement_id = ${announcements.id} AND av.user_id = ${userId}
+      )
+    )`;
+
+    // Build team-based filter condition for tournaments
+    const teamFilter = sql`(
+      ${announcements.teamId} IS NULL
+      OR 
+      EXISTS (
+        SELECT 1 FROM ${tournamentTeams} tt
+        INNER JOIN ${teamMemberships} tm ON tm.team_id = tt.team_id
+        WHERE tt.id = ${announcements.teamId}
+        AND tm.user_id = ${userId}
+        AND tm.status = 'approved'
+      )
+      OR
+      EXISTS (
+        SELECT 1 FROM ${tournamentTeams} tt
+        INNER JOIN ${teams} t ON t.id = tt.team_id
+        WHERE tt.id = ${announcements.teamId}
+        AND t.captain_id = ${userId}
+      )
+    )`;
+
+    // Count announcements that user has NOT read AND can see (respecting visibility and team filtering)
+    const [result] = await db
+      .select({ 
+        count: sql<number>`CAST(COUNT(*) AS INTEGER)` 
+      })
+      .from(announcements)
+      .leftJoin(
+        announcementReadStatus, 
+        and(
+          eq(announcementReadStatus.announcementId, announcements.id),
+          eq(announcementReadStatus.userId, userId)
+        )
+      )
+      .where(
+        and(
+          eq(announcements.tournamentId, tournamentId),
+          isNull(announcementReadStatus.id),
+          visibilityFilter,
+          teamFilter
         )
       );
 
