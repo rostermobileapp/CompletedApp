@@ -1992,6 +1992,203 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // League photo routes
+  app.post("/api/league-photos/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId, fileType, fileSize } = req.body;
+
+      if (!leagueId) {
+        return res.status(400).json({ error: "League ID is required" });
+      }
+
+      // Get user info to check subscription
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || user.length === 0 || user[0].role === 'free_tier') {
+        return res.status(403).json({ error: "League photos require a paid subscription" });
+      }
+
+      // Validate file type (only images allowed)
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!fileType || !allowedTypes.includes(fileType.toLowerCase())) {
+        return res.status(400).json({ error: "Invalid file type. Only images (JPEG, PNG, GIF, WebP) are allowed" });
+      }
+
+      // Validate file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024;
+      if (!fileSize || fileSize > maxSize) {
+        return res.status(400).json({ error: "File size exceeds maximum of 10MB" });
+      }
+
+      // Check if user is an approved member of the league
+      const membership = await db
+        .select()
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, leagueId),
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.status, 'approved')
+          )
+        )
+        .limit(1);
+
+      if (!membership || membership.length === 0) {
+        return res.status(403).json({ error: "Only approved league members can upload photos" });
+      }
+
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const { uploadURL, path } = await supabaseStorageService.getLeaguePhotoUploadURL();
+      res.json({ uploadURL, path });
+    } catch (error) {
+      console.error("Error getting league photo upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  app.get("/league-photos/:objectPath(*)", async (req, res) => {
+    try {
+      const { SupabaseStorageService, SupabaseStorageNotFoundError } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const fullPath = `/league-photos/${req.params.objectPath}`;
+      const objectFile = await supabaseStorageService.getLeaguePhotoFile(fullPath);
+      await supabaseStorageService.streamToResponse(objectFile, res);
+    } catch (error) {
+      console.error("Error serving league photo:", error);
+      if ((error as Error).name === 'SupabaseStorageNotFoundError') {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  app.post("/api/league-photos", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId, fileUrl, fileName, fileSize, caption } = req.body;
+
+      if (!leagueId || !fileUrl || !fileName) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Get user info to check subscription
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || user.length === 0 || user[0].role === 'free_tier') {
+        return res.status(403).json({ error: "League photos require a paid subscription" });
+      }
+
+      // Check if user is an approved member of the league
+      const membership = await db
+        .select()
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, leagueId),
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.status, 'approved')
+          )
+        )
+        .limit(1);
+
+      if (!membership || membership.length === 0) {
+        return res.status(403).json({ error: "Only approved league members can upload photos" });
+      }
+
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const normalizedPath = supabaseStorageService.normalizeLeaguePhotoPath(fileUrl);
+
+      // Always set uploadedBy to the authenticated user (prevent spoofing)
+      const photo = await storage.createLeaguePhoto({
+        leagueId,
+        uploadedBy: userId,
+        fileUrl: normalizedPath,
+        fileName,
+        fileSize: fileSize || 0,
+        caption: caption || null,
+      });
+
+      res.json(photo);
+    } catch (error) {
+      console.error("Error creating league photo:", error);
+      res.status(500).json({ error: "Failed to create photo" });
+    }
+  });
+
+  app.get("/api/league-photos/:leagueId", async (req, res) => {
+    try {
+      const { leagueId } = req.params;
+      const photos = await storage.getLeaguePhotos(leagueId);
+      res.json(photos);
+    } catch (error) {
+      console.error("Error fetching league photos:", error);
+      res.status(500).json({ error: "Failed to fetch photos" });
+    }
+  });
+
+  app.delete("/api/league-photos/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const photo = await storage.getLeaguePhoto(id);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+
+      if (photo.uploadedBy !== userId) {
+        return res.status(403).json({ error: "Unauthorized to delete this photo" });
+      }
+
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      await supabaseStorageService.deleteLeaguePhoto(photo.fileUrl);
+
+      await storage.deleteLeaguePhoto(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting league photo:", error);
+      res.status(500).json({ error: "Failed to delete photo" });
+    }
+  });
+
+  app.get("/api/league-photos/:leagueId/download-zip", async (req, res) => {
+    try {
+      const { leagueId } = req.params;
+      const photos = await storage.getLeaguePhotos(leagueId);
+
+      if (photos.length === 0) {
+        return res.status(404).json({ error: "No photos found" });
+      }
+
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const archiver = require('archiver');
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="league-${leagueId}-photos.zip"`);
+
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      archive.pipe(res);
+
+      for (const photo of photos) {
+        try {
+          const fileData = await supabaseStorageService.getLeaguePhotoFile(photo.fileUrl);
+          const buffer = Buffer.from(await fileData.data.arrayBuffer());
+          archive.append(buffer, { name: photo.fileName });
+        } catch (error) {
+          console.error(`Error adding photo ${photo.fileName} to zip:`, error);
+        }
+      }
+
+      await archive.finalize();
+    } catch (error) {
+      console.error("Error creating zip file:", error);
+      res.status(500).json({ error: "Failed to create zip file" });
+    }
+  });
+
   // League routes
   app.get("/api/leagues", async (req, res) => {
     try {

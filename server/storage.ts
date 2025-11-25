@@ -571,6 +571,13 @@ export interface IStorage {
   getTournamentPhoto(id: string): Promise<TournamentPhoto | undefined>;
   deleteTournamentPhoto(id: string): Promise<void>;
   getTournamentPhotoCount(tournamentId: string): Promise<number>;
+  
+  // League photo operations
+  createLeaguePhoto(photo: InsertLeaguePhoto): Promise<LeaguePhoto>;
+  getLeaguePhotos(leagueId: string): Promise<(LeaguePhoto & { uploader: User })[]>;
+  getLeaguePhoto(id: string): Promise<LeaguePhoto | undefined>;
+  deleteLeaguePhoto(id: string): Promise<void>;
+  getLeaguePhotoCount(leagueId: string): Promise<number>;
 }
 
 // Helper function to generate unique 6-character alphanumeric display ID
@@ -8393,6 +8400,49 @@ export class DatabaseStorage implements IStorage {
       .select({ count: sql<number>`CAST(COUNT(*) AS INTEGER)` })
       .from(tournamentPhotos)
       .where(eq(tournamentPhotos.tournamentId, tournamentId));
+    return result?.count ?? 0;
+  }
+
+  // League photo operations
+  async createLeaguePhoto(photoData: InsertLeaguePhoto): Promise<LeaguePhoto> {
+    const [photo] = await db
+      .insert(leaguePhotos)
+      .values(photoData)
+      .returning();
+    return photo;
+  }
+
+  async getLeaguePhotos(leagueId: string): Promise<(LeaguePhoto & { uploader: User })[]> {
+    const photos = await db
+      .select()
+      .from(leaguePhotos)
+      .innerJoin(users, eq(leaguePhotos.uploadedBy, users.id))
+      .where(eq(leaguePhotos.leagueId, leagueId))
+      .orderBy(desc(leaguePhotos.uploadedAt));
+    
+    return photos.map(p => ({
+      ...p.league_photos,
+      uploader: p.users,
+    }));
+  }
+
+  async getLeaguePhoto(id: string): Promise<LeaguePhoto | undefined> {
+    const [photo] = await db
+      .select()
+      .from(leaguePhotos)
+      .where(eq(leaguePhotos.id, id));
+    return photo;
+  }
+
+  async deleteLeaguePhoto(id: string): Promise<void> {
+    await db.delete(leaguePhotos).where(eq(leaguePhotos.id, id));
+  }
+
+  async getLeaguePhotoCount(leagueId: string): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`CAST(COUNT(*) AS INTEGER)` })
+      .from(leaguePhotos)
+      .where(eq(leaguePhotos.leagueId, leagueId));
     return result?.count ?? 0;
   }
 }

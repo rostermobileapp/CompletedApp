@@ -371,6 +371,87 @@ export class SupabaseStorageService {
     }
   }
 
+  // League Photos
+  async getLeaguePhotoUploadURL(): Promise<{ uploadURL: string; path: string }> {
+    const objectId = randomUUID();
+    const filePath = `league-photos/${objectId}`;
+
+    const { data, error } = await this.supabase.storage
+      .from("private")
+      .createSignedUploadUrl(filePath);
+
+    if (error) {
+      console.error("Error creating signed upload URL:", error);
+      throw new Error("Failed to create upload URL");
+    }
+
+    return {
+      uploadURL: data.signedUrl,
+      path: `/league-photos/${objectId}`,
+    };
+  }
+
+  normalizeLeaguePhotoPath(rawPath: string): string {
+    if (rawPath.startsWith("/league-photos/")) {
+      return rawPath;
+    }
+
+    if (rawPath.includes("supabase.co/storage")) {
+      try {
+        const url = new URL(rawPath);
+        const pathMatch = url.pathname.match(/\/league-photos\/([^?]+)/);
+        if (pathMatch) {
+          return `/league-photos/${pathMatch[1]}`;
+        }
+      } catch (e) {
+        console.error("Error parsing league photo URL:", e);
+      }
+    }
+
+    return rawPath;
+  }
+
+  async getLeaguePhotoFile(leaguePhotoPath: string): Promise<{ data: Blob; contentType: string }> {
+    if (!leaguePhotoPath.startsWith("/league-photos/")) {
+      throw new SupabaseStorageNotFoundError();
+    }
+
+    const objectId = leaguePhotoPath.slice("/league-photos/".length);
+    const filePath = `league-photos/${objectId}`;
+
+    const { data, error } = await this.supabase.storage
+      .from("private")
+      .download(filePath);
+
+    if (error || !data) {
+      console.error("Error downloading league photo:", error);
+      throw new SupabaseStorageNotFoundError();
+    }
+
+    return {
+      data,
+      contentType: data.type || "application/octet-stream",
+    };
+  }
+
+  async deleteLeaguePhoto(leaguePhotoPath: string): Promise<void> {
+    if (!leaguePhotoPath.startsWith("/league-photos/")) {
+      throw new Error("Invalid league photo path");
+    }
+
+    const objectId = leaguePhotoPath.slice("/league-photos/".length);
+    const filePath = `league-photos/${objectId}`;
+
+    const { error } = await this.supabase.storage
+      .from("private")
+      .remove([filePath]);
+
+    if (error) {
+      console.error("Error deleting league photo:", error);
+      throw new Error("Failed to delete photo");
+    }
+  }
+
   // Helper method to stream blob data to Express response
   async streamToResponse(file: { data: Blob; contentType: string }, res: Response, cacheTtlSec: number = 3600) {
     try {
