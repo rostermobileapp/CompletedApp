@@ -435,6 +435,7 @@ export const tournaments = pgTable("tournaments", {
   uniqueTournamentId: varchar("unique_tournament_id", { length: 8 }).unique(),
   paymentStatus: tournamentPaymentStatusEnum("payment_status").default("unpaid"),
   paymentAmount: integer("payment_amount").default(0).notNull(), // in cents: teamCount × 1000
+  paidTeamCount: integer("paid_team_count").default(0).notNull(), // number of teams paid for
   accessStartDate: timestamp("access_start_date"), // 30 days before first match
   accessEndDate: timestamp("access_end_date"), // 7 days after last match
   stripePaymentIntentId: varchar("stripe_payment_intent_id"),
