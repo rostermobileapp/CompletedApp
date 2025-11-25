@@ -139,6 +139,18 @@ export default function ScorekeeperDashboard() {
   const hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager') || false;
   const hasAccess = isCommissioner || hasGlobalStatManager || hasLeagueStatManager;
   
+  console.log('Scorekeeper Access Debug:', {
+    userId: user?.id,
+    selectedLeague,
+    commissionerLeagues: commissionerLeagues.map((l: any) => ({ id: l.id, name: l.name })),
+    isCommissioner,
+    userPermissions,
+    hasGlobalStatManager,
+    leaguePermissions,
+    hasLeagueStatManager,
+    hasAccess
+  });
+  
   const rostersReady = homeTeamMembers.length > 0 && awayTeamMembers.length > 0;
   const rostersLoading = homeTeamLoading || awayTeamLoading;
   const rostersError = homeTeamError || awayTeamError;
