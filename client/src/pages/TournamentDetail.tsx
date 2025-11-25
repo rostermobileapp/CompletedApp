@@ -43,6 +43,12 @@ export default function TournamentDetail() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isUploadingCsv, setIsUploadingCsv] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<TournamentTeam | null>(null);
+  const [additionalPaymentRequired, setAdditionalPaymentRequired] = useState<{
+    additionalTeamsCount: number;
+    additionalFee: number;
+    newTeamsDetected: string[];
+  } | null>(null);
+  const [isProcessingAdditionalPayment, setIsProcessingAdditionalPayment] = useState(false);
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
@@ -409,12 +415,23 @@ export default function TournamentDetail() {
         body: formData
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to upload CSV');
+      const result = await response.json();
+
+      // Check if additional payment is required
+      if (response.status === 402 && result.requiresPayment) {
+        setAdditionalPaymentRequired({
+          additionalTeamsCount: result.additionalTeamsCount,
+          additionalFee: result.additionalFee,
+          newTeamsDetected: result.newTeamsDetected
+        });
+        // Reset file input
+        event.target.value = '';
+        return;
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to upload CSV');
+      }
       
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
@@ -435,6 +452,36 @@ export default function TournamentDetail() {
       });
     } finally {
       setIsUploadingCsv(false);
+    }
+  };
+
+  const handleAdditionalTeamPayment = async () => {
+    if (!additionalPaymentRequired) return;
+
+    setIsProcessingAdditionalPayment(true);
+    try {
+      const response = await fetch(`/api/tournaments/${tournamentId}/additional-teams-checkout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ additionalTeamCount: additionalPaymentRequired.additionalTeamsCount })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create checkout session');
+      }
+
+      const { url } = await response.json();
+      window.location.href = url;
+    } catch (error: any) {
+      toast({
+        title: "Payment failed",
+        description: error?.message || "Failed to initiate payment",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessingAdditionalPayment(false);
     }
   };
 
@@ -1283,6 +1330,45 @@ export default function TournamentDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Additional Team Payment Dialog */}
+      <AlertDialog open={!!additionalPaymentRequired} onOpenChange={(open) => !open && setAdditionalPaymentRequired(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Additional Payment Required</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Your CSV contains {additionalPaymentRequired?.additionalTeamsCount} new team{(additionalPaymentRequired?.additionalTeamsCount || 0) > 1 ? 's' : ''} that haven't been paid for:
+              </p>
+              <ul className="list-disc pl-5 text-sm">
+                {additionalPaymentRequired?.newTeamsDetected.slice(0, 5).map((team, i) => (
+                  <li key={i}>{team}</li>
+                ))}
+                {(additionalPaymentRequired?.newTeamsDetected.length || 0) > 5 && (
+                  <li>...and {(additionalPaymentRequired?.newTeamsDetected.length || 0) - 5} more</li>
+                )}
+              </ul>
+              <p className="font-medium">
+                Additional fee: ${((additionalPaymentRequired?.additionalFee || 0) / 100).toFixed(2)}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                After payment, you can re-upload the CSV to add these teams.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-additional-payment">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleAdditionalTeamPayment}
+              disabled={isProcessingAdditionalPayment}
+              data-testid="button-pay-additional-teams"
+            >
+              {isProcessingAdditionalPayment ? "Processing..." : "Pay Now"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Match Edit Dialog */}
       {editingMatch && (
         <MatchEditDialog
