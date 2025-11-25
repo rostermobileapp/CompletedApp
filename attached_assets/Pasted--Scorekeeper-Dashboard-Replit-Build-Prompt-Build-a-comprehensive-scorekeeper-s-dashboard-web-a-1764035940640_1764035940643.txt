@@ -1,0 +1,197 @@
+# Scorekeeper Dashboard - Replit Build Prompt
+
+Build a comprehensive scorekeeper's dashboard web application for league and tournament play. This application allows assigned scorekeepers and commissioners to record live game scores, track player statistics, and manage team standings.
+
+## Core Requirements
+
+### 1. Game Selection Screen
+- Display a schedule of upcoming games with:
+  - Away team vs Home team
+  - Date and time
+  - Game status (upcoming or completed)
+- Completed games should display:
+  - Green checkmark indicator
+  - Final score
+  - Option to view/edit game details
+- Include a team standings table showing:
+  - Team name
+  - Wins, Losses, Ties
+  - Goals For (GF), Goals Against (GA)
+  - Goal Differential
+  - Sorted by wins, then goal differential
+
+### 2. Live Scoring Interface
+- **Split-screen layout**: Vertically divided with away team on left, home team on right
+- **Each team side includes**:
+  - Team name at top
+  - Large score display (updates in real-time)
+  - "Add Goal" button
+  - "Add Penalty" button
+  - Scrollable sections for goal cards and penalty cards
+
+### 3. Goal Cards
+Each goal card must have:
+- Sequential numbering (Goal #1, Goal #2, etc.)
+- Dropdown to select scorer (required)
+- Dropdown to select primary assist player (optional)
+- Dropdown to select secondary assist player (optional)
+- Automatic timestamp when created
+- Visual indicator showing running score
+- Checkmark icon to submit the goal (adds to score)
+- Trash icon to delete the goal
+- Green border when submitted, gray border when pending
+- Disabled fields after submission
+
+### 4. Penalty Cards
+Each penalty card must have:
+- Sequential numbering (Penalty #1, Penalty #2, etc.)
+- Dropdown to select player who took penalty (required)
+- Automatic timestamp when created
+- Checkmark icon to submit
+- Trash icon to delete
+- Green border when submitted, gray border when pending
+- Disabled fields after submission
+
+### 5. Complete Game Functionality
+- "Complete Game" button in header
+- Confirmation dialog showing final score before saving
+- When completed:
+  - Save all game data (goals, assists, penalties)
+  - Update team standings (W-L-T records)
+  - Update goals for/against for each team
+  - Accumulate player statistics across all games
+  - Mark game as completed in schedule
+
+### 6. Player Statistics Tracking
+- Automatic stat updates when goals/penalties are submitted
+- Track per player:
+  - Goals scored
+  - Assists (primary and secondary combined)
+  - Penalties taken
+- Display season totals at bottom of scoring interface
+- Show stats sorted by goals scored
+- Persist stats across all games
+
+### 7. Data Persistence
+All data must persist using local storage or a database:
+- Completed game records with full details
+- Team standings (wins, losses, ties, goal differentials)
+- Player statistics accumulated across season
+- Game schedule status (completed vs upcoming)
+- Ability to reload and view completed games
+
+### 8. User Interface Requirements
+- Responsive design that works on desktop and tablet
+- Clean, modern styling with good contrast
+- Color coding:
+  - Green for positive actions (submit, completed)
+  - Yellow/amber for penalties
+  - Red for delete actions
+  - Blue for primary branding
+- Loading states and error handling
+- Confirmation dialogs for destructive actions
+- Back navigation from game to schedule
+
+### 9. User Permissions
+- Access control for scorekeepers assigned to specific games
+- Commissioner access to all games
+- Ability to view but protect completed games from accidental changes
+
+## Technical Specifications
+
+### Data Structure
+```javascript
+// Game object
+{
+  id: number,
+  date: string,
+  time: string,
+  awayTeam: string,
+  homeTeam: string,
+  awayPlayers: string[],
+  homePlayers: string[],
+  completed: boolean,
+  awayScore: number,
+  homeScore: number,
+  goals: Goal[],
+  penalties: Penalty[]
+}
+
+// Goal object
+{
+  id: number,
+  team: 'away' | 'home',
+  scorer: string,
+  primaryAssist: string,
+  secondaryAssist: string,
+  timestamp: string,
+  submitted: boolean
+}
+
+// Penalty object
+{
+  id: number,
+  team: 'away' | 'home',
+  player: string,
+  timestamp: string,
+  submitted: boolean
+}
+
+// Team standings
+{
+  teamName: {
+    wins: number,
+    losses: number,
+    ties: number,
+    goalsFor: number,
+    goalsAgainst: number
+  }
+}
+
+// Player stats
+{
+  playerName: {
+    goals: number,
+    assists: number,
+    penalties: number
+  }
+}
+```
+
+### Key Features to Implement
+1. Real-time score calculation as goals are submitted
+2. Validation to prevent submission without required fields
+3. Stat rollback if goals/penalties are deleted after submission
+4. Automatic timestamp generation
+5. Sort and display player stats by performance
+6. Handle tied games in standings
+7. Prevent accidental data loss with confirmation dialogs
+
+### Suggested Tech Stack
+- Frontend: React or vanilla JavaScript
+- Styling: Tailwind CSS or CSS modules
+- Data persistence: localStorage, IndexedDB, or Firebase/Supabase
+- Icons: Lucide React or Font Awesome
+
+## Sample Data for Testing
+Include at least 3 sample games with:
+- Different teams
+- Unique player rosters (5-10 players per team)
+- Mix of completed and upcoming games
+
+## Success Criteria
+- Scorekeeper can select a game and record live scoring
+- All player stats accumulate correctly across games
+- Team standings update properly with W-L-T records
+- Data persists and loads correctly on page refresh
+- Interface is intuitive and requires no training
+- No data loss when navigating between games
+- Completed games are clearly marked and protected
+
+## Additional Considerations
+- Mobile responsiveness for use on sidelines
+- Print-friendly game sheet view
+- Export data to CSV or PDF
+- Undo last action functionality
+- Game clock/timer integration (optional enhancement)
+- Overtime handling (optional enhancement)
