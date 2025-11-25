@@ -49,6 +49,12 @@ export default function TournamentDetail() {
     newTeamsDetected: string[];
   } | null>(null);
   const [isProcessingAdditionalPayment, setIsProcessingAdditionalPayment] = useState(false);
+  
+  // Merge modal state
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [selectedParticipantToMerge, setSelectedParticipantToMerge] = useState<any | null>(null);
+  const [targetUserId, setTargetUserId] = useState('');
+  const [targetUserEmail, setTargetUserEmail] = useState('');
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
@@ -1075,6 +1081,18 @@ export default function TournamentDetail() {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                onClick={() => {
+                                  setSelectedParticipantToMerge(participant);
+                                  setShowMergeModal(true);
+                                }}
+                                data-testid={`button-merge-${participant.id}`}
+                              >
+                                <User className="h-4 w-4 mr-1" />
+                                Merge
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 onClick={() => approveParticipantMutation.mutate({ participantId: participant.id })}
                                 disabled={approveParticipantMutation.isPending}
                                 data-testid={`button-approve-${participant.id}`}
@@ -1423,6 +1441,141 @@ export default function TournamentDetail() {
           onOpenChange={(open) => !open && setScoringMatchId(null)}
           isCommissioner={!!tournament && !!tournament.leagueId && canManageLeagueSpecific(tournament.leagueId)}
         />
+      )}
+      
+      {/* Merge Participant Modal */}
+      {showMergeModal && selectedParticipantToMerge && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Merge Participant</h3>
+              <button
+                onClick={() => {
+                  setShowMergeModal(false);
+                  setSelectedParticipantToMerge(null);
+                  setTargetUserId('');
+                  setTargetUserEmail('');
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <UserX className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <p className="font-medium">Source Participant:</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedParticipantToMerge.user.firstName} {selectedParticipantToMerge.user.lastName}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedParticipantToMerge.user.email}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Target User ID</label>
+                <input
+                  type="text"
+                  value={targetUserId}
+                  onChange={(e) => setTargetUserId(e.target.value)}
+                  placeholder="e.g., 47231827"
+                  className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="input-merge-target-user-id"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the user ID of the account to merge with
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Target User Email (Optional)</label>
+                <input
+                  type="email"
+                  value={targetUserEmail}
+                  onChange={(e) => setTargetUserEmail(e.target.value)}
+                  placeholder="e.g., user@example.com"
+                  className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="input-merge-target-user-email"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional: Enter email for verification
+                </p>
+              </div>
+              
+              <div className="pt-4 border-t border-border">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowMergeModal(false);
+                      setSelectedParticipantToMerge(null);
+                      setTargetUserId('');
+                      setTargetUserEmail('');
+                    }}
+                    className="flex-1 bg-muted text-muted-foreground px-4 py-2 rounded-lg hover:bg-muted/80 font-medium"
+                    data-testid="button-cancel-merge"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!targetUserId.trim()) {
+                        toast({
+                          title: "Error",
+                          description: "Please enter a target user ID.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      
+                      try {
+                        const response = await apiRequest('POST', `/api/tournaments/${tournamentId}/merge-participant`, {
+                          fromUserId: selectedParticipantToMerge.userId,
+                          toUserId: targetUserId.trim()
+                        });
+                        
+                        if (response.ok) {
+                          toast({
+                            title: "Success",
+                            description: "Participant merged successfully!",
+                          });
+                          
+                          // Invalidate queries to refresh the data
+                          await queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'] });
+                          await queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
+                          
+                          setShowMergeModal(false);
+                          setSelectedParticipantToMerge(null);
+                          setTargetUserId('');
+                          setTargetUserEmail('');
+                        } else {
+                          const error = await response.json();
+                          toast({
+                            title: "Error",
+                            description: error.message || "Failed to merge participants.",
+                            variant: "destructive",
+                          });
+                        }
+                      } catch (error) {
+                        console.error('Merge error:', error);
+                        toast({
+                          title: "Error",
+                          description: "Failed to merge participants. Please try again.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    disabled={!targetUserId.trim()}
+                    className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50"
+                    data-testid="button-confirm-merge"
+                  >
+                    Merge Participants
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
