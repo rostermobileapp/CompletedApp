@@ -816,14 +816,18 @@ export const chatPollVotes = pgTable("chat_poll_votes", {
 // Announcements table
 export const announcements = pgTable("announcements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id), // Either leagueId or tournamentId must be set, not both
+  tournamentId: varchar("tournament_id").references(() => tournaments.id), // For tournament-specific announcements
   authorId: varchar("author_id").references(() => users.id).notNull(),
   teamId: varchar("team_id").references(() => teams.id), // null = commissioner post for everyone, set = team captain post for specific team
   content: text("content").notNull(),
   isPinned: boolean("is_pinned").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_announcements_league_id").on(table.leagueId),
+  index("idx_announcements_tournament_id").on(table.tournamentId),
+]);
 
 // Announcement attachments table
 export const announcementAttachments = pgTable("announcement_attachments", {
