@@ -73,15 +73,22 @@ const teamGameSchema = z.object({
 });
 
 // Notification Badge Component
-function AnnouncementBadge({ leagueId }: { leagueId: string | null }) {
+function AnnouncementBadge({ leagueId, tournamentId }: { leagueId?: string | null; tournamentId?: string | null }) {
   const { data: unreadCount } = useQuery({
-    queryKey: ['/api/leagues', leagueId, 'announcements', 'unread-count'],
+    queryKey: tournamentId 
+      ? ['/api/tournaments', tournamentId, 'announcements', 'unread-count']
+      : ['/api/leagues', leagueId, 'announcements', 'unread-count'],
     queryFn: async () => {
-      if (!leagueId) return 0;
-      const response = await apiRequest('GET', `/api/leagues/${leagueId}/announcements/unread-count`);
-      return response.json();
+      if (tournamentId) {
+        const response = await apiRequest('GET', `/api/tournaments/${tournamentId}/announcements/unread-count`);
+        return response.json();
+      } else if (leagueId) {
+        const response = await apiRequest('GET', `/api/leagues/${leagueId}/announcements/unread-count`);
+        return response.json();
+      }
+      return { count: 0 };
     },
-    enabled: !!leagueId,
+    enabled: !!(leagueId || tournamentId),
     refetchInterval: 30000, // Check every 30 seconds
   });
 
@@ -1848,7 +1855,7 @@ export default function Dashboard() {
             data-testid="card-announcements"
             onClick={() => {
               if (selectedType === 'tournament' && selectedId) {
-                navigate(`/tournament/${selectedId}`);
+                navigate(`/tournaments/${selectedId}`);
               } else {
                 navigate('/announcements');
               }
@@ -1858,7 +1865,11 @@ export default function Dashboard() {
               <Megaphone className="w-8 h-8 text-blue-500 mb-3" />
               <p className="text-xs font-medium">News</p>
             </div>
-            {effectiveLeagueId && <AnnouncementBadge leagueId={effectiveLeagueId} />}
+            {selectedType === 'tournament' && selectedId ? (
+              <AnnouncementBadge tournamentId={selectedId} />
+            ) : (
+              effectiveLeagueId && <AnnouncementBadge leagueId={effectiveLeagueId} />
+            )}
           </div>
 
           {/* Stats Card */}
