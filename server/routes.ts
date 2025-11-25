@@ -1808,8 +1808,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? await storage.getUserLeagues(userId)
         : await storage.getLeaguesByCommissioner(userId);
       
-      console.log(`[Commissioner Leagues] userId=${userId}, hasStatManager=${hasStatManager}, leaguesCount=${leagues.length}, leagues=${JSON.stringify(leagues.map(l => ({ id: l.id, name: l.name })))}`);
-      
       // Explicitly map to ensure uniqueLeagueId is present
       const mappedLeagues = leagues.map(league => ({
         ...league,

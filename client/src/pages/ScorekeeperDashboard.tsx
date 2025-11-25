@@ -139,18 +139,6 @@ export default function ScorekeeperDashboard() {
   const hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager') || false;
   const hasAccess = isCommissioner || hasGlobalStatManager || hasLeagueStatManager;
   
-  console.log('Scorekeeper Access Debug:', {
-    userId: user?.id,
-    selectedLeague,
-    commissionerLeagues: commissionerLeagues.map((l: any) => ({ id: l.id, name: l.name })),
-    isCommissioner,
-    userPermissions,
-    hasGlobalStatManager,
-    leaguePermissions,
-    hasLeagueStatManager,
-    hasAccess
-  });
-  
   const rostersReady = homeTeamMembers.length > 0 && awayTeamMembers.length > 0;
   const rostersLoading = homeTeamLoading || awayTeamLoading;
   const rostersError = homeTeamError || awayTeamError;
@@ -326,12 +314,12 @@ export default function ScorekeeperDashboard() {
                 </SelectContent>
               </Select>
 
-              <Select value={newGoal.primaryAssistId} onValueChange={(v) => setNewGoal({ ...newGoal, primaryAssistId: v })}>
+              <Select value={newGoal.primaryAssistId || "none"} onValueChange={(v) => setNewGoal({ ...newGoal, primaryAssistId: v === "none" ? "" : v })}>
                 <SelectTrigger data-testid={`select-primary-assist-${team}`}>
                   <SelectValue placeholder="Primary Assist (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {players.filter(p => p.userId !== newGoal.scorerId).map(p => (
                     <SelectItem key={p.userId} value={p.userId}>
                       {p.user.firstName} {p.user.lastName}
@@ -340,12 +328,12 @@ export default function ScorekeeperDashboard() {
                 </SelectContent>
               </Select>
 
-              <Select value={newGoal.secondaryAssistId} onValueChange={(v) => setNewGoal({ ...newGoal, secondaryAssistId: v })}>
+              <Select value={newGoal.secondaryAssistId || "none"} onValueChange={(v) => setNewGoal({ ...newGoal, secondaryAssistId: v === "none" ? "" : v })}>
                 <SelectTrigger data-testid={`select-secondary-assist-${team}`}>
                   <SelectValue placeholder="Secondary Assist (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {players.filter(p => p.userId !== newGoal.scorerId && p.userId !== newGoal.primaryAssistId).map(p => (
                     <SelectItem key={p.userId} value={p.userId}>
                       {p.user.firstName} {p.user.lastName}

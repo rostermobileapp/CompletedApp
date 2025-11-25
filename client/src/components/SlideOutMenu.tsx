@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy } from 'lucide-react';
+import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 
@@ -78,6 +78,15 @@ export function SlideOutMenu() {
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-amber-500/20',
       iconColor: 'text-amber-500',
+    },
+    {
+      icon: Target,
+      label: 'Scorekeeper',
+      path: '/scorekeeper',
+      locked: !hasRole('secondary_commissioner'),
+      requiredTier: 'COMMISSIONER',
+      bgColor: 'bg-red-500/20',
+      iconColor: 'text-red-500',
     },
   ];
 
