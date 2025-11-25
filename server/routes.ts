@@ -1301,7 +1301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stripe webhook handler - Note: This endpoint needs raw body, configured in server/index.ts
-  app.post('/api/webhooks/stripe', async (req, res) => {
+  app.post('/api/stripe-webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
 
     if (!sig) {
@@ -1367,7 +1367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   paymentStatus: 'paid',
                   paidTeamCount: paidTeamCount,
                   stripePaymentIntentId: session.payment_intent as string || null,
-                  paidAt: new Date(),
+                  stripeCheckoutSessionId: session.id,
                   updatedAt: new Date()
                 })
                 .where(eq(tournaments.id, tournamentId));
