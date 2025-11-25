@@ -1,13 +1,16 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Camera, Upload, Download, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TournamentPhotos } from "@/components/TournamentPhotos";
+import { useState } from "react";
 
 export default function MediaGalleryPage() {
   const [, tournamentParams] = useRoute("/media/tournament/:id");
   const [, leagueParams] = useRoute("/media/league/:id");
   const [, navigate] = useLocation();
+  const [showUploader, setShowUploader] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Determine entity type and ID
   const entityType = tournamentParams ? 'tournament' : leagueParams ? 'league' : null;
@@ -28,6 +31,16 @@ export default function MediaGalleryPage() {
     queryKey: ['/api/leagues', entityId],
     enabled: !!entityId && entityType === 'league'
   });
+
+  // Check if current user is an approved participant (for tournaments)
+  const { data: participants = [] } = useQuery<any[]>({
+    queryKey: [`/api/tournaments/${entityId}/participants`],
+    enabled: !!entityId && entityType === 'tournament' && !!currentUser?.id,
+  });
+
+  const isParticipant = currentUser?.id && participants.some(
+    (p) => p.userId === currentUser.id && p.status === 'approved'
+  );
 
   const entity = tournament || league;
   const entityName = entity?.name || 'Photos';
@@ -57,6 +70,26 @@ export default function MediaGalleryPage() {
             <h1 className="text-xl font-semibold" data-testid="text-entity-name">{entityName}</h1>
             <p className="text-sm text-muted-foreground">Photo Gallery</p>
           </div>
+          {isParticipant && (
+            <Button
+              onClick={() => setShowUploader(true)}
+              disabled={isUploading}
+              size="default"
+              data-testid="button-upload-photos"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -66,6 +99,10 @@ export default function MediaGalleryPage() {
           <TournamentPhotos 
             tournamentId={entityId} 
             currentUserId={currentUser?.id}
+            showUploader={showUploader}
+            onShowUploaderChange={setShowUploader}
+            onUploadStart={() => setIsUploading(true)}
+            onUploadComplete={() => setIsUploading(false)}
           />
         )}
         {entityType === 'league' && entityId && (

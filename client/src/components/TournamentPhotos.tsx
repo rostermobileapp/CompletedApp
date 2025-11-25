@@ -44,14 +44,29 @@ interface TournamentPhoto {
 interface TournamentPhotosProps {
   tournamentId: string;
   currentUserId?: string;
+  showUploader?: boolean;
+  onShowUploaderChange?: (show: boolean) => void;
+  onUploadStart?: () => void;
+  onUploadComplete?: () => void;
 }
 
-export function TournamentPhotos({ tournamentId, currentUserId }: TournamentPhotosProps) {
+export function TournamentPhotos({ 
+  tournamentId, 
+  currentUserId, 
+  showUploader: externalShowUploader,
+  onShowUploaderChange,
+  onUploadStart,
+  onUploadComplete
+}: TournamentPhotosProps) {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
-  const [showUploader, setShowUploader] = useState(false);
+  const [internalShowUploader, setInternalShowUploader] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
+  
+  // Use external show uploader state if provided, otherwise use internal
+  const showUploader = externalShowUploader !== undefined ? externalShowUploader : internalShowUploader;
+  const setShowUploader = onShowUploaderChange || setInternalShowUploader;
 
   const { data: photos = [], isLoading } = useQuery<TournamentPhoto[]>({
     queryKey: [`/api/tournament-photos/${tournamentId}`],
@@ -112,6 +127,11 @@ export function TournamentPhotos({ tournamentId, currentUserId }: TournamentPhot
 
     setIsUploading(true);
     setShowUploader(false);
+    
+    // Notify parent upload started
+    if (onUploadStart) {
+      onUploadStart();
+    }
 
     try {
       for (const mediaFile of mediaFiles) {
@@ -154,6 +174,11 @@ export function TournamentPhotos({ tournamentId, currentUserId }: TournamentPhot
       toast({ title: 'Failed to upload photos', variant: 'destructive' });
     } finally {
       setIsUploading(false);
+      
+      // Notify parent upload completed
+      if (onUploadComplete) {
+        onUploadComplete();
+      }
     }
   };
 
@@ -243,31 +268,9 @@ export function TournamentPhotos({ tournamentId, currentUserId }: TournamentPhot
         </div>
       )}
 
-      {/* Sticky Bottom Action Bar */}
-      <div className="fixed bottom-16 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t border-border p-4 flex gap-2 justify-center z-10">
-        {isParticipant && (
-          <Button
-            onClick={() => setShowUploader(true)}
-            disabled={isUploading}
-            size="lg"
-            className="flex-1 max-w-xs"
-            data-testid="button-upload-photos"
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <Upload className="h-5 w-5 mr-2" />
-                Upload Photos
-              </>
-            )}
-          </Button>
-        )}
-
-        {photos.length > 0 && (
+      {/* Sticky Bottom Action Bar - Download only */}
+      {photos.length > 0 && (
+        <div className="fixed bottom-16 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t border-border p-4 flex gap-2 justify-center z-10">
           <Button
             variant="outline"
             size="lg"
@@ -275,10 +278,11 @@ export function TournamentPhotos({ tournamentId, currentUserId }: TournamentPhot
             className="flex-shrink-0"
             data-testid="button-download-all"
           >
-            <Download className="h-5 w-5" />
+            <Download className="h-5 w-5 mr-2" />
+            Download All
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Media Uploader Dialog */}
       {showUploader && (
