@@ -304,7 +304,7 @@ export default function ScorekeeperDashboard() {
       setPenaltyMinutes(2);
     };
 
-    const textColor = team === 'home' ? 'text-blue-500' : 'text-red-500';
+    const textColor = 'text-blue-500';
 
     return (
       <div className="flex-1 border rounded-lg p-3 bg-[#212121] border-border">
@@ -524,7 +524,7 @@ export default function ScorekeeperDashboard() {
           
           {/* Central Score Display */}
           <div className="flex items-center gap-4">
-            <span className="text-3xl font-bold text-red-500">{awayScore}</span>
+            <span className="text-3xl font-bold text-blue-500">{awayScore}</span>
             <span className="text-2xl text-muted-foreground">-</span>
             <span className="text-3xl font-bold text-blue-500">{homeScore}</span>
             <Badge variant="destructive" className="ml-2">LIVE</Badge>
