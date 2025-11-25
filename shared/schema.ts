@@ -538,14 +538,13 @@ export const tournamentParticipants = pgTable("tournament_participants", {
 // Tournament photos table - stores photos uploaded to tournaments
 export const tournamentPhotos = pgTable("tournament_photos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tournamentId: varchar("tournament_id").references(() => tournaments.id).notNull(),
-  photoUrl: varchar("photo_url").notNull(),
-  thumbnailUrl: varchar("thumbnail_url").notNull(),
-  uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
+  tournamentId: varchar("tournament_id").references(() => tournaments.id, { onDelete: 'cascade' }).notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull().default(0),
+  caption: text("caption"),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
-  fileSize: integer("file_size").notNull(), // in bytes
-  width: integer("width").notNull(),
-  height: integer("height").notNull(),
 }, (table) => [
   index("idx_tournament_photos_tournament_id").on(table.tournamentId),
   index("idx_tournament_photos_uploaded_by").on(table.uploadedBy),
