@@ -1866,35 +1866,31 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Stats Card */}
+          {/* Photos Card */}
           {selectedType === 'tournament' ? (
             <div 
-              className="rounded-xl border border-border p-5 min-h-[72px] bg-[#e2e2e2] dark:bg-[#212121] opacity-50" 
-              data-testid="card-stats"
-            >
-              <div className="h-full flex flex-col items-center justify-center">
-                <BarChart3 className="w-8 h-8 text-muted-foreground mb-3" />
-                <p className="text-xs font-medium text-muted-foreground">Stats</p>
-                <p className="text-[10px] text-muted-foreground mt-1">Coming Soon</p>
-              </div>
-            </div>
-          ) : (
-            <div 
               className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
-              data-testid="card-stats"
+              data-testid="card-photos"
               onClick={() => {
-                if (selectedType === 'team' && selectedId) {
-                  navigate(`/stats?team=${selectedId}`);
-                } else if (selectedType === 'league' && selectedLeagueId) {
-                  navigate(`/stats?league=${selectedLeagueId}`);
-                } else {
-                  navigate('/stats');
+                if (selectedId) {
+                  navigate(`/tournaments/${selectedId}?tab=photos`);
                 }
               }}
             >
               <div className="h-full flex flex-col items-center justify-center">
-                <BarChart3 className="w-8 h-8 text-blue-500 mb-3" />
-                <p className="text-xs font-medium">Stats</p>
+                <Camera className="w-8 h-8 text-blue-500 mb-3" />
+                <p className="text-xs font-medium">Photos</p>
+              </div>
+            </div>
+          ) : (
+            <div 
+              className="rounded-xl border border-border p-5 min-h-[72px] bg-[#e2e2e2] dark:bg-[#212121] opacity-50" 
+              data-testid="card-photos"
+            >
+              <div className="h-full flex flex-col items-center justify-center">
+                <Camera className="w-8 h-8 text-muted-foreground mb-3" />
+                <p className="text-xs font-medium text-muted-foreground">Photos</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Tournaments Only</p>
               </div>
             </div>
           )}
