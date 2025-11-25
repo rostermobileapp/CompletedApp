@@ -4851,14 +4851,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Scorekeeper Dashboard - Get games for scorekeeper
+  // Scorekeeper Dashboard - Get available options (leagues and tournaments)
+  app.get('/api/scorekeeper/options', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const hasGlobalStatManager = user?.specialPermissions?.includes('stat_manager') || false;
+
+      // Get leagues where user is commissioner
+      const commissionerLeagues = await storage.getLeaguesByCommissioner(userId);
+      const commissionerLeagueIds = commissionerLeagues.map(l => l.id);
+      
+      // Get leagues where user has league-specific stat_manager permission
+      const allLeagues = await storage.getLeagues();
+      const leaguesWithStatManagerAccess: typeof allLeagues = [];
+      for (const league of allLeagues) {
+        if (commissionerLeagueIds.includes(league.id)) continue; // Already have as commissioner
+        const permissions = await storage.getUserLeaguePermissions(userId, league.id);
+        if (permissions?.leagueSpecialPermissions?.includes('stat_manager')) {
+          leaguesWithStatManagerAccess.push(league);
+        }
+      }
+      
+      // Combine all leagues with access
+      let leaguesWithAccess = [...commissionerLeagues, ...leaguesWithStatManagerAccess];
+      if (hasGlobalStatManager) {
+        leaguesWithAccess = allLeagues;
+      }
+
+      // Format leagues
+      const leagueOptions = leaguesWithAccess.map(league => ({
+        id: league.id,
+        name: league.name,
+        type: 'league' as const
+      }));
+
+      // Get accessible league IDs for tournament filtering
+      const accessibleLeagueIds = leaguesWithAccess.map(l => l.id);
+
+      // Build tournament query conditions
+      let tournamentConditions: any[] = [eq(tournaments.createdBy, userId)];
+      if (accessibleLeagueIds.length > 0) {
+        tournamentConditions.push(inArray(tournaments.leagueId, accessibleLeagueIds));
+      }
+
+      // Get tournaments where user is creator or has access via leagues
+      let userTournaments = await db
+        .select({
+          id: tournaments.id,
+          name: tournaments.name,
+          leagueId: tournaments.leagueId,
+          leagueName: leagues.name,
+          createdBy: tournaments.createdBy,
+          status: tournaments.status
+        })
+        .from(tournaments)
+        .leftJoin(leagues, eq(tournaments.leagueId, leagues.id))
+        .where(or(...tournamentConditions))
+        .orderBy(sql`${tournaments.createdAt} DESC`);
+
+      // If user has global stat_manager, get all tournaments
+      if (hasGlobalStatManager) {
+        userTournaments = await db
+          .select({
+            id: tournaments.id,
+            name: tournaments.name,
+            leagueId: tournaments.leagueId,
+            leagueName: leagues.name,
+            createdBy: tournaments.createdBy,
+            status: tournaments.status
+          })
+          .from(tournaments)
+          .leftJoin(leagues, eq(tournaments.leagueId, leagues.id))
+          .orderBy(sql`${tournaments.createdAt} DESC`);
+      }
+
+      // Format tournaments
+      const tournamentOptions = userTournaments.map(t => ({
+        id: t.id,
+        name: t.name,
+        type: 'tournament' as const,
+        leagueName: t.leagueName,
+        status: t.status
+      }));
+
+      res.json({ leagues: leagueOptions, tournaments: tournamentOptions });
+    } catch (error) {
+      console.error('Error fetching scorekeeper options:', error);
+      res.status(500).json({ message: 'Failed to fetch scorekeeper options' });
+    }
+  });
+
+  // Scorekeeper Dashboard - Get games for scorekeeper (league or tournament)
   app.get('/api/scorekeeper/games', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { leagueId } = req.query;
+      const { leagueId, tournamentId } = req.query;
       
+      // Handle tournament games
+      if (tournamentId) {
+        const [tournament] = await db
+          .select()
+          .from(tournaments)
+          .where(eq(tournaments.id, tournamentId as string));
+
+        if (!tournament) {
+          return res.status(404).json({ message: 'Tournament not found' });
+        }
+
+        const user = await storage.getUser(userId);
+        const isCreator = tournament.createdBy === userId;
+        const hasGlobalStatManager = user?.specialPermissions?.includes('stat_manager') || false;
+        
+        // Check if commissioner of the league or has league-specific stat_manager
+        let isLeagueCommissioner = false;
+        let hasLeagueStatManager = false;
+        if (tournament.leagueId) {
+          const league = await storage.getLeague(tournament.leagueId);
+          isLeagueCommissioner = league?.commissionerId === userId;
+          const leaguePermissions = await storage.getUserLeaguePermissions(userId, tournament.leagueId);
+          hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager') || false;
+        }
+
+        if (!isCreator && !isLeagueCommissioner && !hasGlobalStatManager && !hasLeagueStatManager) {
+          return res.status(403).json({ message: 'Access denied. You must be a tournament creator, league commissioner, or have stat_manager permission.' });
+        }
+
+        // Get tournament matches with team names
+        const matches = await db
+          .select({
+            id: tournamentMatches.id,
+            scheduledAt: tournamentMatches.scheduledTime,
+            status: tournamentMatches.status,
+            homeScore: tournamentMatches.team1Score,
+            awayScore: tournamentMatches.team2Score,
+            round: tournamentMatches.round,
+            matchNumber: tournamentMatches.matchNumber,
+            team1Id: tournamentMatches.team1Id,
+            team2Id: tournamentMatches.team2Id
+          })
+          .from(tournamentMatches)
+          .where(eq(tournamentMatches.tournamentId, tournamentId as string))
+          .orderBy(tournamentMatches.matchNumber);
+
+        // Get team names for all matches
+        const teamIds = [...new Set([
+          ...matches.map(m => m.team1Id).filter(Boolean),
+          ...matches.map(m => m.team2Id).filter(Boolean)
+        ])] as string[];
+
+        let teamMap: Record<string, { id: string; name: string }> = {};
+        if (teamIds.length > 0) {
+          const teams = await db
+            .select({
+              id: tournamentTeams.id,
+              teamName: tournamentTeams.teamName
+            })
+            .from(tournamentTeams)
+            .where(inArray(tournamentTeams.id, teamIds));
+          
+          teams.forEach(t => {
+            teamMap[t.id] = { id: t.id, name: t.teamName };
+          });
+        }
+
+        // Format matches like games
+        const formattedMatches = matches.map(match => ({
+          id: match.id,
+          scheduledAt: match.scheduledAt?.toISOString() || new Date().toISOString(),
+          homeTeam: match.team1Id ? teamMap[match.team1Id] || { id: match.team1Id, name: 'TBD' } : { id: '', name: 'TBD' },
+          awayTeam: match.team2Id ? teamMap[match.team2Id] || { id: match.team2Id, name: 'TBD' } : { id: '', name: 'TBD' },
+          homeScore: match.homeScore,
+          awayScore: match.awayScore,
+          status: match.status === 'completed' ? 'completed' : null,
+          leagueId: null,
+          tournamentId: tournamentId,
+          round: match.round,
+          matchNumber: match.matchNumber
+        }));
+
+        return res.json(formattedMatches);
+      }
+      
+      // Handle league games (original logic)
       if (!leagueId) {
-        return res.status(400).json({ message: 'League ID is required' });
+        return res.status(400).json({ message: 'League ID or Tournament ID is required' });
       }
 
       // Check if user has scorekeeper permission for this league
@@ -4884,6 +5061,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching scorekeeper games:', error);
       res.status(500).json({ message: 'Failed to fetch games' });
+    }
+  });
+
+  // Scorekeeper Dashboard - Get tournament team players
+  app.get('/api/scorekeeper/tournament-team/:tournamentTeamId/players', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tournamentTeamId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Get tournament team to find tournamentId
+      const [tournamentTeam] = await db
+        .select()
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.id, tournamentTeamId));
+
+      if (!tournamentTeam) {
+        return res.status(404).json({ message: 'Tournament team not found' });
+      }
+
+      // Get participants for this tournament team
+      const participants = await db
+        .select({
+          id: tournamentParticipants.id,
+          odId: tournamentParticipants.userId,
+          odIdAsUserId: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          profileImageUrl: users.profileImageUrl
+        })
+        .from(tournamentParticipants)
+        .leftJoin(users, eq(tournamentParticipants.userId, users.id))
+        .where(and(
+          eq(tournamentParticipants.tournamentTeamId, tournamentTeamId),
+          eq(tournamentParticipants.status, 'approved')
+        ));
+
+      // If no participants, try to get from regular team if linked
+      if (participants.length === 0 && tournamentTeam.teamId) {
+        const members = await storage.getTeamMembers(tournamentTeam.teamId);
+        const formattedMembers = members.map(m => ({
+          userId: m.user.id,
+          user: {
+            id: m.user.id,
+            firstName: m.user.firstName,
+            lastName: m.user.lastName,
+            email: m.user.email
+          }
+        }));
+        return res.json(formattedMembers);
+      }
+
+      // Format as TeamMember-like structure
+      const formattedParticipants = participants.map(p => ({
+        odId: p.odIdAsUserId || p.odId,
+        user: {
+          id: p.odIdAsUserId || p.odId,
+          firstName: p.firstName || 'Unknown',
+          lastName: p.lastName || '',
+          email: p.email
+        }
+      }));
+
+      res.json(formattedParticipants);
+    } catch (error) {
+      console.error('Error fetching tournament team players:', error);
+      res.status(500).json({ message: 'Failed to fetch tournament team players' });
     }
   });
 

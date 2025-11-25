@@ -36,6 +36,14 @@ interface Game {
   awayScore: number | null;
   status: string | null;
   leagueId: string | null;
+  tournamentId?: string;
+  round?: string;
+  matchNumber?: number;
+}
+
+interface ScorekeeperOptions {
+  leagues: { id: string; name: string; type: 'league' }[];
+  tournaments: { id: string; name: string; type: 'tournament'; leagueName?: string | null; status: string }[];
 }
 
 interface Player {
@@ -89,27 +97,49 @@ export default function ScorekeeperDashboard() {
   
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const urlLeagueId = urlParams.get('league');
+  const urlTournamentId = urlParams.get('tournament');
   
-  const [selectedLeague, setSelectedLeague] = useState<string>(urlLeagueId || '');
+  const [selectedId, setSelectedId] = useState<string>(urlLeagueId || urlTournamentId || '');
+  const [selectionType, setSelectionType] = useState<'league' | 'tournament'>(urlTournamentId ? 'tournament' : 'league');
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [activeTab, setActiveTab] = useState('schedule');
   const [showPenalties, setShowPenalties] = useState(false);
 
-  const { data: commissionerLeagues = [] } = useQuery<any[]>({
-    queryKey: ['/api/leagues/commissioner'],
+  // Fetch scorekeeper options (leagues + tournaments)
+  const { data: scorekeeperOptions } = useQuery<ScorekeeperOptions>({
+    queryKey: ['/api/scorekeeper/options'],
     enabled: !!user,
   });
 
+  const commissionerLeagues = scorekeeperOptions?.leagues || [];
+  const accessibleTournaments = scorekeeperOptions?.tournaments || [];
+
   const { data: leaguePermissions } = useQuery<{ leagueSpecialPermissions?: string[] }>({
-    queryKey: [`/api/leagues/${selectedLeague}/users/${user?.id}/permissions`],
-    enabled: !!selectedLeague && !!user?.id,
+    queryKey: [`/api/leagues/${selectedId}/users/${user?.id}/permissions`],
+    enabled: selectionType === 'league' && !!selectedId && !!user?.id,
   });
 
-  const gamesQueryKey = `/api/scorekeeper/games?leagueId=${selectedLeague}`;
+  // Build games query key based on selection type
+  const gamesQueryKey = selectionType === 'tournament' 
+    ? `/api/scorekeeper/games?tournamentId=${selectedId}`
+    : `/api/scorekeeper/games?leagueId=${selectedId}`;
   const { data: games = [], isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: [gamesQueryKey],
-    enabled: !!selectedLeague,
+    enabled: !!selectedId,
   });
+
+  // Handle selection change
+  const handleSelectionChange = (value: string) => {
+    // Parse selection format: "league:id" or "tournament:id"
+    const [type, id] = value.split(':');
+    setSelectionType(type as 'league' | 'tournament');
+    setSelectedId(id);
+    setSelectedGame(null);
+    setActiveTab('schedule');
+  };
+
+  // Create selection value for dropdown
+  const selectionValue = selectedId ? `${selectionType}:${selectedId}` : '';
 
   const goalsQueryKey = `/api/games/${selectedGame?.id}/goals`;
   const { data: gameGoals = [], refetch: refetchGoals } = useQuery<GameGoal[]>({
@@ -123,23 +153,31 @@ export default function ScorekeeperDashboard() {
     enabled: !!selectedGame?.id,
   });
 
-  const homeTeamQueryKey = `/api/teams/${selectedGame?.homeTeam?.id}/members`;
+  // For tournament matches, use tournament team endpoint; for league games, use regular team endpoint
+  const isTournamentGame = !!selectedGame?.tournamentId;
+  
+  const homeTeamQueryKey = isTournamentGame 
+    ? `/api/scorekeeper/tournament-team/${selectedGame?.homeTeam?.id}/players`
+    : `/api/teams/${selectedGame?.homeTeam?.id}/members`;
   const { data: homeTeamMembers = [], isLoading: homeTeamLoading, error: homeTeamError } = useQuery<TeamMember[]>({
     queryKey: [homeTeamQueryKey],
     enabled: !!selectedGame?.homeTeam?.id,
   });
 
-  const awayTeamQueryKey = `/api/teams/${selectedGame?.awayTeam?.id}/members`;
+  const awayTeamQueryKey = isTournamentGame 
+    ? `/api/scorekeeper/tournament-team/${selectedGame?.awayTeam?.id}/players`
+    : `/api/teams/${selectedGame?.awayTeam?.id}/members`;
   const { data: awayTeamMembers = [], isLoading: awayTeamLoading, error: awayTeamError } = useQuery<TeamMember[]>({
     queryKey: [awayTeamQueryKey],
     enabled: !!selectedGame?.awayTeam?.id,
   });
 
-  const isCommissioner = commissionerLeagues.some((league: any) => league.id === selectedLeague);
+  const isCommissioner = commissionerLeagues.some((league: any) => league.id === selectedId);
+  const isTournamentCreator = accessibleTournaments.some((t: any) => t.id === selectedId);
   const userPermissions = (user as any)?.specialPermissions || [];
   const hasGlobalStatManager = userPermissions.includes('stat_manager');
   const hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager') || false;
-  const hasAccess = isCommissioner || hasGlobalStatManager || hasLeagueStatManager;
+  const hasAccess = isCommissioner || isTournamentCreator || hasGlobalStatManager || hasLeagueStatManager;
   
   const rostersLoading = homeTeamLoading || awayTeamLoading;
   const rostersError = homeTeamError || awayTeamError;
@@ -570,7 +608,7 @@ export default function ScorekeeperDashboard() {
     );
   }
 
-  if (selectedLeague && !hasAccess && !gamesLoading) {
+  if (selectedId && !hasAccess && !gamesLoading) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center gap-4 mb-6">
@@ -710,21 +748,50 @@ export default function ScorekeeperDashboard() {
       </div>
 
       <div className="mb-4">
-        <Select value={selectedLeague} onValueChange={setSelectedLeague}>
-          <SelectTrigger className="w-full md:w-[300px]" data-testid="select-league">
-            <SelectValue placeholder="Select a league" />
+        <Select value={selectionValue} onValueChange={handleSelectionChange}>
+          <SelectTrigger className="w-full md:w-[300px]" data-testid="select-league-or-tournament">
+            <SelectValue placeholder="Select a league or tournament" />
           </SelectTrigger>
           <SelectContent>
-            {commissionerLeagues.map((league: any) => (
-              <SelectItem key={league.id} value={league.id}>
-                {league.name}
-              </SelectItem>
-            ))}
+            {commissionerLeagues.length > 0 && (
+              <>
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Leagues</div>
+                {commissionerLeagues.map((league: any) => (
+                  <SelectItem key={`league:${league.id}`} value={`league:${league.id}`}>
+                    {league.name}
+                  </SelectItem>
+                ))}
+              </>
+            )}
+            {accessibleTournaments.length > 0 && (
+              <>
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1 mt-2">
+                  <Trophy className="h-3 w-3 text-orange-500" />
+                  Tournaments
+                </div>
+                {accessibleTournaments.map((tournament: any) => (
+                  <SelectItem key={`tournament:${tournament.id}`} value={`tournament:${tournament.id}`}>
+                    <span className="flex items-center gap-2">
+                      <Trophy className="h-3 w-3 text-orange-500" />
+                      {tournament.name}
+                      {tournament.leagueName && (
+                        <span className="text-xs text-muted-foreground">({tournament.leagueName})</span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </>
+            )}
+            {commissionerLeagues.length === 0 && accessibleTournaments.length === 0 && (
+              <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                No leagues or tournaments available
+              </div>
+            )}
           </SelectContent>
         </Select>
       </div>
 
-      {selectedLeague && (
+      {selectedId && (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-3">
             <TabsTrigger value="schedule" data-testid="tab-schedule">
