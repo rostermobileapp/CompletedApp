@@ -271,6 +271,7 @@ export default function ScorekeeperDashboard() {
   }) => {
     const [scorerId, setScorerId] = useState('');
     const [assistId, setAssistId] = useState('');
+    const [secondaryAssistId, setSecondaryAssistId] = useState('');
     const [penaltyPlayerId, setPenaltyPlayerId] = useState('');
     const [penaltyMinutes, setPenaltyMinutes] = useState(2);
 
@@ -283,10 +284,12 @@ export default function ScorekeeperDashboard() {
         gameId: selectedGame.id,
         teamId,
         scorerId,
-        primaryAssistId: assistId || undefined
+        primaryAssistId: assistId || undefined,
+        secondaryAssistId: secondaryAssistId || undefined
       });
       setScorerId('');
       setAssistId('');
+      setSecondaryAssistId('');
     };
 
     const addPenalty = () => {
@@ -333,11 +336,24 @@ export default function ScorekeeperDashboard() {
               </Select>
               <Select value={assistId || "none"} onValueChange={(v) => setAssistId(v === "none" ? "" : v)}>
                 <SelectTrigger className="flex-1 h-9 text-sm" data-testid={`select-assist-${team}`}>
-                  <SelectValue placeholder="Assist" />
+                  <SelectValue placeholder="1st Assist" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No Assist</SelectItem>
                   {players.filter(p => p.userId !== scorerId).map(p => (
+                    <SelectItem key={p.userId} value={p.userId}>
+                      {p.user.firstName} {p.user.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={secondaryAssistId || "none"} onValueChange={(v) => setSecondaryAssistId(v === "none" ? "" : v)}>
+                <SelectTrigger className="flex-1 h-9 text-sm" data-testid={`select-secondary-assist-${team}`}>
+                  <SelectValue placeholder="2nd Assist" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No 2nd</SelectItem>
+                  {players.filter(p => p.userId !== scorerId && p.userId !== assistId).map(p => (
                     <SelectItem key={p.userId} value={p.userId}>
                       {p.user.firstName} {p.user.lastName}
                     </SelectItem>
@@ -367,7 +383,8 @@ export default function ScorekeeperDashboard() {
                     <span className="font-medium">{goal.scorer.firstName} {goal.scorer.lastName}</span>
                     {goal.primaryAssist && (
                       <span className="text-muted-foreground ml-1">
-                        ({goal.primaryAssist.firstName.charAt(0)}. {goal.primaryAssist.lastName})
+                        ({goal.primaryAssist.firstName.charAt(0)}. {goal.primaryAssist.lastName}
+                        {goal.secondaryAssist && `, ${goal.secondaryAssist.firstName.charAt(0)}. ${goal.secondaryAssist.lastName}`})
                       </span>
                     )}
                   </span>
