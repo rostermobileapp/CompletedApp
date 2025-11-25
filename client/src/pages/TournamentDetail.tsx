@@ -468,7 +468,7 @@ export default function TournamentDetail() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b bg-card">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-3">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 pt-[4px] pb-[4px]">
           <Button
             variant="ghost"
             size="sm"
@@ -560,7 +560,6 @@ export default function TournamentDetail() {
           </div>
         </div>
       </div>
-
       {/* Payment Status Section - Commissioner Only */}
       {tournament && canManageTournament() && (
         <div className="max-w-7xl mx-auto px-4 md:px-8 pb-6">
@@ -651,7 +650,6 @@ export default function TournamentDetail() {
           </Card>
         </div>
       )}
-
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 pt-[2px] pb-[2px] pl-[8px] pr-[8px]">
         <Tabs defaultValue="bracket" className="space-y-6">
@@ -715,7 +713,7 @@ export default function TournamentDetail() {
                 
                 {tournament.format === 'custom_bracket' ? (
                   // Custom bracket builder embedded
-                  <Card>
+                  (<Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <div>
                         <CardTitle>Custom Bracket</CardTitle>
@@ -781,13 +779,13 @@ export default function TournamentDetail() {
                         onLock={() => setIsEditingBracket(false)}
                       />
                     </CardContent>
-                  </Card>
+                  </Card>)
                 ) : (tournament.format === 'single_elimination' || 
                   tournament.format === 'double_elimination' || 
                   tournament.format === 'three_game_guarantee' ||
                   tournament.format === 'round_robin_split') ? (
                   // Bracket visualization for elimination formats and Round Robin + Playoffs
-                  (() => {
+                  ((() => {
                     // For Round Robin + Playoffs, only show playoff matches in the bracket
                     const bracketMatches = tournament.format === 'round_robin_split' 
                       ? matches.filter(m => m.round !== 'Round Robin')
@@ -826,7 +824,7 @@ export default function TournamentDetail() {
                         </CardContent>
                       </Card>
                     );
-                  })()
+                  })())
                 ) : (
                   // Table view for pure round robin
                   (<Card>
@@ -1051,52 +1049,46 @@ export default function TournamentDetail() {
               <CardContent>
                 {!selectedTeam ? (
                   // Teams List View
-                  teams && teams.length > 0 ? (
-                    <div className="space-y-3">
-                      {teams.map((team, index) => {
-                        // Count players for this team (we don't have this data in teams list, but we can show seed)
-                        return (
-                          <div
-                            key={team.id}
-                            className="flex items-center justify-between p-4 rounded-lg border bg-background hover:bg-muted/50 cursor-pointer transition-colors"
-                            onClick={() => setSelectedTeam(team)}
-                            data-testid={`team-${team.id}`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-2">
-                                <p className="font-medium text-base" data-testid={`text-team-name-${team.id}`}>
-                                  {team.teamName}
-                                </p>
-                              </div>
-                              <div className="text-sm text-muted-foreground space-y-1">
-                                <p>Seed: #{team.seed || index + 1}</p>
-                                <p>Click to view players</p>
-                              </div>
+                  (teams && teams.length > 0 ? (<div className="space-y-3">
+                    {teams.map((team, index) => {
+                      // Count players for this team (we don't have this data in teams list, but we can show seed)
+                      return (
+                        <div
+                          key={team.id}
+                          className="flex items-center justify-between p-4 rounded-lg border bg-background hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => setSelectedTeam(team)}
+                          data-testid={`team-${team.id}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="font-medium text-base" data-testid={`text-team-name-${team.id}`}>
+                                {team.teamName}
+                              </p>
                             </div>
-                            <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <p>Seed: #{team.seed || index + 1}</p>
+                              <p>Click to view players</p>
+                            </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No teams added yet</p>
-                      {tournament && canManageTournament() && (
-                        <p className="text-sm mt-1">Upload a CSV file to add teams and players</p>
-                      )}
-                    </div>
-                  )
+                          <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        </div>
+                      );
+                    })}
+                  </div>) : (<div className="text-center py-8 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No teams added yet</p>
+                    {tournament && canManageTournament() && (
+                      <p className="text-sm mt-1">Upload a CSV file to add teams and players</p>
+                    )}
+                  </div>))
                 ) : (
                   // Team Detail View - Show Players in Selected Team
-                  teamPlayersLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                        <p className="text-sm text-muted-foreground">Loading players...</p>
-                      </div>
+                  (teamPlayersLoading ? (<div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-sm text-muted-foreground">Loading players...</p>
                     </div>
-                  ) : teamPlayersError ? (
+                  </div>) : teamPlayersError ? (
                     <div className="text-center py-8">
                       <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
                       <p className="text-destructive font-medium">Error loading players</p>
@@ -1149,7 +1141,7 @@ export default function TournamentDetail() {
                       <p className="text-muted-foreground">No players assigned to this team yet</p>
                       <p className="text-sm text-muted-foreground mt-2">Players will appear here once they join the tournament</p>
                     </div>
-                  )
+                  ))
                 )}
               </CardContent>
             </Card>
@@ -1288,7 +1280,6 @@ export default function TournamentDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       {/* Match Edit Dialog */}
       {editingMatch && (
         <MatchEditDialog
@@ -1299,7 +1290,6 @@ export default function TournamentDetail() {
           team2Name={getTeamName(editingMatch.team2Id)}
         />
       )}
-
       {/* Tournament Match Score Modal */}
       {scoringMatchId && tournamentId && (
         <TournamentMatchScoreModal
