@@ -1873,7 +1873,7 @@ export default function Dashboard() {
               data-testid="card-photos"
               onClick={() => {
                 if (selectedId) {
-                  navigate(`/tournaments/${selectedId}?tab=photos`);
+                  navigate(`/media/tournament/${selectedId}`);
                 }
               }}
             >
