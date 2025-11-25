@@ -290,6 +290,87 @@ export class SupabaseStorageService {
     };
   }
 
+  // Tournament Photos
+  async getTournamentPhotoUploadURL(): Promise<{ uploadURL: string; path: string }> {
+    const objectId = randomUUID();
+    const filePath = `tournament-photos/${objectId}`;
+
+    const { data, error } = await this.supabase.storage
+      .from("private")
+      .createSignedUploadUrl(filePath);
+
+    if (error) {
+      console.error("Error creating signed upload URL:", error);
+      throw new Error("Failed to create upload URL");
+    }
+
+    return {
+      uploadURL: data.signedUrl,
+      path: `/tournament-photos/${objectId}`,
+    };
+  }
+
+  normalizeTournamentPhotoPath(rawPath: string): string {
+    if (rawPath.startsWith("/tournament-photos/")) {
+      return rawPath;
+    }
+
+    if (rawPath.includes("supabase.co/storage")) {
+      try {
+        const url = new URL(rawPath);
+        const pathMatch = url.pathname.match(/\/tournament-photos\/([^?]+)/);
+        if (pathMatch) {
+          return `/tournament-photos/${pathMatch[1]}`;
+        }
+      } catch (e) {
+        console.error("Error parsing tournament photo URL:", e);
+      }
+    }
+
+    return rawPath;
+  }
+
+  async getTournamentPhotoFile(tournamentPhotoPath: string): Promise<{ data: Blob; contentType: string }> {
+    if (!tournamentPhotoPath.startsWith("/tournament-photos/")) {
+      throw new SupabaseStorageNotFoundError();
+    }
+
+    const objectId = tournamentPhotoPath.slice("/tournament-photos/".length);
+    const filePath = `tournament-photos/${objectId}`;
+
+    const { data, error } = await this.supabase.storage
+      .from("private")
+      .download(filePath);
+
+    if (error || !data) {
+      console.error("Error downloading tournament photo:", error);
+      throw new SupabaseStorageNotFoundError();
+    }
+
+    return {
+      data,
+      contentType: data.type || "application/octet-stream",
+    };
+  }
+
+  async deleteTournamentPhoto(tournamentPhotoPath: string): Promise<void> {
+    if (!tournamentPhotoPath.startsWith("/tournament-photos/")) {
+      throw new Error("Invalid tournament photo path");
+    }
+
+    const objectId = tournamentPhotoPath.slice("/tournament-photos/".length);
+    const filePath = `tournament-photos/${objectId}`;
+
+    const { error } = await this.supabase.storage
+      .from("private")
+      .remove([filePath]);
+
+    if (error) {
+      console.error("Error deleting tournament photo:", error);
+      throw new Error("Failed to delete photo");
+    }
+  }
+
   // Helper method to stream blob data to Express response
   async streamToResponse(file: { data: Blob; contentType: string }, res: Response, cacheTtlSec: number = 3600) {
     try {

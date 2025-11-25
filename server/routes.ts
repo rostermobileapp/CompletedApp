@@ -1782,6 +1782,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Tournament photo routes
+  app.post("/api/tournament-photos/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const { uploadURL, path } = await supabaseStorageService.getTournamentPhotoUploadURL();
+      res.json({ uploadURL, path });
+    } catch (error) {
+      console.error("Error getting tournament photo upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  app.get("/tournament-photos/:objectPath(*)", async (req, res) => {
+    try {
+      const { SupabaseStorageService, SupabaseStorageNotFoundError } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const fullPath = `/tournament-photos/${req.params.objectPath}`;
+      const objectFile = await supabaseStorageService.getTournamentPhotoFile(fullPath);
+      await supabaseStorageService.streamToResponse(objectFile, res);
+    } catch (error) {
+      console.error("Error serving tournament photo:", error);
+      if ((error as Error).name === 'SupabaseStorageNotFoundError') {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  app.post("/api/tournament-photos", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tournamentId, fileUrl, fileName, fileSize, caption } = req.body;
+
+      if (!tournamentId || !fileUrl || !fileName) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const normalizedPath = supabaseStorageService.normalizeTournamentPhotoPath(fileUrl);
+
+      const photo = await storage.createTournamentPhoto({
+        tournamentId,
+        uploadedBy: userId,
+        fileUrl: normalizedPath,
+        fileName,
+        fileSize: fileSize || 0,
+        caption: caption || null,
+      });
+
+      res.json(photo);
+    } catch (error) {
+      console.error("Error creating tournament photo:", error);
+      res.status(500).json({ error: "Failed to create photo" });
+    }
+  });
+
+  app.get("/api/tournament-photos/:tournamentId", async (req, res) => {
+    try {
+      const { tournamentId } = req.params;
+      const photos = await storage.getTournamentPhotos(tournamentId);
+      res.json(photos);
+    } catch (error) {
+      console.error("Error fetching tournament photos:", error);
+      res.status(500).json({ error: "Failed to fetch photos" });
+    }
+  });
+
+  app.delete("/api/tournament-photos/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const photo = await storage.getTournamentPhoto(id);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+
+      if (photo.uploadedBy !== userId) {
+        return res.status(403).json({ error: "Unauthorized to delete this photo" });
+      }
+
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      await supabaseStorageService.deleteTournamentPhoto(photo.fileUrl);
+
+      await storage.deleteTournamentPhoto(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting tournament photo:", error);
+      res.status(500).json({ error: "Failed to delete photo" });
+    }
+  });
+
+  app.get("/api/tournament-photos/:tournamentId/download-zip", async (req, res) => {
+    try {
+      const { tournamentId } = req.params;
+      const photos = await storage.getTournamentPhotos(tournamentId);
+
+      if (photos.length === 0) {
+        return res.status(404).json({ error: "No photos found" });
+      }
+
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const archiver = require('archiver');
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="tournament-${tournamentId}-photos.zip"`);
+
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      archive.pipe(res);
+
+      for (const photo of photos) {
+        try {
+          const fileData = await supabaseStorageService.getTournamentPhotoFile(photo.fileUrl);
+          const buffer = Buffer.from(await fileData.data.arrayBuffer());
+          archive.append(buffer, { name: photo.fileName });
+        } catch (error) {
+          console.error(`Error adding photo ${photo.fileName} to zip:`, error);
+        }
+      }
+
+      await archive.finalize();
+    } catch (error) {
+      console.error("Error creating zip file:", error);
+      res.status(500).json({ error: "Failed to create zip file" });
+    }
+  });
+
   // League routes
   app.get("/api/leagues", async (req, res) => {
     try {
