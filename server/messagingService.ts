@@ -11,6 +11,7 @@ import {
   leagueMemberships,
   teams,
   tournamentTeams,
+  tournamentParticipants,
   chatPolls,
   chatPollVotes,
   paymentRequests,
@@ -635,33 +636,51 @@ export class MessagingService {
       team = regularTeam;
     }
 
-    // Get all approved team members from team_memberships
-    const teamMembershipsData = await db
-      .select({ userId: teamMemberships.userId })
-      .from(teamMemberships)
-      .where(and(
-        eq(teamMemberships.teamId, teamId),
-        eq(teamMemberships.status, 'approved')
-      ));
-
-    // Also get league members who are assigned to this team
-    const leagueMembershipsData = await db
-      .select({ userId: leagueMemberships.userId })
-      .from(leagueMemberships)
-      .where(and(
-        eq(leagueMemberships.assignedTeamId, teamId),
-        eq(leagueMemberships.status, 'approved')
-      ));
-
-    // Create a set of all unique team participants (members + captain + league-assigned members)
-    const participantIds = new Set<string>([
-      ...teamMembershipsData.map(m => m.userId),
-      ...leagueMembershipsData.map(m => m.userId)
-    ]);
+    let participantIds: Set<string>;
     
-    // Always add the captain if they exist
-    if (team.captainId) {
-      participantIds.add(team.captainId);
+    if (tournamentTeam && !tournamentTeam.teamId) {
+      // Standalone tournament team - get participants from tournamentParticipants table
+      const tournamentParticipantsData = await db
+        .select({ userId: tournamentParticipants.userId })
+        .from(tournamentParticipants)
+        .where(and(
+          eq(tournamentParticipants.tournamentTeamId, teamId),
+          eq(tournamentParticipants.status, 'approved')
+        ));
+      
+      participantIds = new Set(tournamentParticipantsData.map(p => p.userId));
+    } else {
+      // Regular team or tournament team with linked regular team
+      const actualTeamId = team?.id || teamId;
+      
+      // Get all approved team members from team_memberships
+      const teamMembershipsData = await db
+        .select({ userId: teamMemberships.userId })
+        .from(teamMemberships)
+        .where(and(
+          eq(teamMemberships.teamId, actualTeamId),
+          eq(teamMemberships.status, 'approved')
+        ));
+
+      // Also get league members who are assigned to this team
+      const leagueMembershipsData = await db
+        .select({ userId: leagueMemberships.userId })
+        .from(leagueMemberships)
+        .where(and(
+          eq(leagueMemberships.assignedTeamId, actualTeamId),
+          eq(leagueMemberships.status, 'approved')
+        ));
+
+      // Create a set of all unique team participants (members + captain + league-assigned members)
+      participantIds = new Set<string>([
+        ...teamMembershipsData.map(m => m.userId),
+        ...leagueMembershipsData.map(m => m.userId)
+      ]);
+      
+      // Always add the captain if they exist
+      if (team?.captainId) {
+        participantIds.add(team.captainId);
+      }
     }
 
     // Convert set back to array of objects for consistency with rest of code
