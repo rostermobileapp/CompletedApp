@@ -1905,6 +1905,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/tournaments/:tournamentId/participants", isAuthenticated, async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+      
+      const participants = await db
+        .select({
+          id: tournamentParticipants.id,
+          userId: tournamentParticipants.userId,
+          status: tournamentParticipants.status,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          profileImageUrl: users.profileImageUrl,
+        })
+        .from(tournamentParticipants)
+        .innerJoin(users, eq(tournamentParticipants.userId, users.id))
+        .where(eq(tournamentParticipants.tournamentId, tournamentId));
+
+      res.json(participants);
+    } catch (error) {
+      console.error("Error fetching tournament participants:", error);
+      res.status(500).json({ error: "Failed to fetch participants" });
+    }
+  });
+
   app.delete("/api/tournament-photos/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
