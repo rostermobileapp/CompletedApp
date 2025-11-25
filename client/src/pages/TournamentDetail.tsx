@@ -1562,11 +1562,10 @@ export default function TournamentDetail() {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 pt-[2px] pb-[2px] pl-[8px] pr-[8px]">
         <Tabs defaultValue="bracket" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 md:w-auto">
+          <TabsList className="grid w-full grid-cols-3 md:w-auto">
             <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
             <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
             <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
-            <TabsTrigger value="announcements" data-testid="tab-announcements">Announcements</TabsTrigger>
           </TabsList>
 
           {/* Bracket Tab */}
@@ -2174,90 +2173,6 @@ export default function TournamentDetail() {
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Announcements Tab */}
-          <TabsContent value="announcements">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Megaphone className="h-5 w-5" />
-                      Tournament Announcements
-                    </CardTitle>
-                    <CardDescription>
-                      Updates and announcements from the tournament commissioner
-                    </CardDescription>
-                  </div>
-                  
-                  {canManageTournament() && (
-                    <Button 
-                      onClick={() => setShowCreateAnnouncementModal(true)}
-                      size="sm"
-                      data-testid="button-create-tournament-announcement"
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Post Announcement
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {announcementsLoading ? (
-                  <div className="space-y-4">
-                    {[1, 2, 3].map((i) => (
-                      <Card key={i} className="animate-pulse">
-                        <CardHeader>
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-muted rounded-full" />
-                            <div className="space-y-2">
-                              <div className="h-4 bg-muted rounded w-32" />
-                              <div className="h-3 bg-muted rounded w-24" />
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
-                            <div className="h-4 bg-muted rounded w-full" />
-                            <div className="h-4 bg-muted rounded w-3/4" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : announcements.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Megaphone className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No Announcements Yet</h3>
-                    <p className="text-muted-foreground mb-4">
-                      {canManageTournament() 
-                        ? 'Be the first to share an announcement with tournament participants!'
-                        : 'Check back later for updates from the tournament commissioner.'
-                      }
-                    </p>
-                    {canManageTournament() && (
-                      <Button onClick={() => setShowCreateAnnouncementModal(true)}>
-                        <Plus className="w-4 h-4 mr-1" />
-                        Create First Announcement
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-6" data-testid="tournament-announcements-list">
-                    {announcements.map((announcement: Announcement) => (
-                      <TournamentAnnouncementCard
-                        key={announcement.id}
-                        announcement={announcement}
-                        tournamentId={tournamentId!}
-                        currentUserId={currentUser?.id || ''}
-                        isCommissioner={canManageTournament()}
-                      />
-                    ))}
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
