@@ -6,6 +6,34 @@ The platform now includes a sophisticated tournament system supporting diverse f
 
 # Recent Changes
 
+## November 25, 2025 - Additional Team Payment Enforcement & Dashboard Tournament Integration
+
+### Additional Team Payment for Paid Tournaments
+- **Feature**: When a paid tournament has new teams added via CSV import, additional payment is required
+- **Schema**: Added `paidTeamCount` field to tournaments table to track originally paid team count
+- **Backend Implementation**:
+  - Import endpoint `/api/tournaments/:tournamentId/players/import` now checks if tournament is paid and if new teams are being added
+  - Returns 402 response with `additionalTeamsCount`, `additionalFee`, and `newTeamsDetected` array when payment is required
+  - New endpoint `/api/tournaments/:tournamentId/additional-teams-checkout` creates Stripe session for additional team payments
+  - Webhook handles `additional_team_payment` type and increments `paidTeamCount` after successful payment
+- **Frontend Implementation**:
+  - Dialog in TournamentDetail.tsx informs users about additional payment requirement
+  - Shows breakdown of new teams detected and total fee ($10 per additional team)
+  - Redirects to Stripe checkout for payment
+
+### Dashboard Tournament Selection
+- **Feature**: Paid tournaments now appear in the Dashboard team/league selection dropdown
+- **Backend**: New endpoint `/api/user/paid-tournaments` fetches tournaments where user is either:
+  - A participant with "approved" status, OR
+  - The tournament creator (for standalone tournaments)
+- **Frontend Implementation**:
+  - Extended selection state type to support 'tournament' alongside 'team' and 'league'
+  - Added "MY TOURNAMENTS" section in dropdown with orange trophy icon
+  - Shows tournament name and unique ID
+  - Proper localStorage persistence for tournament selection
+- **Navigation**: Stats and Standings cards route to tournament detail page when tournament is selected
+- **Tournament-only Users**: Shows helpful info section with "View Tournament" button when no teams/leagues exist
+
 ## November 24, 2025 - Standalone Tournament Visibility & Team Assignment
 
 ### Unified Tournaments Landing Page
