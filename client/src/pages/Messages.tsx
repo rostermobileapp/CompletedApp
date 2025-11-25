@@ -53,7 +53,8 @@ interface Conversation {
   id: string;
   title?: string;
   type: 'direct' | 'team_group' | 'custom_group' | 'captain_only';
-  leagueId: string;
+  leagueId?: string;
+  tournamentId?: string;
   teamId?: string;
   createdBy: string;
   createdAt: string;

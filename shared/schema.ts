@@ -683,7 +683,8 @@ export const conversations = pgTable("conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   type: conversationTypeEnum("type").notNull(),
   title: varchar("title"), // For group chats, null for direct messages
-  leagueId: varchar("league_id").references(() => leagues.id).notNull(), // All conversations are within a league context
+  leagueId: varchar("league_id").references(() => leagues.id), // For league-based conversations
+  tournamentId: varchar("tournament_id").references(() => tournaments.id), // For tournament-based conversations
   teamId: varchar("team_id").references(() => teams.id), // For team group chats
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   lastMessageAt: timestamp("last_message_at"),
@@ -691,6 +692,7 @@ export const conversations = pgTable("conversations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_conversations_league_id").on(table.leagueId),
+  index("idx_conversations_tournament_id").on(table.tournamentId),
   index("idx_conversations_team_id").on(table.teamId),
   index("idx_conversations_last_message").on(table.lastMessageAt),
 ]);

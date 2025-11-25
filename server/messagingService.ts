@@ -10,6 +10,7 @@ import {
   teamMemberships,
   leagueMemberships,
   teams,
+  tournamentTeams,
   chatPolls,
   chatPollVotes,
   paymentRequests,
@@ -598,15 +599,40 @@ export class MessagingService {
 
   // Group conversation operations
   async createTeamGroupChat(teamId: string, leagueId: string, createdBy: string): Promise<Conversation> {
-    // Get the team to access the captain
-    const [team] = await db
+    // Check if this is a tournament team first
+    const [tournamentTeam] = await db
       .select()
-      .from(teams)
-      .where(eq(teams.id, teamId))
+      .from(tournamentTeams)
+      .where(eq(tournamentTeams.id, teamId))
       .limit(1);
 
-    if (!team) {
-      throw new Error(`Team ${teamId} not found`);
+    // If it's a tournament team, use tournamentId; otherwise, get regular team info
+    let tournamentId: string | undefined;
+    let team: any;
+    
+    if (tournamentTeam) {
+      tournamentId = tournamentTeam.tournamentId;
+      // For tournament teams, we might have a linked regular team or standalone
+      if (tournamentTeam.teamId) {
+        const [linkedTeam] = await db
+          .select()
+          .from(teams)
+          .where(eq(teams.id, tournamentTeam.teamId))
+          .limit(1);
+        team = linkedTeam;
+      }
+    } else {
+      // Regular team
+      const [regularTeam] = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+      
+      if (!regularTeam) {
+        throw new Error(`Team ${teamId} not found`);
+      }
+      team = regularTeam;
     }
 
     // Get all approved team members from team_memberships
@@ -662,13 +688,16 @@ export class MessagingService {
     };
 
     // Check if team group chat already exists
+    // For tournament teams, check by tournamentId; for regular teams, check by teamId
     const [existingChat] = await db
       .select()
       .from(conversations)
       .where(
         and(
           eq(conversations.type, "team_group"),
-          eq(conversations.teamId, teamId)
+          tournamentId 
+            ? eq(conversations.tournamentId, tournamentId)
+            : eq(conversations.teamId, teamId)
         )
       )
       .limit(1);
@@ -687,14 +716,17 @@ export class MessagingService {
       return existingChat;
     }
 
-    const teamName = team.name || 'Team';
+    const teamName = team?.name || tournamentTeam?.teamName || 'Team';
 
     // Create team group conversation
+    // For tournament teams: use tournamentId and linked team ID (if exists)
+    // For regular teams: use leagueId and teamId
     const conversation = await this.createConversation({
       type: "team_group",
       title: `${teamName} Team Chat`,
-      leagueId,
-      teamId,
+      leagueId: tournamentId ? undefined : leagueId,
+      tournamentId: tournamentId,
+      teamId: tournamentTeam ? (tournamentTeam.teamId || undefined) : teamId,
       createdBy,
     });
 
