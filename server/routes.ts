@@ -7209,10 +7209,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Announcement not found' });
       }
 
-      // Verify user is an approved member of the league
-      const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
-      if (!membership || membership.status !== 'approved') {
-        return res.status(404).json({ message: 'Announcement not found' });
+      // Verify user access (either league member or tournament participant)
+      if (announcement.leagueId) {
+        // League announcement - check league membership
+        const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
+        if (!membership || membership.status !== 'approved') {
+          return res.status(404).json({ message: 'Announcement not found' });
+        }
+      } else if (announcement.tournamentId) {
+        // Tournament announcement - check tournament participation
+        const [participant] = await db
+          .select()
+          .from(tournamentParticipants)
+          .where(
+            and(
+              eq(tournamentParticipants.tournamentId, announcement.tournamentId),
+              eq(tournamentParticipants.userId, userId),
+              eq(tournamentParticipants.status, 'approved')
+            )
+          );
+        
+        if (!participant) {
+          return res.status(404).json({ message: 'Announcement not found' });
+        }
       }
 
       // Check visibility for targeted announcements
@@ -7251,9 +7270,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Announcement not found' });
       }
 
-      const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
-      if (!membership || membership.status !== 'approved') {
-        return res.status(403).json({ message: 'Access denied' });
+      // Verify user access (either league member or tournament participant)
+      if (announcement.leagueId) {
+        // League announcement - check league membership
+        const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
+        if (!membership || membership.status !== 'approved') {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      } else if (announcement.tournamentId) {
+        // Tournament announcement - check tournament participation
+        const [participant] = await db
+          .select()
+          .from(tournamentParticipants)
+          .where(
+            and(
+              eq(tournamentParticipants.tournamentId, announcement.tournamentId),
+              eq(tournamentParticipants.userId, userId),
+              eq(tournamentParticipants.status, 'approved')
+            )
+          );
+        
+        if (!participant) {
+          return res.status(403).json({ message: 'Access denied' });
+        }
       }
 
       // Check if announcement is visible to this user (targeted visibility)
