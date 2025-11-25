@@ -1191,17 +1191,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log('[Webhook] Tournament payment completed for tournament:', tournamentId);
             
             if (tournamentId && session.payment_status === 'paid') {
+              // Get current team count to record as paid team count
+              const teamCount = await db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(tournamentTeams)
+                .where(eq(tournamentTeams.tournamentId, tournamentId));
+              const paidTeamCount = teamCount[0]?.count || 0;
+              
               await db
                 .update(tournaments)
                 .set({
                   paymentStatus: 'paid',
+                  paidTeamCount: paidTeamCount,
                   stripePaymentIntentId: session.payment_intent as string || null,
                   paidAt: new Date(),
                   updatedAt: new Date()
                 })
                 .where(eq(tournaments.id, tournamentId));
               
-              console.log('[Webhook] Tournament', tournamentId, 'marked as paid');
+              console.log('[Webhook] Tournament', tournamentId, 'marked as paid with', paidTeamCount, 'teams');
             }
           } 
           // Handle subscription checkout
