@@ -562,13 +562,13 @@ export default function TournamentDetail() {
       </div>
       {/* Payment Status Section - Commissioner Only */}
       {tournament && canManageTournament() && (
-        <div className="max-w-7xl mx-auto px-4 md:px-8 pb-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 pb-4 md:pb-6">
           <Card className={tournament.paymentStatus === 'paid' ? 'border-green-500/50' : 'border-amber-500/50'}>
-            <CardContent className="p-6 pt-[4px] pb-[4px]">
-              <div className="flex items-center justify-between gap-6">
+            <CardContent className="p-4 md:p-6 pt-[4px] pb-[4px]">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
                 {/* Left: Title and Status */}
                 <div className="space-y-1 flex-shrink-0">
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-base">
                     <DollarSign className="h-5 w-5" />
                     Tournament Payment
                   </CardTitle>
@@ -585,13 +585,13 @@ export default function TournamentDetail() {
                   )}
                 </div>
 
-                {/* Right: Info Boxes */}
-                <div className="flex gap-3 flex-1 items-center justify-end">
+                {/* Right: Info Boxes - Stack on mobile, flex on desktop */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:w-auto md:flex md:gap-3">
                   {/* Tournament ID */}
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50 min-w-fit">
-                    <div className="mr-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+                    <div className="mr-2 min-w-0">
                       <p className="text-xs text-muted-foreground">ID</p>
-                      <p className="text-base font-semibold font-mono" data-testid="text-tournament-id">{tournament.uniqueTournamentId}</p>
+                      <p className="text-sm md:text-base font-semibold font-mono truncate" data-testid="text-tournament-id">{tournament.uniqueTournamentId}</p>
                     </div>
                     <Button
                       variant="ghost"
@@ -613,19 +613,19 @@ export default function TournamentDetail() {
                   </div>
 
                   {/* Teams */}
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50 min-w-fit">
+                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
                     <div className="mr-2">
                       <p className="text-xs text-muted-foreground">Teams</p>
-                      <p className="text-base font-semibold" data-testid="text-team-count">{teams?.length || 0}</p>
+                      <p className="text-sm md:text-base font-semibold" data-testid="text-team-count">{teams?.length || 0}</p>
                     </div>
                     <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   </div>
 
                   {/* Payment Amount */}
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50 min-w-fit">
+                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
                     <div className="mr-2">
                       <p className="text-xs text-muted-foreground">Amount</p>
-                      <p className="text-base font-semibold" data-testid="text-payment-amount">
+                      <p className="text-sm md:text-base font-semibold" data-testid="text-payment-amount">
                         ${((tournament.paymentAmount || 0) / 100).toFixed(2)}
                       </p>
                     </div>
@@ -634,7 +634,7 @@ export default function TournamentDetail() {
                         onClick={() => paymentMutation.mutate()}
                         disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
                         size="sm"
-                        className="h-8 px-2 flex-shrink-0"
+                        className="h-8 px-2 flex-shrink-0 text-xs"
                         data-testid="button-pay-now"
                       >
                         {paymentMutation.isPending ? 'Processing...' : 'Pay'}
