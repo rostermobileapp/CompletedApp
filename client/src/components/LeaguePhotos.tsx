@@ -117,17 +117,21 @@ export function LeaguePhotos({
     }
   }, [showUploader]);
 
-  const { data: photos = [], isLoading } = useQuery<LeaguePhoto[]>({
-    queryKey: [`/api/league-photos/${leagueId}`],
-  });
-
   // Check if current user is an approved league member
-  const { data: membership } = useQuery<any>({
+  const { data: membership, isLoading: membershipLoading } = useQuery<any>({
     queryKey: [`/api/leagues/${leagueId}/membership`],
     enabled: !!currentUserId,
   });
 
   const isParticipant = currentUserId && membership?.status === 'approved';
+
+  // Only fetch photos if user is an approved member
+  const { data: photos = [], isLoading: photosLoading } = useQuery<LeaguePhoto[]>({
+    queryKey: [`/api/league-photos/${leagueId}`],
+    enabled: isParticipant,
+  });
+
+  const isLoading = membershipLoading || photosLoading;
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async (data: { fileUrl: string; fileName: string; fileSize: number }) => {
@@ -166,7 +170,7 @@ export function LeaguePhotos({
     if (!isParticipant) {
       toast({ 
         title: 'Permission denied', 
-        description: 'Only approved tournament participants can upload photos',
+        description: 'Only approved league members can upload photos',
         variant: 'destructive' 
       });
       return;
@@ -241,7 +245,7 @@ export function LeaguePhotos({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `tournament-${leagueId}-photos.zip`;
+      a.download = `league-${leagueId}-photos.zip`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -262,6 +266,20 @@ export function LeaguePhotos({
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Defense-in-depth: Even though MediaGalleryPage checks this, verify membership here
+  if (!isParticipant) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center max-w-md">
+          <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
+          <p className="text-muted-foreground">
+            You must be an approved member of this league to view photos.
+          </p>
+        </div>
       </div>
     );
   }

@@ -2116,9 +2116,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/league-photos/:leagueId", async (req, res) => {
+  app.get("/api/league-photos/:leagueId", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const { leagueId } = req.params;
+
+      // Get user info to check subscription
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || user.length === 0 || user[0].role === 'free_tier') {
+        return res.status(403).json({ error: "League photos require a paid subscription" });
+      }
+
+      // Check if user is an approved member of the league
+      const membership = await db
+        .select()
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, leagueId),
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.status, 'approved')
+          )
+        )
+        .limit(1);
+
+      if (!membership || membership.length === 0) {
+        return res.status(403).json({ error: "Only approved league members can view photos" });
+      }
+
       const photos = await storage.getLeaguePhotos(leagueId);
       res.json(photos);
     } catch (error) {
@@ -2137,8 +2162,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Photo not found" });
       }
 
+      // Check if user is the uploader
       if (photo.uploadedBy !== userId) {
         return res.status(403).json({ error: "Unauthorized to delete this photo" });
+      }
+
+      // Get user info to check subscription
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || user.length === 0 || user[0].role === 'free_tier') {
+        return res.status(403).json({ error: "League photos require a paid subscription" });
+      }
+
+      // Check if user is still an approved member of the league
+      const membership = await db
+        .select()
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, photo.leagueId),
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.status, 'approved')
+          )
+        )
+        .limit(1);
+
+      if (!membership || membership.length === 0) {
+        return res.status(403).json({ error: "Only approved league members can delete photos" });
       }
 
       const { SupabaseStorageService } = await import('./supabaseStorage');
@@ -2153,9 +2202,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/league-photos/:leagueId/download-zip", async (req, res) => {
+  app.get("/api/league-photos/:leagueId/download-zip", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const { leagueId } = req.params;
+
+      // Get user info to check subscription
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || user.length === 0 || user[0].role === 'free_tier') {
+        return res.status(403).json({ error: "League photos require a paid subscription" });
+      }
+
+      // Check if user is an approved member of the league
+      const membership = await db
+        .select()
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, leagueId),
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.status, 'approved')
+          )
+        )
+        .limit(1);
+
+      if (!membership || membership.length === 0) {
+        return res.status(403).json({ error: "Only approved league members can download photos" });
+      }
+
       const photos = await storage.getLeaguePhotos(leagueId);
 
       if (photos.length === 0) {
