@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX, User, ArrowRight, Megaphone, Plus, Heart, ThumbsUp, Laugh, Frown, Angry, Meh, MessageCircle, BarChart3, Pin, MoreHorizontal, Edit2, FileText, AlertCircle } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX, User, ArrowRight, Megaphone, Plus, Heart, ThumbsUp, Laugh, Frown, Angry, Meh, MessageCircle, BarChart3, Pin, MoreHorizontal, Edit2, FileText, AlertCircle, Camera } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1562,10 +1562,11 @@ export default function TournamentDetail() {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 pt-[2px] pb-[2px] pl-[8px] pr-[8px]">
         <Tabs defaultValue="bracket" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 md:w-auto">
+          <TabsList className="grid w-full grid-cols-4 md:w-auto">
             <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
             <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
             <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="photos" data-testid="tab-photos">Photos</TabsTrigger>
           </TabsList>
 
           {/* Bracket Tab */}
@@ -2172,6 +2173,30 @@ export default function TournamentDetail() {
                       No matches scheduled yet
                     </div>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Photos Tab */}
+          <TabsContent value="photos">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Camera className="h-5 w-5" />
+                      Tournament Photos
+                    </CardTitle>
+                    <CardDescription>
+                      Upload and view photos from the tournament
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-muted-foreground">
+                  Photo gallery component will be implemented here
                 </div>
               </CardContent>
             </Card>
