@@ -74,14 +74,26 @@ import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites } from "./emails";
 
 
-// Utility function to format game scheduledAt as timezone-agnostic string
+// Helper function to format date as local time string without timezone suffix
+// Returns format: "YYYY-MM-DDTHH:MM:SS" which prevents timezone adjustments on frontend
+function formatDateAsLocalString(date: Date | string | null | undefined): string {
+  if (!date) return new Date().toISOString().slice(0, 19);
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+// Utility function to format game scheduledAt as local time string (no timezone conversion)
 function formatGameForResponse(game: any) {
   if (game && game.scheduledAt) {
-    const date = new Date(game.scheduledAt);
-    // Return ISO string with timezone information so frontend can convert to local time
     return {
       ...game,
-      scheduledAt: date.toISOString()
+      scheduledAt: formatDateAsLocalString(game.scheduledAt)
     };
   }
   return game;
@@ -5021,7 +5033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Format matches like games
         const formattedMatches = matches.map(match => ({
           id: match.id,
-          scheduledAt: match.scheduledAt?.toISOString() || new Date().toISOString(),
+          scheduledAt: formatDateAsLocalString(match.scheduledAt),
           homeTeam: match.team1Id ? teamMap[match.team1Id] || { id: match.team1Id, name: 'TBD' } : { id: '', name: 'TBD' },
           awayTeam: match.team2Id ? teamMap[match.team2Id] || { id: match.team2Id, name: 'TBD' } : { id: '', name: 'TBD' },
           homeScore: match.homeScore,
