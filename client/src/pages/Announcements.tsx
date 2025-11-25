@@ -125,11 +125,13 @@ function CreateAnnouncementModal({
   isOpen, 
   onClose, 
   leagueId, 
+  tournamentId,
   canPost 
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
-  leagueId: string;
+  leagueId: string | null;
+  tournamentId?: string | null;
   canPost: boolean;
 }) {
   const [content, setContent] = useState('');
@@ -144,11 +146,18 @@ function CreateAnnouncementModal({
 
   const createAnnouncementMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest('POST', `/api/leagues/${leagueId}/announcements`, data);
+      const url = tournamentId 
+        ? `/api/tournaments/${tournamentId}/announcements`
+        : `/api/leagues/${leagueId}/announcements`;
+      const response = await apiRequest('POST', url, data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      if (tournamentId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      }
       toast({ title: 'Announcement created successfully!' });
       onClose();
       resetForm();
@@ -580,11 +589,13 @@ function PollCard({
 function AnnouncementCard({ 
   announcement, 
   leagueId, 
+  tournamentId,
   currentUserId, 
   isCommissioner 
 }: { 
   announcement: Announcement;
-  leagueId: string;
+  leagueId: string | null;
+  tournamentId?: string | null;
   currentUserId: string;
   isCommissioner: boolean;
 }) {
@@ -639,7 +650,11 @@ function AnnouncementCard({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      if (tournamentId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      }
     },
     onError: () => {
       toast({ title: 'Failed to update reaction', variant: 'destructive' });
@@ -652,7 +667,11 @@ function AnnouncementCard({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      if (tournamentId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      }
       toast({ title: 'Vote recorded successfully!' });
     },
     onError: () => {
@@ -666,7 +685,11 @@ function AnnouncementCard({
       return await apiRequest('PATCH', `/api/announcements/${announcement.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      if (tournamentId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      }
       toast({ title: 'Announcement updated successfully!' });
       setShowEditModal(false);
     },
@@ -681,7 +704,11 @@ function AnnouncementCard({
       return await apiRequest('DELETE', `/api/announcements/${announcement.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      if (tournamentId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      }
       toast({ title: 'Announcement deleted successfully!' });
       setShowDeleteConfirm(false);
     },
@@ -1013,7 +1040,7 @@ export default function Announcements() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Get the selected team or league from dashboard selection
-  const { selectedTeamId, selectedLeagueId } = useDashboardSelection();
+  const { selectedTeamId, selectedLeagueId, selectedType, selectedId } = useDashboardSelection();
 
   // Get user teams to find the league for a selected team
   const { data: userTeams = [] } = useQuery({
@@ -1027,11 +1054,26 @@ export default function Announcements() {
     enabled: !!user
   });
 
+  // Get user tournaments
+  const { data: userTournaments = [] } = useQuery({
+    queryKey: ['/api/user/paid-tournaments'],
+    enabled: !!user
+  });
+
   // Get user league memberships to check for commissioner role
   const { data: userMemberships = [] } = useQuery({
     queryKey: ['/api/user/league-memberships'],
     enabled: !!user
   });
+
+  // Determine if we're showing tournament or league announcements
+  const isTournamentContext = selectedType === 'tournament' && selectedId;
+  const tournamentId = isTournamentContext ? selectedId : null;
+
+  // Get tournament data if in tournament context
+  const currentTournament = tournamentId && Array.isArray(userTournaments)
+    ? userTournaments.find((t: any) => t.id === tournamentId)
+    : null;
 
   // Determine the effective league ID based on selection
   const selectedTeam = selectedTeamId && Array.isArray(userTeams) 
@@ -1042,12 +1084,15 @@ export default function Announcements() {
   const currentLeague = Array.isArray(userLeagues) && effectiveLeagueId
     ? userLeagues.find((league: any) => league.id === effectiveLeagueId)
     : (userLeagues as any[])[0];
-  const leagueId = currentLeague?.id;
+  const leagueId = !isTournamentContext ? currentLeague?.id : null;
   
   // Check if user is commissioner - either league owner or has commissioner role in membership
   const currentMembership = (userMemberships as any[]).find((m: any) => m.leagueId === leagueId);
-  const isCommissioner = currentLeague?.commissionerId === user?.id || 
+  const isLeagueCommissioner = currentLeague?.commissionerId === user?.id || 
                          currentMembership?.league_role === 'commissioner';
+
+  // Check if user is tournament commissioner
+  const isTournamentCommissioner = currentTournament?.commissionerId === user?.id;
 
   // Get teams in the league to check if user is a team captain
   const { data: teams = [] } = useQuery({
@@ -1059,28 +1104,42 @@ export default function Announcements() {
   const isTeamCaptain = (teams as any[]).some((team: any) => team.captainId === user?.id);
   
   // User can post if they're a commissioner or team captain AND have Player Pro tier or higher
-  const canPost = (isCommissioner || isTeamCaptain) && canAccessPremiumFeatures();
+  const canPost = isTournamentContext 
+    ? isTournamentCommissioner // Only tournament commissioners can post
+    : (isLeagueCommissioner || isTeamCaptain) && canAccessPremiumFeatures();
 
-  // Fetch announcements
+  // Fetch announcements - either tournament or league
   const { data, isLoading } = useQuery<{ announcements: Announcement[]; pagination?: { page: number; pageSize: number; total: number } }>({
-    queryKey: ['/api/leagues', leagueId, 'announcements'],
-    enabled: !!leagueId,
+    queryKey: isTournamentContext 
+      ? ['/api/tournaments', tournamentId, 'announcements']
+      : ['/api/leagues', leagueId, 'announcements'],
+    enabled: !!(tournamentId || leagueId),
   });
 
   // Mark announcements as read when page loads
   useEffect(() => {
-    if (leagueId && data?.announcements) {
+    if (isTournamentContext && tournamentId && data?.announcements) {
+      const markAsRead = async () => {
+        try {
+          await apiRequest('POST', `/api/tournaments/${tournamentId}/announcements/mark-read`);
+          console.log('📖 Tournament announcements marked as read');
+        } catch (error) {
+          console.error('Failed to mark tournament announcements as read:', error);
+        }
+      };
+      markAsRead();
+    } else if (leagueId && data?.announcements) {
       const markAsRead = async () => {
         try {
           await apiRequest('POST', `/api/leagues/${leagueId}/announcements/mark-read`);
-          console.log('📖 Announcements marked as read');
+          console.log('📖 League announcements marked as read');
         } catch (error) {
-          console.error('Failed to mark announcements as read:', error);
+          console.error('Failed to mark league announcements as read:', error);
         }
       };
       markAsRead();
     }
-  }, [leagueId, data?.announcements]);
+  }, [isTournamentContext, tournamentId, leagueId, data?.announcements]);
 
   // Normalize the data to handle both array and object responses
   const announcements: Announcement[] = Array.isArray(data) ? data : (data?.announcements ?? []);
@@ -1100,13 +1159,13 @@ export default function Announcements() {
     return null;
   }
 
-  if (!currentLeague) {
+  if (!currentLeague && !currentTournament) {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center px-6 pb-20" data-testid="no-league-state">
         <Megaphone className="w-16 h-16 text-muted-foreground mb-4" />
-        <h2 className="text-xl font-bold text-[#212121] dark:text-white mb-2">No League Found</h2>
+        <h2 className="text-xl font-bold text-[#212121] dark:text-white mb-2">No Context Found</h2>
         <p className="text-muted-foreground text-center mb-6">
-          You need to join a league to view announcements
+          You need to join a league or tournament to view announcements
         </p>
         <Button 
           onClick={() => navigate('/leagues')}
@@ -1119,6 +1178,8 @@ export default function Announcements() {
     );
   }
 
+  const contextName = isTournamentContext ? currentTournament?.name : currentLeague?.name;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -1129,7 +1190,7 @@ export default function Announcements() {
               <Megaphone className="w-6 h-6 text-primary" />
               <div>
                 <h1 className="text-xl font-semibold">News</h1>
-                <p className="text-sm text-muted-foreground">{currentLeague.name}</p>
+                <p className="text-sm text-muted-foreground">{contextName}</p>
               </div>
             </div>
             
@@ -1194,9 +1255,10 @@ export default function Announcements() {
               <AnnouncementCard
                 key={announcement.id}
                 announcement={announcement}
-                leagueId={leagueId}
+                leagueId={isTournamentContext ? null : leagueId}
+                tournamentId={isTournamentContext ? tournamentId : null}
                 currentUserId={user.id}
-                isCommissioner={isCommissioner}
+                isCommissioner={isTournamentContext ? isTournamentCommissioner : isLeagueCommissioner}
               />
             ))}
           </div>
@@ -1207,7 +1269,8 @@ export default function Announcements() {
       <CreateAnnouncementModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        leagueId={leagueId}
+        leagueId={isTournamentContext ? null : leagueId}
+        tournamentId={isTournamentContext ? tournamentId : null}
         canPost={canPost}
       />
     </div>

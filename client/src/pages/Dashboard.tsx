@@ -1853,13 +1853,7 @@ export default function Dashboard() {
           <div 
             className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-announcements"
-            onClick={() => {
-              if (selectedType === 'tournament' && selectedId) {
-                navigate(`/tournaments/${selectedId}`);
-              } else {
-                navigate('/announcements');
-              }
-            }}
+            onClick={() => navigate('/announcements')}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <Megaphone className="w-8 h-8 text-blue-500 mb-3" />
