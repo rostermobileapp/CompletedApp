@@ -30,6 +30,7 @@ import MatchEditDialog from "@/components/MatchEditDialog";
 import TournamentMatchScoreModal from "@/components/TournamentMatchScoreModal";
 import { CustomBracketBuilder } from "@/components/CustomBracketBuilder";
 import { EnhancedMediaUploader } from "@/components/EnhancedMediaUploader";
+import { TournamentPhotos } from "@/components/TournamentPhotos";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
@@ -2182,22 +2183,21 @@ export default function TournamentDetail() {
           <TabsContent value="photos">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Camera className="h-5 w-5" />
-                      Tournament Photos
-                    </CardTitle>
-                    <CardDescription>
-                      Upload and view photos from the tournament
-                    </CardDescription>
-                  </div>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Camera className="h-5 w-5" />
+                    Tournament Photos
+                  </CardTitle>
+                  <CardDescription>
+                    Upload and view photos from the tournament
+                  </CardDescription>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  Photo gallery component will be implemented here
-                </div>
+                <TournamentPhotos 
+                  tournamentId={tournamentId!} 
+                  currentUserId={currentUser?.id}
+                />
               </CardContent>
             </Card>
           </TabsContent>
