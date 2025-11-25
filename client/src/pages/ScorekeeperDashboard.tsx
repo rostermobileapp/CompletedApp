@@ -308,7 +308,7 @@ export default function ScorekeeperDashboard() {
     const textColor = team === 'home' ? 'text-blue-500' : 'text-red-500';
 
     return (
-      <div className={`flex-1 border rounded-lg p-3 ${bgColor}`}>
+      <div className="flex-1 border rounded-lg p-3 border-red-500/30 bg-[#212121]">
         {/* Team Header with Score */}
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-lg truncate">{teamName}</h3>
@@ -316,7 +316,6 @@ export default function ScorekeeperDashboard() {
             {goals.length}
           </div>
         </div>
-
         {!showPenalties ? (
           <>
             {/* Goal Entry Row */}
