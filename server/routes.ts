@@ -7420,6 +7420,210 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== TOURNAMENT ANNOUNCEMENT ROUTES ==========
+
+  // Get unread tournament announcements count
+  app.get('/api/tournaments/:tournamentId/announcements/unread-count', isAuthenticated, async (req: any, res) => {
+    try {
+      const tournamentId = req.params.tournamentId;
+      const userId = req.user.claims.sub;
+
+      // Check if user is tournament participant
+      const [participant] = await db
+        .select()
+        .from(tournamentParticipants)
+        .where(
+          and(
+            eq(tournamentParticipants.tournamentId, tournamentId),
+            eq(tournamentParticipants.userId, userId),
+            eq(tournamentParticipants.status, 'approved')
+          )
+        );
+
+      if (!participant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Get actual unread count using proper read tracking
+      const unreadCount = await storage.getUnreadTournamentAnnouncementCount(tournamentId, userId);
+      
+      res.json({ count: unreadCount });
+    } catch (error) {
+      console.error('Error getting unread tournament announcement count:', error);
+      res.status(500).json({ message: 'Failed to get unread count' });
+    }
+  });
+
+  // Get announcements for a tournament
+  app.get('/api/tournaments/:tournamentId/announcements', isAuthenticated, async (req: any, res) => {
+    try {
+      const tournamentId = req.params.tournamentId;
+      const userId = req.user.claims.sub;
+
+      // Check if user is tournament participant
+      const [participant] = await db
+        .select()
+        .from(tournamentParticipants)
+        .where(
+          and(
+            eq(tournamentParticipants.tournamentId, tournamentId),
+            eq(tournamentParticipants.userId, userId),
+            eq(tournamentParticipants.status, 'approved')
+          )
+        );
+
+      if (!participant) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Parse and validate query parameters
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20)); // Default 20, max 50
+      const orderBy = req.query.orderBy === 'createdAt' ? 'createdAt' : 'createdAt'; // Only support createdAt for now
+      const orderDirection = req.query.orderDirection === 'asc' ? 'asc' : 'desc'; // Default desc (newest first)
+      const offset = (page - 1) * limit;
+
+      // Get announcements with visibility filtering handled at SQL level
+      const result = await storage.getTournamentAnnouncements(tournamentId, {
+        limit,
+        offset,
+        orderBy,
+        orderDirection,
+      }, userId);
+
+      // Pagination is now accurate since visibility filtering happens in SQL
+      res.json({
+        announcements: result.announcements,
+        pagination: {
+          page,
+          limit,
+          total: result.total,
+          totalPages: Math.ceil(result.total / limit),
+          hasNext: page * limit < result.total,
+          hasPrev: page > 1,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching tournament announcements:', error);
+      res.status(500).json({ message: 'Failed to fetch announcements' });
+    }
+  });
+
+  // Create tournament announcement (commissioner only)
+  app.post('/api/tournaments/:tournamentId/announcements', isAuthenticated, async (req: any, res) => {
+    try {
+      const tournamentId = req.params.tournamentId;
+      const userId = req.user.claims.sub;
+
+      // Check if user is tournament commissioner
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      const isCommissioner = tournament.commissionerId === userId;
+
+      if (!isCommissioner) {
+        return res.status(403).json({ message: 'Only tournament commissioners can create announcements' });
+      }
+
+      const requestBody = req.body;
+      console.log('📝 Creating tournament announcement with data:', JSON.stringify(requestBody, null, 2));
+      
+      const { targetUserIds, ...announcementData } = createAnnouncementRequestSchema.parse(requestBody);
+      
+      let announcement;
+      
+      // Validate targetUserIds if provided - ensure they are tournament participants
+      if (targetUserIds && targetUserIds.length > 0) {
+        console.log('🎯 Validating targeted tournament announcement user IDs:', targetUserIds);
+        const validUserIds = [];
+        for (const targetUserId of targetUserIds) {
+          const [participant] = await db
+            .select()
+            .from(tournamentParticipants)
+            .where(
+              and(
+                eq(tournamentParticipants.tournamentId, tournamentId),
+                eq(tournamentParticipants.userId, targetUserId),
+                eq(tournamentParticipants.status, 'approved')
+              )
+            );
+          
+          if (participant) {
+            validUserIds.push(targetUserId);
+          } else {
+            console.warn(`⚠️ User ${targetUserId} is not an approved participant of tournament ${tournamentId}, excluding from targets`);
+          }
+        }
+        
+        if (validUserIds.length === 0) {
+          return res.status(400).json({ message: 'None of the specified users are valid tournament participants' });
+        }
+        
+        // Create announcement
+        announcement = await storage.createAnnouncement({
+          ...announcementData,
+          tournamentId,
+          authorId: userId,
+          teamId: null,
+        });
+        
+        // Create visibility records for targeted users + author
+        const visibilityUserIds = Array.from(new Set([...validUserIds, userId])); // Include author and remove duplicates
+        console.log(`🔒 Creating visibility records for ${visibilityUserIds.length} users (including author)`);
+        await storage.createAnnouncementVisibility(announcement.id, visibilityUserIds);
+        
+        console.log(`✅ Created targeted tournament announcement ${announcement.id} for users: ${validUserIds.join(', ')}`);
+      } else {
+        // Create regular announcement visible to all tournament participants
+        announcement = await storage.createAnnouncement({
+          ...announcementData,
+          tournamentId,
+          authorId: userId,
+          teamId: null,
+        });
+        
+        console.log(`📢 Created tournament commissioner announcement ${announcement.id} (visible to all)`);
+      }
+
+      // Handle attachments if provided
+      if (requestBody.attachments && Array.isArray(requestBody.attachments)) {
+        console.log('📎 Processing attachments:', requestBody.attachments);
+        for (const attachment of requestBody.attachments) {
+          await storage.createAnnouncementAttachment({
+            announcementId: announcement.id,
+            type: attachment.type,
+            url: attachment.url,
+            filename: attachment.fileName,
+          });
+        }
+      }
+
+      // Handle poll if provided
+      if (requestBody.poll && requestBody.poll.question) {
+        console.log('📊 Processing poll:', requestBody.poll);
+        await storage.createAnnouncementPoll({
+          announcementId: announcement.id,
+          question: requestBody.poll.question,
+          options: requestBody.poll.options,
+          allowMultiple: requestBody.poll.allowMultiple || false,
+        });
+      }
+
+      // Return the full announcement with attachments and polls
+      const fullAnnouncement = await storage.getAnnouncement(announcement.id);
+      res.json(fullAnnouncement);
+    } catch (error) {
+      console.error('Error creating tournament announcement:', error);
+      res.status(500).json({ message: 'Failed to create announcement' });
+    }
+  });
+
   // ========== SCRIMMAGE ROUTES ==========
 
   // Custom schema for API request that handles string-to-Date conversion
