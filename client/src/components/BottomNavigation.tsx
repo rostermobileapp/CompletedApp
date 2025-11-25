@@ -2,19 +2,12 @@ import { Users, MessageCircle, User, DollarSign } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
-
-// Define fixed navigation shortcuts
-const FIXED_SHORTCUTS = [
-  { id: 'teams', icon: Users, label: 'My Team', path: '/teams' },
-  { id: 'messages', icon: MessageCircle, label: 'Messages', path: '/messages' },
-  { id: 'home', icon: null, label: 'Home', path: '/' },
-  { id: 'payments', icon: DollarSign, label: 'Payments', path: '/payment-requests' },
-  { id: 'profile', icon: User, label: 'Profile', path: '/profile' },
-];
 
 export function BottomNavigation() {
   const [location, navigate] = useLocation();
+  const { selectedType, selectedId } = useDashboardSelection();
   
   // Fetch unread message count
   const { data: unreadData } = useQuery({
@@ -45,11 +38,36 @@ export function BottomNavigation() {
   
   const activeId = getActiveId(location);
   
-  const handleNavClick = (shortcut: typeof FIXED_SHORTCUTS[0]) => {
-    if (shortcut.path) {
-      navigate(shortcut.path);
+  const handleNavClick = (shortcutId: string) => {
+    // Handle dynamic routing based on dashboard selection
+    if (shortcutId === 'teams') {
+      if (selectedType === 'tournament' && selectedId) {
+        // Navigate to tournament detail page for tournament teams
+        navigate(`/tournament/${selectedId}`);
+      } else {
+        // Navigate to teams page for league teams
+        navigate('/teams');
+      }
+    } else if (shortcutId === 'messages') {
+      // Messages page filters automatically based on dashboard selection
+      navigate('/messages');
+    } else if (shortcutId === 'home') {
+      navigate('/');
+    } else if (shortcutId === 'payments') {
+      navigate('/payment-requests');
+    } else if (shortcutId === 'profile') {
+      navigate('/profile');
     }
   };
+  
+  // Define fixed navigation shortcuts
+  const FIXED_SHORTCUTS = [
+    { id: 'teams', icon: Users, label: 'My Team' },
+    { id: 'messages', icon: MessageCircle, label: 'Messages' },
+    { id: 'home', icon: null, label: 'Home' },
+    { id: 'payments', icon: DollarSign, label: 'Payments' },
+    { id: 'profile', icon: User, label: 'Profile' },
+  ];
   
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50" data-testid="bottom-navigation">
@@ -61,7 +79,7 @@ export function BottomNavigation() {
           return (
             <button
               key={shortcut.id}
-              onClick={() => handleNavClick(shortcut)}
+              onClick={() => handleNavClick(shortcut.id)}
               className={cn(
                 "flex flex-col items-center py-2 w-full transition-colors",
                 isActive ? "text-primary" : "text-[#212121]/70 dark:text-muted-foreground"

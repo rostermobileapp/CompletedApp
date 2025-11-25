@@ -464,7 +464,7 @@ export default function Messages() {
   const { canAccessPremiumFeatures } = usePermissions();
   const currentUserId = (user as any)?.id;
   const params = useParams();
-  const { selectedTeamId, selectedLeagueId } = useDashboardSelection();
+  const { selectedTeamId, selectedLeagueId, selectedTournamentId } = useDashboardSelection();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
 
   // Handle conversation ID from URL parameter
@@ -543,12 +543,16 @@ export default function Messages() {
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
-  // Filter conversations by selected league and/or team (client-side for instant filtering)
+  // Filter conversations by selected league, team, or tournament (client-side for instant filtering)
   const conversations = useMemo(() => {
     let filtered = allConversations;
     
+    // Filter by tournament if one is selected
+    if (selectedTournamentId) {
+      filtered = filtered.filter(conv => conv.tournamentId === selectedTournamentId);
+    }
     // Filter by league if one is selected
-    if (selectedLeagueId) {
+    else if (selectedLeagueId) {
       filtered = filtered.filter(conv => conv.leagueId === selectedLeagueId);
     }
     
@@ -562,7 +566,7 @@ export default function Messages() {
     }
     
     return filtered;
-  }, [allConversations, selectedLeagueId, selectedTeamId]);
+  }, [allConversations, selectedLeagueId, selectedTeamId, selectedTournamentId]);
 
   // Fetch unread message counts per conversation
   const { data: unreadCountsData } = useQuery<{ unreadCounts: Array<{ conversationId: string; unreadCount: number }> }>({

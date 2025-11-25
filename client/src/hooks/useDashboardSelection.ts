@@ -9,9 +9,9 @@ export function notifyDashboardSelectionChange() {
 }
 
 export function useDashboardSelection() {
-  const [selectedType, setSelectedType] = useState<'team' | 'league' | null>(() => {
+  const [selectedType, setSelectedType] = useState<'team' | 'league' | 'tournament' | null>(() => {
     const saved = localStorage.getItem('dashboardSelectedType');
-    return (saved === 'team' || saved === 'league') ? saved : null;
+    return (saved === 'team' || saved === 'league' || saved === 'tournament') ? saved : null;
   });
   
   const [selectedId, setSelectedId] = useState<string | null>(() => {
@@ -23,7 +23,7 @@ export function useDashboardSelection() {
     const updateFromLocalStorage = () => {
       const type = localStorage.getItem('dashboardSelectedType');
       const id = localStorage.getItem('dashboardSelectedId');
-      setSelectedType((type === 'team' || type === 'league') ? type : null);
+      setSelectedType((type === 'team' || type === 'league' || type === 'tournament') ? type : null);
       setSelectedId(id);
     };
 
@@ -50,6 +50,7 @@ export function useDashboardSelection() {
 
   const selectedTeamId = selectedType === 'team' ? selectedId : null;
   const selectedLeagueId = selectedType === 'league' ? selectedId : null;
+  const selectedTournamentId = selectedType === 'tournament' ? selectedId : null;
 
   // Setter functions to update the selection
   const setTeamSelection = (teamId: string) => {
@@ -67,13 +68,23 @@ export function useDashboardSelection() {
     setSelectedId(leagueId);
     notifyDashboardSelectionChange();
   };
+  
+  const setTournamentSelection = (tournamentId: string) => {
+    localStorage.setItem('dashboardSelectedType', 'tournament');
+    localStorage.setItem('dashboardSelectedId', tournamentId);
+    setSelectedType('tournament');
+    setSelectedId(tournamentId);
+    notifyDashboardSelectionChange();
+  };
 
   return {
     selectedType,
     selectedId,
     selectedTeamId,
     selectedLeagueId,
+    selectedTournamentId,
     setTeamSelection,
     setLeagueSelection,
+    setTournamentSelection,
   };
 }
