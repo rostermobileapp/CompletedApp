@@ -1,8 +1,10 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TournamentPhotos } from "@/components/TournamentPhotos";
+import { LeaguePhotos } from "@/components/LeaguePhotos";
+import { usePermissions } from "@/context/SubscriptionContext";
 import { useState } from "react";
 
 export default function MediaGalleryPage() {
@@ -11,10 +13,14 @@ export default function MediaGalleryPage() {
   const [, navigate] = useLocation();
   const [showUploader, setShowUploader] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const { userRole } = usePermissions();
 
   // Determine entity type and ID
   const entityType = tournamentParams ? 'tournament' : leagueParams ? 'league' : null;
   const entityId = tournamentParams?.id || leagueParams?.id;
+  
+  // Check if user has paid access (not free tier) for league photos
+  const hasPaidAccess = userRole !== 'free_tier';
 
   // Fetch current user
   const { data: currentUser } = useQuery<any>({
@@ -38,9 +44,20 @@ export default function MediaGalleryPage() {
     enabled: !!entityId && entityType === 'tournament' && !!currentUser?.id,
   });
 
-  const isParticipant = currentUser?.id && participants.some(
+  const isTournamentParticipant = currentUser?.id && participants.some(
     (p) => p.userId === currentUser.id && p.status === 'approved'
   );
+  
+  // Check if current user is a league member (for leagues)
+  const { data: leagueMembership } = useQuery<any>({
+    queryKey: [`/api/leagues/${entityId}/membership`],
+    enabled: !!entityId && entityType === 'league' && !!currentUser?.id,
+  });
+  
+  const isLeagueMember = leagueMembership?.status === 'approved';
+  
+  // Determine if user can upload based on entity type
+  const canUpload = entityType === 'tournament' ? isTournamentParticipant : (entityType === 'league' && isLeagueMember && hasPaidAccess);
 
   const entity = tournament || league;
   const entityName = entity?.name || 'Photos';
@@ -70,7 +87,7 @@ export default function MediaGalleryPage() {
             <h1 className="text-xl font-semibold" data-testid="text-entity-name">{entityName}</h1>
             <p className="text-sm text-muted-foreground">Photo Gallery</p>
           </div>
-          {isParticipant && (
+          {canUpload && (
             <Button
               onClick={() => setShowUploader(true)}
               disabled={isUploading}
@@ -106,10 +123,32 @@ export default function MediaGalleryPage() {
           />
         )}
         {entityType === 'league' && entityId && (
-          <div className="p-6 text-center">
-            <Camera className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">League photo galleries coming soon!</p>
-          </div>
+          hasPaidAccess ? (
+            <LeaguePhotos 
+              leagueId={entityId} 
+              currentUserId={currentUser?.id}
+              showUploader={showUploader}
+              onShowUploaderChange={setShowUploader}
+              onUploadStart={() => setIsUploading(true)}
+              onUploadComplete={() => setIsUploading(false)}
+            />
+          ) : (
+            <div className="p-12 text-center max-w-md mx-auto">
+              <div className="rounded-full bg-muted w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Premium Feature</h3>
+              <p className="text-muted-foreground mb-6">
+                League photo galleries are available for paid subscribers only. Upgrade your account to access this feature.
+              </p>
+              <Button 
+                onClick={() => navigate('/payments')}
+                className="bg-primary hover:bg-primary/90"
+              >
+                Upgrade Now
+              </Button>
+            </div>
+          )
         )}
       </div>
     </div>

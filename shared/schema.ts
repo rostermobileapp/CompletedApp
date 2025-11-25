@@ -551,6 +551,22 @@ export const tournamentPhotos = pgTable("tournament_photos", {
   index("idx_tournament_photos_uploaded_at").on(table.uploadedAt),
 ]);
 
+// League photos table - stores photos uploaded to leagues
+export const leaguePhotos = pgTable("league_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leagueId: varchar("league_id").references(() => leagues.id, { onDelete: 'cascade' }).notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull().default(0),
+  caption: text("caption"),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_league_photos_league_id").on(table.leagueId),
+  index("idx_league_photos_uploaded_by").on(table.uploadedBy),
+  index("idx_league_photos_uploaded_at").on(table.uploadedAt),
+]);
+
 // Personal reminders table
 export const personalReminders = pgTable("personal_reminders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

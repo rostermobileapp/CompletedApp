@@ -1846,9 +1846,9 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* 3-Card Section */}
+      {/* 4-Card Section */}
       <div className="px-6 mb-6">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           {/* Announcements Card */}
           <div 
             className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
@@ -1882,6 +1882,19 @@ export default function Dashboard() {
                 <p className="text-xs font-medium">Photos</p>
               </div>
             </div>
+          ) : selectedType === 'league' && effectiveLeagueId ? (
+            <div 
+              className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
+              data-testid="card-photos"
+              onClick={() => {
+                navigate(`/media/league/${effectiveLeagueId}`);
+              }}
+            >
+              <div className="h-full flex flex-col items-center justify-center">
+                <Camera className="w-8 h-8 text-blue-500 mb-3" />
+                <p className="text-xs font-medium">Photos</p>
+              </div>
+            </div>
           ) : (
             <div 
               className="rounded-xl border border-border p-5 min-h-[72px] bg-[#e2e2e2] dark:bg-[#212121] opacity-50" 
@@ -1890,10 +1903,25 @@ export default function Dashboard() {
               <div className="h-full flex flex-col items-center justify-center">
                 <Camera className="w-8 h-8 text-muted-foreground mb-3" />
                 <p className="text-xs font-medium text-muted-foreground">Photos</p>
-                <p className="text-[10px] text-muted-foreground mt-1">Tournaments Only</p>
               </div>
             </div>
           )}
+
+          {/* Stats Card */}
+          <div 
+            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+            data-testid="card-stats"
+            onClick={() => {
+              if (primaryTeam) {
+                navigate(`/teams/${primaryTeam.id}`);
+              }
+            }}
+          >
+            <div className="h-full flex flex-col items-center justify-center">
+              <BarChart3 className="w-8 h-8 text-blue-500 mb-3" />
+              <p className="text-xs font-medium">Stats</p>
+            </div>
+          </div>
 
           {/* Standings Card */}
           <div 
