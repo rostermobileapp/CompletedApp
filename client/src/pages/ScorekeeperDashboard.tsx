@@ -889,13 +889,13 @@ export default function ScorekeeperDashboard() {
         </Tabs>
       )}
 
-      {!selectedLeague && (
+      {!selectedId && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-8 text-center">
             <Users className="h-10 w-10 text-muted-foreground mb-3" />
-            <h3 className="font-medium mb-1">Select a League</h3>
+            <h3 className="font-medium mb-1">Select a League or Tournament</h3>
             <p className="text-sm text-muted-foreground">
-              Choose a league to start managing game scores.
+              Choose a league or tournament to start managing game scores.
             </p>
           </CardContent>
         </Card>
