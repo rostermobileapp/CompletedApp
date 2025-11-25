@@ -62,15 +62,6 @@ export function SlideOutMenu() {
       iconColor: 'text-green-500',
     },
     {
-      icon: Trophy,
-      label: 'Tournaments',
-      path: '/tournaments',
-      locked: false,
-      requiredTier: null,
-      bgColor: 'bg-orange-500/20',
-      iconColor: 'text-orange-500',
-    },
-    {
       icon: Crown,
       label: 'League Management',
       path: '/league-list',
@@ -78,6 +69,15 @@ export function SlideOutMenu() {
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-amber-500/20',
       iconColor: 'text-amber-500',
+    },
+    {
+      icon: Trophy,
+      label: 'Tournaments',
+      path: '/tournaments',
+      locked: false,
+      requiredTier: null,
+      bgColor: 'bg-orange-500/20',
+      iconColor: 'text-orange-500',
     },
     {
       icon: Target,
