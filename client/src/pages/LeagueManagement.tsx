@@ -360,7 +360,8 @@ const editGameSchema = z.object({
   gameDate: z.string().min(1, 'Game date is required'),
   gameTime: z.string().min(1, 'Game time is required'),
   venue: z.string().optional(),
-  lockerRoom: z.string().optional(),
+  homeTeamLockerRoom: z.string().optional(),
+  awayTeamLockerRoom: z.string().optional(),
 });
 
 type EditGameForm = z.infer<typeof editGameSchema>;
@@ -873,6 +874,8 @@ export default function LeagueManagement() {
       gameDate: '',
       gameTime: '',
       venue: '',
+      homeTeamLockerRoom: '',
+      awayTeamLockerRoom: '',
     },
   });
 
@@ -888,7 +891,8 @@ export default function LeagueManagement() {
         gameDate: formattedDate,
         gameTime: formattedTime,
         venue: selectedGame.venue || '',
-        lockerRoom: selectedGame.lockerRoom || '',
+        homeTeamLockerRoom: selectedGame.homeTeamLockerRoom || '',
+        awayTeamLockerRoom: selectedGame.awayTeamLockerRoom || '',
       });
     }
   }, [selectedGame]);
@@ -1693,7 +1697,8 @@ export default function LeagueManagement() {
         homeTeamId: data.homeTeamId,
         awayTeamId: data.awayTeamId,
         venue: data.venue,
-        lockerRoom: data.lockerRoom,
+        homeTeamLockerRoom: data.homeTeamLockerRoom,
+        awayTeamLockerRoom: data.awayTeamLockerRoom,
       };
       
       if (shouldUpdateScheduledAt) {
@@ -4222,9 +4227,9 @@ export default function LeagueManagement() {
       {showEditGame && selectedGame && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold">Edit Game</h2>
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-bold">Edit Game</h2>
                 <button
                   onClick={() => {
                     setShowEditGame(false);
@@ -4233,7 +4238,7 @@ export default function LeagueManagement() {
                   className="text-muted-foreground hover:text-foreground p-1"
                   data-testid="button-close-edit-game"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
@@ -4245,306 +4250,288 @@ export default function LeagueManagement() {
                     originalScheduledAt: selectedGame.scheduledAt
                   });
                 })}
-                className="space-y-4"
+                className="space-y-2"
               >
-                {/* Home Team */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Home Team</label>
-                  <select
-                    {...editGameForm.register('homeTeamId')}
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    data-testid="select-home-team"
-                  >
-                    <option value="">Select home team</option>
-                    {teams.map((team: Team) => (
-                      <option key={team.id} value={team.id}>{team.name}</option>
-                    ))}
-                  </select>
-                  {editGameForm.formState.errors.homeTeamId && (
-                    <p className="text-red-500/50 text-sm mt-1">
-                      {editGameForm.formState.errors.homeTeamId.message}
-                    </p>
-                  )}
-                </div>
-
-                {/* Away Team */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Away Team</label>
-                  <select
-                    {...editGameForm.register('awayTeamId')}
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    data-testid="select-away-team"
-                  >
-                    <option value="">Select away team</option>
-                    {teams.map((team: Team) => (
-                      <option key={team.id} value={team.id}>{team.name}</option>
-                    ))}
-                  </select>
-                  {editGameForm.formState.errors.awayTeamId && (
-                    <p className="text-red-500/50 text-sm mt-1">
-                      {editGameForm.formState.errors.awayTeamId.message}
-                    </p>
-                  )}
-                </div>
-
-                {/* Date */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Game Date</label>
-                  <div className="relative">
-                    <Controller
-                      name="gameDate"
-                      control={editGameForm.control}
-                      render={({ field }) => (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setShowDatePicker(!showDatePicker)}
-                            className="w-full p-3 pr-12 bg-card text-card-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
-                            data-testid="button-game-date"
-                          >
-                            {field.value ? (() => {
-                              const [year, month, day] = field.value.split('-');
-                              const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                              return date.toLocaleDateString();
-                            })() : 'Select date'}
-                          </button>
-                          <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
-                          {showDatePicker && (
-                            <div 
-                              ref={datePickerRef}
-                              className="absolute z-50 mt-1 bg-white dark:bg-card border border-border rounded-lg shadow-lg min-w-[350px]"
-                            >
-                              <DayPicker
-                                mode="single"
-                                selected={field.value ? (() => {
-                                  const [year, month, day] = field.value.split('-');
-                                  return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                                })() : undefined}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    // Use local date components to avoid timezone issues
-                                    const year = date.getFullYear();
-                                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                                    const day = String(date.getDate()).padStart(2, '0');
-                                    const dateString = `${year}-${month}-${day}`;
-                                    field.onChange(dateString);
-                                    setShowDatePicker(false);
-                                  }
-                                }}
-                                className="p-4"
-                                classNames={{
-                                  today: "rdp-cell_today bg-primary/20 text-black font-bold text-lg w-12 h-12",
-                                  selected: "rdp-cell_selected bg-primary text-white font-bold text-lg w-12 h-12",
-                                  root: "text-black text-lg",
-                                  day: "text-black hover:bg-gray-100 text-lg w-12 h-12 flex items-center justify-center cursor-pointer",
-                                  nav_button: "text-black hover:bg-gray-100 w-10 h-10 flex items-center justify-center",
-                                  caption: "text-black font-medium text-xl mb-4",
-                                  head_cell: "text-black font-medium text-base p-2",
-                                  table: "w-full border-spacing-1",
-                                  cell: "text-center p-1",
-                                } as any}
-                              />
-                            </div>
-                          )}
-                        </>
-                      )}
-                    />
+                {/* Teams Row */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Home Team</label>
+                    <select
+                      {...editGameForm.register('homeTeamId')}
+                      className="w-full p-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      data-testid="select-home-team"
+                    >
+                      <option value="">Select</option>
+                      {teams.map((team: Team) => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
                   </div>
-                  {editGameForm.formState.errors.gameDate && (
-                    <p className="text-red-500/50 text-sm mt-1">
-                      {editGameForm.formState.errors.gameDate.message}
-                    </p>
-                  )}
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Away Team</label>
+                    <select
+                      {...editGameForm.register('awayTeamId')}
+                      className="w-full p-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      data-testid="select-away-team"
+                    >
+                      <option value="">Select</option>
+                      {teams.map((team: Team) => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                {/* Time */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Game Time</label>
-                  <div className="relative">
-                    <Controller
-                      name="gameTime"
-                      control={editGameForm.control}
-                      render={({ field }) => (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setShowTimePicker(!showTimePicker)}
-                            className="w-full p-3 pr-12 bg-card text-card-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
-                            data-testid="button-game-time"
-                          >
-                            {field.value ? (() => {
-                              const [hours, minutes] = field.value.split(':');
-                              const hour12 = parseInt(hours) === 0 ? 12 : parseInt(hours) > 12 ? parseInt(hours) - 12 : parseInt(hours);
-                              const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
-                              return `${hour12}:${minutes} ${ampm}`;
-                            })() : 'Select time'}
-                          </button>
-                          <Clock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
-                          {showTimePicker && (
-                            <div 
-                              ref={timePickerRef}
-                              className="absolute z-50 mt-1 bg-background border border-border rounded-lg shadow-lg min-w-[300px]"
+                {/* Date/Time Row */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Date</label>
+                    <div className="relative">
+                      <Controller
+                        name="gameDate"
+                        control={editGameForm.control}
+                        render={({ field }) => (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setShowDatePicker(!showDatePicker)}
+                              className="w-full p-2 pr-8 text-sm bg-card text-card-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
+                              data-testid="button-game-date"
                             >
-                              <div className="p-6">
-                                <div className="flex items-start justify-center gap-8">
-                                  {/* Hours */}
-                                  <div className="flex flex-col items-center">
-                                    <div className="text-base font-semibold mb-3 text-foreground">Hour</div>
-                                    <div className="h-40 w-16 overflow-y-auto border-2 border-border rounded-xl bg-card scrollbar-thin">
-                                      {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
-                                        <button
-                                          key={hour}
-                                          type="button"
-                                          onClick={() => {
-                                            const currentTime = field.value || '12:00';
-                                            const [, minutes] = currentTime.split(':');
-                                            const currentHour24 = field.value ? parseInt(field.value.split(':')[0]) : 12;
-                                            const isCurrentlyPM = currentHour24 >= 12;
-                                            let newHour24;
-                                            if (isCurrentlyPM && hour !== 12) {
-                                              newHour24 = hour + 12;
-                                            } else if (!isCurrentlyPM && hour === 12) {
-                                              newHour24 = 0;
-                                            } else if (isCurrentlyPM && hour === 12) {
-                                              newHour24 = 12;
-                                            } else {
-                                              newHour24 = hour;
-                                            }
-                                            field.onChange(`${String(newHour24).padStart(2, '0')}:${minutes}`);
-                                          }}
-                                          className={`w-full h-12 flex items-center justify-center text-base font-medium hover:bg-primary/10 rounded-lg mx-1 my-1 transition-colors ${
-                                            field.value && (() => {
-                                              const currentHour24 = parseInt(field.value.split(':')[0]);
-                                              const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24;
-                                              return currentHour12 === hour;
-                                            })() ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground'
-                                          }`}
-                                        >
-                                          {hour}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center text-2xl font-bold text-muted-foreground mt-12">:</div>
-
-                                  {/* Minutes */}
-                                  <div className="flex flex-col items-center">
-                                    <div className="text-base font-semibold mb-3 text-foreground">Minutes</div>
-                                    <div className="h-40 w-16 overflow-y-auto border-2 border-border rounded-xl bg-card scrollbar-thin">
-                                      {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
-                                        <button
-                                          key={minute}
-                                          type="button"
-                                          onClick={() => {
-                                            const currentTime = field.value || '12:00';
-                                            const [hours] = currentTime.split(':');
-                                            field.onChange(`${hours}:${String(minute).padStart(2, '0')}`);
-                                          }}
-                                          className={`w-full h-12 flex items-center justify-center text-base font-medium hover:bg-primary/10 rounded-lg mx-1 my-1 transition-colors ${
-                                            field.value && parseInt(field.value.split(':')[1]) === minute ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground'
-                                          }`}
-                                        >
-                                          {String(minute).padStart(2, '0')}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  {/* AM/PM */}
-                                  <div className="flex flex-col items-center">
-                                    <div className="text-base font-semibold mb-3 text-foreground">Period</div>
-                                    <div className="flex flex-col gap-3">
-                                      {['AM', 'PM'].map((period) => (
-                                        <button
-                                          key={period}
-                                          type="button"
-                                          onClick={() => {
-                                            const currentTime = field.value || '12:00';
-                                            const [hours, minutes] = currentTime.split(':');
-                                            const currentHour24 = parseInt(hours);
-                                            const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24;
-                                            
-                                            let newHour24;
-                                            if (period === 'AM' && currentHour12 === 12) {
-                                              newHour24 = 0;
-                                            } else if (period === 'AM') {
-                                              newHour24 = currentHour12;
-                                            } else if (period === 'PM' && currentHour12 === 12) {
-                                              newHour24 = 12;
-                                            } else {
-                                              newHour24 = currentHour12 + 12;
-                                            }
-                                            
-                                            field.onChange(`${String(newHour24).padStart(2, '0')}:${minutes}`);
-                                          }}
-                                          className={`w-16 h-12 flex items-center justify-center text-base font-semibold hover:bg-primary/10 rounded-lg transition-colors ${
-                                            field.value && (() => {
-                                              const currentHour24 = parseInt(field.value.split(':')[0]);
+                              {field.value ? (() => {
+                                const [year, month, day] = field.value.split('-');
+                                const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                return date.toLocaleDateString();
+                              })() : 'Select'}
+                            </button>
+                            <Calendar className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                            {showDatePicker && (
+                              <div 
+                                ref={datePickerRef}
+                                className="absolute z-50 mt-1 bg-white dark:bg-card border border-border rounded-lg shadow-lg min-w-[350px]"
+                              >
+                                <DayPicker
+                                  mode="single"
+                                  selected={field.value ? (() => {
+                                    const [year, month, day] = field.value.split('-');
+                                    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                  })() : undefined}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      const year = date.getFullYear();
+                                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                                      const day = String(date.getDate()).padStart(2, '0');
+                                      const dateString = `${year}-${month}-${day}`;
+                                      field.onChange(dateString);
+                                      setShowDatePicker(false);
+                                    }
+                                  }}
+                                  className="p-4"
+                                  classNames={{
+                                    today: "rdp-cell_today bg-primary/20 text-black font-bold text-lg w-12 h-12",
+                                    selected: "rdp-cell_selected bg-primary text-white font-bold text-lg w-12 h-12",
+                                    root: "text-black text-lg",
+                                    day: "text-black hover:bg-gray-100 text-lg w-12 h-12 flex items-center justify-center cursor-pointer",
+                                    nav_button: "text-black hover:bg-gray-100 w-10 h-10 flex items-center justify-center",
+                                    caption: "text-black font-medium text-xl mb-4",
+                                    head_cell: "text-black font-medium text-base p-2",
+                                    table: "w-full border-spacing-1",
+                                    cell: "text-center p-1",
+                                  } as any}
+                                />
+                              </div>
+                            )}
+                          </>
+                        )}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Time</label>
+                    <div className="relative">
+                      <Controller
+                        name="gameTime"
+                        control={editGameForm.control}
+                        render={({ field }) => (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setShowTimePicker(!showTimePicker)}
+                              className="w-full p-2 pr-8 text-sm bg-card text-card-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
+                              data-testid="button-game-time"
+                            >
+                              {field.value ? (() => {
+                                const [hours, minutes] = field.value.split(':');
+                                const hour12 = parseInt(hours) === 0 ? 12 : parseInt(hours) > 12 ? parseInt(hours) - 12 : parseInt(hours);
+                                const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
+                                return `${hour12}:${minutes} ${ampm}`;
+                              })() : 'Select'}
+                            </button>
+                            <Clock className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                            {showTimePicker && (
+                              <div 
+                                ref={timePickerRef}
+                                className="absolute z-50 mt-1 bg-background border border-border rounded-lg shadow-lg min-w-[300px]"
+                              >
+                                <div className="p-4">
+                                  <div className="flex items-start justify-center gap-4">
+                                    <div className="flex flex-col items-center">
+                                      <div className="text-sm font-semibold mb-2 text-foreground">Hour</div>
+                                      <div className="h-32 w-14 overflow-y-auto border border-border rounded-lg bg-card">
+                                        {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                                          <button
+                                            key={hour}
+                                            type="button"
+                                            onClick={() => {
+                                              const currentTime = field.value || '12:00';
+                                              const [, minutes] = currentTime.split(':');
+                                              const currentHour24 = field.value ? parseInt(field.value.split(':')[0]) : 12;
                                               const isCurrentlyPM = currentHour24 >= 12;
-                                              return (period === 'PM' && isCurrentlyPM) || (period === 'AM' && !isCurrentlyPM);
-                                            })() ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground border border-border'
-                                          }`}
-                                        >
-                                          {period}
-                                        </button>
-                                      ))}
+                                              let newHour24;
+                                              if (isCurrentlyPM && hour !== 12) {
+                                                newHour24 = hour + 12;
+                                              } else if (!isCurrentlyPM && hour === 12) {
+                                                newHour24 = 0;
+                                              } else if (isCurrentlyPM && hour === 12) {
+                                                newHour24 = 12;
+                                              } else {
+                                                newHour24 = hour;
+                                              }
+                                              field.onChange(`${String(newHour24).padStart(2, '0')}:${minutes}`);
+                                            }}
+                                            className={`w-full h-8 flex items-center justify-center text-sm font-medium hover:bg-primary/10 transition-colors ${
+                                              field.value && (() => {
+                                                const currentHour24 = parseInt(field.value.split(':')[0]);
+                                                const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24;
+                                                return currentHour12 === hour;
+                                              })() ? 'bg-primary text-primary-foreground' : 'text-foreground'
+                                            }`}
+                                          >
+                                            {hour}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center text-xl font-bold text-muted-foreground mt-8">:</div>
+                                    <div className="flex flex-col items-center">
+                                      <div className="text-sm font-semibold mb-2 text-foreground">Min</div>
+                                      <div className="h-32 w-14 overflow-y-auto border border-border rounded-lg bg-card">
+                                        {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
+                                          <button
+                                            key={minute}
+                                            type="button"
+                                            onClick={() => {
+                                              const currentTime = field.value || '12:00';
+                                              const [hours] = currentTime.split(':');
+                                              field.onChange(`${hours}:${String(minute).padStart(2, '0')}`);
+                                            }}
+                                            className={`w-full h-8 flex items-center justify-center text-sm font-medium hover:bg-primary/10 transition-colors ${
+                                              field.value && parseInt(field.value.split(':')[1]) === minute ? 'bg-primary text-primary-foreground' : 'text-foreground'
+                                            }`}
+                                          >
+                                            {String(minute).padStart(2, '0')}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                      <div className="text-sm font-semibold mb-2 text-foreground">Period</div>
+                                      <div className="flex flex-col gap-2">
+                                        {['AM', 'PM'].map((period) => (
+                                          <button
+                                            key={period}
+                                            type="button"
+                                            onClick={() => {
+                                              const currentTime = field.value || '12:00';
+                                              const [hours, minutes] = currentTime.split(':');
+                                              const currentHour24 = parseInt(hours);
+                                              const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24;
+                                              let newHour24;
+                                              if (period === 'AM' && currentHour12 === 12) {
+                                                newHour24 = 0;
+                                              } else if (period === 'AM') {
+                                                newHour24 = currentHour12;
+                                              } else if (period === 'PM' && currentHour12 === 12) {
+                                                newHour24 = 12;
+                                              } else {
+                                                newHour24 = currentHour12 + 12;
+                                              }
+                                              field.onChange(`${String(newHour24).padStart(2, '0')}:${minutes}`);
+                                            }}
+                                            className={`w-12 h-8 flex items-center justify-center text-sm font-semibold hover:bg-primary/10 rounded transition-colors ${
+                                              field.value && (() => {
+                                                const currentHour24 = parseInt(field.value.split(':')[0]);
+                                                const isCurrentlyPM = currentHour24 >= 12;
+                                                return (period === 'PM' && isCurrentlyPM) || (period === 'AM' && !isCurrentlyPM);
+                                              })() ? 'bg-primary text-primary-foreground' : 'text-foreground border border-border'
+                                            }`}
+                                          >
+                                            {period}
+                                          </button>
+                                        ))}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-
-                                <div className="flex justify-center mt-6 pt-4 border-t border-border">
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowTimePicker(false)}
-                                    className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium transition-colors"
-                                  >
-                                    Done
-                                  </button>
+                                  <div className="flex justify-center mt-4 pt-3 border-t border-border">
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowTimePicker(false)}
+                                      className="px-4 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium transition-colors"
+                                    >
+                                      Done
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    />
-                    {editGameForm.formState.errors.gameTime && (
-                      <p className="text-red-500/50 text-sm mt-1">
-                        {editGameForm.formState.errors.gameTime.message}
-                      </p>
-                    )}
+                            )}
+                          </>
+                        )}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {/* Rink */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Rink (Optional)</label>
+                  <label className="block text-xs font-medium mb-1">Rink (Optional)</label>
                   <input
                     {...editGameForm.register('venue')}
                     type="text"
                     placeholder="Enter rink name"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="input-game-venue"
                   />
                 </div>
 
-                {/* Locker Room */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Locker Room (Optional)</label>
-                  <input
-                    {...editGameForm.register('lockerRoom')}
-                    type="text"
-                    placeholder="Enter locker room assignment"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    data-testid="input-game-locker-room"
-                  />
+                {/* Locker Rooms Row */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Home Locker Room</label>
+                    <input
+                      {...editGameForm.register('homeTeamLockerRoom')}
+                      type="text"
+                      placeholder="Home locker"
+                      className="w-full p-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      data-testid="input-home-locker-room"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Away Locker Room</label>
+                    <input
+                      {...editGameForm.register('awayTeamLockerRoom')}
+                      type="text"
+                      placeholder="Away locker"
+                      className="w-full p-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      data-testid="input-away-locker-room"
+                    />
+                  </div>
                 </div>
 
                 {/* Score Management Section */}
                 {selectedGame && (
-                  <div className="pt-6 border-t border-border">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <Target className="w-5 h-5" />
+                  <div className="pt-3 border-t border-border">
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-1">
+                      <Target className="w-4 h-4" />
                       Score Management
                     </h3>
                     
@@ -4945,15 +4932,15 @@ export default function LeagueManagement() {
                 )}
 
                 {/* Submit Buttons */}
-                <div className="space-y-3 pt-4">
-                  <div className="flex gap-3">
+                <div className="space-y-2 pt-2">
+                  <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => {
                         setShowEditGame(false);
                         setSelectedGame(null);
                       }}
-                      className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                      className="flex-1 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
                       data-testid="button-cancel-edit-game"
                     >
                       Cancel
@@ -4961,7 +4948,7 @@ export default function LeagueManagement() {
                     <button
                       type="submit"
                       disabled={updateGameMutation.isPending}
-                      className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                      className="flex-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
                       data-testid="button-save-game-changes"
                     >
                       {updateGameMutation.isPending ? 'Saving...' : 'Save Changes'}
@@ -4970,10 +4957,10 @@ export default function LeagueManagement() {
                   <button
                     type="button"
                     onClick={() => setShowDeleteConfirmation(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium transition-colors"
+                    className="w-full flex items-center justify-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium transition-colors"
                     data-testid="button-delete-game"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3 h-3" />
                     Delete Game
                   </button>
                 </div>
