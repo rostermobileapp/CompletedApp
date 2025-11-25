@@ -1316,6 +1316,44 @@ export const playerStats = pgTable("player_stats", {
   index("idx_player_stats_user_id").on(table.userId),
 ]);
 
+// Game goals table - tracks individual goals scored in games
+export const gameGoals = pgTable("game_goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: varchar("game_id").references(() => games.id).notNull(),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  scorerId: varchar("scorer_id").references(() => users.id).notNull(),
+  primaryAssistId: varchar("primary_assist_id").references(() => users.id),
+  secondaryAssistId: varchar("secondary_assist_id").references(() => users.id),
+  goalNumber: integer("goal_number").notNull(),
+  timestamp: varchar("timestamp"),
+  period: integer("period").default(1),
+  isSubmitted: boolean("is_submitted").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_game_goals_game_id").on(table.gameId),
+  index("idx_game_goals_team_id").on(table.teamId),
+  index("idx_game_goals_scorer_id").on(table.scorerId),
+]);
+
+// Game penalties table - tracks individual penalties in games
+export const gamePenalties = pgTable("game_penalties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: varchar("game_id").references(() => games.id).notNull(),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  playerId: varchar("player_id").references(() => users.id).notNull(),
+  penaltyNumber: integer("penalty_number").notNull(),
+  minutes: integer("minutes").default(2),
+  penaltyType: varchar("penalty_type"),
+  timestamp: varchar("timestamp"),
+  period: integer("period").default(1),
+  isSubmitted: boolean("is_submitted").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_game_penalties_game_id").on(table.gameId),
+  index("idx_game_penalties_team_id").on(table.teamId),
+  index("idx_game_penalties_player_id").on(table.playerId),
+]);
+
 // Feedback category enum
 export const feedbackCategoryEnum = pgEnum("feedback_category", [
   "product_improvement",
@@ -1455,6 +1493,51 @@ export const gamesRelations = relations(games, ({ one, many }) => ({
   rsvps: many(gameRsvps),
   substituteRequests: many(substituteRequests),
   dutyAssignments: many(dutyAssignments),
+  goals: many(gameGoals),
+  penalties: many(gamePenalties),
+}));
+
+// Game goals relations
+export const gameGoalsRelations = relations(gameGoals, ({ one }) => ({
+  game: one(games, {
+    fields: [gameGoals.gameId],
+    references: [games.id],
+  }),
+  team: one(teams, {
+    fields: [gameGoals.teamId],
+    references: [teams.id],
+  }),
+  scorer: one(users, {
+    fields: [gameGoals.scorerId],
+    references: [users.id],
+    relationName: "scoredGoals",
+  }),
+  primaryAssist: one(users, {
+    fields: [gameGoals.primaryAssistId],
+    references: [users.id],
+    relationName: "primaryAssists",
+  }),
+  secondaryAssist: one(users, {
+    fields: [gameGoals.secondaryAssistId],
+    references: [users.id],
+    relationName: "secondaryAssists",
+  }),
+}));
+
+// Game penalties relations
+export const gamePenaltiesRelations = relations(gamePenalties, ({ one }) => ({
+  game: one(games, {
+    fields: [gamePenalties.gameId],
+    references: [games.id],
+  }),
+  team: one(teams, {
+    fields: [gamePenalties.teamId],
+    references: [teams.id],
+  }),
+  player: one(users, {
+    fields: [gamePenalties.playerId],
+    references: [users.id],
+  }),
 }));
 
 // Duty relations
@@ -2083,6 +2166,17 @@ export const insertPlayerStatsSchema = createInsertSchema(playerStats).omit({
   updatedAt: true,
 });
 
+// Game goals and penalties schemas
+export const insertGameGoalSchema = createInsertSchema(gameGoals).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertGamePenaltySchema = createInsertSchema(gamePenalties).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertDraftSchema = createInsertSchema(drafts).omit({
   id: true,
   currentRound: true,
@@ -2582,6 +2676,26 @@ export type SkaterStats = {
 };
 
 export type PlayerStatsUnion = GoalieStats | SkaterStats;
+
+// Game goals and penalties types
+export type GameGoal = typeof gameGoals.$inferSelect;
+export type InsertGameGoal = z.infer<typeof insertGameGoalSchema>;
+export type GamePenalty = typeof gamePenalties.$inferSelect;
+export type InsertGamePenalty = z.infer<typeof insertGamePenaltySchema>;
+
+// Extended game goal and penalty types with relationships
+export type GameGoalWithDetails = GameGoal & {
+  scorer: User;
+  primaryAssist?: User | null;
+  secondaryAssist?: User | null;
+  team: Team;
+};
+
+export type GamePenaltyWithDetails = GamePenalty & {
+  player: User;
+  team: Team;
+};
+
 export type ImportedPlayer = typeof importedPlayers.$inferSelect;
 export type InsertImportedPlayer = z.infer<typeof insertImportedPlayerSchema>;
 export type PlayerMergeRequest = typeof playerMergeRequests.$inferSelect;
