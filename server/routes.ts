@@ -718,6 +718,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create checkout session for additional team payment
+  app.post('/api/tournaments/:tournamentId/additional-teams-checkout', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tournamentId } = req.params;
+      const { additionalTeamCount } = req.body;
+
+      if (!additionalTeamCount || additionalTeamCount < 1) {
+        return res.status(400).json({ message: 'additionalTeamCount is required and must be at least 1' });
+      }
+
+      // Get tournament
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      // Only allow for standalone tournaments that are already paid
+      if (tournament.type !== 'standalone') {
+        return res.status(400).json({ message: 'Additional team payment only available for standalone tournaments' });
+      }
+
+      if (tournament.paymentStatus !== 'paid') {
+        return res.status(400).json({ message: 'Tournament must be paid before adding additional teams' });
+      }
+
+      // Verify user is the tournament creator
+      if (tournament.createdBy !== userId) {
+        return res.status(403).json({ message: 'Only the tournament creator can pay for additional teams' });
+      }
+
+      // Get user
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      let customerId = user.stripeCustomerId;
+
+      // Create Stripe customer if they don't have one
+      if (!customerId) {
+        console.log('[Stripe] Creating new customer for additional team payment:', userId);
+        const customer = await stripe.customers.create({
+          email: user.email || undefined,
+          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+          metadata: {
+            userId: userId,
+          },
+        });
+        
+        customerId = customer.id;
+        await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
+        console.log('[Stripe] Created customer:', customerId);
+      } else {
+        await stripe.customers.update(customerId, {
+          email: user.email || undefined,
+          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+        });
+      }
+
+      // Build URL from request
+      const protocol = req.protocol || 'https';
+      const host = req.get('host') || (process.env.REPLIT_DOMAINS 
+        ? `${process.env.REPLIT_DOMAINS}` 
+        : 'localhost:5000');
+      const appUrl = `${protocol}://${host}`;
+
+      // Calculate amount: $10 per additional team (1000 cents per team)
+      const amountInCents = additionalTeamCount * 1000;
+
+      // Create checkout session
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'payment',
+        payment_method_types: ['card'],
+        allow_promotion_codes: true,
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `Additional Teams: ${tournament.name}`,
+                description: `${additionalTeamCount} additional team${additionalTeamCount > 1 ? 's' : ''} for ${tournament.name} (ID: ${tournament.uniqueTournamentId})`,
+              },
+              unit_amount: 1000, // $10 per team
+            },
+            quantity: additionalTeamCount,
+          },
+        ],
+        success_url: `${appUrl}/tournament/${tournamentId}?payment=success&additional=true`,
+        cancel_url: `${appUrl}/tournament/${tournamentId}?payment=cancelled`,
+        client_reference_id: userId,
+        metadata: {
+          userId: userId,
+          tournamentId: tournamentId,
+          type: 'additional_team_payment',
+          additionalTeamCount: additionalTeamCount.toString()
+        },
+      });
+
+      console.log('[Stripe] Additional team checkout session created:', {
+        sessionId: session.id,
+        additionalTeamCount,
+        amountInCents
+      });
+
+      if (!session.url) {
+        console.error('[Stripe] Session created but URL is missing!', session);
+        return res.status(500).json({ message: 'Stripe session URL missing' });
+      }
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error('[Stripe] Error creating additional team checkout session:', error);
+      res.status(500).json({ message: 'Failed to create checkout session' });
+    }
+  });
+
   // Create billing portal session - creates customer in Stripe if needed
   app.post('/api/stripe/create-portal-session', isAuthenticated, async (req: any, res) => {
     try {
@@ -1211,7 +1333,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               console.log('[Webhook] Tournament', tournamentId, 'marked as paid with', paidTeamCount, 'teams');
             }
-          } 
+          }
+          // Handle additional team payment
+          else if (session.metadata?.type === 'additional_team_payment') {
+            const tournamentId = session.metadata.tournamentId;
+            const additionalTeamCount = parseInt(session.metadata.additionalTeamCount || '0');
+            console.log('[Webhook] Additional team payment completed for tournament:', tournamentId, 'teams:', additionalTeamCount);
+            
+            if (tournamentId && session.payment_status === 'paid' && additionalTeamCount > 0) {
+              // Increment the paidTeamCount by the number of additional teams paid for
+              await db
+                .update(tournaments)
+                .set({
+                  paidTeamCount: sql`${tournaments.paidTeamCount} + ${additionalTeamCount}`,
+                  updatedAt: new Date()
+                })
+                .where(eq(tournaments.id, tournamentId));
+              
+              console.log('[Webhook] Tournament', tournamentId, 'paidTeamCount incremented by', additionalTeamCount);
+            }
+          }
           // Handle subscription checkout
           else if (session.subscription && session.customer) {
             const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
