@@ -7527,7 +7527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Tournament not found' });
       }
 
-      const isCommissioner = tournament.commissionerId === userId;
+      const isCommissioner = tournament.createdBy === userId;
 
       if (!isCommissioner) {
         return res.status(403).json({ message: 'Only tournament commissioners can create announcements' });
