@@ -43,7 +43,7 @@ export function BottomNavigation() {
     if (shortcutId === 'teams') {
       if (selectedType === 'tournament' && selectedId) {
         // Navigate to tournament detail page for tournament teams
-        navigate(`/tournament/${selectedId}`);
+        navigate(`/tournaments/${selectedId}`);
       } else {
         // Navigate to teams page for league teams
         navigate('/teams');

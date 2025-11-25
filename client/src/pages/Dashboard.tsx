@@ -1924,11 +1924,11 @@ export default function Dashboard() {
               View the tournament bracket, manage teams, and track scores on the tournament detail page.
             </p>
             <Button 
-              onClick={() => navigate(`/tournament/${selectedTournament.id}`)}
+              onClick={() => navigate(`/tournaments/${selectedTournament.id}`)}
               className="w-full bg-orange-500 hover:bg-orange-600"
-              data-testid="button-view-tournament"
+              data-testid="button-view-bracket"
             >
-              View Tournament
+              View Bracket
             </Button>
           </div>
         </div>
