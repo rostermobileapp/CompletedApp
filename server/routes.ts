@@ -4903,7 +4903,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           leagueId: tournaments.leagueId,
           leagueName: leagues.name,
           createdBy: tournaments.createdBy,
-          status: tournaments.status
+          status: tournaments.status,
+          paymentStatus: tournaments.paymentStatus
         })
         .from(tournaments)
         .leftJoin(leagues, eq(tournaments.leagueId, leagues.id))
@@ -4919,7 +4920,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             leagueId: tournaments.leagueId,
             leagueName: leagues.name,
             createdBy: tournaments.createdBy,
-            status: tournaments.status
+            status: tournaments.status,
+            paymentStatus: tournaments.paymentStatus
           })
           .from(tournaments)
           .leftJoin(leagues, eq(tournaments.leagueId, leagues.id))
@@ -4932,7 +4934,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: t.name,
         type: 'tournament' as const,
         leagueName: t.leagueName,
-        status: t.status
+        status: t.status,
+        paymentStatus: t.paymentStatus
       }));
 
       res.json({ leagues: leagueOptions, tournaments: tournamentOptions });

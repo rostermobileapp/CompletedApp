@@ -43,7 +43,7 @@ interface Game {
 
 interface ScorekeeperOptions {
   leagues: { id: string; name: string; type: 'league' }[];
-  tournaments: { id: string; name: string; type: 'tournament'; leagueName?: string | null; status: string }[];
+  tournaments: { id: string; name: string; type: 'tournament'; leagueName?: string | null; status: string; paymentStatus?: string }[];
 }
 
 interface Player {
@@ -178,6 +178,12 @@ export default function ScorekeeperDashboard() {
   const hasGlobalStatManager = userPermissions.includes('stat_manager');
   const hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager') || false;
   const hasAccess = isCommissioner || isTournamentCreator || hasGlobalStatManager || hasLeagueStatManager;
+  
+  // Check if selected tournament is unpaid (grey out Score button for unpaid tournaments)
+  const selectedTournament = selectionType === 'tournament' 
+    ? accessibleTournaments.find((t: any) => t.id === selectedId) 
+    : null;
+  const isTournamentUnpaid = selectedTournament?.paymentStatus === 'unpaid';
   
   const rostersLoading = homeTeamLoading || awayTeamLoading;
   const rostersError = homeTeamError || awayTeamError;
@@ -800,6 +806,15 @@ export default function ScorekeeperDashboard() {
             </TabsTrigger>
           </TabsList>
 
+          {isTournamentUnpaid && (
+            <div className="mb-4 p-3 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg flex items-center gap-2 text-amber-800 dark:text-amber-200">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <div className="text-sm">
+                <span className="font-medium">Payment Required:</span> Complete tournament payment to enable game scoring.
+              </div>
+            </div>
+          )}
+
           <TabsContent value="schedule">
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
@@ -837,6 +852,8 @@ export default function ScorekeeperDashboard() {
                             onClick={() => selectGame(game)}
                             className="ml-2"
                             data-testid={`start-scoring-${game.id}`}
+                            disabled={isTournamentUnpaid}
+                            title={isTournamentUnpaid ? 'Tournament payment required to score games' : undefined}
                           >
                             <Target className="mr-1 h-3 w-3" />
                             Score
