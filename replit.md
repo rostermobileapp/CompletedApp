@@ -39,9 +39,17 @@ Key components include unique tournament IDs (8-character nanoid), Stripe integr
 
 Free tier users can create standalone tournaments without league management permissions. The creation flow is a multi-step wizard covering tournament details, team/player addition (manual or CSV upload), and review. The `BracketView.tsx` component implements slot-level dropdown logic for manual team selection in play-in rounds for standalone tournaments. CSV import supports both teams and players in a single file with flexible header detection and automatic de-duplication. Backend authorization ensures standalone tournament creation is open to all authenticated users, with payment enforced at tournament finalization.
 
-### Tournament Photo Album
+### Photo Album System
 
-A mobile-optimized photo album feature allows tournament participants to upload, view, and download photos from tournament events. The feature uses an independent `/media` route structure (e.g., `/media/tournament/:id`) that is scalable for future league support (`/media/league/:id`). The UI features a Google Photos-inspired design with edge-to-edge 3-column grid layout (gap-0.5), sticky bottom action bar positioned above the bottom navigation, fullscreen viewer with swipe gesture navigation, pinch-to-zoom support, and download all photos as ZIP functionality. Access is restricted to approved tournament participants only. The Photos button is accessible from the home screen's quick access cards and navigates directly to the standalone media gallery page. Backend validation enforces participant access, file type restrictions (JPEG, PNG, GIF, WebP), and 10MB file size limits. Photos are stored in Supabase Storage with proper cleanup on deletion.
+A mobile-optimized photo album feature allows users to upload, view, and download photos from tournaments and leagues. The feature uses an independent `/media` route structure (`/media/tournament/:id` and `/media/league/:id`) with entity-specific permission models.
+
+#### Tournament Photo Albums
+Tournament photo galleries are accessible to approved tournament participants only. Access is participant-based with time-limited availability (30 days before tournament start to 7 days after final game). The UI features a Google Photos-inspired design with edge-to-edge 3-column grid layout (gap-0.5), upload button in header, fullscreen viewer with swipe gesture navigation, pinch-to-zoom support, and download all photos as ZIP functionality. Photos are displayed with object-contain and black letterboxing/pillarboxing for non-square images.
+
+#### League Photo Albums
+League photo galleries are a premium feature gated behind paid subscriptions. Access requires both approved league membership AND a paid subscription (user role !== 'free_tier'). Free tier users see a paywall message with upgrade prompt when accessing league photo galleries. The upload, view, delete, and download functionality mirrors the tournament photo system. Photos are stored in Supabase Storage under the `/league-photos` prefix with proper cleanup on deletion.
+
+Backend validation enforces access control, file type restrictions (JPEG, PNG, GIF, WebP), and 10MB file size limits for both tournament and league photos. The Photos button is accessible from the home screen's quick access cards (4-card layout: News, Photos, Stats, Standings) and navigates to the appropriate media gallery based on context.
 
 ## Feature Specifications
 
