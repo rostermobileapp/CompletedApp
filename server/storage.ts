@@ -113,6 +113,14 @@ import {
   type InsertUserOnlineStatus,
   type PlayerStats,
   type InsertPlayerStats,
+  type GameGoal,
+  type InsertGameGoal,
+  type GamePenalty,
+  type InsertGamePenalty,
+  type GameGoalWithDetails,
+  type GamePenaltyWithDetails,
+  gameGoals,
+  gamePenalties,
   type Announcement,
   type InsertAnnouncement,
   type AnnouncementAttachment,
@@ -479,6 +487,26 @@ export interface IStorage {
   
   // Player merge operations
   mergeUsersInLeague(leagueId: string, fromUserId: string, toUserId: string, preserveName?: boolean): Promise<LeagueMembership>;
+  
+  // Game goals operations (scorekeeper dashboard)
+  createGameGoal(goal: InsertGameGoal): Promise<GameGoal>;
+  getGameGoals(gameId: string): Promise<GameGoalWithDetails[]>;
+  getGameGoal(id: string): Promise<GameGoalWithDetails | undefined>;
+  updateGameGoal(id: string, updates: Partial<InsertGameGoal>): Promise<GameGoal>;
+  deleteGameGoal(id: string): Promise<void>;
+  submitGameGoals(gameId: string): Promise<void>;
+  
+  // Game penalties operations (scorekeeper dashboard)
+  createGamePenalty(penalty: InsertGamePenalty): Promise<GamePenalty>;
+  getGamePenalties(gameId: string): Promise<GamePenaltyWithDetails[]>;
+  getGamePenalty(id: string): Promise<GamePenaltyWithDetails | undefined>;
+  updateGamePenalty(id: string, updates: Partial<InsertGamePenalty>): Promise<GamePenalty>;
+  deleteGamePenalty(id: string): Promise<void>;
+  submitGamePenalties(gameId: string): Promise<void>;
+  
+  // Scorekeeper dashboard game updates
+  updateGameScores(gameId: string, homeScore: number, awayScore: number): Promise<Game>;
+  finalizeGame(gameId: string): Promise<Game>;
   
   // Feedback operations
   createFeedbackSubmission(feedbackData: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
@@ -6969,6 +6997,206 @@ export class DatabaseStorage implements IStorage {
 
       return finalMembership;
     });
+  }
+
+  // Game goals operations (scorekeeper dashboard)
+  async createGameGoal(goal: InsertGameGoal): Promise<GameGoal> {
+    const [newGoal] = await db
+      .insert(gameGoals)
+      .values(goal)
+      .returning();
+    return newGoal;
+  }
+
+  async getGameGoals(gameId: string): Promise<GameGoalWithDetails[]> {
+    const results = await db
+      .select({
+        goal: gameGoals,
+        scorer: users,
+        team: teams,
+      })
+      .from(gameGoals)
+      .innerJoin(users, eq(gameGoals.scorerId, users.id))
+      .innerJoin(teams, eq(gameGoals.teamId, teams.id))
+      .where(eq(gameGoals.gameId, gameId))
+      .orderBy(gameGoals.goalNumber);
+
+    const goalsWithDetails: GameGoalWithDetails[] = [];
+    
+    for (const result of results) {
+      let primaryAssist = null;
+      let secondaryAssist = null;
+      
+      if (result.goal.primaryAssistId) {
+        const [assist] = await db.select().from(users).where(eq(users.id, result.goal.primaryAssistId));
+        primaryAssist = assist || null;
+      }
+      
+      if (result.goal.secondaryAssistId) {
+        const [assist] = await db.select().from(users).where(eq(users.id, result.goal.secondaryAssistId));
+        secondaryAssist = assist || null;
+      }
+      
+      goalsWithDetails.push({
+        ...result.goal,
+        scorer: result.scorer,
+        primaryAssist,
+        secondaryAssist,
+        team: result.team,
+      });
+    }
+    
+    return goalsWithDetails;
+  }
+
+  async getGameGoal(id: string): Promise<GameGoalWithDetails | undefined> {
+    const [result] = await db
+      .select({
+        goal: gameGoals,
+        scorer: users,
+        team: teams,
+      })
+      .from(gameGoals)
+      .innerJoin(users, eq(gameGoals.scorerId, users.id))
+      .innerJoin(teams, eq(gameGoals.teamId, teams.id))
+      .where(eq(gameGoals.id, id));
+    
+    if (!result) return undefined;
+    
+    let primaryAssist = null;
+    let secondaryAssist = null;
+    
+    if (result.goal.primaryAssistId) {
+      const [assist] = await db.select().from(users).where(eq(users.id, result.goal.primaryAssistId));
+      primaryAssist = assist || null;
+    }
+    
+    if (result.goal.secondaryAssistId) {
+      const [assist] = await db.select().from(users).where(eq(users.id, result.goal.secondaryAssistId));
+      secondaryAssist = assist || null;
+    }
+    
+    return {
+      ...result.goal,
+      scorer: result.scorer,
+      primaryAssist,
+      secondaryAssist,
+      team: result.team,
+    };
+  }
+
+  async updateGameGoal(id: string, updates: Partial<InsertGameGoal>): Promise<GameGoal> {
+    const [updated] = await db
+      .update(gameGoals)
+      .set(updates)
+      .where(eq(gameGoals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteGameGoal(id: string): Promise<void> {
+    await db.delete(gameGoals).where(eq(gameGoals.id, id));
+  }
+
+  async submitGameGoals(gameId: string): Promise<void> {
+    await db
+      .update(gameGoals)
+      .set({ isSubmitted: true })
+      .where(eq(gameGoals.gameId, gameId));
+  }
+
+  // Game penalties operations (scorekeeper dashboard)
+  async createGamePenalty(penalty: InsertGamePenalty): Promise<GamePenalty> {
+    const [newPenalty] = await db
+      .insert(gamePenalties)
+      .values(penalty)
+      .returning();
+    return newPenalty;
+  }
+
+  async getGamePenalties(gameId: string): Promise<GamePenaltyWithDetails[]> {
+    const results = await db
+      .select({
+        penalty: gamePenalties,
+        player: users,
+        team: teams,
+      })
+      .from(gamePenalties)
+      .innerJoin(users, eq(gamePenalties.playerId, users.id))
+      .innerJoin(teams, eq(gamePenalties.teamId, teams.id))
+      .where(eq(gamePenalties.gameId, gameId))
+      .orderBy(gamePenalties.penaltyNumber);
+
+    return results.map(result => ({
+      ...result.penalty,
+      player: result.player,
+      team: result.team,
+    }));
+  }
+
+  async getGamePenalty(id: string): Promise<GamePenaltyWithDetails | undefined> {
+    const [result] = await db
+      .select({
+        penalty: gamePenalties,
+        player: users,
+        team: teams,
+      })
+      .from(gamePenalties)
+      .innerJoin(users, eq(gamePenalties.playerId, users.id))
+      .innerJoin(teams, eq(gamePenalties.teamId, teams.id))
+      .where(eq(gamePenalties.id, id));
+    
+    if (!result) return undefined;
+    
+    return {
+      ...result.penalty,
+      player: result.player,
+      team: result.team,
+    };
+  }
+
+  async updateGamePenalty(id: string, updates: Partial<InsertGamePenalty>): Promise<GamePenalty> {
+    const [updated] = await db
+      .update(gamePenalties)
+      .set(updates)
+      .where(eq(gamePenalties.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteGamePenalty(id: string): Promise<void> {
+    await db.delete(gamePenalties).where(eq(gamePenalties.id, id));
+  }
+
+  async submitGamePenalties(gameId: string): Promise<void> {
+    await db
+      .update(gamePenalties)
+      .set({ isSubmitted: true })
+      .where(eq(gamePenalties.gameId, gameId));
+  }
+
+  // Scorekeeper dashboard game updates
+  async updateGameScores(gameId: string, homeScore: number, awayScore: number): Promise<Game> {
+    const [updated] = await db
+      .update(games)
+      .set({ 
+        homeScore, 
+        awayScore,
+      })
+      .where(eq(games.id, gameId))
+      .returning();
+    return updated;
+  }
+
+  async finalizeGame(gameId: string): Promise<Game> {
+    const [updated] = await db
+      .update(games)
+      .set({ 
+        status: 'completed',
+      })
+      .where(eq(games.id, gameId))
+      .returning();
+    return updated;
   }
 
   // Line combinations operations
