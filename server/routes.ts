@@ -6418,31 +6418,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
 
-        // Parse date and time
+        // Parse date and time - treat all dates as local time (no timezone conversion)
         let gameDate: Date;
         try {
           const dateStr = row.date.trim();
-          gameDate = new Date(dateStr);
+          
+          // Parse date manually to avoid timezone issues
+          // Supports formats: YYYY-MM-DD, MM/DD/YYYY, M/D/YYYY
+          let year: number, month: number, day: number;
+          
+          if (dateStr.includes('-')) {
+            // YYYY-MM-DD format
+            const parts = dateStr.split('-');
+            year = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10) - 1; // JavaScript months are 0-indexed
+            day = parseInt(parts[2], 10);
+          } else if (dateStr.includes('/')) {
+            // MM/DD/YYYY format
+            const parts = dateStr.split('/');
+            month = parseInt(parts[0], 10) - 1;
+            day = parseInt(parts[1], 10);
+            year = parseInt(parts[2], 10);
+          } else {
+            errors.push(`Row ${index + 1}: Unrecognized date format: ${dateStr}. Use YYYY-MM-DD or MM/DD/YYYY`);
+            return;
+          }
+          
+          // Create date using local time (not UTC) by specifying year, month, day
+          gameDate = new Date(year, month, day, 0, 0, 0, 0);
+          
           if (isNaN(gameDate.getTime())) {
-            // Try different date formats
-            const dateFormats = [
-              dateStr,
-              `${dateStr} 00:00:00`,
-              new Date(Date.parse(dateStr))
-            ];
-            
-            for (const format of dateFormats) {
-              const testDate = new Date(format);
-              if (!isNaN(testDate.getTime())) {
-                gameDate = testDate;
-                break;
-              }
-            }
-            
-            if (isNaN(gameDate.getTime())) {
-              errors.push(`Row ${index + 1}: Invalid date format: ${dateStr}`);
-              return;
-            }
+            errors.push(`Row ${index + 1}: Invalid date: ${dateStr}`);
+            return;
           }
         } catch {
           errors.push(`Row ${index + 1}: Invalid date format`);
