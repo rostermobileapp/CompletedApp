@@ -12109,6 +12109,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       });
 
+      // Check if tournament is paid and if adding new teams requires additional payment
+      if (tournament.type === 'standalone' && tournament.paymentStatus === 'paid' && teamsToCreate.size > 0) {
+        const currentTeamCount = existingTeams.length;
+        const paidTeamCount = tournament.paidTeamCount || 0;
+        const newTeamCount = teamsToCreate.size;
+        const totalTeamsAfterImport = currentTeamCount + newTeamCount;
+        
+        // Check if we're adding more teams than what's been paid for
+        if (totalTeamsAfterImport > paidTeamCount) {
+          const additionalTeamsNeeded = totalTeamsAfterImport - paidTeamCount;
+          const additionalFee = additionalTeamsNeeded * 1000; // $10 per team in cents
+          
+          // Clean up uploaded file
+          if (file.path) {
+            try {
+              fs.unlinkSync(file.path);
+            } catch (e) {}
+          }
+          
+          return res.status(402).json({ 
+            message: 'Additional payment required',
+            additionalTeamsCount: additionalTeamsNeeded,
+            additionalFee: additionalFee,
+            requiresPayment: true,
+            newTeamsDetected: Array.from(teamsToCreate)
+          });
+        }
+      }
+
       // Create missing teams with auto-incrementing seeds
       // Assign one seed per unique team (not per player)
       const currentMaxSeed = existingTeams.length > 0 
