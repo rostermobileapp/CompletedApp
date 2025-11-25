@@ -4817,7 +4817,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }));
 
         if (statsUpdates.length > 0) {
-          await storage.bulkUpdatePlayerStats(game.leagueId, statsUpdates, 'increment');
+          // Pass the game's seasonId to ensure stats are associated with the correct season
+          await storage.bulkUpdatePlayerStats(game.leagueId, statsUpdates, 'increment', game.seasonId || undefined);
         }
       }
 

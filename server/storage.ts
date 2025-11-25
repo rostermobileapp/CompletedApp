@@ -4013,9 +4013,8 @@ export class DatabaseStorage implements IStorage {
         await db.delete(lineCombinations).where(eq(lineCombinations.teamId, teamId));
       }
 
-      // Delete player stats for this team
-      console.log(`Deleting player stats for team ${teamId}`);
-      await db.delete(playerStats).where(eq(playerStats.teamId, teamId));
+      // Note: playerStats table doesn't have teamId - stats are associated by userId/leagueId/seasonId
+      // Player stats are preserved even when team is deleted since they're player-centric
 
       // Update league memberships to remove team assignment (set to null instead of delete)
       console.log(`Updating league memberships assigned to team ${teamId}`);
@@ -4041,9 +4040,19 @@ export class DatabaseStorage implements IStorage {
         .set({ teamId: null })
         .where(eq(tournamentTeams.teamId, teamId));
 
-      // Delete scrimmage requests involving this team
-      console.log(`Deleting scrimmage requests for team ${teamId}`);
-      await db.delete(scrimmageRequests).where(eq(scrimmageRequests.teamId, teamId));
+      // Note: scrimmageRequests table doesn't have teamId - linked via scrimmageId instead
+      // Delete scrimmages associated with this team
+      console.log(`Deleting scrimmages created by team ${teamId}`);
+      const teamScrimmages = await db.select({ id: scrimmages.id }).from(scrimmages).where(eq(scrimmages.creatorTeamId, teamId));
+      if (teamScrimmages.length > 0) {
+        const scrimmageIds = teamScrimmages.map(s => s.id);
+        // Delete scrimmage requests first (foreign key to scrimmages)
+        await db.delete(scrimmageRequests).where(inArray(scrimmageRequests.scrimmageId, scrimmageIds));
+        // Delete scrimmage invites
+        await db.delete(scrimmageInvites).where(inArray(scrimmageInvites.scrimmageId, scrimmageIds));
+        // Now delete the scrimmages
+        await db.delete(scrimmages).where(eq(scrimmages.creatorTeamId, teamId));
+      }
 
       // Sync team chat to remove all participants (since team is being deleted)
       if (team && team.leagueId) {
