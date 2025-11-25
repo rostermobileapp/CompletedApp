@@ -488,6 +488,7 @@ export interface IStorage {
   
   // Player merge operations
   mergeUsersInLeague(leagueId: string, fromUserId: string, toUserId: string, preserveName?: boolean): Promise<LeagueMembership>;
+  mergeUsersInTournament(tournamentId: string, fromUserId: string, toUserId: string): Promise<TournamentParticipant>;
   
   // Game goals operations (scorekeeper dashboard)
   createGameGoal(goal: InsertGameGoal): Promise<GameGoal>;
@@ -7087,6 +7088,144 @@ export class DatabaseStorage implements IStorage {
         .where(eq(leagueMemberships.id, fromMembership.id));
 
       return finalMembership;
+    });
+  }
+
+  async mergeUsersInTournament(tournamentId: string, fromUserId: string, toUserId: string): Promise<TournamentParticipant> {
+    return await db.transaction(async (tx) => {
+      // 1. Get both users' participants in this tournament
+      const [fromParticipant] = await tx
+        .select()
+        .from(tournamentParticipants)
+        .where(and(
+          eq(tournamentParticipants.tournamentId, tournamentId),
+          eq(tournamentParticipants.userId, fromUserId)
+        ));
+      
+      const [toParticipant] = await tx
+        .select()
+        .from(tournamentParticipants)
+        .where(and(
+          eq(tournamentParticipants.tournamentId, tournamentId),
+          eq(tournamentParticipants.userId, toUserId)
+        ));
+
+      if (!fromParticipant) {
+        throw new Error('Source user not found in tournament');
+      }
+
+      // 2. Handle tournament stats merge with conflict resolution
+      const fromStats = await tx
+        .select()
+        .from(tournamentStats)
+        .where(and(
+          eq(tournamentStats.userId, fromUserId),
+          eq(tournamentStats.tournamentId, tournamentId)
+        ));
+
+      const toStats = await tx
+        .select()
+        .from(tournamentStats)
+        .where(and(
+          eq(tournamentStats.userId, toUserId),
+          eq(tournamentStats.tournamentId, tournamentId)
+        ));
+
+      // Merge stats by team
+      const statsByTeam = new Map();
+      toStats.forEach(s => statsByTeam.set(s.teamId, s));
+      
+      for (const fromStat of fromStats) {
+        const existingStat = statsByTeam.get(fromStat.teamId);
+        if (existingStat) {
+          // Update existing stat with merged data (sum the stats)
+          await tx
+            .update(tournamentStats)
+            .set({
+              gamesPlayed: existingStat.gamesPlayed + fromStat.gamesPlayed,
+              goals: existingStat.goals + fromStat.goals,
+              assists: existingStat.assists + fromStat.assists,
+              points: existingStat.points + fromStat.points,
+              penaltyMinutes: existingStat.penaltyMinutes + fromStat.penaltyMinutes,
+            })
+            .where(eq(tournamentStats.id, existingStat.id));
+        } else {
+          // Create new stat for toUser
+          await tx
+            .insert(tournamentStats)
+            .values({
+              userId: toUserId,
+              tournamentId: tournamentId,
+              teamId: fromStat.teamId,
+              gamesPlayed: fromStat.gamesPlayed,
+              goals: fromStat.goals,
+              assists: fromStat.assists,
+              points: fromStat.points,
+              penaltyMinutes: fromStat.penaltyMinutes,
+            });
+        }
+      }
+
+      // Delete fromUser stats
+      await tx
+        .delete(tournamentStats)
+        .where(and(
+          eq(tournamentStats.userId, fromUserId),
+          eq(tournamentStats.tournamentId, tournamentId)
+        ));
+
+      // 3. Update tournament match references (if any)
+      await tx
+        .update(tournamentMatches)
+        .set({ winnerId: toUserId })
+        .where(and(
+          eq(tournamentMatches.winnerId, fromUserId),
+          eq(tournamentMatches.tournamentId, tournamentId)
+        ));
+
+      // 4. Merge tournament participant data
+      const mergedData: Partial<TournamentParticipant> = {
+        userId: toUserId,
+        tournamentTeamId: fromParticipant.tournamentTeamId || toParticipant?.tournamentTeamId,
+        role: fromParticipant.role || toParticipant?.role || 'player',
+        status: toParticipant?.status || fromParticipant.status,
+        joinedAt: toParticipant?.joinedAt || fromParticipant.joinedAt,
+        expiresAt: fromParticipant.expiresAt || toParticipant?.expiresAt,
+        approvedBy: toParticipant?.approvedBy || fromParticipant.approvedBy,
+        approvedAt: toParticipant?.approvedAt || fromParticipant.approvedAt,
+        message: toParticipant?.message || fromParticipant.message,
+      };
+
+      // 5. Create or update the target participant
+      let finalParticipant: TournamentParticipant;
+      
+      if (toParticipant) {
+        // Update existing participant
+        const [updated] = await tx
+          .update(tournamentParticipants)
+          .set(mergedData)
+          .where(eq(tournamentParticipants.id, toParticipant.id))
+          .returning();
+        finalParticipant = updated;
+      } else {
+        // Create new participant for target user
+        const [created] = await tx
+          .insert(tournamentParticipants)
+          .values({
+            ...mergedData,
+            tournamentId: tournamentId,
+            userId: toUserId,
+          } as InsertTournamentParticipant)
+          .returning();
+        finalParticipant = created;
+      }
+
+      // 6. Delete the source participant
+      await tx
+        .delete(tournamentParticipants)
+        .where(eq(tournamentParticipants.id, fromParticipant.id));
+
+      return finalParticipant;
     });
   }
 
