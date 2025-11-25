@@ -3020,27 +3020,10 @@ export default function LeagueManagement() {
                           </thead>
                           <tbody>
                             {(() => {
-                              const today = new Date();
-                              today.setHours(0, 0, 0, 0);
-                              
-                              // Sort games: future/unscored first, then past/scored
+                              // Sort games by date (chronological order)
                               const sortedGames = [...games].sort((a, b) => {
                                 const dateA = new Date(a.scheduledAt);
                                 const dateB = new Date(b.scheduledAt);
-                                const isPastA = dateA < today;
-                                const isPastB = dateB < today;
-                                const hasScoreA = typeof a.homeScore === 'number' && typeof a.awayScore === 'number';
-                                const hasScoreB = typeof b.homeScore === 'number' && typeof b.awayScore === 'number';
-                                
-                                // Priority: future games or games without scores come first
-                                const priorityA = (!isPastA || !hasScoreA) ? 0 : 1;
-                                const priorityB = (!isPastB || !hasScoreB) ? 0 : 1;
-                                
-                                if (priorityA !== priorityB) {
-                                  return priorityA - priorityB;
-                                }
-                                
-                                // Within same priority, sort by date (nearest first, furthest last)
                                 return dateA.getTime() - dateB.getTime();
                               });
                               
@@ -3129,27 +3112,10 @@ export default function LeagueManagement() {
                   <div className="md:hidden">
                     <div className="max-h-[600px] overflow-y-auto space-y-3 border rounded-lg p-2">
                       {(() => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        
-                        // Sort games: future/unscored first, then past/scored
+                        // Sort games by date (chronological order)
                         const sortedGames = [...games].sort((a, b) => {
                           const dateA = new Date(a.scheduledAt);
                           const dateB = new Date(b.scheduledAt);
-                          const isPastA = dateA < today;
-                          const isPastB = dateB < today;
-                          const hasScoreA = typeof a.homeScore === 'number' && typeof a.awayScore === 'number';
-                          const hasScoreB = typeof b.homeScore === 'number' && typeof b.awayScore === 'number';
-                          
-                          // Priority: future games or games without scores come first
-                          const priorityA = (!isPastA || !hasScoreA) ? 0 : 1;
-                          const priorityB = (!isPastB || !hasScoreB) ? 0 : 1;
-                          
-                          if (priorityA !== priorityB) {
-                            return priorityA - priorityB;
-                          }
-                          
-                          // Within same priority, sort by date (nearest first, furthest last)
                           return dateA.getTime() - dateB.getTime();
                         });
                         
