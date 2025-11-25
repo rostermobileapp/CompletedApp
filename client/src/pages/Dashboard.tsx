@@ -833,10 +833,10 @@ export default function Dashboard() {
   // Get user's local timezone for proper date formatting
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   
-  // Unified selection state - can be team or league (with localStorage persistence)
-  const [selectedType, setSelectedType] = useState<'team' | 'league'>(() => {
+  // Unified selection state - can be team, league, or tournament (with localStorage persistence)
+  const [selectedType, setSelectedType] = useState<'team' | 'league' | 'tournament'>(() => {
     const saved = localStorage.getItem('dashboardSelectedType');
-    return (saved === 'team' || saved === 'league') ? saved : 'league';
+    return (saved === 'team' || saved === 'league' || saved === 'tournament') ? saved : 'league';
   });
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     return localStorage.getItem('dashboardSelectedId') || null;
@@ -1109,6 +1109,11 @@ export default function Dashboard() {
     queryKey: ['/api/user/leagues'],
   });
   
+  // Fetch user's paid tournaments
+  const { data: userPaidTournaments } = useQuery({
+    queryKey: ['/api/user/paid-tournaments'],
+  });
+  
   // Filter leagues to only show those where user has no team
   const leaguesWithoutTeams = React.useMemo(() => {
     if (!Array.isArray(userLeagues) || !Array.isArray(userTeamsAll)) {
@@ -1122,11 +1127,11 @@ export default function Dashboard() {
     });
   }, [userLeagues, userTeamsAll]);
   
-  // Set default selection - prefer team first, then league
+  // Set default selection - prefer team first, then league, then tournament
   // Also validate that saved selection still exists
   React.useEffect(() => {
     // Wait for data to load before validating or setting defaults
-    if (userTeamsAll === undefined || userLeagues === undefined) {
+    if (userTeamsAll === undefined || userLeagues === undefined || userPaidTournaments === undefined) {
       return;
     }
     
@@ -1150,6 +1155,17 @@ export default function Dashboard() {
       }
     }
     
+    if (selectedId && selectedType === 'tournament') {
+      const tournamentExists = Array.isArray(userPaidTournaments) && userPaidTournaments.some(t => t.id === selectedId);
+      if (!tournamentExists) {
+        // Saved tournament no longer exists, reset
+        setSelectedId(null);
+        return;
+      }
+      // Valid tournament selection - respect user's choice and don't auto-switch
+      return;
+    }
+    
     // Set default selection if none exists
     if (!selectedId) {
       // First try to select a team
@@ -1162,8 +1178,13 @@ export default function Dashboard() {
         setSelectedType('league');
         setSelectedId(leaguesWithoutTeams[0].id);
       }
+      // Otherwise select a paid tournament (as a last resort)
+      else if (Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0) {
+        setSelectedType('tournament');
+        setSelectedId(userPaidTournaments[0].id);
+      }
     }
-  }, [userTeamsAll, leaguesWithoutTeams, selectedId, selectedType]);
+  }, [userTeamsAll, leaguesWithoutTeams, userPaidTournaments, selectedId, selectedType]);
   
   // Close dropdown when clicking outside
   React.useEffect(() => {
@@ -1232,6 +1253,24 @@ export default function Dashboard() {
     if (!league) return 'Select League';
     return league.name;
   }, []);
+  
+  // Helper function to get tournament display name
+  const getTournamentDisplayName = React.useCallback((tournament: any) => {
+    if (!tournament) return 'Select Tournament';
+    // Show team name if assigned
+    if (tournament.teamName) {
+      return `${tournament.name}: ${tournament.teamName}`;
+    }
+    return tournament.name;
+  }, []);
+  
+  // Get the currently selected tournament
+  const selectedTournament = React.useMemo(() => {
+    if (selectedType === 'tournament' && selectedId && Array.isArray(userPaidTournaments)) {
+      return userPaidTournaments.find(t => t.id === selectedId);
+    }
+    return null;
+  }, [selectedType, selectedId, userPaidTournaments]);
   
   // Determine the effective league ID for feature access
   // If a team is selected and it's part of a league, use that league ID
@@ -1528,8 +1567,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      {/* Team/League Selection Dropdown */}
-      {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0)) && (
+      {/* Team/League/Tournament Selection Dropdown */}
+      {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) || (Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0)) && (
         <div className="px-6 mb-4">
           <div className="relative" ref={dropdownRef}>
             <button
@@ -1540,12 +1579,16 @@ export default function Dashboard() {
               <div className="flex items-center gap-2">
                 {selectedType === 'team' ? (
                   <Users className="w-4 h-4 text-primary" />
+                ) : selectedType === 'tournament' ? (
+                  <Trophy className="w-4 h-4 text-orange-500" />
                 ) : (
                   <Trophy className="w-4 h-4 text-primary" />
                 )}
                 <span className="font-medium text-[16px] pl-[8px] pr-[8px]">
                   {selectedType === 'team' 
                     ? getTeamDisplayName((userTeamsAll as any[])?.find((t: any) => t.id === selectedId))
+                    : selectedType === 'tournament'
+                    ? getTournamentDisplayName(selectedTournament)
                     : getLeagueDisplayName(selectedLeague)}
                 </span>
               </div>
@@ -1627,7 +1670,7 @@ export default function Dashboard() {
                           setSelectedId(league.id);
                           setShowDropdown(false);
                         }}
-                        className={`w-full p-3 text-left hover:bg-muted/50 transition-colors last:rounded-b-lg ${
+                        className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
                           selectedType === 'league' && selectedId === league.id ? 'bg-primary/10 text-primary' : ''
                         }`}
                         data-testid={`option-league-${league.id}`}
@@ -1638,6 +1681,39 @@ export default function Dashboard() {
                             <span className="font-medium text-sm">{getLeagueDisplayName(league)}</span>
                           </div>
                           {/* League notification badge placeholder */}
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
+                
+                {/* Tournaments Section - Show paid tournaments */}
+                {Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 border-t border-border">
+                      MY TOURNAMENTS
+                    </div>
+                    {userPaidTournaments.map((tournament: any) => (
+                      <button
+                        key={`tournament-${tournament.id}`}
+                        onClick={() => {
+                          setSelectedType('tournament');
+                          setSelectedId(tournament.id);
+                          setShowDropdown(false);
+                        }}
+                        className={`w-full p-3 text-left hover:bg-muted/50 transition-colors last:rounded-b-lg ${
+                          selectedType === 'tournament' && selectedId === tournament.id ? 'bg-primary/10 text-primary' : ''
+                        }`}
+                        data-testid={`option-tournament-${tournament.id}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Trophy className="w-4 h-4 text-orange-500" />
+                            <span className="font-medium text-sm">{getTournamentDisplayName(tournament)}</span>
+                          </div>
+                          {tournament.uniqueTournamentId && (
+                            <span className="text-xs text-muted-foreground">{tournament.uniqueTournamentId}</span>
+                          )}
                         </div>
                       </button>
                     ))}
@@ -1669,7 +1745,10 @@ export default function Dashboard() {
             className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
             data-testid="card-stats"
             onClick={() => {
-              if (selectedType === 'team' && selectedId) {
+              if (selectedType === 'tournament' && selectedId) {
+                // Navigate to tournament detail page for tournament stats/bracket
+                navigate(`/tournament/${selectedId}`);
+              } else if (selectedType === 'team' && selectedId) {
                 navigate(`/stats?team=${selectedId}`);
               } else if (selectedType === 'league' && selectedLeagueId) {
                 navigate(`/stats?league=${selectedLeagueId}`);
@@ -1688,7 +1767,14 @@ export default function Dashboard() {
           <div 
             className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-standings"
-            onClick={() => setShowStandingsModal(true)}
+            onClick={() => {
+              if (selectedType === 'tournament' && selectedId) {
+                // Navigate to tournament detail page for tournament bracket/standings
+                navigate(`/tournament/${selectedId}`);
+              } else {
+                setShowStandingsModal(true);
+              }
+            }}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <Award className="w-8 h-8 text-blue-500 mb-3" />
@@ -1697,6 +1783,30 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      {/* Tournament-focused section when tournament is selected */}
+      {selectedType === 'tournament' && selectedTournament && !primaryTeam && (
+        <div className="px-6 mb-6">
+          <div className="rounded-xl border border-border p-4 bg-[#e2e2e2] dark:bg-[#212121]">
+            <div className="flex items-center gap-3 mb-3">
+              <Trophy className="w-8 h-8 text-orange-500" />
+              <div>
+                <h3 className="font-semibold">{selectedTournament.name}</h3>
+                <p className="text-xs text-muted-foreground">Tournament ID: {selectedTournament.uniqueTournamentId}</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              View the tournament bracket, manage teams, and track scores on the tournament detail page.
+            </p>
+            <Button 
+              onClick={() => navigate(`/tournament/${selectedTournament.id}`)}
+              className="w-full bg-orange-500 hover:bg-orange-600"
+              data-testid="button-view-tournament"
+            >
+              View Tournament
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Quick Stats */}
       {primaryTeam && (
         <div className="px-6 mb-6">

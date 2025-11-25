@@ -2154,6 +2154,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get paid tournaments where user is a participant or creator
+  app.get("/api/user/paid-tournaments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get tournaments where user is a participant with approved status
+      const participantTournaments = await db
+        .select({
+          id: tournaments.id,
+          name: tournaments.name,
+          format: tournaments.format,
+          status: tournaments.status,
+          type: tournaments.type,
+          uniqueTournamentId: tournaments.uniqueTournamentId,
+          paymentStatus: tournaments.paymentStatus,
+          tournamentTeamId: tournamentParticipants.tournamentTeamId,
+          teamName: tournamentTeams.teamName
+        })
+        .from(tournamentParticipants)
+        .innerJoin(tournaments, eq(tournamentParticipants.tournamentId, tournaments.id))
+        .leftJoin(tournamentTeams, eq(tournamentParticipants.tournamentTeamId, tournamentTeams.id))
+        .where(and(
+          eq(tournamentParticipants.userId, userId),
+          eq(tournamentParticipants.status, 'approved'),
+          eq(tournaments.paymentStatus, 'paid')
+        ));
+      
+      // Get tournaments created by user that are paid
+      const creatorTournaments = await db
+        .select({
+          id: tournaments.id,
+          name: tournaments.name,
+          format: tournaments.format,
+          status: tournaments.status,
+          type: tournaments.type,
+          uniqueTournamentId: tournaments.uniqueTournamentId,
+          paymentStatus: tournaments.paymentStatus,
+          tournamentTeamId: sql<string>`null`,
+          teamName: sql<string>`null`
+        })
+        .from(tournaments)
+        .where(and(
+          eq(tournaments.createdBy, userId),
+          eq(tournaments.paymentStatus, 'paid')
+        ));
+      
+      // Combine and deduplicate by tournament ID
+      const allTournaments = [...participantTournaments, ...creatorTournaments];
+      const uniqueTournaments = Array.from(
+        new Map(allTournaments.map(t => [t.id, t])).values()
+      );
+      
+      res.json(uniqueTournaments);
+    } catch (error) {
+      console.error("Error fetching user paid tournaments:", error);
+      res.status(500).json({ message: "Failed to fetch paid tournaments" });
+    }
+  });
+
   // Get leagues where user is commissioner
   app.get("/api/user/commissioner-leagues", isAuthenticated, async (req: any, res) => {
     try {
