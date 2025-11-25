@@ -2210,6 +2210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: tournaments.type,
           uniqueTournamentId: tournaments.uniqueTournamentId,
           paymentStatus: tournaments.paymentStatus,
+          createdBy: tournaments.createdBy,
           tournamentTeamId: tournamentParticipants.tournamentTeamId,
           teamName: tournamentTeams.teamName
         })
@@ -2232,6 +2233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: tournaments.type,
           uniqueTournamentId: tournaments.uniqueTournamentId,
           paymentStatus: tournaments.paymentStatus,
+          createdBy: tournaments.createdBy,
           tournamentTeamId: sql<string>`null`,
           teamName: sql<string>`null`
         })

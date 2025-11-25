@@ -1091,8 +1091,8 @@ export default function Announcements() {
   const isLeagueCommissioner = currentLeague?.commissionerId === user?.id || 
                          currentMembership?.league_role === 'commissioner';
 
-  // Check if user is tournament commissioner
-  const isTournamentCommissioner = currentTournament?.commissionerId === user?.id;
+  // Check if user is tournament commissioner (creator)
+  const isTournamentCommissioner = currentTournament?.createdBy === user?.id;
 
   // Get teams in the league to check if user is a team captain
   const { data: teams = [] } = useQuery({
