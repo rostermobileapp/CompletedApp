@@ -42,6 +42,7 @@ import {
   drafts,
   draftPicks,
   tournamentTeams,
+  tournamentPhotos,
   // New messaging tables
   conversations,
   conversationParticipants,
@@ -66,6 +67,8 @@ import {
   type UpsertUser,
   type UserNotification,
   type InsertUserNotification,
+  type TournamentPhoto,
+  type InsertTournamentPhoto,
   type League,
   type InsertLeague,
   type Season,
@@ -561,6 +564,13 @@ export interface IStorage {
   updateEventParticipant(id: string, updates: Partial<InsertEventParticipant>): Promise<EventParticipant>;
   deleteEventParticipant(id: string): Promise<void>;
   checkInEventParticipant(id: string): Promise<EventParticipant>;
+  
+  // Tournament photo operations
+  createTournamentPhoto(photo: InsertTournamentPhoto): Promise<TournamentPhoto>;
+  getTournamentPhotos(tournamentId: string): Promise<(TournamentPhoto & { uploader: User })[]>;
+  getTournamentPhoto(id: string): Promise<TournamentPhoto | undefined>;
+  deleteTournamentPhoto(id: string): Promise<void>;
+  getTournamentPhotoCount(tournamentId: string): Promise<number>;
 }
 
 // Helper function to generate unique 6-character alphanumeric display ID
@@ -8341,6 +8351,49 @@ export class DatabaseStorage implements IStorage {
       .where(eq(eventParticipants.id, id))
       .returning();
     return participant;
+  }
+
+  // Tournament photo operations
+  async createTournamentPhoto(photoData: InsertTournamentPhoto): Promise<TournamentPhoto> {
+    const [photo] = await db
+      .insert(tournamentPhotos)
+      .values(photoData)
+      .returning();
+    return photo;
+  }
+
+  async getTournamentPhotos(tournamentId: string): Promise<(TournamentPhoto & { uploader: User })[]> {
+    const photos = await db
+      .select()
+      .from(tournamentPhotos)
+      .innerJoin(users, eq(tournamentPhotos.uploadedBy, users.id))
+      .where(eq(tournamentPhotos.tournamentId, tournamentId))
+      .orderBy(desc(tournamentPhotos.uploadedAt));
+    
+    return photos.map(p => ({
+      ...p.tournament_photos,
+      uploader: p.users,
+    }));
+  }
+
+  async getTournamentPhoto(id: string): Promise<TournamentPhoto | undefined> {
+    const [photo] = await db
+      .select()
+      .from(tournamentPhotos)
+      .where(eq(tournamentPhotos.id, id));
+    return photo;
+  }
+
+  async deleteTournamentPhoto(id: string): Promise<void> {
+    await db.delete(tournamentPhotos).where(eq(tournamentPhotos.id, id));
+  }
+
+  async getTournamentPhotoCount(tournamentId: string): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`CAST(COUNT(*) AS INTEGER)` })
+      .from(tournamentPhotos)
+      .where(eq(tournamentPhotos.tournamentId, tournamentId));
+    return result?.count ?? 0;
   }
 }
 

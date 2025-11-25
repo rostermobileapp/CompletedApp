@@ -535,6 +535,23 @@ export const tournamentParticipants = pgTable("tournament_participants", {
   index("idx_tournament_participants_expires_at").on(table.expiresAt),
 ]);
 
+// Tournament photos table - stores photos uploaded to tournaments
+export const tournamentPhotos = pgTable("tournament_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tournamentId: varchar("tournament_id").references(() => tournaments.id).notNull(),
+  photoUrl: varchar("photo_url").notNull(),
+  thumbnailUrl: varchar("thumbnail_url").notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  fileSize: integer("file_size").notNull(), // in bytes
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+}, (table) => [
+  index("idx_tournament_photos_tournament_id").on(table.tournamentId),
+  index("idx_tournament_photos_uploaded_by").on(table.uploadedBy),
+  index("idx_tournament_photos_uploaded_at").on(table.uploadedAt),
+]);
+
 // Personal reminders table
 export const personalReminders = pgTable("personal_reminders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2847,6 +2864,7 @@ export const insertTournamentTeamSchema = createInsertSchema(tournamentTeams).om
 export const insertTournamentMatchSchema = createInsertSchema(tournamentMatches).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTournamentStatsSchema = createInsertSchema(tournamentStats).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTournamentParticipantSchema = createInsertSchema(tournamentParticipants).omit({ id: true, createdAt: true });
+export const insertTournamentPhotoSchema = createInsertSchema(tournamentPhotos).omit({ id: true, uploadedAt: true });
 
 // Update tournament match schema for PATCH operations
 export const updateTournamentMatchSchema = z.object({
@@ -2871,6 +2889,8 @@ export type TournamentStats = typeof tournamentStats.$inferSelect;
 export type InsertTournamentStats = z.infer<typeof insertTournamentStatsSchema>;
 export type TournamentParticipant = typeof tournamentParticipants.$inferSelect;
 export type InsertTournamentParticipant = z.infer<typeof insertTournamentParticipantSchema>;
+export type TournamentPhoto = typeof tournamentPhotos.$inferSelect;
+export type InsertTournamentPhoto = z.infer<typeof insertTournamentPhotoSchema>;
 
 // Extended tournament types with relationships
 export type TournamentWithDetails = Tournament & {
