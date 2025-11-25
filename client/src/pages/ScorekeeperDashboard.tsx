@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { 
@@ -20,7 +21,8 @@ import {
   AlertTriangle,
   Calendar,
   Users,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
@@ -274,6 +276,7 @@ export default function ScorekeeperDashboard() {
     const [secondaryAssistId, setSecondaryAssistId] = useState('');
     const [penaltyPlayerId, setPenaltyPlayerId] = useState('');
     const [penaltyMinutes, setPenaltyMinutes] = useState(2);
+    const [goalModalOpen, setGoalModalOpen] = useState(false);
 
     const addGoal = () => {
       if (!scorerId || !selectedGame || !teamId) {
@@ -290,6 +293,7 @@ export default function ScorekeeperDashboard() {
       setScorerId('');
       setAssistId('');
       setSecondaryAssistId('');
+      setGoalModalOpen(false);
     };
 
     const addPenalty = () => {
@@ -320,56 +324,96 @@ export default function ScorekeeperDashboard() {
         </div>
         {!showPenalties ? (
           <>
-            {/* Goal Entry Row */}
-            <div className="flex gap-2 mb-2">
-              <Select value={scorerId} onValueChange={setScorerId}>
-                <SelectTrigger className="flex-1 h-9 text-sm" data-testid={`select-scorer-${team}`}>
-                  <SelectValue placeholder="Scorer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {players.map(p => (
-                    <SelectItem key={p.userId} value={p.userId}>
-                      {p.user.firstName} {p.user.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={assistId || "none"} onValueChange={(v) => setAssistId(v === "none" ? "" : v)}>
-                <SelectTrigger className="flex-1 h-9 text-sm" data-testid={`select-assist-${team}`}>
-                  <SelectValue placeholder="1st Assist" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Assist</SelectItem>
-                  {players.filter(p => p.userId !== scorerId).map(p => (
-                    <SelectItem key={p.userId} value={p.userId}>
-                      {p.user.firstName} {p.user.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={secondaryAssistId || "none"} onValueChange={(v) => setSecondaryAssistId(v === "none" ? "" : v)}>
-                <SelectTrigger className="flex-1 h-9 text-sm" data-testid={`select-secondary-assist-${team}`}>
-                  <SelectValue placeholder="2nd Assist" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No 2nd</SelectItem>
-                  {players.filter(p => p.userId !== scorerId && p.userId !== assistId).map(p => (
-                    <SelectItem key={p.userId} value={p.userId}>
-                      {p.user.firstName} {p.user.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Goal Button */}
+            <div className="mb-2">
               <Button 
-                onClick={addGoal} 
-                size="sm"
-                className="h-9 px-3"
-                disabled={createGoalMutation.isPending || !scorerId}
-                data-testid={`add-goal-${team}`}
+                onClick={() => setGoalModalOpen(true)}
+                className="w-full h-10 bg-blue-500 hover:bg-blue-600 text-white font-bold"
+                data-testid={`goal-button-${team}`}
               >
-                <Plus className="h-4 w-4" />
+                <Zap className="mr-2 h-5 w-5" />
+                GOAL
               </Button>
             </div>
+
+            {/* Goal Modal */}
+            <Dialog open={goalModalOpen} onOpenChange={setGoalModalOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Record Goal - {team === 'home' ? 'HOME' : 'AWAY'}: {teamName}</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Scorer *</label>
+                    <Select value={scorerId} onValueChange={setScorerId}>
+                      <SelectTrigger data-testid={`modal-select-scorer-${team}`}>
+                        <SelectValue placeholder="Select scorer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {players.map(p => (
+                          <SelectItem key={p.userId} value={p.userId}>
+                            {p.user.firstName} {p.user.lastName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">1st Assist (Optional)</label>
+                    <Select value={assistId || "none"} onValueChange={(v) => setAssistId(v === "none" ? "" : v)}>
+                      <SelectTrigger data-testid={`modal-select-assist-${team}`}>
+                        <SelectValue placeholder="Select 1st assist" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Assist</SelectItem>
+                        {players.filter(p => p.userId !== scorerId).map(p => (
+                          <SelectItem key={p.userId} value={p.userId}>
+                            {p.user.firstName} {p.user.lastName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">2nd Assist (Optional)</label>
+                    <Select value={secondaryAssistId || "none"} onValueChange={(v) => setSecondaryAssistId(v === "none" ? "" : v)}>
+                      <SelectTrigger data-testid={`modal-select-secondary-assist-${team}`}>
+                        <SelectValue placeholder="Select 2nd assist" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No 2nd Assist</SelectItem>
+                        {players.filter(p => p.userId !== scorerId && p.userId !== assistId).map(p => (
+                          <SelectItem key={p.userId} value={p.userId}>
+                            {p.user.firstName} {p.user.lastName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setGoalModalOpen(false);
+                      setScorerId('');
+                      setAssistId('');
+                      setSecondaryAssistId('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={addGoal}
+                    disabled={createGoalMutation.isPending || !scorerId}
+                    className="bg-blue-500 hover:bg-blue-600"
+                    data-testid={`confirm-goal-${team}`}
+                  >
+                    Confirm Goal
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* Goals List */}
             <div className="space-y-1 max-h-[calc(100vh-380px)] overflow-y-auto">
