@@ -13450,5 +13450,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Merge tournament participant (commissioner only)
+  app.post('/api/tournaments/:tournamentId/merge-participant', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+      const { fromUserId, toUserId } = req.body;
+      const userId = req.user.claims.sub;
+
+      // Validate input
+      const mergeRequestSchema = z.object({
+        fromUserId: z.string(),
+        toUserId: z.string(),
+      });
+
+      const validatedData = mergeRequestSchema.parse({ fromUserId, toUserId });
+
+      if (validatedData.fromUserId === validatedData.toUserId) {
+        return res.status(400).json({ message: 'Cannot merge user with themselves' });
+      }
+
+      // Check tournament commissioner access
+      const tournament = await storage.getTournament(tournamentId);
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      // Check if user is commissioner of the tournament's league
+      const league = await storage.getLeague(tournament.leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Unauthorized - only league commissioner can merge participants' });
+      }
+
+      // Verify both users exist
+      const [fromUser, toUser] = await Promise.all([
+        storage.getUserById(validatedData.fromUserId),
+        storage.getUserById(validatedData.toUserId)
+      ]);
+
+      if (!fromUser) {
+        return res.status(404).json({ message: 'Source user not found' });
+      }
+
+      if (!toUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      // Perform the merge
+      const mergedParticipant = await storage.mergeUsersInTournament(
+        tournamentId,
+        validatedData.fromUserId,
+        validatedData.toUserId
+      );
+
+      res.json({
+        message: 'Participants merged successfully',
+        participant: mergedParticipant,
+      });
+
+    } catch (error) {
+      console.error('Failed to merge tournament participants:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Invalid request data', 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: 'Failed to merge tournament participants' });
+    }
+  });
+
   return httpServer;
 }

@@ -7131,22 +7131,22 @@ export class DatabaseStorage implements IStorage {
           eq(tournamentStats.tournamentId, tournamentId)
         ));
 
-      // Merge stats by team
+      // Merge stats by team - preserve non-zero values
       const statsByTeam = new Map();
       toStats.forEach(s => statsByTeam.set(s.teamId, s));
       
       for (const fromStat of fromStats) {
         const existingStat = statsByTeam.get(fromStat.teamId);
         if (existingStat) {
-          // Update existing stat with merged data (sum the stats)
+          // Update existing stat with merged data (sum non-zero stats to preserve all data)
           await tx
             .update(tournamentStats)
             .set({
-              gamesPlayed: existingStat.gamesPlayed + fromStat.gamesPlayed,
-              goals: existingStat.goals + fromStat.goals,
-              assists: existingStat.assists + fromStat.assists,
-              points: existingStat.points + fromStat.points,
-              penaltyMinutes: existingStat.penaltyMinutes + fromStat.penaltyMinutes,
+              gamesPlayed: (existingStat.gamesPlayed || 0) + (fromStat.gamesPlayed || 0),
+              goals: (existingStat.goals || 0) + (fromStat.goals || 0),
+              assists: (existingStat.assists || 0) + (fromStat.assists || 0),
+              points: (existingStat.points || 0) + (fromStat.points || 0),
+              penaltyMinutes: (existingStat.penaltyMinutes || 0) + (fromStat.penaltyMinutes || 0),
             })
             .where(eq(tournamentStats.id, existingStat.id));
         } else {
@@ -7157,11 +7157,11 @@ export class DatabaseStorage implements IStorage {
               userId: toUserId,
               tournamentId: tournamentId,
               teamId: fromStat.teamId,
-              gamesPlayed: fromStat.gamesPlayed,
-              goals: fromStat.goals,
-              assists: fromStat.assists,
-              points: fromStat.points,
-              penaltyMinutes: fromStat.penaltyMinutes,
+              gamesPlayed: fromStat.gamesPlayed || 0,
+              goals: fromStat.goals || 0,
+              assists: fromStat.assists || 0,
+              points: fromStat.points || 0,
+              penaltyMinutes: fromStat.penaltyMinutes || 0,
             });
         }
       }
@@ -7174,7 +7174,7 @@ export class DatabaseStorage implements IStorage {
           eq(tournamentStats.tournamentId, tournamentId)
         ));
 
-      // 3. Update tournament match references (if any)
+      // 3. Update tournament match winner references
       await tx
         .update(tournamentMatches)
         .set({ winnerId: toUserId })
@@ -7183,12 +7183,16 @@ export class DatabaseStorage implements IStorage {
           eq(tournamentMatches.tournamentId, tournamentId)
         ));
 
-      // 4. Merge tournament participant data
+      // 4. Merge tournament participant data with conflict resolution
+      // Prefer approved status over pending, and preserve approval metadata
       const mergedData: Partial<TournamentParticipant> = {
         userId: toUserId,
         tournamentTeamId: fromParticipant.tournamentTeamId || toParticipant?.tournamentTeamId,
         role: fromParticipant.role || toParticipant?.role || 'player',
-        status: toParticipant?.status || fromParticipant.status,
+        // Preserve approved status - don't downgrade from approved to pending
+        status: toParticipant?.status === 'approved' ? 'approved' : 
+                (fromParticipant.status === 'approved' ? 'approved' : 
+                (toParticipant?.status || fromParticipant.status)),
         joinedAt: toParticipant?.joinedAt || fromParticipant.joinedAt,
         expiresAt: fromParticipant.expiresAt || toParticipant?.expiresAt,
         approvedBy: toParticipant?.approvedBy || fromParticipant.approvedBy,
