@@ -19,15 +19,19 @@ The platform now includes a sophisticated tournament system supporting diverse f
   - `POST/DELETE /api/games/:gameId/penalties` - Add/remove penalties
   - `POST /api/games/:gameId/finalize` - Finalize game and update player stats
   - `PATCH /api/games/:gameId/scores` - Update game scores in real-time
-  - `GET /api/scorekeeper/games` - Get games for scorekeeper with permission checking
+  - `GET /api/scorekeeper/games` - Get games for scorekeeper with permission checking (supports both leagueId and tournamentId)
+  - `GET /api/scorekeeper/options` - Get leagues and tournaments where user has scorekeeper access
+  - `GET /api/scorekeeper/tournament-team/:tournamentTeamId/players` - Get tournament team players for roster display
 - **Frontend Implementation** (client/src/pages/ScorekeeperDashboard.tsx):
-  - League selection dropdown
-  - Game schedule view with upcoming and completed games
+  - Unified league and tournament selection dropdown with visual distinction (trophy icon for tournaments)
+  - Game schedule view with upcoming and completed games/matches
   - Live scoring interface with goal/penalty entry forms
-  - Team roster integration for player selection
+  - Team roster integration for both regular teams and tournament teams
   - Real-time score display and updates
   - Game finalization workflow with confirmation
   - Loading states and error handling for roster fetching
+  - Automatic landscape orientation lock on mobile for live scoring mode
+  - Blue GOAL button with modal dialog for goal entry with primary/secondary assists
 
 ## November 25, 2025 - Additional Team Payment Enforcement & Dashboard Tournament Integration
 
