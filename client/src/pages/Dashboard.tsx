@@ -1000,6 +1000,13 @@ export default function Dashboard() {
         );
       }
       
+      // Filter by tournament if tournament is selected
+      if (selectedType === 'tournament' && selectedId) {
+        return games.filter(game => 
+          game.tournamentId === selectedId
+        );
+      }
+      
       return games;
     }
   });
@@ -1033,6 +1040,11 @@ export default function Dashboard() {
     select: (invites) => {
       if (!Array.isArray(invites)) return invites;
       
+      // Tournaments don't have scrimmages, return empty
+      if (selectedType === 'tournament') {
+        return [];
+      }
+      
       // Filter by team if team is selected
       if (selectedType === 'team' && selectedId) {
         return invites.filter((invite: any) => invite.teamId === selectedId);
@@ -1052,6 +1064,11 @@ export default function Dashboard() {
     queryKey: ['/api/users/scrimmage-requests'],
     select: (requests) => {
       if (!Array.isArray(requests)) return [];
+      
+      // Tournaments don't have scrimmages, return empty
+      if (selectedType === 'tournament') {
+        return [];
+      }
       
       // Filter by team if team is selected
       if (selectedType === 'team' && selectedId) {
@@ -1076,6 +1093,11 @@ export default function Dashboard() {
     queryKey: ['/api/user/teams'],
     select: (teams) => {
       if (!Array.isArray(teams)) return teams;
+      
+      // Tournaments don't use regular league teams, return empty
+      if (selectedType === 'tournament') {
+        return [];
+      }
       
       // Filter by team if team is selected (show only selected team)
       if (selectedType === 'team' && selectedId) {
@@ -1266,6 +1288,11 @@ export default function Dashboard() {
     }
     return null;
   }, [selectedType, selectedId, userPaidTournaments]);
+  
+  // Get the tournament team ID for the selected tournament
+  const selectedTournamentTeamId = React.useMemo(() => {
+    return selectedTournament?.tournamentTeamId || null;
+  }, [selectedTournament]);
   
   // Determine the effective league ID for feature access
   // If a team is selected and it's part of a league, use that league ID
