@@ -41,6 +41,7 @@ import {
   lineCombinationAssignments,
   drafts,
   draftPicks,
+  tournamentTeams,
   // New messaging tables
   conversations,
   conversationParticipants,
@@ -3948,18 +3949,101 @@ export class DatabaseStorage implements IStorage {
         .from(teams)
         .where(eq(teams.id, teamId))
         .limit(1);
+
+      if (!team) {
+        throw new Error(`Team ${teamId} not found`);
+      }
+
+      // Get all games involving this team to delete dependent records
+      const teamGames = await db
+        .select({ id: games.id })
+        .from(games)
+        .where(or(eq(games.homeTeamId, teamId), eq(games.awayTeamId, teamId)));
       
+      const gameIds = teamGames.map(g => g.id);
+      console.log(`Found ${gameIds.length} games involving team ${teamId}`);
+
+      // Delete game-related records first (foreign key constraints)
+      if (gameIds.length > 0) {
+        console.log(`Deleting game goals for team's games`);
+        await db.delete(gameGoals).where(inArray(gameGoals.gameId, gameIds));
+        
+        console.log(`Deleting game penalties for team's games`);
+        await db.delete(gamePenalties).where(inArray(gamePenalties.gameId, gameIds));
+        
+        console.log(`Deleting game score submissions for team's games`);
+        await db.delete(gameScoreSubmissions).where(inArray(gameScoreSubmissions.gameId, gameIds));
+        
+        console.log(`Deleting game goalies for team's games`);
+        await db.delete(gameGoalies).where(inArray(gameGoalies.gameId, gameIds));
+        
+        console.log(`Deleting game stars for team's games`);
+        await db.delete(gameStars).where(inArray(gameStars.gameId, gameIds));
+        
+        console.log(`Deleting duty assignments for team's games`);
+        await db.delete(dutyAssignments).where(inArray(dutyAssignments.gameId, gameIds));
+      }
+
+      // Delete RSVPs that reference this team directly
+      console.log(`Deleting game RSVPs for team ${teamId}`);
+      await db.delete(gameRsvps).where(eq(gameRsvps.teamId, teamId));
+
       // Delete team memberships (players on the team)
       console.log(`Deleting team memberships for team ${teamId}`);
-      const deletedMemberships = await db.delete(teamMemberships).where(eq(teamMemberships.teamId, teamId));
-      console.log(`Deleted ${deletedMemberships.rowCount || 0} team memberships`);
+      await db.delete(teamMemberships).where(eq(teamMemberships.teamId, teamId));
+
+      // Delete placeholder players for this team
+      console.log(`Deleting placeholder players for team ${teamId}`);
+      await db.delete(placeholderPlayers).where(eq(placeholderPlayers.teamId, teamId));
+
+      // Delete duty templates for this team
+      console.log(`Deleting duty templates for team ${teamId}`);
+      await db.delete(dutyTemplates).where(eq(dutyTemplates.teamId, teamId));
+
+      // Delete team league requests
+      console.log(`Deleting team league requests for team ${teamId}`);
+      await db.delete(teamLeagueRequests).where(eq(teamLeagueRequests.teamId, teamId));
+
+      // Delete line combinations and their assignments
+      console.log(`Deleting line combinations for team ${teamId}`);
+      const teamLineCombos = await db.select({ id: lineCombinations.id }).from(lineCombinations).where(eq(lineCombinations.teamId, teamId));
+      if (teamLineCombos.length > 0) {
+        const comboIds = teamLineCombos.map(c => c.id);
+        await db.delete(lineCombinationAssignments).where(inArray(lineCombinationAssignments.lineCombinationId, comboIds));
+        await db.delete(lineCombinations).where(eq(lineCombinations.teamId, teamId));
+      }
+
+      // Delete player stats for this team
+      console.log(`Deleting player stats for team ${teamId}`);
+      await db.delete(playerStats).where(eq(playerStats.teamId, teamId));
 
       // Update league memberships to remove team assignment (set to null instead of delete)
       console.log(`Updating league memberships assigned to team ${teamId}`);
-      const updatedLeagueMemberships = await db.update(leagueMemberships)
+      await db.update(leagueMemberships)
         .set({ assignedTeamId: null })
         .where(eq(leagueMemberships.assignedTeamId, teamId));
-      console.log(`Updated ${updatedLeagueMemberships.rowCount || 0} league memberships`);
+
+      // Update announcements to remove team association (set to null)
+      console.log(`Updating announcements for team ${teamId}`);
+      await db.update(announcements)
+        .set({ teamId: null })
+        .where(eq(announcements.teamId, teamId));
+
+      // Update conversations to remove team association (set to null)
+      console.log(`Updating conversations for team ${teamId}`);
+      await db.update(conversations)
+        .set({ teamId: null })
+        .where(eq(conversations.teamId, teamId));
+
+      // Update tournament teams to remove team link (set to null)
+      console.log(`Updating tournament teams for team ${teamId}`);
+      await db.update(tournamentTeams)
+        .set({ teamId: null })
+        .where(eq(tournamentTeams.teamId, teamId));
+
+      // Delete scrimmage requests involving this team
+      console.log(`Deleting scrimmage requests for team ${teamId}`);
+      await db.delete(scrimmageRequests).where(eq(scrimmageRequests.teamId, teamId));
 
       // Sync team chat to remove all participants (since team is being deleted)
       if (team && team.leagueId) {
@@ -3985,17 +4069,15 @@ export class DatabaseStorage implements IStorage {
 
       // Delete games where this team is home or away team
       console.log(`Deleting games involving team ${teamId}`);
-      const deletedGames = await db.delete(games).where(
+      await db.delete(games).where(
         or(eq(games.homeTeamId, teamId), eq(games.awayTeamId, teamId))
       );
-      console.log(`Deleted ${deletedGames.rowCount || 0} games involving team`);
 
       // Delete imported schedules where this team is home or away team
       console.log(`Deleting imported schedules involving team ${teamId}`);
-      const deletedImportedSchedules = await db.delete(importedSchedules).where(
+      await db.delete(importedSchedules).where(
         or(eq(importedSchedules.homeTeamId, teamId), eq(importedSchedules.awayTeamId, teamId))
       );
-      console.log(`Deleted ${deletedImportedSchedules.rowCount || 0} imported schedules involving team`);
 
       // Finally delete the team itself
       console.log(`Deleting team ${teamId}`);
