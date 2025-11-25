@@ -7,8 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { 
@@ -21,7 +19,8 @@ import {
   Target,
   AlertTriangle,
   Calendar,
-  Users
+  Users,
+  X
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
@@ -92,6 +91,7 @@ export default function ScorekeeperDashboard() {
   const [selectedLeague, setSelectedLeague] = useState<string>(urlLeagueId || '');
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [activeTab, setActiveTab] = useState('schedule');
+  const [showPenalties, setShowPenalties] = useState(false);
 
   const { data: commissionerLeagues = [] } = useQuery<any[]>({
     queryKey: ['/api/leagues/commissioner'],
@@ -104,19 +104,19 @@ export default function ScorekeeperDashboard() {
   });
 
   const gamesQueryKey = `/api/scorekeeper/games?leagueId=${selectedLeague}`;
-  const { data: games = [], isLoading: gamesLoading, error: gamesError } = useQuery<Game[]>({
+  const { data: games = [], isLoading: gamesLoading } = useQuery<Game[]>({
     queryKey: [gamesQueryKey],
     enabled: !!selectedLeague,
   });
 
   const goalsQueryKey = `/api/games/${selectedGame?.id}/goals`;
-  const { data: gameGoals = [], refetch: refetchGoals, isLoading: goalsLoading } = useQuery<GameGoal[]>({
+  const { data: gameGoals = [], refetch: refetchGoals } = useQuery<GameGoal[]>({
     queryKey: [goalsQueryKey],
     enabled: !!selectedGame?.id,
   });
 
   const penaltiesQueryKey = `/api/games/${selectedGame?.id}/penalties`;
-  const { data: gamePenalties = [], refetch: refetchPenalties, isLoading: penaltiesLoading } = useQuery<GamePenalty[]>({
+  const { data: gamePenalties = [], refetch: refetchPenalties } = useQuery<GamePenalty[]>({
     queryKey: [penaltiesQueryKey],
     enabled: !!selectedGame?.id,
   });
@@ -139,7 +139,6 @@ export default function ScorekeeperDashboard() {
   const hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager') || false;
   const hasAccess = isCommissioner || hasGlobalStatManager || hasLeagueStatManager;
   
-  const rostersReady = homeTeamMembers.length > 0 && awayTeamMembers.length > 0;
   const rostersLoading = homeTeamLoading || awayTeamLoading;
   const rostersError = homeTeamError || awayTeamError;
 
@@ -149,7 +148,7 @@ export default function ScorekeeperDashboard() {
     },
     onSuccess: () => {
       refetchGoals();
-      toast({ title: 'Goal added successfully' });
+      toast({ title: 'Goal added' });
     },
     onError: (error: any) => {
       toast({ title: 'Failed to add goal', description: error.message, variant: 'destructive' });
@@ -175,7 +174,7 @@ export default function ScorekeeperDashboard() {
     },
     onSuccess: () => {
       refetchPenalties();
-      toast({ title: 'Penalty added successfully' });
+      toast({ title: 'Penalty added' });
     },
     onError: (error: any) => {
       toast({ title: 'Failed to add penalty', description: error.message, variant: 'destructive' });
@@ -251,206 +250,80 @@ export default function ScorekeeperDashboard() {
   const selectGame = (game: Game) => {
     setSelectedGame(game);
     setActiveTab('scoring');
+    setShowPenalties(false);
   };
 
-  const GoalEntry = ({ 
+  // Compact Team Scoring Panel
+  const TeamScoringPanel = ({ 
     team, 
+    teamName,
+    teamId,
     goals, 
+    penalties,
     players 
   }: { 
-    team: 'home' | 'away'; 
-    goals: GameGoal[]; 
-    players: TeamMember[];
-  }) => {
-    const [newGoal, setNewGoal] = useState({
-      scorerId: '',
-      primaryAssistId: '',
-      secondaryAssistId: '',
-      period: 1
-    });
-
-    const teamId = team === 'home' ? selectedGame?.homeTeam?.id : selectedGame?.awayTeam?.id;
-    const teamName = team === 'home' ? selectedGame?.homeTeam?.name : selectedGame?.awayTeam?.name;
-
-    const addGoal = () => {
-      if (!newGoal.scorerId || !selectedGame || !teamId) {
-        toast({ title: 'Please select a scorer', variant: 'destructive' });
-        return;
-      }
-
-      createGoalMutation.mutate({
-        gameId: selectedGame.id,
-        teamId,
-        scorerId: newGoal.scorerId,
-        primaryAssistId: newGoal.primaryAssistId || undefined,
-        secondaryAssistId: newGoal.secondaryAssistId || undefined,
-        period: newGoal.period
-      });
-
-      setNewGoal({ scorerId: '', primaryAssistId: '', secondaryAssistId: '', period: 1 });
-    };
-
-    return (
-      <Card className="flex-1">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-center">{teamName}</CardTitle>
-          <div className="text-center text-5xl font-bold text-primary" data-testid={`score-${team}`}>
-            {goals.length}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Select value={newGoal.scorerId} onValueChange={(v) => setNewGoal({ ...newGoal, scorerId: v })}>
-                <SelectTrigger data-testid={`select-scorer-${team}`}>
-                  <SelectValue placeholder="Select Scorer *" />
-                </SelectTrigger>
-                <SelectContent>
-                  {players.map(p => (
-                    <SelectItem key={p.userId} value={p.userId}>
-                      {p.user.firstName} {p.user.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={newGoal.primaryAssistId || "none"} onValueChange={(v) => setNewGoal({ ...newGoal, primaryAssistId: v === "none" ? "" : v })}>
-                <SelectTrigger data-testid={`select-primary-assist-${team}`}>
-                  <SelectValue placeholder="Primary Assist (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {players.filter(p => p.userId !== newGoal.scorerId).map(p => (
-                    <SelectItem key={p.userId} value={p.userId}>
-                      {p.user.firstName} {p.user.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={newGoal.secondaryAssistId || "none"} onValueChange={(v) => setNewGoal({ ...newGoal, secondaryAssistId: v === "none" ? "" : v })}>
-                <SelectTrigger data-testid={`select-secondary-assist-${team}`}>
-                  <SelectValue placeholder="Secondary Assist (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {players.filter(p => p.userId !== newGoal.scorerId && p.userId !== newGoal.primaryAssistId).map(p => (
-                    <SelectItem key={p.userId} value={p.userId}>
-                      {p.user.firstName} {p.user.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button 
-                onClick={addGoal} 
-                className="w-full" 
-                disabled={createGoalMutation.isPending || players.length === 0}
-                data-testid={`add-goal-${team}`}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Goal
-              </Button>
-            </div>
-
-            <Separator />
-
-            <ScrollArea className="h-[300px]">
-              <div className="space-y-2">
-                {goals.map((goal, idx) => (
-                  <div 
-                    key={goal.id} 
-                    className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                    data-testid={`goal-entry-${team}-${idx}`}
-                  >
-                    <div>
-                      <div className="font-medium">
-                        Goal #{idx + 1}: {goal.scorer.firstName} {goal.scorer.lastName}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {goal.primaryAssist && `A1: ${goal.primaryAssist.firstName} ${goal.primaryAssist.lastName}`}
-                        {goal.primaryAssist && goal.secondaryAssist && ', '}
-                        {goal.secondaryAssist && `A2: ${goal.secondaryAssist.firstName} ${goal.secondaryAssist.lastName}`}
-                        {!goal.primaryAssist && !goal.secondaryAssist && 'Unassisted'}
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => deleteGoalMutation.mutate(goal.id)}
-                      disabled={deleteGoalMutation.isPending}
-                      data-testid={`delete-goal-${team}-${idx}`}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))}
-                {goals.length === 0 && (
-                  <div className="text-center text-muted-foreground py-4">
-                    No goals yet
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const PenaltyEntry = ({
-    team,
-    penalties,
-    players
-  }: {
     team: 'home' | 'away';
+    teamName: string;
+    teamId: string;
+    goals: GameGoal[];
     penalties: GamePenalty[];
     players: TeamMember[];
   }) => {
-    const [newPenalty, setNewPenalty] = useState({
-      playerId: '',
-      minutes: 2,
-      penaltyType: '',
-      period: 1
-    });
+    const [scorerId, setScorerId] = useState('');
+    const [assistId, setAssistId] = useState('');
+    const [penaltyPlayerId, setPenaltyPlayerId] = useState('');
+    const [penaltyMinutes, setPenaltyMinutes] = useState(2);
 
-    const teamId = team === 'home' ? selectedGame?.homeTeam?.id : selectedGame?.awayTeam?.id;
-    const teamName = team === 'home' ? selectedGame?.homeTeam?.name : selectedGame?.awayTeam?.name;
-
-    const addPenalty = () => {
-      if (!newPenalty.playerId || !selectedGame || !teamId) {
-        toast({ title: 'Please select a player', variant: 'destructive' });
+    const addGoal = () => {
+      if (!scorerId || !selectedGame || !teamId) {
+        toast({ title: 'Select a scorer', variant: 'destructive' });
         return;
       }
+      createGoalMutation.mutate({
+        gameId: selectedGame.id,
+        teamId,
+        scorerId,
+        primaryAssistId: assistId || undefined
+      });
+      setScorerId('');
+      setAssistId('');
+    };
 
+    const addPenalty = () => {
+      if (!penaltyPlayerId || !selectedGame || !teamId) {
+        toast({ title: 'Select a player', variant: 'destructive' });
+        return;
+      }
       createPenaltyMutation.mutate({
         gameId: selectedGame.id,
         teamId,
-        playerId: newPenalty.playerId,
-        minutes: newPenalty.minutes,
-        penaltyType: newPenalty.penaltyType || undefined,
-        period: newPenalty.period
+        playerId: penaltyPlayerId,
+        minutes: penaltyMinutes
       });
-
-      setNewPenalty({ playerId: '', minutes: 2, penaltyType: '', period: 1 });
+      setPenaltyPlayerId('');
+      setPenaltyMinutes(2);
     };
 
-    const totalPIM = penalties.reduce((sum, p) => sum + (p.minutes || 0), 0);
+    const bgColor = team === 'home' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-red-500/10 border-red-500/30';
+    const textColor = team === 'home' ? 'text-blue-500' : 'text-red-500';
 
     return (
-      <Card className="flex-1">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-center">{teamName} Penalties</CardTitle>
-          <CardDescription className="text-center">
-            Total PIM: <span className="font-bold">{totalPIM}</span>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Select value={newPenalty.playerId} onValueChange={(v) => setNewPenalty({ ...newPenalty, playerId: v })}>
-                <SelectTrigger data-testid={`select-penalty-player-${team}`}>
-                  <SelectValue placeholder="Select Player *" />
+      <div className={`flex-1 border rounded-lg p-3 ${bgColor}`}>
+        {/* Team Header with Score */}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-lg truncate">{teamName}</h3>
+          <div className={`text-5xl font-bold ${textColor}`} data-testid={`score-${team}`}>
+            {goals.length}
+          </div>
+        </div>
+
+        {!showPenalties ? (
+          <>
+            {/* Goal Entry Row */}
+            <div className="flex gap-2 mb-2">
+              <Select value={scorerId} onValueChange={setScorerId}>
+                <SelectTrigger className="flex-1 h-9 text-sm" data-testid={`select-scorer-${team}`}>
+                  <SelectValue placeholder="Scorer" />
                 </SelectTrigger>
                 <SelectContent>
                   {players.map(p => (
@@ -460,70 +333,132 @@ export default function ScorekeeperDashboard() {
                   ))}
                 </SelectContent>
               </Select>
-
-              <Select value={newPenalty.minutes.toString()} onValueChange={(v) => setNewPenalty({ ...newPenalty, minutes: parseInt(v) })}>
-                <SelectTrigger data-testid={`select-penalty-minutes-${team}`}>
-                  <SelectValue placeholder="Minutes" />
+              <Select value={assistId || "none"} onValueChange={(v) => setAssistId(v === "none" ? "" : v)}>
+                <SelectTrigger className="flex-1 h-9 text-sm" data-testid={`select-assist-${team}`}>
+                  <SelectValue placeholder="Assist" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="2">2 Minutes</SelectItem>
-                  <SelectItem value="4">4 Minutes</SelectItem>
-                  <SelectItem value="5">5 Minutes</SelectItem>
-                  <SelectItem value="10">10 Minutes</SelectItem>
+                  <SelectItem value="none">No Assist</SelectItem>
+                  {players.filter(p => p.userId !== scorerId).map(p => (
+                    <SelectItem key={p.userId} value={p.userId}>
+                      {p.user.firstName} {p.user.lastName}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-
               <Button 
-                onClick={addPenalty} 
-                variant="secondary"
-                className="w-full" 
-                disabled={createPenaltyMutation.isPending || players.length === 0}
-                data-testid={`add-penalty-${team}`}
+                onClick={addGoal} 
+                size="sm"
+                className="h-9 px-3"
+                disabled={createGoalMutation.isPending || !scorerId}
+                data-testid={`add-goal-${team}`}
               >
-                <AlertTriangle className="mr-2 h-4 w-4" />
-                Add Penalty
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
 
-            <Separator />
-
-            <ScrollArea className="h-[200px]">
-              <div className="space-y-2">
-                {penalties.map((penalty, idx) => (
-                  <div 
-                    key={penalty.id} 
-                    className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg border border-yellow-200 dark:border-yellow-800"
-                    data-testid={`penalty-entry-${team}-${idx}`}
+            {/* Goals List */}
+            <div className="space-y-1 max-h-[calc(100vh-380px)] overflow-y-auto">
+              {goals.map((goal, idx) => (
+                <div 
+                  key={goal.id} 
+                  className="flex items-center justify-between py-1 px-2 bg-background/50 rounded text-sm"
+                  data-testid={`goal-entry-${team}-${idx}`}
+                >
+                  <span className="truncate">
+                    <span className="font-medium">{goal.scorer.firstName} {goal.scorer.lastName}</span>
+                    {goal.primaryAssist && (
+                      <span className="text-muted-foreground ml-1">
+                        ({goal.primaryAssist.firstName.charAt(0)}. {goal.primaryAssist.lastName})
+                      </span>
+                    )}
+                  </span>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => deleteGoalMutation.mutate(goal.id)}
+                    disabled={deleteGoalMutation.isPending}
+                    data-testid={`delete-goal-${team}-${idx}`}
                   >
-                    <div>
-                      <div className="font-medium">
-                        {penalty.player.firstName} {penalty.player.lastName}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {penalty.minutes} minutes {penalty.penaltyType && `- ${penalty.penaltyType}`}
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => deletePenaltyMutation.mutate(penalty.id)}
-                      disabled={deletePenaltyMutation.isPending}
-                      data-testid={`delete-penalty-${team}-${idx}`}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))}
-                {penalties.length === 0 && (
-                  <div className="text-center text-muted-foreground py-4">
-                    No penalties
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-        </CardContent>
-      </Card>
+                    <X className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+              {goals.length === 0 && (
+                <div className="text-center text-muted-foreground text-sm py-2">No goals</div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Penalty Entry Row */}
+            <div className="flex gap-2 mb-2">
+              <Select value={penaltyPlayerId} onValueChange={setPenaltyPlayerId}>
+                <SelectTrigger className="flex-1 h-9 text-sm" data-testid={`select-penalty-player-${team}`}>
+                  <SelectValue placeholder="Player" />
+                </SelectTrigger>
+                <SelectContent>
+                  {players.map(p => (
+                    <SelectItem key={p.userId} value={p.userId}>
+                      {p.user.firstName} {p.user.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={penaltyMinutes.toString()} onValueChange={(v) => setPenaltyMinutes(parseInt(v))}>
+                <SelectTrigger className="w-20 h-9 text-sm" data-testid={`select-penalty-minutes-${team}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2">2 min</SelectItem>
+                  <SelectItem value="4">4 min</SelectItem>
+                  <SelectItem value="5">5 min</SelectItem>
+                  <SelectItem value="10">10 min</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                onClick={addPenalty} 
+                size="sm"
+                className="h-9 px-3"
+                disabled={createPenaltyMutation.isPending || !penaltyPlayerId}
+                data-testid={`add-penalty-${team}`}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Penalties List */}
+            <div className="space-y-1 max-h-[calc(100vh-380px)] overflow-y-auto">
+              {penalties.map((penalty, idx) => (
+                <div 
+                  key={penalty.id} 
+                  className="flex items-center justify-between py-1 px-2 bg-background/50 rounded text-sm"
+                  data-testid={`penalty-entry-${team}-${idx}`}
+                >
+                  <span className="truncate">
+                    <span className="font-medium">{penalty.player.firstName} {penalty.player.lastName}</span>
+                    <span className="text-muted-foreground ml-1">({penalty.minutes} min)</span>
+                  </span>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => deletePenaltyMutation.mutate(penalty.id)}
+                    disabled={deletePenaltyMutation.isPending}
+                    data-testid={`delete-penalty-${team}-${idx}`}
+                  >
+                    <X className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+              {penalties.length === 0 && (
+                <div className="text-center text-muted-foreground text-sm py-2">No penalties</div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     );
   };
 
@@ -563,24 +498,125 @@ export default function ScorekeeperDashboard() {
     );
   }
 
+  // Live Scoring Mode - Compact Full-Screen Layout
+  if (selectedGame && activeTab === 'scoring') {
+    return (
+      <div className="h-screen flex flex-col p-3 overflow-hidden">
+        {/* Compact Header Bar */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => { setSelectedGame(null); setActiveTab('schedule'); }}
+              data-testid="back-to-schedule"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <div className="font-bold text-lg">
+                {selectedGame.awayTeam?.name} @ {selectedGame.homeTeam?.name}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {format(new Date(selectedGame.scheduledAt), 'MMM d, h:mm a')}
+              </div>
+            </div>
+          </div>
+          
+          {/* Central Score Display */}
+          <div className="flex items-center gap-4">
+            <span className="text-3xl font-bold text-red-500">{awayScore}</span>
+            <span className="text-2xl text-muted-foreground">-</span>
+            <span className="text-3xl font-bold text-blue-500">{homeScore}</span>
+            <Badge variant="destructive" className="ml-2">LIVE</Badge>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            <Button 
+              variant={showPenalties ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowPenalties(!showPenalties)}
+              data-testid="toggle-penalties"
+            >
+              {showPenalties ? 'Goals' : 'Penalties'}
+            </Button>
+            <Button 
+              size="sm"
+              onClick={() => {
+                if (window.confirm(`Finalize game?\n\n${selectedGame.awayTeam?.name}: ${awayScore}\n${selectedGame.homeTeam?.name}: ${homeScore}\n\nThis will update all player stats.`)) {
+                  finalizeGameMutation.mutate(selectedGame.id);
+                }
+              }}
+              disabled={finalizeGameMutation.isPending || rostersLoading}
+              data-testid="finalize-game"
+            >
+              <Check className="mr-1 h-4 w-4" />
+              Finalize
+            </Button>
+          </div>
+        </div>
+
+        {/* Loading/Error States */}
+        {rostersLoading && (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-muted-foreground">Loading rosters...</p>
+          </div>
+        )}
+
+        {rostersError && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-2" />
+              <p className="text-destructive">Failed to load rosters</p>
+            </div>
+          </div>
+        )}
+
+        {/* Main Scoring Area - Two Columns */}
+        {!rostersLoading && !rostersError && (
+          <div className="flex-1 flex gap-4 min-h-0">
+            <TeamScoringPanel 
+              team="away"
+              teamName={selectedGame.awayTeam?.name || 'Away'}
+              teamId={selectedGame.awayTeam?.id || ''}
+              goals={awayGoals}
+              penalties={awayPenalties}
+              players={awayTeamMembers}
+            />
+            <TeamScoringPanel 
+              team="home"
+              teamName={selectedGame.homeTeam?.name || 'Home'}
+              teamId={selectedGame.homeTeam?.id || ''}
+              goals={homeGoals}
+              penalties={homePenalties}
+              players={homeTeamMembers}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Schedule View (default)
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Link href="/stats-management">
+    <div className="container mx-auto p-4">
+      <div className="flex items-center gap-4 mb-4">
+        <Link href="/">
           <Button variant="ghost" size="icon" data-testid="back-button">
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Scorekeeper Dashboard</h1>
-          <p className="text-muted-foreground">Track live game scoring and manage stats</p>
+          <h1 className="text-xl font-bold">Scorekeeper Dashboard</h1>
         </div>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4">
         <Select value={selectedLeague} onValueChange={setSelectedLeague}>
-          <SelectTrigger className="w-full md:w-[400px]" data-testid="select-league">
-            <SelectValue placeholder="Select a league to manage" />
+          <SelectTrigger className="w-full md:w-[300px]" data-testid="select-league">
+            <SelectValue placeholder="Select a league" />
           </SelectTrigger>
           <SelectContent>
             {commissionerLeagues.map((league: any) => (
@@ -594,227 +630,109 @@ export default function ScorekeeperDashboard() {
 
       {selectedLeague && (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
+          <TabsList className="mb-3">
             <TabsTrigger value="schedule" data-testid="tab-schedule">
               <Calendar className="mr-2 h-4 w-4" />
               Schedule
             </TabsTrigger>
-            <TabsTrigger value="scoring" disabled={!selectedGame} data-testid="tab-scoring">
-              <Target className="mr-2 h-4 w-4" />
-              Live Scoring
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="schedule">
-            <div className="grid gap-6">
+            <div className="grid gap-4 md:grid-cols-2">
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Clock className="h-4 w-4" />
                     Upcoming Games
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {gamesLoading ? (
-                    <div className="text-center py-4">Loading games...</div>
+                    <div className="text-center py-4">Loading...</div>
                   ) : upcomingGames.length === 0 ? (
-                    <div className="text-center py-4 text-muted-foreground">
-                      No upcoming games scheduled
+                    <div className="text-center py-4 text-muted-foreground text-sm">
+                      No upcoming games
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date & Time</TableHead>
-                          <TableHead>Away Team</TableHead>
-                          <TableHead>Home Team</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {upcomingGames.map((game) => (
-                          <TableRow key={game.id} data-testid={`game-row-${game.id}`}>
-                            <TableCell>
-                              {format(new Date(game.scheduledAt), 'MMM d, yyyy h:mm a')}
-                            </TableCell>
-                            <TableCell>{game.awayTeam?.name}</TableCell>
-                            <TableCell>{game.homeTeam?.name}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {game.status || 'Scheduled'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Button 
-                                size="sm" 
-                                onClick={() => selectGame(game)}
-                                data-testid={`start-scoring-${game.id}`}
-                              >
-                                <Target className="mr-2 h-4 w-4" />
-                                Score Game
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                      {upcomingGames.map((game) => (
+                        <div 
+                          key={game.id} 
+                          className="flex items-center justify-between p-2 bg-muted rounded-lg"
+                          data-testid={`game-row-${game.id}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">
+                              {game.awayTeam?.name} @ {game.homeTeam?.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {format(new Date(game.scheduledAt), 'MMM d, h:mm a')}
+                            </div>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            onClick={() => selectGame(game)}
+                            className="ml-2"
+                            data-testid={`start-scoring-${game.id}`}
+                          >
+                            <Target className="mr-1 h-3 w-3" />
+                            Score
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Trophy className="h-5 w-5" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Trophy className="h-4 w-4" />
                     Completed Games
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {completedGames.length === 0 ? (
-                    <div className="text-center py-4 text-muted-foreground">
-                      No completed games yet
+                    <div className="text-center py-4 text-muted-foreground text-sm">
+                      No completed games
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Away Team</TableHead>
-                          <TableHead>Score</TableHead>
-                          <TableHead>Home Team</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {completedGames.map((game) => (
-                          <TableRow key={game.id}>
-                            <TableCell>
-                              {format(new Date(game.scheduledAt), 'MMM d, yyyy')}
-                            </TableCell>
-                            <TableCell>{game.awayTeam?.name}</TableCell>
-                            <TableCell className="font-bold">
-                              {game.awayScore ?? 0} - {game.homeScore ?? 0}
-                            </TableCell>
-                            <TableCell>{game.homeTeam?.name}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                      {completedGames.map((game) => (
+                        <div 
+                          key={game.id} 
+                          className="flex items-center justify-between p-2 bg-muted rounded-lg"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">
+                              {game.awayTeam?.name} @ {game.homeTeam?.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {format(new Date(game.scheduledAt), 'MMM d')}
+                            </div>
+                          </div>
+                          <div className="font-bold text-sm ml-2">
+                            {game.awayScore ?? 0} - {game.homeScore ?? 0}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="scoring">
-            {selectedGame && (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>
-                          {selectedGame.awayTeam?.name} @ {selectedGame.homeTeam?.name}
-                        </CardTitle>
-                        <CardDescription>
-                          {format(new Date(selectedGame.scheduledAt), 'EEEE, MMMM d, yyyy h:mm a')}
-                        </CardDescription>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-4xl font-bold" data-testid="live-score">
-                          {awayScore} - {homeScore}
-                        </div>
-                        <Badge>Live</Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-
-                {rostersLoading && (
-                  <Card>
-                    <CardContent className="py-8 text-center">
-                      <p className="text-muted-foreground">Loading team rosters...</p>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {rostersError && (
-                  <Card>
-                    <CardContent className="py-8 text-center">
-                      <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-2" />
-                      <p className="text-destructive">Failed to load team rosters. Please try again.</p>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {!rostersLoading && !rostersError && (
-                  <>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <GoalEntry 
-                        team="away" 
-                        goals={awayGoals} 
-                        players={awayTeamMembers} 
-                      />
-                      <GoalEntry 
-                        team="home" 
-                        goals={homeGoals} 
-                        players={homeTeamMembers} 
-                      />
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <PenaltyEntry 
-                        team="away" 
-                        penalties={awayPenalties} 
-                        players={awayTeamMembers} 
-                      />
-                      <PenaltyEntry 
-                        team="home" 
-                        penalties={homePenalties} 
-                        players={homeTeamMembers} 
-                      />
-                    </div>
-                  </>
-                )}
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex gap-4 justify-center">
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setSelectedGame(null)}
-                        data-testid="cancel-scoring"
-                      >
-                        Cancel
-                      </Button>
-                      <Button 
-                        onClick={() => {
-                          if (window.confirm(`Finalize game?\n\n${selectedGame.awayTeam?.name}: ${awayScore}\n${selectedGame.homeTeam?.name}: ${homeScore}\n\nThis will update all player stats and team standings.`)) {
-                            finalizeGameMutation.mutate(selectedGame.id);
-                          }
-                        }}
-                        disabled={finalizeGameMutation.isPending || rostersLoading}
-                        data-testid="finalize-game"
-                      >
-                        <Check className="mr-2 h-4 w-4" />
-                        Finalize Game
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
           </TabsContent>
         </Tabs>
       )}
 
       {!selectedLeague && (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Users className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Select a League</h3>
-            <p className="text-muted-foreground">
-              Choose a league from the dropdown above to start managing game scores.
+          <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+            <Users className="h-10 w-10 text-muted-foreground mb-3" />
+            <h3 className="font-medium mb-1">Select a League</h3>
+            <p className="text-sm text-muted-foreground">
+              Choose a league to start managing game scores.
             </p>
           </CardContent>
         </Card>
