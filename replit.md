@@ -6,6 +6,29 @@ The platform now includes a sophisticated tournament system supporting diverse f
 
 # Recent Changes
 
+## November 25, 2025 - Scorekeeper Dashboard for Live Game Scoring
+
+### Scorekeeper Dashboard
+- **Feature**: Comprehensive dashboard for authorized users to track live game scoring, manage goals/penalties, and finalize games
+- **Access Control**: Only accessible to commissioners, global stat_manager permission holders, and league-level stat_manager permission holders
+- **Database Schema**:
+  - `game_goals` table: Tracks goals with scorer, primary assist, secondary assist, period, and submission status
+  - `game_penalties` table: Tracks penalties with player, minutes, penalty type, period, and submission status
+- **Backend Implementation**:
+  - `POST/DELETE /api/games/:gameId/goals` - Add/remove goals
+  - `POST/DELETE /api/games/:gameId/penalties` - Add/remove penalties
+  - `POST /api/games/:gameId/finalize` - Finalize game and update player stats
+  - `PATCH /api/games/:gameId/scores` - Update game scores in real-time
+  - `GET /api/scorekeeper/games` - Get games for scorekeeper with permission checking
+- **Frontend Implementation** (client/src/pages/ScorekeeperDashboard.tsx):
+  - League selection dropdown
+  - Game schedule view with upcoming and completed games
+  - Live scoring interface with goal/penalty entry forms
+  - Team roster integration for player selection
+  - Real-time score display and updates
+  - Game finalization workflow with confirmation
+  - Loading states and error handling for roster fetching
+
 ## November 25, 2025 - Additional Team Payment Enforcement & Dashboard Tournament Integration
 
 ### Additional Team Payment for Paid Tournaments
