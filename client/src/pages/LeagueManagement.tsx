@@ -883,13 +883,18 @@ export default function LeagueManagement() {
   React.useEffect(() => {
     if (selectedGame) {
       const gameDate = new Date(selectedGame.scheduledAt);
-      const formattedDate = gameDate.toISOString().split('T')[0]; // YYYY-MM-DD
-      const formattedTime = gameDate.toTimeString().slice(0, 5); // HH:MM
+      // Format as local time without timezone conversion
+      const year = gameDate.getFullYear();
+      const month = String(gameDate.getMonth() + 1).padStart(2, '0');
+      const day = String(gameDate.getDate()).padStart(2, '0');
+      const hours = String(gameDate.getHours()).padStart(2, '0');
+      const minutes = String(gameDate.getMinutes()).padStart(2, '0');
+      
       editGameForm.reset({
         homeTeamId: selectedGame.homeTeamId,
         awayTeamId: selectedGame.awayTeamId,
-        gameDate: formattedDate,
-        gameTime: formattedTime,
+        gameDate: `${year}-${month}-${day}`,
+        gameTime: `${hours}:${minutes}`,
         venue: selectedGame.venue || '',
         homeTeamLockerRoom: selectedGame.homeTeamLockerRoom || '',
         awayTeamLockerRoom: selectedGame.awayTeamLockerRoom || '',
