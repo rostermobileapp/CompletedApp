@@ -255,6 +255,43 @@ export default function ScorekeeperDashboard() {
     setShowPenalties(false);
   };
 
+  // Request landscape orientation when entering scoring mode
+  useEffect(() => {
+    const requestLandscape = async () => {
+      if (selectedGame && activeTab === 'scoring') {
+        try {
+          if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape');
+          }
+        } catch (err) {
+          // Silently fail if orientation lock is not supported
+          console.debug('Screen orientation lock not supported');
+        }
+      } else {
+        try {
+          if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+          }
+        } catch (err) {
+          console.debug('Screen orientation unlock not supported');
+        }
+      }
+    };
+
+    requestLandscape();
+
+    return () => {
+      // Cleanup: unlock orientation when component unmounts
+      try {
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock();
+        }
+      } catch (err) {
+        console.debug('Screen orientation unlock not supported');
+      }
+    };
+  }, [selectedGame, activeTab]);
+
   // Compact Team Scoring Panel
   const TeamScoringPanel = ({ 
     team, 
