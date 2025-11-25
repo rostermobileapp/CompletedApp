@@ -1,12 +1,18 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX, User, ArrowRight } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX, User, ArrowRight, Megaphone, Plus, Heart, ThumbsUp, Laugh, Frown, Angry, Meh, MessageCircle, BarChart3, Pin, MoreHorizontal, Edit2, FileText, AlertCircle } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,15 +24,802 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getImageUrl } from "@/lib/queryClient";
 import BracketView from "@/components/BracketView";
 import MatchEditDialog from "@/components/MatchEditDialog";
 import TournamentMatchScoreModal from "@/components/TournamentMatchScoreModal";
 import { CustomBracketBuilder } from "@/components/CustomBracketBuilder";
+import { EnhancedMediaUploader } from "@/components/EnhancedMediaUploader";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
+
+// Announcement types
+type AnnouncementReaction = {
+  id: string;
+  emoji: string;
+  userId: string;
+  user: {
+    firstName: string;
+    lastName: string;
+    profileImageUrl?: string;
+  };
+};
+
+type AnnouncementPoll = {
+  id: string;
+  question: string;
+  options: string[];
+  allowMultiple: boolean;
+  expiresAt?: string;
+  votes: {
+    userId: string;
+    optionIndex: number;
+  }[];
+};
+
+type AnnouncementAttachment = {
+  id: string;
+  filename: string;
+  url: string;
+  type: string;
+  size: number;
+};
+
+type Announcement = {
+  id: string;
+  content: string;
+  isPinned: boolean;
+  createdAt: string;
+  author: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl?: string;
+  };
+  attachments: AnnouncementAttachment[];
+  reactions: AnnouncementReaction[];
+  polls: AnnouncementPoll[];
+};
+
+// Emoji reactions available
+const REACTION_EMOJIS = [
+  { emoji: '👍', label: 'Like' },
+  { emoji: '❤️', label: 'Love' },
+  { emoji: '😂', label: 'Laugh' },
+  { emoji: '😮', label: 'Wow' },
+  { emoji: '😢', label: 'Sad' },
+  { emoji: '😡', label: 'Angry' }
+];
+
+// Character limit for announcements
+const CHAR_LIMIT = 280;
+
+// Types for media files
+interface MediaFile {
+  file: File;
+  preview: string;
+  type: 'image' | 'video' | 'document';
+  compressed?: File;
+}
+
+// Tournament Announcement Modal Component
+function CreateTournamentAnnouncementModal({ 
+  isOpen, 
+  onClose, 
+  tournamentId, 
+  canPost 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  tournamentId: string;
+  canPost: boolean;
+}) {
+  const [content, setContent] = useState('');
+  const [isPinned, setIsPinned] = useState(false);
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [attachedMedia, setAttachedMedia] = useState<MediaFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const { toast } = useToast();
+
+  const createAnnouncementMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest('POST', `/api/tournaments/${tournamentId}/announcements`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      toast({ title: 'Announcement created successfully!' });
+      onClose();
+      resetForm();
+    },
+    onError: () => {
+      toast({ title: 'Failed to create announcement', variant: 'destructive' });
+    }
+  });
+
+  const resetForm = () => {
+    setContent('');
+    setIsPinned(false);
+    setShowPollCreator(false);
+    setPollQuestion('');
+    setPollOptions(['', '']);
+    setAllowMultiple(false);
+    setAttachedMedia([]);
+    setIsUploading(false);
+  };
+
+  const uploadMediaFiles = async (mediaFiles: MediaFile[]): Promise<any[]> => {
+    const uploadedAttachments: any[] = [];
+    
+    for (const mediaFile of mediaFiles) {
+      try {
+        const uploadResponse = await apiRequest('POST', '/api/announcement-media/upload');
+        const { uploadURL } = await uploadResponse.json();
+        
+        const fileToUpload = mediaFile.compressed || mediaFile.file;
+        
+        const uploadResult = await fetch(uploadURL, {
+          method: 'PUT',
+          body: fileToUpload,
+          headers: {
+            'Content-Type': fileToUpload.type,
+          },
+        });
+        
+        if (!uploadResult.ok) {
+          throw new Error('Failed to upload file');
+        }
+        
+        const urlObj = new URL(uploadURL);
+        const objectPath = urlObj.pathname.split('/').pop();
+        
+        uploadedAttachments.push({
+          type: mediaFile.type,
+          url: `/announcement-media/${objectPath}`,
+          fileName: mediaFile.file.name,
+        });
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        throw new Error(`Failed to upload ${mediaFile.file.name}`);
+      }
+    }
+    
+    return uploadedAttachments;
+  };
+
+  const handleMediaSelection = (files: MediaFile[]) => {
+    setAttachedMedia(files);
+  };
+
+  const handleSubmit = async () => {
+    if (!content.trim()) return;
+
+    try {
+      setIsUploading(true);
+      
+      let attachments: any[] = [];
+      if (attachedMedia.length > 0) {
+        attachments = await uploadMediaFiles(attachedMedia);
+      }
+
+      const announcementData: any = {
+        content: content.trim(),
+        isPinned,
+        attachments
+      };
+
+      if (showPollCreator && pollQuestion.trim() && pollOptions.some(opt => opt.trim())) {
+        announcementData.poll = {
+          question: pollQuestion.trim(),
+          options: pollOptions.filter(opt => opt.trim()),
+          allowMultiple
+        };
+      }
+
+      createAnnouncementMutation.mutate(announcementData);
+    } catch (error) {
+      toast({ 
+        title: 'Upload failed', 
+        description: error instanceof Error ? error.message : 'Failed to upload media files',
+        variant: 'destructive' 
+      });
+      setIsUploading(false);
+    }
+  };
+
+  const addPollOption = () => {
+    if (pollOptions.length < 6) {
+      setPollOptions([...pollOptions, '']);
+    }
+  };
+
+  const removePollOption = (index: number) => {
+    if (pollOptions.length > 2) {
+      setPollOptions(pollOptions.filter((_, i) => i !== index));
+    }
+  };
+
+  const updatePollOption = (index: number, value: string) => {
+    const newOptions = [...pollOptions];
+    newOptions[index] = value;
+    setPollOptions(newOptions);
+  };
+
+  if (!canPost) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Megaphone className="w-5 h-5" />
+            Create Tournament Announcement
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label>Message</Label>
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value.slice(0, CHAR_LIMIT))}
+              placeholder="What would you like to announce?"
+              className="min-h-24 resize-none"
+              data-testid="input-tournament-announcement-content"
+            />
+            <div className="flex justify-between items-center mt-1">
+              <span className={`text-sm ${content.length > CHAR_LIMIT * 0.8 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                {content.length}/{CHAR_LIMIT}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="pin-tournament-announcement"
+              checked={isPinned}
+              onChange={(e) => setIsPinned(e.target.checked)}
+              data-testid="checkbox-pin-tournament-announcement"
+            />
+            <Label htmlFor="pin-tournament-announcement" className="flex items-center gap-1">
+              <Pin className="w-4 h-4" />
+              Pin this announcement
+            </Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant={showPollCreator ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowPollCreator(!showPollCreator)}
+              data-testid="button-toggle-tournament-poll"
+            >
+              <BarChart3 className="w-4 h-4 mr-1" />
+              {showPollCreator ? 'Remove Poll' : 'Add Poll'}
+            </Button>
+          </div>
+
+          {showPollCreator && (
+            <Card>
+              <CardHeader>
+                <h4 className="font-medium">Create Poll</h4>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label>Poll Question</Label>
+                  <Input
+                    value={pollQuestion}
+                    onChange={(e) => setPollQuestion(e.target.value)}
+                    placeholder="Ask a question..."
+                    data-testid="input-tournament-poll-question"
+                  />
+                </div>
+
+                <div>
+                  <Label>Options</Label>
+                  <div className="space-y-2">
+                    {pollOptions.map((option, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={option}
+                          onChange={(e) => updatePollOption(index, e.target.value)}
+                          placeholder={`Option ${index + 1}`}
+                          data-testid={`input-tournament-poll-option-${index}`}
+                        />
+                        {pollOptions.length > 2 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removePollOption(index)}
+                            data-testid={`button-remove-tournament-option-${index}`}
+                          >
+                            ×
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {pollOptions.length < 6 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={addPollOption}
+                      className="mt-2"
+                      data-testid="button-add-tournament-poll-option"
+                    >
+                      + Add option
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="allow-tournament-multiple"
+                    checked={allowMultiple}
+                    onChange={(e) => setAllowMultiple(e.target.checked)}
+                    data-testid="checkbox-allow-tournament-multiple"
+                  />
+                  <Label htmlFor="allow-tournament-multiple">Allow multiple selections</Label>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => document.getElementById('tournament-media-uploader-trigger')?.click()}
+                data-testid="button-add-tournament-media"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Images
+              </Button>
+              {attachedMedia.length > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  {attachedMedia.length} file{attachedMedia.length > 1 ? 's' : ''} selected
+                </span>
+              )}
+            </div>
+            
+            {attachedMedia.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                {attachedMedia.map((media, index) => (
+                  <div key={index} className="relative">
+                    <img 
+                      src={media.preview} 
+                      alt={media.file.name}
+                      className="w-full h-20 object-cover rounded border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                      onClick={() => setAttachedMedia(prev => prev.filter((_, i) => i !== index))}
+                      data-testid={`button-remove-tournament-media-${index}`}
+                    >
+                      ×
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <EnhancedMediaUploader
+              maxFiles={5}
+              acceptedTypes={['image/*']}
+              onFilesSelected={handleMediaSelection}
+            >
+              <div id="tournament-media-uploader-trigger" />
+            </EnhancedMediaUploader>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              data-testid="button-cancel-tournament-announcement"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={!content.trim() || createAnnouncementMutation.isPending || isUploading}
+              data-testid="button-create-tournament-announcement-submit"
+            >
+              {isUploading ? 'Uploading...' : createAnnouncementMutation.isPending ? 'Creating...' : 'Post Announcement'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Tournament Poll Card Component
+function TournamentPollCard({
+  poll,
+  currentUserId,
+  onVote,
+  isPending
+}: {
+  poll: AnnouncementPoll;
+  currentUserId: string;
+  onVote: (pollId: string, optionIndex: number, allowMultiple: boolean) => void;
+  isPending: boolean;
+}) {
+  return (
+    <Card className="bg-card border-border shadow-sm">
+      <CardHeader className="flex flex-col space-y-2 p-5 pb-4">
+        <div className="flex items-center justify-between">
+          <h4 className="text-base font-semibold flex items-center gap-2.5 text-foreground">
+            <BarChart3 className="w-4 h-4 text-primary" />
+            {poll.question}
+          </h4>
+          <div className="flex items-center gap-2">
+            {!poll.allowMultiple && (
+              <Badge variant="outline" className="text-xs">Single Choice</Badge>
+            )}
+            {poll.allowMultiple && (
+              <Badge variant="outline" className="text-xs">Multiple Choice</Badge>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-5 pt-0 space-y-2.5">
+        {poll.options.map((option, index) => {
+          const votes = poll.votes.filter(v => v.optionIndex === index).length;
+          const totalVotes = poll.votes.length;
+          const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
+          const userVoted = poll.votes.some(v => v.userId === currentUserId && v.optionIndex === index);
+          const isTopChoice = votes > 0 && votes === Math.max(...poll.options.map((_, i) => 
+            poll.votes.filter(v => v.optionIndex === i).length
+          ));
+
+          return (
+            <div key={index} className="relative">
+              <Button
+                variant={userVoted ? "default" : "outline"}
+                className={`w-full justify-between h-auto py-3.5 px-4 relative overflow-hidden transition-all duration-300 rounded-xl ${
+                  userVoted 
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 border-primary' 
+                    : 'hover:bg-accent/50 border-border'
+                }`}
+                onClick={() => onVote(poll.id, index, poll.allowMultiple)}
+                disabled={isPending}
+                data-testid={`button-tournament-poll-option-${index}`}
+              >
+                <div 
+                  className="absolute inset-0 transition-all duration-500 bg-primary/20 rounded-xl"
+                  style={{ width: `${Math.max(percentage, 0)}%` }}
+                />
+                
+                <div className="relative flex items-center justify-between w-full gap-3">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    {userVoted && (
+                      <div className="w-2 h-2 rounded-full bg-white flex-shrink-0" />
+                    )}
+                    <span className="font-medium text-sm text-left truncate">{option}</span>
+                    {isTopChoice && totalVotes > 0 && (
+                      <span className="text-[12px] bg-accent text-accent-foreground px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                        Leading
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-xs opacity-75">
+                      {votes} {votes !== 1 ? 'votes' : 'vote'}
+                    </div>
+                  </div>
+                </div>
+              </Button>
+            </div>
+          );
+        })}
+        
+        <div className="flex items-center justify-between pt-3 text-xs text-muted-foreground border-t border-border">
+          <div className="flex items-center gap-2">
+            <Users className="w-3.5 h-3.5" />
+            <span>{poll.votes.length} total votes</span>
+          </div>
+          {isPending && (
+            <div className="flex items-center gap-2 text-primary">
+              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              <span className="text-[12px]">Recording vote...</span>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Tournament Announcement Card Component
+function TournamentAnnouncementCard({ 
+  announcement, 
+  tournamentId, 
+  currentUserId, 
+  isCommissioner 
+}: { 
+  announcement: Announcement;
+  tournamentId: string;
+  currentUserId: string;
+  isCommissioner: boolean;
+}) {
+  const { toast } = useToast();
+  
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editContent, setEditContent] = useState(announcement.content);
+  const [editIsPinned, setEditIsPinned] = useState(announcement.isPinned);
+
+  const reactionCounts = announcement.reactions.reduce((acc, reaction) => {
+    acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const userReactions = announcement.reactions
+    .filter(r => r.userId === currentUserId)
+    .map(r => r.emoji);
+
+  const toggleReactionMutation = useMutation({
+    mutationFn: async ({ emoji, isRemoving }: { emoji: string; isRemoving: boolean }) => {
+      const method = isRemoving ? 'DELETE' : 'POST';
+      const response = await apiRequest(method, `/api/announcements/${announcement.id}/reactions`, { emoji });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update reaction', variant: 'destructive' });
+    }
+  });
+
+  const voteOnPollMutation = useMutation({
+    mutationFn: async ({ pollId, optionIndex }: { pollId: string; optionIndex: number }) => {
+      const response = await apiRequest('POST', `/api/polls/${pollId}/votes`, { optionIndex });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      toast({ title: 'Vote recorded successfully!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to record vote', variant: 'destructive' });
+    }
+  });
+
+  const updateAnnouncementMutation = useMutation({
+    mutationFn: async (data: { content: string; isPinned: boolean }) => {
+      const response = await apiRequest('PATCH', `/api/announcements/${announcement.id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      toast({ title: 'Announcement updated successfully!' });
+      setShowEditModal(false);
+    },
+    onError: () => {
+      toast({ title: 'Failed to update announcement', variant: 'destructive' });
+    }
+  });
+
+  const deleteAnnouncementMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('DELETE', `/api/announcements/${announcement.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      toast({ title: 'Announcement deleted successfully!' });
+      setShowDeleteConfirm(false);
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete announcement', variant: 'destructive' });
+    }
+  });
+
+  const handleReactionClick = (emoji: string) => {
+    const isRemoving = userReactions.includes(emoji);
+    toggleReactionMutation.mutate({ emoji, isRemoving });
+  };
+
+  const handlePollVote = (pollId: string, optionIndex: number, allowMultiple: boolean) => {
+    if (allowMultiple) {
+      voteOnPollMutation.mutate({ pollId, optionIndex });
+    } else {
+      const currentPoll = announcement.polls.find(p => p.id === pollId);
+      const hasVoted = currentPoll?.votes.some(v => v.userId === currentUserId);
+      
+      if (!hasVoted) {
+        voteOnPollMutation.mutate({ pollId, optionIndex });
+      }
+    }
+  };
+
+  return (
+    <Card className="relative">
+      {announcement.isPinned && (
+        <div className="absolute top-3 right-3">
+          <Pin className="h-4 w-4 text-primary" />
+        </div>
+      )}
+      
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-3">
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={getImageUrl(announcement.author.profileImageUrl) || undefined} />
+            <AvatarFallback>
+              {announcement.author.firstName?.[0]}{announcement.author.lastName?.[0]}
+            </AvatarFallback>
+          </Avatar>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-sm">
+                  {announcement.author.firstName} {announcement.author.lastName}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {format(new Date(announcement.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                </p>
+              </div>
+              
+              {isCommissioner && announcement.author.id === currentUserId && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowEditModal(true)}
+                    data-testid="button-edit-tournament-announcement"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    data-testid="button-delete-tournament-announcement"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <p className="text-sm whitespace-pre-wrap">{announcement.content}</p>
+
+        {announcement.attachments && announcement.attachments.length > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            {announcement.attachments.map((attachment) => (
+              <div key={attachment.id} className="relative aspect-video rounded-lg overflow-hidden border">
+                <img 
+                  src={attachment.url} 
+                  alt={attachment.filename || 'Attachment'}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {announcement.polls && announcement.polls.length > 0 && (
+          <div className="space-y-3">
+            {announcement.polls.map((poll) => (
+              <TournamentPollCard
+                key={poll.id}
+                poll={poll}
+                currentUserId={currentUserId}
+                onVote={handlePollVote}
+                isPending={voteOnPollMutation.isPending}
+              />
+            ))}
+          </div>
+        )}
+
+        <Separator />
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {REACTION_EMOJIS.map(({ emoji, label }) => {
+            const count = reactionCounts[emoji] || 0;
+            const hasReacted = userReactions.includes(emoji);
+            
+            return (
+              <Button
+                key={emoji}
+                variant={hasReacted ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleReactionClick(emoji)}
+                className="h-8 px-3"
+                data-testid={`button-tournament-reaction-${label.toLowerCase()}`}
+              >
+                <span className="mr-1">{emoji}</span>
+                {count > 0 && <span className="text-xs">{count}</span>}
+              </Button>
+            );
+          })}
+        </div>
+      </CardContent>
+
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Announcement</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Message</Label>
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="min-h-24"
+                data-testid="input-edit-tournament-announcement"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="edit-pin"
+                checked={editIsPinned}
+                onChange={(e) => setEditIsPinned(e.target.checked)}
+              />
+              <Label htmlFor="edit-pin">Pin this announcement</Label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setShowEditModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => updateAnnouncementMutation.mutate({ content: editContent, isPinned: editIsPinned })}
+                disabled={updateAnnouncementMutation.isPending}
+              >
+                {updateAnnouncementMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Announcement?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this announcement? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAnnouncementMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteAnnouncementMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
 
 export default function TournamentDetail() {
   const [, params] = useRoute("/tournaments/:tournamentId");
@@ -56,7 +849,10 @@ export default function TournamentDetail() {
   const [targetUserId, setTargetUserId] = useState('');
   const [targetUserEmail, setTargetUserEmail] = useState('');
 
-  const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
+  // Announcement state
+  const [showCreateAnnouncementModal, setShowCreateAnnouncementModal] = useState(false);
+
+  const { data: tournament, isLoading: tournamentLoading} = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
     enabled: !!tournamentId
   });
@@ -99,6 +895,28 @@ export default function TournamentDetail() {
     queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'],
     enabled: !!tournamentId && !!tournament && !!currentUser && canManageTournament()
   });
+
+  // Fetch tournament announcements
+  const { data: announcementsData, isLoading: announcementsLoading } = useQuery<{ announcements: Announcement[]; pagination?: { page: number; pageSize: number; total: number } }>({
+    queryKey: ['/api/tournaments', tournamentId, 'announcements'],
+    enabled: !!tournamentId,
+  });
+
+  const announcements: Announcement[] = Array.isArray(announcementsData) ? announcementsData : (announcementsData?.announcements ?? []);
+
+  // Mark announcements as read when viewed
+  useEffect(() => {
+    if (tournamentId && announcements.length > 0) {
+      const markAsRead = async () => {
+        try {
+          await apiRequest('POST', `/api/tournaments/${tournamentId}/announcements/mark-read`);
+        } catch (error) {
+          console.error('Failed to mark announcements as read:', error);
+        }
+      };
+      markAsRead();
+    }
+  }, [tournamentId, announcements]);
 
   // Handle payment success callback from Stripe
   useEffect(() => {
@@ -744,10 +1562,11 @@ export default function TournamentDetail() {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 pt-[2px] pb-[2px] pl-[8px] pr-[8px]">
         <Tabs defaultValue="bracket" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 md:w-auto">
+          <TabsList className="grid w-full grid-cols-4 md:w-auto">
             <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
             <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
             <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="announcements" data-testid="tab-announcements">Announcements</TabsTrigger>
           </TabsList>
 
           {/* Bracket Tab */}
@@ -1358,8 +2177,101 @@ export default function TournamentDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Announcements Tab */}
+          <TabsContent value="announcements">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Megaphone className="h-5 w-5" />
+                      Tournament Announcements
+                    </CardTitle>
+                    <CardDescription>
+                      Updates and announcements from the tournament commissioner
+                    </CardDescription>
+                  </div>
+                  
+                  {canManageTournament() && (
+                    <Button 
+                      onClick={() => setShowCreateAnnouncementModal(true)}
+                      size="sm"
+                      data-testid="button-create-tournament-announcement"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Post Announcement
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {announcementsLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <Card key={i} className="animate-pulse">
+                        <CardHeader>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-muted rounded-full" />
+                            <div className="space-y-2">
+                              <div className="h-4 bg-muted rounded w-32" />
+                              <div className="h-3 bg-muted rounded w-24" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <div className="h-4 bg-muted rounded w-full" />
+                            <div className="h-4 bg-muted rounded w-3/4" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : announcements.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Megaphone className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Announcements Yet</h3>
+                    <p className="text-muted-foreground mb-4">
+                      {canManageTournament() 
+                        ? 'Be the first to share an announcement with tournament participants!'
+                        : 'Check back later for updates from the tournament commissioner.'
+                      }
+                    </p>
+                    {canManageTournament() && (
+                      <Button onClick={() => setShowCreateAnnouncementModal(true)}>
+                        <Plus className="w-4 h-4 mr-1" />
+                        Create First Announcement
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-6" data-testid="tournament-announcements-list">
+                    {announcements.map((announcement: Announcement) => (
+                      <TournamentAnnouncementCard
+                        key={announcement.id}
+                        announcement={announcement}
+                        tournamentId={tournamentId!}
+                        currentUserId={currentUser?.id || ''}
+                        isCommissioner={canManageTournament()}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Create Tournament Announcement Modal */}
+      <CreateTournamentAnnouncementModal
+        isOpen={showCreateAnnouncementModal}
+        onClose={() => setShowCreateAnnouncementModal(false)}
+        tournamentId={tournamentId!}
+        canPost={canManageTournament()}
+      />
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
