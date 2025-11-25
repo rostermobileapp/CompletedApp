@@ -276,14 +276,14 @@ export function TournamentPhotos({
           {photos.map((photo, index) => (
             <div
               key={photo.id}
-              className="relative aspect-square group cursor-pointer bg-muted"
+              className="relative aspect-square group cursor-pointer bg-black"
               data-testid={`photo-${index}`}
               onClick={() => setSelectedPhotoIndex(index)}
             >
               <img
                 src={getImageUrl(photo.fileUrl) || ''}
                 alt={photo.fileName}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 loading="lazy"
               />
               
