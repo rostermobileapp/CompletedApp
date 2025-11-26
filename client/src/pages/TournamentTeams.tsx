@@ -283,11 +283,6 @@ export default function TournamentTeams() {
 
   const canUploadLogo = isTeamCaptain || isCommissioner;
 
-  // Handle team selection change
-  const handleTeamChange = (teamId: string) => {
-    setCurrentTeamId(teamId);
-  };
-
   // Loading state - for auth
   if (isLoading) {
     return (
