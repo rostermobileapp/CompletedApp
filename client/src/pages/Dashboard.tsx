@@ -1866,46 +1866,23 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Photos Card */}
-          {selectedType === 'tournament' ? (
-            <div 
-              className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
-              data-testid="card-photos"
-              onClick={() => {
-                if (selectedId) {
-                  navigate(`/media/tournament/${selectedId}`);
-                }
-              }}
-            >
-              <div className="h-full flex flex-col items-center justify-center">
-                <Camera className="w-8 h-8 text-blue-500 mb-3" />
-                <p className="text-xs font-medium">Photos</p>
-              </div>
-            </div>
-          ) : selectedType === 'league' && effectiveLeagueId ? (
-            <div 
-              className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
-              data-testid="card-photos"
-              onClick={() => {
+          {/* Photos Card - Always clickable, paywall shown on MediaGalleryPage if needed */}
+          <div 
+            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
+            data-testid="card-photos"
+            onClick={() => {
+              if (selectedType === 'tournament' && selectedId) {
+                navigate(`/media/tournament/${selectedId}`);
+              } else if (effectiveLeagueId) {
                 navigate(`/media/league/${effectiveLeagueId}`);
-              }}
-            >
-              <div className="h-full flex flex-col items-center justify-center">
-                <Camera className="w-8 h-8 text-blue-500 mb-3" />
-                <p className="text-xs font-medium">Photos</p>
-              </div>
+              }
+            }}
+          >
+            <div className="h-full flex flex-col items-center justify-center">
+              <Camera className="w-8 h-8 text-blue-500 mb-3" />
+              <p className="text-xs font-medium">Photos</p>
             </div>
-          ) : (
-            <div 
-              className="rounded-xl border border-border p-5 min-h-[72px] bg-[#e2e2e2] dark:bg-[#212121] opacity-50" 
-              data-testid="card-photos"
-            >
-              <div className="h-full flex flex-col items-center justify-center">
-                <Camera className="w-8 h-8 text-muted-foreground mb-3" />
-                <p className="text-xs font-medium text-muted-foreground">Photos</p>
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* Stats Card */}
           <div 
