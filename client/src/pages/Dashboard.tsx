@@ -1716,7 +1716,7 @@ export default function Dashboard() {
                 ) : (
                   <Trophy className="w-4 h-4 text-primary" />
                 )}
-                <span className="font-medium text-[16px] pl-[8px] pr-[8px]">
+                <span className="font-medium pl-[8px] pr-[8px] text-[12px]">
                   {selectedType === 'team' 
                     ? getTeamDisplayName((userTeamsAll as any[])?.find((t: any) => t.id === selectedId))
                     : selectedType === 'tournament'
