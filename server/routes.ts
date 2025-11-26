@@ -11985,24 +11985,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
 
+      // First get the base tournament teams with league captain info
       const tournamentTeamsList = await db
         .select({
           id: tournamentTeams.id,
           tournamentId: tournamentTeams.tournamentId,
           teamId: tournamentTeams.teamId,
-          teamName: tournamentTeams.teamName,  // Use teamName from tournamentTeams, not teams table
+          teamName: tournamentTeams.teamName,
           seed: tournamentTeams.seed,
           division: tournamentTeams.division,
           wins: tournamentTeams.wins,
           losses: tournamentTeams.losses,
+          logoUrl: tournamentTeams.logoUrl,
+          captainId: teams.captainId,  // Captain from linked league team (may be null for standalone)
           createdAt: tournamentTeams.createdAt
         })
         .from(tournamentTeams)
         .leftJoin(teams, eq(tournamentTeams.teamId, teams.id))
         .where(eq(tournamentTeams.tournamentId, id))
         .orderBy(tournamentTeams.seed);
+      
+      // For each team, also check for tournament participant captains (especially for standalone teams)
+      const teamsWithCaptains = await Promise.all(
+        tournamentTeamsList.map(async (team) => {
+          // If no league captain, look for tournament participant captain
+          if (!team.captainId) {
+            const [participantCaptain] = await db
+              .select({ userId: tournamentParticipants.userId })
+              .from(tournamentParticipants)
+              .where(and(
+                eq(tournamentParticipants.tournamentId, id),
+                eq(tournamentParticipants.tournamentTeamId, team.id),
+                eq(tournamentParticipants.role, 'captain'),
+                eq(tournamentParticipants.status, 'approved')
+              ))
+              .limit(1);
+            
+            return {
+              ...team,
+              captainId: participantCaptain?.userId || null
+            };
+          }
+          return team;
+        })
+      );
 
-      res.json(tournamentTeamsList);
+      res.json(teamsWithCaptains);
     } catch (error) {
       console.error("Error fetching tournament teams:", error);
       res.status(500).json({ message: "Failed to fetch tournament teams" });
@@ -14239,6 +14267,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching participation:", error);
       res.status(500).json({ message: "Failed to fetch participation status" });
+    }
+  });
+
+  // Get tournament standings (calculated from matches)
+  app.get('/api/tournaments/:tournamentId/standings', async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+
+      // Get all teams in this tournament
+      const teams = await db
+        .select()
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.tournamentId, tournamentId));
+
+      // Get all completed matches
+      const matches = await db
+        .select()
+        .from(tournamentMatches)
+        .where(and(
+          eq(tournamentMatches.tournamentId, tournamentId),
+          eq(tournamentMatches.status, 'completed')
+        ));
+
+      // Calculate standings for each team
+      // Note: matches reference league team IDs via team1Id/team2Id, or tournament team IDs
+      // We need to match against both team.id (tournament team) and team.teamId (linked league team)
+      const standings = teams.map(team => {
+        let wins = 0;
+        let losses = 0;
+        let ties = 0;
+        let goalsFor = 0;
+        let goalsAgainst = 0;
+        
+        // Match IDs can reference either league team ID or tournament team ID
+        const matchIds = [team.id, team.teamId].filter(Boolean);
+
+        matches.forEach(match => {
+          const isTeam1 = matchIds.includes(match.team1Id);
+          const isTeam2 = matchIds.includes(match.team2Id);
+          
+          if (isTeam1 || isTeam2) {
+            const teamScore = isTeam1 ? match.team1Score : match.team2Score;
+            const opponentScore = isTeam1 ? match.team2Score : match.team1Score;
+
+            if (teamScore !== null && opponentScore !== null) {
+              goalsFor += teamScore;
+              goalsAgainst += opponentScore;
+
+              if (matchIds.includes(match.winnerId)) {
+                wins++;
+              } else if (match.winnerId && !matchIds.includes(match.winnerId)) {
+                losses++;
+              } else {
+                ties++;
+              }
+            }
+          }
+        });
+
+        const points = (wins * 2) + ties;
+        const goalDifferential = goalsFor - goalsAgainst;
+
+        return {
+          teamId: team.id,
+          teamName: team.teamName,
+          wins,
+          losses,
+          ties,
+          goalsFor,
+          goalsAgainst,
+          goalDifferential,
+          points
+        };
+      });
+
+      // Sort by points, then goal differential
+      standings.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        return b.goalDifferential - a.goalDifferential;
+      });
+
+      res.json(standings);
+    } catch (error) {
+      console.error("Error fetching tournament standings:", error);
+      res.status(500).json({ message: "Failed to fetch tournament standings" });
+    }
+  });
+
+  // Get tournament stats for all players
+  app.get('/api/tournaments/:tournamentId/stats', async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+
+      const stats = await db
+        .select({
+          id: tournamentStats.id,
+          tournamentId: tournamentStats.tournamentId,
+          userId: tournamentStats.userId,
+          teamId: tournamentStats.teamId,
+          gamesPlayed: tournamentStats.gamesPlayed,
+          goals: tournamentStats.goals,
+          assists: tournamentStats.assists,
+          points: tournamentStats.points,
+          penaltyMinutes: tournamentStats.penaltyMinutes,
+          user: {
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl
+          }
+        })
+        .from(tournamentStats)
+        .innerJoin(users, eq(tournamentStats.userId, users.id))
+        .where(eq(tournamentStats.tournamentId, tournamentId));
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching tournament stats:", error);
+      res.status(500).json({ message: "Failed to fetch tournament stats" });
+    }
+  });
+
+  // Update tournament team (name, logo) - commissioner or captain only
+  app.patch('/api/tournament-teams/:teamId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { teamId } = req.params;
+      const { teamName, logoUrl } = req.body;
+
+      // Get the tournament team
+      const [team] = await db
+        .select()
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.id, teamId));
+
+      if (!team) {
+        return res.status(404).json({ message: "Tournament team not found" });
+      }
+
+      // Check if user is commissioner or team captain
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, team.tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      // Check commissioner access - via league commissioner OR tournament creator
+      let isCommissioner = false;
+      
+      // For league-based tournaments, check league commissioner
+      if (tournament.leagueId) {
+        const [league] = await db
+          .select()
+          .from(leagues)
+          .where(eq(leagues.id, tournament.leagueId));
+        isCommissioner = league?.commissionerId === userId;
+      }
+      
+      // For standalone tournaments, check tournament creator
+      if (!isCommissioner && tournament.createdBy === userId) {
+        isCommissioner = true;
+      }
+      
+      // Check captain access - either via linked league team OR tournament participant captain
+      let isCaptain = false;
+      
+      // First check linked league team captain (for league-based tournaments)
+      if (team.teamId) {
+        const [linkedTeam] = await db
+          .select()
+          .from(teams)
+          .where(eq(teams.id, team.teamId));
+        isCaptain = linkedTeam?.captainId === userId;
+      }
+      
+      // For standalone tournaments (no linked team), check tournament participant captain
+      if (!isCaptain && !team.teamId) {
+        const [captainParticipant] = await db
+          .select()
+          .from(tournamentParticipants)
+          .where(and(
+            eq(tournamentParticipants.tournamentId, tournament.id),
+            eq(tournamentParticipants.userId, userId),
+            eq(tournamentParticipants.tournamentTeamId, team.id),
+            eq(tournamentParticipants.role, 'captain'),
+            eq(tournamentParticipants.status, 'approved')
+          ));
+        isCaptain = !!captainParticipant;
+      }
+
+      if (!isCommissioner && !isCaptain) {
+        return res.status(403).json({ message: "Only the commissioner or team captain can update this team" });
+      }
+
+      // Build update object
+      const updateData: any = {};
+      if (teamName !== undefined) updateData.teamName = teamName;
+      if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+
+      const [updated] = await db
+        .update(tournamentTeams)
+        .set(updateData)
+        .where(eq(tournamentTeams.id, teamId))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating tournament team:", error);
+      res.status(500).json({ message: "Failed to update tournament team" });
+    }
+  });
+
+  // Get team members for a tournament team
+  app.get('/api/tournaments/:tournamentId/teams/:teamId/members', async (req: any, res) => {
+    try {
+      const { tournamentId, teamId } = req.params;
+
+      // Get participants assigned to this team
+      const members = await db
+        .select({
+          id: tournamentParticipants.id,
+          userId: tournamentParticipants.userId,
+          role: tournamentParticipants.role,
+          status: tournamentParticipants.status,
+          user: {
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+            profileImageUrl: users.profileImageUrl
+          }
+        })
+        .from(tournamentParticipants)
+        .innerJoin(users, eq(tournamentParticipants.userId, users.id))
+        .where(and(
+          eq(tournamentParticipants.tournamentId, tournamentId),
+          eq(tournamentParticipants.tournamentTeamId, teamId),
+          eq(tournamentParticipants.status, 'approved')
+        ));
+
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching tournament team members:", error);
+      res.status(500).json({ message: "Failed to fetch tournament team members" });
     }
   });
 

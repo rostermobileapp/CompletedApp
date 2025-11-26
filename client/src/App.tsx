@@ -56,6 +56,7 @@ import TournamentCreateStandalone from "@/pages/TournamentCreateStandalone";
 import TournamentDetail from "@/pages/TournamentDetail";
 import TournamentEdit from "@/pages/TournamentEdit";
 import TournamentSearch from "@/pages/TournamentSearch";
+import TournamentTeams from "@/pages/TournamentTeams";
 import LeagueTournamentSearch from "@/pages/LeagueTournamentSearch";
 import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 import MediaGalleryPage from "@/pages/MediaGallery";
@@ -144,6 +145,7 @@ function Router() {
             <Route path="/leagues/:leagueId/tournaments" component={Tournaments} />
             <Route path="/tournaments/:tournamentId/edit" component={TournamentEdit} />
             <Route path="/tournaments/:tournamentId/custom-builder" component={CustomBracketBuilderPage} />
+            <Route path="/tournament-teams/:tournamentId" component={TournamentTeams} />
             <Route path="/tournaments/:tournamentId" component={TournamentDetail} />
             <Route path="/media/tournament/:id" component={MediaGalleryPage} />
             <Route path="/media/league/:id" component={MediaGalleryPage} />

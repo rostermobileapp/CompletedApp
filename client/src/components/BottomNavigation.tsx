@@ -29,7 +29,7 @@ export function BottomNavigation() {
   
   const getActiveId = (pathname: string) => {
     if (pathname === '/') return 'home';
-    if (pathname.startsWith('/teams')) return 'teams';
+    if (pathname.startsWith('/teams') || pathname.startsWith('/tournament-teams')) return 'teams';
     if (pathname.startsWith('/messages')) return 'messages';
     if (pathname.startsWith('/profile') || pathname.startsWith('/subscription')) return 'profile';
     if (pathname.startsWith('/payment-requests') || pathname.startsWith('/create-payment-request')) return 'payments';
@@ -42,8 +42,8 @@ export function BottomNavigation() {
     // Handle dynamic routing based on dashboard selection
     if (shortcutId === 'teams') {
       if (selectedType === 'tournament' && selectedId) {
-        // Navigate to tournament detail page for tournament teams
-        navigate(`/tournaments/${selectedId}`);
+        // Navigate to tournament teams page (matching league My Team design)
+        navigate(`/tournament-teams/${selectedId}`);
       } else {
         // Navigate to teams page for league teams
         navigate('/teams');
