@@ -52,12 +52,8 @@ export function BottomNavigation() {
       // Messages page filters automatically based on dashboard selection
       navigate('/messages');
     } else if (shortcutId === 'home') {
-      // Navigate to tournament home if tournament is selected, otherwise main home
-      if (selectedType === 'tournament' && selectedId) {
-        navigate(`/tournaments/${selectedId}`);
-      } else {
-        navigate('/');
-      }
+      // Always navigate to main dashboard - it will show filtered content based on selection
+      navigate('/');
     } else if (shortcutId === 'payments') {
       navigate('/payment-requests');
     } else if (shortcutId === 'profile') {
