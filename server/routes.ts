@@ -11985,31 +11985,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
 
-      // First get the base tournament teams with league captain info
+      // Get all tournament teams
       const tournamentTeamsList = await db
-        .select({
-          id: tournamentTeams.id,
-          tournamentId: tournamentTeams.tournamentId,
-          teamId: tournamentTeams.teamId,
-          teamName: tournamentTeams.teamName,
-          seed: tournamentTeams.seed,
-          division: tournamentTeams.division,
-          wins: tournamentTeams.wins,
-          losses: tournamentTeams.losses,
-          logoUrl: tournamentTeams.logoUrl,
-          captainId: teams.captainId,  // Captain from linked league team (may be null for standalone)
-          createdAt: tournamentTeams.createdAt
-        })
+        .select()
         .from(tournamentTeams)
-        .leftJoin(teams, eq(tournamentTeams.teamId, teams.id))
         .where(eq(tournamentTeams.tournamentId, id))
         .orderBy(tournamentTeams.seed);
       
-      // For each team, also check for tournament participant captains (especially for standalone teams)
+      // For each team, resolve the captain (from linked league team or tournament participant)
       const teamsWithCaptains = await Promise.all(
         tournamentTeamsList.map(async (team) => {
+          let captainId: string | null = null;
+          
+          // First check if team has a linked league team with a captain
+          if (team.teamId) {
+            const [linkedTeam] = await db
+              .select({ captainId: teams.captainId })
+              .from(teams)
+              .where(eq(teams.id, team.teamId))
+              .limit(1);
+            captainId = linkedTeam?.captainId || null;
+          }
+          
           // If no league captain, look for tournament participant captain
-          if (!team.captainId) {
+          if (!captainId) {
             const [participantCaptain] = await db
               .select({ userId: tournamentParticipants.userId })
               .from(tournamentParticipants)
@@ -12020,13 +12019,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 eq(tournamentParticipants.status, 'approved')
               ))
               .limit(1);
-            
-            return {
-              ...team,
-              captainId: participantCaptain?.userId || null
-            };
+            captainId = participantCaptain?.userId || null;
           }
-          return team;
+          
+          return {
+            ...team,
+            captainId
+          };
         })
       );
 
