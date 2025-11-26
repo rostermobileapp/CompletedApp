@@ -20,7 +20,7 @@ export default function TournamentTeams() {
   const [, navigate] = useLocation();
   const { hasRole } = usePermissions();
   const { toast } = useToast();
-  const { selectedTeamId, selectedTournamentId, setTeamSelection, setTournamentSelection } = useDashboardSelection();
+  const { selectedTeamId, selectedTournamentId, setTournamentSelection } = useDashboardSelection();
   const [isEditingTeamName, setIsEditingTeamName] = useState(false);
   const [editedTeamName, setEditedTeamName] = useState('');
   const [currentTeamId, setCurrentTeamId] = useState<string | null>(null);
@@ -103,22 +103,12 @@ export default function TournamentTeams() {
     }
   }, [tournamentTeams, userParticipation, selectedTeamId, isCommissionerCheck]);
   
-  // Keep tournament selection in dashboard and also store team selection
-  // This ensures both tournament context and team context are maintained
+  // Keep tournament selection in dashboard - this ensures navigation stays in tournament context
   useEffect(() => {
     if (tournamentId && selectedTournamentId !== tournamentId) {
       setTournamentSelection(tournamentId);
     }
   }, [tournamentId, selectedTournamentId, setTournamentSelection]);
-  
-  // Also sync team selection for cross-page team consistency
-  useEffect(() => {
-    if (currentTeamId) {
-      const team = tournamentTeams.find((t: any) => t.id === currentTeamId);
-      const selectionId = team?.teamId || currentTeamId;
-      setTeamSelection(selectionId);
-    }
-  }, [currentTeamId, tournamentTeams, setTeamSelection]);
 
   // Find the current team
   const currentTeam = tournamentTeams.find((team: any) => team.id === currentTeamId);
