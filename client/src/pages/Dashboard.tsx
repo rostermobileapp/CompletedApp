@@ -1889,9 +1889,7 @@ export default function Dashboard() {
             className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-stats"
             onClick={() => {
-              if (primaryTeam) {
-                navigate(`/teams/${primaryTeam.id}`);
-              }
+              navigate('/stats');
             }}
           >
             <div className="h-full flex flex-col items-center justify-center">
