@@ -323,8 +323,8 @@ export function LeaguePhotos({
     <div className="relative">
       {/* Team Filter - Only show when there are photos and teams */}
       {photos.length > 0 && leagueTeams.length > 0 && (
-        <div className="px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex items-center gap-2">
+        <div className="sticky top-0 z-20 w-full px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex items-center justify-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Select value={selectedTeamFilter} onValueChange={setSelectedTeamFilter}>
               <SelectTrigger className="w-full max-w-[200px]" data-testid="select-team-filter">
