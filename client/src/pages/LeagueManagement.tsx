@@ -1810,9 +1810,10 @@ export default function LeagueManagement() {
         title: 'Team deleted successfully',
         description: 'The team and all associated data have been permanently removed.'
       });
-      // Invalidate both teams and games as team deletion affects both
+      // Invalidate teams, games, and standings as team deletion affects all
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'standings'] });
     },
     onError: (error: Error) => {
       toast({
