@@ -4063,19 +4063,8 @@ export class DatabaseStorage implements IStorage {
         .set({ teamId: null })
         .where(eq(tournamentTeams.teamId, teamId));
 
-      // Note: scrimmageRequests table doesn't have teamId - linked via scrimmageId instead
-      // Delete scrimmages associated with this team
-      console.log(`Deleting scrimmages created by team ${teamId}`);
-      const teamScrimmages = await db.select({ id: scrimmages.id }).from(scrimmages).where(eq(scrimmages.creatorTeamId, teamId));
-      if (teamScrimmages.length > 0) {
-        const scrimmageIds = teamScrimmages.map(s => s.id);
-        // Delete scrimmage requests first (foreign key to scrimmages)
-        await db.delete(scrimmageRequests).where(inArray(scrimmageRequests.scrimmageId, scrimmageIds));
-        // Delete scrimmage invites
-        await db.delete(scrimmageInvites).where(inArray(scrimmageInvites.scrimmageId, scrimmageIds));
-        // Now delete the scrimmages
-        await db.delete(scrimmages).where(eq(scrimmages.creatorTeamId, teamId));
-      }
+      // Note: scrimmages don't have a teamId field - they are created by users, not teams
+      // Scrimmages are league-level events and will remain after team deletion
 
       // Sync team chat to remove all participants (since team is being deleted)
       if (team && team.leagueId) {
