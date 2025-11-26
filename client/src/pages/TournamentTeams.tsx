@@ -62,12 +62,18 @@ export default function TournamentTeams() {
     enabled: !!tournamentId && !!isAuthenticated,
   });
 
-  // Determine which team to display - prioritize participant team, then selected team, then first team
+  // Check if user is commissioner (for team resolution logic)
+  const isCommissionerCheck = !!(
+    (tournament as any)?.createdBy === (user as any)?.id || 
+    hasRole('secondary_commissioner')
+  );
+
+  // Determine which team to display based on user role
   useEffect(() => {
     if (tournamentTeams.length > 0) {
       let resolvedTeamId: string | null = null;
       
-      // First try user's participation team
+      // First priority: user's participation team (if they are a participant)
       if (userParticipation?.tournamentTeamId) {
         const participantTeam = tournamentTeams.find((t: any) => t.id === userParticipation.tournamentTeamId);
         if (participantTeam) {
@@ -75,24 +81,27 @@ export default function TournamentTeams() {
         }
       }
       
-      // Then try the selected team from dashboard (if it's in this tournament)
-      if (!resolvedTeamId && selectedTeamId) {
-        const selectedTeam = tournamentTeams.find((t: any) => t.id === selectedTeamId || t.teamId === selectedTeamId);
-        if (selectedTeam) {
-          resolvedTeamId = selectedTeam.id;
+      // For commissioners ONLY: try dashboard selection or default to first team
+      if (!resolvedTeamId && isCommissionerCheck) {
+        // Try the selected team from dashboard (if it's in this tournament)
+        if (selectedTeamId) {
+          const selectedTeam = tournamentTeams.find((t: any) => t.id === selectedTeamId || t.teamId === selectedTeamId);
+          if (selectedTeam) {
+            resolvedTeamId = selectedTeam.id;
+          }
         }
-      }
-      
-      // Otherwise default to first team (for commissioners viewing)
-      if (!resolvedTeamId) {
-        resolvedTeamId = tournamentTeams[0]?.id;
+        
+        // Default to first team for commissioners
+        if (!resolvedTeamId) {
+          resolvedTeamId = tournamentTeams[0]?.id;
+        }
       }
       
       if (resolvedTeamId) {
         setCurrentTeamId(resolvedTeamId);
       }
     }
-  }, [tournamentTeams, userParticipation, selectedTeamId]);
+  }, [tournamentTeams, userParticipation, selectedTeamId, isCommissionerCheck]);
   
   // Keep tournament selection in dashboard and also store team selection
   // This ensures both tournament context and team context are maintained
@@ -358,6 +367,41 @@ export default function TournamentTeams() {
             <h3 className="text-xl font-semibold mb-2">No Teams Found</h3>
             <p className="text-muted-foreground mb-4">
               This tournament doesn't have any teams yet.
+            </p>
+            <Button
+              onClick={() => navigate(`/tournaments/${tournamentId}`)}
+              className="w-full"
+              data-testid="button-view-tournament"
+            >
+              View Tournament
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // User is not on any team in this tournament (and not a commissioner)
+  if (!userParticipation?.tournamentTeamId && !isCommissionerCheck) {
+    return (
+      <div className="w-full px-4 py-6 pb-20">
+        <div className="flex items-center gap-2 mb-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/tournaments/${tournamentId}`)}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to Tournament
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center">
+            <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Not on a Team</h3>
+            <p className="text-muted-foreground mb-4">
+              You are not currently assigned to a team in this tournament.
             </p>
             <Button
               onClick={() => navigate(`/tournaments/${tournamentId}`)}
