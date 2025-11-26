@@ -1725,25 +1725,46 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs mr-1 text-[#3c83f6] font-bold">Select Team</span>
-                {/* Total notification count for ALL other teams/leagues */}
+                {/* Total notification count for ALL other teams/leagues/tournaments */}
                 {(() => {
+                  if (!notificationCounts) return null;
+                  
                   let totalNotifications = 0;
                   
-                  // Count notifications from other teams and leagues (not the currently selected one)
+                  // Count notifications from other teams (via their league)
                   if (Array.isArray(userTeamsAll)) {
                     userTeamsAll.forEach((team: any) => {
-                      if (!(selectedType === 'team' && selectedId === team.id)) {
-                        // Add team notification logic here when available
-                        // For now, we'll use 0
+                      // Skip the currently selected team
+                      if (selectedType === 'team' && selectedId === team.id) return;
+                      
+                      // Get the league ID for this team and check notifications
+                      const leagueId = team.leagueId;
+                      if (leagueId && notificationCounts.leagues[leagueId]) {
+                        totalNotifications += notificationCounts.leagues[leagueId];
                       }
                     });
                   }
                   
-                  if (Array.isArray(userLeagues)) {
-                    userLeagues.forEach((league: any) => {
-                      if (!(selectedType === 'league' && selectedId === league.id)) {
-                        // We can't easily fetch all unread counts here without making it too heavy
-                        // This will be implemented with a summary endpoint later
+                  // Count notifications from leagues (without teams)
+                  if (Array.isArray(leaguesWithoutTeams)) {
+                    leaguesWithoutTeams.forEach((league: any) => {
+                      // Skip the currently selected league
+                      if (selectedType === 'league' && selectedId === league.id) return;
+                      
+                      if (notificationCounts.leagues[league.id]) {
+                        totalNotifications += notificationCounts.leagues[league.id];
+                      }
+                    });
+                  }
+                  
+                  // Count notifications from tournaments
+                  if (Array.isArray(userPaidTournaments)) {
+                    userPaidTournaments.forEach((tournament: any) => {
+                      // Skip the currently selected tournament
+                      if (selectedType === 'tournament' && selectedId === tournament.id) return;
+                      
+                      if (notificationCounts.tournaments[tournament.id]) {
+                        totalNotifications += notificationCounts.tournaments[tournament.id];
                       }
                     });
                   }
