@@ -419,8 +419,8 @@ export default function TournamentTeams() {
   return (
     <div className="w-full px-4 py-6 pb-20">
       <div className="space-y-6">
-        {/* Team selector tabs for commissioners/users with multiple teams */}
-        {tournamentTeams.length > 1 && (isCommissioner || !userParticipation?.tournamentTeamId) && (
+        {/* Team selector tabs for commissioners only */}
+        {tournamentTeams.length > 1 && isCommissioner && (
           <Tabs value={currentTeamId || ''} onValueChange={handleTeamChange}>
             <TabsList className="w-full flex flex-wrap gap-1 h-auto">
               {tournamentTeams.map((team: any) => (
