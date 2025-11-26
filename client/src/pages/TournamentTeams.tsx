@@ -419,23 +419,6 @@ export default function TournamentTeams() {
   return (
     <div className="w-full px-4 py-6 pb-20">
       <div className="space-y-6">
-        {/* Team selector tabs for commissioners only */}
-        {tournamentTeams.length > 1 && isCommissioner && (
-          <Tabs value={currentTeamId || ''} onValueChange={handleTeamChange}>
-            <TabsList className="w-full flex flex-wrap gap-1 h-auto">
-              {tournamentTeams.map((team: any) => (
-                <TabsTrigger 
-                  key={team.id} 
-                  value={team.id}
-                  className="flex-1 min-w-[80px]"
-                  data-testid={`tab-team-${team.id}`}
-                >
-                  {team.teamName}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        )}
         
         {/* Show loading state while team is being resolved */}
         {!currentTeam && tournamentTeams.length > 0 && (
