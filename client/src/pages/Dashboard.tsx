@@ -1237,6 +1237,7 @@ export default function Dashboard() {
     tournaments: Record<string, number>;
   }>({
     queryKey: ['/api/user/notification-counts'],
+    enabled: !!supabaseUser, // Only fetch when user is authenticated
     refetchInterval: 30000, // Refetch every 30 seconds
   });
   
