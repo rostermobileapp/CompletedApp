@@ -11992,12 +11992,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(tournamentTeams.tournamentId, id))
         .orderBy(tournamentTeams.seed);
       
-      // For each team, resolve the captain (from linked league team or tournament participant)
+      // For each team, resolve the captain from linked league team
       const teamsWithCaptains = await Promise.all(
         tournamentTeamsList.map(async (team) => {
           let captainId: string | null = null;
           
-          // First check if team has a linked league team with a captain
+          // Check if team has a linked league team with a captain
           if (team.teamId) {
             const [linkedTeam] = await db
               .select({ captainId: teams.captainId })
@@ -12007,20 +12007,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             captainId = linkedTeam?.captainId || null;
           }
           
-          // If no league captain, look for tournament participant captain
-          if (!captainId) {
-            const [participantCaptain] = await db
-              .select({ userId: tournamentParticipants.userId })
-              .from(tournamentParticipants)
-              .where(and(
-                eq(tournamentParticipants.tournamentId, id),
-                eq(tournamentParticipants.tournamentTeamId, team.id),
-                eq(tournamentParticipants.role, 'captain'),
-                eq(tournamentParticipants.status, 'approved')
-              ))
-              .limit(1);
-            captainId = participantCaptain?.userId || null;
-          }
+          // For standalone tournament teams without linked league teams,
+          // there's no captain role in tournament_participant_role enum.
+          // Captaincy is only tracked via the linked league team's captainId.
           
           return {
             ...team,
