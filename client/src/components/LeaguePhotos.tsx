@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Upload, Download, Trash2, Loader2, Camera, X, Filter } from "lucide-react";
+import { Upload, Download, Trash2, Loader2, Camera, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest, getImageUrl } from "@/lib/queryClient";
@@ -16,13 +16,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 // Wrapper component that auto-triggers the file picker
 function AutoOpenMediaUploader({ 
@@ -94,6 +87,8 @@ interface LeaguePhotosProps {
   onShowUploaderChange?: (show: boolean) => void;
   onUploadStart?: () => void;
   onUploadComplete?: () => void;
+  selectedTeamFilter?: string;
+  onTeamsLoaded?: (teams: any[]) => void;
 }
 
 export function LeaguePhotos({ 
@@ -102,14 +97,15 @@ export function LeaguePhotos({
   showUploader: externalShowUploader,
   onShowUploaderChange,
   onUploadStart,
-  onUploadComplete
+  onUploadComplete,
+  selectedTeamFilter = "all",
+  onTeamsLoaded
 }: LeaguePhotosProps) {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [internalShowUploader, setInternalShowUploader] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
-  const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>("all");
   
   // Use external show uploader state if provided, otherwise use internal
   const showUploader = externalShowUploader !== undefined ? externalShowUploader : internalShowUploader;
@@ -157,6 +153,13 @@ export function LeaguePhotos({
     queryKey: [`/api/leagues/${leagueId}/teams`],
     enabled: !!leagueId,
   });
+
+  // Notify parent when teams are loaded
+  useEffect(() => {
+    if (leagueTeams.length > 0 && onTeamsLoaded) {
+      onTeamsLoaded(leagueTeams);
+    }
+  }, [leagueTeams, onTeamsLoaded]);
 
   // Filter photos by selected team (using uploaderTeamId from photo response)
   const filteredPhotos = useMemo(() => {
@@ -321,33 +324,6 @@ export function LeaguePhotos({
 
   return (
     <div className="relative">
-      {/* Team Filter - Only show when there are photos and teams */}
-      {photos.length > 0 && leagueTeams.length > 0 && (
-        <div className="sticky top-0 z-20 w-full px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex items-center justify-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Select value={selectedTeamFilter} onValueChange={setSelectedTeamFilter}>
-              <SelectTrigger className="w-full max-w-[200px]" data-testid="select-team-filter">
-                <SelectValue placeholder="Filter by team" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Teams</SelectItem>
-                {leagueTeams.map((team: any) => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedTeamFilter !== "all" && (
-              <span className="text-sm text-muted-foreground">
-                ({filteredPhotos.length} {filteredPhotos.length === 1 ? 'photo' : 'photos'})
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Photo Grid - Edge to edge, full width */}
       {filteredPhotos.length > 0 ? (
         <div className="grid grid-cols-3 gap-0.5">
