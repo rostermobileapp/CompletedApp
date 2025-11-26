@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2, Lock, Filter } from "lucide-react";
+import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2, Lock, Filter, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TournamentPhotos } from "@/components/TournamentPhotos";
@@ -16,6 +16,7 @@ export default function MediaGalleryPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedTeamFilter, setSelectedTeamFilter] = useState("all");
   const [availableTeams, setAvailableTeams] = useState<any[]>([]);
+  const [showOnlyMyPhotos, setShowOnlyMyPhotos] = useState(false);
   const { role } = usePermissions();
 
   // Determine entity type and ID
@@ -103,25 +104,40 @@ export default function MediaGalleryPage() {
             <p className="text-sm text-muted-foreground">Photo Gallery</p>
           </div>
 
-          {/* Team Filter - Show in center when available */}
-          {availableTeams.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedTeamFilter} onValueChange={setSelectedTeamFilter}>
-                <SelectTrigger className="w-[180px]" data-testid="select-team-filter-header">
-                  <SelectValue placeholder="Filter by team" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Teams</SelectItem>
-                  {availableTeams.map((team: any) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name || team.teamName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* Filters Section */}
+          <div className="flex items-center gap-2">
+            {/* Team Filter - Show when available */}
+            {availableTeams.length > 0 && (
+              <>
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedTeamFilter} onValueChange={setSelectedTeamFilter}>
+                  <SelectTrigger className="w-[140px] md:w-[180px]" data-testid="select-team-filter-header">
+                    <SelectValue placeholder="Filter by team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Teams</SelectItem>
+                    {availableTeams.map((team: any) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name || team.teamName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            {/* Uploaded by Me Toggle */}
+            <Button
+              variant={showOnlyMyPhotos ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowOnlyMyPhotos(!showOnlyMyPhotos)}
+              className="flex items-center gap-1.5"
+              data-testid="button-filter-my-photos"
+            >
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">My Photos</span>
+            </Button>
+          </div>
 
           {canUpload && (
             <Button
@@ -158,6 +174,7 @@ export default function MediaGalleryPage() {
             onUploadComplete={() => setIsUploading(false)}
             selectedTeamFilter={selectedTeamFilter}
             onTeamsLoaded={setAvailableTeams}
+            showOnlyMyPhotos={showOnlyMyPhotos}
           />
         )}
         {entityType === 'league' && entityId && (
@@ -188,6 +205,7 @@ export default function MediaGalleryPage() {
               onUploadComplete={() => setIsUploading(false)}
               selectedTeamFilter={selectedTeamFilter}
               onTeamsLoaded={setAvailableTeams}
+              showOnlyMyPhotos={showOnlyMyPhotos}
             />
           )
         )}

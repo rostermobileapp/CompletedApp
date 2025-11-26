@@ -89,6 +89,7 @@ interface LeaguePhotosProps {
   onUploadComplete?: () => void;
   selectedTeamFilter?: string;
   onTeamsLoaded?: (teams: any[]) => void;
+  showOnlyMyPhotos?: boolean;
 }
 
 export function LeaguePhotos({ 
@@ -99,7 +100,8 @@ export function LeaguePhotos({
   onUploadStart,
   onUploadComplete,
   selectedTeamFilter = "all",
-  onTeamsLoaded
+  onTeamsLoaded,
+  showOnlyMyPhotos = false
 }: LeaguePhotosProps) {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
@@ -163,11 +165,20 @@ export function LeaguePhotos({
 
   // Filter photos by selected team (using uploaderTeamId from photo response)
   const filteredPhotos = useMemo(() => {
-    if (selectedTeamFilter === "all") {
-      return photos;
+    let result = photos;
+    
+    // Filter by team
+    if (selectedTeamFilter !== "all") {
+      result = result.filter((photo) => photo.uploaderTeamId === selectedTeamFilter);
     }
-    return photos.filter((photo) => photo.uploaderTeamId === selectedTeamFilter);
-  }, [photos, selectedTeamFilter]);
+    
+    // Filter by uploader (show only my photos)
+    if (showOnlyMyPhotos && currentUserId) {
+      result = result.filter((photo) => photo.uploadedBy === currentUserId);
+    }
+    
+    return result;
+  }, [photos, selectedTeamFilter, showOnlyMyPhotos, currentUserId]);
 
   const isLoading = leagueLoading || membershipLoading || photosLoading;
 

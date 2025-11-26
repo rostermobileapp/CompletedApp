@@ -88,6 +88,7 @@ interface TournamentPhotosProps {
   onUploadComplete?: () => void;
   selectedTeamFilter?: string;
   onTeamsLoaded?: (teams: any[]) => void;
+  showOnlyMyPhotos?: boolean;
 }
 
 export function TournamentPhotos({ 
@@ -98,7 +99,8 @@ export function TournamentPhotos({
   onUploadStart,
   onUploadComplete,
   selectedTeamFilter = "all",
-  onTeamsLoaded
+  onTeamsLoaded,
+  showOnlyMyPhotos = false
 }: TournamentPhotosProps) {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
@@ -161,14 +163,23 @@ export function TournamentPhotos({
 
   // Filter photos by selected team
   const filteredPhotos = useMemo(() => {
-    if (selectedTeamFilter === "all") {
-      return photos;
+    let result = photos;
+    
+    // Filter by team
+    if (selectedTeamFilter !== "all") {
+      result = result.filter((photo) => {
+        const uploaderTeam = userTeamMap.get(photo.uploadedBy);
+        return uploaderTeam?.teamId === selectedTeamFilter;
+      });
     }
-    return photos.filter((photo) => {
-      const uploaderTeam = userTeamMap.get(photo.uploadedBy);
-      return uploaderTeam?.teamId === selectedTeamFilter;
-    });
-  }, [photos, selectedTeamFilter, userTeamMap]);
+    
+    // Filter by uploader (show only my photos)
+    if (showOnlyMyPhotos && currentUserId) {
+      result = result.filter((photo) => photo.uploadedBy === currentUserId);
+    }
+    
+    return result;
+  }, [photos, selectedTeamFilter, userTeamMap, showOnlyMyPhotos, currentUserId]);
 
   const isParticipant = currentUserId && participants.some(
     (p) => p.userId === currentUserId && p.status === 'approved'
