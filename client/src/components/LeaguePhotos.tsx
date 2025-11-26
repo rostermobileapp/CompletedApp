@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Upload, Download, Trash2, Loader2, Camera, X } from "lucide-react";
+import { Upload, Download, Trash2, Loader2, Camera, X, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest, getImageUrl } from "@/lib/queryClient";
@@ -16,6 +16,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Wrapper component that auto-triggers the file picker
 function AutoOpenMediaUploader({ 
@@ -77,6 +84,7 @@ interface LeaguePhoto {
     lastName: string;
     profileImageUrl?: string;
   };
+  uploaderTeamId?: string | null;
 }
 
 interface LeaguePhotosProps {
@@ -101,6 +109,7 @@ export function LeaguePhotos({
   const [internalShowUploader, setInternalShowUploader] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
+  const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>("all");
   
   // Use external show uploader state if provided, otherwise use internal
   const showUploader = externalShowUploader !== undefined ? externalShowUploader : internalShowUploader;
@@ -142,6 +151,20 @@ export function LeaguePhotos({
     queryKey: [`/api/league-photos/${leagueId}`],
     enabled: isParticipant,
   });
+
+  // Fetch league teams for filtering
+  const { data: leagueTeams = [] } = useQuery<any[]>({
+    queryKey: [`/api/leagues/${leagueId}/teams`],
+    enabled: !!leagueId,
+  });
+
+  // Filter photos by selected team (using uploaderTeamId from photo response)
+  const filteredPhotos = useMemo(() => {
+    if (selectedTeamFilter === "all") {
+      return photos;
+    }
+    return photos.filter((photo) => photo.uploaderTeamId === selectedTeamFilter);
+  }, [photos, selectedTeamFilter]);
 
   const isLoading = leagueLoading || membershipLoading || photosLoading;
 
@@ -298,10 +321,37 @@ export function LeaguePhotos({
 
   return (
     <div className="relative">
+      {/* Team Filter - Only show when there are photos and teams */}
+      {photos.length > 0 && leagueTeams.length > 0 && (
+        <div className="px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedTeamFilter} onValueChange={setSelectedTeamFilter}>
+              <SelectTrigger className="w-full max-w-[200px]" data-testid="select-team-filter">
+                <SelectValue placeholder="Filter by team" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Teams</SelectItem>
+                {leagueTeams.map((team: any) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedTeamFilter !== "all" && (
+              <span className="text-sm text-muted-foreground">
+                ({filteredPhotos.length} {filteredPhotos.length === 1 ? 'photo' : 'photos'})
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Photo Grid - Edge to edge, full width */}
-      {photos.length > 0 ? (
+      {filteredPhotos.length > 0 ? (
         <div className="grid grid-cols-3 gap-0.5">
-          {photos.map((photo, index) => (
+          {filteredPhotos.map((photo, index) => (
             <div
               key={photo.id}
               className="relative aspect-square group cursor-pointer bg-black"
@@ -334,6 +384,14 @@ export function LeaguePhotos({
               )}
             </div>
           ))}
+        </div>
+      ) : photos.length > 0 && selectedTeamFilter !== "all" ? (
+        <div className="text-center py-20 px-6">
+          <Camera className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <p className="text-lg font-medium text-muted-foreground mb-2">No photos from this team</p>
+          <p className="text-sm text-muted-foreground">
+            Try selecting a different team or view all photos
+          </p>
         </div>
       ) : (
         <div className="text-center py-20 px-6">
@@ -375,7 +433,7 @@ export function LeaguePhotos({
       {/* Photo Viewer */}
       {selectedPhotoIndex !== null && (
         <PhotoViewer
-          photos={photos.map((p) => ({
+          photos={filteredPhotos.map((p) => ({
             url: getImageUrl(p.fileUrl) || '',
             caption: p.caption ?? undefined,
             uploader: `${p.uploader.firstName} ${p.uploader.lastName}`,

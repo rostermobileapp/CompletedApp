@@ -577,7 +577,7 @@ export interface IStorage {
   
   // League photo operations
   createLeaguePhoto(photo: InsertLeaguePhoto): Promise<LeaguePhoto>;
-  getLeaguePhotos(leagueId: string): Promise<(LeaguePhoto & { uploader: User })[]>;
+  getLeaguePhotos(leagueId: string): Promise<(LeaguePhoto & { uploader: User } & { uploaderTeamId?: string | null })[]>;
   getLeaguePhoto(id: string): Promise<LeaguePhoto | undefined>;
   deleteLeaguePhoto(id: string): Promise<void>;
   getLeaguePhotoCount(leagueId: string): Promise<number>;
@@ -8415,17 +8415,29 @@ export class DatabaseStorage implements IStorage {
     return photo;
   }
 
-  async getLeaguePhotos(leagueId: string): Promise<(LeaguePhoto & { uploader: User })[]> {
+  async getLeaguePhotos(leagueId: string): Promise<(LeaguePhoto & { uploader: User } & { uploaderTeamId?: string | null })[]> {
     const photos = await db
-      .select()
+      .select({
+        photo: leaguePhotos,
+        user: users,
+        uploaderTeamId: leagueMemberships.assignedTeamId,
+      })
       .from(leaguePhotos)
       .innerJoin(users, eq(leaguePhotos.uploadedBy, users.id))
+      .leftJoin(
+        leagueMemberships,
+        and(
+          eq(leagueMemberships.userId, leaguePhotos.uploadedBy),
+          eq(leagueMemberships.leagueId, leagueId)
+        )
+      )
       .where(eq(leaguePhotos.leagueId, leagueId))
       .orderBy(desc(leaguePhotos.uploadedAt));
     
     return photos.map(p => ({
-      ...p.league_photos,
-      uploader: p.users,
+      ...p.photo,
+      uploader: p.user,
+      uploaderTeamId: p.uploaderTeamId,
     }));
   }
 
