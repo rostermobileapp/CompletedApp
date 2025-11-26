@@ -43,6 +43,7 @@ import {
   draftPicks,
   tournamentTeams,
   tournamentPhotos,
+  leaguePhotos,
   // New messaging tables
   conversations,
   conversationParticipants,
@@ -69,6 +70,8 @@ import {
   type InsertUserNotification,
   type TournamentPhoto,
   type InsertTournamentPhoto,
+  type LeaguePhoto,
+  type InsertLeaguePhoto,
   type League,
   type InsertLeague,
   type Season,
