@@ -117,21 +117,33 @@ export function LeaguePhotos({
     }
   }, [showUploader]);
 
+  // Fetch league data to check if user is commissioner
+  const { data: league, isLoading: leagueLoading } = useQuery<any>({
+    queryKey: ['/api/leagues', leagueId],
+    enabled: !!leagueId,
+  });
+  
   // Check if current user is an approved league member
   const { data: membership, isLoading: membershipLoading } = useQuery<any>({
     queryKey: [`/api/leagues/${leagueId}/membership`],
     enabled: !!currentUserId,
   });
 
-  const isParticipant = currentUserId && membership?.status === 'approved';
+  const isApprovedMember = currentUserId && membership?.status === 'approved';
+  
+  // Check if user is the league commissioner (commissioners always have access)
+  const isLeagueCommissioner = league && currentUserId && league.commissionerId === currentUserId;
+  
+  // User is a participant if they are the commissioner OR an approved member
+  const isParticipant = isLeagueCommissioner || isApprovedMember;
 
-  // Only fetch photos if user is an approved member
+  // Fetch photos if user has any form of access
   const { data: photos = [], isLoading: photosLoading } = useQuery<LeaguePhoto[]>({
     queryKey: [`/api/league-photos/${leagueId}`],
     enabled: isParticipant,
   });
 
-  const isLoading = membershipLoading || photosLoading;
+  const isLoading = leagueLoading || membershipLoading || photosLoading;
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async (data: { fileUrl: string; fileName: string; fileSize: number }) => {
@@ -364,7 +376,7 @@ export function LeaguePhotos({
       {selectedPhotoIndex !== null && (
         <PhotoViewer
           photos={photos.map((p) => ({
-            url: getImageUrl(p.fileUrl),
+            url: getImageUrl(p.fileUrl) || '',
             caption: p.caption ?? undefined,
             uploader: `${p.uploader.firstName} ${p.uploader.lastName}`,
           }))}

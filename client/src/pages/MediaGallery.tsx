@@ -13,14 +13,14 @@ export default function MediaGalleryPage() {
   const [, navigate] = useLocation();
   const [showUploader, setShowUploader] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const { userRole } = usePermissions();
+  const { role } = usePermissions();
 
   // Determine entity type and ID
   const entityType = tournamentParams ? 'tournament' : leagueParams ? 'league' : null;
   const entityId = tournamentParams?.id || leagueParams?.id;
   
   // Check if user has paid access (not free tier) for league photos
-  const hasPaidAccess = userRole !== 'free_tier';
+  const hasPaidAccess = role !== 'free_tier';
 
   // Fetch current user
   const { data: currentUser } = useQuery<any>({
@@ -56,8 +56,20 @@ export default function MediaGalleryPage() {
   
   const isLeagueMember = leagueMembership?.status === 'approved';
   
+  // Check if user is the league commissioner (commissioners always have access)
+  const isLeagueCommissioner = league && currentUser?.id && league.commissionerId === currentUser.id;
+  
+  // Check if user is a secondary commissioner of this league
+  const isSecondaryCommissioner = role === 'secondary_commissioner' && isLeagueMember;
+  
+  // User has access to league photos if they are:
+  // 1. The league commissioner (always has access), OR
+  // 2. A secondary commissioner with membership, OR
+  // 3. An approved member with paid subscription
+  const hasLeaguePhotoAccess = isLeagueCommissioner || isSecondaryCommissioner || (isLeagueMember && hasPaidAccess);
+  
   // Determine if user can upload based on entity type
-  const canUpload = entityType === 'tournament' ? isTournamentParticipant : (entityType === 'league' && isLeagueMember && hasPaidAccess);
+  const canUpload = entityType === 'tournament' ? isTournamentParticipant : (entityType === 'league' && hasLeaguePhotoAccess);
 
   const entity = tournament || league;
   const entityName = entity?.name || 'Photos';
@@ -123,14 +135,14 @@ export default function MediaGalleryPage() {
           />
         )}
         {entityType === 'league' && entityId && (
-          !hasPaidAccess ? (
+          !hasLeaguePhotoAccess ? (
             <div className="p-12 text-center max-w-md mx-auto">
               <div className="rounded-full bg-muted w-20 h-20 flex items-center justify-center mx-auto mb-4">
                 <Lock className="w-10 h-10 text-muted-foreground" />
               </div>
               <h3 className="text-xl font-semibold mb-2">Premium Feature</h3>
               <p className="text-muted-foreground mb-6">
-                League photo galleries are available for paid subscribers only. Upgrade your account to access this feature.
+                League photo galleries are available for paid subscribers and league commissioners. Upgrade your account to access this feature.
               </p>
               <Button 
                 onClick={() => navigate('/payments')}
@@ -138,22 +150,6 @@ export default function MediaGalleryPage() {
                 data-testid="button-upgrade-now"
               >
                 Upgrade Now
-              </Button>
-            </div>
-          ) : !isLeagueMember ? (
-            <div className="p-12 text-center max-w-md mx-auto">
-              <div className="rounded-full bg-muted w-20 h-20 flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-10 h-10 text-muted-foreground" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Access Denied</h3>
-              <p className="text-muted-foreground mb-6">
-                You must be an approved member of this league to access its photo gallery.
-              </p>
-              <Button 
-                onClick={() => navigate('/')}
-                data-testid="button-go-home"
-              >
-                Go Home
               </Button>
             </div>
           ) : (
