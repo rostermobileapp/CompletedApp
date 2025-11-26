@@ -1,7 +1,8 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2, Lock } from "lucide-react";
+import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2, Lock, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TournamentPhotos } from "@/components/TournamentPhotos";
 import { LeaguePhotos } from "@/components/LeaguePhotos";
 import { usePermissions } from "@/context/SubscriptionContext";
@@ -13,6 +14,8 @@ export default function MediaGalleryPage() {
   const [, navigate] = useLocation();
   const [showUploader, setShowUploader] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedTeamFilter, setSelectedTeamFilter] = useState("all");
+  const [availableTeams, setAvailableTeams] = useState<any[]>([]);
   const { role } = usePermissions();
 
   // Determine entity type and ID
@@ -85,7 +88,7 @@ export default function MediaGalleryPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
         <div className="flex items-center gap-4 px-4 py-3">
           <Button
             variant="ghost"
@@ -99,6 +102,27 @@ export default function MediaGalleryPage() {
             <h1 className="text-xl font-semibold" data-testid="text-entity-name">{entityName}</h1>
             <p className="text-sm text-muted-foreground">Photo Gallery</p>
           </div>
+
+          {/* Team Filter - Show in center when available */}
+          {availableTeams.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedTeamFilter} onValueChange={setSelectedTeamFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-team-filter-header">
+                  <SelectValue placeholder="Filter by team" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Teams</SelectItem>
+                  {availableTeams.map((team: any) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name || team.teamName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {canUpload && (
             <Button
               onClick={() => setShowUploader(true)}
@@ -132,6 +156,8 @@ export default function MediaGalleryPage() {
             onShowUploaderChange={setShowUploader}
             onUploadStart={() => setIsUploading(true)}
             onUploadComplete={() => setIsUploading(false)}
+            selectedTeamFilter={selectedTeamFilter}
+            onTeamsLoaded={setAvailableTeams}
           />
         )}
         {entityType === 'league' && entityId && (
@@ -160,6 +186,8 @@ export default function MediaGalleryPage() {
               onShowUploaderChange={setShowUploader}
               onUploadStart={() => setIsUploading(true)}
               onUploadComplete={() => setIsUploading(false)}
+              selectedTeamFilter={selectedTeamFilter}
+              onTeamsLoaded={setAvailableTeams}
             />
           )
         )}
