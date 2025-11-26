@@ -428,7 +428,7 @@ export default function Stats() {
               {starLeaderboard.slice(0, 3).map((leader: any, index: number) => (
                 <div 
                   key={leader.user.id} 
-                  className="bg-gray-100/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-lg p-3 flex items-start gap-2"
+                  className="bg-gray-100/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-lg p-3 flex items-start gap-2 text-[12px] pt-[4px] pb-[4px] pl-[0px] pr-[0px]"
                   data-testid={`row-star-leader-${index}`}
                 >
                   <Avatar className="w-12 h-12">
