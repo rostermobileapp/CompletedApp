@@ -1783,28 +1783,35 @@ export default function Dashboard() {
                     <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30">
                       MY TEAMS
                     </div>
-                    {userTeamsAll.map((team: any) => (
-                      <button
-                        key={`team-${team.id}`}
-                        onClick={() => {
-                          setSelectedType('team');
-                          setSelectedId(team.id);
-                          setShowDropdown(false);
-                        }}
-                        className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
-                          selectedType === 'team' && selectedId === team.id ? 'bg-primary/10 text-primary' : ''
-                        }`}
-                        data-testid={`option-team-${team.id}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Users className="w-4 h-4" />
-                            <span className="font-medium text-sm">{getTeamDisplayName(team)}</span>
+                    {userTeamsAll.map((team: any) => {
+                      // Get notification count for this team's league
+                      const teamNotificationCount = team.leagueId && notificationCounts?.leagues[team.leagueId] || 0;
+                      
+                      return (
+                        <button
+                          key={`team-${team.id}`}
+                          onClick={() => {
+                            setSelectedType('team');
+                            setSelectedId(team.id);
+                            setShowDropdown(false);
+                          }}
+                          className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
+                            selectedType === 'team' && selectedId === team.id ? 'bg-primary/10 text-primary' : ''
+                          }`}
+                          data-testid={`option-team-${team.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Users className="w-4 h-4" />
+                              <span className="font-medium text-sm">{getTeamDisplayName(team)}</span>
+                            </div>
+                            {teamNotificationCount > 0 && (
+                              <NotificationBadge count={teamNotificationCount} />
+                            )}
                           </div>
-                          {/* Team notification badge placeholder */}
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </>
                 )}
                 
@@ -1814,28 +1821,34 @@ export default function Dashboard() {
                     <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 border-t border-border">
                       MY LEAGUES
                     </div>
-                    {leaguesWithoutTeams.map((league: any) => (
-                      <button
-                        key={`league-${league.id}`}
-                        onClick={() => {
-                          setSelectedType('league');
-                          setSelectedId(league.id);
-                          setShowDropdown(false);
-                        }}
-                        className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
-                          selectedType === 'league' && selectedId === league.id ? 'bg-primary/10 text-primary' : ''
-                        }`}
-                        data-testid={`option-league-${league.id}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Trophy className="w-4 h-4" />
-                            <span className="font-medium text-sm">{getLeagueDisplayName(league)}</span>
+                    {leaguesWithoutTeams.map((league: any) => {
+                      const leagueNotificationCount = notificationCounts?.leagues[league.id] || 0;
+                      
+                      return (
+                        <button
+                          key={`league-${league.id}`}
+                          onClick={() => {
+                            setSelectedType('league');
+                            setSelectedId(league.id);
+                            setShowDropdown(false);
+                          }}
+                          className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
+                            selectedType === 'league' && selectedId === league.id ? 'bg-primary/10 text-primary' : ''
+                          }`}
+                          data-testid={`option-league-${league.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Trophy className="w-4 h-4" />
+                              <span className="font-medium text-sm">{getLeagueDisplayName(league)}</span>
+                            </div>
+                            {leagueNotificationCount > 0 && (
+                              <NotificationBadge count={leagueNotificationCount} />
+                            )}
                           </div>
-                          {/* League notification badge placeholder */}
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </>
                 )}
                 
@@ -1845,30 +1858,39 @@ export default function Dashboard() {
                     <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 border-t border-border">
                       MY TOURNAMENTS
                     </div>
-                    {userPaidTournaments.map((tournament: any) => (
-                      <button
-                        key={`tournament-${tournament.id}`}
-                        onClick={() => {
-                          setSelectedType('tournament');
-                          setSelectedId(tournament.id);
-                          setShowDropdown(false);
-                        }}
-                        className={`w-full p-3 text-left hover:bg-muted/50 transition-colors last:rounded-b-lg ${
-                          selectedType === 'tournament' && selectedId === tournament.id ? 'bg-primary/10 text-primary' : ''
-                        }`}
-                        data-testid={`option-tournament-${tournament.id}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Trophy className="w-4 h-4 text-orange-500" />
-                            <span className="font-medium text-sm">{getTournamentDisplayName(tournament)}</span>
+                    {userPaidTournaments.map((tournament: any) => {
+                      const tournamentNotificationCount = notificationCounts?.tournaments[tournament.id] || 0;
+                      
+                      return (
+                        <button
+                          key={`tournament-${tournament.id}`}
+                          onClick={() => {
+                            setSelectedType('tournament');
+                            setSelectedId(tournament.id);
+                            setShowDropdown(false);
+                          }}
+                          className={`w-full p-3 text-left hover:bg-muted/50 transition-colors last:rounded-b-lg ${
+                            selectedType === 'tournament' && selectedId === tournament.id ? 'bg-primary/10 text-primary' : ''
+                          }`}
+                          data-testid={`option-tournament-${tournament.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Trophy className="w-4 h-4 text-orange-500" />
+                              <span className="font-medium text-sm">{getTournamentDisplayName(tournament)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {tournamentNotificationCount > 0 && (
+                                <NotificationBadge count={tournamentNotificationCount} />
+                              )}
+                              {tournament.uniqueTournamentId && (
+                                <span className="text-xs text-muted-foreground">{tournament.uniqueTournamentId}</span>
+                              )}
+                            </div>
                           </div>
-                          {tournament.uniqueTournamentId && (
-                            <span className="text-xs text-muted-foreground">{tournament.uniqueTournamentId}</span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </>
                 )}
               </div>
