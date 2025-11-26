@@ -4051,11 +4051,18 @@ export class DatabaseStorage implements IStorage {
         .set({ teamId: null })
         .where(eq(announcements.teamId, teamId));
 
-      // Update conversations to remove team association (set to null)
-      console.log(`Updating conversations for team ${teamId}`);
-      await db.update(conversations)
-        .set({ teamId: null })
-        .where(eq(conversations.teamId, teamId));
+      // Delete team conversations (team group chats) - first delete related data
+      console.log(`Deleting team conversations for team ${teamId}`);
+      const teamConversations = await db.select({ id: conversations.id }).from(conversations).where(eq(conversations.teamId, teamId));
+      if (teamConversations.length > 0) {
+        const conversationIds = teamConversations.map(c => c.id);
+        // Delete messages in these conversations
+        await db.delete(messages).where(inArray(messages.conversationId, conversationIds));
+        // Delete conversation participants
+        await db.delete(conversationParticipants).where(inArray(conversationParticipants.conversationId, conversationIds));
+        // Delete the conversations themselves
+        await db.delete(conversations).where(eq(conversations.teamId, teamId));
+      }
 
       // Update tournament teams to remove team link (set to null)
       console.log(`Updating tournament teams for team ${teamId}`);
@@ -4066,18 +4073,8 @@ export class DatabaseStorage implements IStorage {
       // Note: scrimmages don't have a teamId field - they are created by users, not teams
       // Scrimmages are league-level events and will remain after team deletion
 
-      // Sync team chat to remove all participants (since team is being deleted)
+      // Sync captain chat membership for the league (captain should be removed from captain chat)
       if (team && team.leagueId) {
-        try {
-          const { MessagingService } = await import('./messagingService');
-          const messagingService = new MessagingService();
-          await messagingService.syncTeamChatParticipants(teamId, team.leagueId);
-        } catch (error) {
-          console.error('Error syncing team chat after team deletion:', error);
-          // Don't fail the deletion if chat sync fails
-        }
-
-        // Sync captain chat membership for the league (captain should be removed)
         try {
           const { MessagingService } = await import('./messagingService');
           const messagingService = new MessagingService();
