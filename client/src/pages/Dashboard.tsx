@@ -1231,6 +1231,15 @@ export default function Dashboard() {
     queryKey: ['/api/user/paid-tournaments'],
   });
   
+  // Fetch notification counts for all leagues and tournaments
+  const { data: notificationCounts } = useQuery<{
+    leagues: Record<string, number>;
+    tournaments: Record<string, number>;
+  }>({
+    queryKey: ['/api/user/notification-counts'],
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+  
   // Filter leagues to only show those where user has no team
   const leaguesWithoutTeams = React.useMemo(() => {
     if (!Array.isArray(userLeagues) || !Array.isArray(userTeamsAll)) {
