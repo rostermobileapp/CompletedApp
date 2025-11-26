@@ -438,7 +438,7 @@ export default function Stats() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col">
-                    <div className="text-[#212121] dark:text-white font-medium text-[16px]" data-testid={`text-star-leader-name-${index}`}>
+                    <div className="text-[#212121] dark:text-white font-medium text-[12px]" data-testid={`text-star-leader-name-${index}`}>
                       {leader.user.lastName}
                     </div>
                     <div className="text-xl font-bold text-yellow-500" data-testid={`text-star-points-${index}`}>
