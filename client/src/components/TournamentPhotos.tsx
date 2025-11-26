@@ -313,9 +313,9 @@ export function TournamentPhotos({
 
   return (
     <div className="relative">
-      {/* Photo Grid - Edge to edge, full width */}
+      {/* Photo Grid - Edge to edge, full width, responsive columns */}
       {filteredPhotos.length > 0 ? (
-        <div className="grid grid-cols-3 gap-0.5">
+        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-0.5">
           {filteredPhotos.map((photo, index) => (
             <div
               key={photo.id}
