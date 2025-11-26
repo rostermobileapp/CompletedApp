@@ -9,6 +9,7 @@ import { BottomNavigation } from "@/components/BottomNavigation";
 import { AdSenseBanner } from "@/components/AdSenseBanner";
 import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
+import { ScrollToTop } from "@/components/ScrollToTop";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
@@ -95,6 +96,7 @@ function Router() {
 
   return (
     <PermissionProvider>
+      <ScrollToTop />
       <div className="relative min-h-screen w-full">
         <SlideOutMenu />
         <PageTransition>
