@@ -22,8 +22,8 @@ export default function Stats() {
   const [viewMode, setViewMode] = useState<'summary' | 'table'>('summary');
   const [sortBy, setSortBy] = useState<'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'wins' | 'goalsAgainstAverage' | 'shutouts'>('points');
 
-  // Use dashboard selection to determine league/team context
-  const { selectedType, selectedId, selectedTeamId, selectedLeagueId } = useDashboardSelection();
+  // Use dashboard selection to determine league/team/tournament context
+  const { selectedType, selectedId, selectedTeamId, selectedLeagueId, selectedTournamentId } = useDashboardSelection();
 
   // Fetch user teams to get league info for selected team
   const { data: userTeams } = useQuery({
@@ -35,56 +35,73 @@ export default function Stats() {
     queryKey: ['/api/user/leagues'],
   });
 
-  // Determine effective league ID based on dashboard selection
+  // Check if we're viewing tournament stats
+  const isTournamentContext = selectedType === 'tournament' && !!selectedTournamentId;
+  const tournamentId = isTournamentContext ? selectedTournamentId : null;
+
+  // Determine effective league ID based on dashboard selection (only used when not in tournament context)
   let leagueId: string | null | undefined = null;
   
-  if (selectedType === 'league') {
-    // Direct league selection
-    leagueId = selectedLeagueId;
-  } else if (selectedType === 'team' && selectedTeamId) {
-    // Team selected - find its league
-    const selectedTeam = Array.isArray(userTeams) 
-      ? userTeams.find((t: any) => t.id === selectedTeamId)
-      : null;
-    leagueId = selectedTeam?.leagueId;
-  } else {
-    // Fallback to URL params or first league
-    const urlParams = new URLSearchParams(location.split('?')[1] || '');
-    const urlLeagueId = urlParams.get('league');
-    const urlTeamId = urlParams.get('team');
-    
-    if (urlLeagueId) {
-      leagueId = urlLeagueId;
-    } else if (urlTeamId && Array.isArray(userTeams)) {
-      const teamFromUrl = userTeams.find((t: any) => t.id === urlTeamId);
-      leagueId = teamFromUrl?.leagueId;
-    } else {
-      // Fallback to first league
-      leagueId = Array.isArray(userLeagues) && userLeagues.length > 0 
-        ? userLeagues[0].id 
+  if (!isTournamentContext) {
+    if (selectedType === 'league') {
+      // Direct league selection
+      leagueId = selectedLeagueId;
+    } else if (selectedType === 'team' && selectedTeamId) {
+      // Team selected - find its league
+      const selectedTeam = Array.isArray(userTeams) 
+        ? userTeams.find((t: any) => t.id === selectedTeamId)
         : null;
+      leagueId = selectedTeam?.leagueId;
+    } else {
+      // Fallback to URL params or first league
+      const urlParams = new URLSearchParams(location.split('?')[1] || '');
+      const urlLeagueId = urlParams.get('league');
+      const urlTeamId = urlParams.get('team');
+      
+      if (urlLeagueId) {
+        leagueId = urlLeagueId;
+      } else if (urlTeamId && Array.isArray(userTeams)) {
+        const teamFromUrl = userTeams.find((t: any) => t.id === urlTeamId);
+        leagueId = teamFromUrl?.leagueId;
+      } else {
+        // Fallback to first league
+        leagueId = Array.isArray(userLeagues) && userLeagues.length > 0 
+          ? userLeagues[0].id 
+          : null;
+      }
     }
   }
 
-  // Fetch league seasons for filtering
-  const { data: seasons } = useQuery({
-    queryKey: [`/api/leagues/${leagueId}/seasons`],
-    enabled: !!leagueId,
+  // Fetch tournament data when in tournament context
+  const { data: tournament } = useQuery({
+    queryKey: ['/api/tournaments', tournamentId],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/tournaments/${tournamentId}`);
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!tournamentId,
   });
 
-  // Auto-select current season when seasons are loaded
+  // Fetch league seasons for filtering (only for leagues)
+  const { data: seasons } = useQuery({
+    queryKey: [`/api/leagues/${leagueId}/seasons`],
+    enabled: !!leagueId && !isTournamentContext,
+  });
+
+  // Auto-select current season when seasons are loaded (only for leagues)
   useEffect(() => {
-    if (Array.isArray(seasons) && seasons.length > 0 && !selectedSeason) {
+    if (!isTournamentContext && Array.isArray(seasons) && seasons.length > 0 && !selectedSeason) {
       const activeSeason = seasons.find((s: any) => s.isActive);
       setSelectedSeason(activeSeason?.id || seasons[0].id);
     }
-  }, [seasons, selectedSeason]);
+  }, [seasons, selectedSeason, isTournamentContext]);
 
   // Determine player type based on active tab
   const playerType = activeTab === 'goalies' ? 'goalies' : 'non-goalies';
 
-  // Fetch player stats for the league
-  const { data: playerStats, isLoading } = useQuery({
+  // Fetch player stats for the league (when not in tournament context)
+  const { data: leaguePlayerStats, isLoading: leagueStatsLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'stats', { seasonId: selectedSeason, playerType }],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -98,31 +115,56 @@ export default function Stats() {
       const res = await apiRequest('GET', `/api/leagues/${leagueId}/stats${query ? `?${query}` : ''}`);
       return res.json();
     },
-    enabled: !!leagueId,
+    enabled: !!leagueId && !isTournamentContext,
   });
 
-  // Fetch star leaderboard
+  // Fetch tournament stats when in tournament context
+  const { data: tournamentPlayerStats, isLoading: tournamentStatsLoading } = useQuery({
+    queryKey: ['/api/tournaments', tournamentId, 'stats'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/tournaments/${tournamentId}/stats`);
+      return res.json();
+    },
+    enabled: !!tournamentId && isTournamentContext,
+  });
+
+  // Use the appropriate stats based on context
+  const playerStats = isTournamentContext ? tournamentPlayerStats : leaguePlayerStats;
+  const isLoading = isTournamentContext ? tournamentStatsLoading : leagueStatsLoading;
+
+  // Fetch star leaderboard (only for leagues)
   const { data: starLeaderboard } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/star-leaderboard`],
-    enabled: !!leagueId,
+    enabled: !!leagueId && !isTournamentContext,
   });
 
   // Ensure playerStats is an array
   const statsArray = Array.isArray(playerStats) ? playerStats : [];
 
-  // Fetch league memberships to get position and jersey number data
+  // Fetch league memberships to get position and jersey number data (only for leagues)
   const { data: leagueMemberships } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/members`],
-    enabled: !!leagueId,
+    enabled: !!leagueId && !isTournamentContext,
   });
 
-  // Fetch league teams to get team names
+  // Fetch league teams to get team names (only for leagues)
   const { data: leagueTeams } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/teams`],
-    enabled: !!leagueId,
+    enabled: !!leagueId && !isTournamentContext,
   });
 
-  // Create a map of userId to membership data
+  // Fetch tournament teams (only for tournaments)
+  const { data: tournamentTeams } = useQuery({
+    queryKey: ['/api/tournaments', tournamentId, 'teams'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/tournaments/${tournamentId}/teams`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!tournamentId && isTournamentContext,
+  });
+
+  // Create a map of userId to membership data (only used for leagues)
   const membershipMap = new Map();
   if (Array.isArray(leagueMemberships)) {
     leagueMemberships.forEach((membership: any) => {
@@ -132,7 +174,11 @@ export default function Stats() {
 
   // Create a map of teamId to team name
   const teamMap = new Map();
-  if (Array.isArray(leagueTeams)) {
+  if (isTournamentContext && Array.isArray(tournamentTeams)) {
+    tournamentTeams.forEach((team: any) => {
+      teamMap.set(team.id, team.teamName);
+    });
+  } else if (Array.isArray(leagueTeams)) {
     leagueTeams.forEach((team: any) => {
       teamMap.set(team.id, team.name);
     });
@@ -270,13 +316,14 @@ export default function Stats() {
     return 'Unknown Player';
   };
 
-  if (!leagueId) {
+  // Show error state only if neither league nor tournament is available
+  if (!leagueId && !tournamentId) {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center px-6" data-testid="no-league-state">
         <Trophy className="w-16 h-16 text-gray-500 mb-4" />
-        <h2 className="text-xl font-bold text-[#212121] dark:text-white mb-2">No League Found</h2>
+        <h2 className="text-xl font-bold text-[#212121] dark:text-white mb-2">No League or Tournament Found</h2>
         <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
-          You need to join a league to view player stats
+          You need to join a league or tournament to view player stats
         </p>
         <Button 
           onClick={() => navigate('/league-search')}
@@ -306,10 +353,12 @@ export default function Stats() {
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h1 className="text-2xl font-bold" data-testid="text-page-title">Stats</h1>
+                <h1 className="text-2xl font-bold" data-testid="text-page-title">
+                  {isTournamentContext ? 'Tournament Stats' : 'Stats'}
+                </h1>
                 
-                {/* Season Selector */}
-                {Array.isArray(seasons) && seasons.length > 0 && (
+                {/* Season Selector - only for leagues */}
+                {!isTournamentContext && Array.isArray(seasons) && seasons.length > 0 && (
                   <select
                     value={selectedSeason}
                     onChange={(e) => setSelectedSeason(e.target.value)}
@@ -326,7 +375,8 @@ export default function Stats() {
                 )}
               </div>
               
-              {canEditStats() && (
+              {/* Update Stats button - only for leagues */}
+              {!isTournamentContext && canEditStats() && (
                 <Button 
                   onClick={() => {
                     setPageTransitionDirection('up');
@@ -367,8 +417,8 @@ export default function Stats() {
           </Tabs>
         </div>
 
-        {/* Star Leaders Section */}
-        {Array.isArray(starLeaderboard) && starLeaderboard.length > 0 && (
+        {/* Star Leaders Section - only for leagues */}
+        {!isTournamentContext && Array.isArray(starLeaderboard) && starLeaderboard.length > 0 && (
           <div className="px-4 py-4 bg-gradient-to-b from-yellow-900/10 to-transparent pt-[4px] pb-[4px]">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2" data-testid="text-star-leaders-title">
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
