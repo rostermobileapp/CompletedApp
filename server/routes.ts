@@ -9981,6 +9981,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== NOTIFICATION SUMMARY FOR DASHBOARD DROPDOWN =====
+  
+  // Get notification counts for all user's leagues and tournaments
+  app.get('/api/user/notification-counts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get all user's approved league memberships
+      const userLeagueMemberships = await db
+        .select({
+          leagueId: leagueMemberships.leagueId,
+        })
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.status, 'approved')
+          )
+        );
+      
+      // Get all user's paid tournaments
+      const userTournaments = await db
+        .select({
+          tournamentId: tournamentParticipants.tournamentId,
+        })
+        .from(tournamentParticipants)
+        .where(
+          and(
+            eq(tournamentParticipants.userId, userId),
+            eq(tournamentParticipants.status, 'approved')
+          )
+        );
+      
+      // Get leagues where user is commissioner
+      const commissionerLeagues = await db
+        .select({ id: leagues.id })
+        .from(leagues)
+        .where(eq(leagues.commissionerId, userId));
+      
+      // Combine all league IDs
+      const allLeagueIds = new Set([
+        ...userLeagueMemberships.map(m => m.leagueId),
+        ...commissionerLeagues.map(l => l.id)
+      ]);
+      
+      // Fetch notification counts for each league
+      const leagueNotifications: Record<string, number> = {};
+      
+      for (const leagueId of allLeagueIds) {
+        try {
+          // Get unread announcement count
+          const unreadCount = await storage.getUnreadAnnouncementCount(leagueId, userId);
+          
+          // Check if user is commissioner of this league
+          const [league] = await db
+            .select({ commissionerId: leagues.commissionerId })
+            .from(leagues)
+            .where(eq(leagues.id, leagueId));
+          
+          const isCommissioner = league?.commissionerId === userId;
+          
+          let todoCount = 0;
+          
+          if (isCommissioner) {
+            // Get pending members count
+            const pendingMembersResult = await db
+              .select({ count: sql<number>`CAST(COUNT(*) AS INTEGER)` })
+              .from(leagueMemberships)
+              .where(
+                and(
+                  eq(leagueMemberships.leagueId, leagueId),
+                  eq(leagueMemberships.status, 'pending')
+                )
+              );
+            todoCount += pendingMembersResult[0]?.count || 0;
+          }
+          
+          leagueNotifications[leagueId] = unreadCount + todoCount;
+        } catch (error) {
+          // If fetching fails for a league, just set to 0
+          leagueNotifications[leagueId] = 0;
+        }
+      }
+      
+      // Fetch notification counts for each tournament
+      const tournamentNotifications: Record<string, number> = {};
+      
+      for (const { tournamentId } of userTournaments) {
+        try {
+          const unreadCount = await storage.getUnreadTournamentAnnouncementCount(tournamentId, userId);
+          tournamentNotifications[tournamentId] = unreadCount;
+        } catch (error) {
+          tournamentNotifications[tournamentId] = 0;
+        }
+      }
+      
+      res.json({
+        leagues: leagueNotifications,
+        tournaments: tournamentNotifications
+      });
+    } catch (error) {
+      console.error('Error fetching notification counts:', error);
+      res.status(500).json({ message: 'Failed to fetch notification counts' });
+    }
+  });
+
   // ===== ADMIN / DEBUG ROUTES =====
   
   // Sync all captain chats
