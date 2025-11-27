@@ -10700,6 +10700,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Invite scorekeeper by email - creates membership and adds stat_manager permission
+  app.post('/api/leagues/:leagueId/invite-scorekeeper', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const invitingUserId = req.user.claims.sub;
+      const { email } = req.body;
+      
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ message: 'Email is required' });
+      }
+      
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      // Check if user can manage this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+      
+      const userPermissions = (req as any).userWithPermissions;
+      const canManageLeague = league.commissionerId === invitingUserId || 
+                             userPermissions.specialPermissions?.includes('admin') ||
+                             userPermissions.isPrimaryCommissioner;
+                             
+      if (!canManageLeague) {
+        return res.status(403).json({ message: 'Access denied - only commissioners can invite scorekeepers' });
+      }
+      
+      // Find user by email
+      const targetUser = await storage.getUserByEmail(normalizedEmail);
+      
+      if (!targetUser) {
+        return res.status(404).json({ 
+          message: 'User not found. They must create an account first with this email address.',
+          code: 'USER_NOT_FOUND'
+        });
+      }
+      
+      // Check if user already has a membership in this league
+      let membership = await storage.getUserLeagueMembership(targetUser.id, leagueId);
+      
+      if (!membership) {
+        // Create a new membership (auto-approved for scorekeeper invitations)
+        membership = await storage.requestLeagueMembership({
+          userId: targetUser.id,
+          leagueId,
+        });
+        // Immediately approve the membership
+        membership = await storage.approveLeagueMembership(membership.id, invitingUserId);
+      } else if (membership.status !== 'approved') {
+        // If membership exists but not approved, approve it
+        membership = await storage.approveLeagueMembership(membership.id, invitingUserId);
+      }
+      
+      // Add stat_manager permission
+      const currentPermissions = membership.leagueSpecialPermissions || [];
+      if (!currentPermissions.includes('stat_manager')) {
+        membership = await storage.addLeagueSpecialPermission(targetUser.id, leagueId, 'stat_manager');
+      }
+      
+      res.json({ 
+        message: 'Scorekeeper invited successfully',
+        user: {
+          id: targetUser.id,
+          email: targetUser.email,
+          firstName: targetUser.firstName,
+          lastName: targetUser.lastName
+        },
+        membership
+      });
+    } catch (error) {
+      console.error('Error inviting scorekeeper:', error);
+      res.status(500).json({ message: 'Failed to invite scorekeeper' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time messaging
