@@ -1522,37 +1522,30 @@ export default function LeagueManagement() {
     },
   });
 
-  // Add stat manager special permission mutation
+  // Add stat manager special permission mutation - uses invite-scorekeeper endpoint
+  // This allows inviting users by email even if they're not league members yet
   const addStatManagerMutation = useMutation({
     mutationFn: async (email: string) => {
-      // Find user by email from members list
-      const member = members?.find((m: any) => m.user.email === email);
-      if (!member) {
-        throw new Error('User not found in league members');
-      }
-      
-      const currentPermissions = member.leagueSpecialPermissions || [];
-      const newPermissions = currentPermissions.includes('stat_manager') 
-        ? currentPermissions 
-        : [...currentPermissions, 'stat_manager'];
-      
-      const response = await apiRequest('PATCH', `/api/leagues/${leagueId}/users/${member.userId}/permissions`, {
-        leagueRole: member.leagueRole,
-        leagueSpecialPermissions: newPermissions
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/invite-scorekeeper`, {
+        email: email
       });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to add stat manager');
+      }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
-        title: 'Stat Manager Added',
-        description: 'User has been granted stat manager privileges.',
+        title: 'Scorekeeper Added',
+        description: `${data.user?.firstName || data.user?.email || 'User'} has been granted scorekeeper privileges.`,
       });
       setStatManagerEmail('');
       refetchMembers();
     },
     onError: (error: any) => {
       toast({
-        title: 'Failed to Add Stat Manager',
+        title: 'Failed to Add Scorekeeper',
         description: error.message || 'Please check the email and try again.',
         variant: 'destructive',
       });
@@ -3799,9 +3792,9 @@ export default function LeagueManagement() {
 
                 {/* Stat Manager Management */}
                 <div className="border-t pt-4">
-                  <h3 className="font-medium mb-3">Stat Managers</h3>
+                  <h3 className="font-medium mb-3">Scorekeepers</h3>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Grant stat manager privileges to users. Stat managers can edit game statistics and scores.
+                    Invite scorekeepers by email. They can edit game statistics and scores. Users must have an account first.
                   </p>
                   
                   {/* Current stat managers list */}
@@ -3844,7 +3837,7 @@ export default function LeagueManagement() {
                       type="email"
                       value={statManagerEmail}
                       onChange={(e) => setStatManagerEmail(e.target.value)}
-                      placeholder="Enter league member's email"
+                      placeholder="Enter scorekeeper's email"
                       className="flex-1 p-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       data-testid="input-stat-manager-email"
                     />
