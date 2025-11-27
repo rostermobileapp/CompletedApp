@@ -4019,6 +4019,17 @@ export class DatabaseStorage implements IStorage {
       console.log(`Deleting placeholder players for team ${teamId}`);
       await db.delete(placeholderPlayers).where(eq(placeholderPlayers.teamId, teamId));
 
+      // Delete or unlink imported players for this team
+      console.log(`Cleaning up imported players for team ${teamId} (${team.name})`);
+      await db.delete(importedPlayers).where(eq(importedPlayers.teamId, teamId));
+      // Also clean up imported players that match by team name (for imports without team_id)
+      await db.delete(importedPlayers).where(
+        and(
+          eq(importedPlayers.teamName, team.name),
+          isNull(importedPlayers.teamId)
+        )
+      );
+
       // Delete duty templates for this team
       console.log(`Deleting duty templates for team ${teamId}`);
       await db.delete(dutyTemplates).where(eq(dutyTemplates.teamId, teamId));
