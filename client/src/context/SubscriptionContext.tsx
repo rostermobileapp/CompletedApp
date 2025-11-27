@@ -11,6 +11,7 @@ interface PermissionContextType {
   role: UserRole;
   specialPermissions: SpecialPermission[];
   isPrimaryCommissioner: boolean;
+  leagueMemberships: any[];
   // Global permission checks (backward compatibility)
   hasRole: (requiredRole: UserRole) => boolean;
   hasAnyRole: (roles: UserRole[]) => boolean;
@@ -19,6 +20,7 @@ interface PermissionContextType {
   canManageLeague: (leagueId?: string) => boolean;
   canEditStats: () => boolean;
   canAccessPremiumFeatures: () => boolean;
+  hasStatManagerAccess: () => boolean;
   // League-specific permission checks
   hasLeagueRole: (leagueId: string, requiredRole: UserRole) => boolean;
   hasAnyLeagueRole: (leagueId: string, roles: UserRole[]) => boolean;
@@ -99,6 +101,18 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     return hasRole('player_pro');
   };
 
+  const hasStatManagerAccess = (): boolean => {
+    if (!user) return false;
+    if (isPrimaryCommissioner) return true;
+    if (hasSpecialPermission('stat_manager')) return true;
+    if (hasSpecialPermission('admin')) return true;
+    if (hasRole('secondary_commissioner')) return true;
+    const hasLeagueStatManager = leagueMemberships.some((membership: any) => 
+      membership.leagueSpecialPermissions?.includes('stat_manager')
+    );
+    return hasLeagueStatManager;
+  };
+
   // League-specific permission functions
   const getUserLeagueMembership = (leagueId: string) => {
     return leagueMemberships.find((membership: any) => membership.leagueId === leagueId) || null;
@@ -163,6 +177,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
       role,
       specialPermissions,
       isPrimaryCommissioner,
+      leagueMemberships,
       hasRole,
       hasAnyRole,
       hasSpecialPermission,
@@ -170,6 +185,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
       canManageLeague,
       canEditStats,
       canAccessPremiumFeatures,
+      hasStatManagerAccess,
       hasLeagueRole,
       hasAnyLeagueRole,
       hasLeagueSpecialPermission,

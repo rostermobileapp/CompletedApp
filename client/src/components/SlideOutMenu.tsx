@@ -10,7 +10,7 @@ export function SlideOutMenu() {
   const [open, setOpen] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [location, navigate] = useLocation();
-  const { canAccessPremiumFeatures, canManageLeague, hasRole } = usePermissions();
+  const { canAccessPremiumFeatures, canManageLeague, hasRole, hasStatManagerAccess } = usePermissions();
 
   // Only show hamburger menu on home and profile screens
   const shouldShowHamburger = location === '/' || location === '/profile';
@@ -83,8 +83,8 @@ export function SlideOutMenu() {
       icon: Target,
       label: 'Scorekeeper',
       path: '/scorekeeper',
-      locked: !hasRole('secondary_commissioner'),
-      requiredTier: 'COMMISSIONER',
+      locked: !hasStatManagerAccess(),
+      requiredTier: 'SCOREKEEPER',
       bgColor: 'bg-red-500/20',
       iconColor: 'text-red-500',
     },
