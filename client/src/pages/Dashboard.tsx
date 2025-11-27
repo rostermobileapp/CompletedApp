@@ -916,7 +916,7 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
 export default function Dashboard() {
   const { user: supabaseUser } = useAuth();
   const tier = (supabaseUser as any)?.role || 'free_tier';
-  const { canAccessPremiumFeatures } = usePermissions();
+  const { canAccessPremiumFeatures, hasStatManagerAccess } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -2053,6 +2053,31 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+      
+      {/* Scorekeeper Link Box - Show for users with scorekeeper access but no team */}
+      {!primaryTeam && hasStatManagerAccess() && (
+        <div className="px-6 mb-6">
+          <div className="rounded-xl border border-border bg-[#e2e2e2] dark:bg-[#212121]">
+            <button
+              onClick={() => navigate('/scorekeeper')}
+              className="w-full h-full flex items-center justify-between rounded-xl px-4 py-3"
+              data-testid="button-scorekeeper-link"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                  <Clipboard className="w-5 h-5 text-white" />
+                </div>
+                <div className="text-left">
+                  <span className="font-medium text-sm text-[#212121] dark:text-white block">Scorekeeper Dashboard</span>
+                  <span className="text-xs text-muted-foreground">Manage game scores</span>
+                </div>
+              </div>
+              <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white rotate-[-90deg]" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Needs Attention Section - Show for leagues and league teams */}
       {effectiveLeagueId && (
         <NeedsAttentionTasks 
