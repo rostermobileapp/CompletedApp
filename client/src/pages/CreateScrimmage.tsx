@@ -676,42 +676,9 @@ export default function CreateScrimmage() {
               </div>
 
               {form.watch('enableReminders') && (
-                <div className="space-y-3 pt-2">
-                  <Label className="text-sm font-medium">Send reminders:</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { hours: 2, label: '2 hours before' },
-                      { hours: 24, label: '1 day before' },
-                      { hours: 48, label: '2 days before' },
-                      { hours: 168, label: '1 week before' },
-                    ].map(({ hours, label }) => {
-                      const currentReminders = form.watch('reminderHoursBefore') || [];
-                      const isSelected = currentReminders.includes(hours);
-                      
-                      return (
-                        <button
-                          key={hours}
-                          type="button"
-                          onClick={() => {
-                            const updated = isSelected
-                              ? currentReminders.filter(h => h !== hours)
-                              : [...currentReminders, hours].sort((a, b) => b - a);
-                            form.setValue('reminderHoursBefore', updated);
-                          }}
-                          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                            isSelected
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                          }`}
-                          data-testid={`button-reminder-${hours}`}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Select when you want reminders sent to approved players
+                <div className="pt-2">
+                  <p className="text-sm text-muted-foreground">
+                    Reminders will be sent the day prior to the scrimmage at 8AM for approved players.
                   </p>
                 </div>
               )}
