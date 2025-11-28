@@ -2004,7 +2004,7 @@ export default function LeagueManagement() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
+            <h1 className="font-bold flex items-center gap-2 text-[18px]" data-testid="text-page-title">
               <Crown className="w-6 h-6 text-warning" />
               League Management
             </h1>
