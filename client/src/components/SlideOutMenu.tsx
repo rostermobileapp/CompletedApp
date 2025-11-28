@@ -111,6 +111,7 @@ export function SlideOutMenu() {
     <>
       {/* Fixed header bar with notification and menu icons */}
       <div className="fixed top-[32px] right-6 z-50 flex items-center gap-2">
+        <NotificationCenter key="notification-center" />
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <button
@@ -120,47 +121,46 @@ export function SlideOutMenu() {
               <Menu className="w-8 h-8 text-foreground" />
             </button>
           </SheetTrigger>
-          <SheetContent 
-            side="right" 
-            className="w-[85%] sm:w-[400px] h-screen border-l border-border bg-background flex flex-col [&>button]:hidden"
-          >
-            <SheetHeader className="flex-shrink-0 px-6 pt-[4px] pb-[4px]">
-              <div className="flex items-center justify-between">
-                <SheetTitle className="text-2xl font-bold">Menu</SheetTitle>
-                <SheetClose asChild>
-                  <button
-                    className="w-10 h-10 bg-red-600 hover:bg-red-700 rounded flex items-center justify-center transition-colors"
-                    data-testid="button-close-menu"
-                  >
-                    <X className="w-5 h-5 text-white" />
-                  </button>
-                </SheetClose>
-              </div>
-            </SheetHeader>
-            
-            <div className="flex-1 flex flex-col justify-evenly px-6 pb-6">
-              {menuItems.map((item) => (
+        <SheetContent 
+          side="right" 
+          className="w-[85%] sm:w-[400px] h-screen border-l border-border bg-background flex flex-col [&>button]:hidden"
+        >
+          <SheetHeader className="flex-shrink-0 px-6 pt-[4px] pb-[4px]">
+            <div className="flex items-center justify-between">
+              <SheetTitle className="text-2xl font-bold">Menu</SheetTitle>
+              <SheetClose asChild>
                 <button
-                  key={item.path}
-                  onClick={() => handleNavigate(item.path, item.locked)}
-                  className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50"
-                  data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
+                  className="w-10 h-10 bg-red-600 hover:bg-red-700 rounded flex items-center justify-center transition-colors"
+                  data-testid="button-close-menu"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2.5 rounded-xl ${item.bgColor}`}>
-                      <item.icon className={`w-5 h-5 ${item.iconColor}`} />
-                    </div>
-                    <span className="text-base font-semibold text-left text-foreground">
-                      {item.label}
-                    </span>
-                  </div>
-                  <div className="text-muted-foreground text-base">→</div>
+                  <X className="w-5 h-5 text-white" />
                 </button>
-              ))}
+              </SheetClose>
             </div>
-          </SheetContent>
+          </SheetHeader>
+          
+          <div className="flex-1 flex flex-col justify-evenly px-6 pb-6">
+            {menuItems.map((item) => (
+              <button
+                key={item.path}
+                onClick={() => handleNavigate(item.path, item.locked)}
+                className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50"
+                data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${item.bgColor}`}>
+                    <item.icon className={`w-5 h-5 ${item.iconColor}`} />
+                  </div>
+                  <span className="text-base font-semibold text-left text-foreground">
+                    {item.label}
+                  </span>
+                </div>
+                <div className="text-muted-foreground text-base">→</div>
+              </button>
+            ))}
+          </div>
+        </SheetContent>
         </Sheet>
-        <NotificationCenter key="notification-center" />
       </div>
       
       <PremiumFeatureAlert 
