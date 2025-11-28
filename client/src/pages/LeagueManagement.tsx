@@ -2023,7 +2023,7 @@ export default function LeagueManagement() {
             data-testid="tab-players"
           >
             <Users className="w-4 h-4" />
-            Players
+            Members
             {pendingMembers.length > 0 && (
               <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
                 <span className="text-white text-xs font-bold">{pendingMembers.length}</span>
