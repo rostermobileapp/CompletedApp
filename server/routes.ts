@@ -10996,8 +10996,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send email using Resend
       try {
+        console.log('[Feedback] Attempting to send feedback email...');
         const { getUncachableResendClient } = await import('./resend');
         const { client, fromEmail } = await getUncachableResendClient();
+        console.log('[Feedback] Got Resend client, fromEmail:', fromEmail);
         
         const categoryLabel = validatedData.category === 'product_improvement' 
           ? 'Product Improvement' 
@@ -11006,8 +11008,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Override from email to use verified domain
         const verifiedFromEmail = 'contact@notifications.roster-app.com';
         const recipientEmail = process.env.FEEDBACK_EMAIL || verifiedFromEmail;
+        console.log('[Feedback] Sending to:', recipientEmail, 'from:', verifiedFromEmail);
 
-        await client.emails.send({
+        const emailResult = await client.emails.send({
           from: verifiedFromEmail,
           to: recipientEmail,
           subject: `Rosters Feedback: ${categoryLabel}`,
@@ -11022,8 +11025,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             <p>${validatedData.message.replace(/\n/g, '<br />')}</p>
           `,
         });
-      } catch (emailError) {
-        console.error("Error sending feedback email:", emailError);
+        console.log('[Feedback] Email sent successfully:', emailResult);
+      } catch (emailError: any) {
+        console.error("[Feedback] Error sending feedback email:", emailError?.message || emailError);
+        console.error("[Feedback] Full error:", JSON.stringify(emailError, null, 2));
         // Don't fail the request if email fails - feedback is still saved
       }
 
