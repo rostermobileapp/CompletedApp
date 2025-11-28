@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 
 let connectionSettings: any;
 
-async function getCredentials() {
+async function getCredentialsFromReplit() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
@@ -28,6 +28,17 @@ async function getCredentials() {
     throw new Error('Resend not connected');
   }
   return {apiKey: connectionSettings.settings.api_key, fromEmail: connectionSettings.settings.from_email};
+}
+
+async function getCredentials() {
+  if (process.env.RESEND_API_KEY) {
+    return {
+      apiKey: process.env.RESEND_API_KEY,
+      fromEmail: process.env.RESEND_FROM_EMAIL || 'contact@notifications.roster-app.com'
+    };
+  }
+  
+  return getCredentialsFromReplit();
 }
 
 export async function getUncachableResendClient() {
