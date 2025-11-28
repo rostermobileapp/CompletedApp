@@ -4251,7 +4251,7 @@ export default function LeagueManagement() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-xs font-medium mb-1">Date</label>
-                    <div className="relative">
+                    <div className="relative" ref={datePickerRef}>
                       <Controller
                         name="gameDate"
                         control={editGameForm.control}
@@ -4272,8 +4272,7 @@ export default function LeagueManagement() {
                             <Calendar className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                             {showDatePicker && (
                               <div 
-                                ref={datePickerRef}
-                                className="absolute z-50 mt-1 bg-white dark:bg-card border border-border rounded-lg shadow-lg min-w-[350px]"
+                                className="absolute z-[9999] mt-1 bg-white dark:bg-card border border-border rounded-lg shadow-lg min-w-[350px]"
                               >
                                 <DayPicker
                                   mode="single"
@@ -4313,7 +4312,7 @@ export default function LeagueManagement() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1">Time</label>
-                    <div className="relative">
+                    <div className="relative" ref={timePickerRef}>
                       <Controller
                         name="gameTime"
                         control={editGameForm.control}
@@ -4335,8 +4334,7 @@ export default function LeagueManagement() {
                             <Clock className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                             {showTimePicker && (
                               <div 
-                                ref={timePickerRef}
-                                className="absolute z-50 mt-1 bg-background border border-border rounded-lg shadow-lg min-w-[300px]"
+                                className="absolute z-[9999] mt-1 bg-background border border-border rounded-lg shadow-lg min-w-[300px]"
                               >
                                 <div className="p-4">
                                   <div className="flex items-start justify-center gap-4">
