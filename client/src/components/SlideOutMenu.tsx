@@ -111,7 +111,7 @@ export function SlideOutMenu() {
     <>
       {/* Fixed header bar with notification and menu icons */}
       <div className="fixed top-[32px] right-6 z-50 flex items-center gap-2">
-        <NotificationCenter />
+        <NotificationCenter key="notification-center" />
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <button

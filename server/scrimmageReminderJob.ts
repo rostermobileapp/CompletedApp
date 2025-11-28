@@ -1,7 +1,8 @@
 import { db } from "./db";
-import { scrimmages, scrimmageRequests, scrimmageRemindersSent, users } from "@shared/schema";
+import { scrimmages, scrimmageRequests, scrimmageRemindersSent, users, userNotifications } from "@shared/schema";
 import { and, eq, gt, lt, inArray, sql } from "drizzle-orm";
-import { sendScrimmageReminderEmail } from "./emails";
+import { storage } from "./storage";
+import { format } from "date-fns";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -81,27 +82,30 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
         
         const sentPlayerIds = new Set(alreadySent.map(s => s.playerId));
         
-        // Send reminders to players who haven't received this reminder yet
+        // Send push notification reminders to players who haven't received this reminder yet
         for (const { request, player } of approvedRequests) {
           if (sentPlayerIds.has(player.id)) {
             continue; // Already sent this reminder
           }
           
-          if (!player.email) {
-            continue; // No email address
-          }
-          
           try {
-            await sendScrimmageReminderEmail(player.email, {
+            // Create in-app push notification
+            const timeLabel = reminderHours < 24 
+              ? `${reminderHours} hour${reminderHours === 1 ? '' : 's'}`
+              : reminderHours === 24 
+                ? '1 day' 
+                : reminderHours === 48 
+                  ? '2 days'
+                  : `${Math.round(reminderHours / 24)} days`;
+            
+            await storage.createNotification({
+              userId: player.id,
+              type: 'scrimmage_reminder',
+              title: `Reminder: ${scrimmage.title}`,
+              message: `Starting in ${timeLabel} at ${scrimmage.location} on ${format(scrimmageTime, 'EEEE, MMMM d')} at ${format(scrimmageTime, 'h:mm a')}`,
+              actionUrl: `/scrimmage/${scrimmage.id}`,
+              actionText: 'View Details',
               scrimmageId: scrimmage.id,
-              title: scrimmage.title,
-              dateTime: scrimmageTime,
-              location: scrimmage.location,
-              organizerName,
-              playerName: player.firstName || 'Player',
-              currentPlayers: approvedRequests.length,
-              maxPlayers: scrimmage.maxPlayers,
-              hoursUntil: Math.round(hoursUntil),
             });
             
             // Record that we sent this reminder
@@ -111,9 +115,9 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
               hoursBefore: reminderHours,
             }).onConflictDoNothing();
             
-            console.log(`✅ Sent ${reminderHours}h reminder for scrimmage ${scrimmage.id} to ${player.email}`);
+            console.log(`✅ Sent ${reminderHours}h push notification for scrimmage ${scrimmage.id} to ${player.firstName || player.id}`);
           } catch (error) {
-            console.error(`❌ Failed to send reminder to ${player.email}:`, error);
+            console.error(`❌ Failed to send push notification to ${player.id}:`, error);
           }
         }
       }

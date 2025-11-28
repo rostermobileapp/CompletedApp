@@ -39,6 +39,10 @@ const createScrimmageSchema = createScrimmageRequestSchema.extend({
   recurrenceEndType: z.enum(['date', 'count']).optional(), // Either end by date or count
   recurrenceEndDate: z.string().optional(),
   recurrenceCount: z.number().optional(),
+  // Invitation scheduling for recurring scrimmages
+  enableInviteScheduling: z.boolean().default(true),
+  inviteDaysBefore: z.number().min(1).max(14).default(5), // Days before each occurrence to send invites
+  inviteTimeOfDay: z.string().default('09:00'), // Time to send invites (HH:MM format)
   // Reminder settings
   enableReminders: z.boolean().default(true),
   reminderHoursBefore: z.array(z.number()).default([24]), // Default to 24 hours before
@@ -94,6 +98,10 @@ export default function CreateScrimmage() {
       recurrenceEndType: 'date',
       recurrenceEndDate: '',
       recurrenceCount: 1,
+      // Invitation scheduling defaults (for recurring scrimmages)
+      enableInviteScheduling: true,
+      inviteDaysBefore: 5, // Send invites 5 days before each occurrence
+      inviteTimeOfDay: '09:00', // Send at 9 AM
       // Reminder defaults
       enableReminders: true,
       reminderHoursBefore: [24], // Default to 24 hours before
@@ -209,6 +217,9 @@ export default function CreateScrimmage() {
           ? new Date(data.recurrenceEndDate) 
           : null,
         recurrenceCount: data.isRecurring && data.recurrenceEndType === 'count' ? data.recurrenceCount : null,
+        // Invitation scheduling for recurring scrimmages
+        inviteDaysBefore: data.isRecurring && data.enableInviteScheduling ? data.inviteDaysBefore : null,
+        inviteTimeOfDay: data.isRecurring && data.enableInviteScheduling ? data.inviteTimeOfDay : null,
         // Reminder settings
         reminderHoursBefore: data.enableReminders ? data.reminderHoursBefore : null,
       };
@@ -537,12 +548,100 @@ export default function CreateScrimmage() {
               )}
             </div>
 
+            {/* Invitation Scheduling for Recurring Scrimmages */}
+            {form.watch('isRecurring') && (
+              <div className="space-y-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="enableInviteScheduling" className="text-base">Schedule Invitations</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Each recurring scrimmage will have its own invitation sent at a scheduled time
+                    </p>
+                  </div>
+                  <Switch
+                    id="enableInviteScheduling"
+                    checked={form.watch('enableInviteScheduling')}
+                    onCheckedChange={(checked) => form.setValue('enableInviteScheduling', checked)}
+                    data-testid="switch-enable-invite-scheduling"
+                  />
+                </div>
+
+                {form.watch('enableInviteScheduling') && (
+                  <div className="space-y-4 pt-2">
+                    <div className="bg-muted/50 rounded-md p-3">
+                      <p className="text-sm text-foreground font-medium mb-2">How it works:</p>
+                      <p className="text-xs text-muted-foreground">
+                        For each recurring scrimmage, a separate invitation will be sent to all league members at your scheduled time. 
+                        For example, if you have a Friday scrimmage and set invites to go out 5 days before at 9:00 AM, 
+                        invites will be sent every Sunday morning.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="inviteDaysBefore" className="text-sm font-medium">Send invites</Label>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Input
+                            id="inviteDaysBefore"
+                            type="number"
+                            {...form.register('inviteDaysBefore', { valueAsNumber: true })}
+                            className="w-20"
+                            min={1}
+                            max={14}
+                            data-testid="input-invite-days-before"
+                          />
+                          <span className="text-sm text-muted-foreground">days before each scrimmage</span>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="inviteTimeOfDay" className="text-sm font-medium">At time</Label>
+                        <Input
+                          id="inviteTimeOfDay"
+                          type="time"
+                          {...form.register('inviteTimeOfDay')}
+                          className="mt-2"
+                          data-testid="input-invite-time"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { days: 2, label: '2 days before' },
+                        { days: 5, label: '5 days before' },
+                        { days: 7, label: '1 week before' },
+                      ].map(({ days, label }) => {
+                        const currentDays = form.watch('inviteDaysBefore');
+                        const isSelected = currentDays === days;
+                        
+                        return (
+                          <button
+                            key={days}
+                            type="button"
+                            onClick={() => form.setValue('inviteDaysBefore', days)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                              isSelected
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            }`}
+                            data-testid={`button-invite-days-${days}`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Reminder Settings */}
             <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="enableReminders" className="text-base">Email Reminders</Label>
-                  <p className="text-sm text-muted-foreground">Send email reminders to approved players before the scrimmage</p>
+                  <Label htmlFor="enableReminders" className="text-base">Push Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Send in-app reminders to approved players before the scrimmage</p>
                 </div>
                 <Switch
                   id="enableReminders"

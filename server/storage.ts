@@ -184,7 +184,7 @@ import {
   type InsertEventParticipant,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, not } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt } from "drizzle-orm";
 
 // Helper function to generate unique 6-character alphanumeric team IDs (ABC123 format)
 async function generateUniqueTeamId(): Promise<string> {
@@ -240,6 +240,7 @@ export interface IStorage {
   
   // User notification operations
   createNotification(notification: InsertUserNotification): Promise<UserNotification>;
+  createNotificationIfNotExists(notification: InsertUserNotification): Promise<UserNotification | null>;
   getUserNotifications(userId: string): Promise<UserNotification[]>;
   getUnreadNotifications(userId: string): Promise<UserNotification[]>;
   markNotificationAsRead(id: string, userId: string): Promise<UserNotification | undefined>;
@@ -482,6 +483,13 @@ export interface IStorage {
   createScrimmageInvites(scrimmageId: string, emails: string[]): Promise<ScrimmageInvite[]>;
   getScrimmageInvites(scrimmageId: string): Promise<ScrimmageInvite[]>;
   deleteScrimmageInvite(inviteId: string): Promise<void>;
+  
+  // Scrimmage invitation scheduling operations
+  getScrimmagesNeedingInvites(): Promise<Scrimmage[]>;
+  updateScrimmageInviteSent(scrimmageId: string): Promise<Scrimmage>;
+  getScrimmageByParentAndDate(parentId: string, date: Date): Promise<Scrimmage | undefined>;
+  createRecurringScrimmageOccurrence(parentScrimmage: Scrimmage, dateTime: Date): Promise<Scrimmage>;
+  getRecurringParentScrimmages(): Promise<Scrimmage[]>;
   
   // User search operations
   searchUsersByEmail(email: string, limit?: number): Promise<User[]>;
@@ -826,6 +834,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNotification(notification: InsertUserNotification): Promise<UserNotification> {
+    const [newNotification] = await db
+      .insert(userNotifications)
+      .values(notification)
+      .returning();
+    return newNotification;
+  }
+
+  async createNotificationIfNotExists(notification: InsertUserNotification): Promise<UserNotification | null> {
+    const conditions = [
+      eq(userNotifications.userId, notification.userId),
+      eq(userNotifications.type, notification.type as any),
+    ];
+    
+    if (notification.scrimmageId) {
+      conditions.push(eq(userNotifications.scrimmageId, notification.scrimmageId));
+    }
+    
+    if (notification.actionUrl) {
+      conditions.push(eq(userNotifications.actionUrl, notification.actionUrl));
+    }
+    
+    const existingNotification = await db
+      .select()
+      .from(userNotifications)
+      .where(and(...conditions))
+      .limit(1);
+    
+    if (existingNotification.length > 0) {
+      return null;
+    }
+    
     const [newNotification] = await db
       .insert(userNotifications)
       .values(notification)
@@ -6332,6 +6371,81 @@ export class DatabaseStorage implements IStorage {
 
   async deleteScrimmageInvite(inviteId: string): Promise<void> {
     await db.delete(scrimmageInvites).where(eq(scrimmageInvites.id, inviteId));
+  }
+
+  // Scrimmage invitation scheduling operations
+  async getScrimmagesNeedingInvites(): Promise<Scrimmage[]> {
+    const now = new Date();
+    return await db
+      .select()
+      .from(scrimmages)
+      .where(
+        and(
+          isNotNull(scrimmages.inviteDaysBefore),
+          isNull(scrimmages.inviteSentAt),
+          eq(scrimmages.status, 'open'),
+          gt(scrimmages.dateTime, now),
+          eq(scrimmages.isRecurring, false)
+        )
+      );
+  }
+
+  async updateScrimmageInviteSent(scrimmageId: string): Promise<Scrimmage> {
+    const [updated] = await db
+      .update(scrimmages)
+      .set({ inviteSentAt: new Date(), updatedAt: new Date() })
+      .where(eq(scrimmages.id, scrimmageId))
+      .returning();
+    return updated;
+  }
+
+  async getScrimmageByParentAndDate(parentId: string, date: Date): Promise<Scrimmage | undefined> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const [result] = await db
+      .select()
+      .from(scrimmages)
+      .where(
+        and(
+          eq(scrimmages.parentScrimmageId, parentId),
+          gte(scrimmages.dateTime, startOfDay),
+          lte(scrimmages.dateTime, endOfDay)
+        )
+      )
+      .limit(1);
+    return result;
+  }
+
+  async createRecurringScrimmageOccurrence(parentScrimmage: Scrimmage, dateTime: Date): Promise<Scrimmage> {
+    const { id, createdAt, updatedAt, parentScrimmageId: _, ...parentData } = parentScrimmage;
+    
+    const occurrenceData: InsertScrimmage = {
+      ...parentData,
+      dateTime,
+      parentScrimmageId: parentScrimmage.id,
+      isRecurring: false,
+      inviteSentAt: null,
+    };
+    
+    const [newOccurrence] = await db.insert(scrimmages).values(occurrenceData).returning();
+    return newOccurrence;
+  }
+
+  async getRecurringParentScrimmages(): Promise<Scrimmage[]> {
+    const now = new Date();
+    return await db
+      .select()
+      .from(scrimmages)
+      .where(
+        and(
+          eq(scrimmages.isRecurring, true),
+          eq(scrimmages.status, 'open'),
+          isNull(scrimmages.parentScrimmageId)
+        )
+      );
   }
 
   // User search operations

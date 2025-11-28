@@ -73,6 +73,7 @@ import Stripe from "stripe";
 import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail } from "./emails";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
+import { startScrimmageInviteJob } from "./scrimmageInviteJob";
 
 
 // Helper function to format date as local time string without timezone suffix
@@ -8859,18 +8860,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const allRequests = await storage.getScrimmageRequests(scrimmage.id);
           const approvedCount = allRequests.filter(r => r.status === 'approved').length;
           
-          if (player?.email && creator) {
-            await sendScrimmageApprovalEmail(player.email, {
+          if (player) {
+            // Send in-app push notification
+            await storage.createNotification({
+              userId: player.id,
+              type: 'scrimmage_approved',
+              title: `You're in! ${scrimmage.title}`,
+              message: `Your request to join "${scrimmage.title}" on ${format(new Date(scrimmage.dateTime), 'EEEE, MMMM d')} at ${format(new Date(scrimmage.dateTime), 'h:mm a')} has been approved!`,
+              actionUrl: `/scrimmage/${scrimmage.id}`,
+              actionText: 'View Details',
               scrimmageId: scrimmage.id,
-              title: scrimmage.title,
-              dateTime: new Date(scrimmage.dateTime),
-              location: scrimmage.location,
-              organizerName: `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer',
-              playerName: player.firstName || 'Player',
-              maxPlayers: scrimmage.maxPlayers,
-              currentPlayers: approvedCount,
             });
-            console.log(`✅ Sent scrimmage approval email to ${player.email}`);
+            console.log(`✅ Sent scrimmage approval push notification to ${player.firstName || player.id}`);
+            
+            // Also send email if available
+            if (player.email && creator) {
+              await sendScrimmageApprovalEmail(player.email, {
+                scrimmageId: scrimmage.id,
+                title: scrimmage.title,
+                dateTime: new Date(scrimmage.dateTime),
+                location: scrimmage.location,
+                organizerName: `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer',
+                playerName: player.firstName || 'Player',
+                maxPlayers: scrimmage.maxPlayers,
+                currentPlayers: approvedCount,
+              });
+              console.log(`✅ Sent scrimmage approval email to ${player.email}`);
+            }
           }
         } catch (emailError) {
           // Log but don't fail the request if email fails
@@ -14783,6 +14799,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Start the scrimmage reminder job
   startScrimmageReminderJob();
+  
+  // Start the scrimmage invitation job (for recurring scrimmage invites)
+  startScrimmageInviteJob();
 
   return httpServer;
 }

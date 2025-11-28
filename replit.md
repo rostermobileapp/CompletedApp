@@ -55,17 +55,35 @@ Backend validation enforces access control, file type restrictions (JPEG, PNG, G
 
 Key features include a subscription-gating system, payment management, a universal "Needs Attention" notification system, team captain announcements, CSV import for players and schedules, bulk delete operations, facility linking, recurring scrimmages, substitute game display, and automation for finalizing scrimmages and invoicing. Additional features include standalone team creation, player management, league migration requests, a "Your Teams" section for users, automatic scroll to first unread messages, dashboard enhancements with localStorage persistence, profile career stats, team-scoped messages and payments, calendar team filtering, email notifications for scrimmage invites, and automatic chat synchronization for teams and captains. A 3-star awards system for hockey leagues is also implemented.
 
-### Scrimmage Email Notification System
+### Scrimmage Notification System
 
-The platform includes a comprehensive email notification system for scrimmages:
+The platform includes a comprehensive notification system for scrimmages with both email and in-app push notifications:
 
-1. **Approval Notifications**: When a commissioner approves a player's scrimmage request, an approval email is automatically sent containing the scrimmage details (title, date, location, cost) and a direct link to view the scrimmage.
+#### In-App Push Notifications
+1. **NotificationCenter Component**: A bell icon with badge counter displays in the header (home/profile screens). Clicking opens a dropdown showing all notifications with read/unread status, dismiss functionality, and action links.
 
-2. **Automated Reminders**: Creators can configure reminder emails when creating a scrimmage. Preset options include 2 hours, 1 day, 2 days, and 1 week before the event. Reminders are only sent to approved players. A background job runs every 5 minutes to check for upcoming scrimmages and dispatch reminders.
+2. **Notification Types**: `scrimmage_invite`, `scrimmage_reminder`, `scrimmage_approved`, `scrimmage_canceled` - each with distinct icons and styling.
 
-3. **Duplicate Prevention**: The `scrimmageRemindersSent` table tracks sent reminders to prevent duplicate emails. Each combination of scrimmage ID, user ID, and hours-before interval is recorded.
+3. **Idempotency**: The `createNotificationIfNotExists` storage method prevents duplicate notifications using a composite key of `{userId, type, scrimmageId, actionUrl}`.
 
-The email templates feature branded styling with plain-text fallbacks for accessibility. Key files: `server/emails.ts` (email functions), `server/scrimmageReminderJob.ts` (scheduled job), `shared/schema.ts` (reminder schema fields).
+#### Recurring Scrimmage Invitation Scheduling
+1. **Invitation Scheduling**: Organizers can schedule when invitations are sent for recurring scrimmages using `inviteDaysBefore` (days before event) and `inviteTimeOfDay` (specific time).
+
+2. **Automatic Occurrence Generation**: The `scrimmageInviteJob` runs every 5 minutes and:
+   - Generates missing child occurrences for recurring parent scrimmages (up to 12 weeks ahead)
+   - Persists each occurrence to the database with its own unique ID
+   - Sends in-app invitations to approved league members at the scheduled time
+
+3. **Parent vs Child Occurrences**: Parent scrimmages (isRecurring=true) serve as templates; only child occurrences (isRecurring=false) receive invitations and reminders.
+
+#### Email Notifications
+1. **Approval Notifications**: When a commissioner approves a player's scrimmage request, both an email and in-app push notification are sent.
+
+2. **Automated Reminders**: The `scrimmageReminderJob` sends in-app push notifications at configured intervals (2 hours, 1 day, 2 days, 1 week before). Reminders are only sent to approved players.
+
+3. **Duplicate Prevention**: The `scrimmageRemindersSent` table tracks sent reminders. Each combination of scrimmage ID, user ID, and hours-before interval is recorded.
+
+Key files: `server/emails.ts`, `server/scrimmageReminderJob.ts`, `server/scrimmageInviteJob.ts`, `client/src/components/NotificationCenter.tsx`, `shared/schema.ts`.
 
 # External Dependencies
 
