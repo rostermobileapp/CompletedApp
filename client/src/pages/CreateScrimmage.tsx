@@ -655,33 +655,6 @@ export default function CreateScrimmage() {
                         />
                       </div>
                     </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { days: 2, label: '2 days before' },
-                        { days: 5, label: '5 days before' },
-                        { days: 7, label: '1 week before' },
-                      ].map(({ days, label }) => {
-                        const currentDays = form.watch('inviteDaysBefore');
-                        const isSelected = currentDays === days;
-                        
-                        return (
-                          <button
-                            key={days}
-                            type="button"
-                            onClick={() => form.setValue('inviteDaysBefore', days)}
-                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                              isSelected
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                            }`}
-                            data-testid={`button-invite-days-${days}`}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
                   </div>
                 )}
               </div>
