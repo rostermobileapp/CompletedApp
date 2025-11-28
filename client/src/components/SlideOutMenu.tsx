@@ -5,6 +5,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
+import { NotificationCenter } from '@/components/NotificationCenter';
 
 export function SlideOutMenu() {
   const [open, setOpen] = useState(false);
@@ -108,15 +109,18 @@ export function SlideOutMenu() {
 
   return (
     <>
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <button
-            className="fixed top-[32px] right-6 z-50 w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
-            data-testid="button-hamburger-menu"
-          >
-            <Menu className="w-8 h-8 text-foreground" />
-          </button>
-        </SheetTrigger>
+      {/* Fixed header bar with notification and menu icons */}
+      <div className="fixed top-[32px] right-6 z-50 flex items-center gap-2">
+        <NotificationCenter />
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <button
+              className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
+              data-testid="button-hamburger-menu"
+            >
+              <Menu className="w-8 h-8 text-foreground" />
+            </button>
+          </SheetTrigger>
         <SheetContent 
           side="right" 
           className="w-[85%] sm:w-[400px] h-screen border-l border-border bg-background flex flex-col [&>button]:hidden"
@@ -156,7 +160,8 @@ export function SlideOutMenu() {
             ))}
           </div>
         </SheetContent>
-      </Sheet>
+        </Sheet>
+      </div>
       
       <PremiumFeatureAlert 
         open={showPremiumAlert} 

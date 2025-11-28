@@ -183,7 +183,12 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "payment_failed",
   "subscription_canceled",
   "subscription_renewed",
-  "general"
+  "general",
+  "scrimmage_invite",
+  "scrimmage_reminder",
+  "scrimmage_approved",
+  "scrimmage_updated",
+  "scrimmage_canceled"
 ]);
 
 // Users table (required for Replit Auth)
@@ -233,10 +238,13 @@ export const userNotifications = pgTable("user_notifications", {
   actionText: varchar("action_text"),
   isRead: boolean("is_read").default(false).notNull(),
   isDismissed: boolean("is_dismissed").default(false).notNull(),
+  // Optional reference to related entities (scrimmage, etc.)
+  scrimmageId: varchar("scrimmage_id"), // Reference to scrimmage for scrimmage notifications
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_user_notifications_user").on(table.userId),
   index("idx_user_notifications_read").on(table.isRead),
+  index("idx_user_notifications_scrimmage").on(table.scrimmageId),
 ]);
 
 // Leagues table
@@ -953,6 +961,10 @@ export const scrimmages = pgTable("scrimmages", {
   parentScrimmageId: varchar("parent_scrimmage_id"), // Link to parent scrimmage if this is part of a recurring series
   // Reminder settings - hours before the scrimmage to send reminders (e.g., 24, 48, 168 for 1 day, 2 days, 1 week)
   reminderHoursBefore: integer("reminder_hours_before").array(), // Array of hours before to send reminders
+  // Invitation scheduling for recurring scrimmages
+  inviteDaysBefore: integer("invite_days_before"), // Number of days before each occurrence to send invites (e.g., 5 for Sunday invite for Friday scrimmage)
+  inviteTimeOfDay: varchar("invite_time_of_day"), // Time to send invites in HH:MM format (e.g., "09:00" for 9am)
+  inviteSentAt: timestamp("invite_sent_at"), // When the invite was sent for this occurrence (null if not sent yet)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
