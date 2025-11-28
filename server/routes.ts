@@ -71,7 +71,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
-import { sendBulkScrimmageInvites } from "./emails";
+import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail } from "./emails";
+import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 
 
 // Helper function to format date as local time string without timezone suffix
@@ -8844,6 +8845,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedRequest = await storage.updateScrimmageRequestStatus(requestId, status);
+      
+      // Send approval notification email if request was approved
+      if (status === 'approved') {
+        try {
+          // Get the player who was approved
+          const player = await storage.getUser(request.playerId);
+          
+          // Get the scrimmage creator for the organizer name
+          const creator = await storage.getUser(scrimmage.creatorId);
+          
+          // Get current player count
+          const allRequests = await storage.getScrimmageRequests(scrimmage.id);
+          const approvedCount = allRequests.filter(r => r.status === 'approved').length;
+          
+          if (player?.email && creator) {
+            await sendScrimmageApprovalEmail(player.email, {
+              scrimmageId: scrimmage.id,
+              title: scrimmage.title,
+              dateTime: new Date(scrimmage.dateTime),
+              location: scrimmage.location,
+              organizerName: `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer',
+              playerName: player.firstName || 'Player',
+              maxPlayers: scrimmage.maxPlayers,
+              currentPlayers: approvedCount,
+            });
+            console.log(`✅ Sent scrimmage approval email to ${player.email}`);
+          }
+        } catch (emailError) {
+          // Log but don't fail the request if email fails
+          console.error('Failed to send approval notification email:', emailError);
+        }
+      }
+      
       res.json(updatedRequest);
     } catch (error) {
       console.error('Error updating request status:', error);
@@ -14746,6 +14780,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to merge tournament participants' });
     }
   });
+
+  // Start the scrimmage reminder job
+  startScrimmageReminderJob();
 
   return httpServer;
 }

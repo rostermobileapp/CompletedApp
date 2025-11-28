@@ -951,6 +951,8 @@ export const scrimmages = pgTable("scrimmages", {
   recurrenceEndDate: timestamp("recurrence_end_date"), // When to stop creating recurring events
   recurrenceCount: integer("recurrence_count"), // Number of times to repeat (alternative to end date)
   parentScrimmageId: varchar("parent_scrimmage_id"), // Link to parent scrimmage if this is part of a recurring series
+  // Reminder settings - hours before the scrimmage to send reminders (e.g., 24, 48, 168 for 1 day, 2 days, 1 week)
+  reminderHoursBefore: integer("reminder_hours_before").array(), // Array of hours before to send reminders
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1000,6 +1002,17 @@ export const scrimmageInvites = pgTable("scrimmage_invites", {
   userId: varchar("user_id").references(() => users.id), // If the invited email matches a registered user
 }, (table) => [
   unique("unique_scrimmage_email_invite").on(table.scrimmageId, table.email),
+]);
+
+// Scrimmage reminder tracking table - prevents duplicate reminders
+export const scrimmageRemindersSent = pgTable("scrimmage_reminders_sent", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scrimmageId: varchar("scrimmage_id").references(() => scrimmages.id).notNull(),
+  playerId: varchar("player_id").references(() => users.id).notNull(),
+  hoursBefore: integer("hours_before").notNull(), // Which reminder was sent (e.g., 24, 48, 168)
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_scrimmage_player_reminder").on(table.scrimmageId, table.playerId, table.hoursBefore),
 ]);
 
 // Facility membership status enum
@@ -2335,6 +2348,11 @@ export const insertScrimmageInviteSchema = createInsertSchema(scrimmageInvites).
   invitedAt: true,
 });
 
+export const insertScrimmageReminderSentSchema = createInsertSchema(scrimmageRemindersSent).omit({
+  id: true,
+  sentAt: true,
+});
+
 // Payment request schemas
 export const insertPaymentRequestSchema = createInsertSchema(paymentRequests).omit({
   id: true,
@@ -2782,6 +2800,8 @@ export type InviteGroupMember = typeof inviteGroupMembers.$inferSelect;
 export type InsertInviteGroupMember = z.infer<typeof insertInviteGroupMemberSchema>;
 export type ScrimmageInvite = typeof scrimmageInvites.$inferSelect;
 export type InsertScrimmageInvite = z.infer<typeof insertScrimmageInviteSchema>;
+export type ScrimmageReminderSent = typeof scrimmageRemindersSent.$inferSelect;
+export type InsertScrimmageReminderSent = z.infer<typeof insertScrimmageReminderSentSchema>;
 export type PaymentRequest = typeof paymentRequests.$inferSelect;
 export type InsertPaymentRequest = z.infer<typeof insertPaymentRequestSchema>;
 export type CreatePaymentRequest = z.infer<typeof createPaymentRequestSchema>;

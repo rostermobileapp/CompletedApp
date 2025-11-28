@@ -39,6 +39,9 @@ const createScrimmageSchema = createScrimmageRequestSchema.extend({
   recurrenceEndType: z.enum(['date', 'count']).optional(), // Either end by date or count
   recurrenceEndDate: z.string().optional(),
   recurrenceCount: z.number().optional(),
+  // Reminder settings
+  enableReminders: z.boolean().default(true),
+  reminderHoursBefore: z.array(z.number()).default([24]), // Default to 24 hours before
 }).omit({
   dateTime: true, // We'll construct this from date + time
   location: true, // We'll map venue to location  
@@ -91,6 +94,9 @@ export default function CreateScrimmage() {
       recurrenceEndType: 'date',
       recurrenceEndDate: '',
       recurrenceCount: 1,
+      // Reminder defaults
+      enableReminders: true,
+      reminderHoursBefore: [24], // Default to 24 hours before
     },
   });
 
@@ -203,6 +209,8 @@ export default function CreateScrimmage() {
           ? new Date(data.recurrenceEndDate) 
           : null,
         recurrenceCount: data.isRecurring && data.recurrenceEndType === 'count' ? data.recurrenceCount : null,
+        // Reminder settings
+        reminderHoursBefore: data.enableReminders ? data.reminderHoursBefore : null,
       };
 
       // Filter out the creator from selectedMemberIds (they don't need to invite themselves)
@@ -525,6 +533,63 @@ export default function CreateScrimmage() {
                       </div>
                     </RadioGroup>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Reminder Settings */}
+            <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="enableReminders" className="text-base">Email Reminders</Label>
+                  <p className="text-sm text-muted-foreground">Send email reminders to approved players before the scrimmage</p>
+                </div>
+                <Switch
+                  id="enableReminders"
+                  checked={form.watch('enableReminders')}
+                  onCheckedChange={(checked) => form.setValue('enableReminders', checked)}
+                  data-testid="switch-enable-reminders"
+                />
+              </div>
+
+              {form.watch('enableReminders') && (
+                <div className="space-y-3 pt-2">
+                  <Label className="text-sm font-medium">Send reminders:</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { hours: 2, label: '2 hours before' },
+                      { hours: 24, label: '1 day before' },
+                      { hours: 48, label: '2 days before' },
+                      { hours: 168, label: '1 week before' },
+                    ].map(({ hours, label }) => {
+                      const currentReminders = form.watch('reminderHoursBefore') || [];
+                      const isSelected = currentReminders.includes(hours);
+                      
+                      return (
+                        <button
+                          key={hours}
+                          type="button"
+                          onClick={() => {
+                            const updated = isSelected
+                              ? currentReminders.filter(h => h !== hours)
+                              : [...currentReminders, hours].sort((a, b) => b - a);
+                            form.setValue('reminderHoursBefore', updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            isSelected
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                          data-testid={`button-reminder-${hours}`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Select when you want reminders sent to approved players
+                  </p>
                 </div>
               )}
             </div>
