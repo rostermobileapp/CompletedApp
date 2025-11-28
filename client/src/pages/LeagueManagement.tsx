@@ -4272,7 +4272,7 @@ export default function LeagueManagement() {
                             <Calendar className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                             {showDatePicker && (
                               <div 
-                                className="absolute z-[9999] mt-1 bg-white dark:bg-zinc-800 border border-border rounded-lg shadow-lg min-w-[350px]"
+                                className="absolute z-[9999] mt-1 bg-white dark:bg-zinc-800 border border-border rounded-lg shadow-lg"
                               >
                                 <DayPicker
                                   mode="single"
@@ -4290,17 +4290,17 @@ export default function LeagueManagement() {
                                       setShowDatePicker(false);
                                     }
                                   }}
-                                  className="p-4"
+                                  className="p-2"
                                   classNames={{
-                                    today: "rdp-cell_today bg-primary/20 text-black dark:text-white font-bold text-lg w-12 h-12",
-                                    selected: "rdp-cell_selected bg-primary text-white font-bold text-lg w-12 h-12",
-                                    root: "text-black dark:text-white text-lg",
-                                    day: "text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-700 text-lg w-12 h-12 flex items-center justify-center cursor-pointer",
-                                    nav_button: "text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-700 w-10 h-10 flex items-center justify-center",
-                                    caption: "text-black dark:text-white font-medium text-xl mb-4",
-                                    head_cell: "text-black dark:text-white font-medium text-base p-2",
-                                    table: "w-full border-spacing-1",
-                                    cell: "text-center p-1",
+                                    today: "rdp-cell_today bg-primary/20 text-black dark:text-white font-semibold text-sm w-8 h-8",
+                                    selected: "rdp-cell_selected bg-primary text-white font-semibold text-sm w-8 h-8",
+                                    root: "text-black dark:text-white text-sm",
+                                    day: "text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-700 text-sm w-8 h-8 flex items-center justify-center cursor-pointer rounded",
+                                    nav_button: "text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-700 w-7 h-7 flex items-center justify-center rounded",
+                                    caption: "text-black dark:text-white font-medium text-sm mb-2",
+                                    head_cell: "text-black dark:text-white font-medium text-xs p-1",
+                                    table: "w-full border-collapse",
+                                    cell: "text-center p-0.5",
                                   } as any}
                                 />
                               </div>
