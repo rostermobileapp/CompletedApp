@@ -433,6 +433,35 @@ export default function CreateScrimmage() {
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  {...form.register('date')}
+                  min={new Date().toISOString().split('T')[0]}
+                  data-testid="input-date"
+                />
+                {form.formState.errors.date && (
+                  <p className="text-sm text-destructive mt-1">{form.formState.errors.date.message}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="time">Time</Label>
+                <Input
+                  id="time"
+                  type="time"
+                  {...form.register('time')}
+                  data-testid="input-time"
+                />
+                {form.formState.errors.time && (
+                  <p className="text-sm text-destructive mt-1">{form.formState.errors.time.message}</p>
+                )}
+              </div>
+            </div>
+
             {/* Recurring Event Settings */}
             <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
               <div className="flex items-center justify-between">
@@ -691,35 +720,6 @@ export default function CreateScrimmage() {
                   </p>
                 </div>
               )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="date">Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  {...form.register('date')}
-                  min={new Date().toISOString().split('T')[0]}
-                  data-testid="input-date"
-                />
-                {form.formState.errors.date && (
-                  <p className="text-sm text-destructive mt-1">{form.formState.errors.date.message}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="time">Time</Label>
-                <Input
-                  id="time"
-                  type="time"
-                  {...form.register('time')}
-                  data-testid="input-time"
-                />
-                {form.formState.errors.time && (
-                  <p className="text-sm text-destructive mt-1">{form.formState.errors.time.message}</p>
-                )}
-              </div>
             </div>
           </div>
         </div>
