@@ -13,7 +13,6 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign } from 'lucide-react';
-import { NotificationCenter } from '@/components/NotificationCenter';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -347,12 +346,8 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="profile-page">
-      {/* Header with NotificationCenter */}
-      <div className="p-3 pt-[12px] flex items-center justify-end pr-16">
-        <NotificationCenter />
-      </div>
       {/* Profile Info */}
-      <div className="px-6 mb-6 pt-[12px] pb-[24px]">
+      <div className="px-6 mb-6 pt-[24px] pb-[24px]">
         <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
           <div className="relative flex-shrink-0">
             <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
