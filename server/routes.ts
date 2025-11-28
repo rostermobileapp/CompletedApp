@@ -11005,13 +11005,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? 'Product Improvement' 
           : 'Report an Issue';
 
-        // Override from email to use verified domain
-        const verifiedFromEmail = 'contact@notifications.roster-app.com';
-        const recipientEmail = process.env.FEEDBACK_EMAIL || verifiedFromEmail;
-        console.log('[Feedback] Sending to:', recipientEmail, 'from:', verifiedFromEmail);
+        // Use the verified fromEmail from Resend integration
+        const recipientEmail = process.env.FEEDBACK_EMAIL || fromEmail;
+        console.log('[Feedback] Sending to:', recipientEmail, 'from:', fromEmail);
 
         const emailResult = await client.emails.send({
-          from: verifiedFromEmail,
+          from: fromEmail,
           to: recipientEmail,
           subject: `Rosters Feedback: ${categoryLabel}`,
           html: `
