@@ -285,7 +285,13 @@ export default function ScorekeeperDashboard() {
     }
   }, [homeScore, awayScore, selectedGame?.id]);
 
-  const upcomingGames = games.filter(g => g.status !== 'completed').sort((a, b) => 
+  // Filter out games that already have scores recorded (both homeScore and awayScore are set)
+  // or are already completed
+  const upcomingGames = games.filter(g => {
+    const hasScoresRecorded = typeof g.homeScore === 'number' && typeof g.awayScore === 'number';
+    const isCompleted = g.status === 'completed';
+    return !hasScoresRecorded && !isCompleted;
+  }).sort((a, b) => 
     new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
   );
   
