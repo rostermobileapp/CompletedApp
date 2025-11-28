@@ -55,6 +55,18 @@ Backend validation enforces access control, file type restrictions (JPEG, PNG, G
 
 Key features include a subscription-gating system, payment management, a universal "Needs Attention" notification system, team captain announcements, CSV import for players and schedules, bulk delete operations, facility linking, recurring scrimmages, substitute game display, and automation for finalizing scrimmages and invoicing. Additional features include standalone team creation, player management, league migration requests, a "Your Teams" section for users, automatic scroll to first unread messages, dashboard enhancements with localStorage persistence, profile career stats, team-scoped messages and payments, calendar team filtering, email notifications for scrimmage invites, and automatic chat synchronization for teams and captains. A 3-star awards system for hockey leagues is also implemented.
 
+### Scrimmage Email Notification System
+
+The platform includes a comprehensive email notification system for scrimmages:
+
+1. **Approval Notifications**: When a commissioner approves a player's scrimmage request, an approval email is automatically sent containing the scrimmage details (title, date, location, cost) and a direct link to view the scrimmage.
+
+2. **Automated Reminders**: Creators can configure reminder emails when creating a scrimmage. Preset options include 2 hours, 1 day, 2 days, and 1 week before the event. Reminders are only sent to approved players. A background job runs every 5 minutes to check for upcoming scrimmages and dispatch reminders.
+
+3. **Duplicate Prevention**: The `scrimmageRemindersSent` table tracks sent reminders to prevent duplicate emails. Each combination of scrimmage ID, user ID, and hours-before interval is recorded.
+
+The email templates feature branded styling with plain-text fallbacks for accessibility. Key files: `server/emails.ts` (email functions), `server/scrimmageReminderJob.ts` (scheduled job), `shared/schema.ts` (reminder schema fields).
+
 # External Dependencies
 
 ## Third-Party Services
