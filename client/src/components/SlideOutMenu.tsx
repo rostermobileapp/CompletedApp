@@ -5,7 +5,6 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
-import { NotificationCenter } from '@/components/NotificationCenter';
 
 export function SlideOutMenu() {
   const [open, setOpen] = useState(false);
@@ -109,9 +108,8 @@ export function SlideOutMenu() {
 
   return (
     <>
-      {/* Fixed header bar with notification and menu icons */}
+      {/* Fixed header bar with menu icon */}
       <div className="fixed top-[32px] right-6 z-50 flex items-center gap-2">
-        <NotificationCenter key="notification-center" />
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <button
