@@ -4272,7 +4272,7 @@ export default function LeagueManagement() {
                             <Calendar className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                             {showDatePicker && (
                               <div 
-                                className="absolute z-[9999] mt-1 bg-white dark:bg-card border border-border rounded-lg shadow-lg min-w-[350px]"
+                                className="absolute z-[9999] mt-1 bg-white dark:bg-zinc-800 border border-border rounded-lg shadow-lg min-w-[350px]"
                               >
                                 <DayPicker
                                   mode="single"
@@ -4292,13 +4292,13 @@ export default function LeagueManagement() {
                                   }}
                                   className="p-4"
                                   classNames={{
-                                    today: "rdp-cell_today bg-primary/20 text-black font-bold text-lg w-12 h-12",
+                                    today: "rdp-cell_today bg-primary/20 text-black dark:text-white font-bold text-lg w-12 h-12",
                                     selected: "rdp-cell_selected bg-primary text-white font-bold text-lg w-12 h-12",
-                                    root: "text-black text-lg",
-                                    day: "text-black hover:bg-gray-100 text-lg w-12 h-12 flex items-center justify-center cursor-pointer",
-                                    nav_button: "text-black hover:bg-gray-100 w-10 h-10 flex items-center justify-center",
-                                    caption: "text-black font-medium text-xl mb-4",
-                                    head_cell: "text-black font-medium text-base p-2",
+                                    root: "text-black dark:text-white text-lg",
+                                    day: "text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-700 text-lg w-12 h-12 flex items-center justify-center cursor-pointer",
+                                    nav_button: "text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-700 w-10 h-10 flex items-center justify-center",
+                                    caption: "text-black dark:text-white font-medium text-xl mb-4",
+                                    head_cell: "text-black dark:text-white font-medium text-base p-2",
                                     table: "w-full border-spacing-1",
                                     cell: "text-center p-1",
                                   } as any}
