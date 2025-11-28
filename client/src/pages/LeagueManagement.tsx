@@ -241,7 +241,7 @@ function UnreadAnnouncementsAlert({ leagueId }: { leagueId: string }) {
   return (
     <div className="mb-6">
       <div 
-        className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
+        className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors pt-[4px] pb-[4px] pl-[4px] pr-[4px]"
         onClick={() => navigate(`/league/${leagueId}/announcements`)}
         data-testid="unread-announcements-alert"
       >
