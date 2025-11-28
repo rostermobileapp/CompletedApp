@@ -10997,6 +10997,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send email using Resend
       try {
         console.log('[Feedback] Attempting to send feedback email...');
+        console.log('[Feedback] RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
+        console.log('[Feedback] RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL);
+        console.log('[Feedback] FEEDBACK_EMAIL:', process.env.FEEDBACK_EMAIL);
+        
         const { getUncachableResendClient } = await import('./resend');
         const { client, fromEmail } = await getUncachableResendClient();
         console.log('[Feedback] Got Resend client, fromEmail:', fromEmail);
@@ -11005,8 +11009,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? 'Product Improvement' 
           : 'Report an Issue';
 
-        // Use the verified fromEmail from Resend integration
-        const recipientEmail = process.env.FEEDBACK_EMAIL || fromEmail;
+        // Send to FEEDBACK_EMAIL, or fallback to contact@roster-app.com
+        const recipientEmail = process.env.FEEDBACK_EMAIL || 'contact@roster-app.com';
         console.log('[Feedback] Sending to:', recipientEmail, 'from:', fromEmail);
 
         const emailResult = await client.emails.send({
