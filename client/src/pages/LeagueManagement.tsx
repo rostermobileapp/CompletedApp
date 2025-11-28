@@ -254,9 +254,6 @@ function UnreadAnnouncementsAlert({ leagueId }: { leagueId: string }) {
               <h3 className="text-base font-semibold text-blue-600 dark:text-blue-400">
                 New Announcements
               </h3>
-              <p className="text-sm text-blue-600 dark:text-blue-400">
-                {count === 1 ? '1 unread announcement' : `${count} unread announcements`}
-              </p>
             </div>
           </div>
           <Button
