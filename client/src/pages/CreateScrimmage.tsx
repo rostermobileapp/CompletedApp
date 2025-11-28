@@ -41,6 +41,7 @@ const createScrimmageSchema = createScrimmageRequestSchema.extend({
   recurrenceCount: z.number().optional(),
   // Invitation scheduling for recurring scrimmages
   enableInviteScheduling: z.boolean().default(true),
+  sendInviteNow: z.boolean().default(true), // Send invitation immediately when scrimmage is created
   inviteDaysBefore: z.number().min(1).max(14).default(5), // Days before each occurrence to send invites
   inviteTimeOfDay: z.string().default('09:00'), // Time to send invites (HH:MM format)
   // Reminder settings
@@ -100,6 +101,7 @@ export default function CreateScrimmage() {
       recurrenceCount: 1,
       // Invitation scheduling defaults (for recurring scrimmages)
       enableInviteScheduling: true,
+      sendInviteNow: true, // Send invitation immediately when scrimmage is created
       inviteDaysBefore: 5, // Send invites 5 days before each occurrence
       inviteTimeOfDay: '09:00', // Send at 9 AM
       // Reminder defaults
@@ -222,6 +224,8 @@ export default function CreateScrimmage() {
         inviteTimeOfDay: data.isRecurring && data.enableInviteScheduling ? data.inviteTimeOfDay : null,
         // Reminder settings
         reminderHoursBefore: data.enableReminders ? data.reminderHoursBefore : null,
+        // Send invite immediately when scrimmage is created
+        sendInviteNow: data.sendInviteNow,
       };
 
       // Filter out the creator from selectedMemberIds (they don't need to invite themselves)
@@ -232,7 +236,7 @@ export default function CreateScrimmage() {
 
       const response = await apiRequest('POST', '/api/scrimmages', {
         ...scrimmageData,
-        selectedMemberIds: filteredMemberIds, // Include for targeted announcements
+        selectedMemberIds: filteredMemberIds, // Include for targeted announcements/invitations
         selectedEmails: data.selectedEmails || [], // Include email invites
       });
       return response.json();
@@ -577,14 +581,32 @@ export default function CreateScrimmage() {
               )}
             </div>
 
+            {/* Send Invite Now Option */}
+            <div className="space-y-4 p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="sendInviteNow" className="text-base">Send Invite Now</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Immediately notify selected members when this scrimmage is created
+                  </p>
+                </div>
+                <Switch
+                  id="sendInviteNow"
+                  checked={form.watch('sendInviteNow')}
+                  onCheckedChange={(checked) => form.setValue('sendInviteNow', checked)}
+                  data-testid="switch-send-invite-now"
+                />
+              </div>
+            </div>
+
             {/* Invitation Scheduling for Recurring Scrimmages */}
             {form.watch('isRecurring') && (
               <div className="space-y-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="enableInviteScheduling" className="text-base">Schedule Invitations</Label>
+                    <Label htmlFor="enableInviteScheduling" className="text-base">Schedule Future Invitations</Label>
                     <p className="text-sm text-muted-foreground">
-                      Each recurring scrimmage will have its own invitation sent at a scheduled time
+                      Automatically send invitations before each recurring occurrence
                     </p>
                   </div>
                   <Switch

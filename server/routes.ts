@@ -8399,6 +8399,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`✅ Created ${dates.length - 1} recurring scrimmages linked to parent ${parentScrimmage.id}`);
         
+        // Send in-app push notifications if sendInviteNow is enabled
+        if (req.body.sendInviteNow && req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+          console.log(`📲 Sending immediate in-app notifications to ${req.body.selectedMemberIds.length} members for recurring scrimmage`);
+          for (const memberId of req.body.selectedMemberIds) {
+            try {
+              await storage.createNotificationIfNotExists({
+                userId: memberId,
+                type: 'scrimmage_invite',
+                title: `You're Invited: ${scrimmageData.title}`,
+                message: `Join us on ${format(scrimmageData.dateTime, 'MMM d')} at ${format(scrimmageData.dateTime, 'h:mm a')} at ${scrimmageData.location}. Tap to RSVP!`,
+                actionUrl: `/scrimmage/${parentScrimmage.id}`,
+                scrimmageId: parentScrimmage.id,
+              });
+            } catch (notifError) {
+              console.error(`Failed to create notification for user ${memberId}:`, notifError);
+            }
+          }
+          console.log(`✅ Sent immediate in-app notifications`);
+        }
+        
         // Save email invites if provided
         if (req.body.selectedEmails && Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
           try {
@@ -8454,6 +8474,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         console.log(`✅ Created scrimmage ${scrimmage.id}${announcementId ? ` linked to announcement ${announcementId}` : ''}`);
+        
+        // Send in-app push notifications if sendInviteNow is enabled
+        if (req.body.sendInviteNow && req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+          console.log(`📲 Sending immediate in-app notifications to ${req.body.selectedMemberIds.length} members`);
+          for (const memberId of req.body.selectedMemberIds) {
+            try {
+              await storage.createNotificationIfNotExists({
+                userId: memberId,
+                type: 'scrimmage_invite',
+                title: `You're Invited: ${scrimmageData.title}`,
+                message: `Join us on ${format(scrimmageData.dateTime, 'MMM d')} at ${format(scrimmageData.dateTime, 'h:mm a')} at ${scrimmageData.location}. Tap to RSVP!`,
+                actionUrl: `/scrimmage/${scrimmage.id}`,
+                scrimmageId: scrimmage.id,
+              });
+            } catch (notifError) {
+              console.error(`Failed to create notification for user ${memberId}:`, notifError);
+            }
+          }
+          console.log(`✅ Sent immediate in-app notifications`);
+        }
         
         // Save email invites if provided
         if (req.body.selectedEmails && Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
