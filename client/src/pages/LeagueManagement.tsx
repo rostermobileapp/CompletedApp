@@ -1991,7 +1991,7 @@ export default function LeagueManagement() {
   return (
     <div className="min-h-screen flex flex-col pb-6" data-testid="league-management-page">
       {/* Header */}
-      <div className="p-6 pl-[20px] pr-[20px] pt-[12px] pb-[12px] mt-[8px] mb-[8px]">
+      <div className="p-6 pl-[20px] pr-[20px] mt-[8px] mb-[8px] pt-[4px] pb-[4px]">
         <div className="flex items-center gap-4 mb-4">
           <button 
             onClick={() => {
