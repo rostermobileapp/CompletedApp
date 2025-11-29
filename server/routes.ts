@@ -10054,22 +10054,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Mark all messages in a conversation as read
-  app.post('/api/conversations/:id/mark-all-read', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const conversationId = req.params.id;
-      
-      await messagingService.markAllMessagesInConversationAsRead(userId, conversationId);
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error marking all messages as read:', error);
-      if (error instanceof Error && error.message === 'User is not a participant in this conversation') {
-        return res.status(403).json({ message: 'Access denied' });
-      }
-      res.status(500).json({ message: 'Failed to mark messages as read' });
-    }
-  });
+  // Mark all messages in a conversation as read - MOVED AFTER WEBSOCKET SETUP
+  // (This route is defined later in the file to have access to WebSocket connections)
 
   // ===== NOTIFICATION SUMMARY FOR DASHBOARD DROPDOWN =====
   
@@ -11063,6 +11049,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   }
+
+  // Mark all messages in a conversation as read (with WebSocket notifications)
+  app.post('/api/conversations/:id/mark-all-read', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const conversationId = req.params.id;
+      
+      // Mark messages as read and get the list of marked messages with sender IDs
+      const markedMessages = await messagingService.markAllMessagesInConversationAsRead(userId, conversationId);
+      
+      // Send WebSocket notifications to message senders
+      if (markedMessages.length > 0) {
+        const readAt = new Date().toISOString();
+        
+        // Group messages by sender to minimize WebSocket messages
+        const messagesBySender = new Map<string, string[]>();
+        for (const { messageId, senderId } of markedMessages) {
+          if (!messagesBySender.has(senderId)) {
+            messagesBySender.set(senderId, []);
+          }
+          messagesBySender.get(senderId)!.push(messageId);
+        }
+        
+        // Send notification to each sender
+        Array.from(messagesBySender.entries()).forEach(([senderId, messageIds]) => {
+          const senderConnection = activeConnections.get(senderId);
+          if (senderConnection && senderConnection.readyState === WebSocket.OPEN) {
+            senderConnection.send(JSON.stringify({
+              type: 'message_read',
+              conversationId,
+              messageIds,
+              readBy: userId,
+              readAt
+            }));
+          }
+        });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking all messages as read:', error);
+      if (error instanceof Error && error.message === 'User is not a participant in this conversation') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      res.status(500).json({ message: 'Failed to mark messages as read' });
+    }
+  });
 
   // Feedback submission route
   app.post('/api/feedback', isAuthenticated, async (req: any, res) => {

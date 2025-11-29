@@ -1078,7 +1078,9 @@ export default function Messages() {
           break;
           
         case 'read_receipt':
+        case 'message_read':
           // Refresh messages to show updated read receipts
+          // message_read is sent by mark-all-read endpoint with conversationId and messageIds array
           if (data.conversationId === selectedConversation) {
             queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
           }

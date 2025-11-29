@@ -557,16 +557,16 @@ export class MessagingService {
     }));
   }
 
-  async markAllMessagesInConversationAsRead(userId: string, conversationId: string): Promise<void> {
+  async markAllMessagesInConversationAsRead(userId: string, conversationId: string): Promise<{ messageId: string; senderId: string }[]> {
     // First verify the user is a participant in this conversation
     const isParticipant = await this.isUserInConversation(userId, conversationId);
     if (!isParticipant) {
       throw new Error('User is not a participant in this conversation');
     }
 
-    // Get all unread messages in the conversation for this user
+    // Get all unread messages in the conversation for this user (including sender ID)
     const unreadMessages = await db
-      .select({ id: messages.id })
+      .select({ id: messages.id, senderId: messages.senderId })
       .from(messages)
       .leftJoin(
         messageReadReceipts,
@@ -585,7 +585,7 @@ export class MessagingService {
 
     // If no unread messages, nothing to do
     if (unreadMessages.length === 0) {
-      return;
+      return [];
     }
 
     // Create read receipts for all unread messages atomically
@@ -596,6 +596,9 @@ export class MessagingService {
     }));
 
     await db.insert(messageReadReceipts).values(readReceiptData);
+    
+    // Return the marked messages with their sender IDs for WebSocket notifications
+    return unreadMessages.map(m => ({ messageId: m.id, senderId: m.senderId }));
   }
 
   // Group conversation operations
