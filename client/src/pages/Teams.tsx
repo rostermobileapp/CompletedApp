@@ -293,7 +293,7 @@ export default function Teams() {
               </p>
               <div className="flex flex-col gap-2">
                 <Button
-                  onClick={() => navigate('/leagues')}
+                  onClick={() => navigate('/league-tournament-search')}
                   className="w-full"
                   data-testid="button-find-league"
                 >
