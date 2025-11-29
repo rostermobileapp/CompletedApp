@@ -6,23 +6,29 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { getImageUrl } from '@/lib/queryClient';
 
+interface UserProfileData {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  city?: string | null;
+  dateOfBirth?: string | null;
+  profileImageUrl?: string | null;
+  role?: string | null;
+  playerType?: string | null;
+  venmoUsername?: string | null;
+  cashappUsername?: string | null;
+}
+
 export default function UserProfile() {
   const params = useParams();
   const userId = params.userId;
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading } = useQuery<UserProfileData>({
     queryKey: ['/api/users', userId],
-    queryFn: async () => {
-      const response = await fetch(`/api/users/${userId}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch user');
-      }
-      return response.json();
-    },
     enabled: !!userId,
   });
 
