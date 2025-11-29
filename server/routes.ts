@@ -7217,6 +7217,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Search league members by name for merge functionality
+  app.get('/api/leagues/:leagueId/members/search', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const { query, excludeUserId } = req.query;
+      const userId = req.user.claims.sub;
+
+      // Check commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Commissioner access required' });
+      }
+
+      // Get all league members
+      const members = await storage.getLeagueMembersWithDetails(leagueId);
+      
+      if (!query || (query as string).trim().length === 0) {
+        // Return all members (excluding the source user if specified)
+        const filteredMembers = excludeUserId 
+          ? members.filter(m => m.userId !== excludeUserId)
+          : members;
+        return res.json(filteredMembers.slice(0, 50));
+      }
+
+      const searchQuery = (query as string).toLowerCase().trim();
+      
+      // Filter and score members by name similarity
+      const scoredMembers = members
+        .filter(m => m.userId !== excludeUserId)
+        .map(member => {
+          const firstName = (member.displayFirstName || member.user.firstName || '').toLowerCase();
+          const lastName = (member.displayLastName || member.user.lastName || '').toLowerCase();
+          const fullName = `${firstName} ${lastName}`.trim();
+          const email = (member.user.email || '').toLowerCase();
+          
+          let score = 0;
+          
+          // Exact match scores highest
+          if (fullName === searchQuery) score = 100;
+          else if (firstName === searchQuery || lastName === searchQuery) score = 90;
+          // Starts with query
+          else if (fullName.startsWith(searchQuery)) score = 80;
+          else if (firstName.startsWith(searchQuery) || lastName.startsWith(searchQuery)) score = 70;
+          // Contains query
+          else if (fullName.includes(searchQuery)) score = 60;
+          else if (firstName.includes(searchQuery) || lastName.includes(searchQuery)) score = 50;
+          // Email contains query
+          else if (email.includes(searchQuery)) score = 40;
+          
+          return { ...member, score };
+        })
+        .filter(m => m.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 20);
+
+      res.json(scoredMembers);
+    } catch (error) {
+      console.error('Error searching league members:', error);
+      res.status(500).json({ message: 'Failed to search members' });
+    }
+  });
+
   // Merge two user accounts in a league (e.g., placeholder with real user)
   app.post('/api/leagues/:leagueId/merge-player', isAuthenticated, async (req: any, res) => {
     try {
