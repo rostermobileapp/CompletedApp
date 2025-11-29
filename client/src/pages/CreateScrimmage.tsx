@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Calendar, Crown, MapPin, Users, Search, Mail, X, UserPlus, BookMarked } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Search, Mail, X, UserPlus, BookMarked } from 'lucide-react';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { useLocation } from 'wouter';
@@ -77,6 +77,10 @@ export default function CreateScrimmage() {
   // Date picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
+  
+  // Time picker state
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const timePickerRef = useRef<HTMLDivElement>(null);
 
   // Fetch user's facility memberships
   const { data: facilityMemberships, isLoading: facilitiesLoading } = useQuery<Array<{ facility: { id: string; name: string; address: string; city: string; state: string } }>>({
@@ -216,6 +220,23 @@ export default function CreateScrimmage() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showDatePicker]);
+
+  // Close time picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (timePickerRef.current && !timePickerRef.current.contains(event.target as Node)) {
+        setShowTimePicker(false);
+      }
+    };
+
+    if (showTimePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTimePicker]);
 
   const createScrimmageRequest = useMutation({
     mutationFn: async (data: CreateScrimmageForm) => {
@@ -521,12 +542,147 @@ export default function CreateScrimmage() {
 
               <div>
                 <Label htmlFor="time">Time</Label>
-                <Input
-                  id="time"
-                  type="time"
-                  {...form.register('time')}
-                  data-testid="input-time"
-                />
+                <div className="relative" ref={timePickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowTimePicker(!showTimePicker)}
+                    className="w-full h-10 px-3 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-left flex items-center justify-between"
+                    data-testid="button-time"
+                  >
+                    <span className={form.watch('time') ? 'text-foreground' : 'text-muted-foreground'}>
+                      {form.watch('time') ? (() => {
+                        const [hours, minutes] = form.watch('time').split(':');
+                        const hour12 = parseInt(hours) === 0 ? 12 : parseInt(hours) > 12 ? parseInt(hours) - 12 : parseInt(hours);
+                        const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
+                        return `${hour12}:${minutes} ${ampm}`;
+                      })() : 'Select time'}
+                    </span>
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  {showTimePicker && (
+                    <div className="absolute z-[9999] mt-1 bg-white dark:bg-zinc-800 border border-border rounded-lg shadow-lg min-w-[280px]">
+                      <div className="p-4">
+                        <div className="flex items-start justify-center gap-3">
+                          <div className="flex flex-col items-center">
+                            <div className="text-sm font-semibold mb-2 text-foreground">Hour</div>
+                            <div className="h-32 w-12 overflow-y-auto border border-border rounded-lg bg-card">
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => {
+                                const currentTime = form.watch('time') || '12:00';
+                                const currentHour24 = parseInt(currentTime.split(':')[0]);
+                                const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24;
+                                const isSelected = currentHour12 === hour;
+                                
+                                return (
+                                  <button
+                                    key={hour}
+                                    type="button"
+                                    onClick={() => {
+                                      const currentTimeVal = form.watch('time') || '12:00';
+                                      const [, minutes] = currentTimeVal.split(':');
+                                      const currHour24 = parseInt(currentTimeVal.split(':')[0]);
+                                      const isCurrentlyPM = currHour24 >= 12;
+                                      let newHour24;
+                                      if (isCurrentlyPM && hour !== 12) {
+                                        newHour24 = hour + 12;
+                                      } else if (!isCurrentlyPM && hour === 12) {
+                                        newHour24 = 0;
+                                      } else if (isCurrentlyPM && hour === 12) {
+                                        newHour24 = 12;
+                                      } else {
+                                        newHour24 = hour;
+                                      }
+                                      form.setValue('time', `${String(newHour24).padStart(2, '0')}:${minutes}`);
+                                    }}
+                                    className={`w-full h-8 flex items-center justify-center text-sm font-medium hover:bg-primary/10 transition-colors ${
+                                      isSelected ? 'bg-primary text-primary-foreground' : 'text-foreground'
+                                    }`}
+                                  >
+                                    {hour}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div className="flex items-center text-xl font-bold text-muted-foreground mt-8">:</div>
+                          <div className="flex flex-col items-center">
+                            <div className="text-sm font-semibold mb-2 text-foreground">Min</div>
+                            <div className="h-32 w-12 overflow-y-auto border border-border rounded-lg bg-card">
+                              {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => {
+                                const currentTime = form.watch('time') || '12:00';
+                                const currentMinute = parseInt(currentTime.split(':')[1]);
+                                const isSelected = currentMinute === minute;
+                                
+                                return (
+                                  <button
+                                    key={minute}
+                                    type="button"
+                                    onClick={() => {
+                                      const currentTimeVal = form.watch('time') || '12:00';
+                                      const [hours] = currentTimeVal.split(':');
+                                      form.setValue('time', `${hours}:${String(minute).padStart(2, '0')}`);
+                                    }}
+                                    className={`w-full h-8 flex items-center justify-center text-sm font-medium hover:bg-primary/10 transition-colors ${
+                                      isSelected ? 'bg-primary text-primary-foreground' : 'text-foreground'
+                                    }`}
+                                  >
+                                    {String(minute).padStart(2, '0')}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-center">
+                            <div className="text-sm font-semibold mb-2 text-foreground">Period</div>
+                            <div className="flex flex-col gap-2">
+                              {['AM', 'PM'].map((period) => {
+                                const currentTime = form.watch('time') || '12:00';
+                                const currentHour24 = parseInt(currentTime.split(':')[0]);
+                                const isCurrentlyPM = currentHour24 >= 12;
+                                const isSelected = (period === 'PM' && isCurrentlyPM) || (period === 'AM' && !isCurrentlyPM);
+                                
+                                return (
+                                  <button
+                                    key={period}
+                                    type="button"
+                                    onClick={() => {
+                                      const currentTimeVal = form.watch('time') || '12:00';
+                                      const [hours, minutes] = currentTimeVal.split(':');
+                                      const currHour24 = parseInt(hours);
+                                      const currentHour12 = currHour24 === 0 ? 12 : currHour24 > 12 ? currHour24 - 12 : currHour24;
+                                      let newHour24;
+                                      if (period === 'AM' && currentHour12 === 12) {
+                                        newHour24 = 0;
+                                      } else if (period === 'AM') {
+                                        newHour24 = currentHour12;
+                                      } else if (period === 'PM' && currentHour12 === 12) {
+                                        newHour24 = 12;
+                                      } else {
+                                        newHour24 = currentHour12 + 12;
+                                      }
+                                      form.setValue('time', `${String(newHour24).padStart(2, '0')}:${minutes}`);
+                                    }}
+                                    className={`w-12 h-8 flex items-center justify-center text-sm font-semibold hover:bg-primary/10 rounded transition-colors ${
+                                      isSelected ? 'bg-primary text-primary-foreground' : 'text-foreground border border-border'
+                                    }`}
+                                  >
+                                    {period}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowTimePicker(false)}
+                          className="w-full mt-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 {form.formState.errors.time && (
                   <p className="text-sm text-destructive mt-1">{form.formState.errors.time.message}</p>
                 )}
