@@ -82,7 +82,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md top-[20%] translate-y-0" data-testid="modal-auth">
+      <DialogContent className="sm:max-w-md top-4 translate-y-0" data-testid="modal-auth">
         <DialogHeader>
           <DialogTitle data-testid="text-auth-title">
             {isSignUp ? 'Create Account' : 'Sign In'}
