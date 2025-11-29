@@ -7315,6 +7315,100 @@ export class DatabaseStorage implements IStorage {
           sql`${draftPicks.draftId} IN (SELECT id FROM ${drafts} WHERE league_id = ${leagueId})`
         ));
 
+      // Handle player stats merge with conflict resolution
+      const fromPlayerStats = await tx
+        .select()
+        .from(playerStats)
+        .where(and(
+          eq(playerStats.userId, fromUserId),
+          eq(playerStats.leagueId, leagueId)
+        ));
+
+      const toPlayerStats = await tx
+        .select()
+        .from(playerStats)
+        .where(and(
+          eq(playerStats.userId, toUserId),
+          eq(playerStats.leagueId, leagueId)
+        ));
+
+      // Merge stats by season - sum stats together
+      const statsBySeason = new Map();
+      toPlayerStats.forEach(s => statsBySeason.set(s.seasonId || 'null', s));
+      
+      for (const fromStat of fromPlayerStats) {
+        const seasonKey = fromStat.seasonId || 'null';
+        const existingStat = statsBySeason.get(seasonKey);
+        if (existingStat) {
+          // Merge by adding stats together
+          await tx
+            .update(playerStats)
+            .set({
+              gamesPlayed: (existingStat.gamesPlayed || 0) + (fromStat.gamesPlayed || 0),
+              goals: (existingStat.goals || 0) + (fromStat.goals || 0),
+              assists: (existingStat.assists || 0) + (fromStat.assists || 0),
+              penaltyMinutes: (existingStat.penaltyMinutes || 0) + (fromStat.penaltyMinutes || 0),
+              updatedAt: new Date(),
+            })
+            .where(eq(playerStats.id, existingStat.id));
+        } else {
+          // Create new stat record for target user
+          await tx
+            .insert(playerStats)
+            .values({
+              userId: toUserId,
+              leagueId: leagueId,
+              seasonId: fromStat.seasonId,
+              gamesPlayed: fromStat.gamesPlayed || 0,
+              goals: fromStat.goals || 0,
+              assists: fromStat.assists || 0,
+              penaltyMinutes: fromStat.penaltyMinutes || 0,
+            });
+        }
+      }
+
+      // Delete fromUser player stats
+      await tx
+        .delete(playerStats)
+        .where(and(
+          eq(playerStats.userId, fromUserId),
+          eq(playerStats.leagueId, leagueId)
+        ));
+
+      // Handle game goals merge (scorer, primary assist, secondary assist)
+      await tx
+        .update(gameGoals)
+        .set({ scorerId: toUserId })
+        .where(and(
+          eq(gameGoals.scorerId, fromUserId),
+          sql`${gameGoals.gameId} IN (SELECT id FROM ${games} WHERE league_id = ${leagueId})`
+        ));
+
+      await tx
+        .update(gameGoals)
+        .set({ primaryAssistId: toUserId })
+        .where(and(
+          eq(gameGoals.primaryAssistId, fromUserId),
+          sql`${gameGoals.gameId} IN (SELECT id FROM ${games} WHERE league_id = ${leagueId})`
+        ));
+
+      await tx
+        .update(gameGoals)
+        .set({ secondaryAssistId: toUserId })
+        .where(and(
+          eq(gameGoals.secondaryAssistId, fromUserId),
+          sql`${gameGoals.gameId} IN (SELECT id FROM ${games} WHERE league_id = ${leagueId})`
+        ));
+
+      // Handle game penalties merge
+      await tx
+        .update(gamePenalties)
+        .set({ playerId: toUserId })
+        .where(and(
+          eq(gamePenalties.playerId, fromUserId),
+          sql`${gamePenalties.gameId} IN (SELECT id FROM ${games} WHERE league_id = ${leagueId})`
+        ));
+
       // 5. Merge league membership data
       const mergedData: Partial<LeagueMembership> = {
         userId: toUserId,
