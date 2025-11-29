@@ -4,7 +4,8 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign, CheckCircle } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams } from 'wouter';
+import { useParams, useLocation } from 'wouter';
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -20,6 +21,7 @@ import { MediaGallery } from '@/components/MediaGallery';
 import GifSearchModal from '@/components/GifSearchModal';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { ClickableAvatar } from '@/components/ClickableAvatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface Message {
   id: string;
@@ -465,6 +467,7 @@ export default function Messages() {
   const { canAccessPremiumFeatures } = usePermissions();
   const currentUserId = (user as any)?.id;
   const params = useParams();
+  const [, navigate] = useLocation();
   const { selectedTeamId, selectedLeagueId, selectedTournamentId } = useDashboardSelection();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
 
@@ -2567,30 +2570,38 @@ export default function Messages() {
           </DialogHeader>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {currentConversation?.participants?.map((participant) => {
+              const handleMemberClick = () => {
+                setShowMembersModal(false);
+                setPageTransitionDirection('up');
+                navigate(`/user/${participant.userId}`);
+              };
+              
               return (
-                <div
+                <button
                   key={participant.id}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors"
+                  onClick={handleMemberClick}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer text-left"
                   data-testid={`member-${participant.userId}`}
                 >
-                  <ClickableAvatar
-                    userId={participant.userId}
-                    profileImageUrl={participant.user?.profileImageUrl}
-                    firstName={participant.user?.firstName}
-                    lastName={participant.user?.lastName}
-                    size="sm"
-                  />
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={participant.user?.profileImageUrl || undefined} alt={participant.user?.firstName || 'User'} />
+                    <AvatarFallback>
+                      {participant.user?.firstName && participant.user?.lastName 
+                        ? `${participant.user.firstName[0]}${participant.user.lastName[0]}`.toUpperCase()
+                        : participant.user?.firstName?.[0]?.toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate" data-testid={`member-name-${participant.userId}`}>
                       {participant.user?.displayName || 'Unknown User'}
                     </p>
                   </div>
                   {participant.userId === currentUserId && (
-                    <span className="text-xs text-muted-foreground bg-accent px-2 py-1 rounded">
+                    <span className="text-xs text-muted-foreground bg-green-500 text-white px-2 py-1 rounded">
                       You
                     </span>
                   )}
-                </div>
+                </button>
               );
             })}
             {(!currentConversation?.participants || currentConversation.participants.length === 0) && (
