@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users } from 'lucide-react';
+import { Link } from 'wouter';
 
 interface LineManagerProps {
   teamId: string;
@@ -40,11 +41,14 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
               const jerseyNumber = member.jerseyNumber;
               const isCaptain = member.isCaptain;
               
+              const playerId = member.user?.id || member.userId;
+              
               return (
-                <div
-                  key={member.id || member.user?.id || member.userId}
-                  className="flex items-center py-1 px-2 rounded hover:bg-muted/50 transition-colors"
-                  data-testid={`roster-player-${member.user?.id || member.userId}`}
+                <Link
+                  key={member.id || playerId}
+                  href={`/user/${playerId}`}
+                  className="flex items-center py-1 px-2 rounded hover:bg-muted/50 transition-colors cursor-pointer"
+                  data-testid={`roster-player-${playerId}`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {jerseyNumber && (
@@ -59,7 +63,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
                       <Badge variant="outline" className="text-xs shrink-0">C</Badge>
                     )}
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
