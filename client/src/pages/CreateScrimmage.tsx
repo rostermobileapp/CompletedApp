@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,6 +6,8 @@ import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Calendar, Crown, MapPin, Users, Search, Mail, X, UserPlus, BookMarked } from 'lucide-react';
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
 import { useLocation } from 'wouter';
 import { createScrimmageRequestSchema } from '@shared/schema';
 import { z } from 'zod';
@@ -71,6 +73,10 @@ export default function CreateScrimmage() {
   
   // Invite group states
   const [selectedInviteGroupId, setSelectedInviteGroupId] = useState<string>("");
+  
+  // Date picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
 
   // Fetch user's facility memberships
   const { data: facilityMemberships, isLoading: facilitiesLoading } = useQuery<Array<{ facility: { id: string; name: string; address: string; city: string; state: string } }>>({
@@ -193,6 +199,23 @@ export default function CreateScrimmage() {
       form.setValue('venue', leagueFacility.name);
     }
   }, [leagueFacility, form]);
+
+  // Close date picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+
+    if (showDatePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDatePicker]);
 
   const createScrimmageRequest = useMutation({
     mutationFn: async (data: CreateScrimmageForm) => {
@@ -440,13 +463,57 @@ export default function CreateScrimmage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="date">Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  {...form.register('date')}
-                  min={new Date().toISOString().split('T')[0]}
-                  data-testid="input-date"
-                />
+                <div className="relative" ref={datePickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="w-full h-10 px-3 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-left flex items-center justify-between"
+                    data-testid="button-date"
+                  >
+                    <span className={form.watch('date') ? 'text-foreground' : 'text-muted-foreground'}>
+                      {form.watch('date') ? (() => {
+                        const [year, month, day] = form.watch('date').split('-');
+                        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                      })() : 'Select date'}
+                    </span>
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  {showDatePicker && (
+                    <div className="absolute z-[9999] mt-1 bg-white dark:bg-zinc-800 border border-border rounded-lg shadow-lg">
+                      <DayPicker
+                        mode="single"
+                        selected={form.watch('date') ? (() => {
+                          const [year, month, day] = form.watch('date').split('-');
+                          return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                        })() : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const year = date.getFullYear();
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const dateString = `${year}-${month}-${day}`;
+                            form.setValue('date', dateString);
+                            setShowDatePicker(false);
+                          }
+                        }}
+                        disabled={{ before: new Date() }}
+                        className="p-2"
+                        classNames={{
+                          today: "rdp-cell_today bg-primary/20 text-black dark:text-white font-semibold text-sm w-8 h-8",
+                          selected: "rdp-cell_selected bg-primary text-white font-semibold text-sm w-8 h-8",
+                          root: "text-black dark:text-white text-sm",
+                          day: "text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-700 text-sm w-8 h-8 flex items-center justify-center cursor-pointer rounded",
+                          nav_button: "text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-700 w-7 h-7 flex items-center justify-center rounded",
+                          caption: "text-black dark:text-white font-medium text-sm mb-2",
+                          head_cell: "text-black dark:text-white font-medium text-xs p-1",
+                          table: "w-full border-collapse",
+                          cell: "text-center p-0.5",
+                        } as any}
+                      />
+                    </div>
+                  )}
+                </div>
                 {form.formState.errors.date && (
                   <p className="text-sm text-destructive mt-1">{form.formState.errors.date.message}</p>
                 )}
