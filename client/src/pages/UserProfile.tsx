@@ -15,7 +15,9 @@ export default function UserProfile() {
   const { data: user, isLoading } = useQuery({
     queryKey: ['/api/users', userId],
     queryFn: async () => {
-      const response = await fetch(`/api/users/${userId}`);
+      const response = await fetch(`/api/users/${userId}`, {
+        credentials: 'include',
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch user');
       }
