@@ -899,7 +899,10 @@ export default function Profile() {
           <button
             onClick={async () => {
               await supabase.auth.signOut();
-              navigate('/');
+              // Clear all cached data to prevent stale user data from showing
+              queryClient.clear();
+              // Force a full page reload to the home page to clear all state
+              window.location.href = '/';
             }}
             className="w-full border border-border rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-card/80 bg-[#e2e2e2] dark:bg-[#212121] font-bold"
             data-testid="button-sign-out"
