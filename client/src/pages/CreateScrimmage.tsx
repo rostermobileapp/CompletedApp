@@ -38,7 +38,7 @@ const createScrimmageSchema = createScrimmageRequestSchema.extend({
   isRecurring: z.boolean().default(false),
   recurrenceType: z.enum(['none', 'daily', 'weekly', 'monthly']).default('none'),
   recurrenceDays: z.array(z.number()).optional(), // Array of day numbers (0=Sunday, 1=Monday, etc.)
-  recurrenceEndType: z.enum(['date', 'count']).optional(), // Either end by date or count
+  recurrenceEndType: z.enum(['never', 'date', 'count']).optional(), // Either never end, end by date, or count
   recurrenceEndDate: z.string().optional(),
   recurrenceCount: z.number().optional(),
   // Invitation scheduling for recurring scrimmages
@@ -106,7 +106,7 @@ export default function CreateScrimmage() {
       isRecurring: false,
       recurrenceType: 'none',
       recurrenceDays: [],
-      recurrenceEndType: 'date',
+      recurrenceEndType: 'never',
       recurrenceEndDate: '',
       recurrenceCount: 1,
       // Invitation scheduling defaults (for recurring scrimmages)
@@ -768,6 +768,11 @@ export default function CreateScrimmage() {
                       onValueChange={(value: any) => form.setValue('recurrenceEndType', value)}
                       className="space-y-2 mt-2"
                     >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="never" id="endNever" data-testid="radio-end-never" />
+                        <Label htmlFor="endNever" className="font-normal cursor-pointer">Never</Label>
+                        <span className="text-xs text-muted-foreground">(repeats indefinitely)</span>
+                      </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="date" id="endDate" data-testid="radio-end-date" />
                         <Label htmlFor="endDate" className="font-normal cursor-pointer">On date</Label>
