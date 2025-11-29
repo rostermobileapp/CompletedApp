@@ -30,10 +30,10 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
         {sortedMembers.length === 0 ? (
           <div className="text-center py-6 text-muted-foreground">
             <Users className="w-10 h-10 mx-auto mb-3 opacity-50" />
-            <p>No players on this roster yet.</p>
+            <p className="text-sm">No players on this roster yet.</p>
           </div>
         ) : (
-          <div className="space-y-1">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {sortedMembers.map((member: any) => {
               const firstName = member.displayFirstName || member.user?.firstName || '';
               const lastName = member.displayLastName || member.user?.lastName || '';
@@ -43,20 +43,20 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
               return (
                 <div
                   key={member.id || member.user?.id || member.userId}
-                  className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex items-center py-1 px-2 rounded hover:bg-muted/50 transition-colors"
                   data-testid={`roster-player-${member.user?.id || member.userId}`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
                     {jerseyNumber && (
-                      <span className="text-sm font-bold text-muted-foreground w-6 text-right">
-                        #{jerseyNumber}
+                      <span className="text-sm font-bold text-muted-foreground w-5 text-right shrink-0">
+                        {jerseyNumber}
                       </span>
                     )}
-                    <span className="font-medium">
-                      {lastName}{firstName ? `, ${firstName}` : ''}
+                    <span className="text-sm font-medium truncate">
+                      {lastName}{firstName ? `, ${firstName.charAt(0)}.` : ''}
                     </span>
                     {isCaptain && (
-                      <Badge variant="outline" className="text-xs">C</Badge>
+                      <Badge variant="outline" className="text-xs shrink-0">C</Badge>
                     )}
                   </div>
                 </div>
