@@ -5220,7 +5220,7 @@ export default function LeagueManagement() {
       {/* User Merge Modal */}
       {showUserMergeModal && selectedPlayerToMerge && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-border">
+          <div className="bg-card rounded-lg p-6 max-w-lg w-full border border-border max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Merge Player</h3>
               <button
@@ -5232,49 +5232,115 @@ export default function LeagueManagement() {
                   setPreserveDisplayName(true);
                 }}
                 className="text-muted-foreground hover:text-foreground"
+                data-testid="button-close-merge-modal"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="space-y-4">
-              <div>
-                <p className="font-medium">Source Player:</p>
-                <p className="text-sm text-muted-foreground">
+            <div className="space-y-4 overflow-y-auto flex-1">
+              <div className="bg-muted/50 p-3 rounded-lg">
+                <p className="text-xs text-muted-foreground uppercase mb-1">Merge From (Source)</p>
+                <p className="font-medium">
                   {formatUserName(selectedPlayerToMerge.user, selectedPlayerToMerge)}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {selectedPlayerToMerge.user.email}
+                <p className="text-sm text-muted-foreground">
+                  {selectedPlayerToMerge.user.email || 'No email'}
                 </p>
               </div>
               
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Target User ID</label>
-                <input
-                  type="text"
-                  value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
-                  placeholder="e.g., 47231827"
-                  className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <label className="block text-sm font-medium">Search for Target Player</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={targetUserEmail}
+                    onChange={(e) => setTargetUserEmail(e.target.value)}
+                    placeholder="Type a name to search..."
+                    className="w-full pl-10 p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-merge-search"
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Enter the user ID of the account to merge with
+                  Search by name or email to find the player to merge with
                 </p>
               </div>
               
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Target User Email (Optional)</label>
-                <input
-                  type="email"
-                  value={targetUserEmail}
-                  onChange={(e) => setTargetUserEmail(e.target.value)}
-                  placeholder="e.g., tobinkern88@gmail.com"
-                  className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Optional: Enter email for verification
-                </p>
+              {/* Player Search Results */}
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="max-h-48 overflow-y-auto">
+                  {members
+                    .filter(m => m.userId !== selectedPlayerToMerge.userId)
+                    .filter(m => {
+                      if (!targetUserEmail.trim()) return true;
+                      const searchQuery = targetUserEmail.toLowerCase().trim();
+                      const firstName = (m.displayFirstName || m.user.firstName || '').toLowerCase();
+                      const lastName = (m.displayLastName || m.user.lastName || '').toLowerCase();
+                      const email = (m.user.email || '').toLowerCase();
+                      const fullName = `${firstName} ${lastName}`;
+                      return fullName.includes(searchQuery) || 
+                             firstName.includes(searchQuery) || 
+                             lastName.includes(searchQuery) ||
+                             email.includes(searchQuery);
+                    })
+                    .slice(0, 20)
+                    .map(member => {
+                      const isSelected = targetUserId === member.userId;
+                      const memberTeam = teams.find(t => t.id === member.assignedTeamId);
+                      return (
+                        <button
+                          key={member.id}
+                          onClick={() => setTargetUserId(isSelected ? '' : member.userId)}
+                          className={`w-full p-3 text-left border-b border-border last:border-b-0 hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/10 border-l-4 border-l-primary' : ''}`}
+                          data-testid={`button-select-merge-target-${member.userId}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">
+                                {formatUserName(member.user, member)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {member.user.email || 'No email'}
+                                {memberTeam && ` • ${memberTeam.name}`}
+                              </p>
+                            </div>
+                            {isSelected && (
+                              <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                                <Check className="w-3 h-3 text-primary-foreground" />
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  {members.filter(m => m.userId !== selectedPlayerToMerge.userId).length === 0 && (
+                    <div className="p-4 text-center text-muted-foreground">
+                      No other players in this league
+                    </div>
+                  )}
+                </div>
               </div>
+              
+              {targetUserId && (
+                <div className="bg-primary/10 p-3 rounded-lg border border-primary/20">
+                  <p className="text-xs text-muted-foreground uppercase mb-1">Merge Into (Target)</p>
+                  {(() => {
+                    const targetMember = members.find(m => m.userId === targetUserId);
+                    if (!targetMember) return null;
+                    return (
+                      <>
+                        <p className="font-medium">
+                          {formatUserName(targetMember.user, targetMember)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {targetMember.user.email || 'No email'}
+                        </p>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
               
               <div className="space-y-2">
                 <label className="flex items-center space-x-2">
@@ -5283,12 +5349,10 @@ export default function LeagueManagement() {
                     checked={preserveDisplayName}
                     onChange={(e) => setPreserveDisplayName(e.target.checked)}
                     className="rounded"
+                    data-testid="checkbox-preserve-name"
                   />
-                  <span className="text-sm">Preserve display name from source player</span>
+                  <span className="text-sm">Keep source player's display name on roster</span>
                 </label>
-                <p className="text-xs text-muted-foreground">
-                  If checked, the source player's name will be shown on the roster
-                </p>
               </div>
               
               <div className="pt-4 border-t border-border">
@@ -5302,15 +5366,16 @@ export default function LeagueManagement() {
                       setPreserveDisplayName(true);
                     }}
                     className="flex-1 bg-muted text-muted-foreground px-4 py-2 rounded-lg hover:bg-muted/80 font-medium"
+                    data-testid="button-cancel-merge"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={async () => {
-                      if (!targetUserId.trim()) {
+                      if (!targetUserId) {
                         toast({
                           title: "Error",
-                          description: "Please enter a target user ID.",
+                          description: "Please select a target player.",
                           variant: "destructive",
                         });
                         return;
@@ -5319,7 +5384,7 @@ export default function LeagueManagement() {
                       try {
                         const response = await apiRequest('POST', `/api/leagues/${leagueId}/merge-player`, {
                           fromUserId: selectedPlayerToMerge.userId,
-                          toUserId: targetUserId.trim(),
+                          toUserId: targetUserId,
                           preserveName: preserveDisplayName
                         });
                         
@@ -5355,8 +5420,9 @@ export default function LeagueManagement() {
                         });
                       }
                     }}
-                    disabled={!targetUserId.trim()}
+                    disabled={!targetUserId}
                     className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50"
+                    data-testid="button-confirm-merge"
                   >
                     Merge Players
                   </button>
