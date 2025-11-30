@@ -34,7 +34,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
             <p className="text-sm">No players on this roster yet.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-x-3 gap-y-1">
+          <div className="grid grid-cols-3 gap-x-3 gap-y-2">
             {sortedMembers.map((member: any) => {
               const firstName = member.displayFirstName || member.user?.firstName || '';
               const lastName = member.displayLastName || member.user?.lastName || '';
