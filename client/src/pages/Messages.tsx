@@ -2054,10 +2054,10 @@ export default function Messages() {
                     )}
                     
                     <div className={`${message.messageType === 'poll' ? 'w-3/4 lg:max-w-[20%]' : 'max-w-[70%]'} ${isCurrentUser ? 'order-1' : 'order-2'}`}>
-                      <div className={`rounded-lg p-3 opacity-50 ${
+                      <div className={`rounded-lg p-3 ${
                         isCurrentUser 
-                          ? 'bg-primary text-primary-foreground ml-auto' 
-                          : 'bg-muted'
+                          ? 'bg-primary/50 text-primary-foreground ml-auto' 
+                          : 'bg-muted/50'
                       }`}>
                         {!isCurrentUser && (
                           <div className="flex items-center gap-2 mb-1">
