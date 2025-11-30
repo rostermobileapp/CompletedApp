@@ -47,7 +47,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
                 <Link
                   key={member.id || playerId}
                   href={`/user/${playerId}`}
-                  className="flex items-center py-1 px-2 rounded hover:bg-muted/50 transition-colors cursor-pointer"
+                  className="flex items-center py-1 px-2 rounded hover:bg-muted/50 transition-colors cursor-pointer bg-[#2563eb] text-center"
                   data-testid={`roster-player-${playerId}`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
