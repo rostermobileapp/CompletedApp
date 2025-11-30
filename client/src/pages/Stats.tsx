@@ -432,7 +432,7 @@ export default function Stats() {
                   data-testid={`row-star-leader-${index}`}
                 >
                   <Avatar className="w-12 h-12">
-                    <AvatarImage src={leader.user?.profileImageUrl || undefined} />
+                    <AvatarImage src={getImageUrl(leader.user?.profileImageUrl) || undefined} />
                     <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
                       {getInitials(leader.user?.firstName, leader.user?.lastName)}
                     </AvatarFallback>
@@ -518,7 +518,7 @@ export default function Stats() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <Avatar className="w-8 h-8">
-                                <AvatarImage src={stat.user?.profileImageUrl || undefined} />
+                                <AvatarImage src={getImageUrl(stat.user?.profileImageUrl) || undefined} />
                                 <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-white text-xs">
                                   {getInitials(stat.user?.firstName, stat.user?.lastName)}
                                 </AvatarFallback>
@@ -719,7 +719,7 @@ function StatSection({
               (<>
                 {tiedPlayers.slice(0, 3).map((player, idx) => (
                   <Avatar key={idx} className="w-12 h-12 border-2 border-black" data-testid={`avatar-player-${idx}`}>
-                    <AvatarImage src={player.user?.profileImageUrl || undefined} />
+                    <AvatarImage src={getImageUrl(player.user?.profileImageUrl) || undefined} />
                     <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
                       {getInitials(player.user?.firstName, player.user?.lastName)}
                     </AvatarFallback>
@@ -734,7 +734,7 @@ function StatSection({
             ) : (
               // Show single avatar
               (<Avatar className="w-12 h-12" data-testid="avatar-player-single">
-                <AvatarImage src={players[0].user?.profileImageUrl || undefined} />
+                <AvatarImage src={getImageUrl(players[0].user?.profileImageUrl) || undefined} />
                 <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
                   {getInitials(players[0].user?.firstName, players[0].user?.lastName)}
                 </AvatarFallback>
