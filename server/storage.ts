@@ -28,6 +28,7 @@ import {
   announcementPollVotes,
   scrimmages,
   scrimmageRequests,
+  scrimmageCoHosts,
   inviteGroups,
   inviteGroupMembers,
   scrimmageInvites,
@@ -148,6 +149,8 @@ import {
   type InsertInviteGroupMember,
   type ScrimmageInvite,
   type InsertScrimmageInvite,
+  type ScrimmageCoHost,
+  type InsertScrimmageCoHost,
   type PlayerImport,
   type InsertPlayerImport,
   type ImportedPlayer,
@@ -483,6 +486,14 @@ export interface IStorage {
   createScrimmageInvites(scrimmageId: string, emails: string[]): Promise<ScrimmageInvite[]>;
   getScrimmageInvites(scrimmageId: string): Promise<ScrimmageInvite[]>;
   deleteScrimmageInvite(inviteId: string): Promise<void>;
+  
+  // Scrimmage co-host operations
+  addScrimmageCoHost(coHostData: InsertScrimmageCoHost): Promise<ScrimmageCoHost>;
+  getScrimmageCoHosts(scrimmageId: string): Promise<(ScrimmageCoHost & { user: User })[]>;
+  getScrimmageCoHost(scrimmageId: string, userId: string): Promise<ScrimmageCoHost | undefined>;
+  removeScrimmageCoHost(scrimmageId: string, userId: string): Promise<void>;
+  isUserScrimmageCoHost(scrimmageId: string, userId: string): Promise<boolean>;
+  canUserManageScrimmage(scrimmageId: string, userId: string): Promise<{ canManage: boolean; isCreator: boolean; isCoHost: boolean; permissions?: ScrimmageCoHost }>;
   
   // Scrimmage invitation scheduling operations
   getScrimmagesNeedingInvites(): Promise<Scrimmage[]>;
@@ -6371,6 +6382,70 @@ export class DatabaseStorage implements IStorage {
 
   async deleteScrimmageInvite(inviteId: string): Promise<void> {
     await db.delete(scrimmageInvites).where(eq(scrimmageInvites.id, inviteId));
+  }
+
+  // Scrimmage co-host operations
+  async addScrimmageCoHost(coHostData: InsertScrimmageCoHost): Promise<ScrimmageCoHost> {
+    const [coHost] = await db.insert(scrimmageCoHosts).values(coHostData).returning();
+    return coHost;
+  }
+
+  async getScrimmageCoHosts(scrimmageId: string): Promise<(ScrimmageCoHost & { user: User })[]> {
+    const results = await db
+      .select({
+        coHost: scrimmageCoHosts,
+        user: users,
+      })
+      .from(scrimmageCoHosts)
+      .innerJoin(users, eq(scrimmageCoHosts.userId, users.id))
+      .where(eq(scrimmageCoHosts.scrimmageId, scrimmageId));
+    
+    return results.map(r => ({
+      ...r.coHost,
+      user: r.user,
+    }));
+  }
+
+  async getScrimmageCoHost(scrimmageId: string, userId: string): Promise<ScrimmageCoHost | undefined> {
+    const [result] = await db
+      .select()
+      .from(scrimmageCoHosts)
+      .where(and(
+        eq(scrimmageCoHosts.scrimmageId, scrimmageId),
+        eq(scrimmageCoHosts.userId, userId)
+      ));
+    return result;
+  }
+
+  async removeScrimmageCoHost(scrimmageId: string, userId: string): Promise<void> {
+    await db.delete(scrimmageCoHosts).where(and(
+      eq(scrimmageCoHosts.scrimmageId, scrimmageId),
+      eq(scrimmageCoHosts.userId, userId)
+    ));
+  }
+
+  async isUserScrimmageCoHost(scrimmageId: string, userId: string): Promise<boolean> {
+    const coHost = await this.getScrimmageCoHost(scrimmageId, userId);
+    return !!coHost;
+  }
+
+  async canUserManageScrimmage(scrimmageId: string, userId: string): Promise<{ canManage: boolean; isCreator: boolean; isCoHost: boolean; permissions?: ScrimmageCoHost }> {
+    const scrimmage = await this.getScrimmage(scrimmageId);
+    if (!scrimmage) {
+      return { canManage: false, isCreator: false, isCoHost: false };
+    }
+    
+    const isCreator = scrimmage.creatorId === userId;
+    if (isCreator) {
+      return { canManage: true, isCreator: true, isCoHost: false };
+    }
+    
+    const coHost = await this.getScrimmageCoHost(scrimmageId, userId);
+    if (coHost) {
+      return { canManage: true, isCreator: false, isCoHost: true, permissions: coHost };
+    }
+    
+    return { canManage: false, isCreator: false, isCoHost: false };
   }
 
   // Scrimmage invitation scheduling operations

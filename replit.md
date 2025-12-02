@@ -85,6 +85,28 @@ The platform includes a comprehensive notification system for scrimmages with bo
 
 Key files: `server/emails.ts`, `server/scrimmageReminderJob.ts`, `server/scrimmageInviteJob.ts`, `client/src/components/NotificationCenter.tsx`, `shared/schema.ts`.
 
+### Scrimmage Co-Host System
+
+The platform allows scrimmage creators to designate co-hosts who can help manage scrimmages with granular permissions:
+
+#### Co-Host Permissions
+1. **canApproveRequests**: Co-host can approve or decline player requests to join the scrimmage
+2. **canSendReminders**: Co-host can send reminder notifications to players
+3. **canManagePayments**: Co-host can collect and mark payments as received
+
+#### Management Flow
+1. **Add Co-Host**: From the Scrimmage Management page, creators click "Manage Requests" to open the management view, then navigate to the "Co-Hosts" tab
+2. **Select Member**: A dialog allows selecting from approved league members (excluding the creator and existing co-hosts)
+3. **Configure Permissions**: Checkbox options for each permission type
+4. **Notifications**: Co-hosts receive in-app notifications when added or removed
+
+#### Authorization
+- Only the scrimmage creator can add or remove co-hosts
+- Co-hosts with appropriate permissions can approve/decline requests, send reminders, or manage payments
+- The `canUserManageScrimmage` storage method checks both creator and co-host status for authorization
+
+Key files: `shared/schema.ts` (scrimmageCoHosts table), `server/storage.ts` (co-host CRUD operations), `server/routes.ts` (co-host endpoints), `client/src/pages/ScrimmageManagement.tsx` (co-host UI).
+
 # External Dependencies
 
 ## Third-Party Services

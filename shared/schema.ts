@@ -982,6 +982,20 @@ export const scrimmageRequests = pgTable("scrimmage_requests", {
   unique("unique_scrimmage_player_request").on(table.scrimmageId, table.playerId),
 ]);
 
+// Scrimmage co-hosts table - allows multiple users to manage a scrimmage
+export const scrimmageCoHosts = pgTable("scrimmage_co_hosts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scrimmageId: varchar("scrimmage_id").references(() => scrimmages.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  canApproveRequests: boolean("can_approve_requests").default(true).notNull(),
+  canSendReminders: boolean("can_send_reminders").default(true).notNull(),
+  canManagePayments: boolean("can_manage_payments").default(true).notNull(),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+  addedBy: varchar("added_by").references(() => users.id).notNull(),
+}, (table) => [
+  unique("unique_scrimmage_cohost").on(table.scrimmageId, table.userId),
+]);
+
 // Invite groups table - allows users to save groups of people for quick invites
 export const inviteGroups = pgTable("invite_groups", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2344,6 +2358,11 @@ export const insertScrimmageRequestSchema = createInsertSchema(scrimmageRequests
   requestedAt: true,
 });
 
+export const insertScrimmageCoHostSchema = createInsertSchema(scrimmageCoHosts).omit({
+  id: true,
+  addedAt: true,
+});
+
 export const insertInviteGroupSchema = createInsertSchema(inviteGroups).omit({
   id: true,
   createdAt: true,
@@ -2806,6 +2825,8 @@ export type ScrimmageRequest = typeof scrimmageRequests.$inferSelect;
 export type InsertScrimmageRequest = z.infer<typeof insertScrimmageRequestSchema>;
 export type CreateScrimmageRequest = z.infer<typeof createScrimmageRequestSchema>;
 export type UpdateScrimmageRequest = z.infer<typeof updateScrimmageRequestSchema>;
+export type ScrimmageCoHost = typeof scrimmageCoHosts.$inferSelect;
+export type InsertScrimmageCoHost = z.infer<typeof insertScrimmageCoHostSchema>;
 export type InviteGroup = typeof inviteGroups.$inferSelect;
 export type InsertInviteGroup = z.infer<typeof insertInviteGroupSchema>;
 export type InviteGroupMember = typeof inviteGroupMembers.$inferSelect;

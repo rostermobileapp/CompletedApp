@@ -8864,7 +8864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get scrimmage requests (Creator only)
+  // Get scrimmage requests (Creator or Co-Host with canApproveRequests permission)
   app.get('/api/scrimmages/:id/requests', isAuthenticated, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
@@ -8875,14 +8875,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not found" });
       }
 
-      // Get scrimmage to check ownership
-      const scrimmage = await storage.getScrimmage(scrimmageId);
-      if (!scrimmage) {
-        return res.status(404).json({ message: 'Scrimmage not found' });
+      // Check if user can manage this scrimmage
+      const { canManage, isCreator, isCoHost, permissions } = await storage.canUserManageScrimmage(scrimmageId, userId);
+      
+      if (!canManage) {
+        return res.status(403).json({ message: 'Only the creator or co-hosts can view requests' });
       }
-
-      if (scrimmage.creatorId !== userId) {
-        return res.status(403).json({ message: 'Only the creator can view requests' });
+      
+      // If co-host, verify they have permission to approve requests
+      if (isCoHost && permissions && !permissions.canApproveRequests) {
+        return res.status(403).json({ message: 'You do not have permission to view requests for this scrimmage' });
       }
 
       const requests = await storage.getScrimmageRequests(scrimmageId);
@@ -8893,7 +8895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update scrimmage request status (Creator only)
+  // Update scrimmage request status (Creator or Co-Host with canApproveRequests permission)
   app.put('/api/scrimmage-requests/:id/status', isAuthenticated, async (req: any, res) => {
     try {
       const requestId = req.params.id;
@@ -8927,8 +8929,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
       
-      if (scrimmage.creatorId !== userId) {
-        return res.status(403).json({ message: 'Only the creator can update request status' });
+      // Check if user can manage this scrimmage
+      const { canManage, isCreator, isCoHost, permissions } = await storage.canUserManageScrimmage(request.scrimmageId, userId);
+      
+      if (!canManage) {
+        return res.status(403).json({ message: 'Only the creator or co-hosts can update request status' });
+      }
+      
+      // If co-host, verify they have permission to approve requests
+      if (isCoHost && permissions && !permissions.canApproveRequests) {
+        return res.status(403).json({ message: 'You do not have permission to approve requests for this scrimmage' });
       }
       
       // Business invariant: Cannot approve requests for scrimmages that have passed
@@ -9052,7 +9062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Finalize scrimmage roster and send confirmation notifications
+  // Finalize scrimmage roster and send confirmation notifications (Creator or Co-Host)
   app.put('/api/scrimmages/:id/finalize', isAuthenticated, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
@@ -9069,9 +9079,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
       
-      // Only creator can finalize
-      if (scrimmage.creatorId !== userId) {
-        return res.status(403).json({ message: 'Only the creator can finalize the scrimmage' });
+      // Check if user can manage this scrimmage (creator or co-host)
+      const { canManage } = await storage.canUserManageScrimmage(scrimmageId, userId);
+      if (!canManage) {
+        return res.status(403).json({ message: 'Only the creator or co-hosts can finalize the scrimmage' });
       }
       
       // Check if already finalized
@@ -9172,6 +9183,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error finalizing scrimmage:', error);
       res.status(500).json({ message: 'Failed to finalize scrimmage' });
+    }
+  });
+
+  // ========================================
+  // Scrimmage Co-Host Management Endpoints
+  // ========================================
+
+  // Get co-hosts for a scrimmage
+  app.get('/api/scrimmages/:id/co-hosts', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      // Verify scrimmage exists
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      
+      // Verify user is a member of the league
+      const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: "Must be a league member to view co-hosts" });
+      }
+
+      const coHosts = await storage.getScrimmageCoHosts(scrimmageId);
+      res.json(coHosts);
+    } catch (error) {
+      console.error('Error fetching co-hosts:', error);
+      res.status(500).json({ message: 'Failed to fetch co-hosts' });
+    }
+  });
+
+  // Add a co-host to a scrimmage (Creator only)
+  app.post('/api/scrimmages/:id/co-hosts', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { coHostUserId, canApproveRequests = true, canSendReminders = true, canManagePayments = true } = req.body;
+      
+      if (!coHostUserId) {
+        return res.status(400).json({ message: 'Co-host user ID is required' });
+      }
+      
+      // Get scrimmage to check ownership
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      
+      // Only the creator can add co-hosts
+      if (scrimmage.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only the creator can add co-hosts' });
+      }
+      
+      // Cannot add creator as co-host
+      if (coHostUserId === userId) {
+        return res.status(400).json({ message: 'Cannot add yourself as a co-host' });
+      }
+      
+      // Verify the co-host user exists and is a league member
+      const coHostUser = await storage.getUser(coHostUserId);
+      if (!coHostUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      const coHostMembership = await storage.getUserLeagueMembership(coHostUserId, scrimmage.leagueId);
+      if (!coHostMembership || coHostMembership.status !== 'approved') {
+        return res.status(400).json({ message: 'Co-host must be an approved league member' });
+      }
+      
+      // Check if already a co-host
+      const existingCoHost = await storage.getScrimmageCoHost(scrimmageId, coHostUserId);
+      if (existingCoHost) {
+        return res.status(409).json({ message: 'User is already a co-host for this scrimmage' });
+      }
+      
+      const coHost = await storage.addScrimmageCoHost({
+        scrimmageId,
+        userId: coHostUserId,
+        canApproveRequests,
+        canSendReminders,
+        canManagePayments,
+        addedBy: userId,
+      });
+      
+      // Notify the new co-host
+      await storage.createNotification({
+        userId: coHostUserId,
+        type: 'scrimmage_cohost_added',
+        title: `You're a co-host for ${scrimmage.title}`,
+        message: `You have been added as a co-host for "${scrimmage.title}" on ${format(new Date(scrimmage.dateTime), 'MMM d, yyyy \'at\' h:mm a')}. You can now help manage players and payments.`,
+        actionUrl: `/scrimmage/${scrimmageId}`,
+        scrimmageId: scrimmageId,
+      });
+      
+      res.status(201).json(coHost);
+    } catch (error) {
+      console.error('Error adding co-host:', error);
+      res.status(500).json({ message: 'Failed to add co-host' });
+    }
+  });
+
+  // Remove a co-host from a scrimmage (Creator only)
+  app.delete('/api/scrimmages/:id/co-hosts/:coHostUserId', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const coHostUserId = req.params.coHostUserId;
+      const userId = req.user.claims.sub;
+      
+      // Get scrimmage to check ownership
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      
+      // Only the creator can remove co-hosts
+      if (scrimmage.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only the creator can remove co-hosts' });
+      }
+      
+      // Check if user is a co-host
+      const existingCoHost = await storage.getScrimmageCoHost(scrimmageId, coHostUserId);
+      if (!existingCoHost) {
+        return res.status(404).json({ message: 'User is not a co-host for this scrimmage' });
+      }
+      
+      await storage.removeScrimmageCoHost(scrimmageId, coHostUserId);
+      
+      // Notify the removed co-host
+      await storage.createNotification({
+        userId: coHostUserId,
+        type: 'scrimmage_cohost_removed',
+        title: `Co-host access removed`,
+        message: `Your co-host access for "${scrimmage.title}" has been removed.`,
+        scrimmageId: scrimmageId,
+      });
+      
+      res.json({ message: 'Co-host removed successfully' });
+    } catch (error) {
+      console.error('Error removing co-host:', error);
+      res.status(500).json({ message: 'Failed to remove co-host' });
+    }
+  });
+
+  // Check if current user can manage a scrimmage (Creator or Co-Host)
+  app.get('/api/scrimmages/:id/can-manage', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      const result = await storage.canUserManageScrimmage(scrimmageId, userId);
+      res.json(result);
+    } catch (error) {
+      console.error('Error checking management permissions:', error);
+      res.status(500).json({ message: 'Failed to check permissions' });
     }
   });
 

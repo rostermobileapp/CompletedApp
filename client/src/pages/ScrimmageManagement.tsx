@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Clock, MapPin, Users, Check, X, Calendar, Crown, Trash2, Eye, DollarSign } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Users, Check, X, Calendar, Crown, Trash2, Eye, DollarSign, UserPlus, Shield } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,12 @@ import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Scrimmage, ScrimmageRequest, User } from '@shared/schema';
+import { Scrimmage, ScrimmageRequest, User, ScrimmageCoHost } from '@shared/schema';
 import { usePermissions } from '@/context/SubscriptionContext';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 // Extended types with relationships for UI
 type ScrimmageWithCreatorAndCount = Scrimmage & {
@@ -25,12 +29,23 @@ type ScrimmageRequestWithPlayer = ScrimmageRequest & {
   player: User;
 };
 
+type ScrimmageCoHostWithUser = ScrimmageCoHost & {
+  user: User;
+};
+
 export default function ScrimmageManagement() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedScrimmage, setSelectedScrimmage] = useState<string | null>(null);
   const [viewRosterScrimmage, setViewRosterScrimmage] = useState<string | null>(null);
+  const [coHostDialogOpen, setCoHostDialogOpen] = useState<string | null>(null);
+  const [selectedCoHostUserId, setSelectedCoHostUserId] = useState<string>('');
+  const [coHostPermissions, setCoHostPermissions] = useState({
+    canApproveRequests: true,
+    canSendReminders: true,
+    canManagePayments: true,
+  });
   const { canAccessPremiumFeatures } = usePermissions();
 
   const handleBack = () => {
@@ -54,6 +69,73 @@ export default function ScrimmageManagement() {
     queryKey: ['/api/scrimmages', viewRosterScrimmage, 'approved-players'],
     enabled: !!viewRosterScrimmage,
   }) as { data: { scrimmage: any; approvedPlayers: ScrimmageRequestWithPlayer[] } | undefined, isLoading: boolean, error: any };
+
+  // Fetch co-hosts for selected scrimmage
+  const { data: coHosts = [], isLoading: coHostsLoading } = useQuery({
+    queryKey: ['/api/scrimmages', selectedScrimmage, 'co-hosts'],
+    enabled: !!selectedScrimmage,
+  }) as { data: ScrimmageCoHostWithUser[], isLoading: boolean };
+
+  // Fetch league members to add as co-hosts (using the scrimmage's league)
+  const selectedScrimmageData = scrimmages.find(s => s.id === coHostDialogOpen);
+  const { data: leagueMembers = [] } = useQuery({
+    queryKey: ['/api/leagues', selectedScrimmageData?.leagueId, 'members'],
+    enabled: !!selectedScrimmageData?.leagueId,
+  }) as { data: { user: User; status: string }[] };
+
+  // Mutation to add co-host
+  const addCoHostMutation = useMutation({
+    mutationFn: async ({ scrimmageId, coHostUserId, permissions }: { 
+      scrimmageId: string; 
+      coHostUserId: string;
+      permissions: { canApproveRequests: boolean; canSendReminders: boolean; canManagePayments: boolean };
+    }) => {
+      const response = await apiRequest('POST', `/api/scrimmages/${scrimmageId}/co-hosts`, {
+        coHostUserId,
+        ...permissions,
+      });
+      return response.json();
+    },
+    onSuccess: (_, { scrimmageId }) => {
+      toast({
+        title: 'Co-Host Added',
+        description: 'The co-host has been added and notified.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', scrimmageId, 'co-hosts'] });
+      setCoHostDialogOpen(null);
+      setSelectedCoHostUserId('');
+      setCoHostPermissions({ canApproveRequests: true, canSendReminders: true, canManagePayments: true });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add co-host',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Mutation to remove co-host
+  const removeCoHostMutation = useMutation({
+    mutationFn: async ({ scrimmageId, coHostUserId }: { scrimmageId: string; coHostUserId: string }) => {
+      const response = await apiRequest('DELETE', `/api/scrimmages/${scrimmageId}/co-hosts/${coHostUserId}`, {});
+      return response.json();
+    },
+    onSuccess: (_, { scrimmageId }) => {
+      toast({
+        title: 'Co-Host Removed',
+        description: 'The co-host has been removed from the scrimmage.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', scrimmageId, 'co-hosts'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to remove co-host',
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Mutation to approve/dismiss requests
   const manageRequestMutation = useMutation({
@@ -455,12 +537,16 @@ export default function ScrimmageManagement() {
                           </div>
                         ) : (
                           <Tabs defaultValue="pending" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2">
+                            <TabsList className="grid w-full grid-cols-3">
                               <TabsTrigger value="pending">
                                 Pending ({getPendingRequests(requests).length})
                               </TabsTrigger>
                               <TabsTrigger value="approved">
                                 Approved ({getApprovedRequests(requests).length})
+                              </TabsTrigger>
+                              <TabsTrigger value="cohosts">
+                                <Shield className="w-3 h-3 mr-1" />
+                                Co-Hosts ({coHosts.length})
                               </TabsTrigger>
                             </TabsList>
                             
@@ -561,6 +647,171 @@ export default function ScrimmageManagement() {
                                   </div>
                                 )}
                               </ScrollArea>
+                            </TabsContent>
+                            
+                            <TabsContent value="cohosts" className="mt-4">
+                              <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                  <p className="text-sm text-muted-foreground">
+                                    Co-hosts can help manage this scrimmage
+                                  </p>
+                                  <Dialog open={coHostDialogOpen === scrimmage.id} onOpenChange={(open) => {
+                                    if (open) {
+                                      setCoHostDialogOpen(scrimmage.id);
+                                    } else {
+                                      setCoHostDialogOpen(null);
+                                      setSelectedCoHostUserId('');
+                                      setCoHostPermissions({ canApproveRequests: true, canSendReminders: true, canManagePayments: true });
+                                    }
+                                  }}>
+                                    <DialogTrigger asChild>
+                                      <Button size="sm" variant="outline" data-testid={`button-add-cohost-${scrimmage.id}`}>
+                                        <UserPlus className="w-4 h-4 mr-1" />
+                                        Add Co-Host
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                      <DialogHeader>
+                                        <DialogTitle>Add Co-Host</DialogTitle>
+                                        <DialogDescription>
+                                          Select a league member to add as a co-host for this scrimmage. Configure what permissions they should have.
+                                        </DialogDescription>
+                                      </DialogHeader>
+                                      <div className="space-y-4 py-4">
+                                        <div className="space-y-2">
+                                          <Label htmlFor="cohost-select">Select Member</Label>
+                                          <Select value={selectedCoHostUserId} onValueChange={setSelectedCoHostUserId}>
+                                            <SelectTrigger id="cohost-select" data-testid="select-cohost-user">
+                                              <SelectValue placeholder="Select a member..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {leagueMembers
+                                                .filter(m => m.user.id !== scrimmage.creatorId && !coHosts.some(c => c.userId === m.user.id))
+                                                .map((member) => (
+                                                  <SelectItem key={member.user.id} value={member.user.id}>
+                                                    {member.user.firstName} {member.user.lastName}
+                                                  </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                        <div className="space-y-3">
+                                          <Label>Permissions</Label>
+                                          <div className="flex items-center space-x-2">
+                                            <Checkbox 
+                                              id="perm-approve" 
+                                              checked={coHostPermissions.canApproveRequests}
+                                              onCheckedChange={(checked) => setCoHostPermissions(p => ({ ...p, canApproveRequests: !!checked }))}
+                                              data-testid="checkbox-perm-approve"
+                                            />
+                                            <label htmlFor="perm-approve" className="text-sm">
+                                              Can approve/decline player requests
+                                            </label>
+                                          </div>
+                                          <div className="flex items-center space-x-2">
+                                            <Checkbox 
+                                              id="perm-reminders" 
+                                              checked={coHostPermissions.canSendReminders}
+                                              onCheckedChange={(checked) => setCoHostPermissions(p => ({ ...p, canSendReminders: !!checked }))}
+                                              data-testid="checkbox-perm-reminders"
+                                            />
+                                            <label htmlFor="perm-reminders" className="text-sm">
+                                              Can send reminders to players
+                                            </label>
+                                          </div>
+                                          <div className="flex items-center space-x-2">
+                                            <Checkbox 
+                                              id="perm-payments" 
+                                              checked={coHostPermissions.canManagePayments}
+                                              onCheckedChange={(checked) => setCoHostPermissions(p => ({ ...p, canManagePayments: !!checked }))}
+                                              data-testid="checkbox-perm-payments"
+                                            />
+                                            <label htmlFor="perm-payments" className="text-sm">
+                                              Can collect and mark payments
+                                            </label>
+                                          </div>
+                                        </div>
+                                        <Button 
+                                          className="w-full"
+                                          disabled={!selectedCoHostUserId || addCoHostMutation.isPending}
+                                          onClick={() => addCoHostMutation.mutate({
+                                            scrimmageId: scrimmage.id,
+                                            coHostUserId: selectedCoHostUserId,
+                                            permissions: coHostPermissions,
+                                          })}
+                                          data-testid="button-confirm-add-cohost"
+                                        >
+                                          {addCoHostMutation.isPending ? 'Adding...' : 'Add Co-Host'}
+                                        </Button>
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+                                </div>
+                                
+                                <ScrollArea className="h-48">
+                                  {coHostsLoading ? (
+                                    <div className="text-center py-4">
+                                      <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                                    </div>
+                                  ) : coHosts.length === 0 ? (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                      <Shield className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                                      <p>No co-hosts assigned</p>
+                                      <p className="text-xs mt-1">Add co-hosts to help manage this scrimmage</p>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-3">
+                                      {coHosts.map((coHost) => (
+                                        <div
+                                          key={coHost.userId}
+                                          className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50"
+                                          data-testid={`cohost-${coHost.userId}`}
+                                        >
+                                          <Avatar className="h-10 w-10">
+                                            <AvatarImage src={coHost.user?.profileImageUrl || undefined} />
+                                            <AvatarFallback>
+                                              {coHost.user?.firstName?.[0]}{coHost.user?.lastName?.[0]}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <div className="flex-1">
+                                            <p className="font-medium">
+                                              {coHost.user?.firstName} {coHost.user?.lastName}
+                                            </p>
+                                            <div className="flex gap-1 flex-wrap mt-1">
+                                              {coHost.canApproveRequests && (
+                                                <Badge variant="outline" className="text-xs">Approve</Badge>
+                                              )}
+                                              {coHost.canSendReminders && (
+                                                <Badge variant="outline" className="text-xs">Reminders</Badge>
+                                              )}
+                                              {coHost.canManagePayments && (
+                                                <Badge variant="outline" className="text-xs">Payments</Badge>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="text-destructive hover:text-destructive"
+                                            onClick={() => {
+                                              if (confirm('Remove this co-host from the scrimmage?')) {
+                                                removeCoHostMutation.mutate({
+                                                  scrimmageId: scrimmage.id,
+                                                  coHostUserId: coHost.userId,
+                                                });
+                                              }
+                                            }}
+                                            disabled={removeCoHostMutation.isPending}
+                                            data-testid={`button-remove-cohost-${coHost.userId}`}
+                                          >
+                                            <X className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </ScrollArea>
+                              </div>
                             </TabsContent>
                           </Tabs>
                         )}
