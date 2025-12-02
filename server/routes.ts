@@ -8449,14 +8449,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`✅ Created parent scrimmage ${parentScrimmage.id}`);
         
+        // Add co-hosts if provided
+        if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
+          console.log(`👥 Adding ${req.body.coHostIds.length} co-hosts to parent scrimmage ${parentScrimmage.id}`);
+          for (const coHostId of req.body.coHostIds) {
+            try {
+              await storage.addScrimmageCoHost({
+                scrimmageId: parentScrimmage.id,
+                userId: coHostId,
+                canApproveRequests: true,
+                canSendReminders: true,
+                canManagePayments: true,
+                addedBy: userId,
+              });
+              // Notify co-host
+              await storage.createNotification({
+                userId: coHostId,
+                type: 'scrimmage_cohost_added',
+                title: `You're a co-host for ${scrimmageData.title}`,
+                message: `You have been added as a co-host for "${scrimmageData.title}" on ${format(new Date(scrimmageData.dateTime), 'MMM d, yyyy \'at\' h:mm a')}. You can now help manage players and payments.`,
+                actionUrl: `/scrimmage/${parentScrimmage.id}`,
+                scrimmageId: parentScrimmage.id,
+              });
+            } catch (coHostError) {
+              console.error(`Failed to add co-host ${coHostId}:`, coHostError);
+            }
+          }
+          console.log(`✅ Added co-hosts to parent scrimmage`);
+        }
+        
         // Create child scrimmages for remaining dates
         for (let i = 1; i < dates.length; i++) {
-          await storage.createScrimmage({
+          const childScrimmage = await storage.createScrimmage({
             ...scrimmageData,
             dateTime: dates[i],
             parentScrimmageId: parentScrimmage.id,
             announcementId: null, // Only first scrimmage has announcement
           });
+          
+          // Add co-hosts to child scrimmage as well
+          if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
+            for (const coHostId of req.body.coHostIds) {
+              try {
+                await storage.addScrimmageCoHost({
+                  scrimmageId: childScrimmage.id,
+                  userId: coHostId,
+                  canApproveRequests: true,
+                  canSendReminders: true,
+                  canManagePayments: true,
+                  addedBy: userId,
+                });
+              } catch (coHostError) {
+                console.error(`Failed to add co-host ${coHostId} to child scrimmage ${childScrimmage.id}:`, coHostError);
+              }
+            }
+          }
         }
         
         console.log(`✅ Created ${dates.length - 1} recurring scrimmages linked to parent ${parentScrimmage.id}`);
@@ -8536,6 +8583,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         console.log(`✅ Created scrimmage ${scrimmage.id}${announcementId ? ` linked to announcement ${announcementId}` : ''}`);
+        
+        // Add co-hosts if provided
+        if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
+          console.log(`👥 Adding ${req.body.coHostIds.length} co-hosts to scrimmage ${scrimmage.id}`);
+          for (const coHostId of req.body.coHostIds) {
+            try {
+              await storage.addScrimmageCoHost({
+                scrimmageId: scrimmage.id,
+                userId: coHostId,
+                canApproveRequests: true,
+                canSendReminders: true,
+                canManagePayments: true,
+                addedBy: userId,
+              });
+              // Notify co-host
+              await storage.createNotification({
+                userId: coHostId,
+                type: 'scrimmage_cohost_added',
+                title: `You're a co-host for ${scrimmageData.title}`,
+                message: `You have been added as a co-host for "${scrimmageData.title}" on ${format(new Date(scrimmageData.dateTime), 'MMM d, yyyy \'at\' h:mm a')}. You can now help manage players and payments.`,
+                actionUrl: `/scrimmage/${scrimmage.id}`,
+                scrimmageId: scrimmage.id,
+              });
+            } catch (coHostError) {
+              console.error(`Failed to add co-host ${coHostId}:`, coHostError);
+            }
+          }
+          console.log(`✅ Added co-hosts to scrimmage`);
+        }
         
         // Send in-app push notifications if sendInviteNow is enabled
         if (req.body.sendInviteNow && req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
@@ -8811,14 +8887,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate request data
-      // If creator is joining their own scrimmage, auto-approve them
+      // If creator or co-host is joining their own scrimmage, auto-approve them
       const isCreator = scrimmage.creatorId === userId;
+      const isCoHost = await storage.isUserScrimmageCoHost(scrimmageId, userId);
+      const shouldAutoApprove = isCreator || isCoHost;
       let requestData;
       try {
         requestData = insertScrimmageRequestSchema.parse({
           scrimmageId,
           playerId: userId,
-          status: isCreator ? 'approved' : 'pending',
+          status: shouldAutoApprove ? 'approved' : 'pending',
         });
       } catch (validationError) {
         console.error('Validation error creating scrimmage request:', validationError);

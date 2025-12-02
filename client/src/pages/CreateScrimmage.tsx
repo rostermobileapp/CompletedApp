@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 const createScrimmageSchema = createScrimmageRequestSchema.extend({
   selectedMemberIds: z.array(z.string()).optional().default([]), // Optional when no league available
   selectedEmails: z.array(z.string()).optional().default([]), // Email invites
+  coHostIds: z.array(z.string()).optional().default([]), // Co-hosts who can help manage the scrimmage
   date: z.string().min(1, 'Date is required'),
   time: z.string().min(1, 'Time is required'),
   venue: z.string().min(1, 'Venue is required'), // UI field that maps to location
@@ -65,6 +66,7 @@ export default function CreateScrimmage() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [selectedCoHostIds, setSelectedCoHostIds] = useState<string[]>([]);
   
   // Email invite states
   const [emailSearchTerm, setEmailSearchTerm] = useState("");
@@ -282,6 +284,7 @@ export default function CreateScrimmage() {
         ...scrimmageData,
         selectedMemberIds: filteredMemberIds, // Include for targeted announcements/invitations
         selectedEmails: data.selectedEmails || [], // Include email invites
+        coHostIds: data.coHostIds || [], // Include co-hosts who can help manage
       });
       return response.json();
     },
@@ -318,6 +321,7 @@ export default function CreateScrimmage() {
       ...data, 
       selectedMemberIds: selectedLeague ? selectedMemberIds : [],
       selectedEmails: selectedLeague ? selectedEmails : [],
+      coHostIds: selectedLeague ? selectedCoHostIds : [],
     };
     createScrimmageRequest.mutate(formData);
   };
@@ -345,6 +349,16 @@ export default function CreateScrimmage() {
     setSelectedMemberIds([]);
     form.setValue('selectedMemberIds', []);
     form.trigger('selectedMemberIds');
+  };
+
+  // Co-host selection handler
+  const toggleCoHostSelection = (memberId: string) => {
+    const newSelection = selectedCoHostIds.includes(memberId) 
+      ? selectedCoHostIds.filter(id => id !== memberId)
+      : [...selectedCoHostIds, memberId];
+    
+    setSelectedCoHostIds(newSelection);
+    form.setValue('coHostIds', newSelection);
   };
 
   // Email invite handlers
@@ -993,6 +1007,101 @@ export default function CreateScrimmage() {
             </div>
           </div>
         </div>
+
+        {/* Co-Host Selection - Only show if user has leagues */}
+        {selectedLeague && (
+          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121]">
+            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+              <Crown className="w-5 h-5" />
+              Add Co-Hosts (Optional)
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Co-hosts can help manage this scrimmage - approve players, send reminders, and collect payments
+            </p>
+
+            {membersLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
+                    <div className="w-10 h-10 bg-muted rounded-full"></div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (leagueMembers as any[]).filter((m: any) => m.user.id !== (user as any)?.id).length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                No other league members available to add as co-hosts
+              </div>
+            ) : (
+              <>
+                {selectedCoHostIds.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {selectedCoHostIds.map(coHostId => {
+                      const member = (leagueMembers as any[]).find((m: any) => m.user.id === coHostId);
+                      if (!member) return null;
+                      return (
+                        <Badge 
+                          key={coHostId} 
+                          variant="secondary" 
+                          className="flex items-center gap-1 pr-1"
+                          data-testid={`badge-cohost-${coHostId}`}
+                        >
+                          <Crown className="w-3 h-3" />
+                          {member.user.firstName} {member.user.lastName}
+                          <button
+                            type="button"
+                            onClick={() => toggleCoHostSelection(coHostId)}
+                            className="ml-1 hover:bg-muted rounded p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+                <ScrollArea className="h-48">
+                  <div className="space-y-2">
+                    {(leagueMembers as any[])
+                      .filter((member: any) => member.user.id !== (user as any)?.id)
+                      .map((member: any) => (
+                        <div
+                          key={member.user.id}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50"
+                          data-testid={`cohost-item-${member.user.id}`}
+                        >
+                          <Checkbox
+                            checked={selectedCoHostIds.includes(member.user.id)}
+                            onCheckedChange={() => toggleCoHostSelection(member.user.id)}
+                            data-testid={`checkbox-cohost-${member.user.id}`}
+                          />
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={member.user.profileImageUrl || undefined} />
+                            <AvatarFallback>
+                              {member.user.firstName?.[0]}{member.user.lastName?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <p className="font-medium">
+                              {member.user.firstName} {member.user.lastName}
+                            </p>
+                          </div>
+                          {selectedCoHostIds.includes(member.user.id) && (
+                            <Badge variant="outline" className="text-xs">
+                              <Crown className="w-3 h-3 mr-1" />
+                              Co-Host
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </ScrollArea>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Member Selection - Only show if user has leagues */}
         {selectedLeague ? (
