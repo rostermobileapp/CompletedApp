@@ -1030,7 +1030,7 @@ export default function CreateScrimmage() {
 
         {/* Co-Host Selection - Only show if user has leagues */}
         {selectedLeague && (
-          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121]">
+          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] pl-[8px] pr-[8px] mt-[8px] mb-[8px]">
             <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
               <Crown className="w-5 h-5" />
               Add Co-Hosts (Optional)
