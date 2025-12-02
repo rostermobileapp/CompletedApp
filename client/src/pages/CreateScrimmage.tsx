@@ -462,7 +462,7 @@ export default function CreateScrimmage() {
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="create-scrimmage-page">
       {/* Header */}
-      <div className="p-6 pt-12">
+      <div className="p-6 pt-[4px] pb-[4px] mt-[20px] mb-[20px] pl-[24px] pr-[24px]">
         <div className="flex items-center gap-4 mb-6">
           <button 
             onClick={() => {
