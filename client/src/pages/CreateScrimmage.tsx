@@ -67,6 +67,9 @@ export default function CreateScrimmage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [selectedCoHostIds, setSelectedCoHostIds] = useState<string[]>([]);
+  const [coHostSearchTerm, setCoHostSearchTerm] = useState("");
+  const [showCoHostDropdown, setShowCoHostDropdown] = useState(false);
+  const coHostSearchRef = useRef<HTMLDivElement>(null);
   
   // Email invite states
   const [emailSearchTerm, setEmailSearchTerm] = useState("");
@@ -239,6 +242,23 @@ export default function CreateScrimmage() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showTimePicker]);
+
+  // Close co-host dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (coHostSearchRef.current && !coHostSearchRef.current.contains(event.target as Node)) {
+        setShowCoHostDropdown(false);
+      }
+    };
+
+    if (showCoHostDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCoHostDropdown]);
 
   const createScrimmageRequest = useMutation({
     mutationFn: async (data: CreateScrimmageForm) => {
@@ -1010,7 +1030,7 @@ export default function CreateScrimmage() {
 
         {/* Co-Host Selection - Only show if user has leagues */}
         {selectedLeague && (
-          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] pl-[4px] pr-[4px] text-left">
+          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121]">
             <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
               <Crown className="w-5 h-5" />
               Add Co-Hosts (Optional)
@@ -1020,15 +1040,8 @@ export default function CreateScrimmage() {
             </p>
 
             {membersLoading ? (
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
-                    <div className="w-10 h-10 bg-muted rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center gap-3 p-3 animate-pulse">
+                <div className="w-full h-10 bg-muted rounded"></div>
               </div>
             ) : (leagueMembers as any[]).filter((m: any) => m.user.id !== (user as any)?.id).length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">
@@ -1036,6 +1049,7 @@ export default function CreateScrimmage() {
               </div>
             ) : (
               <>
+                {/* Selected co-hosts badges */}
                 {selectedCoHostIds.length > 0 && (
                   <div className="mb-4 flex flex-wrap gap-2">
                     {selectedCoHostIds.map(coHostId => {
@@ -1062,42 +1076,78 @@ export default function CreateScrimmage() {
                     })}
                   </div>
                 )}
-                <ScrollArea className="h-48">
-                  <div className="space-y-2">
-                    {(leagueMembers as any[])
-                      .filter((member: any) => member.user.id !== (user as any)?.id)
-                      .map((member: any) => (
-                        <div
-                          key={member.user.id}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 pt-[0px] pb-[0px] pl-[4px] pr-[4px] text-left"
-                          data-testid={`cohost-item-${member.user.id}`}
-                        >
-                          <Checkbox
-                            checked={selectedCoHostIds.includes(member.user.id)}
-                            onCheckedChange={() => toggleCoHostSelection(member.user.id)}
-                            data-testid={`checkbox-cohost-${member.user.id}`}
-                          />
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={member.user.profileImageUrl || undefined} />
-                            <AvatarFallback>
-                              {member.user.firstName?.[0]}{member.user.lastName?.[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <p className="font-medium">
-                              {member.user.firstName} {member.user.lastName}
-                            </p>
-                          </div>
-                          {selectedCoHostIds.includes(member.user.id) && (
-                            <Badge variant="outline" className="text-xs">
-                              <Crown className="w-3 h-3 mr-1" />
-                              Co-Host
-                            </Badge>
-                          )}
-                        </div>
-                      ))}
+                
+                {/* Search input with dropdown */}
+                <div className="relative" ref={coHostSearchRef}>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search league members..."
+                      value={coHostSearchTerm}
+                      onChange={(e) => {
+                        setCoHostSearchTerm(e.target.value);
+                        setShowCoHostDropdown(true);
+                      }}
+                      onFocus={() => setShowCoHostDropdown(true)}
+                      className="pl-10"
+                      data-testid="input-cohost-search"
+                    />
                   </div>
-                </ScrollArea>
+                  
+                  {/* Dropdown results */}
+                  {showCoHostDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-auto">
+                      {(() => {
+                        const availableMembers = (leagueMembers as any[])
+                          .filter((member: any) => {
+                            // Exclude creator
+                            if (member.user.id === (user as any)?.id) return false;
+                            // Exclude already selected co-hosts
+                            if (selectedCoHostIds.includes(member.user.id)) return false;
+                            // Filter by search term
+                            if (coHostSearchTerm) {
+                              const fullName = `${member.user.firstName} ${member.user.lastName}`.toLowerCase();
+                              return fullName.includes(coHostSearchTerm.toLowerCase());
+                            }
+                            return true;
+                          });
+                        
+                        if (availableMembers.length === 0) {
+                          return (
+                            <div className="p-3 text-center text-muted-foreground text-sm">
+                              {coHostSearchTerm ? 'No members match your search' : 'All members are already selected'}
+                            </div>
+                          );
+                        }
+                        
+                        return availableMembers.map((member: any) => (
+                          <button
+                            key={member.user.id}
+                            type="button"
+                            onClick={() => {
+                              toggleCoHostSelection(member.user.id);
+                              setCoHostSearchTerm('');
+                              setShowCoHostDropdown(false);
+                            }}
+                            className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 text-left"
+                            data-testid={`cohost-option-${member.user.id}`}
+                          >
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={member.user.profileImageUrl || undefined} />
+                              <AvatarFallback className="text-xs">
+                                {member.user.firstName?.[0]}{member.user.lastName?.[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">
+                              {member.user.firstName} {member.user.lastName}
+                            </span>
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
