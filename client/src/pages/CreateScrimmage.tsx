@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Search, Mail, X, UserPlus, BookMarked } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked } from 'lucide-react';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { useLocation } from 'wouter';
@@ -1079,21 +1079,17 @@ export default function CreateScrimmage() {
                 
                 {/* Search input with dropdown */}
                 <div className="relative" ref={coHostSearchRef}>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search league members..."
-                      value={coHostSearchTerm}
-                      onChange={(e) => {
-                        setCoHostSearchTerm(e.target.value);
-                        setShowCoHostDropdown(true);
-                      }}
-                      onFocus={() => setShowCoHostDropdown(true)}
-                      className="pl-10"
-                      data-testid="input-cohost-search"
-                    />
-                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Search league members..."
+                    value={coHostSearchTerm}
+                    onChange={(e) => {
+                      setCoHostSearchTerm(e.target.value);
+                      setShowCoHostDropdown(true);
+                    }}
+                    onFocus={() => setShowCoHostDropdown(true)}
+                    data-testid="input-cohost-search"
+                  />
                   
                   {/* Dropdown results */}
                   {showCoHostDropdown && (
@@ -1218,13 +1214,11 @@ export default function CreateScrimmage() {
           <div className="mb-6">
             <Label>League Members</Label>
             {/* Search */}
-            <div className="relative mt-2 mb-4">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="mt-2 mb-4">
               <Input
                 placeholder="Search by name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
                 data-testid="input-search-members"
               />
             </div>

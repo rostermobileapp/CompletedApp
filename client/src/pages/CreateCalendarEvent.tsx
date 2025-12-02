@@ -184,16 +184,12 @@ export default function CreateCalendarEvent() {
                         </div>
                       ) : (
                         <>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              placeholder="Search facilities by name or location..."
-                              value={search}
-                              onChange={(e) => setSearch(e.target.value)}
-                              className="pl-9"
-                              data-testid="input-facility-search"
-                            />
-                          </div>
+                          <Input
+                            placeholder="Search facilities by name or location..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            data-testid="input-facility-search"
+                          />
                           {search.trim().length > 0 && (
                             <div className="mt-2 border rounded-lg max-h-64 overflow-y-auto" data-testid="facility-search-results">
                               {facilitiesLoading ? (

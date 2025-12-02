@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, DollarSign, Users, Search } from 'lucide-react';
+import { ArrowLeft, DollarSign, Users } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { createPaymentRequestSchema } from '@shared/schema';
 import { z } from 'zod';
@@ -282,17 +282,13 @@ export default function CreatePaymentRequest() {
               <>
                 {/* Search Bar */}
                 <div className="mb-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search members..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                      data-testid="input-search-recipients"
-                    />
-                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Search members..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    data-testid="input-search-recipients"
+                  />
                 </div>
 
                 {/* Select/Deselect All */}

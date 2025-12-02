@@ -113,14 +113,13 @@ export default function LeagueSearch() {
         </div>
         
         {/* Search Bar */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+        <div className="mb-4">
           <input 
             type="text" 
             placeholder="Search leagues..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-input border border-border rounded-lg pl-10 pr-4 py-3 text-foreground"
+            className="w-full bg-input border border-border rounded-lg px-4 py-3 text-foreground"
             data-testid="input-search"
           />
         </div>

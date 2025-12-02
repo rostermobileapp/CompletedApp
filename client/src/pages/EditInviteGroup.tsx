@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, UserPlus, Mail, Search, X, Users } from 'lucide-react';
+import { ArrowLeft, UserPlus, Mail, X, Users } from 'lucide-react';
 
 const inviteGroupSchema = z.object({
   name: z.string().min(1, 'Group name is required'),
@@ -393,13 +393,11 @@ export default function EditInviteGroup() {
             ) : (
               <>
                 {/* Search */}
-                <div className="relative mt-2 mb-4">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="mt-2 mb-4">
                   <Input
                     placeholder="Search by name..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
                     data-testid="input-search-members"
                   />
                 </div>
@@ -497,15 +495,13 @@ export default function EditInviteGroup() {
             {/* Email Search */}
             <div className="mb-4">
               <Label htmlFor="email-search" className="text-sm">Search by email</Label>
-              <div className="relative mt-2">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <div className="mt-2">
                 <Input
                   id="email-search"
                   type="email"
                   placeholder="Search existing users..."
                   value={emailSearchTerm}
                   onChange={(e) => setEmailSearchTerm(e.target.value)}
-                  className="pl-10"
                   data-testid="input-search-email"
                 />
               </div>

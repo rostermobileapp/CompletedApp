@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, UserPlus, Search, Calendar } from "lucide-react";
+import { Users, UserPlus, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -184,16 +184,13 @@ export function SubstituteRequestModal({
 
         <div className="space-y-4 flex flex-col flex-1 overflow-hidden">
           {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search for any player..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-[#1a1a1a]"
-              data-testid="input-search-players"
-            />
-          </div>
+          <Input
+            placeholder="Search for any player..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="bg-[#1a1a1a]"
+            data-testid="input-search-players"
+          />
 
           {/* Players List */}
           {isLoading ? (

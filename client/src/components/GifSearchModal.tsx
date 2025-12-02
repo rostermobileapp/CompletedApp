@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Sparkles, Heart, Laugh, Trophy, Zap, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Sparkles, Heart, Laugh, Trophy, Zap, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { queryClient } from '@/lib/queryClient';
 
 interface GiphyGif {
@@ -242,14 +242,13 @@ export default function GifSearchModal({ open, onOpenChange, onSelectGif }: GifS
         <div className="px-6">
           {/* Search Input */}
           <form onSubmit={handleSearchSubmit} className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
               ref={inputRef}
               type="text"
               placeholder="Search for GIFs..."
               value={searchQuery}
               onChange={handleSearchChange}
-              className="pl-10 pr-4 w-full"
+              className="pr-4 w-full"
               data-testid="gif-search-input"
             />
             {isFetching && (

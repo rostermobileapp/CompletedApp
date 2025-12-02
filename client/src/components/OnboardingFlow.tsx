@@ -405,16 +405,13 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
             </p>
 
             <div className="mb-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <Input
-                  placeholder="Search facilities..."
-                  value={facilitySearchQuery}
-                  onChange={(e) => setFacilitySearchQuery(e.target.value)}
-                  className="pl-10 bg-gray-800 dark:bg-gray-800 text-white dark:text-white border-gray-700 dark:border-gray-700"
-                  data-testid="input-facility-search"
-                />
-              </div>
+              <Input
+                placeholder="Search facilities..."
+                value={facilitySearchQuery}
+                onChange={(e) => setFacilitySearchQuery(e.target.value)}
+                className="bg-gray-800 dark:bg-gray-800 text-white dark:text-white border-gray-700 dark:border-gray-700"
+                data-testid="input-facility-search"
+              />
             </div>
 
             {selectedFacility && (

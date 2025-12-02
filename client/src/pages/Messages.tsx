@@ -1734,16 +1734,12 @@ export default function Messages() {
             {/* Search Contacts */}
             {(conversationType === 'direct' || conversationType === 'custom_group') && (selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
               <>
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search contacts..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                    data-testid="input-search-contacts"
-                  />
-                </div>
+                <Input
+                  placeholder="Search contacts..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-testid="input-search-contacts"
+                />
                 
                 {/* Contacts List */}
                 <div className="max-h-64 overflow-y-auto space-y-2">

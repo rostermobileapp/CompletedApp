@@ -42,7 +42,6 @@ import {
   Target,
   Shield,
   AlertCircle as AlertIcon,
-  Search,
   User
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
@@ -3491,13 +3490,12 @@ export default function LeagueManagement() {
                     <div className="flex-1">
                       {!selectedFacility ? (
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <input
                             type="text"
                             value={facilitySearch}
                             onChange={(e) => setFacilitySearch(e.target.value)}
                             placeholder="Search for a facility..."
-                            className="w-full pl-10 p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                             data-testid="input-facility-search"
                           />
                           {facilitySearch && facilities.length > 0 && (
@@ -5251,17 +5249,14 @@ export default function LeagueManagement() {
               
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Search for Target Player</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    value={targetUserEmail}
-                    onChange={(e) => setTargetUserEmail(e.target.value)}
-                    placeholder="Type a name to search..."
-                    className="w-full pl-10 p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    data-testid="input-merge-search"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={targetUserEmail}
+                  onChange={(e) => setTargetUserEmail(e.target.value)}
+                  placeholder="Type a name to search..."
+                  className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  data-testid="input-merge-search"
+                />
                 <p className="text-xs text-muted-foreground">
                   Search by name or email to find the player to merge with
                 </p>
