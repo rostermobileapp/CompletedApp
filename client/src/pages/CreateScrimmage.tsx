@@ -1069,7 +1069,7 @@ export default function CreateScrimmage() {
                       .map((member: any) => (
                         <div
                           key={member.user.id}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50"
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 pt-[0px] pb-[0px] pl-[4px] pr-[4px] text-left"
                           data-testid={`cohost-item-${member.user.id}`}
                         >
                           <Checkbox
