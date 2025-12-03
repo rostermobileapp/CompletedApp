@@ -127,8 +127,12 @@ export default function StatsManagement() {
   }, [players]);
 
   // Get individual player stats for selected player
+  const playerStatsUrl = selectedSeason 
+    ? `/api/leagues/${selectedLeague}/stats/players/${selectedPlayer}?seasonId=${selectedSeason}`
+    : `/api/leagues/${selectedLeague}/stats/players/${selectedPlayer}`;
+    
   const { data: currentPlayerStats } = useQuery<PlayerStatsResponse>({
-    queryKey: [`/api/leagues/${selectedLeague}/stats/player/${selectedPlayer}`, selectedSeason],
+    queryKey: [playerStatsUrl],
     enabled: !!selectedLeague && !!selectedPlayer && !!selectedSeason,
   });
 
@@ -281,22 +285,20 @@ export default function StatsManagement() {
         title: 'Success',
         description: 'Player statistics updated successfully.',
       });
-      // Invalidate all stats-related queries for this league
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/leagues/${selectedLeague}/stats`] 
-      });
-      queryClient.invalidateQueries({ 
-        queryKey: ['/api/leagues', selectedLeague, 'stats'] 
-      });
+      // Invalidate all stats-related queries for this league (using predicate to catch all variations)
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const queryKey = query.queryKey;
-          return Array.isArray(queryKey) && 
-                 queryKey.length >= 3 &&
-                 queryKey[0] === '/api/leagues' && 
-                 queryKey[1] === selectedLeague && 
-                 queryKey[2] === 'stats';
+          if (!Array.isArray(queryKey) || queryKey.length === 0) return false;
+          const keyStr = queryKey[0];
+          if (typeof keyStr !== 'string') return false;
+          // Match any stats-related URL for this league
+          return keyStr.includes(`/api/leagues/${selectedLeague}/stats`);
         }
+      });
+      // Also invalidate using the standard key format
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/leagues', selectedLeague, 'stats'] 
       });
       // Reset form
       setPlayerGameStats({});

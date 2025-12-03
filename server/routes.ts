@@ -9650,7 +9650,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const stats = await storage.getPlayerStatsByUser(playerId, leagueId, seasonId);
       if (!stats) {
-        return res.status(404).json({ message: "Player stats not found" });
+        // Return default empty stats instead of 404 for players without stats yet
+        return res.json({
+          userId: playerId,
+          leagueId,
+          seasonId: seasonId || null,
+          gamesPlayed: 0,
+          goals: 0,
+          assists: 0,
+          penaltyMinutes: 0
+        });
       }
       
       res.json(stats);
