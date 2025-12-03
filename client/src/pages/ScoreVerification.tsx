@@ -161,8 +161,10 @@ export default function ScoreVerification() {
         return;
       }
       
-      // Determine result type
-      const resultType = isOvertimeShootout ? 'overtime' : 'regulation';
+      // Double-check: only allow OT/SO if score difference is 0 or 1
+      const scoreDiff = Math.abs(home - away);
+      const canUseOvertimeShootout = scoreDiff <= 1;
+      const resultType = (isOvertimeShootout && canUseOvertimeShootout) ? 'overtime' : 'regulation';
       
       submitScoreMutation.mutate({ gameId: game.id, homeScore: home, awayScore: away, resultType });
     };
@@ -198,7 +200,15 @@ export default function ScoreVerification() {
               type="number"
               min="0"
               value={homeScore}
-              onChange={(e) => setHomeScore(e.target.value)}
+              onChange={(e) => {
+                const newHomeScore = e.target.value;
+                setHomeScore(newHomeScore);
+                const homeVal = parseInt(newHomeScore);
+                const awayVal = parseInt(awayScore);
+                if (!isNaN(homeVal) && !isNaN(awayVal) && Math.abs(homeVal - awayVal) > 1) {
+                  setIsOvertimeShootout(false);
+                }
+              }}
               className="text-center"
               placeholder="0"
               data-testid={`input-home-score-${game.id}`}
@@ -217,7 +227,15 @@ export default function ScoreVerification() {
               type="number"
               min="0"
               value={awayScore}
-              onChange={(e) => setAwayScore(e.target.value)}
+              onChange={(e) => {
+                const newAwayScore = e.target.value;
+                setAwayScore(newAwayScore);
+                const homeVal = parseInt(homeScore);
+                const awayVal = parseInt(newAwayScore);
+                if (!isNaN(homeVal) && !isNaN(awayVal) && Math.abs(homeVal - awayVal) > 1) {
+                  setIsOvertimeShootout(false);
+                }
+              }}
               className="text-center"
               placeholder="0"
               data-testid={`input-away-score-${game.id}`}
@@ -226,22 +244,40 @@ export default function ScoreVerification() {
         </div>
         
         {/* Overtime/Shootout Checkbox */}
-        <div className="flex items-center gap-2 my-3 p-2 bg-muted/50 rounded-lg">
-          <input
-            type="checkbox"
-            id={`overtime-${game.id}`}
-            checked={isOvertimeShootout}
-            onChange={(e) => setIsOvertimeShootout(e.target.checked)}
-            className="h-4 w-4 rounded border-border"
-            data-testid={`checkbox-overtime-${game.id}`}
-          />
-          <label 
-            htmlFor={`overtime-${game.id}`} 
-            className="text-sm font-medium cursor-pointer"
-          >
-            Game ended in Overtime/Shootout (losing team gets 1 point)
-          </label>
-        </div>
+        {(() => {
+          const homeVal = parseInt(homeScore);
+          const awayVal = parseInt(awayScore);
+          const hasValidScores = !isNaN(homeVal) && !isNaN(awayVal) && homeVal >= 0 && awayVal >= 0;
+          const scoreDiff = hasValidScores ? Math.abs(homeVal - awayVal) : 0;
+          const canSelectOvertimeShootout = !hasValidScores || scoreDiff <= 1;
+          
+          return (
+            <div className={`flex items-center gap-2 my-3 p-2 bg-muted/50 rounded-lg ${!canSelectOvertimeShootout ? 'opacity-50' : ''}`}>
+              <input
+                type="checkbox"
+                id={`overtime-${game.id}`}
+                checked={isOvertimeShootout && canSelectOvertimeShootout}
+                onChange={(e) => {
+                  if (canSelectOvertimeShootout) {
+                    setIsOvertimeShootout(e.target.checked);
+                  }
+                }}
+                disabled={!canSelectOvertimeShootout}
+                className="h-4 w-4 rounded border-border disabled:cursor-not-allowed"
+                data-testid={`checkbox-overtime-${game.id}`}
+              />
+              <label 
+                htmlFor={`overtime-${game.id}`} 
+                className={`text-sm font-medium ${canSelectOvertimeShootout ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+              >
+                Game ended in Overtime/Shootout (losing team gets 1 point)
+                {!canSelectOvertimeShootout && (
+                  <span className="ml-2 text-xs text-muted-foreground">(score difference must be 0 or 1)</span>
+                )}
+              </label>
+            </div>
+          );
+        })()}
         
         <Button
           onClick={handleSubmitScore}

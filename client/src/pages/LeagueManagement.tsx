@@ -4445,7 +4445,15 @@ export default function LeagueManagement() {
                                   type="number"
                                   min="0"
                                   value={editGameHomeScore}
-                                  onChange={(e) => setEditGameHomeScore(e.target.value)}
+                                  onChange={(e) => {
+                                    const newHomeScore = e.target.value;
+                                    setEditGameHomeScore(newHomeScore);
+                                    const homeVal = parseInt(newHomeScore);
+                                    const awayVal = parseInt(editGameAwayScore);
+                                    if (!isNaN(homeVal) && !isNaN(awayVal) && Math.abs(homeVal - awayVal) > 1) {
+                                      setEditGameIsOvertimeShootout(false);
+                                    }
+                                  }}
                                   className="text-center text-xl font-bold"
                                   placeholder="0"
                                   data-testid="input-edit-game-home-score"
@@ -4462,7 +4470,15 @@ export default function LeagueManagement() {
                                   type="number"
                                   min="0"
                                   value={editGameAwayScore}
-                                  onChange={(e) => setEditGameAwayScore(e.target.value)}
+                                  onChange={(e) => {
+                                    const newAwayScore = e.target.value;
+                                    setEditGameAwayScore(newAwayScore);
+                                    const homeVal = parseInt(editGameHomeScore);
+                                    const awayVal = parseInt(newAwayScore);
+                                    if (!isNaN(homeVal) && !isNaN(awayVal) && Math.abs(homeVal - awayVal) > 1) {
+                                      setEditGameIsOvertimeShootout(false);
+                                    }
+                                  }}
                                   className="text-center text-xl font-bold"
                                   placeholder="0"
                                   data-testid="input-edit-game-away-score"
@@ -4471,20 +4487,38 @@ export default function LeagueManagement() {
                             </div>
                             
                             <div className="mb-3 space-y-3">
-                              <div className="flex items-center space-x-2">
-                                <Checkbox
-                                  id="edit-overtime-shootout"
-                                  checked={editGameIsOvertimeShootout}
-                                  onCheckedChange={(checked) => setEditGameIsOvertimeShootout(checked === true)}
-                                  data-testid="checkbox-edit-overtime-shootout"
-                                />
-                                <Label
-                                  htmlFor="edit-overtime-shootout"
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[#ffffff]"
-                                >
-                                  Overtime/Shootout
-                                </Label>
-                              </div>
+                              {(() => {
+                                const homeVal = parseInt(editGameHomeScore);
+                                const awayVal = parseInt(editGameAwayScore);
+                                const hasValidScores = !isNaN(homeVal) && !isNaN(awayVal) && homeVal >= 0 && awayVal >= 0;
+                                const scoreDiff = hasValidScores ? Math.abs(homeVal - awayVal) : 0;
+                                const canSelectOvertimeShootout = !hasValidScores || scoreDiff <= 1;
+                                
+                                return (
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id="edit-overtime-shootout"
+                                      checked={editGameIsOvertimeShootout && canSelectOvertimeShootout}
+                                      onCheckedChange={(checked) => {
+                                        if (canSelectOvertimeShootout) {
+                                          setEditGameIsOvertimeShootout(checked === true);
+                                        }
+                                      }}
+                                      disabled={!canSelectOvertimeShootout}
+                                      data-testid="checkbox-edit-overtime-shootout"
+                                    />
+                                    <Label
+                                      htmlFor="edit-overtime-shootout"
+                                      className={`text-sm font-medium leading-none ${!canSelectOvertimeShootout ? 'cursor-not-allowed opacity-50' : ''} text-[#ffffff]`}
+                                    >
+                                      Overtime/Shootout
+                                      {!canSelectOvertimeShootout && (
+                                        <span className="ml-2 text-xs text-muted-foreground">(score difference must be 0 or 1)</span>
+                                      )}
+                                    </Label>
+                                  </div>
+                                );
+                              })()}
 
                               {editGameIsOvertimeShootout && (
                                 <div>
@@ -4548,7 +4582,10 @@ export default function LeagueManagement() {
                                     return;
                                   }
                                   
-                                  const resultType = editGameIsOvertimeShootout ? editGameResultType : 'regulation';
+                                  // Double-check: only allow OT/SO if score difference is 0 or 1
+                                  const scoreDiff = Math.abs(home - away);
+                                  const canUseOvertimeShootout = scoreDiff <= 1;
+                                  const resultType = (editGameIsOvertimeShootout && canUseOvertimeShootout) ? editGameResultType : 'regulation';
                                   commissionerScoreOverrideMutation.mutate(
                                     { gameId: selectedGame.id, homeScore: home, awayScore: away, resultType },
                                     {
@@ -4736,7 +4773,15 @@ export default function LeagueManagement() {
                                 type="number"
                                 min="0"
                                 value={commissionerHomeScore}
-                                onChange={(e) => setCommissionerHomeScore(e.target.value)}
+                                onChange={(e) => {
+                                  const newHomeScore = e.target.value;
+                                  setCommissionerHomeScore(newHomeScore);
+                                  const homeVal = parseInt(newHomeScore);
+                                  const awayVal = parseInt(commissionerAwayScore);
+                                  if (!isNaN(homeVal) && !isNaN(awayVal) && Math.abs(homeVal - awayVal) > 1) {
+                                    setCommissionerIsOvertimeShootout(false);
+                                  }
+                                }}
                                 placeholder="0"
                                 className="mt-1"
                               />
@@ -4750,7 +4795,15 @@ export default function LeagueManagement() {
                                 type="number"
                                 min="0"
                                 value={commissionerAwayScore}
-                                onChange={(e) => setCommissionerAwayScore(e.target.value)}
+                                onChange={(e) => {
+                                  const newAwayScore = e.target.value;
+                                  setCommissionerAwayScore(newAwayScore);
+                                  const homeVal = parseInt(commissionerHomeScore);
+                                  const awayVal = parseInt(newAwayScore);
+                                  if (!isNaN(homeVal) && !isNaN(awayVal) && Math.abs(homeVal - awayVal) > 1) {
+                                    setCommissionerIsOvertimeShootout(false);
+                                  }
+                                }}
                                 placeholder="0"
                                 className="mt-1"
                               />
@@ -4758,20 +4811,38 @@ export default function LeagueManagement() {
                           </div>
                           
                           <div className="mb-3 space-y-3">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id="commissioner-overtime-shootout"
-                                checked={commissionerIsOvertimeShootout}
-                                onCheckedChange={(checked) => setCommissionerIsOvertimeShootout(checked === true)}
-                                data-testid="checkbox-overtime-shootout"
-                              />
-                              <Label
-                                htmlFor="commissioner-overtime-shootout"
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[#ffffff]"
-                              >
-                                Overtime/Shootout
-                              </Label>
-                            </div>
+                            {(() => {
+                              const homeVal = parseInt(commissionerHomeScore);
+                              const awayVal = parseInt(commissionerAwayScore);
+                              const hasValidScores = !isNaN(homeVal) && !isNaN(awayVal) && homeVal >= 0 && awayVal >= 0;
+                              const scoreDiff = hasValidScores ? Math.abs(homeVal - awayVal) : 0;
+                              const canSelectOvertimeShootout = !hasValidScores || scoreDiff <= 1;
+                              
+                              return (
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id="commissioner-overtime-shootout"
+                                    checked={commissionerIsOvertimeShootout && canSelectOvertimeShootout}
+                                    onCheckedChange={(checked) => {
+                                      if (canSelectOvertimeShootout) {
+                                        setCommissionerIsOvertimeShootout(checked === true);
+                                      }
+                                    }}
+                                    disabled={!canSelectOvertimeShootout}
+                                    data-testid="checkbox-overtime-shootout"
+                                  />
+                                  <Label
+                                    htmlFor="commissioner-overtime-shootout"
+                                    className={`text-sm font-medium leading-none ${!canSelectOvertimeShootout ? 'cursor-not-allowed opacity-50' : ''} text-[#ffffff]`}
+                                  >
+                                    Overtime/Shootout
+                                    {!canSelectOvertimeShootout && (
+                                      <span className="ml-2 text-xs text-muted-foreground">(score difference must be 0 or 1)</span>
+                                    )}
+                                  </Label>
+                                </div>
+                              );
+                            })()}
 
                             {commissionerIsOvertimeShootout && (
                               <div>
@@ -4800,7 +4871,10 @@ export default function LeagueManagement() {
                               const home = parseInt(commissionerHomeScore);
                               const away = parseInt(commissionerAwayScore);
                               if (!isNaN(home) && !isNaN(away) && home >= 0 && away >= 0) {
-                                const resultType = commissionerIsOvertimeShootout ? commissionerResultType : 'regulation';
+                                // Double-check: only allow OT/SO if score difference is 0 or 1
+                                const scoreDiff = Math.abs(home - away);
+                                const canUseOvertimeShootout = scoreDiff <= 1;
+                                const resultType = (commissionerIsOvertimeShootout && canUseOvertimeShootout) ? commissionerResultType : 'regulation';
                                 commissionerScoreOverrideMutation.mutate({ 
                                   gameId: selectedGame.id, 
                                   homeScore: home, 
