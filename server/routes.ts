@@ -2545,13 +2545,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user is already a member
       const existingMembership = await storage.getUserLeagueMembership(targetUser.id, leagueId);
       
+      let updatedMembership;
+      
       if (existingMembership) {
         // If already a member, update their role to secondary_commissioner
-        const updatedMembership = await storage.updateLeagueMember(existingMembership.id, {
+        updatedMembership = await storage.updateLeagueMember(existingMembership.id, {
           leagueRole: 'secondary_commissioner',
           status: 'approved'
         });
-        return res.json(updatedMembership);
       } else {
         // Create new membership with secondary_commissioner role
         const membership = await storage.requestLeagueMembership({
@@ -2560,12 +2561,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Update the membership to secondary_commissioner and approved
-        const updatedMembership = await storage.updateLeagueMember(membership.id, {
+        updatedMembership = await storage.updateLeagueMember(membership.id, {
           leagueRole: 'secondary_commissioner',
           status: 'approved'
         });
-        return res.json(updatedMembership);
       }
+      
+      // Send notification to the new co-commissioner
+      const commissioner = await storage.getUser(userId);
+      const commissionerName = commissioner 
+        ? `${commissioner.firstName || ''} ${commissioner.lastName || ''}`.trim() || 'The commissioner'
+        : 'The commissioner';
+      
+      await storage.createNotification({
+        userId: targetUser.id,
+        type: 'general',
+        title: 'Co-Commissioner Role Granted',
+        message: `${commissionerName} has added you as a co-commissioner for ${league.name}. You now have access to League Management features for this league.`,
+        actionUrl: `/league-management/${leagueId}`,
+        actionText: 'View League Management'
+      });
+      
+      return res.json(updatedMembership);
     } catch (error) {
       console.error("Error adding co-commissioner:", error);
       res.status(500).json({ message: "Failed to add co-commissioner" });

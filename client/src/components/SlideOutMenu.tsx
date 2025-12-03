@@ -10,7 +10,7 @@ export function SlideOutMenu() {
   const [open, setOpen] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [location, navigate] = useLocation();
-  const { canAccessPremiumFeatures, canManageLeague, hasRole, hasStatManagerAccess } = usePermissions();
+  const { canAccessPremiumFeatures, canManageLeague, hasRole, hasStatManagerAccess, isCoCommissionerOfAnyLeague } = usePermissions();
 
   // Only show hamburger menu on home and profile screens
   const shouldShowHamburger = location === '/' || location === '/profile';
@@ -65,7 +65,7 @@ export function SlideOutMenu() {
       icon: Crown,
       label: 'League Management',
       path: '/league-list',
-      locked: !hasRole('secondary_commissioner'),
+      locked: !isCoCommissionerOfAnyLeague(),
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-amber-500/20',
       iconColor: 'text-amber-500',

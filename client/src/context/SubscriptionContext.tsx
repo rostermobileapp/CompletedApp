@@ -21,6 +21,7 @@ interface PermissionContextType {
   canEditStats: () => boolean;
   canAccessPremiumFeatures: () => boolean;
   hasStatManagerAccess: () => boolean;
+  isCoCommissionerOfAnyLeague: () => boolean;
   // League-specific permission checks
   hasLeagueRole: (leagueId: string, requiredRole: UserRole) => boolean;
   hasAnyLeagueRole: (leagueId: string, roles: UserRole[]) => boolean;
@@ -113,6 +114,16 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     return hasLeagueStatManager;
   };
 
+  const isCoCommissionerOfAnyLeague = (): boolean => {
+    if (!user) return false;
+    if (isPrimaryCommissioner) return true;
+    if (hasRole('commissioner')) return true;
+    if (hasRole('secondary_commissioner')) return true;
+    return leagueMemberships.some((membership: any) => 
+      membership.leagueRole === 'secondary_commissioner'
+    );
+  };
+
   // League-specific permission functions
   const getUserLeagueMembership = (leagueId: string) => {
     return leagueMemberships.find((membership: any) => membership.leagueId === leagueId) || null;
@@ -186,6 +197,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
       canEditStats,
       canAccessPremiumFeatures,
       hasStatManagerAccess,
+      isCoCommissionerOfAnyLeague,
       hasLeagueRole,
       hasAnyLeagueRole,
       hasLeagueSpecialPermission,
