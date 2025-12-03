@@ -3028,12 +3028,40 @@ export class DatabaseStorage implements IStorage {
   }>> {
     // Get all teams in the league
     const teams = await this.getTeamsByLeague(leagueId);
+    const teamIdSet = new Set(teams.map(t => t.id));
     
-    // Get all completed games in the league
-    const games = await this.getGamesByLeague(leagueId);
-    const completedGames = games.filter(game => 
-      game.isCompleted || (game.homeScore !== null && game.awayScore !== null)
-    );
+    // Get all completed games for this league
+    // Query all games that either have this league_id OR involve teams from this league
+    const result = await db.execute(sql`
+      SELECT 
+        g.id,
+        g.league_id,
+        g.home_team_id,
+        g.away_team_id,
+        g.home_score,
+        g.away_score,
+        g.is_completed,
+        g.result_type
+      FROM games g
+      LEFT JOIN teams ht ON g.home_team_id = ht.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
+      WHERE (g.is_completed = true OR (g.home_score IS NOT NULL AND g.away_score IS NOT NULL))
+        AND (
+          g.league_id = ${leagueId}
+          OR (ht.league_id = ${leagueId} AND at.league_id = ${leagueId})
+        )
+    `);
+    
+    const completedGames = result.rows.map((row: any) => ({
+      id: row.id as string,
+      leagueId: row.league_id as string | null,
+      homeTeamId: row.home_team_id as string,
+      awayTeamId: row.away_team_id as string | null,
+      homeScore: row.home_score as number | null,
+      awayScore: row.away_score as number | null,
+      isCompleted: row.is_completed as boolean,
+      resultType: row.result_type as "regulation" | "overtime" | "shootout" | null,
+    }));
 
     // Calculate standings for each team
     const standings = [];
@@ -3047,34 +3075,46 @@ export class DatabaseStorage implements IStorage {
       let goalsFor = 0;
       let goalsAgainst = 0;
 
-      // Process each completed game
+      // Process each completed game - only count games where this team is involved
+      // and the opponent is also a league team (for proper league standings)
       for (const game of completedGames) {
-        if (game.homeTeamId === team.id || game.awayTeamId === team.id) {
-          gamesPlayed++;
-          
-          const isHomeTeam = game.homeTeamId === team.id;
-          const teamScore = isHomeTeam ? game.homeScore : game.awayScore;
-          const opponentScore = isHomeTeam ? game.awayScore : game.homeScore;
-          
-          // Add to goals for/against
-          goalsFor += teamScore || 0;
-          goalsAgainst += opponentScore || 0;
-          
-          // Determine win/loss/tie/OTL
-          if (teamScore !== null && opponentScore !== null) {
-            if (teamScore > opponentScore) {
-              wins++;
-            } else if (teamScore < opponentScore) {
-              // Check if this is an overtime/shootout loss (gets 1 point)
-              if (game.resultType === 'overtime' || game.resultType === 'shootout') {
-                shootoutLosses++;
-              } else {
-                losses++;
-              }
-            } else {
-              ties++;
-            }
+        const isHomeTeam = game.homeTeamId === team.id;
+        const isAwayTeam = game.awayTeamId === team.id;
+        
+        // Skip if this team isn't in this game
+        if (!isHomeTeam && !isAwayTeam) continue;
+        
+        // Get the opponent's team ID
+        const opponentId = isHomeTeam ? game.awayTeamId : game.homeTeamId;
+        
+        // Only count games where opponent is also a league team
+        // (this handles edge cases with cross-league games or games with null away_team_id)
+        if (!opponentId || !teamIdSet.has(opponentId)) continue;
+        
+        // Ensure we have scores for both teams
+        if (game.homeScore === null || game.awayScore === null) continue;
+        
+        gamesPlayed++;
+        
+        const teamScore = isHomeTeam ? game.homeScore : game.awayScore;
+        const opponentScore = isHomeTeam ? game.awayScore : game.homeScore;
+        
+        // Add to goals for/against
+        goalsFor += teamScore;
+        goalsAgainst += opponentScore;
+        
+        // Determine win/loss/tie/OTL
+        if (teamScore > opponentScore) {
+          wins++;
+        } else if (teamScore < opponentScore) {
+          // Check if this is an overtime/shootout loss (gets 1 point)
+          if (game.resultType === 'overtime' || game.resultType === 'shootout') {
+            shootoutLosses++;
+          } else {
+            losses++;
           }
+        } else {
+          ties++;
         }
       }
 
