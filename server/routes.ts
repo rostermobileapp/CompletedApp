@@ -7361,6 +7361,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { membershipId, importedPlayerId } = req.body;
       const userId = req.user.claims.sub;
 
+      console.log('Player merge request:', { leagueId, membershipId, importedPlayerId, userId });
+
+      // Validate required fields
+      if (!membershipId || !importedPlayerId) {
+        return res.status(400).json({ message: 'Missing required fields: membershipId and importedPlayerId are required' });
+      }
+
       // Check commissioner access
       const league = await storage.getLeague(leagueId);
       if (!league || league.commissionerId !== userId) {
@@ -7374,10 +7381,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(1);
 
       if (!importedPlayer.length) {
+        console.log('Imported player not found:', importedPlayerId);
         return res.status(404).json({ message: 'Imported player not found' });
       }
 
       const player = importedPlayer[0];
+      console.log('Found imported player:', { firstName: player.firstName, lastName: player.lastName, teamName: player.teamName });
+
+      // Get the membership first to verify it exists
+      const membershipCheck = await db.select().from(leagueMemberships).where(eq(leagueMemberships.id, membershipId)).limit(1);
+      if (!membershipCheck.length) {
+        console.log('Membership not found:', membershipId);
+        return res.status(404).json({ message: 'Membership not found' });
+      }
+
+      const realUserId = membershipCheck[0].userId;
+      console.log('Real user ID from membership:', realUserId);
 
       // Approve the membership and assign to team if available
       await storage.approveLeagueMembership(membershipId, userId);
@@ -7405,41 +7424,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(leagueMemberships.id, membershipId));
       }
 
-      // Get the real user's ID from the membership
-      const realUserMembership = await db.select().from(leagueMemberships).where(eq(leagueMemberships.id, membershipId)).limit(1);
-      const realUserId = realUserMembership[0].userId;
-      
       // Find and delete the placeholder user's league membership
       // Placeholder users have emails ending with @placeholder.roster
-      // Match BOTH first and last name to ensure we only delete the correct placeholder
-      const placeholderMemberships = await db.select()
-        .from(leagueMemberships)
-        .innerJoin(users, eq(leagueMemberships.userId, users.id))
-        .where(
-          and(
-            eq(leagueMemberships.leagueId, leagueId),
-            ilike(users.email, '%@placeholder.roster'),
-            ilike(users.firstName, player.firstName || ''),
-            ilike(users.lastName, player.lastName || '')
-          )
-        );
-      
-      // Delete placeholder memberships
-      for (const pm of placeholderMemberships) {
-        const placeholderUserId = pm.league_memberships.userId;
+      // Only attempt to find placeholder if we have both first and last name
+      if (player.firstName && player.lastName) {
+        const placeholderMemberships = await db.select()
+          .from(leagueMemberships)
+          .innerJoin(users, eq(leagueMemberships.userId, users.id))
+          .where(
+            and(
+              eq(leagueMemberships.leagueId, leagueId),
+              ilike(users.email, '%@placeholder.roster'),
+              ilike(users.firstName, player.firstName),
+              ilike(users.lastName, player.lastName)
+            )
+          );
         
-        // Only delete if it's not the real user
-        if (placeholderUserId !== realUserId) {
-          await db.delete(leagueMemberships)
-            .where(eq(leagueMemberships.id, pm.league_memberships.id));
+        console.log('Found placeholder memberships:', placeholderMemberships.length);
+        
+        // Delete placeholder memberships
+        for (const pm of placeholderMemberships) {
+          const placeholderUserId = pm.league_memberships.userId;
           
-          // Optionally delete the placeholder user if they have no other memberships
-          const otherMemberships = await db.select()
-            .from(leagueMemberships)
-            .where(eq(leagueMemberships.userId, placeholderUserId));
-          
-          if (otherMemberships.length === 0) {
-            await db.delete(users).where(eq(users.id, placeholderUserId));
+          // Only delete if it's not the real user
+          if (placeholderUserId !== realUserId) {
+            await db.delete(leagueMemberships)
+              .where(eq(leagueMemberships.id, pm.league_memberships.id));
+            
+            // Optionally delete the placeholder user if they have no other memberships
+            const otherMemberships = await db.select()
+              .from(leagueMemberships)
+              .where(eq(leagueMemberships.userId, placeholderUserId));
+            
+            if (otherMemberships.length === 0) {
+              await db.delete(users).where(eq(users.id, placeholderUserId));
+            }
           }
         }
       }
@@ -7452,10 +7471,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(importedPlayers.id, importedPlayerId));
 
+      console.log('Player merge completed successfully');
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error merging player:', error);
-      res.status(500).json({ message: 'Failed to merge player' });
+      console.error('Error stack:', error?.stack);
+      res.status(500).json({ message: 'Failed to merge player', error: error?.message });
     }
   });
 
