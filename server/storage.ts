@@ -6835,9 +6835,11 @@ export class DatabaseStorage implements IStorage {
     teamId?: string;
   }>> {
     // Build season conditions
-    let gameSeasonConditions = [];
+    // Include games that match the seasonId OR have NULL seasonId (legacy games without season assigned)
+    let gameSeasonConditions: SQL[] = [];
     if (seasonId) {
-      gameSeasonConditions.push(eq(games.seasonId, seasonId));
+      // Match games with the specified seasonId OR games with NULL seasonId
+      gameSeasonConditions.push(or(eq(games.seasonId, seasonId), isNull(games.seasonId))!);
     }
     // If no seasonId provided, return stats for all seasons (no filter)
 
