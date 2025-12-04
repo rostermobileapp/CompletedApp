@@ -317,7 +317,12 @@ export default function CreateTeam() {
 
   const handleCreateFacility = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFacilityName.trim()) {
+    const name = newFacilityName.trim();
+    const address = newFacilityAddress.trim();
+    const city = newFacilityCity.trim();
+    const state = newFacilityState.trim();
+
+    if (!name) {
       toast({
         title: 'Error',
         description: 'Facility name is required',
@@ -326,11 +331,55 @@ export default function CreateTeam() {
       return;
     }
 
+    if (!address) {
+      toast({
+        title: 'Error',
+        description: 'Address is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!city) {
+      toast({
+        title: 'Error',
+        description: 'City is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!state) {
+      toast({
+        title: 'Error',
+        description: 'State is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check for duplicate facilities
+    const duplicate = facilities.find(
+      facility =>
+        facility.address?.toLowerCase() === address.toLowerCase() &&
+        facility.city?.toLowerCase() === city.toLowerCase() &&
+        facility.state?.toLowerCase() === state.toLowerCase()
+    );
+
+    if (duplicate) {
+      toast({
+        title: 'Duplicate Facility',
+        description: 'This facility already exists',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     createFacilityMutation.mutate({
-      name: newFacilityName.trim(),
-      address: newFacilityAddress.trim() || undefined,
-      city: newFacilityCity.trim() || undefined,
-      state: newFacilityState.trim() || undefined,
+      name,
+      address,
+      city,
+      state,
     });
   };
 
@@ -673,7 +722,7 @@ export default function CreateTeam() {
               />
             </div>
             <div>
-              <Label htmlFor="facilityAddress">Address</Label>
+              <Label htmlFor="facilityAddress">Address *</Label>
               <Input
                 id="facilityAddress"
                 data-testid="input-facility-address"
@@ -685,7 +734,7 @@ export default function CreateTeam() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="facilityCity">City</Label>
+                <Label htmlFor="facilityCity">City *</Label>
                 <Input
                   id="facilityCity"
                   data-testid="input-facility-city"
@@ -696,7 +745,7 @@ export default function CreateTeam() {
                 />
               </div>
               <div>
-                <Label htmlFor="facilityState">State</Label>
+                <Label htmlFor="facilityState">State *</Label>
                 <Input
                   id="facilityState"
                   data-testid="input-facility-state"
@@ -719,7 +768,7 @@ export default function CreateTeam() {
               <Button
                 type="submit"
                 data-testid="button-submit-facility"
-                disabled={createFacilityMutation.isPending || !newFacilityName.trim()}
+                disabled={createFacilityMutation.isPending || !newFacilityName.trim() || !newFacilityAddress.trim() || !newFacilityCity.trim() || !newFacilityState.trim()}
               >
                 {createFacilityMutation.isPending ? 'Creating...' : 'Create Facility'}
               </Button>
