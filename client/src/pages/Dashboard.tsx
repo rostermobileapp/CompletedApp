@@ -1671,7 +1671,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex flex-col" data-testid="dashboard-page">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-background p-3 pt-[0px] pb-[0px] flex items-center mt-[12px] mb-[12px] pl-[16px] pr-[16px]">
+      <div className="sticky top-0 z-50 bg-background p-3 pt-[0px] pb-[0px] flex items-center mb-[12px] pl-[16px] pr-[16px]">
         <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
           <div className="flex items-center gap-2">
             <img 
