@@ -1671,7 +1671,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex flex-col" data-testid="dashboard-page">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-background p-3 pt-[0px] pb-[0px] flex items-center mb-[12px] pl-[16px] pr-[16px]">
+      <div className="sticky top-0 z-50 bg-background p-3 flex items-center mb-[12px] pl-[16px] pr-[16px] pt-[4px] pb-[4px]">
         <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
           <div className="flex items-center gap-2">
             <img 
@@ -2101,7 +2101,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      
       {/* Scorekeeper Link Box - Show for users with scorekeeper access but no team */}
       {!primaryTeam && hasStatManagerAccess() && (
         <div className="px-6 mb-6">
@@ -2125,7 +2124,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
       {/* Needs Attention Section - Show for leagues and league teams */}
       {effectiveLeagueId && (
         <NeedsAttentionTasks 
