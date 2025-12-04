@@ -410,7 +410,7 @@ export function TournamentPhotos({
       {selectedPhotoIndex !== null && (
         <PhotoViewer
           photos={filteredPhotos.map((p) => ({
-            url: getImageUrl(p.fileUrl),
+            url: getImageUrl(p.fileUrl) || p.fileUrl,
             caption: p.caption ?? undefined,
             uploader: `${p.uploader.firstName} ${p.uploader.lastName}`,
           }))}

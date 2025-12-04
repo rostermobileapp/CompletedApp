@@ -149,6 +149,7 @@ function Router() {
             <Route path="/tournaments/:tournamentId" component={TournamentDetail} />
             <Route path="/media/tournament/:id" component={MediaGalleryPage} />
             <Route path="/media/league/:id" component={MediaGalleryPage} />
+            <Route path="/media/team/:id" component={MediaGalleryPage} />
             <Route path="/privacy" component={Privacy} />
             <Route path="/admin/stripe" component={StripeAdmin} />
             <Route component={NotFound} />

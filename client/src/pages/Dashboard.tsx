@@ -1928,6 +1928,8 @@ export default function Dashboard() {
             onClick={() => {
               if (selectedType === 'tournament' && selectedId) {
                 navigate(`/media/tournament/${selectedId}`);
+              } else if (selectedType === 'team' && selectedId) {
+                navigate(`/media/team/${selectedId}`);
               } else if (effectiveLeagueId) {
                 navigate(`/media/league/${effectiveLeagueId}`);
               }

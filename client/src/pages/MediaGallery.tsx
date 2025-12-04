@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TournamentPhotos } from "@/components/TournamentPhotos";
 import { LeaguePhotos } from "@/components/LeaguePhotos";
+import { TeamPhotos } from "@/components/TeamPhotos";
 import { usePermissions } from "@/context/SubscriptionContext";
 import { useState } from "react";
 
 export default function MediaGalleryPage() {
   const [, tournamentParams] = useRoute("/media/tournament/:id");
   const [, leagueParams] = useRoute("/media/league/:id");
+  const [, teamParams] = useRoute("/media/team/:id");
   const [, navigate] = useLocation();
   const [showUploader, setShowUploader] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -20,8 +22,8 @@ export default function MediaGalleryPage() {
   const { role } = usePermissions();
 
   // Determine entity type and ID
-  const entityType = tournamentParams ? 'tournament' : leagueParams ? 'league' : null;
-  const entityId = tournamentParams?.id || leagueParams?.id;
+  const entityType = tournamentParams ? 'tournament' : leagueParams ? 'league' : teamParams ? 'team' : null;
+  const entityId = tournamentParams?.id || leagueParams?.id || teamParams?.id;
   
   // Check if user has paid access (not free tier) for league photos
   const hasPaidAccess = role !== 'free_tier';
@@ -72,10 +74,25 @@ export default function MediaGalleryPage() {
   // 3. An approved member with paid subscription
   const hasLeaguePhotoAccess = isLeagueCommissioner || isSecondaryCommissioner || (isLeagueMember && hasPaidAccess);
   
-  // Determine if user can upload based on entity type
-  const canUpload = entityType === 'tournament' ? isTournamentParticipant : (entityType === 'league' && hasLeaguePhotoAccess);
+  // Fetch team data
+  const { data: team } = useQuery<any>({
+    queryKey: ['/api/teams', entityId],
+    enabled: !!entityId && entityType === 'team'
+  });
 
-  const entity = tournament || league;
+  // Check if current user is a team member (for team photos)
+  const { data: teamMembership } = useQuery<any>({
+    queryKey: [`/api/teams/${entityId}/membership`],
+    enabled: !!entityId && entityType === 'team' && !!currentUser?.id,
+  });
+
+  const isTeamMember = teamMembership?.status === 'approved' || !!currentUser?.id;
+  const isTeamCaptain = team && currentUser?.id && team.captainId === currentUser.id;
+
+  // Determine if user can upload based on entity type
+  const canUpload = entityType === 'tournament' ? isTournamentParticipant : entityType === 'team' ? isTeamMember : (entityType === 'league' && hasLeaguePhotoAccess);
+
+  const entity = tournament || league || team;
   const entityName = entity?.name || 'Photos';
 
   if (!entityId || !entityType) {
@@ -208,6 +225,17 @@ export default function MediaGalleryPage() {
               showOnlyMyPhotos={showOnlyMyPhotos}
             />
           )
+        )}
+        {entityType === 'team' && entityId && (
+          <TeamPhotos 
+            teamId={entityId} 
+            currentUserId={currentUser?.id}
+            showUploader={showUploader}
+            onShowUploaderChange={setShowUploader}
+            onUploadStart={() => setIsUploading(true)}
+            onUploadComplete={() => setIsUploading(false)}
+            showOnlyMyPhotos={showOnlyMyPhotos}
+          />
         )}
       </div>
     </div>

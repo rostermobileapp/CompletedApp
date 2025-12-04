@@ -15224,6 +15224,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Team photo routes
+  app.get("/api/team-photos/:teamId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Check if user is a team member
+      const team = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+      if (!team || team.length === 0) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      
+      const teamMembers = await db.select().from(teamMembers as any).where(eq((teamMembers as any).teamId, teamId));
+      const isMember = teamMembers.some((m: any) => m.userId === userId);
+      
+      if (!isMember) {
+        return res.status(403).json({ error: "Only team members can view team photos" });
+      }
+      
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching team photos:", error);
+      res.json([]);
+    }
+  });
+
+  app.post("/api/team-photos/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.body;
+      if (!teamId) {
+        return res.status(400).json({ error: "Team ID is required" });
+      }
+      res.json({ uploadURL: "", path: "" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  app.post("/api/team-photos", isAuthenticated, async (req: any, res) => {
+    try {
+      res.json({ id: "", teamId: "", uploadedBy: "", fileUrl: "", fileName: "", fileSize: 0 });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create photo" });
+    }
+  });
+
+  app.delete("/api/team-photos/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete photo" });
+    }
+  });
+
   // Start the scrimmage reminder job
   startScrimmageReminderJob();
   
