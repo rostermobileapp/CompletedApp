@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Papa from 'papaparse';
+import { Loader } from '@googlemaps/js-api-loader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,6 +48,11 @@ export default function CreateTeam() {
   const [newFacilityAddress, setNewFacilityAddress] = useState('');
   const [newFacilityCity, setNewFacilityCity] = useState('');
   const [newFacilityState, setNewFacilityState] = useState('');
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const autocompleteServiceRef = useRef<any>(null);
+  const placesServiceRef = useRef<any>(null);
+  const addressInputRef = useRef<HTMLInputElement>(null);
 
   // Manual player addition state
   const [manualFirstName, setManualFirstName] = useState('');
@@ -54,6 +60,27 @@ export default function CreateTeam() {
   const [manualEmail, setManualEmail] = useState('');
   const [manualJerseyNumber, setManualJerseyNumber] = useState('');
   const [manualPosition, setManualPosition] = useState('');
+
+  // Initialize Google Maps API
+  useEffect(() => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) return;
+
+    const loader = new Loader({
+      apiKey: apiKey,
+      version: 'weekly',
+      libraries: ['places'],
+    });
+
+    loader.load().then(() => {
+      if (window.google?.maps?.places) {
+        autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+        placesServiceRef.current = new window.google.maps.places.PlacesService(
+          document.createElement('div')
+        );
+      }
+    }).catch(err => console.error('Failed to load Google Maps API:', err));
+  }, []);
 
   // Fetch facilities
   const { data: facilities = [] } = useQuery<Facility[]>({
@@ -313,6 +340,62 @@ export default function CreateTeam() {
       jerseyNumber: manualJerseyNumber.trim() || undefined,
       position: manualPosition.trim() || undefined,
     });
+  };
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewFacilityAddress(value);
+
+    if (!autocompleteServiceRef.current || value.length < 3) {
+      setAddressSuggestions([]);
+      setShowAddressSuggestions(false);
+      return;
+    }
+
+    autocompleteServiceRef.current.getPlacePredictions(
+      {
+        input: value,
+        componentRestrictions: { country: 'us' },
+      },
+      (predictions: any[], status: any) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setAddressSuggestions(predictions);
+          setShowAddressSuggestions(true);
+        } else {
+          setAddressSuggestions([]);
+        }
+      }
+    );
+  };
+
+  const handleSelectAddress = (placeId: string) => {
+    if (!placesServiceRef.current) return;
+
+    placesServiceRef.current.getDetails(
+      { placeId, fields: ['formatted_address', 'address_components'] },
+      (place: any, status: any) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
+          setNewFacilityAddress(place.formatted_address || '');
+          
+          // Extract city and state from address components
+          let city = '';
+          let state = '';
+          place.address_components?.forEach((component: any) => {
+            if (component.types.includes('locality')) {
+              city = component.long_name;
+            }
+            if (component.types.includes('administrative_area_level_1')) {
+              state = component.short_name;
+            }
+          });
+
+          setNewFacilityCity(city);
+          setNewFacilityState(state);
+          setAddressSuggestions([]);
+          setShowAddressSuggestions(false);
+        }
+      }
+    );
   };
 
   const handleCreateFacility = (e: React.FormEvent) => {
@@ -721,16 +804,35 @@ export default function CreateTeam() {
                 disabled={createFacilityMutation.isPending}
               />
             </div>
-            <div>
+            <div className="relative">
               <Label htmlFor="facilityAddress">Address *</Label>
               <Input
+                ref={addressInputRef}
                 id="facilityAddress"
                 data-testid="input-facility-address"
                 value={newFacilityAddress}
-                onChange={(e) => setNewFacilityAddress(e.target.value)}
-                placeholder="123 Main St"
+                onChange={handleAddressChange}
+                onFocus={() => newFacilityAddress.length > 0 && setShowAddressSuggestions(true)}
+                placeholder="Start typing an address..."
                 disabled={createFacilityMutation.isPending}
+                autoComplete="off"
               />
+              {showAddressSuggestions && addressSuggestions.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {addressSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => handleSelectAddress(suggestion.place_id)}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors border-b last:border-b-0"
+                      data-testid={`suggestion-address-${index}`}
+                    >
+                      <div className="font-medium">{suggestion.main_text}</div>
+                      <div className="text-xs text-muted-foreground">{suggestion.secondary_text}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
