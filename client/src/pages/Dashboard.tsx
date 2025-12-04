@@ -1674,6 +1674,15 @@ export default function Dashboard() {
       <div className="sticky top-0 z-50 bg-background p-3 pt-[0px] pb-[0px] flex items-center mt-[12px] mb-[12px] pl-[16px] pr-[16px]">
         <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
           <div className="flex items-center gap-2">
+            <img 
+              src={logoUrl}
+              alt="Roster Logo" 
+              className="h-[30px] w-auto pt-[0px] pb-[0px] pl-[12px] pr-[12px] invert dark:invert-0"
+              data-testid="img-roster-logo"
+            />
+          </div>
+          <div className="flex items-center gap-3 pr-16">
+            <NotificationCenter />
             <Sheet open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu}>
               <SheetTrigger asChild>
                 <button
@@ -1684,8 +1693,8 @@ export default function Dashboard() {
                 </button>
               </SheetTrigger>
               <SheetContent 
-                side="left" 
-                className="w-[85%] sm:w-[400px] h-screen border-r border-border bg-background flex flex-col [&>button]:hidden"
+                side="right" 
+                className="w-[85%] sm:w-[400px] h-screen border-l border-border bg-background flex flex-col [&>button]:hidden"
               >
                 <SheetHeader className="flex-shrink-0 px-6 pt-[4px] pb-[4px]">
                   <div className="flex items-center justify-between">
@@ -1716,15 +1725,6 @@ export default function Dashboard() {
                 </div>
               </SheetContent>
             </Sheet>
-            <img 
-              src={logoUrl}
-              alt="Roster Logo" 
-              className="h-[30px] w-auto pt-[0px] pb-[0px] pl-[12px] pr-[12px] invert dark:invert-0"
-              data-testid="img-roster-logo"
-            />
-          </div>
-          <div className="flex items-center gap-3 pr-16">
-            <NotificationCenter />
             <button 
               onClick={() => navigate('/profile')}
               className="w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden bg-primary"
