@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { notifyDashboardSelectionChange } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon, UserPlus, Target, ArrowRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -1727,17 +1727,61 @@ export default function Dashboard() {
                   </div>
                 </SheetHeader>
                 <div className="flex-1 flex flex-col justify-evenly px-6 pb-6">
-                  <button onClick={() => { navigate('/create-scrimmage'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center gap-3" data-testid="menu-item-scrimmage">
-                    <div className="p-2.5 rounded-xl bg-blue-500/20"><Calendar className="w-5 h-5 text-blue-500" /></div>
-                    <span className="text-base font-semibold">Schedule Scrimmage</span>
+                  <button onClick={() => { navigate('/create-scrimmage'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between" data-testid="menu-item-scrimmage">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-blue-500/20"><Calendar className="w-5 h-5 text-blue-500" /></div>
+                      <span className="text-base font-semibold">Schedule Scrimmage</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
                   </button>
-                  <button onClick={() => { navigate('/create-team'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center gap-3" data-testid="menu-item-team">
-                    <div className="p-2.5 rounded-xl bg-cyan-500/20"><Users className="w-5 h-5 text-cyan-500" /></div>
-                    <span className="text-base font-semibold">Create a Team</span>
+                  <button onClick={() => { navigate('/invite-groups'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between" data-testid="menu-item-invite-groups">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-teal-500/20"><UserPlus className="w-5 h-5 text-teal-500" /></div>
+                      <span className="text-base font-semibold">Invite Groups</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
                   </button>
-                  <button onClick={() => { navigate('/create-league'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center gap-3" data-testid="menu-item-league">
-                    <div className="p-2.5 rounded-xl bg-green-500/20"><Plus className="w-5 h-5 text-green-500" /></div>
-                    <span className="text-base font-semibold">Create a League</span>
+                  <button onClick={() => { navigate('/scrimmage-management'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between" data-testid="menu-item-scrimmage-management">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-purple-500/20"><Settings className="w-5 h-5 text-purple-500" /></div>
+                      <span className="text-base font-semibold">Scrimmage Management</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => { navigate('/create-team'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between" data-testid="menu-item-team">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-cyan-500/20"><Users className="w-5 h-5 text-cyan-500" /></div>
+                      <span className="text-base font-semibold">Create a Team</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => { navigate('/create-league'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between" data-testid="menu-item-league">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-green-500/20"><Plus className="w-5 h-5 text-green-500" /></div>
+                      <span className="text-base font-semibold">Create a League</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => { navigate('/league-list'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between" data-testid="menu-item-league-management">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-amber-500/20"><Crown className="w-5 h-5 text-amber-500" /></div>
+                      <span className="text-base font-semibold">League Management</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => { navigate('/tournaments'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between" data-testid="menu-item-tournaments">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-orange-500/20"><Trophy className="w-5 h-5 text-orange-500" /></div>
+                      <span className="text-base font-semibold">Tournaments</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => { navigate('/scorekeeper'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between" data-testid="menu-item-scorekeeper">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-red-500/20"><Target className="w-5 h-5 text-red-500" /></div>
+                      <span className="text-base font-semibold">Scorekeeper</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </div>
               </SheetContent>
