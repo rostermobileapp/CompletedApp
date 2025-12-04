@@ -3618,6 +3618,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const gameData = insertGameSchema.parse(req.body);
+      
+      // Permission check: Only team captains, team creators, or league commissioners can schedule games
+      let hasPermission = false;
+      
+      // Check if user is captain or creator of home team
+      const homeTeam = await storage.getTeam(gameData.homeTeamId);
+      if (homeTeam?.captainId === userId || homeTeam?.creatorId === userId) {
+        hasPermission = true;
+      }
+      
+      // Check if user is captain or creator of away team (if present)
+      if (!hasPermission && gameData.awayTeamId) {
+        const awayTeam = await storage.getTeam(gameData.awayTeamId);
+        if (awayTeam?.captainId === userId || awayTeam?.creatorId === userId) {
+          hasPermission = true;
+        }
+      }
+      
+      // Check if user is commissioner of the league (only for league games)
+      if (!hasPermission && gameData.leagueId) {
+        const league = await storage.getLeague(gameData.leagueId);
+        if (league?.commissionerId === userId) {
+          hasPermission = true;
+        }
+      }
+      
+      if (!hasPermission) {
+        return res.status(403).json({ message: "You don't have permission to schedule games. Only team captains, team creators, or league commissioners can schedule games." });
+      }
+      
       const game = await storage.createGame(gameData);
       const formattedGame = formatGameForResponse(game);
       res.json(formattedGame);
@@ -3637,10 +3667,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Verify that the game exists and the user has permission to edit it
+      // Verify that the game exists
       const existingGame = await storage.getGameById(gameId);
       if (!existingGame) {
         return res.status(404).json({ message: "Game not found" });
+      }
+      
+      // Permission check: Only team captains, team creators, or league commissioners can update games
+      let hasPermission = false;
+      
+      // Check if user is captain or creator of home team
+      const homeTeam = await storage.getTeam(existingGame.homeTeamId);
+      if (homeTeam?.captainId === userId || homeTeam?.creatorId === userId) {
+        hasPermission = true;
+      }
+      
+      // Check if user is captain or creator of away team (if present)
+      if (!hasPermission && existingGame.awayTeamId) {
+        const awayTeam = await storage.getTeam(existingGame.awayTeamId);
+        if (awayTeam?.captainId === userId || awayTeam?.creatorId === userId) {
+          hasPermission = true;
+        }
+      }
+      
+      // Check if user is commissioner of the league (only for league games)
+      if (!hasPermission && existingGame.leagueId) {
+        const league = await storage.getLeague(existingGame.leagueId);
+        if (league?.commissionerId === userId) {
+          hasPermission = true;
+        }
+      }
+      
+      if (!hasPermission) {
+        return res.status(403).json({ message: "You don't have permission to update this game. Only team captains, team creators, or league commissioners can update games." });
       }
 
       const updates = req.body;
@@ -3676,13 +3735,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      // Check if user has permission to delete the game
+      // Permission check: Only team captains, team creators, or league commissioners can delete games
       let hasPermission = false;
       
-      // Check if user is captain of home team
+      // Check if user is captain or creator of home team
       const homeTeam = await storage.getTeam(game.homeTeamId);
-      if (homeTeam?.captainId === userId) {
+      if (homeTeam?.captainId === userId || homeTeam?.creatorId === userId) {
         hasPermission = true;
+      }
+      
+      // Check if user is captain or creator of away team (if present)
+      if (!hasPermission && game.awayTeamId) {
+        const awayTeam = await storage.getTeam(game.awayTeamId);
+        if (awayTeam?.captainId === userId || awayTeam?.creatorId === userId) {
+          hasPermission = true;
+        }
       }
       
       // Check if user is commissioner of the league (only for league games)
@@ -3694,7 +3761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (!hasPermission) {
-        return res.status(403).json({ message: "You don't have permission to delete this game" });
+        return res.status(403).json({ message: "You don't have permission to delete this game. Only team captains, team creators, or league commissioners can delete games." });
       }
 
       await storage.deleteGame(gameId);
