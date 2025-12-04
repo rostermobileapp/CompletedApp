@@ -10305,7 +10305,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         replyToId: z.string().optional(),
         attachments: z.array(z.object({
           fileName: z.string(),
-          fileUrl: z.string().url(),
+          fileUrl: z.string().regex(/^(https?:\/\/|\/message-attachments\/)/, {
+            message: 'fileUrl must be a valid URL or a /message-attachments/ path'
+          }),
           fileType: z.string(),
           fileSize: z.number().min(0)
         })).optional()
