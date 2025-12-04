@@ -1683,6 +1683,23 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3 pr-16">
             <NotificationCenter />
+            <button 
+              onClick={() => navigate('/profile')}
+              className="w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden bg-primary"
+              data-testid="button-profile"
+            >
+              {(userProfile as any)?.profileImageUrl ? (
+                <img 
+                  src={getImageUrl((userProfile as any).profileImageUrl) || ''} 
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-primary-foreground text-lg font-semibold">
+                  {(userProfile as any)?.firstName?.[0] || 'U'}
+                </span>
+              )}
+            </button>
             <Sheet open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu}>
               <SheetTrigger asChild>
                 <button
@@ -1725,23 +1742,6 @@ export default function Dashboard() {
                 </div>
               </SheetContent>
             </Sheet>
-            <button 
-              onClick={() => navigate('/profile')}
-              className="w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden bg-primary"
-              data-testid="button-profile"
-            >
-              {(userProfile as any)?.profileImageUrl ? (
-                <img 
-                  src={getImageUrl((userProfile as any).profileImageUrl) || ''} 
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-primary-foreground text-lg font-semibold">
-                  {(userProfile as any)?.firstName?.[0] || 'U'}
-                </span>
-              )}
-            </button>
           </div>
         </div>
       </div>
