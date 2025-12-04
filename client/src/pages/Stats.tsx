@@ -488,7 +488,7 @@ export default function Stats() {
                 <table className="w-full" data-testid="table-stats">
                   <thead className="bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">#</th>
+                      <th className="text-left px-2 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 w-8">#</th>
                       <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Player</th>
                       {activeTab === 'skaters' ? (
                         <>
@@ -513,7 +513,7 @@ export default function Stats() {
                       const membership = membershipMap.get(stat.userId);
                       return (
                         <tr key={stat.userId} className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-900/50" data-testid={`row-player-${index}`}>
-                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-sm">{index + 1}</td>
+                          <td className="px-2 py-3 text-gray-600 dark:text-gray-400 text-sm w-8">{index + 1}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <Avatar className="w-8 h-8">
