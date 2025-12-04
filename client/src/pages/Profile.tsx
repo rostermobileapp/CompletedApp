@@ -528,6 +528,10 @@ export default function Profile() {
           ) : (
             <div className="space-y-3">
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Name:</span>
+                <span data-testid="text-profile-name">{`${(user as any)?.firstName || ''} ${(user as any)?.lastName || ''}`.trim() || 'Not specified'}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Email:</span>
                 <span data-testid="text-profile-email">{(user as any)?.email || 'Not specified'}</span>
               </div>
