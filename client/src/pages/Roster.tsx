@@ -174,21 +174,27 @@ export default function Roster() {
         </div>
         
         {isLoading ? (
-          <div className="space-y-3" data-testid="loading-team-members">
+          <div className="grid grid-cols-2 gap-3" data-testid="loading-team-members">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-card rounded-lg border border-border p-4 animate-pulse">
-                <div className="h-12 bg-muted rounded"></div>
+              <div key={i} className="bg-card rounded-lg border border-border p-3 animate-pulse">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-muted rounded-full shrink-0"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-muted rounded w-3/4"></div>
+                    <div className="h-3 bg-muted rounded w-1/2"></div>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         ) : Array.isArray(teamMembers) && teamMembers.length > 0 ? (
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             {teamMembers
               .filter((member: any) => !member.user.email?.includes('@placeholder.roster'))
               .map((member: any) => (
-              <div key={member.id} className="bg-card rounded-lg border border-border p-4" data-testid={`card-player-${member.id}`}>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
+              <div key={member.id} className="bg-card rounded-lg border border-border p-3" data-testid={`card-player-${member.id}`}>
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shrink-0">
                     {member.user.profileImageUrl ? (
                       <img 
                         src={getImageUrl(member.user.profileImageUrl) || ''} 
@@ -197,44 +203,36 @@ export default function Roster() {
                         data-testid={`img-player-avatar-${member.id}`}
                       />
                     ) : (
-                      <span className="text-primary-foreground font-semibold" data-testid={`text-player-initials-${member.id}`}>
+                      <span className="text-primary-foreground font-semibold text-sm" data-testid={`text-player-initials-${member.id}`}>
                         {member.user.firstName?.[0]}{member.user.lastName?.[0]}
                       </span>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold" data-testid={`text-player-name-${member.id}`}>
-                      {member.user.firstName} {member.user.lastName}
-                    </h3>
-                    <p className="text-sm text-muted-foreground" data-testid={`text-player-position-${member.id}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <h3 className="font-semibold text-sm truncate" data-testid={`text-player-name-${member.id}`}>
+                        {member.user.firstName} {member.user.lastName}
+                      </h3>
+                      {primaryTeam.captainId === member.userId && (
+                        <span className="text-warning font-bold text-xs shrink-0">C</span>
+                      )}
+                      {isTeamCaptain && (
+                        <button
+                          onClick={() => {
+                            navigate(`/league-management?leagueId=${primaryTeam.leagueId}&edit=true&editMember=${member.id}`);
+                          }}
+                          className="p-0.5 hover:bg-muted rounded-md transition-colors shrink-0"
+                          title="Edit Player"
+                          data-testid={`button-edit-player-${member.id}`}
+                        >
+                          <Edit className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate" data-testid={`text-player-position-${member.id}`}>
                       {member.position ? `${member.position}` : 'Player'}
                       {member.jerseyNumber ? ` • #${member.jerseyNumber}` : ''}
                     </p>
-                  </div>
-                  <div className="text-right flex items-center gap-2">
-                    <span 
-                      className={`tier-badge text-xs px-2 py-1 rounded-full font-semibold ${
-                        primaryTeam.captainId === member.userId 
-                          ? 'bg-success text-accent-foreground' 
-                          : 'bg-secondary text-secondary-foreground'
-                      }`}
-                      data-testid={`badge-player-role-${member.id}`}
-                    >
-                      {primaryTeam.captainId === member.userId ? 'CAPTAIN' : 'PLAYER'}
-                    </span>
-                    {/* Only show edit button if user is team captain */}
-                    {isTeamCaptain && (
-                      <button
-                        onClick={() => {
-                          navigate(`/league-management?leagueId=${primaryTeam.leagueId}&edit=true&editMember=${member.id}`);
-                        }}
-                        className="p-1 hover:bg-muted rounded-md transition-colors"
-                        title="Edit Player"
-                        data-testid={`button-edit-player-${member.id}`}
-                      >
-                        <Edit className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
