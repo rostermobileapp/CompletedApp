@@ -492,7 +492,6 @@ export default function Stats() {
                       <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Player</th>
                       {activeTab === 'skaters' ? (
                         <>
-                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">GP</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">G</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">A</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">PTS</th>
@@ -537,7 +536,6 @@ export default function Stats() {
                           </td>
                           {activeTab === 'skaters' && stat.type === 'skater' ? (
                             <>
-                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.gamesPlayed || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.goals || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.assists || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.points || 0}</td>
