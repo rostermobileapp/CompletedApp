@@ -62,7 +62,7 @@ export default function Subscription() {
     },
     {
       name: "Player Pro",
-      price: "$8",
+      price: "$6.49",
       period: "month",
       description: "Enhanced features for serious players",
       features: [
