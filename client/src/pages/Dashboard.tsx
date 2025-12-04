@@ -7,10 +7,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { notifyDashboardSelectionChange } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, LucideIcon } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, LucideIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -936,6 +937,7 @@ export default function Dashboard() {
     return localStorage.getItem('dashboardSelectedId') || null;
   });
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   
   // Save selection to localStorage whenever it changes
@@ -1672,6 +1674,48 @@ export default function Dashboard() {
       <div className="sticky top-0 z-50 bg-background p-3 pt-[0px] pb-[0px] flex items-center mt-[12px] mb-[12px] pl-[16px] pr-[16px]">
         <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
           <div className="flex items-center gap-2">
+            <Sheet open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu}>
+              <SheetTrigger asChild>
+                <button
+                  className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
+                  data-testid="button-hamburger-menu"
+                >
+                  <Menu className="w-8 h-8 text-foreground" />
+                </button>
+              </SheetTrigger>
+              <SheetContent 
+                side="left" 
+                className="w-[85%] sm:w-[400px] h-screen border-r border-border bg-background flex flex-col [&>button]:hidden"
+              >
+                <SheetHeader className="flex-shrink-0 px-6 pt-[4px] pb-[4px]">
+                  <div className="flex items-center justify-between">
+                    <SheetTitle className="text-2xl font-bold">Menu</SheetTitle>
+                    <SheetClose asChild>
+                      <button
+                        className="w-10 h-10 bg-red-600 hover:bg-red-700 rounded flex items-center justify-center transition-colors"
+                        data-testid="button-close-menu"
+                      >
+                        <X className="w-5 h-5 text-white" />
+                      </button>
+                    </SheetClose>
+                  </div>
+                </SheetHeader>
+                <div className="flex-1 flex flex-col justify-evenly px-6 pb-6">
+                  <button onClick={() => { navigate('/create-scrimmage'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center gap-3" data-testid="menu-item-scrimmage">
+                    <div className="p-2.5 rounded-xl bg-blue-500/20"><Calendar className="w-5 h-5 text-blue-500" /></div>
+                    <span className="text-base font-semibold">Schedule Scrimmage</span>
+                  </button>
+                  <button onClick={() => { navigate('/create-team'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center gap-3" data-testid="menu-item-team">
+                    <div className="p-2.5 rounded-xl bg-cyan-500/20"><Users className="w-5 h-5 text-cyan-500" /></div>
+                    <span className="text-base font-semibold">Create a Team</span>
+                  </button>
+                  <button onClick={() => { navigate('/create-league'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center gap-3" data-testid="menu-item-league">
+                    <div className="p-2.5 rounded-xl bg-green-500/20"><Plus className="w-5 h-5 text-green-500" /></div>
+                    <span className="text-base font-semibold">Create a League</span>
+                  </button>
+                </div>
+              </SheetContent>
+            </Sheet>
             <img 
               src={logoUrl}
               alt="Roster Logo" 
