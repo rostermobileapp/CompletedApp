@@ -15228,21 +15228,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/team-photos/:teamId", isAuthenticated, async (req: any, res) => {
     try {
       const { teamId } = req.params;
-      const userId = req.user.claims.sub;
-      
-      // Check if user is a team member
-      const team = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
-      if (!team || team.length === 0) {
-        return res.status(404).json({ error: "Team not found" });
-      }
-      
-      const teamMembers = await db.select().from(teamMembers as any).where(eq((teamMembers as any).teamId, teamId));
-      const isMember = teamMembers.some((m: any) => m.userId === userId);
-      
-      if (!isMember) {
-        return res.status(403).json({ error: "Only team members can view team photos" });
-      }
-      
       res.json([]);
     } catch (error) {
       console.error("Error fetching team photos:", error);
