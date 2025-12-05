@@ -131,8 +131,9 @@ export function SubstituteRequestModal({
 
   // Filter players based on requirements
   const filteredPlayers = allPlayers.filter((player: any) => {
-    // Exclude the original player
+    // Exclude the original player (either from prop or selected in browse mode)
     if (player.id === originalPlayerId) return false;
+    if (player.id === selectedOriginalPlayer) return false;
     
     // Exclude players on BOTH teams in this game (same team AND opposing team)
     if (player.teamId === originalPlayerTeamId) return false;
