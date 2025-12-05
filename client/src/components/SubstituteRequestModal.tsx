@@ -61,22 +61,31 @@ export function SubstituteRequestModal({
   const opposingTeamId = originalPlayerTeamId === homeTeamId ? awayTeamId : homeTeamId;
 
   // Fetch all league players with availability status
-  const { data: allPlayers = [], isLoading, error: playersError } = useQuery({
+  const { data: allPlayers = [], isLoading, error: playersError, isError } = useQuery({
     queryKey: [`/api/players/all-with-availability/${gameDate}`, leagueId],
     queryFn: async () => {
       const authHeaders = await getAuthHeaders();
-      console.log('SubstituteModal: Fetching players with availability', { gameDate, leagueId });
-      const response = await fetch(`/api/players/all-with-availability/${gameDate}?leagueId=${leagueId}`, {
-        headers: authHeaders
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('SubstituteModal: Failed to fetch players', { status: response.status, error: errorText });
-        throw new Error(`Failed to fetch players: ${response.status}`);
+      console.log('%c[SubstituteModal] Fetching players...', 'color: blue; font-weight: bold', { gameDate, leagueId });
+      try {
+        const response = await fetch(`/api/players/all-with-availability/${gameDate}?leagueId=${leagueId}`, {
+          headers: authHeaders
+        });
+        console.log('%c[SubstituteModal] Response status:', 'color: blue', response.status);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('%c[SubstituteModal] API Error:', 'color: red; font-weight: bold', { status: response.status, error: errorText });
+          throw new Error(`Failed to fetch players: ${response.status} - ${errorText}`);
+        }
+        const players = await response.json();
+        console.log('%c[SubstituteModal] SUCCESS - Fetched players:', 'color: green; font-weight: bold', { count: players.length });
+        if (players.length === 0) {
+          console.warn('%c[SubstituteModal] WARNING: API returned 0 players', 'color: orange; font-weight: bold');
+        }
+        return players;
+      } catch (err) {
+        console.error('%c[SubstituteModal] Fetch exception:', 'color: red; font-weight: bold', err);
+        throw err;
       }
-      const players = await response.json();
-      console.log('SubstituteModal: Fetched players', { count: players.length, players });
-      return players;
     },
     enabled: isOpen && !!gameDate && !!leagueId,
   });
@@ -334,10 +343,17 @@ export function SubstituteRequestModal({
                     <p>
                       {searchTerm 
                         ? "No players found matching your search" 
-                        : originalPlayerIsGoalie 
-                          ? "No goalies available for substitution"
-                          : "No skaters available for substitution"}
+                        : allPlayers.length === 0
+                          ? "No league members found"
+                          : originalPlayerIsGoalie 
+                            ? "No goalies available for substitution"
+                            : "No skaters available for substitution"}
                     </p>
+                    {allPlayers.length === 0 && !searchTerm && (
+                      <p className="text-xs mt-2 text-muted-foreground/70">
+                        Check that players are approved league members
+                      </p>
+                    )}
                   </div>
                 ) : (
                   sortedPlayers.map((player: any) => (
