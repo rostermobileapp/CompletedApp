@@ -54,13 +54,13 @@ export function SubstituteRequestDetailsModal({
   const getStatusInfo = (status: string) => {
     switch (status) {
       case "pending_opponent_approval":
-        return { label: "Awaiting opponent approval", color: "bg-amber-500/20 text-amber-400 border-amber-500/30" };
+        return { label: "Awaiting opponent approval", color: "bg-[#212121] text-[#ff0000] border-amber-500/30" };
       case "pending_commissioner_approval":
-        return { label: "Awaiting commissioner approval", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
+        return { label: "Awaiting commissioner approval", color: "bg-[#212121] text-[#ff0000] border-blue-500/30" };
       case "pending_substitute_approval":
-        return { label: "Awaiting sub confirmation", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" };
+        return { label: "Awaiting sub confirmation", color: "bg-[#212121] text-[#ff0000] border-purple-500/30" };
       default:
-        return { label: "Pending", color: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30" };
+        return { label: "Pending", color: "bg-[#212121] text-[#ff0000] border-zinc-500/30" };
     }
   };
 
@@ -105,7 +105,7 @@ export function SubstituteRequestDetailsModal({
           <div className="space-y-4">
             {/* Status Badge */}
             {statusInfo && (
-              <div className="border-purple-500/30 border text-xs cursor-default inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold bg-[#212121] text-[#ff0000]">
+              <div className={`${statusInfo.color} border text-xs cursor-default inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold`}>
                 <Clock className="h-3 w-3 mr-1" />
                 {statusInfo.label}
               </div>
