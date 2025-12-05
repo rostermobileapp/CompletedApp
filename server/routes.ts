@@ -3224,6 +3224,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const games = await storage.getUpcomingGames(userId);
       
+      // Get game IDs where user is an approved substitute
+      const substituteGameIds = await storage.getUserSubstituteGameIds(userId);
+      
       // Debug log raw data from database
       const oct26Game = games.find(g => g.scheduledAt.toString().includes('2025-10-26'));
       if (oct26Game) {
@@ -3231,7 +3234,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('🎯 Type:', typeof oct26Game.scheduledAt);
       }
       
-      const formattedGames = games.map(formatGameForResponse);
+      const formattedGames = games.map(game => {
+        const formatted = formatGameForResponse(game);
+        // Mark games where user is a substitute
+        return {
+          ...formatted,
+          isSubstitute: substituteGameIds.includes(game.id)
+        };
+      });
       
       // Debug log after formatting
       const oct26Formatted = formattedGames.find(g => g.scheduledAt && g.scheduledAt.toString().includes('2025-10-26'));

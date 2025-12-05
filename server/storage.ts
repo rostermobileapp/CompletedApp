@@ -367,6 +367,7 @@ export interface IStorage {
   getSubstituteRequests(options?: { status?: string; gameId?: string; userId?: string; requestingTeamId?: string; leagueIds?: string[] }): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] })[]>;
   getSubstituteRequest(requestId: string): Promise<(SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User; requestedByUser: User; requestingTeam?: Team; approvals: SubstitutionApproval[] }) | undefined>;
   expireSubstituteRequests(leagueIds?: string[]): Promise<SubstituteRequest[]>;
+  getUserSubstituteGameIds(userId: string): Promise<string[]>;
   
   // Controlled substitute request updates (SECURITY: No direct status updates allowed)
   updateSubstituteRequestNonStatusFields(requestId: string, updates: { reason?: string; expiresAt?: Date; substitutePlayerId?: string }): Promise<SubstituteRequest>;
@@ -2840,6 +2841,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
     const substituteGameIds = substituteGames.map(r => r.gameId);
+    console.log(`🏒 getUpcomingGames for user ${userId}: found ${substituteGameIds.length} substitute games:`, substituteGameIds);
     
     // If user has neither teams, league memberships, attending RSVPs, nor approved substitutions, return empty
     if (teamIds.length === 0 && leagueIds.length === 0 && rsvpGameIds.length === 0 && substituteGameIds.length === 0) return [];
@@ -5146,6 +5148,19 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return expiredRequests;
+  }
+
+  async getUserSubstituteGameIds(userId: string): Promise<string[]> {
+    const results = await db
+      .select({ gameId: substituteRequests.gameId })
+      .from(substituteRequests)
+      .where(
+        and(
+          eq(substituteRequests.substitutePlayerId, userId),
+          eq(substituteRequests.status, 'approved')
+        )
+      );
+    return results.map(r => r.gameId);
   }
 
   // Substitution approval operations

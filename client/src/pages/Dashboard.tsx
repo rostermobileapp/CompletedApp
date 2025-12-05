@@ -2537,7 +2537,10 @@ export default function Dashboard() {
                 }
                 // For regular games, ensure we only show games for teams the user is currently on
                 const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
-                return userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
+                const isOnTeam = userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
+                // Also show games where user is an approved substitute (marked by backend)
+                const isSubstitute = game.isSubstitute === true;
+                return isOnTeam || isSubstitute;
               })
               .slice(0, 5).map((game: any) => (
               <div 
