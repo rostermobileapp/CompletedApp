@@ -385,7 +385,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
               )}
 
               {/* Pending Substitute Approvals Section */}
-              {pendingSubstituteApprovals && (pendingSubstituteApprovals.captain.length > 0 || pendingSubstituteApprovals.commissioner.length > 0) && (
+              {pendingSubstituteApprovals && (pendingSubstituteApprovals.captain.length > 0 || pendingSubstituteApprovals.commissioner.length > 0 || (pendingSubstituteApprovals.substitutePlayer?.length || 0) > 0) && (
                 <div>
                   <div className="flex items-center gap-2 mb-4">
                     <h3 className="text-lg font-black text-[#3c83f6]">
@@ -532,6 +532,55 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                                 data-testid={`button-deny-commissioner-substitute-${request.id}`}
                               >
                                 Deny
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Substitute Player Confirmations */}
+                      {pendingSubstituteApprovals.substitutePlayer?.map((request: any) => {
+                        return (
+                          <div 
+                            key={request.id}
+                            className="dark:bg-card rounded-lg p-3 text-[#212121] dark:text-[#ffffff] bg-[#e2e2e2] dark:bg-[#212121]"
+                            data-testid={`pending-substitute-player-${request.id}`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  <p className="font-medium text-[#212121] dark:text-[#ffffff]">
+                                    {request.game.homeTeam.name} vs {request.game.awayTeam.name}
+                                  </p>
+                                  <p className="text-[#212121] dark:text-[#ffffff] text-[16px]">
+                                    {format(new Date(request.game.scheduledAt), 'MMM d, yyyy')}
+                                  </p>
+                                  <p className="ml-[1px] mr-[1px] mt-[1px] mb-[1px] pt-[5px] pb-[5px] bg-[#ffffff00] font-extrabold text-left pl-[0px] pr-[0px] text-[#22c55e] text-[20px]">Confirm Your Availability</p>
+                                  <p className="text-[#212121] dark:text-[#ffffff] text-[14px]">
+                                    You've been requested to substitute for {request.originalPlayer?.firstName} {request.originalPlayer?.lastName}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Action Buttons */}
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleApprove(request, 'substitute_player')}
+                                disabled={processApprovalMutation.isPending}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                data-testid={`button-confirm-substitute-${request.id}`}
+                              >
+                                I'm Available - Confirm
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleDeny(request, 'substitute_player')}
+                                disabled={processApprovalMutation.isPending}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                                data-testid={`button-decline-substitute-${request.id}`}
+                              >
+                                Can't Make It
                               </Button>
                             </div>
                           </div>

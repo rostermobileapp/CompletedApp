@@ -5110,8 +5110,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Get pending substitute requests that require action from the current user for needs attention system
-  async getPendingSubstituteApprovalsForUser(userId: string, leagueId: string): Promise<{ captain: any[]; commissioner: any[]; total: number }> {
-    const result: { captain: any[]; commissioner: any[]; total: number } = { captain: [], commissioner: [], total: 0 };
+  async getPendingSubstituteApprovalsForUser(userId: string, leagueId: string): Promise<{ captain: any[]; commissioner: any[]; substitutePlayer: any[]; total: number }> {
+    const result: { captain: any[]; commissioner: any[]; substitutePlayer: any[]; total: number } = { captain: [], commissioner: [], substitutePlayer: [], total: 0 };
 
     // Get all pending substitute requests for this league with basic joins
     const pendingRequests = await db
@@ -5126,7 +5126,8 @@ export class DatabaseStorage implements IStorage {
           eq(games.leagueId, leagueId),
           or(
             eq(substituteRequests.status, 'pending_opponent_approval'),
-            eq(substituteRequests.status, 'pending_commissioner_approval')
+            eq(substituteRequests.status, 'pending_commissioner_approval'),
+            eq(substituteRequests.status, 'pending_substitute_approval')
           )
         )
       );
@@ -5209,6 +5210,12 @@ export class DatabaseStorage implements IStorage {
           result.commissioner.push(requestSummary);
           result.total++;
         }
+      }
+      
+      // Check if user is the substitute player who needs to confirm their availability
+      if (request.status === 'pending_substitute_approval' && request.substitutePlayerId === userId) {
+        result.substitutePlayer.push(requestSummary);
+        result.total++;
       }
     }
 
@@ -5469,6 +5476,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Create targeted notifications for substitution workflow progression
+  // Sends both push notifications (bell icon) and adds items to To-Do section
   private async createSubstitutionNotification(
     tx: any,
     originalRequest: SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User },
@@ -5478,10 +5486,7 @@ export class DatabaseStorage implements IStorage {
   ): Promise<void> {
     try {
       const leagueId = originalRequest.game.leagueId;
-      
-      // Determine notification content and target based on workflow progression
-      let targetUserId: string | null = null;
-      let content = '';
+      const gameId = originalRequest.gameId;
       
       if (decision === 'denied') {
         // Handle denials based on new workflow
@@ -5489,8 +5494,15 @@ export class DatabaseStorage implements IStorage {
           // Opposing captain denied → notify commissioner for final decision
           const league = await tx.select().from(leagues).where(eq(leagues.id, leagueId)).limit(1);
           if (league[0]?.commissionerId) {
-            targetUserId = league[0].commissionerId;
-            content = `⚖️ Commissioner decision needed: A substitution request for the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game has been denied by the opposing team captain. Please review and make a final decision.`;
+            // Push notification (bell icon) for commissioner
+            await tx.insert(userNotifications).values({
+              userId: league[0].commissionerId,
+              type: 'general',
+              title: 'Commissioner Decision Needed',
+              message: `A substitution request for the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game was denied by the opposing captain. Check your To-Do section to make a final decision.`,
+              actionUrl: `/games/${gameId}`,
+              actionText: 'View Game',
+            });
           }
         } else {
           // All other denials (substitute player or commissioner) - notify requesting team captain
@@ -5499,9 +5511,16 @@ export class DatabaseStorage implements IStorage {
             : originalRequest.game.awayTeam;
           
           if (requestingTeam.captainId) {
-            targetUserId = requestingTeam.captainId;
             const approverRole = approverType === 'commissioner' ? 'league commissioner' : 'substitute player';
-            content = `🚫 Your substitution request for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game has been denied by the ${approverRole}.`;
+            // Push notification (bell icon) for requesting captain
+            await tx.insert(userNotifications).values({
+              userId: requestingTeam.captainId,
+              type: 'general',
+              title: 'Substitute Request Denied',
+              message: `Your substitution request for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} was denied by the ${approverRole}.`,
+              actionUrl: `/games/${gameId}`,
+              actionText: 'View Game',
+            });
           }
         }
       } else if (decision === 'approved') {
@@ -5510,13 +5529,20 @@ export class DatabaseStorage implements IStorage {
           case 'pending_substitute_approval':
             // Opposing captain (or commissioner) approved → notify substitute player for confirmation
             if (originalRequest.substitutePlayer?.id) {
-              targetUserId = originalRequest.substitutePlayer.id;
-              content = `🏒 You've been requested as a substitute! The opposing captain has approved a request for you to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game. Please confirm your availability.`;
+              // Push notification (bell icon) for substitute player
+              await tx.insert(userNotifications).values({
+                userId: originalRequest.substitutePlayer.id,
+                type: 'general',
+                title: 'You\'ve Been Requested as a Substitute!',
+                message: `You've been approved to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game. Check your To-Do section to confirm your availability.`,
+                actionUrl: `/games/${gameId}`,
+                actionText: 'View Game',
+              });
             }
             break;
             
           case 'approved':
-            // Opposing captain OR commissioner approved → FINAL APPROVAL, notify all parties
+            // FINAL APPROVAL - notify all parties via push notification
             const allParticipants: string[] = [];
             
             // Add requesting team captain
@@ -5551,53 +5577,24 @@ export class DatabaseStorage implements IStorage {
               allParticipants.push(originalRequest.substitutePlayer.id);
             }
             
-            // Create notifications for all participants (multiple target users)
-            if (allParticipants.length > 0) {
-              const substitutePlayerName = originalRequest.substitutePlayer 
-                ? `${originalRequest.substitutePlayer.firstName} ${originalRequest.substitutePlayer.lastName}`
-                : 'the substitute player';
-              content = `✅ Substitution approved! ${substitutePlayerName} will substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game.`;
-              
-              // Create the announcement
-              const [announcement] = await tx
-                .insert(announcements)
-                .values({
-                  leagueId,
-                  authorId: originalRequest.requestedBy,
-                  content,
-                  isPinned: false,
-                })
-                .returning();
-              
-              // Create visibility records for all participants
-              const visibilityRecords = allParticipants.map(userId => ({
-                announcementId: announcement.id,
+            // Create push notifications for all participants (deduplicated)
+            const uniqueParticipants = [...new Set(allParticipants)];
+            const substitutePlayerName = originalRequest.substitutePlayer 
+              ? `${originalRequest.substitutePlayer.firstName} ${originalRequest.substitutePlayer.lastName}`
+              : 'the substitute player';
+            
+            for (const userId of uniqueParticipants) {
+              await tx.insert(userNotifications).values({
                 userId,
-              }));
-              
-              await tx.insert(announcementVisibility).values(visibilityRecords);
-              return; // Early return for multi-user notification
+                type: 'general',
+                title: 'Substitution Approved!',
+                message: `${substitutePlayerName} will substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game.`,
+                actionUrl: `/games/${gameId}`,
+                actionText: 'View Game',
+              });
             }
             break;
         }
-      }
-      
-      // Create single-user targeted notification
-      if (targetUserId && content) {
-        const [announcement] = await tx
-          .insert(announcements)
-          .values({
-            leagueId,
-            authorId: originalRequest.requestedBy, // System notification from the requesting user
-            content,
-            isPinned: false,
-          })
-          .returning();
-        
-        await tx.insert(announcementVisibility).values({
-          announcementId: announcement.id,
-          userId: targetUserId,
-        });
       }
       
     } catch (error) {
