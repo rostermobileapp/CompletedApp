@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, X } from "lucide-react";
+import { Check, X, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { ClickableAvatar } from "@/components/ClickableAvatar";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { setPageTransitionDirection } from "@/components/PageTransition";
 
 interface RSVPButtonsProps {
@@ -27,7 +27,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
     queryKey: [`/api/games/${gameId}/rsvp?teamId=${userTeamId}`],
   });
 
-  const { data: rsvpSummary } = useQuery<{ attending?: any[]; notAttending?: any[] } | null>({
+  const { data: rsvpSummary } = useQuery<{ attending?: any[]; notAttending?: any[]; noResponse?: any[] } | null>({
     queryKey: [`/api/games/${gameId}/rsvp-summary?teamId=${userTeamId}`],
   });
 
@@ -62,6 +62,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
 
   const attendingPlayers = rsvpSummary?.attending || [];
   const notAttendingPlayers = rsvpSummary?.notAttending || [];
+  const noResponsePlayers = rsvpSummary?.noResponse || [];
 
   const [, navigate] = useLocation();
 
@@ -78,7 +79,8 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
   };
 
   return (
-    <div className={cn("grid grid-cols-2 gap-4", className)} data-testid="rsvp-buttons">
+    <div className={cn("grid grid-cols-3 gap-3", className)} data-testid="rsvp-buttons">
+      {/* In Column */}
       <div className="flex flex-col">
         <Button
           variant={currentStatus === 'attending' ? "default" : "outline"}
@@ -86,7 +88,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
           onClick={() => rsvpMutation.mutate('attending')}
           disabled={isLoading}
           className={cn(
-            "flex items-center justify-center gap-1 transition-all border-2 w-full",
+            "flex items-center justify-center gap-1 transition-all border-2 w-full text-xs px-2",
             currentStatus === 'attending' 
               ? "bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-lg scale-105" 
               : "border-green-600 text-green-600 hover:bg-green-600 hover:text-white hover:shadow-md",
@@ -95,7 +97,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
           data-testid="button-attending"
         >
           <Check className={cn(
-            "h-4 w-4",
+            "h-3 w-3",
             currentStatus === 'attending' ? "animate-pulse" : ""
           )} />
           In ({attendingPlayers.length})
@@ -103,10 +105,10 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
         
         <div className="mt-2 space-y-1">
           {attendingPlayers.map((rsvp: any) => (
-            <button
+            <div
               key={rsvp.user.id}
               onClick={() => handlePlayerClick(rsvp.user.id)}
-              className="flex items-center gap-3 p-2 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
+              className="flex items-center gap-2 p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
               data-testid={`player-attending-${rsvp.user.id}`}
             >
               <ClickableAvatar
@@ -114,19 +116,20 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
                 profileImageUrl={rsvp.user.profileImageUrl}
                 firstName={rsvp.user.firstName}
                 lastName={rsvp.user.lastName}
-                size="sm"
+                size="xs"
               />
-              <span className="text-sm font-medium truncate text-white">
+              <span className="text-xs font-medium truncate text-white">
                 {formatPlayerName(rsvp.user.firstName, rsvp.user.lastName)}
               </span>
-            </button>
+            </div>
           ))}
           {attendingPlayers.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-2">No players yet</p>
+            <p className="text-xs text-muted-foreground text-center py-2">—</p>
           )}
         </div>
       </div>
       
+      {/* Out Column */}
       <div className="flex flex-col">
         <Button
           variant={currentStatus === 'not_attending' ? "default" : "outline"}
@@ -134,7 +137,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
           onClick={() => rsvpMutation.mutate('not_attending')}
           disabled={isLoading}
           className={cn(
-            "flex items-center justify-center gap-1 transition-all border-2 w-full",
+            "flex items-center justify-center gap-1 transition-all border-2 w-full text-xs px-2",
             currentStatus === 'not_attending' 
               ? "bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-lg scale-105" 
               : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white hover:shadow-md",
@@ -143,7 +146,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
           data-testid="button-not-attending"
         >
           <X className={cn(
-            "h-4 w-4",
+            "h-3 w-3",
             currentStatus === 'not_attending' ? "animate-pulse" : ""
           )} />
           Out ({notAttendingPlayers.length})
@@ -151,10 +154,10 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
         
         <div className="mt-2 space-y-1">
           {notAttendingPlayers.map((rsvp: any) => (
-            <button
+            <div
               key={rsvp.user.id}
               onClick={() => handlePlayerClick(rsvp.user.id)}
-              className="flex items-center gap-3 p-2 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
+              className="flex items-center gap-2 p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
               data-testid={`player-not-attending-${rsvp.user.id}`}
             >
               <ClickableAvatar
@@ -162,15 +165,48 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
                 profileImageUrl={rsvp.user.profileImageUrl}
                 firstName={rsvp.user.firstName}
                 lastName={rsvp.user.lastName}
-                size="sm"
+                size="xs"
               />
-              <span className="text-sm font-medium truncate text-white">
+              <span className="text-xs font-medium truncate text-white">
                 {formatPlayerName(rsvp.user.firstName, rsvp.user.lastName)}
               </span>
-            </button>
+            </div>
           ))}
           {notAttendingPlayers.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-2">No players yet</p>
+            <p className="text-xs text-muted-foreground text-center py-2">—</p>
+          )}
+        </div>
+      </div>
+      
+      {/* No Response Column */}
+      <div className="flex flex-col">
+        <div className="flex items-center justify-center gap-1 h-9 rounded-md border-2 border-zinc-600 bg-zinc-800 text-zinc-400 text-xs px-2">
+          <HelpCircle className="h-3 w-3" />
+          ? ({noResponsePlayers.length})
+        </div>
+        
+        <div className="mt-2 space-y-1">
+          {noResponsePlayers.map((player: any) => (
+            <div
+              key={player.id}
+              onClick={() => handlePlayerClick(player.id)}
+              className="flex items-center gap-2 p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
+              data-testid={`player-no-response-${player.id}`}
+            >
+              <ClickableAvatar
+                userId={player.id}
+                profileImageUrl={player.profileImageUrl}
+                firstName={player.firstName}
+                lastName={player.lastName}
+                size="xs"
+              />
+              <span className="text-xs font-medium truncate text-zinc-400">
+                {formatPlayerName(player.firstName, player.lastName)}
+              </span>
+            </div>
+          ))}
+          {noResponsePlayers.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-2">—</p>
           )}
         </div>
       </div>

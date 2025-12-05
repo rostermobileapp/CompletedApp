@@ -668,7 +668,14 @@ export default function GameDetails() {
                 <Button
                   variant="outline"
                   className="w-full mt-4 border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
-                  onClick={() => setShowRSVPModal(true)}
+                  onClick={() => {
+                    setSubstituteRequestData({ 
+                      playerId: '', 
+                      playerName: '', 
+                      teamId: captainTeamId || userTeam?.id 
+                    });
+                    setShowSubstituteModal(true);
+                  }}
                   data-testid="button-find-substitutes"
                 >
                   <UserSearch className="w-4 h-4 mr-2" />
@@ -1130,8 +1137,8 @@ export default function GameDetails() {
           gameId={game.id}
           gameDate={format(new Date(game.scheduledAt), 'yyyy-MM-dd')}
           leagueId={game.leagueId ?? ''}
-          originalPlayerId={substituteRequestData.playerId}
-          originalPlayerName={substituteRequestData.playerName}
+          originalPlayerId={substituteRequestData.playerId || undefined}
+          originalPlayerName={substituteRequestData.playerName || undefined}
           homeTeamId={game.homeTeamId ?? ''}
           awayTeamId={game.awayTeamId ?? ''}
           originalPlayerTeamId={substituteRequestData.teamId}
@@ -1140,6 +1147,7 @@ export default function GameDetails() {
             setShowSubstituteModal(false);
             setSubstituteRequestData(null);
           }}
+          notAttendingPlayers={captainRsvpSummary?.notAttending || []}
         />
       )}
     </div>

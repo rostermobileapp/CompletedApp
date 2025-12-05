@@ -8,7 +8,7 @@ interface ClickableAvatarProps {
   firstName?: string | null;
   lastName?: string | null;
   className?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 export function ClickableAvatar({
@@ -36,6 +36,7 @@ export function ClickableAvatar({
   };
 
   const sizeClasses = {
+    xs: 'h-6 w-6',
     sm: 'h-8 w-8',
     md: 'h-10 w-10',
     lg: 'h-12 w-12'
