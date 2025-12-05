@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, X, HelpCircle, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,17 +8,20 @@ import { cn } from "@/lib/utils";
 import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { setPageTransitionDirection } from "@/components/PageTransition";
+import { SubstituteRequestDetailsModal } from "./SubstituteRequestDetailsModal";
 
 interface RSVPButtonsProps {
   gameId: string;
   userId: string;
   userTeamId?: string;
   className?: string;
+  onRequestSubstitute?: (playerId: string, playerName: string) => void;
 }
 
-export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButtonsProps) {
+export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSubstitute }: RSVPButtonsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [detailsModalPlayer, setDetailsModalPlayer] = useState<string | null>(null);
 
   if (!userTeamId) {
     return null;
@@ -179,7 +183,13 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
             return (
               <button
                 key={rsvp.user.id}
-                onClick={() => handlePlayerClick(rsvp.user.id)}
+                onClick={() => {
+                  if (hasPendingRequest) {
+                    setDetailsModalPlayer(rsvp.user.id);
+                  } else {
+                    handlePlayerClick(rsvp.user.id);
+                  }
+                }}
                 className={cn(
                   "flex items-center gap-2 p-1.5 rounded-md transition-colors w-full text-left cursor-pointer",
                   hasPendingRequest 
@@ -247,6 +257,22 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
           )}
         </div>
       </div>
+
+      {/* Substitute Request Details Modal */}
+      {detailsModalPlayer && (
+        <SubstituteRequestDetailsModal
+          gameId={gameId}
+          originalPlayerId={detailsModalPlayer}
+          isOpen={!!detailsModalPlayer}
+          onClose={() => setDetailsModalPlayer(null)}
+          onRequestNewSub={onRequestSubstitute ? () => {
+            const player = notAttendingPlayers.find((p: any) => p.user.id === detailsModalPlayer);
+            if (player) {
+              onRequestSubstitute(player.user.id, `${player.user.firstName} ${player.user.lastName}`);
+            }
+          } : undefined}
+        />
+      )}
     </div>
   );
 }

@@ -646,6 +646,14 @@ export default function GameDetails() {
                     gameId={game.id} 
                     userId={(user as User).id}
                     userTeamId={userTeam.id}
+                    onRequestSubstitute={isCaptain ? (playerId, playerName) => {
+                      setSubstituteRequestData({ 
+                        playerId, 
+                        playerName, 
+                        teamId: captainTeamId || userTeam?.id 
+                      });
+                      setShowSubstituteModal(true);
+                    } : undefined}
                   />
                 </div>
               )}
