@@ -579,13 +579,18 @@ export default function Calendar() {
             ? (selectedGameData.awayTeamId || selectedGameData.awayTeam?.id)
             : undefined;
         
+        // Check if user is a captain of either team in this game
+        const isHomeCaptain = selectedGameData.homeTeam?.captainId === (user as any)?.id;
+        const isAwayCaptain = selectedGameData.awayTeam?.captainId === (user as any)?.id;
+        const isCaptain = isHomeCaptain || isAwayCaptain;
+        
         return (
           <RSVPDetailModal
             gameId={selectedGameId}
             isOpen={showRSVPModal}
             onClose={handleCloseRSVPModal}
-            onRequestSubstitute={handleRequestSubstitute}
-            showSubstituteButtons={true}
+            onRequestSubstitute={isCaptain ? handleRequestSubstitute : undefined}
+            showSubstituteButtons={isCaptain}
             teamId={userTeamId}
           />
         );
