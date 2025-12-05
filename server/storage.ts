@@ -2827,8 +2827,22 @@ export class DatabaseStorage implements IStorage {
       );
     const rsvpGameIds = rsvpGames.map(r => r.gameId);
     
-    // If user has neither teams, league memberships, nor attending RSVPs, return empty
-    if (teamIds.length === 0 && leagueIds.length === 0 && rsvpGameIds.length === 0) return [];
+    // Get games where user is an approved substitute player
+    const substituteGames = await db
+      .select({ gameId: substituteRequests.gameId })
+      .from(substituteRequests)
+      .innerJoin(games, eq(substituteRequests.gameId, games.id))
+      .where(
+        and(
+          eq(substituteRequests.substitutePlayerId, userId),
+          eq(substituteRequests.status, 'approved'),
+          gte(games.scheduledAt, new Date())
+        )
+      );
+    const substituteGameIds = substituteGames.map(r => r.gameId);
+    
+    // If user has neither teams, league memberships, attending RSVPs, nor approved substitutions, return empty
+    if (teamIds.length === 0 && leagueIds.length === 0 && rsvpGameIds.length === 0 && substituteGameIds.length === 0) return [];
 
     // Build conditions for the query
     const conditions: any[] = [];
@@ -2843,6 +2857,9 @@ export class DatabaseStorage implements IStorage {
     }
     if (rsvpGameIds.length > 0) {
       conditions.push(inArray(games.id, rsvpGameIds));
+    }
+    if (substituteGameIds.length > 0) {
+      conditions.push(inArray(games.id, substituteGameIds));
     }
 
     // Get all games first, then join with teams
@@ -2962,22 +2979,41 @@ export class DatabaseStorage implements IStorage {
     const userLeagues = await this.getUserLeagues(userId);
     const leagueIds = userLeagues.map(l => l.id);
     
-    // If user has neither teams nor league memberships, return empty
-    if (teamIds.length === 0 && leagueIds.length === 0) return [];
+    // Get games where user is an approved substitute player
+    const substituteGames = await db
+      .select({ gameId: substituteRequests.gameId })
+      .from(substituteRequests)
+      .where(
+        and(
+          eq(substituteRequests.substitutePlayerId, userId),
+          eq(substituteRequests.status, 'approved')
+        )
+      );
+    const substituteGameIds = substituteGames.map(r => r.gameId);
+    
+    // If user has neither teams, league memberships, nor approved substitutions, return empty
+    if (teamIds.length === 0 && leagueIds.length === 0 && substituteGameIds.length === 0) return [];
 
-    // Get all games (past and future) - removed the date filter from getUpcomingGames
+    // Build conditions for the query
+    const conditions: any[] = [];
+    if (teamIds.length > 0) {
+      conditions.push(or(
+        inArray(games.homeTeamId, teamIds),
+        inArray(games.awayTeamId, teamIds)
+      ));
+    }
+    if (leagueIds.length > 0) {
+      conditions.push(inArray(games.leagueId, leagueIds));
+    }
+    if (substituteGameIds.length > 0) {
+      conditions.push(inArray(games.id, substituteGameIds));
+    }
+
+    // Get all games (past and future)
     const gamesResult = await db
       .select()
       .from(games)
-      .where(
-        or(
-          teamIds.length > 0 ? or(
-            inArray(games.homeTeamId, teamIds),
-            inArray(games.awayTeamId, teamIds)
-          ) : undefined,
-          leagueIds.length > 0 ? inArray(games.leagueId, leagueIds) : undefined
-        )
-      )
+      .where(or(...conditions))
       .orderBy(asc(games.scheduledAt)); // Chronological order
 
     // Get team data for each game
