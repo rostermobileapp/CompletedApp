@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { notifyDashboardSelectionChange } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon, UserPlus, Target, ArrowRight } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon, UserPlus, Target, ArrowRight, Bell, XCircle, CheckCircle2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -28,7 +28,6 @@ import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 import FeedbackModal from '@/components/FeedbackModal';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
-import { NotificationCenter } from '@/components/NotificationCenter';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -116,6 +115,21 @@ function NotificationBadge({ count }: { count: number }) {
   );
 }
 
+
+// Notification interface for the modal
+interface Notification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  actionUrl?: string;
+  actionText?: string;
+  isRead: boolean;
+  isDismissed: boolean;
+  scrimmageId?: string;
+  createdAt: string;
+}
 
 // Needs Attention Modal Component
 function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: { 
@@ -234,10 +248,84 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
     enabled: !!leagueId && isOpen,
   });
 
+  // Fetch notifications (previously in header NotificationCenter)
+  const { data: notifications = [], isLoading: notificationsLoading } = useQuery<Notification[]>({
+    queryKey: ['/api/notifications'],
+    refetchInterval: 30000,
+    staleTime: 10000,
+    enabled: isOpen,
+  });
+
+  const { data: unreadNotifications = [] } = useQuery<Notification[]>({
+    queryKey: ['/api/notifications/unread'],
+    refetchInterval: 10000,
+    staleTime: 5000,
+    enabled: isOpen,
+  });
+
+  // Mark notification as read mutation
+  const markAsReadMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('PATCH', `/api/notifications/${id}/read`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
+    },
+  });
+
+  // Dismiss notification mutation
+  const dismissNotificationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('PATCH', `/api/notifications/${id}/dismiss`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
+    },
+  });
+
+  // Helper function to get notification icon based on type
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'scrimmage_invite':
+        return <Calendar className="w-4 h-4 text-blue-500" />;
+      case 'scrimmage_reminder':
+        return <AlertCircle className="w-4 h-4 text-amber-500" />;
+      case 'scrimmage_approved':
+        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+      case 'scrimmage_canceled':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return <Bell className="w-4 h-4 text-muted-foreground" />;
+    }
+  };
+
+  // Handle notification click
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.isRead) {
+      markAsReadMutation.mutate(notification.id);
+    }
+    if (notification.actionUrl) {
+      onNavigate(notification.actionUrl);
+      onClose();
+    }
+  };
+
+  // Mark all notifications as read
+  const handleMarkAllRead = () => {
+    unreadNotifications.forEach((notification) => {
+      markAsReadMutation.mutate(notification.id);
+    });
+  };
+
+  const unreadNotificationCount = unreadNotifications.length;
+
   const totalTasks = (Array.isArray(pendingMembers) ? pendingMembers.length : 0) + 
                      (Array.isArray(gamesNeedingVerification) ? gamesNeedingVerification.length : 0) +
                      (pendingSubstituteApprovals?.total || 0) +
-                     (Array.isArray(gamesNeedingStars) ? gamesNeedingStars.length : 0);
+                     (Array.isArray(gamesNeedingStars) ? gamesNeedingStars.length : 0) +
+                     (Array.isArray(notifications) ? notifications.length : 0);
 
   // Process substitute approval mutation
   const processApprovalMutation = useMutation({
@@ -310,7 +398,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6 pl-[4px] pr-[4px]">
-          {(pendingMembersLoading || gamesLoading || substituteApprovalsLoading) ? (
+          {(pendingMembersLoading || gamesLoading || substituteApprovalsLoading || notificationsLoading) ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
@@ -654,6 +742,74 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                           >
                             Award Stars
                           </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Notifications Section */}
+              {Array.isArray(notifications) && notifications.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-5 h-5 text-primary" />
+                      <h3 className="text-lg font-semibold text-[#212121] dark:text-[#ffffff]">
+                        Notifications ({notifications.length})
+                      </h3>
+                    </div>
+                    {unreadNotificationCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                        onClick={handleMarkAllRead}
+                        data-testid="button-mark-all-read"
+                      >
+                        <Check className="w-3 h-3 mr-1" />
+                        Mark all read
+                      </Button>
+                    )}
+                  </div>
+                  <div className="bg-[#e2e2e2] dark:bg-[#212121] rounded-lg p-4">
+                    <div className="space-y-3">
+                      {notifications.map((notification) => (
+                        <div 
+                          key={notification.id}
+                          className={`bg-white dark:bg-card rounded-lg p-3 flex items-start gap-3 cursor-pointer hover:bg-muted/50 transition-colors relative group ${!notification.isRead ? 'border-l-4 border-primary' : 'border border-border'}`}
+                          onClick={() => handleNotificationClick(notification)}
+                          data-testid={`notification-item-${notification.id}`}
+                        >
+                          <div className="flex-shrink-0 mt-0.5">
+                            {getNotificationIcon(notification.type)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm truncate ${!notification.isRead ? 'font-semibold text-foreground' : 'text-foreground'}`}>
+                                {notification.title}
+                              </p>
+                              {!notification.isRead && (
+                                <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                              {notification.message}
+                            </p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">
+                              {format(new Date(notification.createdAt), 'MMM d, h:mm a')}
+                            </p>
+                          </div>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              dismissNotificationMutation.mutate(notification.id);
+                            }}
+                            data-testid={`button-dismiss-notification-${notification.id}`}
+                          >
+                            <X className="w-4 h-4 text-muted-foreground" />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1605,21 +1761,23 @@ export default function Dashboard() {
   const { data: needsAttentionData, isLoading: isLoadingNeedsAttention } = useQuery({
     queryKey: ['/api/needs-attention-summary', effectiveLeagueId],
     queryFn: async () => {
-      if (!effectiveLeagueId) return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
+      if (!effectiveLeagueId) return { pendingMembers: 0, gamesNeedingVerification: 0, notifications: 0, total: 0 };
       
       try {
-        // Fetch all top-level data in parallel
-        const [pendingMembersResponse, gamesResponse, substituteApprovalsResponse, starsResponse] = await Promise.all([
+        // Fetch all top-level data in parallel (including notifications)
+        const [pendingMembersResponse, gamesResponse, substituteApprovalsResponse, starsResponse, notificationsResponse] = await Promise.all([
           apiRequest('GET', `/api/leagues/${effectiveLeagueId}/pending-members`),
           apiRequest('GET', `/api/leagues/${effectiveLeagueId}/games`),
           apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${effectiveLeagueId}`).catch(() => null),
-          apiRequest('GET', `/api/user/games-needing-stars?leagueId=${effectiveLeagueId}`).catch(() => null)
+          apiRequest('GET', `/api/user/games-needing-stars?leagueId=${effectiveLeagueId}`).catch(() => null),
+          apiRequest('GET', `/api/notifications`).catch(() => null)
         ]);
         
         const pendingMembers = await pendingMembersResponse.json();
         const allGames = await gamesResponse.json();
         const substituteData = substituteApprovalsResponse ? await substituteApprovalsResponse.json().catch(() => ({ total: 0 })) : { total: 0 };
         const starsData = starsResponse ? await starsResponse.json().catch(() => []) : [];
+        const notificationsData = notificationsResponse ? await notificationsResponse.json().catch(() => []) : [];
         
         let gamesNeedingVerification = 0;
         if (Array.isArray(allGames)) {
@@ -1678,17 +1836,19 @@ export default function Dashboard() {
         const pendingMembersCount = Array.isArray(pendingMembers) ? pendingMembers.length : 0;
         const pendingSubstituteApprovals = substituteData.total || 0;
         const gamesNeedingStars = Array.isArray(starsData) ? starsData.length : 0;
-        const total = pendingMembersCount + gamesNeedingVerification + pendingSubstituteApprovals + gamesNeedingStars;
+        const notificationsCount = Array.isArray(notificationsData) ? notificationsData.length : 0;
+        const total = pendingMembersCount + gamesNeedingVerification + pendingSubstituteApprovals + gamesNeedingStars + notificationsCount;
         
         return {
           pendingMembers: pendingMembersCount,
           gamesNeedingVerification,
           pendingSubstituteApprovals,
           gamesNeedingStars,
+          notifications: notificationsCount,
           total
         };
       } catch (error) {
-        return { pendingMembers: 0, gamesNeedingVerification: 0, pendingSubstituteApprovals: 0, gamesNeedingStars: 0, total: 0 };
+        return { pendingMembers: 0, gamesNeedingVerification: 0, pendingSubstituteApprovals: 0, gamesNeedingStars: 0, notifications: 0, total: 0 };
       }
     },
     enabled: !!effectiveLeagueId,
@@ -1709,7 +1869,6 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex items-center gap-3">
-            <NotificationCenter />
             <button 
               onClick={() => navigate('/profile')}
               className="w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden bg-primary"
@@ -2141,7 +2300,7 @@ export default function Dashboard() {
                 {isLoadingNeedsAttention ? (
                   <div className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2">
                     <div className="flex items-center gap-3">
-                      <Settings className="w-4 h-4 text-white" />
+                      <Bell className="w-4 h-4 text-white" />
                       <span className="text-white font-medium text-sm">To-Do</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -2156,7 +2315,7 @@ export default function Dashboard() {
                     data-testid="button-needs-attention-permanent"
                   >
                     <div className="flex items-center gap-3">
-                      <Settings className="w-4 h-4 text-[#212121] dark:text-white" />
+                      <Bell className="w-4 h-4 text-[#212121] dark:text-white" />
                       <span className="font-medium text-sm text-[#212121] dark:text-white">Alerts</span>
                     </div>
                     <div className="flex items-center gap-2">
