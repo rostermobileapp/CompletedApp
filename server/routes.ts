@@ -5833,15 +5833,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Route renamed to avoid potential caching/routing conflicts in production
-  // Using POST to bypass any GET request caching at CDN/proxy level
-  app.post('/api/substitute-players/availability', isAuthenticated, async (req: any, res) => {
+  // Route uses existing /api/substitute-requests/ prefix which is known to work in production
+  // Using POST to ensure the request goes through properly
+  app.post('/api/substitute-requests/players-availability', isAuthenticated, async (req: any, res) => {
     // Set headers immediately to prevent any caching and ensure JSON response
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.setHeader('X-API-Route', 'substitute-players-availability');
+    res.setHeader('X-API-Route', 'players-availability');
     
     try {
       // Get date and leagueId from request body (POST) instead of URL params (GET)

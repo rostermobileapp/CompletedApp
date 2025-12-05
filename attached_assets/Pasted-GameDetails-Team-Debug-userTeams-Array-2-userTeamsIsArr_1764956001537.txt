@@ -1,0 +1,49 @@
+GameDetails Team Debug: {userTeams: Array(2), userTeamsIsArray: true, userTeamsLength: 2, userTeamIds: Array(2), homeTeamId: 'a3861439-0e67-4e01-9a91-1fa765997803', …}
+index-pZfP1-b_.js:684 UserTeam Assignment Debug: {userTeam: {…}, userTeamId: 'c019a814-0eae-4c4b-8958-329aa7f857f7', gameHomeTeam: {…}, gameAwayTeam: {…}, isCommissioner: true, …}
+index-pZfP1-b_.js:684 GameDetails Team Debug: {userTeams: Array(2), userTeamsIsArray: true, userTeamsLength: 2, userTeamIds: Array(2), homeTeamId: 'a3861439-0e67-4e01-9a91-1fa765997803', …}
+index-pZfP1-b_.js:684 UserTeam Assignment Debug: {userTeam: {…}, userTeamId: 'c019a814-0eae-4c4b-8958-329aa7f857f7', gameHomeTeam: {…}, gameAwayTeam: {…}, isCommissioner: true, …}
+index-pZfP1-b_.js:684 GameDetails Team Debug: {userTeams: Array(2), userTeamsIsArray: true, userTeamsLength: 2, userTeamIds: Array(2), homeTeamId: 'a3861439-0e67-4e01-9a91-1fa765997803', …}
+index-pZfP1-b_.js:684 UserTeam Assignment Debug: {userTeam: {…}, userTeamId: 'c019a814-0eae-4c4b-8958-329aa7f857f7', gameHomeTeam: {…}, gameAwayTeam: {…}, isCommissioner: true, …}
+index-pZfP1-b_.js:684 [SubstituteModal] Fetching players (POST)... {gameDate: '2026-01-11', leagueId: '8f4c9613-80e3-41d4-a940-f69893268687'}
+index-pZfP1-b_.js:684  POST https://www.roster-app.com/api/substitute-players/availability net::ERR_ABORTED 405 (Method Not Allowed)
+queryFn @ index-pZfP1-b_.js:684
+await in queryFn
+i @ index-pZfP1-b_.js:48
+x @ index-pZfP1-b_.js:48
+start @ index-pZfP1-b_.js:48
+fetch @ index-pZfP1-b_.js:48
+Tg @ index-pZfP1-b_.js:48
+onSubscribe @ index-pZfP1-b_.js:48
+subscribe @ index-pZfP1-b_.js:48
+(anonymous) @ index-pZfP1-b_.js:48
+NR @ index-pZfP1-b_.js:38
+n1 @ index-pZfP1-b_.js:40
+wf @ index-pZfP1-b_.js:40
+OW @ index-pZfP1-b_.js:40
+km @ index-pZfP1-b_.js:40
+oC @ index-pZfP1-b_.js:40
+sm @ index-pZfP1-b_.js:38
+(anonymous) @ index-pZfP1-b_.js:40Understand this error
+index-pZfP1-b_.js:684 [SubstituteModal] Response status: 405
+index-pZfP1-b_.js:684 [SubstituteModal] Response headers: {contentType: 'text/html; charset=utf-8', apiRouteHeader: null, isFromOurApi: false}
+index-pZfP1-b_.js:684 [SubstituteModal] ROUTING ERROR: Got HTML instead of JSON! {contentType: 'text/html; charset=utf-8', apiRouteHeader: null, hint: 'Route is not being matched - falling through to static file handler'}
+queryFn @ index-pZfP1-b_.js:684
+await in queryFn
+i @ index-pZfP1-b_.js:48
+x @ index-pZfP1-b_.js:48
+start @ index-pZfP1-b_.js:48
+fetch @ index-pZfP1-b_.js:48
+Tg @ index-pZfP1-b_.js:48
+onSubscribe @ index-pZfP1-b_.js:48
+subscribe @ index-pZfP1-b_.js:48
+(anonymous) @ index-pZfP1-b_.js:48
+NR @ index-pZfP1-b_.js:38
+n1 @ index-pZfP1-b_.js:40
+wf @ index-pZfP1-b_.js:40
+OW @ index-pZfP1-b_.js:40
+km @ index-pZfP1-b_.js:40
+oC @ index-pZfP1-b_.js:40
+sm @ index-pZfP1-b_.js:38
+(anonymous) @ index-pZfP1-b_.js:40Understand this error
+index-pZfP1-b_.js:684 [SubstituteModal] Fetch exception: Error: API routing error: received HTML instead of JSON. This may be a production routing issue.
+    at queryFn (index-pZfP1-b_.js:684:269595)
