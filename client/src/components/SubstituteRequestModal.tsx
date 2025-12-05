@@ -61,14 +61,20 @@ export function SubstituteRequestModal({
   const opposingTeamId = originalPlayerTeamId === homeTeamId ? awayTeamId : homeTeamId;
 
   // Fetch all league players with availability status
+  // Using POST to bypass potential GET caching issues in production
   const { data: allPlayers = [], isLoading, error: playersError, isError } = useQuery({
-    queryKey: [`/api/players/all-with-availability/${gameDate}`, leagueId],
+    queryKey: ['/api/substitute-players/availability', gameDate, leagueId],
     queryFn: async () => {
       const authHeaders = await getAuthHeaders();
-      console.log('%c[SubstituteModal] Fetching players...', 'color: blue; font-weight: bold', { gameDate, leagueId });
+      console.log('%c[SubstituteModal] Fetching players (POST)...', 'color: blue; font-weight: bold', { gameDate, leagueId });
       try {
-        const response = await fetch(`/api/players/all-with-availability/${gameDate}?leagueId=${leagueId}`, {
-          headers: authHeaders
+        const response = await fetch('/api/substitute-players/availability', {
+          method: 'POST',
+          headers: {
+            ...authHeaders,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ date: gameDate, leagueId }),
         });
         console.log('%c[SubstituteModal] Response status:', 'color: blue', response.status);
         
@@ -78,7 +84,7 @@ export function SubstituteRequestModal({
         console.log('%c[SubstituteModal] Response headers:', 'color: blue', { 
           contentType, 
           apiRouteHeader,
-          isFromOurApi: apiRouteHeader === 'all-with-availability'
+          isFromOurApi: apiRouteHeader === 'substitute-players-availability'
         });
         
         // Check if we got HTML instead of JSON (routing issue)
