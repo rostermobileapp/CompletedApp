@@ -61,17 +61,22 @@ export function SubstituteRequestModal({
   const opposingTeamId = originalPlayerTeamId === homeTeamId ? awayTeamId : homeTeamId;
 
   // Fetch all league players with availability status
-  const { data: allPlayers = [], isLoading } = useQuery({
+  const { data: allPlayers = [], isLoading, error: playersError } = useQuery({
     queryKey: [`/api/players/all-with-availability/${gameDate}`, leagueId],
     queryFn: async () => {
       const authHeaders = await getAuthHeaders();
+      console.log('SubstituteModal: Fetching players with availability', { gameDate, leagueId });
       const response = await fetch(`/api/players/all-with-availability/${gameDate}?leagueId=${leagueId}`, {
         headers: authHeaders
       });
       if (!response.ok) {
-        throw new Error('Failed to fetch players');
+        const errorText = await response.text();
+        console.error('SubstituteModal: Failed to fetch players', { status: response.status, error: errorText });
+        throw new Error(`Failed to fetch players: ${response.status}`);
       }
-      return response.json();
+      const players = await response.json();
+      console.log('SubstituteModal: Fetched players', { count: players.length, players });
+      return players;
     },
     enabled: isOpen && !!gameDate && !!leagueId,
   });
@@ -313,6 +318,12 @@ export function SubstituteRequestModal({
                   <div className="h-8 w-16 bg-muted rounded"></div>
                 </div>
               ))}
+            </div>
+          ) : playersError ? (
+            <div className="text-center py-8 text-red-500">
+              <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p className="font-medium">Failed to load players</p>
+              <p className="text-sm text-muted-foreground mt-1">Please try again or contact support</p>
             </div>
           ) : (
             <ScrollArea className="flex-1 overflow-auto" style={{ height: '50vh' }}>
