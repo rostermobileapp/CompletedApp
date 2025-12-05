@@ -5,6 +5,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Trophy, ArrowLeft, Check, X, Clock, Users } from "lucide-react";
 import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPStatusIcon } from "@/components/RSVPStatusIcon";
+import { RSVPAlertIcon } from "@/components/RSVPAlertIcon";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
 import { Button } from "@/components/ui/button";
@@ -442,9 +443,14 @@ export default function Calendar() {
                     })()}
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
-                      vs {game.homeTeam?.id === activeTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
+                        vs {game.homeTeam?.id === activeTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}
+                      </h3>
+                      {!isCompleted && !isPastGame && activeTeam && (
+                        <RSVPAlertIcon gameId={game.id} teamId={activeTeam.id} />
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
                       {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
                     </p>

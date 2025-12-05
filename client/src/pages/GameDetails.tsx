@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star } from "lucide-react";
+import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch } from "lucide-react";
 import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPSummary } from "@/components/RSVPSummary";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
@@ -74,6 +74,21 @@ export default function GameDetails() {
     queryKey: [`/api/scrimmages/${gameId}/approved-players`],
     enabled: !!gameId && isScrimmage,
   });
+
+  // Compute captain team ID early for the RSVP summary query
+  // This requires knowing which team the user is captain of
+  const isEarlyCaptainOfHome = game?.homeTeam?.captainId === (user as any)?.id;
+  const isEarlyCaptainOfAway = game?.awayTeam?.captainId === (user as any)?.id;
+  const earlyCaptainTeamId = isEarlyCaptainOfHome ? game?.homeTeam?.id : 
+                              isEarlyCaptainOfAway ? game?.awayTeam?.id : null;
+
+  // Fetch RSVP summary for captain's team (to check if any players are not attending)
+  const { data: captainRsvpSummary } = useQuery<{ attending?: any[]; notAttending?: any[] } | null>({
+    queryKey: [`/api/games/${gameId}/rsvp-summary?teamId=${earlyCaptainTeamId}`],
+    enabled: !!gameId && !!earlyCaptainTeamId && !isScrimmage,
+  });
+
+  const notAttendingCount = captainRsvpSummary?.notAttending?.length || 0;
 
 
 
@@ -646,6 +661,19 @@ export default function GameDetails() {
                     onViewDetails={() => setShowRSVPModal(true)}
                   />
                 </div>
+              )}
+              
+              {/* Find Substitutes Button - Show for captains when there are players not attending */}
+              {isCaptain && notAttendingCount > 0 && (
+                <Button
+                  variant="outline"
+                  className="w-full mt-4 border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+                  onClick={() => setShowRSVPModal(true)}
+                  data-testid="button-find-substitutes"
+                >
+                  <UserSearch className="w-4 h-4 mr-2" />
+                  Find Substitutes ({notAttendingCount})
+                </Button>
               )}
             </div>
           </div>
