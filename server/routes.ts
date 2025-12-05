@@ -5974,11 +5974,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         requestedBy: userId,
         requestingTeamId,
         reason,
-        status: 'pending_substitute_approval',
+        status: 'pending_opponent_approval', // First goes to opposing captain
         expiresAt: expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
       });
 
       const request = await storage.createSubstituteRequest(requestData);
+      
+      // Notify the opposing team captain about the new substitute request
+      try {
+        const opposingTeamId = requestingTeamId === game.homeTeamId 
+          ? game.awayTeamId 
+          : game.homeTeamId;
+        
+        if (opposingTeamId) {
+          const opposingTeam = await storage.getTeam(opposingTeamId);
+          if (opposingTeam?.captainId && game.leagueId) {
+            const requestingTeam = await storage.getTeam(requestingTeamId);
+            const originalPlayer = await storage.getUser(originalPlayerId);
+            const substitutePlayer = substitutePlayerId ? await storage.getUser(substitutePlayerId) : null;
+            
+            const substitutePlayerName = substitutePlayer 
+              ? `${substitutePlayer.firstName} ${substitutePlayer.lastName}`
+              : 'a substitute player';
+            
+            const content = `⚽ Substitution approval needed: ${requestingTeam?.name || 'A team'} is requesting ${substitutePlayerName} to substitute for ${originalPlayer?.firstName || ''} ${originalPlayer?.lastName || ''} in your upcoming game. Please review and approve or deny.`;
+            
+            // Create announcement and set visibility for opposing captain only
+            const announcement = await storage.createAnnouncement({
+              leagueId: game.leagueId,
+              authorId: userId,
+              content,
+              isPinned: false,
+            });
+            await storage.createAnnouncementVisibility(announcement.id, [opposingTeam.captainId]);
+          }
+        }
+      } catch (notifyError) {
+        console.error('Error notifying opposing captain:', notifyError);
+        // Don't fail the request creation if notification fails
+      }
+      
       res.json(request);
     } catch (error) {
       console.error('Error creating substitute request:', error);

@@ -5372,7 +5372,43 @@ export class DatabaseStorage implements IStorage {
         .where(eq(substituteRequests.id, requestId))
         .returning();
 
-      // 8. Send notifications for workflow progression
+      // 8. If fully approved, add substitute player to RSVP and game schedule
+      if (nextStatus === 'approved' && request.substitutePlayerId) {
+        // Create RSVP for the substitute player with 'attending' status
+        const existingRsvp = await tx
+          .select()
+          .from(gameRsvps)
+          .where(and(
+            eq(gameRsvps.gameId, request.gameId),
+            eq(gameRsvps.userId, request.substitutePlayerId),
+            eq(gameRsvps.teamId, request.requestingTeamId)
+          ))
+          .limit(1);
+
+        if (existingRsvp.length > 0) {
+          // Update existing RSVP to 'attending'
+          await tx
+            .update(gameRsvps)
+            .set({ status: 'attending', updatedAt: new Date() })
+            .where(and(
+              eq(gameRsvps.gameId, request.gameId),
+              eq(gameRsvps.userId, request.substitutePlayerId),
+              eq(gameRsvps.teamId, request.requestingTeamId)
+            ));
+        } else {
+          // Create new RSVP with 'attending' status
+          await tx
+            .insert(gameRsvps)
+            .values({
+              gameId: request.gameId,
+              userId: request.substitutePlayerId,
+              teamId: request.requestingTeamId,
+              status: 'attending',
+            });
+        }
+      }
+
+      // 9. Send notifications for workflow progression
       await this.createSubstitutionNotification(tx, request, updatedRequest, approverType, status);
 
       return { approval, updatedRequest };
@@ -5471,18 +5507,11 @@ export class DatabaseStorage implements IStorage {
       } else if (decision === 'approved') {
         // Approval notifications - notify next person in workflow
         switch (updatedRequest.status) {
-          case 'pending_opponent_approval':
-            // NEW: Substitute player confirmed availability → notify opposing captain
-            const opposingTeam = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
-              ? originalRequest.game.awayTeam 
-              : originalRequest.game.homeTeam;
-            
-            if (opposingTeam.captainId) {
-              targetUserId = opposingTeam.captainId;
-              const substitutePlayerName = originalRequest.substitutePlayer 
-                ? `${originalRequest.substitutePlayer.firstName} ${originalRequest.substitutePlayer.lastName}`
-                : 'a substitute player';
-              content = `⚽ Substitution approval needed: ${substitutePlayerName} has confirmed availability to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in your upcoming game against ${originalRequest.requestingTeamId === originalRequest.game.homeTeamId ? originalRequest.game.homeTeam.name : originalRequest.game.awayTeam.name}. Please review and approve.`;
+          case 'pending_substitute_approval':
+            // Opposing captain (or commissioner) approved → notify substitute player for confirmation
+            if (originalRequest.substitutePlayer?.id) {
+              targetUserId = originalRequest.substitutePlayer.id;
+              content = `🏒 You've been requested as a substitute! The opposing captain has approved a request for you to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game. Please confirm your availability.`;
             }
             break;
             
@@ -5578,7 +5607,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // SECURITY: Derive next status from current state and approval decision
-  // New workflow: substitute_player → opposing_captain → (only if denied) commissioner
+  // Workflow: opposing_captain → substitute_player → approved (commissioner only if denied)
   private deriveNextStatus(
     currentStatus: string, 
     approverType: 'opposing_captain' | 'commissioner' | 'substitute_player', 
@@ -5596,28 +5625,28 @@ export class DatabaseStorage implements IStorage {
 
     // Only allow approved decisions to advance workflow
     switch (approverType) {
-      case 'substitute_player':
-        // First step: substitute confirms availability → notify opposing captain
-        if (currentStatus !== 'pending_substitute_approval') {
-          throw new Error(`Invalid transition: cannot process substitute_player approval from status ${currentStatus}`);
-        }
-        return 'pending_opponent_approval';
-        
       case 'opposing_captain':
-        // Second step: opposing captain approves → FULLY APPROVED (bypass commissioner)
+        // First step: opposing captain approves → send to substitute player for confirmation
         if (currentStatus !== 'pending_opponent_approval') {
           throw new Error(`Invalid transition: cannot process opposing_captain approval from status ${currentStatus}`);
+        }
+        return 'pending_substitute_approval';
+        
+      case 'substitute_player':
+        // Second step: substitute confirms → FULLY APPROVED
+        if (currentStatus !== 'pending_substitute_approval') {
+          throw new Error(`Invalid transition: cannot process substitute_player approval from status ${currentStatus}`);
         }
         return 'approved';
         
       case 'commissioner':
         // Commissioner only sees requests if opposing captain denied them
-        // Commissioners can approve at either pending_opponent_approval (if they jumped in early) or pending_commissioner_approval
-        if (currentStatus !== 'pending_opponent_approval' && currentStatus !== 'pending_commissioner_approval') {
+        // Commissioners can approve at pending_commissioner_approval stage
+        if (currentStatus !== 'pending_commissioner_approval') {
           throw new Error(`Invalid transition: cannot process commissioner approval from status ${currentStatus}`);
         }
-        // Commissioner approval is final
-        return 'approved';
+        // Commissioner approval sends to substitute player for confirmation
+        return 'pending_substitute_approval';
         
       default:
         throw new Error(`Invalid approver type: ${approverType}`);
