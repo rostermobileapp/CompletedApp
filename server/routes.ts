@@ -5834,6 +5834,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get('/api/players/all-with-availability/:date', isAuthenticated, async (req: any, res) => {
+    // Set headers immediately to prevent any caching and ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('X-API-Route', 'all-with-availability');
+    
     try {
       const { date } = req.params;
       const { leagueId } = req.query;

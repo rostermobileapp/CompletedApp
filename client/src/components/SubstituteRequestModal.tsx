@@ -71,6 +71,26 @@ export function SubstituteRequestModal({
           headers: authHeaders
         });
         console.log('%c[SubstituteModal] Response status:', 'color: blue', response.status);
+        
+        // Log response headers to diagnose routing issues
+        const contentType = response.headers.get('content-type');
+        const apiRouteHeader = response.headers.get('x-api-route');
+        console.log('%c[SubstituteModal] Response headers:', 'color: blue', { 
+          contentType, 
+          apiRouteHeader,
+          isFromOurApi: apiRouteHeader === 'all-with-availability'
+        });
+        
+        // Check if we got HTML instead of JSON (routing issue)
+        if (contentType && contentType.includes('text/html')) {
+          console.error('%c[SubstituteModal] ROUTING ERROR: Got HTML instead of JSON!', 'color: red; font-weight: bold', {
+            contentType,
+            apiRouteHeader,
+            hint: 'Route is not being matched - falling through to static file handler'
+          });
+          throw new Error('API routing error: received HTML instead of JSON. This may be a production routing issue.');
+        }
+        
         if (!response.ok) {
           const errorText = await response.text();
           console.error('%c[SubstituteModal] API Error:', 'color: red; font-weight: bold', { status: response.status, error: errorText });
