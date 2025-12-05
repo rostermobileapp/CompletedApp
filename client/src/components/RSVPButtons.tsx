@@ -21,32 +21,12 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
     return null;
   }
 
-  const { data: currentRsvp } = useQuery({
-    queryKey: [`/api/games/${gameId}/rsvp`, userId, userTeamId],
-    queryFn: async () => {
-      try {
-        const response = await fetch(`/api/games/${gameId}/rsvp?teamId=${userTeamId}`, {
-          credentials: 'include',
-        });
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error('Failed to fetch RSVP');
-        return response.json();
-      } catch (error) {
-        return null;
-      }
-    },
+  const { data: currentRsvp } = useQuery<{ status?: string } | null>({
+    queryKey: [`/api/games/${gameId}/rsvp?teamId=${userTeamId}`],
   });
 
-  const { data: rsvpSummary } = useQuery({
-    queryKey: [`/api/games/${gameId}/rsvp-summary`, userTeamId],
-    queryFn: async () => {
-      const url = `/api/games/${gameId}/rsvp-summary?teamId=${userTeamId}`;
-      const response = await fetch(url, {
-        credentials: 'include',
-      });
-      if (!response.ok) return { attending: [], notAttending: [] };
-      return response.json();
-    },
+  const { data: rsvpSummary } = useQuery<{ attending?: any[]; notAttending?: any[] } | null>({
+    queryKey: [`/api/games/${gameId}/rsvp-summary?teamId=${userTeamId}`],
   });
 
   const rsvpMutation = useMutation({
@@ -57,8 +37,8 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
       });
     },
     onSuccess: (_, status) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/rsvp`, userId, userTeamId] });
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/rsvp-summary`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/rsvp?teamId=${userTeamId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/rsvp-summary?teamId=${userTeamId}`] });
       toast({
         title: "RSVP Updated",
         description: status === 'attending' 
