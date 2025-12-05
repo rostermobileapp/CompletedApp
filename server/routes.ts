@@ -5833,58 +5833,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Route uses existing /api/substitute-requests/ prefix which is known to work in production
-  // Using POST to ensure the request goes through properly
+  // Get all league players with availability status for substitute requests
   app.post('/api/substitute-requests/players-availability', isAuthenticated, async (req: any, res) => {
-    // Set headers immediately to prevent any caching and ensure JSON response
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('X-API-Route', 'players-availability');
-    
     try {
-      // Get date and leagueId from request body (POST) instead of URL params (GET)
       const { date, leagueId } = req.body;
       const userId = req.user.claims.sub;
       
-      console.log(`📋 [SubstituteModal API] Request: date=${date}, leagueId=${leagueId}, userId=${userId?.substring(0, 8)}...`);
-      
       if (!userId) {
-        console.log(`📋 [SubstituteModal API] ❌ User ID not found`);
         return res.status(401).json({ message: 'User ID not found' });
       }
 
       if (!leagueId) {
-        console.log(`📋 [SubstituteModal API] ❌ League ID missing`);
         return res.status(400).json({ message: 'League ID is required' });
       }
 
       // Check if user is captain or commissioner
-      const user = await storage.getUser(userId);
       const league = await storage.getLeague(leagueId as string);
       const isCommissioner = league && league.commissionerId === userId;
       
-      console.log(`📋 [SubstituteModal API] League found: ${!!league}, isCommissioner: ${isCommissioner}`);
-      
-      // For captain check, we need to verify they're captain of a team in this league
+      // For captain check, verify they're captain of a team in this league
       const userTeams = await storage.getUserTeams(userId);
       const userTeamsInLeague = userTeams.filter(team => team.leagueId === leagueId);
       const isTeamCaptain = userTeamsInLeague.some(team => team.captainId === userId);
       
-      console.log(`📋 [SubstituteModal API] User teams: ${userTeams.length}, in league: ${userTeamsInLeague.length}, isCaptain: ${isTeamCaptain}`);
-      
       if (!isCommissioner && !isTeamCaptain) {
-        console.log(`📋 [SubstituteModal API] ❌ Access denied - not captain or commissioner`);
         return res.status(403).json({ message: 'Captain or Commissioner access required' });
       }
 
-      console.log(`📋 [SubstituteModal API] ✅ Access granted, fetching players...`);
       const allPlayers = await storage.getAllLeaguePlayersWithAvailability(new Date(date), leagueId as string);
-      console.log(`📋 [SubstituteModal API] ✅ Returning ${allPlayers.length} players`);
       res.json(allPlayers);
     } catch (error) {
-      console.error('📋 [SubstituteModal API] ❌ Error:', error);
+      console.error('Error fetching players availability:', error);
       res.status(500).json({ message: 'Failed to fetch players' });
     }
   });

@@ -61,57 +61,23 @@ export function SubstituteRequestModal({
   const opposingTeamId = originalPlayerTeamId === homeTeamId ? awayTeamId : homeTeamId;
 
   // Fetch all league players with availability status
-  // Using POST under /api/substitute-requests/ prefix which is known to work in production
   const { data: allPlayers = [], isLoading, error: playersError, isError } = useQuery({
     queryKey: ['/api/substitute-requests/players-availability', gameDate, leagueId],
     queryFn: async () => {
       const authHeaders = await getAuthHeaders();
-      console.log('%c[SubstituteModal] Fetching players (POST)...', 'color: blue; font-weight: bold', { gameDate, leagueId });
-      try {
-        const response = await fetch('/api/substitute-requests/players-availability', {
-          method: 'POST',
-          headers: {
-            ...authHeaders,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ date: gameDate, leagueId }),
-        });
-        console.log('%c[SubstituteModal] Response status:', 'color: blue', response.status);
-        
-        // Log response headers to diagnose routing issues
-        const contentType = response.headers.get('content-type');
-        const apiRouteHeader = response.headers.get('x-api-route');
-        console.log('%c[SubstituteModal] Response headers:', 'color: blue', { 
-          contentType, 
-          apiRouteHeader,
-          isFromOurApi: apiRouteHeader === 'players-availability'
-        });
-        
-        // Check if we got HTML instead of JSON (routing issue)
-        if (contentType && contentType.includes('text/html')) {
-          console.error('%c[SubstituteModal] ROUTING ERROR: Got HTML instead of JSON!', 'color: red; font-weight: bold', {
-            contentType,
-            apiRouteHeader,
-            hint: 'Route is not being matched - falling through to static file handler'
-          });
-          throw new Error('API routing error: received HTML instead of JSON. This may be a production routing issue.');
-        }
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('%c[SubstituteModal] API Error:', 'color: red; font-weight: bold', { status: response.status, error: errorText });
-          throw new Error(`Failed to fetch players: ${response.status} - ${errorText}`);
-        }
-        const players = await response.json();
-        console.log('%c[SubstituteModal] SUCCESS - Fetched players:', 'color: green; font-weight: bold', { count: players.length });
-        if (players.length === 0) {
-          console.warn('%c[SubstituteModal] WARNING: API returned 0 players', 'color: orange; font-weight: bold');
-        }
-        return players;
-      } catch (err) {
-        console.error('%c[SubstituteModal] Fetch exception:', 'color: red; font-weight: bold', err);
-        throw err;
+      const response = await fetch('/api/substitute-requests/players-availability', {
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ date: gameDate, leagueId }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch players: ${response.status}`);
       }
+      return response.json();
     },
     enabled: isOpen && !!gameDate && !!leagueId,
   });
