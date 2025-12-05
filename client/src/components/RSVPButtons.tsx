@@ -25,7 +25,9 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
     queryKey: [`/api/games/${gameId}/rsvp`, userId, userTeamId],
     queryFn: async () => {
       try {
-        const response = await fetch(`/api/games/${gameId}/rsvp?teamId=${userTeamId}`);
+        const response = await fetch(`/api/games/${gameId}/rsvp?teamId=${userTeamId}`, {
+          credentials: 'include',
+        });
         if (response.status === 404) return null;
         if (!response.ok) throw new Error('Failed to fetch RSVP');
         return response.json();
@@ -39,7 +41,9 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
     queryKey: [`/api/games/${gameId}/rsvp-summary`, userTeamId],
     queryFn: async () => {
       const url = `/api/games/${gameId}/rsvp-summary?teamId=${userTeamId}`;
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        credentials: 'include',
+      });
       if (!response.ok) return { attending: [], notAttending: [] };
       return response.json();
     },
