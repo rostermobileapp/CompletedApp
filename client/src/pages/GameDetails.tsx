@@ -673,8 +673,9 @@ export default function GameDetails() {
               {/* Find Substitutes Button - Show for captains when there are players not attending */}
               {isCaptain && notAttendingCount > 0 && (
                 <Button
-                  variant="outline"
-                  className="w-full mt-4 border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+                  size="sm"
+                  variant="default"
+                  className="w-full mt-4"
                   onClick={() => {
                     setSubstituteRequestData({ 
                       playerId: '', 
