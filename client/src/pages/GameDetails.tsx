@@ -1032,7 +1032,7 @@ export default function GameDetails() {
                     ...(homeTeamMembers || []),
                     ...(awayTeamMembers || [])
                   ].filter((member, index, self) => 
-                    self.findIndex(m => m.user.id === member.user.id) === index
+                    member?.user?.id && self.findIndex(m => m?.user?.id === member.user.id) === index
                   );
                   
                   return (
