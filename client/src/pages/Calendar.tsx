@@ -415,6 +415,11 @@ export default function Calendar() {
                 key={game.id} 
                 className="bg-card rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors" 
                 data-testid={`card-game-${game.id}`}
+                onMouseEnter={() => {
+                  queryClient.prefetchQuery({
+                    queryKey: [`/api/games/${game.id}/full`],
+                  });
+                }}
                 onClick={() => {
                   setPageTransitionDirection('up');
                   navigate(`/game/${game.id}`);
