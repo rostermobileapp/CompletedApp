@@ -4669,7 +4669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         game.leagueId ? storage.getLeague(game.leagueId) : null,
         storage.getTeamMembers(game.homeTeamId),
         game.awayTeamId ? storage.getTeamMembers(game.awayTeamId) : [],
-        storage.getScoreSubmissions(gameId),
+        storage.getGameScoreSubmissions(gameId),
         storage.getUserTeams(userId)
       ]);
       
