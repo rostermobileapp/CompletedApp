@@ -150,6 +150,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/pending-members`);
       return response.json();
     },
+    staleTime: 0,
     enabled: !!leagueId && isOpen,
   });
 
@@ -161,6 +162,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
       const response = await apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${leagueId}`);
       return response.json();
     },
+    staleTime: 0,
     enabled: !!leagueId && isOpen,
   });
 
@@ -234,6 +236,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
       
       return gamesNeedingVerification;
     },
+    staleTime: 0,
     enabled: !!leagueId && isOpen,
   });
 
@@ -245,21 +248,20 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
       const response = await apiRequest('GET', `/api/user/games-needing-stars?leagueId=${leagueId}`);
       return response.json();
     },
+    staleTime: 0,
     enabled: !!leagueId && isOpen,
   });
 
   // Fetch notifications (previously in header NotificationCenter)
   const { data: notifications = [], isLoading: notificationsLoading } = useQuery<Notification[]>({
     queryKey: ['/api/notifications'],
-    refetchInterval: 30000,
-    staleTime: 10000,
+    staleTime: 0,
     enabled: isOpen,
   });
 
   const { data: unreadNotifications = [] } = useQuery<Notification[]>({
     queryKey: ['/api/notifications/unread'],
-    refetchInterval: 10000,
-    staleTime: 5000,
+    staleTime: 0,
     enabled: isOpen,
   });
 
@@ -398,7 +400,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6 pl-[4px] pr-[4px]">
-          {(pendingMembersLoading || gamesLoading || substituteApprovalsLoading || notificationsLoading) ? (
+          {(pendingMembersLoading || gamesLoading || substituteApprovalsLoading || starsLoading || notificationsLoading) ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
