@@ -5,11 +5,24 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://completedapp-production.up.railway.app/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate"
+        }
+      ]
+    },
     {
       "source": "/assets/(.*)",
       "headers": [
