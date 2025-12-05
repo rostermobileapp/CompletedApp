@@ -5973,43 +5973,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         requestedBy: userId,
         requestingTeamId,
         reason,
-        status: 'pending_opponent_approval', // First goes to opposing captain
+        status: 'pending_substitute_approval', // First goes to substitute player for confirmation
         expiresAt: expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
       });
 
       const request = await storage.createSubstituteRequest(requestData);
       
-      // Notify the opposing team captain about the new substitute request via push notification (bell icon)
-      // The request also appears in their "Needs Attention" / To-Do section automatically
+      // Notify the substitute player about the new substitute request via push notification (bell icon)
+      // Workflow: Captain → Substitute Player → Opposing Captain → Done
       try {
-        const opposingTeamId = requestingTeamId === game.homeTeamId 
-          ? game.awayTeamId 
-          : game.homeTeamId;
-        
-        if (opposingTeamId) {
-          const opposingTeam = await storage.getTeam(opposingTeamId);
-          if (opposingTeam?.captainId && game.leagueId) {
-            const requestingTeam = await storage.getTeam(requestingTeamId);
-            const originalPlayer = await storage.getUser(originalPlayerId);
-            const substitutePlayer = substitutePlayerId ? await storage.getUser(substitutePlayerId) : null;
-            
-            const substitutePlayerName = substitutePlayer 
-              ? `${substitutePlayer.firstName} ${substitutePlayer.lastName}`
-              : 'a substitute player';
-            
-            // Create a push notification (bell icon) for the opposing captain
-            await storage.createNotification({
-              userId: opposingTeam.captainId,
-              type: 'general',
-              title: 'Substitute Request Needs Your Approval',
-              message: `${requestingTeam?.name || 'A team'} is requesting ${substitutePlayerName} to substitute for ${originalPlayer?.firstName || ''} ${originalPlayer?.lastName || ''}. Check your To-Do section to approve or deny.`,
-              actionUrl: `/games/${gameId}`,
-              actionText: 'View Game',
-            });
-          }
+        if (substitutePlayerId) {
+          const requestingTeam = await storage.getTeam(requestingTeamId);
+          const originalPlayer = await storage.getUser(originalPlayerId);
+          
+          // Create a push notification (bell icon) for the substitute player
+          await storage.createNotification({
+            userId: substitutePlayerId,
+            type: 'general',
+            title: 'You\'ve Been Requested as a Substitute!',
+            message: `${requestingTeam?.name || 'A team'} is requesting you to substitute for ${originalPlayer?.firstName || ''} ${originalPlayer?.lastName || ''}. Check your To-Do section to confirm your availability.`,
+            actionUrl: `/games/${gameId}`,
+            actionText: 'View Game',
+          });
         }
       } catch (notifyError) {
-        console.error('Error notifying opposing captain:', notifyError);
+        console.error('Error notifying substitute player:', notifyError);
         // Don't fail the request creation if notification fails
       }
       
