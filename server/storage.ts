@@ -2813,8 +2813,37 @@ export class DatabaseStorage implements IStorage {
     const userLeagues = await this.getUserLeagues(userId);
     const leagueIds = userLeagues.map(l => l.id);
     
-    // If user has neither teams nor league memberships, return empty
-    if (teamIds.length === 0 && leagueIds.length === 0) return [];
+    // Get games where user has an attending RSVP (for substitute players)
+    const rsvpGames = await db
+      .select({ gameId: gameRsvps.gameId })
+      .from(gameRsvps)
+      .innerJoin(games, eq(gameRsvps.gameId, games.id))
+      .where(
+        and(
+          eq(gameRsvps.userId, userId),
+          eq(gameRsvps.status, 'attending'),
+          gte(games.scheduledAt, new Date())
+        )
+      );
+    const rsvpGameIds = rsvpGames.map(r => r.gameId);
+    
+    // If user has neither teams, league memberships, nor attending RSVPs, return empty
+    if (teamIds.length === 0 && leagueIds.length === 0 && rsvpGameIds.length === 0) return [];
+
+    // Build conditions for the query
+    const conditions: any[] = [];
+    if (teamIds.length > 0) {
+      conditions.push(or(
+        inArray(games.homeTeamId, teamIds),
+        inArray(games.awayTeamId, teamIds)
+      ));
+    }
+    if (leagueIds.length > 0) {
+      conditions.push(inArray(games.leagueId, leagueIds));
+    }
+    if (rsvpGameIds.length > 0) {
+      conditions.push(inArray(games.id, rsvpGameIds));
+    }
 
     // Get all games first, then join with teams
     const gamesResult = await db
@@ -2823,13 +2852,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           gte(games.scheduledAt, new Date()),
-          or(
-            teamIds.length > 0 ? or(
-              inArray(games.homeTeamId, teamIds),
-              inArray(games.awayTeamId, teamIds)
-            ) : undefined,
-            leagueIds.length > 0 ? inArray(games.leagueId, leagueIds) : undefined
-          )
+          or(...conditions)
         )
       )
       .orderBy(asc(games.scheduledAt));
@@ -5600,14 +5623,14 @@ export class DatabaseStorage implements IStorage {
               ? `${originalRequest.substitutePlayer.firstName} ${originalRequest.substitutePlayer.lastName}`
               : 'the substitute player';
             
-            for (const userId of uniqueParticipants) {
+            for (const visitorId of uniqueParticipants) {
+              // Final approval notifications are informational only - no action needed
+              // Do NOT include actionUrl to prevent clickable notifications that lead to errors
               await tx.insert(userNotifications).values({
-                userId,
+                userId: visitorId,
                 type: 'general',
                 title: 'Substitution Approved!',
                 message: `${substitutePlayerName} will substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game.`,
-                actionUrl: `/games/${gameId}`,
-                actionText: 'View Game',
               });
             }
             break;
