@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, X, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
-import { ClickableAvatar } from "@/components/ClickableAvatar";
 import { useLocation } from "wouter";
 import { setPageTransitionDirection } from "@/components/PageTransition";
 
@@ -105,23 +105,22 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
         
         <div className="mt-2 space-y-1">
           {attendingPlayers.map((rsvp: any) => (
-            <div
+            <button
               key={rsvp.user.id}
               onClick={() => handlePlayerClick(rsvp.user.id)}
               className="flex items-center gap-2 p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
               data-testid={`player-attending-${rsvp.user.id}`}
             >
-              <ClickableAvatar
-                userId={rsvp.user.id}
-                profileImageUrl={rsvp.user.profileImageUrl}
-                firstName={rsvp.user.firstName}
-                lastName={rsvp.user.lastName}
-                size="xs"
-              />
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={rsvp.user.profileImageUrl || undefined} alt={rsvp.user.firstName || 'User'} />
+                <AvatarFallback className="text-xs">
+                  {rsvp.user.firstName?.[0]}{rsvp.user.lastName?.[0]}
+                </AvatarFallback>
+              </Avatar>
               <span className="text-xs font-medium truncate text-white">
                 {formatPlayerName(rsvp.user.firstName, rsvp.user.lastName)}
               </span>
-            </div>
+            </button>
           ))}
           {attendingPlayers.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">—</p>
@@ -154,23 +153,22 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
         
         <div className="mt-2 space-y-1">
           {notAttendingPlayers.map((rsvp: any) => (
-            <div
+            <button
               key={rsvp.user.id}
               onClick={() => handlePlayerClick(rsvp.user.id)}
               className="flex items-center gap-2 p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
               data-testid={`player-not-attending-${rsvp.user.id}`}
             >
-              <ClickableAvatar
-                userId={rsvp.user.id}
-                profileImageUrl={rsvp.user.profileImageUrl}
-                firstName={rsvp.user.firstName}
-                lastName={rsvp.user.lastName}
-                size="xs"
-              />
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={rsvp.user.profileImageUrl || undefined} alt={rsvp.user.firstName || 'User'} />
+                <AvatarFallback className="text-xs">
+                  {rsvp.user.firstName?.[0]}{rsvp.user.lastName?.[0]}
+                </AvatarFallback>
+              </Avatar>
               <span className="text-xs font-medium truncate text-white">
                 {formatPlayerName(rsvp.user.firstName, rsvp.user.lastName)}
               </span>
-            </div>
+            </button>
           ))}
           {notAttendingPlayers.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">—</p>
@@ -187,23 +185,22 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
         
         <div className="mt-2 space-y-1">
           {noResponsePlayers.map((player: any) => (
-            <div
+            <button
               key={player.id}
               onClick={() => handlePlayerClick(player.id)}
               className="flex items-center gap-2 p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
               data-testid={`player-no-response-${player.id}`}
             >
-              <ClickableAvatar
-                userId={player.id}
-                profileImageUrl={player.profileImageUrl}
-                firstName={player.firstName}
-                lastName={player.lastName}
-                size="xs"
-              />
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={player.profileImageUrl || undefined} alt={player.firstName || 'User'} />
+                <AvatarFallback className="text-xs">
+                  {player.firstName?.[0]}{player.lastName?.[0]}
+                </AvatarFallback>
+              </Avatar>
               <span className="text-xs font-medium truncate text-zinc-400">
                 {formatPlayerName(player.firstName, player.lastName)}
               </span>
-            </div>
+            </button>
           ))}
           {noResponsePlayers.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">—</p>
