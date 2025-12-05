@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, X, HelpCircle, UserCheck } from "lucide-react";
+import { Check, X, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -88,7 +88,6 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
 
   const attendingPlayers = rsvpSummary?.attending || [];
   const notAttendingPlayers = rsvpSummary?.notAttending || [];
-  const noResponsePlayers = rsvpSummary?.noResponse || [];
 
   const [, navigate] = useLocation();
 
@@ -105,7 +104,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
   };
 
   return (
-    <div className={cn("grid grid-cols-3 gap-3", className)} data-testid="rsvp-buttons">
+    <div className={cn("grid grid-cols-2 gap-3", className)} data-testid="rsvp-buttons">
       {/* In Column */}
       <div className="flex flex-col">
         <Button
@@ -221,38 +220,6 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
             );
           })}
           {notAttendingPlayers.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-2">—</p>
-          )}
-        </div>
-      </div>
-      
-      {/* No Response Column */}
-      <div className="flex flex-col">
-        <div className="flex items-center justify-center gap-1 h-9 rounded-md border-2 border-zinc-600 bg-zinc-800 text-zinc-400 text-xs px-2">
-          <HelpCircle className="h-3 w-3" />
-          ? ({noResponsePlayers.length})
-        </div>
-        
-        <div className="mt-2 space-y-1">
-          {noResponsePlayers.map((player: any) => (
-            <button
-              key={player.id}
-              onClick={() => handlePlayerClick(player.id)}
-              className="flex items-center gap-2 p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
-              data-testid={`player-no-response-${player.id}`}
-            >
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={player.profileImageUrl || undefined} alt={player.firstName || 'User'} />
-                <AvatarFallback className="text-xs">
-                  {player.firstName?.[0]}{player.lastName?.[0]}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-xs font-medium truncate text-zinc-400">
-                {formatPlayerName(player.firstName, player.lastName)}
-              </span>
-            </button>
-          ))}
-          {noResponsePlayers.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">—</p>
           )}
         </div>

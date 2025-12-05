@@ -7,7 +7,6 @@ import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPSummary } from "@/components/RSVPSummary";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
-import { SubstituteRequestsDashboard } from "@/components/SubstituteRequestsDashboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -714,14 +713,6 @@ export default function GameDetails() {
             isCaptain={game.awayTeam.captainId === (user as User).id}
             isTeamMember={isUserOnAwayTeam}
           />
-        )}
-
-        {/* Substitute Requests Dashboard for Commissioners */}
-        {isCommissioner && (
-          <div className="rounded-xl border border-border p-6 pt-[8px] pb-[8px] mt-[8px] mb-[8px] text-[#212121] dark:text-[#ffffff] bg-[#e2e2e2] dark:bg-[#212121]">
-            <h3 className="text-lg font-semibold mb-4">Substitute Requests for This Game</h3>
-            <SubstituteRequestsDashboard gameId={game.id} />
-          </div>
         )}
 
         {/* Score Submission */}
