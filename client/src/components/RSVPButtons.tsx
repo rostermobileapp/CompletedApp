@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, X, HelpCircle } from "lucide-react";
+import { Check, X, HelpCircle, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { setPageTransitionDirection } from "@/components/PageTransition";
 
@@ -30,6 +30,28 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
   const { data: rsvpSummary } = useQuery<{ attending?: any[]; notAttending?: any[]; noResponse?: any[] } | null>({
     queryKey: [`/api/games/${gameId}/rsvp-summary?teamId=${userTeamId}`],
   });
+
+  // Fetch existing substitute requests for this game
+  const { data: existingRequests = [] } = useQuery({
+    queryKey: ["/api/substitute-requests", gameId],
+    queryFn: async () => {
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch("/api/substitute-requests", {
+        headers: authHeaders
+      });
+      if (!response.ok) return [];
+      const allRequests = await response.json();
+      return allRequests.filter((req: any) => 
+        req.gameId === gameId && 
+        ['pending_opponent_approval', 'pending_commissioner_approval', 'pending_substitute_approval'].includes(req.status)
+      );
+    },
+  });
+
+  // Create a set of player IDs who already have pending substitute requests
+  const playersWithPendingRequests = new Set(
+    existingRequests.map((req: any) => req.originalPlayerId)
+  );
 
   const rsvpMutation = useMutation({
     mutationFn: async (status: 'attending' | 'not_attending') => {
@@ -152,24 +174,42 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
         </Button>
         
         <div className="mt-2 space-y-1">
-          {notAttendingPlayers.map((rsvp: any) => (
-            <button
-              key={rsvp.user.id}
-              onClick={() => handlePlayerClick(rsvp.user.id)}
-              className="flex items-center gap-2 p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
-              data-testid={`player-not-attending-${rsvp.user.id}`}
-            >
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={rsvp.user.profileImageUrl || undefined} alt={rsvp.user.firstName || 'User'} />
-                <AvatarFallback className="text-xs">
-                  {rsvp.user.firstName?.[0]}{rsvp.user.lastName?.[0]}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-xs font-medium truncate text-white">
-                {formatPlayerName(rsvp.user.firstName, rsvp.user.lastName)}
-              </span>
-            </button>
-          ))}
+          {notAttendingPlayers.map((rsvp: any) => {
+            const hasPendingRequest = playersWithPendingRequests.has(rsvp.user.id);
+            return (
+              <button
+                key={rsvp.user.id}
+                onClick={() => handlePlayerClick(rsvp.user.id)}
+                className={cn(
+                  "flex items-center gap-2 p-1.5 rounded-md transition-colors w-full text-left cursor-pointer",
+                  hasPendingRequest 
+                    ? "bg-green-900/30 hover:bg-green-900/40 border border-green-600/30" 
+                    : "bg-zinc-800 hover:bg-zinc-700"
+                )}
+                data-testid={`player-not-attending-${rsvp.user.id}`}
+              >
+                <div className="relative">
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={rsvp.user.profileImageUrl || undefined} alt={rsvp.user.firstName || 'User'} />
+                    <AvatarFallback className="text-xs">
+                      {rsvp.user.firstName?.[0]}{rsvp.user.lastName?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  {hasPendingRequest && (
+                    <div className="absolute -bottom-0.5 -right-0.5 bg-green-600 rounded-full p-0.5">
+                      <UserCheck className="h-2 w-2 text-white" />
+                    </div>
+                  )}
+                </div>
+                <span className={cn(
+                  "text-xs font-medium truncate",
+                  hasPendingRequest ? "text-green-400" : "text-white"
+                )}>
+                  {formatPlayerName(rsvp.user.firstName, rsvp.user.lastName)}
+                </span>
+              </button>
+            );
+          })}
           {notAttendingPlayers.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">—</p>
           )}
