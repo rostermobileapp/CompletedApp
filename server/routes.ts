@@ -15420,5 +15420,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Start the scrimmage invitation job (for recurring scrimmage invites)
   startScrimmageInviteJob();
 
+  // IMPORTANT: Catch-all for unmatched API routes - must return JSON 404 instead of HTML
+  // This prevents the static file handler from serving index.html for API routes
+  app.all('/api/*', (req, res) => {
+    console.log(`⚠️ Unmatched API route: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ message: 'API endpoint not found', path: req.originalUrl });
+  });
+
   return httpServer;
 }
