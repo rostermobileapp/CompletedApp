@@ -107,7 +107,11 @@ export default function UserProfile() {
             <button 
               onClick={() => {
                 setPageTransitionDirection('down');
-                window.history.back();
+                if (window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  navigate('/');
+                }
               }}
               className="text-muted-foreground"
               data-testid="button-back"
