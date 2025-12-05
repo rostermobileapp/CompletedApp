@@ -1,0 +1,30 @@
+UserTeam Assignment Debug: {userTeam: {…}, userTeamId: 'c019a814-0eae-4c4b-8958-329aa7f857f7', gameHomeTeam: {…}, gameAwayTeam: {…}, isCommissioner: true, …}
+index-TLgyjRIT.js:684 GameDetails Team Debug: {userTeams: Array(2), userTeamsIsArray: true, userTeamsLength: 2, userTeamIds: Array(2), homeTeamId: 'a3861439-0e67-4e01-9a91-1fa765997803', …}
+index-TLgyjRIT.js:684 UserTeam Assignment Debug: {userTeam: {…}, userTeamId: 'c019a814-0eae-4c4b-8958-329aa7f857f7', gameHomeTeam: {…}, gameAwayTeam: {…}, isCommissioner: true, …}
+index-TLgyjRIT.js:684 GameDetails Team Debug: {userTeams: Array(2), userTeamsIsArray: true, userTeamsLength: 2, userTeamIds: Array(2), homeTeamId: 'a3861439-0e67-4e01-9a91-1fa765997803', …}
+index-TLgyjRIT.js:684 UserTeam Assignment Debug: {userTeam: {…}, userTeamId: 'c019a814-0eae-4c4b-8958-329aa7f857f7', gameHomeTeam: {…}, gameAwayTeam: {…}, isCommissioner: true, …}
+index-TLgyjRIT.js:684 [SubstituteModal] Fetching players... {gameDate: '2026-01-11', leagueId: '8f4c9613-80e3-41d4-a940-f69893268687'}
+index-TLgyjRIT.js:684 [SubstituteModal] Response status: 200
+index-TLgyjRIT.js:684 [SubstituteModal] Fetch exception: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+queryFn @ index-TLgyjRIT.js:684
+await in queryFn
+i @ index-TLgyjRIT.js:48
+x @ index-TLgyjRIT.js:48
+start @ index-TLgyjRIT.js:48
+fetch @ index-TLgyjRIT.js:48
+Tg @ index-TLgyjRIT.js:48
+onSubscribe @ index-TLgyjRIT.js:48
+subscribe @ index-TLgyjRIT.js:48
+(anonymous) @ index-TLgyjRIT.js:48
+NR @ index-TLgyjRIT.js:38
+n1 @ index-TLgyjRIT.js:40
+wf @ index-TLgyjRIT.js:40
+OW @ index-TLgyjRIT.js:40
+km @ index-TLgyjRIT.js:40
+oC @ index-TLgyjRIT.js:40
+sm @ index-TLgyjRIT.js:38
+(anonymous) @ index-TLgyjRIT.js:40Understand this error
+index-TLgyjRIT.js:684 GameDetails Team Debug: {userTeams: Array(2), userTeamsIsArray: true, userTeamsLength: 2, userTeamIds: Array(2), homeTeamId: 'a3861439-0e67-4e01-9a91-1fa765997803', …}
+index-TLgyjRIT.js:684 UserTeam Assignment Debug: {userTeam: {…}, userTeamId: 'c019a814-0eae-4c4b-8958-329aa7f857f7', gameHomeTeam: {…}, gameAwayTeam: {…}, isCommissioner: true, …}
+index-TLgyjRIT.js:684 GameDetails Team Debug: {userTeams: Array(2), userTeamsIsArray: true, userTeamsLength: 2, userTeamIds: Array(2), homeTeamId: 'a3861439-0e67-4e01-9a91-1fa765997803', …}
+index-TLgyjRIT.js:684 UserTeam Assignment Debug: {userTeam: {…}, userTeamId: 'c019a814-0eae-4c4b-8958-329aa7f857f7', gameHomeTeam: {…}, gameAwayTeam: {…}, isCommissioner: true, …}
