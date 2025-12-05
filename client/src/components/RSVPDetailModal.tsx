@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClickableAvatar } from "@/components/ClickableAvatar";
+import { getAuthHeaders } from "@/lib/queryClient";
 
 interface RSVPDetailModalProps {
   gameId: string;
@@ -37,7 +38,8 @@ export function RSVPDetailModal({
       if (teamId) {
         url += `?teamId=${teamId}`;
       }
-      const response = await fetch(url);
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(url, { headers: authHeaders });
       if (!response.ok) {
         throw new Error('Failed to fetch RSVP summary');
       }
