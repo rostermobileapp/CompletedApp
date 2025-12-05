@@ -43,49 +43,36 @@ export default function GameDetails() {
   const [secondStarUserId, setSecondStarUserId] = useState("");
   const [thirdStarUserId, setThirdStarUserId] = useState("");
 
-  // Fetch user's teams
-  const { data: userTeams } = useQuery<UserTeam[]>({
-    queryKey: ["/api/user/teams"],
+  // Consolidated query - fetches game, league, team members, score submissions, and user teams in ONE request
+  interface FullGameData {
+    game: GameWithTeams;
+    league: League | null;
+    homeTeamMembers: TeamMemberWithUser[];
+    awayTeamMembers: TeamMemberWithUser[];
+    scoreSubmissions: GameScoreSubmission[];
+    userTeams: UserTeam[];
+  }
+
+  const { data: fullGameData, isLoading: gameLoading } = useQuery<FullGameData>({
+    queryKey: [`/api/games/${gameId}/full`],
+    enabled: !!gameId && !isScrimmage,
   });
+
+  // Extract data from consolidated response
+  const game = fullGameData?.game;
+  const league = fullGameData?.league;
+  const homeTeamMembers = fullGameData?.homeTeamMembers;
+  const awayTeamMembers = fullGameData?.awayTeamMembers;
+  const scoreSubmissions = fullGameData?.scoreSubmissions;
+  const userTeams = fullGameData?.userTeams;
 
   // Get primary team (first team for now)
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
-
-  // Fetch specific game details
-  const { data: game, isLoading: gameLoading } = useQuery<GameWithTeams>({
-    queryKey: [`/api/games/${gameId}`],
-    enabled: !!gameId && !isScrimmage,
-  });
 
   // Fetch scrimmage details and approved players
   const { data: scrimmageData, isLoading: scrimmageLoading } = useQuery({
     queryKey: [`/api/scrimmages/${gameId}/approved-players`],
     enabled: !!gameId && isScrimmage,
-  });
-
-
-  // Fetch team members to get names for beverage duty
-  const { data: homeTeamMembers } = useQuery<TeamMemberWithUser[]>({
-    queryKey: [`/api/teams/${game?.homeTeam?.id}/members`],
-    enabled: !!game?.homeTeam?.id,
-  });
-
-  const { data: awayTeamMembers } = useQuery<TeamMemberWithUser[]>({
-    queryKey: [`/api/teams/${game?.awayTeam?.id}/members`],
-    enabled: !!game?.awayTeam?.id,
-  });
-
-
-  // Fetch score submissions (only for games, not scrimmages)
-  const { data: scoreSubmissions } = useQuery<GameScoreSubmission[]>({
-    queryKey: [`/api/games/${gameId}/score-submissions`],
-    enabled: !!gameId && !isScrimmage,
-  });
-
-  // Fetch league details for commissioner check
-  const { data: league } = useQuery<League>({
-    queryKey: [`/api/leagues/${game?.leagueId}`],
-    enabled: !!game?.leagueId,
   });
 
 
@@ -98,7 +85,7 @@ export default function GameDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/full`] });
       toast({
         title: "Beverage Duty Claimed",
         description: "You've successfully claimed beverage duty for this game.",
@@ -120,7 +107,7 @@ export default function GameDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/full`] });
       toast({
         title: "Beverage Duty Released",
         description: "You've released beverage duty for this game.",
@@ -142,8 +129,7 @@ export default function GameDetails() {
       return await response.json();
     },
     onSuccess: (data: { message: string }) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/score-submissions`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/full`] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
       
       setHomeScore("");

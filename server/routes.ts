@@ -4651,6 +4651,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get consolidated game details (game + league + team members + score submissions) in one request
+  app.get('/api/games/:gameId/full', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const userId = req.user.claims.sub;
+      
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+      
+      const formattedGame = formatGameForResponse(game);
+      
+      // Fetch all related data in parallel for maximum speed
+      const [league, homeTeamMembers, awayTeamMembers, scoreSubmissions, userTeams] = await Promise.all([
+        game.leagueId ? storage.getLeague(game.leagueId) : null,
+        storage.getTeamMembers(game.homeTeamId),
+        game.awayTeamId ? storage.getTeamMembers(game.awayTeamId) : [],
+        storage.getScoreSubmissions(gameId),
+        storage.getUserTeams(userId)
+      ]);
+      
+      res.json({
+        game: formattedGame,
+        league,
+        homeTeamMembers,
+        awayTeamMembers,
+        scoreSubmissions,
+        userTeams
+      });
+    } catch (error) {
+      console.error('Error fetching full game details:', error);
+      res.status(500).json({ message: 'Failed to fetch game details' });
+    }
+  });
+
   // Get game participants (all players from home and away teams)
   app.get('/api/games/:gameId/participants', isAuthenticated, async (req: any, res) => {
     try {
