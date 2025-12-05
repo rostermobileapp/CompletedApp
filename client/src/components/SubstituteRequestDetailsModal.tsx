@@ -188,9 +188,9 @@ export function SubstituteRequestDetailsModal({
             {/* Actions */}
             {onRequestNewSub && (
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
-                className="w-full border-primary/50 text-primary hover:bg-primary/10"
+                className="w-full"
                 onClick={() => {
                   onClose();
                   onRequestNewSub();
