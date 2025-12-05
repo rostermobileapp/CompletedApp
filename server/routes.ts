@@ -5839,11 +5839,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { leagueId } = req.query;
       const userId = req.user.claims.sub;
       
+      console.log(`📋 [SubstituteModal API] Request: date=${date}, leagueId=${leagueId}, userId=${userId?.substring(0, 8)}...`);
+      
       if (!userId) {
+        console.log(`📋 [SubstituteModal API] ❌ User ID not found`);
         return res.status(401).json({ message: 'User ID not found' });
       }
 
       if (!leagueId) {
+        console.log(`📋 [SubstituteModal API] ❌ League ID missing`);
         return res.status(400).json({ message: 'League ID is required' });
       }
 
@@ -5852,19 +5856,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(leagueId as string);
       const isCommissioner = league && league.commissionerId === userId;
       
+      console.log(`📋 [SubstituteModal API] League found: ${!!league}, isCommissioner: ${isCommissioner}`);
+      
       // For captain check, we need to verify they're captain of a team in this league
       const userTeams = await storage.getUserTeams(userId);
       const userTeamsInLeague = userTeams.filter(team => team.leagueId === leagueId);
       const isTeamCaptain = userTeamsInLeague.some(team => team.captainId === userId);
       
+      console.log(`📋 [SubstituteModal API] User teams: ${userTeams.length}, in league: ${userTeamsInLeague.length}, isCaptain: ${isTeamCaptain}`);
+      
       if (!isCommissioner && !isTeamCaptain) {
+        console.log(`📋 [SubstituteModal API] ❌ Access denied - not captain or commissioner`);
         return res.status(403).json({ message: 'Captain or Commissioner access required' });
       }
 
+      console.log(`📋 [SubstituteModal API] ✅ Access granted, fetching players...`);
       const allPlayers = await storage.getAllLeaguePlayersWithAvailability(new Date(date), leagueId as string);
+      console.log(`📋 [SubstituteModal API] ✅ Returning ${allPlayers.length} players`);
       res.json(allPlayers);
     } catch (error) {
-      console.error('Error fetching all players with availability:', error);
+      console.error('📋 [SubstituteModal API] ❌ Error:', error);
       res.status(500).json({ message: 'Failed to fetch players' });
     }
   });
