@@ -3227,27 +3227,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get game IDs where user is an approved substitute
       const substituteGameIds = await storage.getUserSubstituteGameIds(userId);
       
-      // Debug log raw data from database
-      const oct26Game = games.find(g => g.scheduledAt.toString().includes('2025-10-26'));
-      if (oct26Game) {
-        console.log('🎯 Raw from DB:', oct26Game.scheduledAt);
-        console.log('🎯 Type:', typeof oct26Game.scheduledAt);
+      // Enhanced debug logging for substitute games
+      console.log(`📅 getUpcomingGames for user ${userId}: returned ${games.length} games, substituteGameIds: [${substituteGameIds.join(', ')}]`);
+      
+      // Check if the specific substitute game (0b1cb152...) is included
+      const targetGame = games.find(g => g.id === '0b1cb152-0c4a-42bb-af17-665e55c76f12');
+      if (targetGame) {
+        console.log(`✅ Brent's substitute game found in getUpcomingGames:`, targetGame.id);
+      } else if (userId === '604842d7-5df9-4ffa-b6fc-04786edc168b') {
+        console.log(`❌ Brent's substitute game 0b1cb152-0c4a-42bb-af17-665e55c76f12 NOT in getUpcomingGames results`);
+        console.log(`   Games returned:`, games.map(g => g.id));
       }
       
       const formattedGames = games.map(game => {
         const formatted = formatGameForResponse(game);
-        // Mark games where user is a substitute
+        const isSubstitute = substituteGameIds.includes(game.id);
+        // Debug for substitute games
+        if (isSubstitute) {
+          console.log(`🔄 Game ${game.id} marked as isSubstitute=true for user ${userId}`);
+        }
         return {
           ...formatted,
-          isSubstitute: substituteGameIds.includes(game.id)
+          isSubstitute
         };
       });
-      
-      // Debug log after formatting
-      const oct26Formatted = formattedGames.find(g => g.scheduledAt && g.scheduledAt.toString().includes('2025-10-26'));
-      if (oct26Formatted) {
-        console.log('🎯 After formatting:', oct26Formatted.scheduledAt);
-      }
       
       // Disable caching to force fresh response
       res.setHeader('Cache-Control', 'no-store');
