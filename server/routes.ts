@@ -5980,7 +5980,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const request = await storage.createSubstituteRequest(requestData);
       
-      // Notify the opposing team captain about the new substitute request
+      // Notify the opposing team captain about the new substitute request via push notification (bell icon)
+      // The request also appears in their "Needs Attention" / To-Do section automatically
       try {
         const opposingTeamId = requestingTeamId === game.homeTeamId 
           ? game.awayTeamId 
@@ -5997,16 +5998,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? `${substitutePlayer.firstName} ${substitutePlayer.lastName}`
               : 'a substitute player';
             
-            const content = `⚽ Substitution approval needed: ${requestingTeam?.name || 'A team'} is requesting ${substitutePlayerName} to substitute for ${originalPlayer?.firstName || ''} ${originalPlayer?.lastName || ''} in your upcoming game. Please review and approve or deny.`;
-            
-            // Create announcement and set visibility for opposing captain only
-            const announcement = await storage.createAnnouncement({
-              leagueId: game.leagueId,
-              authorId: userId,
-              content,
-              isPinned: false,
+            // Create a push notification (bell icon) for the opposing captain
+            await storage.createNotification({
+              userId: opposingTeam.captainId,
+              type: 'general',
+              title: 'Substitute Request Needs Your Approval',
+              message: `${requestingTeam?.name || 'A team'} is requesting ${substitutePlayerName} to substitute for ${originalPlayer?.firstName || ''} ${originalPlayer?.lastName || ''}. Check your To-Do section to approve or deny.`,
+              actionUrl: `/games/${gameId}`,
+              actionText: 'View Game',
             });
-            await storage.createAnnouncementVisibility(announcement.id, [opposingTeam.captainId]);
           }
         }
       } catch (notifyError) {
