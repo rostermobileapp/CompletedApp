@@ -105,7 +105,7 @@ export function SubstituteRequestDetailsModal({
           <div className="space-y-4">
             {/* Status Badge */}
             {statusInfo && (
-              <div className={`${statusInfo.color} border text-xs cursor-default inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold`}>
+              <div className="border-purple-500/30 border text-xs cursor-default inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold bg-[#212121] text-[#ff0000]">
                 <Clock className="h-3 w-3 mr-1" />
                 {statusInfo.label}
               </div>
