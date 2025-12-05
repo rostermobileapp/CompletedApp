@@ -150,7 +150,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
     enabled: !!leagueId && isOpen,
   });
 
-  // Fetch games that need score verification
+  // Fetch games that need score verification - parallelized for performance
   const { data: gamesNeedingVerification = [], isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games-needing-verification-modal'],
     queryFn: async () => {
@@ -160,62 +160,61 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
       
       if (!Array.isArray(allGames)) return [];
       
-      const gamesNeedingVerification = [];
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      for (const game of allGames) {
+      // Filter past games first
+      const pastGames = allGames.filter((game: any) => {
         const gameDate = new Date(game.scheduledAt);
         gameDate.setHours(0, 0, 0, 0);
+        return gameDate < today;
+      });
+      
+      // Fetch all score submissions in parallel
+      const submissionResults = await Promise.all(
+        pastGames.map(async (game: any) => {
+          try {
+            const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
+            if (!submissionsResponse.ok) return { game, submissions: null };
+            const submissions = await submissionsResponse.json();
+            return { game, submissions: Array.isArray(submissions) ? submissions : null };
+          } catch {
+            return { game, submissions: null };
+          }
+        })
+      );
+      
+      // Process results
+      const gamesNeedingVerification = [];
+      for (const { game, submissions } of submissionResults) {
+        if (!submissions) continue;
         
-        if (gameDate >= today) continue;
+        const submissionCount = submissions.length;
+        let needsVerification = false;
+        let reason = '';
         
-        try {
-          const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
-          
-          // If we get a 403, skip this game (user doesn't have access)
-          if (!submissionsResponse.ok) {
-            if (submissionsResponse.status === 403) {
-              continue;
-            }
-            throw new Error(`Failed to fetch submissions: ${submissionsResponse.status}`);
-          }
-          
-          const submissions = await submissionsResponse.json();
-          
-          if (!Array.isArray(submissions)) continue;
-          
-          const submissionCount = submissions.length;
-          let needsVerification = false;
-          let reason = '';
-          
-          // Check if there's a commissioner submission - if so, no verification needed
-          const hasCommissionerSubmission = submissions.some((sub: any) => 
-            sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
-          );
-          
-          if (hasCommissionerSubmission) {
-            // Commissioner has already submitted final score - no verification needed
-            needsVerification = false;
-          } else if (submissionCount === 0) {
+        const hasCommissionerSubmission = submissions.some((sub: any) => 
+          sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
+        );
+        
+        if (hasCommissionerSubmission) {
+          needsVerification = false;
+        } else if (submissionCount === 0) {
+          needsVerification = true;
+          reason = 'No score submissions';
+        } else if (submissionCount === 1) {
+          needsVerification = true;
+          reason = 'Missing one team submission';
+        } else if (submissionCount === 2) {
+          const [sub1, sub2] = submissions;
+          if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
             needsVerification = true;
-            reason = 'No score submissions';
-          } else if (submissionCount === 1) {
-            needsVerification = true;
-            reason = 'Missing one team submission';
-          } else if (submissionCount === 2) {
-            const [sub1, sub2] = submissions;
-            if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
-              needsVerification = true;
-              reason = `Mismatched scores: ${sub1.homeScore}-${sub1.awayScore} vs ${sub2.homeScore}-${sub2.awayScore}`;
-            }
+            reason = `Mismatched scores: ${sub1.homeScore}-${sub1.awayScore} vs ${sub2.homeScore}-${sub2.awayScore}`;
           }
-          
-          if (needsVerification) {
-            gamesNeedingVerification.push({ ...game, reason });
-          }
-        } catch (error) {
-          continue;
+        }
+        
+        if (needsVerification) {
+          gamesNeedingVerification.push({ ...game, reason });
         }
       }
       
@@ -893,7 +892,7 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
   leagueId: string; 
   onNavigate: (path: string) => void; 
 }) {
-  // Fetch games that need score verification
+  // Fetch games that need score verification - parallelized for performance
   const { data: gamesNeedingVerification = [] } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
     queryFn: async () => {
@@ -902,55 +901,51 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
       
       if (!Array.isArray(allGames)) return [];
       
-      // Find games that need verification based on the correct business logic:
-      // 1. Today's date is AFTER the game's date (past games)
-      // 2. Game has problematic score submissions (0, 1, or 2 mismatched)
-      const gamesNeedingVerification: any[] = [];
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // Start of today
+      today.setHours(0, 0, 0, 0);
       
-      for (const game of allGames) {
+      // Filter past games first
+      const pastGames = allGames.filter((game: any) => {
         const gameDate = new Date(game.scheduledAt);
-        gameDate.setHours(0, 0, 0, 0); // Start of game date
+        gameDate.setHours(0, 0, 0, 0);
+        return gameDate < today;
+      });
+      
+      // Fetch all score submissions in parallel
+      const submissionResults = await Promise.all(
+        pastGames.map(async (game: any) => {
+          try {
+            const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
+            if (!submissionsResponse.ok) return { game, submissions: null };
+            const submissions = await submissionsResponse.json();
+            return { game, submissions: Array.isArray(submissions) ? submissions : null };
+          } catch {
+            return { game, submissions: null };
+          }
+        })
+      );
+      
+      // Process results
+      const gamesNeedingVerification = [];
+      for (const { game, submissions } of submissionResults) {
+        if (!submissions) continue;
         
-        // Only check games from past dates
-        if (gameDate >= today) {
-          continue; // Skip future games
+        const submissionCount = submissions.length;
+        let needsVerification = false;
+        
+        if (submissionCount === 0) {
+          needsVerification = true;
+        } else if (submissionCount === 1) {
+          needsVerification = true;
+        } else if (submissionCount === 2) {
+          const [sub1, sub2] = submissions;
+          if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
+            needsVerification = true;
+          }
         }
         
-        try {
-          const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
-          const submissions = await submissionsResponse.json();
-          
-          if (!Array.isArray(submissions)) continue;
-          
-          const submissionCount = submissions.length;
-          let needsVerification = false;
-          let reason = '';
-          
-          if (submissionCount === 0) {
-            // No score submissions - needs verification
-            needsVerification = true;
-            reason = 'No score submissions';
-          } else if (submissionCount === 1) {
-            // Only one team submitted - needs verification
-            needsVerification = true;
-            reason = 'Missing one team submission';
-          } else if (submissionCount === 2) {
-            // Two submissions - check if they match
-            const [sub1, sub2] = submissions;
-            if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
-              needsVerification = true;
-              reason = `Mismatched scores: ${sub1.homeScore}-${sub1.awayScore} vs ${sub2.homeScore}-${sub2.awayScore}`;
-            }
-          }
-          
-          if (needsVerification) {
-            gamesNeedingVerification.push(game);
-          }
-        } catch (error) {
-          // Skip on error
-          continue;
+        if (needsVerification) {
+          gamesNeedingVerification.push(game);
         }
       }
       
@@ -1606,101 +1601,84 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch needs attention data for the permanent bar
+  // Fetch needs attention data for the permanent bar - parallelized for performance
   const { data: needsAttentionData, isLoading: isLoadingNeedsAttention } = useQuery({
     queryKey: ['/api/needs-attention-summary', effectiveLeagueId],
     queryFn: async () => {
       if (!effectiveLeagueId) return { pendingMembers: 0, gamesNeedingVerification: 0, total: 0 };
       
       try {
-        // Fetch pending members
-        const pendingMembersResponse = await apiRequest('GET', `/api/leagues/${effectiveLeagueId}/pending-members`);
-        const pendingMembers = await pendingMembersResponse.json();
+        // Fetch all top-level data in parallel
+        const [pendingMembersResponse, gamesResponse, substituteApprovalsResponse, starsResponse] = await Promise.all([
+          apiRequest('GET', `/api/leagues/${effectiveLeagueId}/pending-members`),
+          apiRequest('GET', `/api/leagues/${effectiveLeagueId}/games`),
+          apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${effectiveLeagueId}`).catch(() => null),
+          apiRequest('GET', `/api/user/games-needing-stars?leagueId=${effectiveLeagueId}`).catch(() => null)
+        ]);
         
-        // Fetch games needing verification
-        const gamesResponse = await apiRequest('GET', `/api/leagues/${effectiveLeagueId}/games`);
+        const pendingMembers = await pendingMembersResponse.json();
         const allGames = await gamesResponse.json();
+        const substituteData = substituteApprovalsResponse ? await substituteApprovalsResponse.json().catch(() => ({ total: 0 })) : { total: 0 };
+        const starsData = starsResponse ? await starsResponse.json().catch(() => []) : [];
         
         let gamesNeedingVerification = 0;
         if (Array.isArray(allGames)) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           
-          for (const game of allGames) {
+          // Filter past games first
+          const pastGames = allGames.filter((game: any) => {
             const gameDate = new Date(game.scheduledAt);
             gameDate.setHours(0, 0, 0, 0);
-            
-            if (gameDate >= today) continue;
-            
-            try {
-              const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
-              
-              // If we get a 403, skip this game (user doesn't have access)
-              if (!submissionsResponse.ok) {
-                if (submissionsResponse.status === 403) {
-                  continue;
-                }
-                throw new Error(`Failed to fetch submissions: ${submissionsResponse.status}`);
+            return gameDate < today;
+          });
+          
+          // Fetch all score submissions in parallel
+          const submissionResults = await Promise.all(
+            pastGames.map(async (game: any) => {
+              try {
+                const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
+                if (!submissionsResponse.ok) return null;
+                const submissions = await submissionsResponse.json();
+                return Array.isArray(submissions) ? submissions : null;
+              } catch {
+                return null;
               }
-              
-              const submissions = await submissionsResponse.json();
-              
-              if (!Array.isArray(submissions)) continue;
-              
-              const submissionCount = submissions.length;
-              let needsVerification = false;
-              
-              // Check if there's a commissioner submission - if so, no verification needed
-              const hasCommissionerSubmission = submissions.some((sub: any) => 
-                sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
-              );
-              
-              if (hasCommissionerSubmission) {
-                // Commissioner has already submitted final score - no verification needed
-                needsVerification = false;
-              } else if (submissionCount === 0 || submissionCount === 1) {
+            })
+          );
+          
+          // Count games needing verification
+          for (const submissions of submissionResults) {
+            if (!submissions) continue;
+            
+            const submissionCount = submissions.length;
+            let needsVerification = false;
+            
+            const hasCommissionerSubmission = submissions.some((sub: any) => 
+              sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
+            );
+            
+            if (hasCommissionerSubmission) {
+              needsVerification = false;
+            } else if (submissionCount === 0 || submissionCount === 1) {
+              needsVerification = true;
+            } else if (submissionCount === 2) {
+              const [sub1, sub2] = submissions;
+              if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
                 needsVerification = true;
-              } else if (submissionCount === 2) {
-                const [sub1, sub2] = submissions;
-                if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
-                  needsVerification = true;
-                }
               }
-              
-              if (needsVerification) {
-                gamesNeedingVerification++;
-              }
-            } catch (error) {
-              continue;
+            }
+            
+            if (needsVerification) {
+              gamesNeedingVerification++;
             }
           }
         }
         
-        // Fetch pending substitute approvals
-        let pendingSubstituteApprovals = 0;
-        try {
-          const substituteApprovalsResponse = await apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${effectiveLeagueId}`);
-          const substituteData = await substituteApprovalsResponse.json();
-          pendingSubstituteApprovals = substituteData.total || 0;
-        } catch (error) {
-          // If substitute approvals endpoint fails, just continue without it
-          pendingSubstituteApprovals = 0;
-        }
-        
-        // Fetch games needing star awards
-        let gamesNeedingStars = 0;
-        try {
-          const starsResponse = await apiRequest('GET', `/api/user/games-needing-stars?leagueId=${effectiveLeagueId}`);
-          const starsData = await starsResponse.json();
-          gamesNeedingStars = Array.isArray(starsData) ? starsData.length : 0;
-        } catch (error) {
-          // If star awards endpoint fails, just continue without it
-          gamesNeedingStars = 0;
-        }
-        
         const pendingMembersCount = Array.isArray(pendingMembers) ? pendingMembers.length : 0;
+        const pendingSubstituteApprovals = substituteData.total || 0;
+        const gamesNeedingStars = Array.isArray(starsData) ? starsData.length : 0;
         const total = pendingMembersCount + gamesNeedingVerification + pendingSubstituteApprovals + gamesNeedingStars;
-        
         
         return {
           pendingMembers: pendingMembersCount,
