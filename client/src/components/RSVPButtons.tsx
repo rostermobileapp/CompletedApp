@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ClickableAvatar } from "@/components/ClickableAvatar";
+import { Link, useLocation } from "wouter";
+import { setPageTransitionDirection } from "@/components/PageTransition";
 
 interface RSVPButtonsProps {
   gameId: string;
@@ -61,8 +63,18 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
   const attendingPlayers = rsvpSummary?.attending || [];
   const notAttendingPlayers = rsvpSummary?.notAttending || [];
 
-  const getInitials = (firstName?: string, lastName?: string) => {
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || '?';
+  const [, navigate] = useLocation();
+
+  const handlePlayerClick = (playerId: string) => {
+    setPageTransitionDirection('up');
+    navigate(`/user/${playerId}`);
+  };
+
+  const formatPlayerName = (firstName?: string, lastName?: string) => {
+    if (lastName && firstName) {
+      return `${lastName}, ${firstName.charAt(0)}.`;
+    }
+    return lastName || firstName || 'Unknown';
   };
 
   return (
@@ -91,21 +103,23 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
         
         <div className="mt-2 space-y-1">
           {attendingPlayers.map((rsvp: any) => (
-            <div 
-              key={rsvp.user.id} 
-              className="flex items-center gap-2 p-1.5 rounded-md bg-green-50 dark:bg-green-950/30"
+            <button
+              key={rsvp.user.id}
+              onClick={() => handlePlayerClick(rsvp.user.id)}
+              className="flex items-center gap-3 p-2 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
               data-testid={`player-attending-${rsvp.user.id}`}
             >
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={rsvp.user.profileImageUrl} />
-                <AvatarFallback className="text-xs bg-green-200 dark:bg-green-800">
-                  {getInitials(rsvp.user.firstName, rsvp.user.lastName)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-xs font-medium truncate text-green-700 dark:text-green-300">
-                {rsvp.user.firstName} {rsvp.user.lastName?.[0]}.
+              <ClickableAvatar
+                userId={rsvp.user.id}
+                profileImageUrl={rsvp.user.profileImageUrl}
+                firstName={rsvp.user.firstName}
+                lastName={rsvp.user.lastName}
+                size="sm"
+              />
+              <span className="text-sm font-medium truncate text-white">
+                {formatPlayerName(rsvp.user.firstName, rsvp.user.lastName)}
               </span>
-            </div>
+            </button>
           ))}
           {attendingPlayers.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">No players yet</p>
@@ -137,21 +151,23 @@ export function RSVPButtons({ gameId, userId, userTeamId, className }: RSVPButto
         
         <div className="mt-2 space-y-1">
           {notAttendingPlayers.map((rsvp: any) => (
-            <div 
-              key={rsvp.user.id} 
-              className="flex items-center gap-2 p-1.5 rounded-md bg-red-50 dark:bg-red-950/30"
+            <button
+              key={rsvp.user.id}
+              onClick={() => handlePlayerClick(rsvp.user.id)}
+              className="flex items-center gap-3 p-2 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
               data-testid={`player-not-attending-${rsvp.user.id}`}
             >
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={rsvp.user.profileImageUrl} />
-                <AvatarFallback className="text-xs bg-red-200 dark:bg-red-800">
-                  {getInitials(rsvp.user.firstName, rsvp.user.lastName)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-xs font-medium truncate text-red-700 dark:text-red-300">
-                {rsvp.user.firstName} {rsvp.user.lastName?.[0]}.
+              <ClickableAvatar
+                userId={rsvp.user.id}
+                profileImageUrl={rsvp.user.profileImageUrl}
+                firstName={rsvp.user.firstName}
+                lastName={rsvp.user.lastName}
+                size="sm"
+              />
+              <span className="text-sm font-medium truncate text-white">
+                {formatPlayerName(rsvp.user.firstName, rsvp.user.lastName)}
               </span>
-            </div>
+            </button>
           ))}
           {notAttendingPlayers.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">No players yet</p>
