@@ -1634,6 +1634,20 @@ export default function Dashboard() {
     return userTeamsAll.some(team => team.leagueId === leagueId && team.captainId === (userProfile as any).id);
   }, [userTeamsAll, (userProfile as any)?.id]);
 
+  // Check if user can schedule games (must be captain of any team OR commissioner of any league)
+  const canScheduleGames = React.useMemo(() => {
+    const userId = (userProfile as any)?.id;
+    if (!userId) return false;
+    
+    // Check if user is captain of any team
+    const isCaptain = Array.isArray(userTeamsAll) && userTeamsAll.some(team => team.captainId === userId);
+    
+    // Check if user is commissioner of any league
+    const isCommissioner = Array.isArray(userLeagues) && userLeagues.some((league: any) => league.commissionerId === userId);
+    
+    return isCaptain || isCommissioner;
+  }, [userTeamsAll, userLeagues, (userProfile as any)?.id]);
+
   // Fetch standings for the primary team's league to get accurate record
   const primaryTeamLeagueId = React.useMemo(() => {
     return primaryTeam?.leagueId || null;
@@ -2762,20 +2776,22 @@ export default function Dashboard() {
                 <div className="text-sm text-muted-foreground">Add a personal note or reminder to your calendar</div>
               </div>
             </Button>
-            <Button
-              onClick={() => {
-                setEventType('game');
-                setShowAddEventDialog(false);
-              }}
-              variant="outline"
-              className="w-full h-auto py-4 px-6 justify-start text-left"
-              data-testid="button-select-game"
-            >
-              <div>
-                <div className="font-semibold">Team Game</div>
-                <div className="text-sm text-muted-foreground">Schedule a game for your team</div>
-              </div>
-            </Button>
+            {canScheduleGames && (
+              <Button
+                onClick={() => {
+                  setEventType('game');
+                  setShowAddEventDialog(false);
+                }}
+                variant="outline"
+                className="w-full h-auto py-4 px-6 justify-start text-left"
+                data-testid="button-select-game"
+              >
+                <div>
+                  <div className="font-semibold">Team Game</div>
+                  <div className="text-sm text-muted-foreground">Schedule a game for your team</div>
+                </div>
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
