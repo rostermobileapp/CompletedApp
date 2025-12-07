@@ -150,14 +150,17 @@ export function NotificationCenter() {
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {notifications.map((notification) => (
+                {notifications.map((notification) => {
+                  const isClickable = !!notification.actionUrl;
+                  return (
                   <div
                     key={notification.id}
                     className={cn(
-                      "px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors relative group",
+                      "px-4 py-3 transition-colors relative group",
+                      isClickable && "hover:bg-muted/50 cursor-pointer",
                       !notification.isRead && "bg-primary/5"
                     )}
-                    onClick={() => handleNotificationClick(notification)}
+                    onClick={isClickable ? () => handleNotificationClick(notification) : undefined}
                     data-testid={`notification-item-${notification.id}`}
                   >
                     <div className="flex items-start gap-3">
@@ -195,7 +198,7 @@ export function NotificationCenter() {
                       </button>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             )}
           </ScrollArea>
