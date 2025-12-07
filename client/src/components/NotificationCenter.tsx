@@ -185,17 +185,34 @@ export function NotificationCenter() {
                         <p className="text-xs text-muted-foreground/70 mt-1">
                           {format(new Date(notification.createdAt), 'MMM d, h:mm a')}
                         </p>
+                        {!isClickable && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 text-xs h-7"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              dismissMutation.mutate(notification.id);
+                            }}
+                            data-testid={`button-clear-notification-${notification.id}`}
+                          >
+                            <X className="w-3 h-3 mr-1" />
+                            Clear
+                          </Button>
+                        )}
                       </div>
-                      <button
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          dismissMutation.mutate(notification.id);
-                        }}
-                        data-testid={`button-dismiss-notification-${notification.id}`}
-                      >
-                        <X className="w-4 h-4 text-muted-foreground" />
-                      </button>
+                      {isClickable && (
+                        <button
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dismissMutation.mutate(notification.id);
+                          }}
+                          data-testid={`button-dismiss-notification-${notification.id}`}
+                        >
+                          <X className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 )})}
