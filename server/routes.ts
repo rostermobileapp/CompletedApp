@@ -3227,25 +3227,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get game IDs where user is an approved substitute
       const substituteGameIds = await storage.getUserSubstituteGameIds(userId);
       
-      // Enhanced debug logging for substitute games
-      console.log(`📅 getUpcomingGames for user ${userId}: returned ${games.length} games, substituteGameIds: [${substituteGameIds.join(', ')}]`);
+      console.log(`📅 getUpcomingGames for user ${userId}: returned ${games.length} roster games, ${substituteGameIds.length} substitute game IDs`);
       
-      // Check if the specific substitute game (0b1cb152...) is included
-      const targetGame = games.find(g => g.id === '0b1cb152-0c4a-42bb-af17-665e55c76f12');
-      if (targetGame) {
-        console.log(`✅ Brent's substitute game found in getUpcomingGames:`, targetGame.id);
-      } else if (userId === '604842d7-5df9-4ffa-b6fc-04786edc168b') {
-        console.log(`❌ Brent's substitute game 0b1cb152-0c4a-42bb-af17-665e55c76f12 NOT in getUpcomingGames results`);
-        console.log(`   Games returned:`, games.map(g => g.id));
+      // Create a set of existing game IDs for deduplication
+      const existingGameIds = new Set(games.map(g => g.id));
+      
+      // Fetch and add substitute games that aren't already in the list
+      const substituteGames: typeof games = [];
+      for (const gameId of substituteGameIds) {
+        if (!existingGameIds.has(gameId)) {
+          const game = await storage.getGameById(gameId);
+          if (game) {
+            // Only include future games
+            const gameDate = new Date(game.scheduledAt);
+            if (gameDate >= new Date()) {
+              substituteGames.push(game);
+              console.log(`🔄 Added substitute game ${gameId} to schedule for user ${userId}`);
+            }
+          }
+        }
       }
       
-      const formattedGames = games.map(game => {
+      // Combine roster games and substitute games
+      const allGames = [...games, ...substituteGames];
+      
+      // Sort by date
+      allGames.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+      
+      const formattedGames = allGames.map(game => {
         const formatted = formatGameForResponse(game);
         const isSubstitute = substituteGameIds.includes(game.id);
-        // Debug for substitute games
-        if (isSubstitute) {
-          console.log(`🔄 Game ${game.id} marked as isSubstitute=true for user ${userId}`);
-        }
         return {
           ...formatted,
           isSubstitute
@@ -4712,7 +4723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Game not found' });
       }
 
-      // Verify user has access to this game (league member or team member)
+      // Verify user has access to this game (league member, team member, or approved substitute)
       let hasAccess = false;
       if (game.leagueId) {
         const userMembership = await storage.getUserLeagueMembership(userId, game.leagueId);
@@ -4722,6 +4733,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
         const awayTeamMembers = game.awayTeamId ? await storage.getTeamMembers(game.awayTeamId) : [];
         hasAccess = [...homeTeamMembers, ...awayTeamMembers].some(m => m.userId === userId);
+      }
+      
+      // Also check if user is an approved substitute for this game
+      if (!hasAccess) {
+        const substituteGameIds = await storage.getUserSubstituteGameIds(userId);
+        hasAccess = substituteGameIds.includes(gameId);
       }
       
       if (!hasAccess) {
@@ -5123,19 +5140,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasLeagueTeamAssignment = !!(leagueMembership && leagueMembership.assignedTeamId === teamId);
         }
         
-        console.log('RSVP Summary Auth Debug:', {
-          userId,
-          teamId,
-          gameLeagueId: game.leagueId,
-          isCommissioner,
-          isCaptainOfRequestedTeam,
-          isMemberOfTeam,
-          hasLeagueMembership: !!leagueMembership,
-          leagueMembershipAssignedTeam: leagueMembership?.assignedTeamId,
-          hasLeagueTeamAssignment
-        });
+        // Also check if user is an approved substitute for this game
+        const substituteGameIds = await storage.getUserSubstituteGameIds(userId);
+        const isApprovedSubstitute = substituteGameIds.includes(gameId);
         
-        if (!isCommissioner && !isCaptainOfRequestedTeam && !isMemberOfTeam && !hasLeagueTeamAssignment) {
+        if (!isCommissioner && !isCaptainOfRequestedTeam && !isMemberOfTeam && !hasLeagueTeamAssignment && !isApprovedSubstitute) {
           return res.status(403).json({ message: 'You must be on this team, a captain, or commissioner to view attendance' });
         }
         
@@ -5157,7 +5166,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasAwayTeamAssignment = !!(leagueMembership && leagueMembership.assignedTeamId === game.awayTeamId);
         }
         
-        if (!isCommissioner && !isHomeCaptain && !isAwayCaptain && !isOnHomeTeam && !isOnAwayTeam && !hasHomeTeamAssignment && !hasAwayTeamAssignment) {
+        // Also check if user is an approved substitute for this game
+        const substituteGameIds = await storage.getUserSubstituteGameIds(userId);
+        const isApprovedSubstitute = substituteGameIds.includes(gameId);
+        
+        if (!isCommissioner && !isHomeCaptain && !isAwayCaptain && !isOnHomeTeam && !isOnAwayTeam && !hasHomeTeamAssignment && !hasAwayTeamAssignment && !isApprovedSubstitute) {
           return res.status(403).json({ message: 'You must be on a team, captain, or commissioner to view attendance' });
         }
 
