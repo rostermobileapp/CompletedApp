@@ -1,0 +1,284 @@
+Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/66ced585-04ba-45b3-85ba-d4ad5c84f039/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/ba953426-ac71-4a57-83a5-a79addde3f70/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/46729a1e-a651-4bba-a64e-32ebe7db1633/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/b73de305-228b-4d95-a042-34c2f71a87e8/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/d8315cec-920c-4d71-9bba-becf2ed322a3/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/2fb31e81-b17e-462c-bfa4-23901e610dc1/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/4fc4f372-a29c-48c5-9f79-c9f61fb648c4/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/82827ca7-8209-45f6-9b5a-196fe233d052/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/d9e6941f-f5f8-49e1-bb31-e67b6500deda/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/01b53082-413a-4e84-9c5c-d37a3dd7245c/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/242714a7-40bd-42bf-94d5-5d96fd76c5db/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/2f6471e2-7e67-49a4-976e-8a4dedfe1804/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/b1f08c6c-0c5d-4929-a34b-d2c52a7098ef/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/7ee2d935-a760-4c81-a8a9-6f7fbc0be9d5/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/a03e2f1e-7189-4095-91ed-02148fed4c9c/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/f842eeb0-fab0-4680-9a1b-311c3463cfa5/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/810870b0-0c49-4080-991a-f717906cddea/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/b4d7da23-d026-451b-96a0-7b85221645d3/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/28916d14-932e-46a0-b704-9a2bbc46eacd/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/85854054-db53-44b6-b51c-e2e8b7ef5c94/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/e67c740c-cc8c-485e-a541-33cb57139740/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/3d6ab18e-6a22-4d43-a81a-1cbf61a61c85/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/299d73ec-6709-4ec2-92df-61dd8b2dbf18/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/366c93b0-3f4a-4458-a55c-7c9f27458fb1/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/c22bf706-1584-4633-a432-57d40b8a481f/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/6aeb5c79-3a9f-44e4-9c10-55c3f4c29efe/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/7781264d-733f-449e-9afb-43749e39f7a5/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/456fbaf5-5200-4e8f-a2c4-80cc59b6562c/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/72cddec5-bfe4-4aef-a2e7-13b1e3e85618/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/a0f25721-89a1-4f98-8d2c-23ac11b1cd0e/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/c700d5fb-99b7-4d54-bcbb-1452f24a99f6/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/acda0358-a4c1-4425-970d-83911b6d4bad/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/b5cb7083-0dfc-49ea-94f7-ac4e99b0b654/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/01a0c7af-01ea-4df5-b4f9-aa6feb84a18b/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/c483ee8b-ee3b-4974-8f27-d6a03a22c408/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/a18e5dc3-8f41-49f5-bca8-e9af6f043e03/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/e2bef790-cb1b-4a21-aa33-289ed3d2247b/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/7dca0e82-117e-4fc8-b20b-e03a32860f1b/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/2f0c70f1-5bbc-4f82-a9fa-48ab3b4c1b0d/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/3e34995b-f5dc-4b01-80ec-2e04dd8d5d58/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/75e3d9f6-474c-463e-adf3-b653ce3b21d1/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/b0636797-f0f4-42e8-bbfa-3f84ecac98b6/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/4dd46c8e-5c39-4896-8609-db9a359ed677/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/d582510e-c0a3-4e65-a9c7-4387be7d7fa3/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/f2b08fcb-e21a-44ba-a887-4a0a2178f191/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/a519be31-991c-477b-99c4-ddb6d06e6316/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+completedapp-production.up.railway.app/api/games/19319aac-5ca0-4a0b-909f-a8d16d84101a/score-submissions:1  Failed to load resource: the server responded with a status of 403 ()Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/66ced585-04ba-45b3-85ba-d4ad5c84f039/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/82827ca7-8209-45f6-9b5a-196fe233d052/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/2f6471e2-7e67-49a4-976e-8a4dedfe1804/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/957cee56-87e8-4bc8-a436-b7ef1957c601/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/46729a1e-a651-4bba-a64e-32ebe7db1633/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/19319aac-5ca0-4a0b-909f-a8d16d84101a/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/2fb31e81-b17e-462c-bfa4-23901e610dc1/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/d582510e-c0a3-4e65-a9c7-4387be7d7fa3/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/ba953426-ac71-4a57-83a5-a79addde3f70/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/3e34995b-f5dc-4b01-80ec-2e04dd8d5d58/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/b73de305-228b-4d95-a042-34c2f71a87e8/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/d8315cec-920c-4d71-9bba-becf2ed322a3/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/4fc4f372-a29c-48c5-9f79-c9f61fb648c4/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/242714a7-40bd-42bf-94d5-5d96fd76c5db/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/d9e6941f-f5f8-49e1-bb31-e67b6500deda/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/7781264d-733f-449e-9afb-43749e39f7a5/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/f2b08fcb-e21a-44ba-a887-4a0a2178f191/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/b4d7da23-d026-451b-96a0-7b85221645d3/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/a03e2f1e-7189-4095-91ed-02148fed4c9c/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/28916d14-932e-46a0-b704-9a2bbc46eacd/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/b1f08c6c-0c5d-4929-a34b-d2c52a7098ef/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/e67c740c-cc8c-485e-a541-33cb57139740/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/a519be31-991c-477b-99c4-ddb6d06e6316/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/85854054-db53-44b6-b51c-e2e8b7ef5c94/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/f842eeb0-fab0-4680-9a1b-311c3463cfa5/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/299d73ec-6709-4ec2-92df-61dd8b2dbf18/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/3d6ab18e-6a22-4d43-a81a-1cbf61a61c85/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/c22bf706-1584-4633-a432-57d40b8a481f/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/810870b0-0c49-4080-991a-f717906cddea/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/366c93b0-3f4a-4458-a55c-7c9f27458fb1/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/6aeb5c79-3a9f-44e4-9c10-55c3f4c29efe/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/456fbaf5-5200-4e8f-a2c4-80cc59b6562c/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/01a0c7af-01ea-4df5-b4f9-aa6feb84a18b/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/01b53082-413a-4e84-9c5c-d37a3dd7245c/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/2f0c70f1-5bbc-4f82-a9fa-48ab3b4c1b0d/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/a0f25721-89a1-4f98-8d2c-23ac11b1cd0e/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/acda0358-a4c1-4425-970d-83911b6d4bad/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/b5cb7083-0dfc-49ea-94f7-ac4e99b0b654/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/72cddec5-bfe4-4aef-a2e7-13b1e3e85618/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/e2bef790-cb1b-4a21-aa33-289ed3d2247b/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/4dd46c8e-5c39-4896-8609-db9a359ed677/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/b0636797-f0f4-42e8-bbfa-3f84ecac98b6/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/75e3d9f6-474c-463e-adf3-b653ce3b21d1/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/c483ee8b-ee3b-4974-8f27-d6a03a22c408/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/a18e5dc3-8f41-49f5-bca8-e9af6f043e03/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/7ee2d935-a760-4c81-a8a9-6f7fbc0be9d5/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/c700d5fb-99b7-4d54-bcbb-1452f24a99f6/score-submissions 403 (Forbidden)
+Ee @ index-CBwCpWbc.js:87
+await in Ee
+(anonymous) @ index-CBwCpWbc.js:661
+queryFn @ index-CBwCpWbc.js:661Understand this error
+index-CBwCpWbc.js:87  GET https://completedapp-production.up.railway.app/api/games/7dca0e82-117e-4fc8-b20b-e03a32860f1b/score-submissions 403 (Forbidden)
