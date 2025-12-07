@@ -3842,13 +3842,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (now < gameStartTime) {
         return res.status(400).json({ message: "Cannot record score for a future-dated game. The game must have started before scores can be submitted." });
       }
-      
-      // Check if the game started more than 1 hour ago
-      const oneHourAfterStart = gameStartTime + (60 * 60 * 1000); // 1 hour in milliseconds
-      
-      if (now < oneHourAfterStart) {
-        return res.status(400).json({ message: "Score submission not available until 1 hour after game start" });
-      }
 
       // Determine the user's role in this game
       let submitterRole = '';
