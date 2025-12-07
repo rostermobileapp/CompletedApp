@@ -6018,7 +6018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             type: 'general',
             title: 'You\'ve Been Requested as a Substitute!',
             message: `${requestingTeam?.name || 'A team'} is requesting you to substitute for ${originalPlayer?.firstName || ''} ${originalPlayer?.lastName || ''}. Check your To-Do section to confirm your availability.`,
-            actionUrl: `/games/${gameId}`,
+            actionUrl: `/game/${gameId}`,
             actionText: 'View Game',
           });
         }

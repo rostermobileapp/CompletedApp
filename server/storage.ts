@@ -5574,7 +5574,7 @@ export class DatabaseStorage implements IStorage {
               type: 'general',
               title: 'Commissioner Decision Needed',
               message: `A substitution request for the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game was denied by the opposing captain. Check your To-Do section to make a final decision.`,
-              actionUrl: `/games/${gameId}`,
+              actionUrl: `/game/${gameId}`,
               actionText: 'View Game',
             });
           }
@@ -5592,7 +5592,7 @@ export class DatabaseStorage implements IStorage {
               type: 'general',
               title: 'Substitute Request Denied',
               message: `Your substitution request for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} was denied by the ${approverRole}.`,
-              actionUrl: `/games/${gameId}`,
+              actionUrl: `/game/${gameId}`,
               actionText: 'View Game',
             });
           }
@@ -5626,7 +5626,7 @@ export class DatabaseStorage implements IStorage {
                 type: 'general',
                 title: 'Substitute Request Needs Your Approval',
                 message: `${requestingTeamForNotify?.name || 'A team'} is requesting ${substitutePlayerNameForCaptain} to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName}. The substitute has confirmed availability. Check your To-Do section to approve or deny.`,
-                actionUrl: `/games/${gameId}`,
+                actionUrl: `/game/${gameId}`,
                 actionText: 'View Game',
               });
             }
