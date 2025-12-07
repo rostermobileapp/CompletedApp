@@ -1293,7 +1293,8 @@ export default function Dashboard() {
       if (selectedType === 'team' && selectedId) {
         return games.filter(game => 
           game.homeTeamId === selectedId || 
-          game.awayTeamId === selectedId
+          game.awayTeamId === selectedId ||
+          game.isSubstitute === true // Always show substitute games regardless of selected team
         );
       }
       
@@ -1301,7 +1302,8 @@ export default function Dashboard() {
       if (selectedType === 'league' && selectedLeagueId) {
         return games.filter(game => 
           game.homeTeam?.leagueId === selectedLeagueId || 
-          game.awayTeam?.leagueId === selectedLeagueId
+          game.awayTeam?.leagueId === selectedLeagueId ||
+          game.isSubstitute === true // Always show substitute games regardless of selected league
         );
       }
       

@@ -146,6 +146,10 @@ export default function Calendar() {
   // Filter games by active team (or all user teams if none selected)
   const userGames = Array.isArray(allGames) && Array.isArray(userTeams) 
     ? allGames.filter((game: any) => {
+        // Always show substitute games regardless of team filter
+        if (game.isSubstitute === true) {
+          return true;
+        }
         if (selectedTeamId) {
           // Team is selected - filter by activeTeam (which has fallback logic)
           return activeTeam && (game.homeTeamId === activeTeam.id || game.awayTeamId === activeTeam.id);
@@ -186,7 +190,7 @@ export default function Calendar() {
     return true;
   });
 
-  // Get user's substitute games (games they're subbing for), filtered by selected team
+  // Get user's substitute games (games they're subbing for) - always show regardless of team filter
   const substituteGames = Array.isArray(mySubstitutions) 
     ? mySubstitutions
         .map((sub: any) => ({
@@ -195,13 +199,6 @@ export default function Calendar() {
           substituteForTeam: sub.requestingTeam,
           scheduledAt: sub.game.scheduledAt,
         }))
-        .filter((game: any) => {
-          // Filter by active team if a team is selected
-          if (selectedTeamId) {
-            return activeTeam && (game.homeTeamId === activeTeam.id || game.awayTeamId === activeTeam.id);
-          }
-          return true;
-        })
     : [];
 
   // Combine games, scrimmages, personal reminders, and substitute games, then sort chronologically
