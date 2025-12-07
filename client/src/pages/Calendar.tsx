@@ -444,6 +444,11 @@ export default function Calendar() {
                       <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
                         vs {game.homeTeam?.id === activeTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}
                       </h3>
+                      {game.isSubstitute === true && (
+                        <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-sub-${game.id}`}>
+                          SUB
+                        </span>
+                      )}
                       {!isCompleted && !isPastGame && activeTeam && (
                         <RSVPAlertIcon gameId={game.id} teamId={activeTeam.id} />
                       )}
