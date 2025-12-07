@@ -3228,23 +3228,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const substituteGameIds = await storage.getUserSubstituteGameIds(userId);
       
       console.log(`📅 getUpcomingGames for user ${userId}: returned ${games.length} roster games, ${substituteGameIds.length} substitute game IDs`);
+      console.log(`📅 Substitute game IDs: ${JSON.stringify(substituteGameIds)}`);
       
       // Create a set of existing game IDs for deduplication
       const existingGameIds = new Set(games.map(g => g.id));
+      console.log(`📅 Existing roster game IDs: ${JSON.stringify([...existingGameIds])}`);
       
       // Fetch and add substitute games that aren't already in the list
       const substituteGames: typeof games = [];
       for (const gameId of substituteGameIds) {
-        if (!existingGameIds.has(gameId)) {
+        const alreadyInRoster = existingGameIds.has(gameId);
+        console.log(`📅 Checking substitute game ${gameId}: alreadyInRoster=${alreadyInRoster}`);
+        
+        if (!alreadyInRoster) {
           const game = await storage.getGameById(gameId);
+          console.log(`📅 Fetched game ${gameId}: exists=${!!game}, scheduledAt=${game?.scheduledAt}`);
+          
           if (game) {
             // Only include future games
             const gameDate = new Date(game.scheduledAt);
-            if (gameDate >= new Date()) {
+            const now = new Date();
+            const isFuture = gameDate >= now;
+            console.log(`📅 Game ${gameId}: gameDate=${gameDate.toISOString()}, now=${now.toISOString()}, isFuture=${isFuture}`);
+            
+            if (isFuture) {
               substituteGames.push(game);
               console.log(`🔄 Added substitute game ${gameId} to schedule for user ${userId}`);
+            } else {
+              console.log(`⏰ Skipped substitute game ${gameId} - game is in the past`);
             }
+          } else {
+            console.log(`❌ Substitute game ${gameId} not found in database`);
           }
+        } else {
+          console.log(`✅ Substitute game ${gameId} already in roster games - will mark with isSubstitute flag`);
         }
       }
       
@@ -3262,6 +3279,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isSubstitute
         };
       });
+      
+      const substituteGamesInResponse = formattedGames.filter(g => g.isSubstitute);
+      console.log(`📅 Final response: ${formattedGames.length} total games, ${substituteGamesInResponse.length} marked as substitute`);
+      console.log(`📅 Substitute games in response: ${JSON.stringify(substituteGamesInResponse.map(g => ({ id: g.id, scheduledAt: g.scheduledAt, isSubstitute: g.isSubstitute })))}`);
       
       // Disable caching to force fresh response
       res.setHeader('Cache-Control', 'no-store');
