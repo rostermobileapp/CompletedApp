@@ -131,11 +131,13 @@ export function LeaguePhotos({
   });
   
   // Check if current user is an approved league member
-  const { data: membership, isLoading: membershipLoading } = useQuery<any>({
-    queryKey: [`/api/leagues/${leagueId}/membership`],
+  const { data: userLeagueMemberships = [], isLoading: membershipLoading } = useQuery<any[]>({
+    queryKey: ['/api/user/league-memberships'],
     enabled: !!currentUserId,
   });
-
+  
+  // Find the membership for the current league
+  const membership = userLeagueMemberships.find((m: any) => m.leagueId === leagueId);
   const isApprovedMember = currentUserId && membership?.status === 'approved';
   
   // Check if user is the league commissioner (commissioners always have access)

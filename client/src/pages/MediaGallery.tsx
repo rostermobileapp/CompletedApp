@@ -55,11 +55,13 @@ export default function MediaGalleryPage() {
   );
   
   // Check if current user is a league member (for leagues)
-  const { data: leagueMembership } = useQuery<any>({
-    queryKey: [`/api/leagues/${entityId}/membership`],
-    enabled: !!entityId && entityType === 'league' && !!currentUser?.id,
+  const { data: userLeagueMemberships = [] } = useQuery<any[]>({
+    queryKey: ['/api/user/league-memberships'],
+    enabled: !!currentUser?.id,
   });
   
+  // Find the membership for the current league
+  const leagueMembership = userLeagueMemberships.find((m: any) => m.leagueId === entityId);
   const isLeagueMember = leagueMembership?.status === 'approved';
   
   // Check if user is the league commissioner (commissioners always have access)
