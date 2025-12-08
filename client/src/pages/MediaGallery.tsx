@@ -39,7 +39,7 @@ export default function MediaGalleryPage() {
     enabled: !!entityId && entityType === 'tournament'
   });
 
-  const { data: league } = useQuery<any>({
+  const { data: league, isLoading: leagueLoading } = useQuery<any>({
     queryKey: ['/api/leagues', entityId],
     enabled: !!entityId && entityType === 'league'
   });
@@ -55,7 +55,7 @@ export default function MediaGalleryPage() {
   );
   
   // Check if current user is a league member (for leagues)
-  const { data: userLeagueMemberships = [] } = useQuery<any[]>({
+  const { data: userLeagueMemberships = [], isLoading: membershipLoading } = useQuery<any[]>({
     queryKey: ['/api/user/league-memberships'],
     enabled: !!currentUser?.id,
   });
@@ -75,6 +75,9 @@ export default function MediaGalleryPage() {
   // 2. A secondary commissioner with membership, OR
   // 3. An approved member with paid subscription
   const hasLeaguePhotoAccess = isLeagueCommissioner || isSecondaryCommissioner || (isLeagueMember && hasPaidAccess);
+  
+  // Track if league access data is still loading
+  const isLeagueAccessLoading = entityType === 'league' && (leagueLoading || membershipLoading);
   
   // Fetch team data
   const { data: team } = useQuery<any>({
@@ -197,7 +200,11 @@ export default function MediaGalleryPage() {
           />
         )}
         {entityType === 'league' && entityId && (
-          !hasLeaguePhotoAccess ? (
+          isLeagueAccessLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : !hasLeaguePhotoAccess ? (
             <div className="p-12 text-center max-w-md mx-auto">
               <div className="rounded-full bg-muted w-20 h-20 flex items-center justify-center mx-auto mb-4">
                 <Lock className="w-10 h-10 text-muted-foreground" />
