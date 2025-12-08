@@ -146,7 +146,7 @@ export function LeaguePhotos({
 
   // Fetch photos if user has any form of access
   const { data: photos = [], isLoading: photosLoading } = useQuery<LeaguePhoto[]>({
-    queryKey: [`/api/league-photos/${leagueId}`],
+    queryKey: ['/api/league-photos', leagueId],
     enabled: isParticipant,
   });
 
@@ -191,7 +191,7 @@ export function LeaguePhotos({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/league-photos/${leagueId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/league-photos', leagueId] });
       toast({ title: 'Photo uploaded successfully!' });
     },
     onError: () => {
@@ -205,7 +205,7 @@ export function LeaguePhotos({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/league-photos/${leagueId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/league-photos', leagueId] });
       toast({ title: 'Photo deleted successfully!' });
       setPhotoToDelete(null);
     },
