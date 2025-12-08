@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2, Lock, Filter, User } from "lucide-react";
+import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2, Lock, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TournamentPhotos } from "@/components/TournamentPhotos";
@@ -136,9 +136,7 @@ export default function MediaGalleryPage() {
           <div className="flex items-center gap-2">
             {/* Team Filter - Show when available */}
             {availableTeams.length > 0 && (
-              <>
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={selectedTeamFilter} onValueChange={setSelectedTeamFilter}>
+              <Select value={selectedTeamFilter} onValueChange={setSelectedTeamFilter}>
                   <SelectTrigger className="w-[140px] md:w-[180px]" data-testid="select-team-filter-header">
                     <SelectValue placeholder="Filter by team" />
                   </SelectTrigger>
@@ -151,7 +149,6 @@ export default function MediaGalleryPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </>
             )}
 
             {/* Uploaded by Me Toggle */}
