@@ -123,7 +123,7 @@ export default function MediaGalleryPage() {
           </Button>
           <div className="flex-1">
             {entityType === 'league' ? (
-              <h1 className="text-xl font-semibold" data-testid="text-entity-name">Photo Gallery</h1>
+              <h1 className="text-xl font-semibold" data-testid="text-entity-name">Photos</h1>
             ) : (
               <>
                 <h1 className="text-xl font-semibold" data-testid="text-entity-name">{entityName}</h1>
@@ -180,7 +180,6 @@ export default function MediaGalleryPage() {
           )}
         </div>
       </div>
-
       {/* Photos Content */}
       <div className="pb-20">
         {entityType === 'tournament' && entityId && (
