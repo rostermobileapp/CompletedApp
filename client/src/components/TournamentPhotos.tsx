@@ -124,7 +124,7 @@ export function TournamentPhotos({
   }, [showUploader]);
 
   const { data: photos = [], isLoading } = useQuery<TournamentPhoto[]>({
-    queryKey: [`/api/tournament-photos/${tournamentId}`],
+    queryKey: ['/api/tournament-photos', tournamentId],
   });
 
   // Fetch tournament teams for filtering
@@ -194,7 +194,7 @@ export function TournamentPhotos({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/tournament-photos/${tournamentId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournament-photos', tournamentId] });
       toast({ title: 'Photo uploaded successfully!' });
     },
     onError: () => {
@@ -208,7 +208,7 @@ export function TournamentPhotos({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/tournament-photos/${tournamentId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournament-photos', tournamentId] });
       toast({ title: 'Photo deleted successfully!' });
       setPhotoToDelete(null);
     },
