@@ -168,19 +168,13 @@ export default function MediaGalleryPage() {
             <Button
               onClick={() => setShowUploader(true)}
               disabled={isUploading}
-              size="default"
+              size="icon"
               data-testid="button-upload-photos"
             >
               {isUploading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading
-                </>
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload
-                </>
+                <Upload className="h-5 w-5" />
               )}
             </Button>
           )}
