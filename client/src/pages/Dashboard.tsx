@@ -2220,10 +2220,12 @@ export default function Dashboard() {
             onClick={() => {
               if (selectedType === 'tournament' && selectedId) {
                 navigate(`/media/tournament/${selectedId}`);
-              } else if (selectedType === 'team' && selectedId) {
-                navigate(`/media/team/${selectedId}`);
               } else if (effectiveLeagueId) {
+                // Prioritize league photos when in a league context (even if a team is selected)
                 navigate(`/media/league/${effectiveLeagueId}`);
+              } else if (selectedType === 'team' && selectedId) {
+                // Only go to team photos if there's no league context
+                navigate(`/media/team/${selectedId}`);
               }
             }}
           >
