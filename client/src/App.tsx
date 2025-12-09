@@ -10,6 +10,7 @@ import { AdSenseBanner } from "@/components/AdSenseBanner";
 import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { OneSignalProvider } from "@/components/OneSignalProvider";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
@@ -101,11 +102,12 @@ function Router() {
 
   return (
     <PermissionProvider>
-      <ScrollToTop />
-      <div className="relative min-h-screen w-full">
-        <SlideOutMenu />
-        <PageTransition>
-          <Switch>
+      <OneSignalProvider>
+        <ScrollToTop />
+        <div className="relative min-h-screen w-full">
+          <SlideOutMenu />
+          <PageTransition>
+            <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
             <Route path="/league-search" component={LeagueSearch} />
@@ -161,9 +163,10 @@ function Router() {
             <Route component={NotFound} />
           </Switch>
         </PageTransition>
-        <AdSenseBanner />
-        <BottomNavigation />
-      </div>
+          <AdSenseBanner />
+          <BottomNavigation />
+        </div>
+      </OneSignalProvider>
     </PermissionProvider>
   );
 }

@@ -74,6 +74,7 @@ import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail } from "./emails";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
+import { notificationService } from "./notificationService";
 
 
 // Helper function to format date as local time string without timezone suffix
@@ -2791,6 +2792,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leagueId,
         message: req.body.message,
       });
+      
+      // Send push notification to league commissioner (async, don't wait)
+      (async () => {
+        try {
+          const league = await storage.getLeague(leagueId);
+          if (league && league.commissionerId) {
+            const requestingUser = await storage.getUser(userId);
+            const requesterName = requestingUser 
+              ? `${requestingUser.firstName} ${requestingUser.lastName}`.trim() || requestingUser.email 
+              : 'Someone';
+            
+            await notificationService.sendJoinRequestNotification(
+              [league.commissionerId],
+              requesterName,
+              'league',
+              league.name || 'your league',
+              membership.id
+            );
+          }
+        } catch (notifError) {
+          console.error('[Notifications] Failed to send join request notification:', notifError);
+        }
+      })();
+      
       res.json(membership);
     } catch (error) {
       console.error("Error joining league:", error);
@@ -4506,6 +4531,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const request = await storage.requestTeamJoinLeague(teamId, leagueId, userId, message);
+      
+      // Send push notification to league commissioner (async, don't wait)
+      (async () => {
+        try {
+          if (league.commissionerId) {
+            const requesterName = team.name || 'A team';
+            
+            await notificationService.sendJoinRequestNotification(
+              [league.commissionerId],
+              requesterName,
+              'league',
+              league.name || 'your league',
+              request.id
+            );
+          }
+        } catch (notifError) {
+          console.error('[Notifications] Failed to send team join request notification:', notifError);
+        }
+      })();
+      
       res.json(request);
     } catch (error) {
       console.error('Error requesting team join league:', error);
@@ -6121,6 +6166,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             actionUrl: `/game/${gameId}`,
             actionText: 'View Game',
           });
+          
+          // Send push notification via OneSignal
+          const requester = await storage.getUser(userId);
+          const requesterName = requester ? `${requester.firstName} ${requester.lastName}`.trim() || requester.email : 'Someone';
+          const gameInfo = `${homeTeam?.name || 'Home'} vs ${awayTeam?.name || 'Away'}`;
+          
+          await notificationService.sendSubstitutionRequestNotification(
+            [substitutePlayerId],
+            requesterName,
+            gameInfo,
+            request.id
+          );
         }
       } catch (notifyError) {
         console.error('Error notifying substitute player:', notifyError);
@@ -10560,6 +10617,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
+      // Send push notifications to other participants (async, don't wait)
+      (async () => {
+        try {
+          const sender = await storage.getUser(userId);
+          const senderName = sender ? `${sender.firstName} ${sender.lastName}`.trim() || sender.email : 'Someone';
+          const recipientIds = participants
+            .filter(p => p.id !== undefined && p.id !== null)
+            .map(p => p.id as string)
+            .filter(id => id !== userId);
+          
+          if (recipientIds.length > 0) {
+            await notificationService.sendMessageNotification(
+              recipientIds,
+              senderName,
+              content,
+              conversationId
+            );
+          }
+        } catch (notifError) {
+          console.error('[Notifications] Failed to send message notifications:', notifError);
+        }
+      })();
+
       res.status(201).json({
         ...message,
         sentAt: message.createdAt, // Map for frontend compatibility
@@ -12027,6 +12107,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         relatedScrimmageId: validatedData.relatedScrimmageId || null,
         relatedConversationId: validatedData.relatedConversationId || null,
       }, validatedData.recipientUserIds);
+
+      // Send push notifications to recipients (async, don't wait)
+      (async () => {
+        try {
+          const creator = await storage.getUser(userId);
+          const creatorName = creator ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email : 'Someone';
+          
+          if (validatedData.recipientUserIds.length > 0) {
+            await notificationService.sendPaymentRequestNotification(
+              validatedData.recipientUserIds,
+              creatorName,
+              validatedData.amountPerPerson,
+              validatedData.title,
+              paymentRequest.id
+            );
+          }
+        } catch (notifError) {
+          console.error('[Notifications] Failed to send payment request notifications:', notifError);
+        }
+      })();
 
       res.json(paymentRequest);
     } catch (error) {

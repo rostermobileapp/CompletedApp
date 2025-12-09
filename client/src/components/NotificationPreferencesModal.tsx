@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useOneSignal } from '@/hooks/useOneSignal';
 import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
@@ -11,7 +12,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, DollarSign, Users, UserPlus, Calendar, Bell, Loader2 } from 'lucide-react';
+import { MessageSquare, DollarSign, Users, UserPlus, Calendar, Bell, Loader2, BellRing, AlertCircle } from 'lucide-react';
 
 interface NotificationSettings {
   inAppMessages: boolean;
@@ -69,6 +70,8 @@ interface NotificationPreferencesModalProps {
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isInitialized, permissionState, requestPermission, playerId } = useOneSignal();
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   
   const [settings, setSettings] = useState<NotificationSettings>({
     inAppMessages: true,
@@ -122,6 +125,29 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     setHasChanges(true);
   };
 
+  const handleRequestPermission = async () => {
+    setIsRequestingPermission(true);
+    try {
+      const granted = await requestPermission();
+      if (granted) {
+        setPushEnabled(true);
+        setHasChanges(true);
+        toast({ title: 'Push notifications enabled!' });
+        queryClient.invalidateQueries({ queryKey: ['/api/notification-preferences'] });
+      } else {
+        toast({ 
+          title: 'Permission denied', 
+          description: 'You can enable notifications later in your browser settings.',
+          variant: 'destructive' 
+        });
+      }
+    } catch (error) {
+      toast({ title: 'Failed to request permission', variant: 'destructive' });
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
+
   const handleSave = () => {
     updateMutation.mutate({ notificationSettings: settings, pushEnabled });
   };
@@ -146,19 +172,60 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
         ) : (
           <div className="space-y-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-                <div className="flex-1">
-                  <p className="font-medium">Push Notifications</p>
-                  <p className="text-sm text-muted-foreground">
-                    Enable push notifications on this device
-                  </p>
+              {permissionState !== 'granted' && isInitialized ? (
+                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                  <div className="flex items-start gap-3">
+                    <BellRing className="w-5 h-5 text-primary mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium">Enable Push Notifications</p>
+                      <p className="text-sm text-muted-foreground mt-1 mb-3">
+                        Get notified about messages, payments, and game reminders even when you're not in the app
+                      </p>
+                      <Button 
+                        onClick={handleRequestPermission}
+                        disabled={isRequestingPermission}
+                        size="sm"
+                        data-testid="button-enable-push"
+                      >
+                        {isRequestingPermission ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Requesting...
+                          </>
+                        ) : (
+                          'Enable Notifications'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <Switch
-                  checked={pushEnabled}
-                  onCheckedChange={handlePushEnabledChange}
-                  data-testid="switch-push-enabled"
-                />
-              </div>
+              ) : permissionState === 'denied' ? (
+                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-destructive mt-0.5" />
+                    <div>
+                      <p className="font-medium">Notifications Blocked</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        You've blocked notifications. To enable them, go to your browser settings.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                  <div className="flex-1">
+                    <p className="font-medium">Push Notifications</p>
+                    <p className="text-sm text-muted-foreground">
+                      {playerId ? 'Push notifications are enabled on this device' : 'Enable push notifications on this device'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={pushEnabled}
+                    onCheckedChange={handlePushEnabledChange}
+                    data-testid="switch-push-enabled"
+                  />
+                </div>
+              )}
 
               <div className="border-t pt-4">
                 <p className="text-sm font-medium text-muted-foreground mb-3">
