@@ -69,7 +69,7 @@ interface GameGoal {
   period: number;
   timestamp: string | null;
   isSubmitted: boolean;
-  scorer: Player;
+  scorer: Player | null;
   primaryAssist?: Player | null;
   secondaryAssist?: Player | null;
   team: { id: string; name: string };
@@ -86,7 +86,7 @@ interface GamePenalty {
   period: number;
   timestamp: string | null;
   isSubmitted: boolean;
-  player: Player;
+  player: Player | null;
   team: { id: string; name: string };
 }
 
@@ -437,6 +437,9 @@ export default function ScorekeeperDashboard() {
                         <SelectValue placeholder="Select scorer" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="substitute" className="text-muted-foreground italic">
+                          Substitute Player
+                        </SelectItem>
                         {players.map(p => (
                           <SelectItem key={p.userId} value={p.userId}>
                             {p.user.firstName} {p.user.lastName}
@@ -453,6 +456,9 @@ export default function ScorekeeperDashboard() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">No Assist</SelectItem>
+                        <SelectItem value="substitute" className="text-muted-foreground italic">
+                          Substitute Player
+                        </SelectItem>
                         {players.filter(p => p.userId !== scorerId).map(p => (
                           <SelectItem key={p.userId} value={p.userId}>
                             {p.user.firstName} {p.user.lastName}
@@ -469,6 +475,9 @@ export default function ScorekeeperDashboard() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">No 2nd Assist</SelectItem>
+                        <SelectItem value="substitute" className="text-muted-foreground italic">
+                          Substitute Player
+                        </SelectItem>
                         {players.filter(p => p.userId !== scorerId && p.userId !== assistId).map(p => (
                           <SelectItem key={p.userId} value={p.userId}>
                             {p.user.firstName} {p.user.lastName}
@@ -504,33 +513,45 @@ export default function ScorekeeperDashboard() {
 
             {/* Goals List */}
             <div className="space-y-1 max-h-[calc(100vh-380px)] overflow-y-auto">
-              {goals.map((goal, idx) => (
-                <div 
-                  key={goal.id} 
-                  className="flex items-center justify-between py-1 px-2 bg-background/50 rounded text-sm"
-                  data-testid={`goal-entry-${team}-${idx}`}
-                >
-                  <span className="truncate">
-                    <span className="font-medium">{goal.scorer.firstName} {goal.scorer.lastName}</span>
-                    {goal.primaryAssist && (
-                      <span className="text-muted-foreground ml-1">
-                        ({goal.primaryAssist.firstName.charAt(0)}. {goal.primaryAssist.lastName}
-                        {goal.secondaryAssist && `, ${goal.secondaryAssist.firstName.charAt(0)}. ${goal.secondaryAssist.lastName}`})
-                      </span>
-                    )}
-                  </span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => deleteGoalMutation.mutate(goal.id)}
-                    disabled={deleteGoalMutation.isPending}
-                    data-testid={`delete-goal-${team}-${idx}`}
+              {goals.map((goal, idx) => {
+                const scorerName = goal.scorer 
+                  ? `${goal.scorer.firstName} ${goal.scorer.lastName}` 
+                  : 'Sub';
+                const primaryAssistName = goal.primaryAssist 
+                  ? `${goal.primaryAssist.firstName.charAt(0)}. ${goal.primaryAssist.lastName}`
+                  : (goal.primaryAssistId === 'substitute' ? 'Sub' : null);
+                const secondaryAssistName = goal.secondaryAssist
+                  ? `${goal.secondaryAssist.firstName.charAt(0)}. ${goal.secondaryAssist.lastName}`
+                  : (goal.secondaryAssistId === 'substitute' ? 'Sub' : null);
+                const hasAnyAssist = primaryAssistName || secondaryAssistName;
+                
+                return (
+                  <div 
+                    key={goal.id} 
+                    className="flex items-center justify-between py-1 px-2 bg-background/50 rounded text-sm"
+                    data-testid={`goal-entry-${team}-${idx}`}
                   >
-                    <X className="h-3 w-3 text-destructive" />
-                  </Button>
-                </div>
-              ))}
+                    <span className="truncate">
+                      <span className="font-medium">{scorerName}</span>
+                      {hasAnyAssist && (
+                        <span className="text-muted-foreground ml-1">
+                          ({primaryAssistName}{secondaryAssistName && primaryAssistName && ', '}{secondaryAssistName})
+                        </span>
+                      )}
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => deleteGoalMutation.mutate(goal.id)}
+                      disabled={deleteGoalMutation.isPending}
+                      data-testid={`delete-goal-${team}-${idx}`}
+                    >
+                      <X className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
+                );
+              })}
               {goals.length === 0 && (
                 <div className="text-center text-muted-foreground text-sm py-2">No goals</div>
               )}
@@ -545,6 +566,9 @@ export default function ScorekeeperDashboard() {
                   <SelectValue placeholder="Player" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="substitute" className="text-muted-foreground italic">
+                    Substitute Player
+                  </SelectItem>
                   {players.map(p => (
                     <SelectItem key={p.userId} value={p.userId}>
                       {p.user.firstName} {p.user.lastName}
@@ -576,28 +600,33 @@ export default function ScorekeeperDashboard() {
 
             {/* Penalties List */}
             <div className="space-y-1 max-h-[calc(100vh-380px)] overflow-y-auto">
-              {penalties.map((penalty, idx) => (
-                <div 
-                  key={penalty.id} 
-                  className="flex items-center justify-between py-1 px-2 bg-background/50 rounded text-sm"
-                  data-testid={`penalty-entry-${team}-${idx}`}
-                >
-                  <span className="truncate">
-                    <span className="font-medium">{penalty.player.firstName} {penalty.player.lastName}</span>
-                    <span className="text-muted-foreground ml-1">({penalty.minutes} min)</span>
-                  </span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => deletePenaltyMutation.mutate(penalty.id)}
-                    disabled={deletePenaltyMutation.isPending}
-                    data-testid={`delete-penalty-${team}-${idx}`}
+              {penalties.map((penalty, idx) => {
+                const playerName = penalty.player 
+                  ? `${penalty.player.firstName} ${penalty.player.lastName}` 
+                  : 'Sub';
+                return (
+                  <div 
+                    key={penalty.id} 
+                    className="flex items-center justify-between py-1 px-2 bg-background/50 rounded text-sm"
+                    data-testid={`penalty-entry-${team}-${idx}`}
                   >
-                    <X className="h-3 w-3 text-destructive" />
-                  </Button>
-                </div>
-              ))}
+                    <span className="truncate">
+                      <span className="font-medium">{playerName}</span>
+                      <span className="text-muted-foreground ml-1">({penalty.minutes} min)</span>
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => deletePenaltyMutation.mutate(penalty.id)}
+                      disabled={deletePenaltyMutation.isPending}
+                      data-testid={`delete-penalty-${team}-${idx}`}
+                    >
+                      <X className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
+                );
+              })}
               {penalties.length === 0 && (
                 <div className="text-center text-muted-foreground text-sm py-2">No penalties</div>
               )}
