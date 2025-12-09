@@ -1,0 +1,57 @@
+# Replit Prompt: Add Privacy Policy and Terms of Service Pages
+
+Please add the following to my website:
+
+## Requirements:
+
+1. **Create two new pages:**
+   - Privacy Policy page (`/privacy-policy`)
+   - Terms of Service page (`/terms-of-service`)
+
+2. **Add footer links on the homepage:**
+   - Add a footer section at the bottom of the landing page
+   - Include links to both the Privacy Policy and Terms of Service pages
+   - Style the footer to match the existing website design
+   - Footer should be subtle but clearly visible
+
+3. **Privacy Policy Content:**
+   Include these standard sections:
+   - Information we collect (personal data, usage data, cookies)
+   - How we use your information
+   - Data sharing and third parties
+   - Data security measures
+   - User rights (access, deletion, opt-out)
+   - Children's privacy (COPPA compliance - no data collection from users under 13)
+   - International data transfers
+   - Changes to privacy policy
+   - Contact information
+
+4. **Terms of Service Content:**
+   Include these standard sections:
+   - Acceptance of terms
+   - Description of service
+   - User accounts and responsibilities
+   - Acceptable use policy
+   - Intellectual property rights
+   - Disclaimers and limitations of liability
+   - Indemnification
+   - Termination rights
+   - Governing law and dispute resolution
+   - Changes to terms
+   - Contact information
+
+5. **Compliance Requirements:**
+   - Must comply with GDPR (European users)
+   - Must comply with CCPA (California users)
+   - Must comply with COPPA (no data collection from children under 13)
+   - Must meet Google Play Store requirements
+   - Must meet Apple App Store requirements
+
+6. **Formatting:**
+   - Use clear headings and subheadings
+   - Make text readable with proper spacing
+   - Include a "Last Updated" date at the top
+   - Use placeholder text like "[Company Name]", "[App Name]", "[Contact Email]" that I can easily replace
+   - Ensure pages are mobile-responsive
+
+Please create these pages with generic, compliant content that I can customize with my specific business details.
