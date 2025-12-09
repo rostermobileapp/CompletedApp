@@ -98,7 +98,11 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
 
   useEffect(() => {
     if (preferences) {
-      setSettings(preferences.notificationSettings);
+      // Merge with defaults to ensure new notification types are included
+      setSettings(prev => ({
+        ...prev,
+        ...preferences.notificationSettings,
+      }));
       setPushEnabled(preferences.pushEnabled);
       setHasChanges(false);
     }
