@@ -56,8 +56,8 @@ const NOTIFICATION_TYPES = [
   },
   {
     key: 'upcomingEvents' as const,
-    label: 'Game Reminders',
-    description: 'Reminders 24 hours and 2 hours before games',
+    label: 'Schedule Reminders',
+    description: 'Reminders for games, scrimmages, and claimed duties',
     icon: Calendar,
   },
 ];
