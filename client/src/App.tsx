@@ -60,7 +60,6 @@ import TournamentTeams from "@/pages/TournamentTeams";
 import LeagueTournamentSearch from "@/pages/LeagueTournamentSearch";
 import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 import MediaGalleryPage from "@/pages/MediaGallery";
-import IsometricEditor from "@/pages/IsometricEditor";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -153,7 +152,6 @@ function Router() {
             <Route path="/media/team/:id" component={MediaGalleryPage} />
             <Route path="/privacy" component={Privacy} />
             <Route path="/admin/stripe" component={StripeAdmin} />
-            <Route path="/isometric-editor" component={IsometricEditor} />
             <Route component={NotFound} />
           </Switch>
         </PageTransition>

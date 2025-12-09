@@ -2977,23 +2977,3 @@ export type TournamentMatchWithTeams = TournamentMatch & {
   team2?: TournamentTeam;
   winner?: TournamentTeam;
 };
-
-// Isometric Hero Cards table - for landing page 3D design
-export const isometricCards = pgTable("isometric_cards", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  imageUrl: varchar("image_url").notNull(),
-  x: integer("x").notNull().default(0),
-  y: integer("y").notNull().default(0),
-  width: integer("width").notNull().default(200),
-  height: integer("height").notNull().default(150),
-  rotation: integer("rotation").notNull().default(0),
-  zIndex: integer("z_index").notNull().default(1),
-  scale: decimal("scale", { precision: 3, scale: 2 }).notNull().default("1.00"),
-  isVisible: boolean("is_visible").notNull().default(true),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const insertIsometricCardSchema = createInsertSchema(isometricCards).omit({ id: true, createdAt: true, updatedAt: true });
-export type IsometricCard = typeof isometricCards.$inferSelect;
-export type InsertIsometricCard = z.infer<typeof insertIsometricCardSchema>;
