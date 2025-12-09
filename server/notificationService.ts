@@ -136,10 +136,13 @@ export async function sendPushNotification(
     return { sent: 0, skipped };
   }
 
-  // Use include_player_ids for direct device targeting (more reliable than aliases)
+  // Use include_aliases with onesignal_id for device targeting (required for newer OneSignal API)
   const notification: OneSignalNotification = {
     app_id: appId,
-    include_player_ids: eligiblePlayerIds,
+    include_aliases: {
+      onesignal_id: eligiblePlayerIds,
+    },
+    target_channel: 'push',
     headings: { en: title },
     contents: { en: message },
     url,
