@@ -17,7 +17,7 @@ export default function TermsOfService() {
           <section data-testid="section-acceptance">
             <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
             <p className="text-gray-300 leading-relaxed">
-              By accessing or using [App Name] (the "Service") operated by [Company Name] ("we," "us," or "our"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not access or use the Service. These Terms apply to all visitors, users, and others who access or use the Service.
+              By accessing or using [App Name] (the "Service") operated by Roster, LLC ("we," "us," or "our"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not access or use the Service. These Terms apply to all visitors, users, and others who access or use the Service.
             </p>
           </section>
 
@@ -71,7 +71,7 @@ export default function TermsOfService() {
             
             <h3 className="text-xl font-medium mb-3">Our Content</h3>
             <p className="text-gray-300 leading-relaxed mb-4">
-              The Service and its entire contents, features, and functionality (including but not limited to all information, software, text, displays, images, video, audio, and the design, selection, and arrangement thereof) are owned by [Company Name], its licensors, or other providers and are protected by United States and international copyright, trademark, patent, trade secret, and other intellectual property or proprietary rights laws.
+              The Service and its entire contents, features, and functionality (including but not limited to all information, software, text, displays, images, video, audio, and the design, selection, and arrangement thereof) are owned by Roster, LLC, its licensors, or other providers and are protected by United States and international copyright, trademark, patent, trade secret, and other intellectual property or proprietary rights laws.
             </p>
 
             <h3 className="text-xl font-medium mb-3">Your Content</h3>
@@ -112,14 +112,14 @@ export default function TermsOfService() {
 
             <h3 className="text-xl font-medium mb-3">Limitation of Liability</h3>
             <p className="text-gray-300 leading-relaxed">
-              TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL [COMPANY NAME], ITS AFFILIATES, DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE FOR ANY INDIRECT, PUNITIVE, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES, INCLUDING WITHOUT LIMITATION DAMAGES FOR LOSS OF PROFITS, GOODWILL, USE, DATA, OR OTHER INTANGIBLE LOSSES, ARISING OUT OF OR RELATING TO THE USE OF, OR INABILITY TO USE, THE SERVICE.
+              TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL ROSTER, LLC, ITS AFFILIATES, DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE FOR ANY INDIRECT, PUNITIVE, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES, INCLUDING WITHOUT LIMITATION DAMAGES FOR LOSS OF PROFITS, GOODWILL, USE, DATA, OR OTHER INTANGIBLE LOSSES, ARISING OUT OF OR RELATING TO THE USE OF, OR INABILITY TO USE, THE SERVICE.
             </p>
           </section>
 
           <section data-testid="section-indemnification">
             <h2 className="text-2xl font-semibold mb-4">8. Indemnification</h2>
             <p className="text-gray-300 leading-relaxed">
-              You agree to defend, indemnify, and hold harmless [Company Name], its affiliates, licensors, and service providers, and its and their respective officers, directors, employees, contractors, agents, licensors, suppliers, successors, and assigns from and against any claims, liabilities, damages, judgments, awards, losses, costs, expenses, or fees (including reasonable attorneys' fees) arising out of or relating to your violation of these Terms or your use of the Service.
+              You agree to defend, indemnify, and hold harmless Roster, LLC, its affiliates, licensors, and service providers, and its and their respective officers, directors, employees, contractors, agents, licensors, suppliers, successors, and assigns from and against any claims, liabilities, damages, judgments, awards, losses, costs, expenses, or fees (including reasonable attorneys' fees) arising out of or relating to your violation of these Terms or your use of the Service.
             </p>
           </section>
 
@@ -145,7 +145,7 @@ export default function TermsOfService() {
               Any dispute arising from or relating to these Terms or the Service shall first be attempted to be resolved through good-faith negotiation. If such disputes cannot be resolved, they shall be submitted to binding arbitration in [City, State/Country] in accordance with the rules of the American Arbitration Association.
             </p>
             <p className="text-gray-300 leading-relaxed">
-              You agree that any arbitration shall be limited to the dispute between you and [Company Name] individually. You waive any right to participate in a class action lawsuit or class-wide arbitration.
+              You agree that any arbitration shall be limited to the dispute between you and Roster, LLC individually. You waive any right to participate in a class action lawsuit or class-wide arbitration.
             </p>
           </section>
 
@@ -166,7 +166,7 @@ export default function TermsOfService() {
           <section data-testid="section-entire-agreement">
             <h2 className="text-2xl font-semibold mb-4">13. Entire Agreement</h2>
             <p className="text-gray-300 leading-relaxed">
-              These Terms, together with the Privacy Policy and any other legal notices published by us on the Service, constitute the entire agreement between you and [Company Name] concerning the Service and supersede all prior or contemporaneous understandings and agreements, whether written or oral, regarding such subject matter.
+              These Terms, together with the Privacy Policy and any other legal notices published by us on the Service, constitute the entire agreement between you and Roster, LLC concerning the Service and supersede all prior or contemporaneous understandings and agreements, whether written or oral, regarding such subject matter.
             </p>
           </section>
 
@@ -176,7 +176,7 @@ export default function TermsOfService() {
               If you have any questions about these Terms of Service, please contact us:
             </p>
             <ul className="list-none text-gray-300 space-y-2 mt-4">
-              <li><strong>Email:</strong> [Contact Email]</li>
+              <li><strong>Email:</strong> contact@roster-app.com</li>
               <li><strong>Address:</strong> [Company Address]</li>
             </ul>
           </section>

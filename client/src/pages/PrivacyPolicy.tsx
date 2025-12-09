@@ -17,7 +17,7 @@ export default function PrivacyPolicy() {
           <section data-testid="section-introduction">
             <h2 className="text-2xl font-semibold mb-4">Introduction</h2>
             <p className="text-gray-300 leading-relaxed">
-              [Company Name] ("we," "our," or "us") operates [App Name] (the "Service"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the Service.
+              Roster, LLC ("we," "our," or "us") operates [App Name] (the "Service"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the Service.
             </p>
           </section>
 
@@ -110,7 +110,7 @@ export default function PrivacyPolicy() {
               <li><strong>Object:</strong> Object to processing of your personal data in certain circumstances</li>
             </ul>
             <p className="text-gray-300 leading-relaxed">
-              To exercise any of these rights, please contact us at [Contact Email]. We will respond to your request within the timeframe required by applicable law.
+              To exercise any of these rights, please contact us at contact@roster-app.com. We will respond to your request within the timeframe required by applicable law.
             </p>
           </section>
 
@@ -139,14 +139,14 @@ export default function PrivacyPolicy() {
               <li>The right to non-discrimination for exercising your CCPA rights</li>
             </ul>
             <p className="text-gray-300 leading-relaxed mt-4">
-              To exercise these rights, please contact us at [Contact Email].
+              To exercise these rights, please contact us at contact@roster-app.com.
             </p>
           </section>
 
           <section data-testid="section-coppa">
             <h2 className="text-2xl font-semibold mb-4">Children's Privacy (COPPA Compliance)</h2>
             <p className="text-gray-300 leading-relaxed">
-              Our Service is not intended for children under the age of 13. We do not knowingly collect personally identifiable information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us at [Contact Email]. If we discover that a child under 13 has provided us with personal information, we will promptly delete such information from our servers.
+              Our Service is not intended for children under the age of 13. We do not knowingly collect personally identifiable information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us at contact@roster-app.com. If we discover that a child under 13 has provided us with personal information, we will promptly delete such information from our servers.
             </p>
           </section>
 
@@ -177,7 +177,7 @@ export default function PrivacyPolicy() {
               If you have any questions about this Privacy Policy, please contact us:
             </p>
             <ul className="list-none text-gray-300 space-y-2 mt-4">
-              <li><strong>Email:</strong> [Contact Email]</li>
+              <li><strong>Email:</strong> contact@roster-app.com</li>
               <li><strong>Address:</strong> [Company Address]</li>
             </ul>
           </section>
