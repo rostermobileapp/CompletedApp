@@ -11,20 +11,20 @@ export default function TermsOfService() {
         </Link>
 
         <h1 className="text-4xl font-bold mb-4" data-testid="text-title">Terms of Service</h1>
-        <p className="text-gray-400 mb-8" data-testid="text-last-updated">Last Updated: [Date]</p>
+        <p className="text-gray-400 mb-8" data-testid="text-last-updated">Last Updated: 12/1/2025</p>
 
         <div className="prose prose-invert prose-lg max-w-none space-y-8">
           <section data-testid="section-acceptance">
             <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
             <p className="text-gray-300 leading-relaxed">
-              By accessing or using [App Name] (the "Service") operated by Roster, LLC ("we," "us," or "our"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not access or use the Service. These Terms apply to all visitors, users, and others who access or use the Service.
+              By accessing or using Roster (the "Service") operated by Roster, LLC ("we," "us," or "our"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not access or use the Service. These Terms apply to all visitors, users, and others who access or use the Service.
             </p>
           </section>
 
           <section data-testid="section-description">
             <h2 className="text-2xl font-semibold mb-4">2. Description of Service</h2>
             <p className="text-gray-300 leading-relaxed">
-              [App Name] is a sports team management platform that allows users to organize recreational leagues and teams, manage schedules, track attendance, communicate with team members, and access related features. The Service may include web-based applications, mobile applications, and any related services or features.
+              Roster is a sports team management platform that allows users to organize recreational leagues and teams, manage schedules, track attendance, communicate with team members, and access related features. The Service may include web-based applications, mobile applications, and any related services or features.
             </p>
           </section>
 
@@ -139,10 +139,10 @@ export default function TermsOfService() {
           <section data-testid="section-governing-law">
             <h2 className="text-2xl font-semibold mb-4">10. Governing Law and Dispute Resolution</h2>
             <p className="text-gray-300 leading-relaxed mb-4">
-              These Terms shall be governed by and construed in accordance with the laws of [State/Country], without regard to its conflict of law provisions.
+              These Terms shall be governed by and construed in accordance with the laws of United States, without regard to its conflict of law provisions.
             </p>
             <p className="text-gray-300 leading-relaxed mb-4">
-              Any dispute arising from or relating to these Terms or the Service shall first be attempted to be resolved through good-faith negotiation. If such disputes cannot be resolved, they shall be submitted to binding arbitration in [City, State/Country] in accordance with the rules of the American Arbitration Association.
+              Any dispute arising from or relating to these Terms or the Service shall first be attempted to be resolved through good-faith negotiation. If such disputes cannot be resolved, they shall be submitted to binding arbitration in United States in accordance with the rules of the American Arbitration Association.
             </p>
             <p className="text-gray-300 leading-relaxed">
               You agree that any arbitration shall be limited to the dispute between you and Roster, LLC individually. You waive any right to participate in a class action lawsuit or class-wide arbitration.
@@ -175,10 +175,9 @@ export default function TermsOfService() {
             <p className="text-gray-300 leading-relaxed">
               If you have any questions about these Terms of Service, please contact us:
             </p>
-            <ul className="list-none text-gray-300 space-y-2 mt-4">
-              <li><strong>Email:</strong> contact@roster-app.com</li>
-              <li><strong>Address:</strong> [Company Address]</li>
-            </ul>
+            <p className="text-gray-300 mt-4">
+              <strong>Email:</strong> contact@roster-app.com
+            </p>
           </section>
         </div>
 

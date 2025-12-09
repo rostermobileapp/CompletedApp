@@ -11,13 +11,13 @@ export default function PrivacyPolicy() {
         </Link>
 
         <h1 className="text-4xl font-bold mb-4" data-testid="text-title">Privacy Policy</h1>
-        <p className="text-gray-400 mb-8" data-testid="text-last-updated">Last Updated: [Date]</p>
+        <p className="text-gray-400 mb-8" data-testid="text-last-updated">Last Updated: 12/1/2025</p>
 
         <div className="prose prose-invert prose-lg max-w-none space-y-8">
           <section data-testid="section-introduction">
             <h2 className="text-2xl font-semibold mb-4">Introduction</h2>
             <p className="text-gray-300 leading-relaxed">
-              Roster, LLC ("we," "our," or "us") operates [App Name] (the "Service"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the Service.
+              Roster, LLC ("we," "our," or "us") operates Roster (the "Service"). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the Service.
             </p>
           </section>
 
@@ -176,10 +176,9 @@ export default function PrivacyPolicy() {
             <p className="text-gray-300 leading-relaxed">
               If you have any questions about this Privacy Policy, please contact us:
             </p>
-            <ul className="list-none text-gray-300 space-y-2 mt-4">
-              <li><strong>Email:</strong> contact@roster-app.com</li>
-              <li><strong>Address:</strong> [Company Address]</li>
-            </ul>
+            <p className="text-gray-300 mt-4">
+              <strong>Email:</strong> contact@roster-app.com
+            </p>
           </section>
         </div>
 
