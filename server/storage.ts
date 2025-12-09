@@ -65,10 +65,14 @@ import {
   eventParticipants,
   // Notifications
   userNotifications,
+  notificationPreferences,
   type User,
   type UpsertUser,
   type UserNotification,
   type InsertUserNotification,
+  type NotificationPreferences,
+  type InsertNotificationPreferences,
+  type UpdateNotificationPreferences,
   type TournamentPhoto,
   type InsertTournamentPhoto,
   type LeaguePhoto,
@@ -249,6 +253,12 @@ export interface IStorage {
   markNotificationAsRead(id: string, userId: string): Promise<UserNotification | undefined>;
   dismissNotification(id: string, userId: string): Promise<UserNotification | undefined>;
   deleteNotification(id: string): Promise<void>;
+  
+  // Push notification preferences operations
+  getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined>;
+  upsertNotificationPreferences(userId: string, data: Partial<UpdateNotificationPreferences>): Promise<NotificationPreferences>;
+  updateOneSignalPlayerId(userId: string, playerId: string): Promise<NotificationPreferences>;
+  getUsersWithPushEnabled(userIds: string[]): Promise<{ userId: string; oneSignalPlayerId: string; notificationSettings: any }[]>;
   
   // Permission management operations (global - deprecated, use league-specific instead)
   getAllUsers(): Promise<User[]>;
@@ -937,6 +947,75 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userNotifications.id, id));
   }
 
+  // Push notification preferences operations
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined> {
+    const [prefs] = await db
+      .select()
+      .from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
+    return prefs;
+  }
+
+  async upsertNotificationPreferences(userId: string, data: Partial<UpdateNotificationPreferences>): Promise<NotificationPreferences> {
+    const existing = await this.getNotificationPreferences(userId);
+    
+    if (existing) {
+      // Update existing preferences
+      const updateData: any = { updatedAt: new Date() };
+      if (data.oneSignalPlayerId !== undefined) updateData.oneSignalPlayerId = data.oneSignalPlayerId;
+      if (data.notificationSettings !== undefined) updateData.notificationSettings = data.notificationSettings;
+      if (data.pushEnabled !== undefined) updateData.pushEnabled = data.pushEnabled;
+      
+      const [updated] = await db
+        .update(notificationPreferences)
+        .set(updateData)
+        .where(eq(notificationPreferences.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      // Create new preferences with defaults
+      const [created] = await db
+        .insert(notificationPreferences)
+        .values({
+          userId,
+          oneSignalPlayerId: data.oneSignalPlayerId,
+          notificationSettings: data.notificationSettings || {
+            inAppMessages: true,
+            paymentRequests: true,
+            substitutionRequests: true,
+            joinRequests: true,
+            upcomingEvents: true,
+          },
+          pushEnabled: data.pushEnabled ?? true,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async updateOneSignalPlayerId(userId: string, playerId: string): Promise<NotificationPreferences> {
+    return this.upsertNotificationPreferences(userId, { oneSignalPlayerId: playerId });
+  }
+
+  async getUsersWithPushEnabled(userIds: string[]): Promise<{ userId: string; oneSignalPlayerId: string; notificationSettings: any }[]> {
+    if (userIds.length === 0) return [];
+    
+    const prefs = await db
+      .select({
+        userId: notificationPreferences.userId,
+        oneSignalPlayerId: notificationPreferences.oneSignalPlayerId,
+        notificationSettings: notificationPreferences.notificationSettings,
+      })
+      .from(notificationPreferences)
+      .where(and(
+        inArray(notificationPreferences.userId, userIds),
+        eq(notificationPreferences.pushEnabled, true),
+        isNotNull(notificationPreferences.oneSignalPlayerId)
+      ));
+    
+    return prefs.filter(p => p.oneSignalPlayerId !== null) as { userId: string; oneSignalPlayerId: string; notificationSettings: any }[];
+  }
+
   async deleteUser(id: string): Promise<void> {
     // Get user details to check subscription status
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -974,6 +1053,9 @@ export class DatabaseStorage implements IStorage {
       
       // Delete feedback
       await tx.delete(feedbackSubmissions).where(eq(feedbackSubmissions.userId, id));
+      
+      // Delete notification preferences
+      await tx.delete(notificationPreferences).where(eq(notificationPreferences.userId, id));
       
       // Delete announcement related data
       await tx.delete(announcementPollVotes).where(eq(announcementPollVotes.userId, id));

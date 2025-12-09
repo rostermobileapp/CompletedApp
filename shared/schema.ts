@@ -247,6 +247,28 @@ export const userNotifications = pgTable("user_notifications", {
   index("idx_user_notifications_scrimmage").on(table.scrimmageId),
 ]);
 
+// Push notification preferences table - stores user's OneSignal player ID and notification settings
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  oneSignalPlayerId: varchar("onesignal_player_id"), // OneSignal player/subscription ID
+  // JSONB field for flexible notification type preferences
+  // Default: all notification types enabled
+  notificationSettings: jsonb("notification_settings").default({
+    inAppMessages: true,
+    paymentRequests: true,
+    substitutionRequests: true,
+    joinRequests: true,
+    upcomingEvents: true,
+  }).notNull(),
+  pushEnabled: boolean("push_enabled").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_notification_prefs_user").on(table.userId),
+  index("idx_notification_prefs_player_id").on(table.oneSignalPlayerId),
+]);
+
 // Leagues table
 export const leagues = pgTable("leagues", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2113,6 +2135,27 @@ export const insertUserNotificationSchema = createInsertSchema(userNotifications
   createdAt: true,
 });
 
+// Notification settings schema for validation
+export const notificationSettingsSchema = z.object({
+  inAppMessages: z.boolean().default(true),
+  paymentRequests: z.boolean().default(true),
+  substitutionRequests: z.boolean().default(true),
+  joinRequests: z.boolean().default(true),
+  upcomingEvents: z.boolean().default(true),
+});
+
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateNotificationPreferencesSchema = z.object({
+  oneSignalPlayerId: z.string().optional(),
+  notificationSettings: notificationSettingsSchema.optional(),
+  pushEnabled: z.boolean().optional(),
+});
+
 export const insertLeagueSchema = createInsertSchema(leagues).omit({
   id: true,
   createdAt: true,
@@ -2679,6 +2722,10 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type UserNotification = typeof userNotifications.$inferSelect;
 export type InsertUserNotification = z.infer<typeof insertUserNotificationSchema>;
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
+export type UpdateNotificationPreferences = z.infer<typeof updateNotificationPreferencesSchema>;
+export type NotificationSettings = z.infer<typeof notificationSettingsSchema>;
 export type League = typeof leagues.$inferSelect;
 export type InsertLeague = z.infer<typeof insertLeagueSchema>;
 export type Season = typeof seasons.$inferSelect;
