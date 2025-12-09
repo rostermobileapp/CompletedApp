@@ -12,7 +12,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, DollarSign, Users, UserPlus, Calendar, Bell, Loader2, BellRing, AlertCircle, Newspaper } from 'lucide-react';
+import { MessageSquare, DollarSign, Users, UserPlus, Calendar, Bell, Loader2, BellRing, AlertCircle, Newspaper, Send } from 'lucide-react';
 
 interface NotificationSettings {
   inAppMessages: boolean;
@@ -164,6 +164,34 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     updateMutation.mutate({ notificationSettings: settings, pushEnabled });
   };
 
+  const testNotificationMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/notification-preferences/test', { type: 'message' });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({ 
+          title: 'Test notification sent!', 
+          description: 'Check your device for the test notification.' 
+        });
+      } else {
+        toast({ 
+          title: 'Notification skipped', 
+          description: data.message,
+          variant: 'destructive'
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to send test notification',
+        description: String(error),
+        variant: 'destructive',
+      });
+    },
+  });
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto" data-testid="modal-notification-preferences">
@@ -236,6 +264,33 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                     onCheckedChange={handlePushEnabledChange}
                     data-testid="switch-push-enabled"
                   />
+                </div>
+              )}
+
+              {pushEnabled && playerId && (
+                <div className="p-4 rounded-lg bg-muted/50 border">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">Test Push Notifications</p>
+                      <p className="text-xs text-muted-foreground">Send a test notification to this device</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testNotificationMutation.mutate()}
+                      disabled={testNotificationMutation.isPending}
+                      data-testid="button-test-notification"
+                    >
+                      {testNotificationMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-1" />
+                          Send Test
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               )}
 

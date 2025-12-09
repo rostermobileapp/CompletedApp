@@ -499,6 +499,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test Push Notification Endpoint - Send a test notification to yourself
+  app.post('/api/notification-preferences/test', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { type = 'message' } = req.body;
+      
+      // Get user info for personalization
+      const user = await storage.getUser(userId);
+      const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Test User' : 'Test User';
+      
+      console.log(`[Test Notification] Sending test ${type} notification to user ${userId}`);
+      
+      let result;
+      switch (type) {
+        case 'message':
+          result = await notificationService.sendMessageNotification(
+            [userId],
+            'Test Sender',
+            'This is a test message notification to verify push notifications are working!',
+            undefined
+          );
+          break;
+        case 'payment':
+          result = await notificationService.sendPaymentRequestNotification(
+            [userId],
+            userName,
+            1000, // $10.00 test amount
+            'Test payment notification'
+          );
+          break;
+        case 'event':
+          result = await notificationService.sendEventReminderNotification(
+            [userId],
+            'Test Event',
+            'Today at 7:00 PM'
+          );
+          break;
+        case 'join':
+          result = await notificationService.sendJoinRequestNotification(
+            [userId],
+            'Test Player',
+            'team',
+            'Test Team'
+          );
+          break;
+        default:
+          result = await notificationService.sendMessageNotification(
+            [userId],
+            'Test Sender',
+            'This is a test notification!',
+            undefined
+          );
+      }
+      
+      console.log(`[Test Notification] Result: sent=${result.sent}, skipped=${result.skipped}`);
+      
+      res.json({
+        success: result.sent > 0,
+        message: result.sent > 0 
+          ? 'Test notification sent successfully! Check your device.'
+          : 'Notification was skipped - please ensure push notifications are enabled and the notification type is turned on in your preferences.',
+        details: {
+          sent: result.sent,
+          skipped: result.skipped,
+          type
+        }
+      });
+    } catch (error) {
+      console.error("[Test Notification] Error:", error);
+      res.status(500).json({ message: "Failed to send test notification", error: String(error) });
+    }
+  });
+
   // Personal Reminders Routes
   app.get('/api/user/personal-reminders', isAuthenticated, async (req: any, res) => {
     try {

@@ -40,6 +40,13 @@ async function sendToOneSignal(notification: OneSignalNotification): Promise<boo
     return false;
   }
 
+  console.log('[OneSignal] Sending notification:', JSON.stringify({
+    app_id: notification.app_id,
+    target: notification.include_aliases || notification.include_player_ids,
+    title: notification.headings?.en,
+    message: notification.contents?.en?.substring(0, 50) + '...',
+  }));
+
   try {
     const response = await fetch(ONESIGNAL_API_URL, {
       method: 'POST',
@@ -57,7 +64,11 @@ async function sendToOneSignal(notification: OneSignalNotification): Promise<boo
     }
 
     const result = await response.json();
-    console.log('[OneSignal] Notification sent:', result.id);
+    console.log('[OneSignal] Notification sent successfully:', {
+      id: result.id,
+      recipients: result.recipients,
+      external_id: result.external_id,
+    });
     return true;
   } catch (error) {
     console.error('[OneSignal] Failed to send notification:', error);
@@ -73,6 +84,12 @@ export async function sendPushNotification(
   url?: string,
   data?: Record<string, any>
 ): Promise<{ sent: number; skipped: number }> {
+  console.log(`[OneSignal] sendPushNotification called:`, {
+    userIds,
+    notificationType,
+    title: title.substring(0, 30),
+  });
+
   const appId = process.env.ONESIGNAL_APP_ID;
   
   if (!appId) {
@@ -81,10 +98,14 @@ export async function sendPushNotification(
   }
 
   if (userIds.length === 0) {
+    console.log('[OneSignal] No user IDs provided');
     return { sent: 0, skipped: 0 };
   }
 
   const usersWithPush = await storage.getUsersWithPushEnabled(userIds);
+  console.log(`[OneSignal] Users with push enabled: ${usersWithPush.length}/${userIds.length}`, 
+    usersWithPush.map(u => ({ userId: u.userId, pushEnabled: u.pushEnabled, hasPlayerId: !!u.oneSignalPlayerId }))
+  );
   
   const eligibleExternalIds: string[] = [];
   let skipped = 0;
@@ -94,13 +115,16 @@ export async function sendPushNotification(
     
     if (settings && settings[notificationType] === true) {
       eligibleExternalIds.push(user.userId);
+      console.log(`[OneSignal] User ${user.userId} eligible for ${notificationType}`);
     } else {
+      console.log(`[OneSignal] User ${user.userId} skipped - ${notificationType} disabled in settings:`, settings);
       skipped++;
     }
   }
 
   const usersWithoutPush = userIds.length - usersWithPush.length;
   skipped += usersWithoutPush;
+  console.log(`[OneSignal] Users without push enabled: ${usersWithoutPush}`);
 
   if (eligibleExternalIds.length === 0) {
     return { sent: 0, skipped };
