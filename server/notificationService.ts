@@ -19,7 +19,11 @@ export interface NotificationSettings {
 
 interface OneSignalNotification {
   app_id: string;
-  include_player_ids: string[];
+  include_aliases?: {
+    external_id: string[];
+  };
+  include_player_ids?: string[];
+  target_channel?: string;
   headings: { en: string };
   contents: { en: string };
   url?: string;
