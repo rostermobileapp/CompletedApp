@@ -12,7 +12,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, DollarSign, Users, UserPlus, Calendar, Bell, Loader2, BellRing, AlertCircle } from 'lucide-react';
+import { MessageSquare, DollarSign, Users, UserPlus, Calendar, Bell, Loader2, BellRing, AlertCircle, Newspaper } from 'lucide-react';
 
 interface NotificationSettings {
   inAppMessages: boolean;
@@ -20,6 +20,7 @@ interface NotificationSettings {
   substitutionRequests: boolean;
   joinRequests: boolean;
   upcomingEvents: boolean;
+  newsAnnouncements: boolean;
 }
 
 interface NotificationPreferences {
@@ -60,6 +61,12 @@ const NOTIFICATION_TYPES = [
     description: 'Reminders for games, scrimmages, and claimed duties',
     icon: Calendar,
   },
+  {
+    key: 'newsAnnouncements' as const,
+    label: 'News & Announcements',
+    description: 'New posts in the News feed from your leagues and teams',
+    icon: Newspaper,
+  },
 ];
 
 interface NotificationPreferencesModalProps {
@@ -79,6 +86,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     substitutionRequests: true,
     joinRequests: true,
     upcomingEvents: true,
+    newsAnnouncements: true,
   });
   const [pushEnabled, setPushEnabled] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);

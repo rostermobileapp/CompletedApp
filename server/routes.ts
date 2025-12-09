@@ -8062,6 +8062,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return the full announcement with attachments and polls
       const fullAnnouncement = await storage.getAnnouncement(announcement.id);
+      
+      // Send push notifications to relevant users
+      try {
+        const author = await storage.getUser(userId);
+        const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() || 'Someone' : 'Someone';
+        
+        let recipientUserIds: string[] = [];
+        
+        if (targetUserIds && targetUserIds.length > 0) {
+          // Targeted announcement - send to targeted users (excluding author)
+          recipientUserIds = targetUserIds.filter(id => id !== userId);
+        } else if (teamId) {
+          // Team announcement - send to team members
+          const teamMembers = await storage.getTeamMembers(teamId);
+          recipientUserIds = teamMembers
+            .filter(m => m.user.id !== userId)
+            .map(m => m.user.id);
+        } else {
+          // League-wide announcement - send to all approved league members
+          const leagueMembers = await storage.getLeagueMemberships(leagueId);
+          recipientUserIds = leagueMembers
+            .filter(m => m.status === 'approved' && m.userId !== userId)
+            .map(m => m.userId);
+        }
+        
+        if (recipientUserIds.length > 0) {
+          await notificationService.sendNewsAnnouncementNotification(
+            recipientUserIds,
+            authorName,
+            announcementData.content?.substring(0, 50) || 'New announcement',
+            teamId ? 'team' : 'league',
+            teamId ? (captainTeam?.name || league.name) : league.name,
+            announcement.id,
+            teamId || leagueId
+          );
+          console.log(`📲 Sent push notifications for announcement to ${recipientUserIds.length} users`);
+        }
+      } catch (notificationError) {
+        console.error('Failed to send announcement push notifications:', notificationError);
+        // Don't fail the request if notifications fail
+      }
+      
       res.json(fullAnnouncement);
     } catch (error) {
       console.error('Error creating announcement:', error);
@@ -8594,6 +8636,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return the full announcement with attachments and polls
       const fullAnnouncement = await storage.getAnnouncement(announcement.id);
+      
+      // Send push notifications to tournament participants
+      try {
+        const author = await storage.getUser(userId);
+        const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() || 'Someone' : 'Someone';
+        
+        let recipientUserIds: string[] = [];
+        
+        if (targetUserIds && targetUserIds.length > 0) {
+          // Targeted announcement - send to targeted users (excluding author)
+          recipientUserIds = targetUserIds.filter(id => id !== userId);
+        } else {
+          // Tournament-wide announcement - send to all approved participants
+          const participants = await db
+            .select({ userId: tournamentParticipants.userId })
+            .from(tournamentParticipants)
+            .where(
+              and(
+                eq(tournamentParticipants.tournamentId, tournamentId),
+                eq(tournamentParticipants.status, 'approved')
+              )
+            );
+          recipientUserIds = participants
+            .filter(p => p.userId !== userId)
+            .map(p => p.userId);
+        }
+        
+        if (recipientUserIds.length > 0) {
+          await notificationService.sendNewsAnnouncementNotification(
+            recipientUserIds,
+            authorName,
+            announcementData.content?.substring(0, 50) || 'New announcement',
+            'tournament',
+            tournament.name,
+            announcement.id,
+            tournamentId
+          );
+          console.log(`📲 Sent push notifications for tournament announcement to ${recipientUserIds.length} users`);
+        }
+      } catch (notificationError) {
+        console.error('Failed to send tournament announcement push notifications:', notificationError);
+        // Don't fail the request if notifications fail
+      }
+      
       res.json(fullAnnouncement);
     } catch (error) {
       console.error('Error creating tournament announcement:', error);

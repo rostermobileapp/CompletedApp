@@ -5,7 +5,8 @@ export type NotificationType =
   | 'paymentRequests' 
   | 'substitutionRequests' 
   | 'joinRequests' 
-  | 'upcomingEvents';
+  | 'upcomingEvents'
+  | 'newsAnnouncements';
 
 export interface NotificationSettings {
   inAppMessages: boolean;
@@ -13,6 +14,7 @@ export interface NotificationSettings {
   substitutionRequests: boolean;
   joinRequests: boolean;
   upcomingEvents: boolean;
+  newsAnnouncements: boolean;
 }
 
 interface OneSignalNotification {
@@ -288,6 +290,37 @@ export async function sendEventReminderNotification(
   );
 }
 
+export async function sendNewsAnnouncementNotification(
+  recipientUserIds: string[],
+  authorName: string,
+  announcementTitle: string,
+  entityType: 'league' | 'team' | 'tournament',
+  entityName: string,
+  announcementId?: string,
+  entityId?: string
+): Promise<{ sent: number; skipped: number }> {
+  const title = 'New Announcement';
+  const message = `${authorName} posted in ${entityName}: ${announcementTitle}`;
+  
+  let url = '/announcements';
+  if (entityType === 'league' && entityId) {
+    url = `/league/${entityId}/announcements`;
+  } else if (entityType === 'tournament' && entityId) {
+    url = `/tournament/${entityId}/announcements`;
+  } else if (entityType === 'team' && entityId) {
+    url = `/team/${entityId}/announcements`;
+  }
+  
+  return sendPushNotification(
+    recipientUserIds,
+    'newsAnnouncements',
+    title,
+    message,
+    url,
+    { type: 'newsAnnouncement', announcementId, entityType, entityId }
+  );
+}
+
 export const notificationService = {
   sendPushNotification,
   sendMessageNotification,
@@ -298,4 +331,5 @@ export const notificationService = {
   sendGameReminderNotification,
   sendScrimmageReminderNotification,
   sendEventReminderNotification,
+  sendNewsAnnouncementNotification,
 };
