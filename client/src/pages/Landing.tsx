@@ -1,5 +1,6 @@
 import { Users, Calendar, Trophy, MessageCircle, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Link } from 'wouter';
 import { AuthModal } from '@/components/AuthModal';
 import logoWhite from '@assets/Roster Logo White_1759233840726.png';
 import heroImage from '@assets/previewed_1761963923150.png';
@@ -426,11 +427,29 @@ export default function Landing() {
         </div>
       </section>
       {/* Footer */}
-      <footer className="border-t border-gray-800/50 py-12 px-6">
-        <div className="max-w-7xl mx-auto text-center text-gray-400">
-          <p className="text-sm text-gray-400" data-testid="text-footer">
-            © 2025 Rosters. Built for teams, by team players.
-          </p>
+      <footer className="border-t border-gray-800/50 py-12 px-6" data-testid="footer">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <p className="text-sm text-gray-400" data-testid="text-footer">
+              © 2025 Rosters. Built for teams, by team players.
+            </p>
+            <div className="flex items-center gap-6">
+              <Link 
+                href="/privacy-policy" 
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+                data-testid="link-privacy-policy"
+              >
+                Privacy Policy
+              </Link>
+              <Link 
+                href="/terms-of-service" 
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+                data-testid="link-terms-of-service"
+              >
+                Terms of Service
+              </Link>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

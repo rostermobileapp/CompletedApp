@@ -48,6 +48,8 @@ import FacilityDetail from "@/pages/FacilityDetail";
 import FacilityMemberships from "@/pages/FacilityMemberships";
 import CreateCalendarEvent from "@/pages/CreateCalendarEvent";
 import Privacy from "@/pages/Privacy";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsOfService from "@/pages/TermsOfService";
 import StripeAdmin from "@/pages/StripeAdmin";
 import Tournaments from "@/pages/Tournaments";
 import TournamentsLanding from "@/pages/TournamentsLanding";
@@ -88,6 +90,8 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/privacy-policy" component={PrivacyPolicy} />
+        <Route path="/terms-of-service" component={TermsOfService} />
         <Route path="/facilities" component={FacilityBrowse} />
         <Route path="/facilities/:id" component={FacilityDetail} />
         <Route component={Landing} />
@@ -151,6 +155,8 @@ function Router() {
             <Route path="/media/league/:id" component={MediaGalleryPage} />
             <Route path="/media/team/:id" component={MediaGalleryPage} />
             <Route path="/privacy" component={Privacy} />
+            <Route path="/privacy-policy" component={PrivacyPolicy} />
+            <Route path="/terms-of-service" component={TermsOfService} />
             <Route path="/admin/stripe" component={StripeAdmin} />
             <Route component={NotFound} />
           </Switch>
