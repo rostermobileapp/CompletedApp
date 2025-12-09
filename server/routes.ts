@@ -134,6 +134,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Isometric Cards routes (public read, admin write)
+  app.get('/api/isometric-cards', async (req, res) => {
+    try {
+      const cards = await storage.getIsometricCards();
+      res.json(cards);
+    } catch (error) {
+      console.error("Error fetching isometric cards:", error);
+      res.status(500).json({ message: "Failed to fetch isometric cards" });
+    }
+  });
+
+  app.get('/api/isometric-cards/all', isAuthenticated, async (req: any, res) => {
+    try {
+      const cards = await storage.getAllIsometricCards();
+      res.json(cards);
+    } catch (error) {
+      console.error("Error fetching all isometric cards:", error);
+      res.status(500).json({ message: "Failed to fetch isometric cards" });
+    }
+  });
+
+  app.post('/api/isometric-cards', isAuthenticated, async (req: any, res) => {
+    try {
+      const card = await storage.createIsometricCard(req.body);
+      res.json(card);
+    } catch (error) {
+      console.error("Error creating isometric card:", error);
+      res.status(500).json({ message: "Failed to create isometric card" });
+    }
+  });
+
+  app.patch('/api/isometric-cards/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const card = await storage.updateIsometricCard(req.params.id, req.body);
+      res.json(card);
+    } catch (error) {
+      console.error("Error updating isometric card:", error);
+      res.status(500).json({ message: "Failed to update isometric card" });
+    }
+  });
+
+  app.delete('/api/isometric-cards/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deleteIsometricCard(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting isometric card:", error);
+      res.status(500).json({ message: "Failed to delete isometric card" });
+    }
+  });
+
   // Visitor count routes (public)
   app.get('/api/visitor-count', async (req, res) => {
     try {

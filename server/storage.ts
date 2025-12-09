@@ -65,6 +65,8 @@ import {
   eventParticipants,
   // Notifications
   userNotifications,
+  // Isometric cards
+  isometricCards,
   type User,
   type UpsertUser,
   type UserNotification,
@@ -185,6 +187,9 @@ import {
   type InsertCalendarEvent,
   type EventParticipant,
   type InsertEventParticipant,
+  // Isometric card types
+  type IsometricCard,
+  type InsertIsometricCard,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt } from "drizzle-orm";
@@ -8898,6 +8903,43 @@ export class DatabaseStorage implements IStorage {
       .from(leaguePhotos)
       .where(eq(leaguePhotos.leagueId, leagueId));
     return result?.count ?? 0;
+  }
+
+  // Isometric card operations
+  async createIsometricCard(cardData: InsertIsometricCard): Promise<IsometricCard> {
+    const [card] = await db
+      .insert(isometricCards)
+      .values(cardData)
+      .returning();
+    return card;
+  }
+
+  async getIsometricCards(): Promise<IsometricCard[]> {
+    return await db
+      .select()
+      .from(isometricCards)
+      .where(eq(isometricCards.isVisible, true))
+      .orderBy(asc(isometricCards.zIndex));
+  }
+
+  async getAllIsometricCards(): Promise<IsometricCard[]> {
+    return await db
+      .select()
+      .from(isometricCards)
+      .orderBy(asc(isometricCards.zIndex));
+  }
+
+  async updateIsometricCard(id: string, updates: Partial<InsertIsometricCard>): Promise<IsometricCard> {
+    const [card] = await db
+      .update(isometricCards)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(isometricCards.id, id))
+      .returning();
+    return card;
+  }
+
+  async deleteIsometricCard(id: string): Promise<void> {
+    await db.delete(isometricCards).where(eq(isometricCards.id, id));
   }
 }
 
