@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { NotificationPreferencesModal } from '@/components/NotificationPreferencesModal';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -48,6 +49,7 @@ export default function Profile() {
   const [showLeagueRequestDialog, setShowLeagueRequestDialog] = useState(false);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
   const [teamJoinLeagueMessage, setTeamJoinLeagueMessage] = useState('');
+  const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
 
   // Fetch full user profile from database (includes displayId)
   const { data: user } = useQuery({
@@ -308,7 +310,7 @@ export default function Profile() {
     {
       icon: Bell,
       label: 'Notifications',
-      action: () => {/* TODO: Navigate to notifications */},
+      action: () => setShowNotificationPreferences(true),
     },
     {
       icon: Shield,
@@ -999,6 +1001,11 @@ export default function Profile() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <NotificationPreferencesModal
+        open={showNotificationPreferences}
+        onOpenChange={setShowNotificationPreferences}
+      />
     </div>
   );
 }

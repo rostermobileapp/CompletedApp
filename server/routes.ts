@@ -418,6 +418,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Push Notification Preferences Routes
+  app.get('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const preferences = await storage.getNotificationPreferences(userId);
+      
+      if (!preferences) {
+        // Return default preferences if none exist
+        return res.json({
+          userId,
+          notificationSettings: {
+            inAppMessages: true,
+            paymentRequests: true,
+            substitutionRequests: true,
+            joinRequests: true,
+            upcomingEvents: true,
+          },
+          pushEnabled: false,
+          oneSignalPlayerId: null,
+        });
+      }
+      
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error fetching notification preferences:", error);
+      res.status(500).json({ message: "Failed to fetch notification preferences" });
+    }
+  });
+
+  app.put('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { notificationSettings, pushEnabled } = req.body;
+      
+      const updateData: any = {};
+      if (notificationSettings !== undefined) {
+        // Validate notification settings structure
+        const validKeys = ['inAppMessages', 'paymentRequests', 'substitutionRequests', 'joinRequests', 'upcomingEvents'];
+        const settings: Record<string, boolean> = {};
+        
+        for (const key of validKeys) {
+          if (typeof notificationSettings[key] === 'boolean') {
+            settings[key] = notificationSettings[key];
+          } else {
+            settings[key] = true; // Default to enabled if not specified
+          }
+        }
+        
+        updateData.notificationSettings = settings;
+      }
+      
+      if (typeof pushEnabled === 'boolean') {
+        updateData.pushEnabled = pushEnabled;
+      }
+      
+      const preferences = await storage.upsertNotificationPreferences(userId, updateData);
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error updating notification preferences:", error);
+      res.status(500).json({ message: "Failed to update notification preferences" });
+    }
+  });
+
+  app.post('/api/notification-preferences/player-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { playerId } = req.body;
+      
+      if (!playerId || typeof playerId !== 'string') {
+        return res.status(400).json({ message: "Player ID is required" });
+      }
+      
+      const preferences = await storage.updateOneSignalPlayerId(userId, playerId);
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error registering OneSignal player ID:", error);
+      res.status(500).json({ message: "Failed to register player ID" });
+    }
+  });
+
   // Personal Reminders Routes
   app.get('/api/user/personal-reminders', isAuthenticated, async (req: any, res) => {
     try {
