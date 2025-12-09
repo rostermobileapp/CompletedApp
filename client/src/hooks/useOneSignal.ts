@@ -27,16 +27,40 @@ export function useOneSignal() {
     if (!isAuthenticated || !playerIdToRegister) return;
     
     try {
-      const response = await fetch('/api/notification-preferences/player-id', {
+      // First, register the Player ID
+      const playerIdResponse = await fetch('/api/notification-preferences/player-id', {
         method: 'POST',
         body: JSON.stringify({ playerId: playerIdToRegister }),
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      if (!playerIdResponse.ok) {
+        throw new Error(`HTTP ${playerIdResponse.status}`);
       }
       console.log('[Natively] Player ID registered with backend:', playerIdToRegister);
+      
+      // Also enable push notifications in preferences (critical for backend to send)
+      const prefsResponse = await fetch('/api/notification-preferences', {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          pushEnabled: true,
+          notificationSettings: {
+            inAppMessages: true,
+            paymentRequests: true,
+            substitutionRequests: true,
+            joinRequests: true,
+            upcomingEvents: true,
+            newsAnnouncements: true,
+          }
+        }),
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!prefsResponse.ok) {
+        console.warn('[Natively] Failed to enable push preferences:', prefsResponse.status);
+      } else {
+        console.log('[Natively] Push preferences enabled successfully');
+      }
     } catch (error) {
       console.error('[Natively] Failed to register player ID:', error);
     }

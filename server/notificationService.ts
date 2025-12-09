@@ -104,18 +104,23 @@ export async function sendPushNotification(
 
   const usersWithPush = await storage.getUsersWithPushEnabled(userIds);
   console.log(`[OneSignal] Users with push enabled: ${usersWithPush.length}/${userIds.length}`, 
-    usersWithPush.map(u => ({ userId: u.userId, pushEnabled: u.pushEnabled, hasPlayerId: !!u.oneSignalPlayerId }))
+    usersWithPush.map(u => ({ userId: u.userId, playerId: u.oneSignalPlayerId?.substring(0, 8) + '...' }))
   );
   
-  const eligibleExternalIds: string[] = [];
+  const eligiblePlayerIds: string[] = [];
   let skipped = 0;
 
   for (const user of usersWithPush) {
     const settings = user.notificationSettings as NotificationSettings;
     
     if (settings && settings[notificationType] === true) {
-      eligibleExternalIds.push(user.userId);
-      console.log(`[OneSignal] User ${user.userId} eligible for ${notificationType}`);
+      if (user.oneSignalPlayerId) {
+        eligiblePlayerIds.push(user.oneSignalPlayerId);
+        console.log(`[OneSignal] User ${user.userId} eligible for ${notificationType}, playerId: ${user.oneSignalPlayerId.substring(0, 8)}...`);
+      } else {
+        console.log(`[OneSignal] User ${user.userId} has no Player ID, skipping`);
+        skipped++;
+      }
     } else {
       console.log(`[OneSignal] User ${user.userId} skipped - ${notificationType} disabled in settings:`, settings);
       skipped++;
@@ -126,16 +131,15 @@ export async function sendPushNotification(
   skipped += usersWithoutPush;
   console.log(`[OneSignal] Users without push enabled: ${usersWithoutPush}`);
 
-  if (eligibleExternalIds.length === 0) {
+  if (eligiblePlayerIds.length === 0) {
+    console.log(`[OneSignal] No eligible Player IDs found, returning`);
     return { sent: 0, skipped };
   }
 
+  // Use include_player_ids for direct device targeting (more reliable than aliases)
   const notification: OneSignalNotification = {
     app_id: appId,
-    include_aliases: {
-      external_id: eligibleExternalIds,
-    },
-    target_channel: 'push',
+    include_player_ids: eligiblePlayerIds,
     headings: { en: title },
     contents: { en: message },
     url,
@@ -145,7 +149,7 @@ export async function sendPushNotification(
   const success = await sendToOneSignal(notification);
   
   return {
-    sent: success ? eligibleExternalIds.length : 0,
+    sent: success ? eligiblePlayerIds.length : 0,
     skipped: success ? skipped : userIds.length,
   };
 }
