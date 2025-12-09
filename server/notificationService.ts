@@ -227,11 +227,17 @@ export async function sendGameReminderNotification(
   recipientUserIds: string[],
   gameInfo: string,
   timeUntil: '24h' | '2h',
-  gameId?: string
+  gameId?: string,
+  dutyInfo?: string
 ): Promise<{ sent: number; skipped: number }> {
   const title = 'Upcoming Game Reminder';
   const timeText = timeUntil === '24h' ? 'tomorrow' : 'in 2 hours';
-  const message = `${gameInfo} is ${timeText}`;
+  let message = `${gameInfo} is ${timeText}`;
+  
+  // Add duty reminder if the user has a claimed duty
+  if (dutyInfo) {
+    message += `. Don't forget: ${dutyInfo}`;
+  }
   
   return sendPushNotification(
     recipientUserIds,
@@ -239,7 +245,27 @@ export async function sendGameReminderNotification(
     title,
     message,
     gameId ? `/games/${gameId}` : '/schedule',
-    { type: 'gameReminder', timeUntil, gameId }
+    { type: 'gameReminder', timeUntil, gameId, dutyInfo }
+  );
+}
+
+export async function sendScrimmageReminderNotification(
+  recipientUserId: string,
+  scrimmageTitle: string,
+  location: string,
+  timeLabel: string,
+  scrimmageId?: string
+): Promise<{ sent: number; skipped: number }> {
+  const title = 'Upcoming Scrimmage Reminder';
+  const message = `${scrimmageTitle} at ${location} starts ${timeLabel}`;
+  
+  return sendPushNotification(
+    [recipientUserId],
+    'upcomingEvents',
+    title,
+    message,
+    scrimmageId ? `/scrimmage/${scrimmageId}` : '/schedule',
+    { type: 'scrimmageReminder', scrimmageId }
   );
 }
 
@@ -270,5 +296,6 @@ export const notificationService = {
   sendSubstitutionApprovalNotification,
   sendJoinRequestNotification,
   sendGameReminderNotification,
+  sendScrimmageReminderNotification,
   sendEventReminderNotification,
 };

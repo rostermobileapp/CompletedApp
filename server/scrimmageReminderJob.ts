@@ -3,6 +3,7 @@ import { scrimmages, scrimmageRequests, scrimmageRemindersSent, users, userNotif
 import { and, eq, gt, lt, inArray, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { format } from "date-fns";
+import { sendScrimmageReminderNotification } from "./notificationService";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -108,6 +109,15 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
               scrimmageId: scrimmage.id,
             });
             
+            // Send push notification
+            await sendScrimmageReminderNotification(
+              player.id,
+              scrimmage.title,
+              scrimmage.location,
+              `in ${timeLabel}`,
+              scrimmage.id
+            );
+            
             // Record that we sent this reminder
             await db.insert(scrimmageRemindersSent).values({
               scrimmageId: scrimmage.id,
@@ -115,7 +125,7 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
               hoursBefore: reminderHours,
             }).onConflictDoNothing();
             
-            console.log(`✅ Sent ${reminderHours}h push notification for scrimmage ${scrimmage.id} to ${player.firstName || player.id}`);
+            console.log(`✅ Sent ${reminderHours}h notification for scrimmage ${scrimmage.id} to ${player.firstName || player.id}`);
           } catch (error) {
             console.error(`❌ Failed to send push notification to ${player.id}:`, error);
           }
