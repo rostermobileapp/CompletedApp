@@ -67,6 +67,12 @@ export function useOneSignal() {
         setIsInitialized(true);
         console.log('[OneSignal] Initialized successfully');
 
+        // Set external_id to map this user to OneSignal (required for include_aliases targeting)
+        if (user?.id) {
+          await OneSignal.login(user.id);
+          console.log('[OneSignal] External ID set:', user.id);
+        }
+
         const permission = await OneSignal.Notifications.permission;
         const permissionString = permission === true ? 'granted' : (permission === false ? 'denied' : 'default');
         setPermissionState(permissionString);
@@ -94,7 +100,7 @@ export function useOneSignal() {
 
     return () => {
     };
-  }, [isAuthenticated, registerPlayerId]);
+  }, [isAuthenticated, registerPlayerId, user?.id]);
 
   const requestPermission = useCallback(async () => {
     if (!window.OneSignal || !isInitialized) {

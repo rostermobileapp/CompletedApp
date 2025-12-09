@@ -86,14 +86,14 @@ export async function sendPushNotification(
 
   const usersWithPush = await storage.getUsersWithPushEnabled(userIds);
   
-  const eligiblePlayerIds: string[] = [];
+  const eligibleExternalIds: string[] = [];
   let skipped = 0;
 
   for (const user of usersWithPush) {
     const settings = user.notificationSettings as NotificationSettings;
     
-    if (settings && settings[notificationType] === true && user.oneSignalPlayerId) {
-      eligiblePlayerIds.push(user.oneSignalPlayerId);
+    if (settings && settings[notificationType] === true) {
+      eligibleExternalIds.push(user.userId);
     } else {
       skipped++;
     }
@@ -102,13 +102,16 @@ export async function sendPushNotification(
   const usersWithoutPush = userIds.length - usersWithPush.length;
   skipped += usersWithoutPush;
 
-  if (eligiblePlayerIds.length === 0) {
+  if (eligibleExternalIds.length === 0) {
     return { sent: 0, skipped };
   }
 
   const notification: OneSignalNotification = {
     app_id: appId,
-    include_player_ids: eligiblePlayerIds,
+    include_aliases: {
+      external_id: eligibleExternalIds,
+    },
+    target_channel: 'push',
     headings: { en: title },
     contents: { en: message },
     url,
@@ -118,7 +121,7 @@ export async function sendPushNotification(
   const success = await sendToOneSignal(notification);
   
   return {
-    sent: success ? eligiblePlayerIds.length : 0,
+    sent: success ? eligibleExternalIds.length : 0,
     skipped: success ? skipped : userIds.length,
   };
 }
