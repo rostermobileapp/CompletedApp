@@ -1,0 +1,69 @@
+I need to integrate OneSignal push notifications into my sports league app using their REST API.
+
+OneSignal App ID: c73c3e8e-8121-4cb6-8979-a0942c7095bd
+OneSignal REST API Key: os_v2_app_y46d5dubefglnclzuckcy4evxui4ouuqmoieffvesk7qedoy2s7l7o3zxu3c6thgvis4onikq2ld4cin5znuz7n2xpuq7vhvosr3pqq
+
+PART 1: BACKEND NOTIFICATION SYSTEM
+
+Create a complete push notification system with the following notification types:
+
+1. IN-APP MESSAGES
+   - When a user receives a new message
+   - Include sender name and message preview
+
+2. PAYMENT REQUESTS
+   - When a payment is requested from a user
+   - Include amount and what the payment is for
+
+3. SUBSTITUTION REQUESTS
+   - When a player is needed as a substitute for a game
+   - Include game details (date, time, location, team)
+
+4. JOIN REQUESTS
+   - When someone requests to join a user's team or league
+   - Include requester name and team/league name
+
+5. UPCOMING SCHEDULE EVENTS
+   - Game reminders (24 hours before, 2 hours before)
+   - Scrimmage reminders
+   - Include event details (opponent, time, location)
+
+For the backend, I need:
+- A notification service module that handles sending to OneSignal API
+- Functions for each notification type listed above
+- Store OneSignal Player IDs in the user database
+- A way to check user notification preferences before sending
+- Error handling and logging for failed sends
+- A test endpoint to verify each notification type works
+
+PART 2: NOTIFICATION PREFERENCES UI
+
+Create a Notifications settings page/section in the user profile that allows users to toggle each notification type ON/OFF:
+
+The UI should have:
+- Toggle switches for each of the 5 notification types
+- Clear labels for each notification type
+- Save preferences to the database
+- Load current preferences when page opens
+- Visual feedback when preferences are saved
+
+Database changes needed:
+- Add a notification_preferences table or JSON field to store:
+  * in_app_messages (boolean)
+  * payment_requests (boolean)
+  * substitution_requests (boolean)
+  * join_requests (boolean)
+  * schedule_reminders (boolean)
+  * player_id (OneSignal Player ID)
+
+PART 3: INTEGRATION REQUIREMENTS
+
+Show me:
+1. Complete code for the notification service
+2. Database schema changes needed
+3. The Notifications settings UI component
+4. How to trigger each notification type from relevant parts of the app
+5. How to capture and store the OneSignal Player ID when a user logs in or first opens the app
+6. Example implementations for at least 2-3 notification scenarios
+
+Please provide complete, working code that I can copy and paste into my Replit project, with clear instructions on where each piece of code should go.
