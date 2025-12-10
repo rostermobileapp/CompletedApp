@@ -491,15 +491,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Player ID is required" });
       }
       
-      console.log(`[Player ID Registration] User ${userId} registering Player ID: ${playerId}`);
+      // Get user to fetch their displayId for External ID linking
+      const user = await storage.getUser(userId);
+      const displayId = user?.displayId;
+      
+      console.log(`[Player ID Registration] User ${userId} (displayId: ${displayId}) registering Player ID: ${playerId}`);
       
       const preferences = await storage.updateOneSignalPlayerId(userId, playerId);
       
-      // Also set the External ID in OneSignal via API to ensure proper linking
-      const externalIdResult = await notificationService.setExternalIdViaApi(playerId, userId);
-      console.log(`[Player ID Registration] External ID set via API: ${externalIdResult}`);
+      // Set the External ID in OneSignal using displayId (e.g., "LFB3Kf") for easier tracking
+      let externalIdResult = false;
+      if (displayId) {
+        externalIdResult = await notificationService.setExternalIdViaApi(playerId, displayId);
+        console.log(`[Player ID Registration] External ID (displayId: ${displayId}) set via API: ${externalIdResult}`);
+      } else {
+        console.warn(`[Player ID Registration] No displayId for user ${userId}, cannot link External ID`);
+      }
       
-      res.json({ ...preferences, externalIdLinked: externalIdResult });
+      res.json({ ...preferences, externalIdLinked: externalIdResult, displayId });
     } catch (error) {
       console.error("Error registering OneSignal player ID:", error);
       res.status(500).json({ message: "Failed to register player ID" });
@@ -511,6 +520,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       
+      // Get user to fetch their displayId
+      const user = await storage.getUser(userId);
+      const displayId = user?.displayId;
+      
+      if (!displayId) {
+        return res.status(400).json({ 
+          message: "No display ID found for user.",
+          hasDisplayId: false 
+        });
+      }
+      
       // Get current notification preferences to find the Player ID
       const preferences = await storage.getNotificationPreferences(userId);
       
@@ -521,10 +541,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      console.log(`[Link External ID] User ${userId} linking External ID to Player ID: ${preferences.oneSignalPlayerId}`);
+      console.log(`[Link External ID] User ${userId} (displayId: ${displayId}) linking to Player ID: ${preferences.oneSignalPlayerId}`);
       
-      // Set the External ID in OneSignal via API
-      const result = await notificationService.setExternalIdViaApi(preferences.oneSignalPlayerId, userId);
+      // Set the External ID in OneSignal via API using displayId
+      const result = await notificationService.setExternalIdViaApi(preferences.oneSignalPlayerId, displayId);
       
       console.log(`[Link External ID] Result: ${result}`);
       
@@ -532,7 +552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: result, 
         message: result ? "External ID linked successfully" : "Failed to link External ID",
         playerId: preferences.oneSignalPlayerId,
-        externalId: userId
+        externalId: displayId
       });
     } catch (error) {
       console.error("Error linking External ID:", error);
