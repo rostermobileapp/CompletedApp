@@ -20,9 +20,8 @@ export interface NotificationSettings {
 interface OneSignalNotification {
   app_id: string;
   include_aliases?: {
-    external_id: string[];
+    onesignal_id: string[];
   };
-  include_player_ids?: string[];
   target_channel?: string;
   headings: { en: string };
   contents: { en: string };
@@ -42,32 +41,39 @@ async function sendToOneSignal(notification: OneSignalNotification): Promise<boo
 
   console.log('[OneSignal] Sending notification:', JSON.stringify({
     app_id: notification.app_id,
-    target: notification.include_aliases || notification.include_player_ids,
+    target: notification.include_aliases,
+    target_channel: notification.target_channel,
     title: notification.headings?.en,
     message: notification.contents?.en?.substring(0, 50) + '...',
   }));
 
   try {
+    const payload = JSON.stringify(notification);
+    console.log('[OneSignal] Full payload:', payload);
+    
     const response = await fetch(ONESIGNAL_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${apiKey}`,
       },
-      body: JSON.stringify(notification),
+      body: payload,
     });
 
+    const responseText = await response.text();
+    console.log('[OneSignal] API Response status:', response.status);
+    console.log('[OneSignal] API Response body:', responseText);
+
     if (!response.ok) {
-      const error = await response.text();
-      console.error('[OneSignal] API error:', response.status, error);
+      console.error('[OneSignal] API error:', response.status, responseText);
       return false;
     }
 
-    const result = await response.json();
+    const result = JSON.parse(responseText);
     console.log('[OneSignal] Notification sent successfully:', {
       id: result.id,
       recipients: result.recipients,
-      external_id: result.external_id,
+      errors: result.errors,
     });
     return true;
   } catch (error) {
