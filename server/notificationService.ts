@@ -240,7 +240,7 @@ export async function sendPushNotification(
   const success = await sendToOneSignal(notification);
   
   return {
-    sent: success ? eligiblePlayerIds.length : 0,
+    sent: success ? eligibleUserIds.length : 0,
     skipped: success ? skipped : userIds.length,
   };
 }
