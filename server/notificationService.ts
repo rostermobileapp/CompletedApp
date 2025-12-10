@@ -30,6 +30,48 @@ interface OneSignalNotification {
 }
 
 const ONESIGNAL_API_URL = 'https://onesignal.com/api/v1/notifications';
+const ONESIGNAL_PLAYERS_API_URL = 'https://onesignal.com/api/v1/players';
+
+export async function setExternalIdViaApi(playerId: string, externalUserId: string): Promise<boolean> {
+  const apiKey = process.env.ONESIGNAL_REST_API_KEY;
+  const appId = process.env.ONESIGNAL_APP_ID;
+  
+  if (!apiKey || !appId) {
+    console.error('[OneSignal] Missing API key or App ID for setExternalId');
+    return false;
+  }
+
+  console.log(`[OneSignal] Setting External ID via API: playerId=${playerId.substring(0, 8)}..., externalUserId=${externalUserId}`);
+
+  try {
+    const response = await fetch(`${ONESIGNAL_PLAYERS_API_URL}/${playerId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${apiKey}`,
+      },
+      body: JSON.stringify({
+        app_id: appId,
+        external_user_id: externalUserId,
+      }),
+    });
+
+    const responseText = await response.text();
+    console.log('[OneSignal] Set External ID Response status:', response.status);
+    console.log('[OneSignal] Set External ID Response body:', responseText);
+
+    if (!response.ok) {
+      console.error('[OneSignal] Failed to set External ID:', response.status, responseText);
+      return false;
+    }
+
+    console.log('[OneSignal] External ID set successfully for player:', playerId.substring(0, 8) + '...');
+    return true;
+  } catch (error) {
+    console.error('[OneSignal] Error setting External ID:', error);
+    return false;
+  }
+}
 
 async function sendToOneSignal(notification: OneSignalNotification): Promise<boolean> {
   const apiKey = process.env.ONESIGNAL_REST_API_KEY;

@@ -491,11 +491,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Player ID is required" });
       }
       
+      console.log(`[Player ID Registration] User ${userId} registering Player ID: ${playerId}`);
+      
       const preferences = await storage.updateOneSignalPlayerId(userId, playerId);
-      res.json(preferences);
+      
+      // Also set the External ID in OneSignal via API to ensure proper linking
+      const externalIdResult = await notificationService.setExternalIdViaApi(playerId, userId);
+      console.log(`[Player ID Registration] External ID set via API: ${externalIdResult}`);
+      
+      res.json({ ...preferences, externalIdLinked: externalIdResult });
     } catch (error) {
       console.error("Error registering OneSignal player ID:", error);
       res.status(500).json({ message: "Failed to register player ID" });
+    }
+  });
+
+  // Manually link External ID for users who already have Player ID registered
+  app.post('/api/notification-preferences/link-external-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get current notification preferences to find the Player ID
+      const preferences = await storage.getNotificationPreferences(userId);
+      
+      if (!preferences || !preferences.oneSignalPlayerId) {
+        return res.status(400).json({ 
+          message: "No Player ID found. Please enable notifications first.",
+          hasPlayerId: false 
+        });
+      }
+      
+      console.log(`[Link External ID] User ${userId} linking External ID to Player ID: ${preferences.oneSignalPlayerId}`);
+      
+      // Set the External ID in OneSignal via API
+      const result = await notificationService.setExternalIdViaApi(preferences.oneSignalPlayerId, userId);
+      
+      console.log(`[Link External ID] Result: ${result}`);
+      
+      res.json({ 
+        success: result, 
+        message: result ? "External ID linked successfully" : "Failed to link External ID",
+        playerId: preferences.oneSignalPlayerId,
+        externalId: userId
+      });
+    } catch (error) {
+      console.error("Error linking External ID:", error);
+      res.status(500).json({ message: "Failed to link External ID" });
     }
   });
 
