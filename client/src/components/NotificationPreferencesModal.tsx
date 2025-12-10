@@ -272,12 +272,12 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                 <p><strong>Debug Info:</strong></p>
                 <p>SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
                 <p>Permission: {permissionState}</p>
-                <p>Player ID: {playerId || 'Not set'}</p>
-                <p>DB Player ID: {preferences?.oneSignalPlayerId || 'Not in DB'}</p>
+                <p>Player ID (SDK): {playerId || 'Not set'}</p>
+                <p>Player ID (DB): {preferences?.oneSignalPlayerId || 'Not in DB'}</p>
                 <p>Push Enabled: {pushEnabled ? 'Yes' : 'No'}</p>
               </div>
 
-              {pushEnabled && playerId && (
+              {pushEnabled && (playerId || preferences?.oneSignalPlayerId) && (
                 <div className="p-4 rounded-lg bg-muted/50 border">
                   <div className="flex items-center justify-between">
                     <div>
