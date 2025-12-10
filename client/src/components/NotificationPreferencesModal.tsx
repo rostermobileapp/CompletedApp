@@ -267,6 +267,16 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                 </div>
               )}
 
+              {/* Debug section - shows SDK status */}
+              <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs font-mono">
+                <p><strong>Debug Info:</strong></p>
+                <p>SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
+                <p>Permission: {permissionState}</p>
+                <p>Player ID: {playerId || 'Not set'}</p>
+                <p>DB Player ID: {preferences?.oneSignalPlayerId || 'Not in DB'}</p>
+                <p>Push Enabled: {pushEnabled ? 'Yes' : 'No'}</p>
+              </div>
+
               {pushEnabled && playerId && (
                 <div className="p-4 rounded-lg bg-muted/50 border">
                   <div className="flex items-center justify-between">
