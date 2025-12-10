@@ -20,7 +20,8 @@ export interface NotificationSettings {
 interface OneSignalNotification {
   app_id: string;
   include_aliases?: {
-    onesignal_id: string[];
+    external_id?: string[];
+    onesignal_id?: string[];
   };
   target_channel?: string;
   headings: { en: string };
@@ -30,9 +31,8 @@ interface OneSignalNotification {
 }
 
 const ONESIGNAL_API_URL = 'https://onesignal.com/api/v1/notifications';
-const ONESIGNAL_PLAYERS_API_URL = 'https://onesignal.com/api/v1/players';
 
-export async function setExternalIdViaApi(playerId: string, externalUserId: string): Promise<boolean> {
+export async function setExternalIdViaApi(oneSignalId: string, externalUserId: string): Promise<boolean> {
   const apiKey = process.env.ONESIGNAL_REST_API_KEY;
   const appId = process.env.ONESIGNAL_APP_ID;
   
@@ -41,18 +41,23 @@ export async function setExternalIdViaApi(playerId: string, externalUserId: stri
     return false;
   }
 
-  console.log(`[OneSignal] Setting External ID via API: playerId=${playerId.substring(0, 8)}..., externalUserId=${externalUserId}`);
+  console.log(`[OneSignal] Setting External ID via Identity API: oneSignalId=${oneSignalId.substring(0, 8)}..., externalUserId=${externalUserId}`);
 
   try {
-    const response = await fetch(`${ONESIGNAL_PLAYERS_API_URL}/${playerId}`, {
-      method: 'PUT',
+    // Use the newer OneSignal Identity API which accepts the OneSignal ID (alias) directly
+    // This endpoint allows setting the external_id for a user identified by their OneSignal ID
+    const identityUrl = `https://onesignal.com/api/v1/apps/${appId}/users/by/onesignal_id/${oneSignalId}/identity`;
+    
+    const response = await fetch(identityUrl, {
+      method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${apiKey}`,
       },
       body: JSON.stringify({
-        app_id: appId,
-        external_user_id: externalUserId,
+        identity: {
+          external_id: externalUserId,
+        },
       }),
     });
 
@@ -61,14 +66,51 @@ export async function setExternalIdViaApi(playerId: string, externalUserId: stri
     console.log('[OneSignal] Set External ID Response body:', responseText);
 
     if (!response.ok) {
-      console.error('[OneSignal] Failed to set External ID:', response.status, responseText);
-      return false;
+      // If Identity API fails, try the alternative approach using Users API
+      console.log('[OneSignal] Identity API failed, trying Users API...');
+      return await setExternalIdViaUsersApi(oneSignalId, externalUserId, appId, apiKey);
     }
 
-    console.log('[OneSignal] External ID set successfully for player:', playerId.substring(0, 8) + '...');
+    console.log('[OneSignal] External ID set successfully via Identity API for:', oneSignalId.substring(0, 8) + '...');
     return true;
   } catch (error) {
     console.error('[OneSignal] Error setting External ID:', error);
+    return false;
+  }
+}
+
+async function setExternalIdViaUsersApi(oneSignalId: string, externalUserId: string, appId: string, apiKey: string): Promise<boolean> {
+  try {
+    // Alternative: Use the Users API to update user aliases
+    const usersUrl = `https://onesignal.com/api/v1/apps/${appId}/users/by/onesignal_id/${oneSignalId}`;
+    
+    const response = await fetch(usersUrl, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${apiKey}`,
+      },
+      body: JSON.stringify({
+        properties: {},
+        identity: {
+          external_id: externalUserId,
+        },
+      }),
+    });
+
+    const responseText = await response.text();
+    console.log('[OneSignal] Users API Response status:', response.status);
+    console.log('[OneSignal] Users API Response body:', responseText);
+
+    if (!response.ok) {
+      console.error('[OneSignal] Users API also failed:', response.status, responseText);
+      return false;
+    }
+
+    console.log('[OneSignal] External ID set successfully via Users API for:', oneSignalId.substring(0, 8) + '...');
+    return true;
+  } catch (error) {
+    console.error('[OneSignal] Error in Users API fallback:', error);
     return false;
   }
 }
@@ -155,20 +197,17 @@ export async function sendPushNotification(
     usersWithPush.map(u => ({ userId: u.userId, playerId: u.oneSignalPlayerId?.substring(0, 8) + '...' }))
   );
   
-  const eligiblePlayerIds: string[] = [];
+  const eligibleUserIds: string[] = [];
   let skipped = 0;
 
   for (const user of usersWithPush) {
     const settings = user.notificationSettings as NotificationSettings;
     
     if (settings && settings[notificationType] === true) {
-      if (user.oneSignalPlayerId) {
-        eligiblePlayerIds.push(user.oneSignalPlayerId);
-        console.log(`[OneSignal] User ${user.userId} eligible for ${notificationType}, playerId: ${user.oneSignalPlayerId.substring(0, 8)}...`);
-      } else {
-        console.log(`[OneSignal] User ${user.userId} has no Player ID, skipping`);
-        skipped++;
-      }
+      // Use the user's app ID (external_id in OneSignal) for targeting
+      // This requires that the external_id has been properly linked in OneSignal
+      eligibleUserIds.push(user.userId);
+      console.log(`[OneSignal] User ${user.userId} eligible for ${notificationType}`);
     } else {
       console.log(`[OneSignal] User ${user.userId} skipped - ${notificationType} disabled in settings:`, settings);
       skipped++;
@@ -179,16 +218,17 @@ export async function sendPushNotification(
   skipped += usersWithoutPush;
   console.log(`[OneSignal] Users without push enabled: ${usersWithoutPush}`);
 
-  if (eligiblePlayerIds.length === 0) {
-    console.log(`[OneSignal] No eligible Player IDs found, returning`);
+  if (eligibleUserIds.length === 0) {
+    console.log(`[OneSignal] No eligible users found, returning`);
     return { sent: 0, skipped };
   }
 
-  // Use include_aliases with onesignal_id for device targeting (required for newer OneSignal API)
+  // Use include_aliases with external_id for device targeting
+  // This targets users by their app user ID which is linked to OneSignal via the External ID
   const notification: OneSignalNotification = {
     app_id: appId,
     include_aliases: {
-      onesignal_id: eligiblePlayerIds,
+      external_id: eligibleUserIds,
     },
     target_channel: 'push',
     headings: { en: title },
