@@ -258,7 +258,7 @@ export interface IStorage {
   getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined>;
   upsertNotificationPreferences(userId: string, data: Partial<UpdateNotificationPreferences>): Promise<NotificationPreferences>;
   updateOneSignalPlayerId(userId: string, playerId: string): Promise<NotificationPreferences>;
-  getUsersWithPushEnabled(userIds: string[]): Promise<{ userId: string; oneSignalPlayerId: string; notificationSettings: any }[]>;
+  getUsersWithPushEnabled(userIds: string[]): Promise<{ userId: string; displayId: string | null; oneSignalPlayerId: string; notificationSettings: any }[]>;
   
   // Permission management operations (global - deprecated, use league-specific instead)
   getAllUsers(): Promise<User[]>;
@@ -985,6 +985,7 @@ export class DatabaseStorage implements IStorage {
             substitutionRequests: true,
             joinRequests: true,
             upcomingEvents: true,
+            newsAnnouncements: true,
           },
           pushEnabled: data.pushEnabled ?? true,
         })
@@ -997,23 +998,25 @@ export class DatabaseStorage implements IStorage {
     return this.upsertNotificationPreferences(userId, { oneSignalPlayerId: playerId });
   }
 
-  async getUsersWithPushEnabled(userIds: string[]): Promise<{ userId: string; oneSignalPlayerId: string; notificationSettings: any }[]> {
+  async getUsersWithPushEnabled(userIds: string[]): Promise<{ userId: string; displayId: string | null; oneSignalPlayerId: string; notificationSettings: any }[]> {
     if (userIds.length === 0) return [];
     
     const prefs = await db
       .select({
         userId: notificationPreferences.userId,
+        displayId: users.displayId,
         oneSignalPlayerId: notificationPreferences.oneSignalPlayerId,
         notificationSettings: notificationPreferences.notificationSettings,
       })
       .from(notificationPreferences)
+      .innerJoin(users, eq(notificationPreferences.userId, users.id))
       .where(and(
         inArray(notificationPreferences.userId, userIds),
         eq(notificationPreferences.pushEnabled, true),
         isNotNull(notificationPreferences.oneSignalPlayerId)
       ));
     
-    return prefs.filter(p => p.oneSignalPlayerId !== null) as { userId: string; oneSignalPlayerId: string; notificationSettings: any }[];
+    return prefs.filter(p => p.oneSignalPlayerId !== null) as { userId: string; displayId: string | null; oneSignalPlayerId: string; notificationSettings: any }[];
   }
 
   async deleteUser(id: string): Promise<void> {

@@ -194,20 +194,25 @@ export async function sendPushNotification(
 
   const usersWithPush = await storage.getUsersWithPushEnabled(userIds);
   console.log(`[OneSignal] Users with push enabled: ${usersWithPush.length}/${userIds.length}`, 
-    usersWithPush.map(u => ({ userId: u.userId, playerId: u.oneSignalPlayerId?.substring(0, 8) + '...' }))
+    usersWithPush.map(u => ({ userId: u.userId, displayId: u.displayId, playerId: u.oneSignalPlayerId?.substring(0, 8) + '...' }))
   );
   
-  const eligibleUserIds: string[] = [];
+  const eligibleDisplayIds: string[] = [];
   let skipped = 0;
 
   for (const user of usersWithPush) {
     const settings = user.notificationSettings as NotificationSettings;
     
     if (settings && settings[notificationType] === true) {
-      // Use the user's app ID (external_id in OneSignal) for targeting
-      // This requires that the external_id has been properly linked in OneSignal
-      eligibleUserIds.push(user.userId);
-      console.log(`[OneSignal] User ${user.userId} eligible for ${notificationType}`);
+      // Use the user's displayId as the external_id for OneSignal targeting
+      // This matches what the mobile app sends when calling login(displayId)
+      if (user.displayId) {
+        eligibleDisplayIds.push(user.displayId);
+        console.log(`[OneSignal] User ${user.userId} (displayId: ${user.displayId}) eligible for ${notificationType}`);
+      } else {
+        console.log(`[OneSignal] User ${user.userId} skipped - no displayId assigned`);
+        skipped++;
+      }
     } else {
       console.log(`[OneSignal] User ${user.userId} skipped - ${notificationType} disabled in settings:`, settings);
       skipped++;
@@ -218,17 +223,18 @@ export async function sendPushNotification(
   skipped += usersWithoutPush;
   console.log(`[OneSignal] Users without push enabled: ${usersWithoutPush}`);
 
-  if (eligibleUserIds.length === 0) {
-    console.log(`[OneSignal] No eligible users found, returning`);
+  if (eligibleDisplayIds.length === 0) {
+    console.log(`[OneSignal] No eligible users with displayId found, returning`);
     return { sent: 0, skipped };
   }
 
   // Use include_aliases with external_id for device targeting
-  // This targets users by their app user ID which is linked to OneSignal via the External ID
+  // The external_id is the user's displayId (e.g., "LFB3Kf") which is linked in OneSignal
+  console.log(`[OneSignal] Sending notification to displayIds:`, eligibleDisplayIds);
   const notification: OneSignalNotification = {
     app_id: appId,
     include_aliases: {
-      external_id: eligibleUserIds,
+      external_id: eligibleDisplayIds,
     },
     target_channel: 'push',
     headings: { en: title },
@@ -240,7 +246,7 @@ export async function sendPushNotification(
   const success = await sendToOneSignal(notification);
   
   return {
-    sent: success ? eligibleUserIds.length : 0,
+    sent: success ? eligibleDisplayIds.length : 0,
     skipped: success ? skipped : userIds.length,
   };
 }

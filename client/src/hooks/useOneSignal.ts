@@ -27,11 +27,36 @@ export function useOneSignal() {
   const { user, isAuthenticated } = useAuth();
   const [isInitialized, setIsInitialized] = useState(false);
   const [playerId, setPlayerId] = useState<string | null>(null);
+  const [displayId, setDisplayId] = useState<string | null>(null);
   const [externalIdSet, setExternalIdSet] = useState(false);
   const [permissionState, setPermissionState] = useState<string>('default');
   const notificationsRef = useRef<NativelyNotificationsInstance | null>(null);
   const retryCountRef = useRef(0);
   const maxRetries = 3;
+
+  // Fetch the user's displayId from the backend
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setDisplayId(null);
+      return;
+    }
+
+    fetch('/api/user', {
+      credentials: 'include',
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.displayId) {
+          console.log('[Natively] Fetched displayId:', data.displayId);
+          setDisplayId(data.displayId);
+        } else {
+          console.warn('[Natively] No displayId in user profile, user:', data.id);
+        }
+      })
+      .catch(err => {
+        console.error('[Natively] Failed to fetch user profile:', err);
+      });
+  }, [isAuthenticated, user?.id]);
 
   const registerPlayerId = useCallback(async (playerIdToRegister: string) => {
     if (!isAuthenticated || !playerIdToRegister) return;
@@ -172,7 +197,8 @@ export function useOneSignal() {
   }, [setExternalIdWithRetry, playerId, linkExternalIdViaBackend]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) {
+    // Wait for both authentication and displayId to be available
+    if (!isAuthenticated || !user?.id || !displayId) {
       return;
     }
 
@@ -185,30 +211,30 @@ export function useOneSignal() {
       const notifications = new window.NativelyNotifications();
       notificationsRef.current = notifications;
       setIsInitialized(true);
-      console.log('[Natively] NativelyNotifications initialized for user:', user.id);
+      console.log('[Natively] NativelyNotifications initialized for user:', user.id, 'displayId:', displayId);
 
-      // CRITICAL: Call login() IMMEDIATELY after authentication, before anything else
-      // This ensures the External ID is linked as early as possible per OneSignal guidance
-      console.log('[Natively] PRIORITY: Calling login() immediately for user:', user.id);
+      // CRITICAL: Use displayId as External ID for OneSignal
+      // This makes tracking easier as it matches the User ID shown in the profile
+      console.log('[Natively] PRIORITY: Calling login() immediately with displayId:', displayId);
       
-      // Try all login methods right away
+      // Try all login methods right away with displayId
       if (notifications.login) {
         try {
-          notifications.login(user.id);
-          console.log('[Natively] Called NativelyNotifications.login() for:', user.id);
+          notifications.login(displayId);
+          console.log('[Natively] Called NativelyNotifications.login() for displayId:', displayId);
         } catch (err) {
           console.warn('[Natively] NativelyNotifications.login() error:', err);
         }
       }
       
       if (window.OneSignal?.login) {
-        window.OneSignal.login(user.id)
-          .then(() => console.log('[Natively] OneSignal.login() succeeded'))
+        window.OneSignal.login(displayId)
+          .then(() => console.log('[Natively] OneSignal.login() succeeded with displayId:', displayId))
           .catch((err: any) => console.warn('[Natively] OneSignal.login() error:', err));
       }
       
-      // Also call setExternalId immediately, don't wait for Player ID
-      setExternalIdWithRetry(notifications, user.id);
+      // Also call setExternalId immediately with displayId
+      setExternalIdWithRetry(notifications, displayId);
 
       notifications.getPermissionStatus((resp) => {
         const status = resp.status ? 'granted' : 'default';
@@ -216,7 +242,7 @@ export function useOneSignal() {
         console.log('[Natively] Permission status:', status);
       });
 
-      // Get Player ID (for registration with our backend, not for External ID)
+      // Get Player ID (for registration with our backend)
       notifications.getOneSignalId((resp) => {
         if (resp.playerId) {
           console.log('[Natively] Got Player ID:', resp.playerId);
@@ -243,11 +269,11 @@ export function useOneSignal() {
       notifications.getExternalId((resp) => {
         console.log('[Natively] Current External ID status:', JSON.stringify(resp));
         if (Array.isArray(resp) && resp.length > 0 && resp[0].externalId) {
-          if (resp[0].externalId === user.id) {
-            console.log('[Natively] External ID already correctly set');
+          if (resp[0].externalId === displayId) {
+            console.log('[Natively] External ID already correctly set to displayId');
             setExternalIdSet(true);
           } else {
-            console.log('[Natively] External ID mismatch, need to update');
+            console.log('[Natively] External ID mismatch, need to update to displayId');
           }
         }
       });
@@ -259,7 +285,7 @@ export function useOneSignal() {
     return () => {
       notificationsRef.current = null;
     };
-  }, [isAuthenticated, user?.id, registerPlayerId, setExternalIdWithRetry]);
+  }, [isAuthenticated, user?.id, displayId, registerPlayerId, setExternalIdWithRetry]);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -276,15 +302,15 @@ export function useOneSignal() {
         setPermissionState(isGranted ? 'granted' : 'denied');
         console.log('[Natively] Permission request result:', isGranted);
         
-        if (isGranted && notificationsRef.current && user?.id) {
+        if (isGranted && notificationsRef.current && displayId) {
           notificationsRef.current.getOneSignalId((idResp) => {
             if (idResp.playerId) {
               console.log('[Natively] Got Player ID after permission:', idResp.playerId);
               setPlayerId(idResp.playerId);
               registerPlayerId(idResp.playerId);
-              // Also set external ID after getting permission
+              // Also set external ID with displayId after getting permission
               if (notificationsRef.current) {
-                setExternalIdWithRetry(notificationsRef.current, user.id);
+                setExternalIdWithRetry(notificationsRef.current, displayId);
               }
             }
           });
@@ -293,7 +319,7 @@ export function useOneSignal() {
         resolve(isGranted);
       });
     });
-  }, [registerPlayerId, user?.id, setExternalIdWithRetry]);
+  }, [registerPlayerId, displayId, setExternalIdWithRetry]);
 
   return {
     isInitialized,
