@@ -963,6 +963,7 @@ export class DatabaseStorage implements IStorage {
       // Update existing preferences
       const updateData: any = { updatedAt: new Date() };
       if (data.oneSignalPlayerId !== undefined) updateData.oneSignalPlayerId = data.oneSignalPlayerId;
+      if (data.oneSignalExternalId !== undefined) updateData.oneSignalExternalId = data.oneSignalExternalId;
       if (data.notificationSettings !== undefined) updateData.notificationSettings = data.notificationSettings;
       if (data.pushEnabled !== undefined) updateData.pushEnabled = data.pushEnabled;
       
@@ -979,6 +980,7 @@ export class DatabaseStorage implements IStorage {
         .values({
           userId,
           oneSignalPlayerId: data.oneSignalPlayerId,
+          oneSignalExternalId: data.oneSignalExternalId,
           notificationSettings: data.notificationSettings || {
             inAppMessages: true,
             paymentRequests: true,

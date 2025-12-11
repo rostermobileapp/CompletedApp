@@ -252,6 +252,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull().unique(),
   oneSignalPlayerId: varchar("onesignal_player_id"), // OneSignal player/subscription ID
+  oneSignalExternalId: varchar("onesignal_external_id"), // External ID linked in OneSignal (should match user's displayId)
   // JSONB field for flexible notification type preferences
   // Default: all notification types enabled
   notificationSettings: jsonb("notification_settings").default({
@@ -260,6 +261,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
     substitutionRequests: true,
     joinRequests: true,
     upcomingEvents: true,
+    newsAnnouncements: true,
   }).notNull(),
   pushEnabled: boolean("push_enabled").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -2152,6 +2154,7 @@ export const insertNotificationPreferencesSchema = createInsertSchema(notificati
 
 export const updateNotificationPreferencesSchema = z.object({
   oneSignalPlayerId: z.string().optional(),
+  oneSignalExternalId: z.string().optional(),
   notificationSettings: notificationSettingsSchema.optional(),
   pushEnabled: z.boolean().optional(),
 });

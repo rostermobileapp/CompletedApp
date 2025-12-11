@@ -497,13 +497,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Player ID Registration] User ${userId} (displayId: ${displayId}) registering Player ID: ${playerId}`);
       
-      const preferences = await storage.updateOneSignalPlayerId(userId, playerId);
+      let preferences = await storage.updateOneSignalPlayerId(userId, playerId);
       
       // Set the External ID in OneSignal using displayId (e.g., "LFB3Kf") for easier tracking
       let externalIdResult = false;
       if (displayId) {
         externalIdResult = await notificationService.setExternalIdViaApi(playerId, displayId);
         console.log(`[Player ID Registration] External ID (displayId: ${displayId}) set via API: ${externalIdResult}`);
+        
+        // Save the External ID to database if linking was successful
+        if (externalIdResult) {
+          preferences = await storage.upsertNotificationPreferences(userId, { oneSignalExternalId: displayId });
+          console.log(`[Player ID Registration] Saved External ID to database: ${displayId}`);
+        }
       } else {
         console.warn(`[Player ID Registration] No displayId for user ${userId}, cannot link External ID`);
       }
@@ -564,6 +570,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await notificationService.setExternalIdViaApi(playerIdToUse, displayIdToUse);
       
       console.log(`[Link External ID] Result: ${result}`);
+      
+      // Save the External ID to database if linking was successful
+      if (result) {
+        await storage.upsertNotificationPreferences(authUserId, { oneSignalExternalId: displayIdToUse });
+        console.log(`[Link External ID] Saved External ID to database: ${displayIdToUse}`);
+      }
       
       res.json({ 
         success: result, 
