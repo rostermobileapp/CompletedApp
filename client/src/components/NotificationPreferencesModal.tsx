@@ -96,8 +96,13 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     },
   });
 
-  // Determine if notifications are fully set up
-  const isFullySetUp = preferences?.oneSignalExternalId && preferences?.oneSignalPlayerId && preferences?.pushEnabled;
+  // Determine notification status
+  const hasPlayerId = !!preferences?.oneSignalPlayerId;
+  const hasExternalId = !!preferences?.oneSignalExternalId;
+  const isPushEnabled = !!preferences?.pushEnabled;
+  const isFullySetUp = hasExternalId && hasPlayerId && isPushEnabled;
+  // Can send test if we have a Player ID in DB (even without External ID)
+  const canSendTest = hasPlayerId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -131,6 +136,18 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                   </div>
                 </div>
               </div>
+            ) : hasPlayerId && !hasExternalId ? (
+              <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                <div className="flex items-start gap-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-yellow-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-medium text-yellow-700 dark:text-yellow-400">Linking Your Account</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      OneSignal ID saved. Waiting for External ID to link... This may take a few moments.
+                    </p>
+                  </div>
+                </div>
+              </div>
             ) : permissionState === 'denied' ? (
               <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
                 <div className="flex items-start gap-3">
@@ -143,14 +160,14 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                   </div>
                 </div>
               </div>
-            ) : !isInitialized ? (
+            ) : !isInitialized && !hasPlayerId ? (
               <div className="p-4 rounded-lg bg-muted/50 border">
                 <div className="flex items-center gap-3">
                   <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Initializing notification system...</p>
+                  <p className="text-sm text-muted-foreground">Waiting for notification SDK...</p>
                 </div>
               </div>
-            ) : permissionState !== 'granted' ? (
+            ) : permissionState !== 'granted' && !hasPlayerId ? (
               <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                 <div className="flex items-start gap-3">
                   <BellRing className="w-5 h-5 text-primary mt-0.5" />
@@ -177,22 +194,10 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                   </div>
                 </div>
               </div>
-            ) : !preferences?.oneSignalExternalId ? (
-              <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-                <div className="flex items-start gap-3">
-                  <Loader2 className="w-5 h-5 animate-spin text-yellow-600 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-medium text-yellow-700 dark:text-yellow-400">Setting Up Notifications</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Please wait while we connect your account to the notification system. This may take a few moments...
-                    </p>
-                  </div>
-                </div>
-              </div>
             ) : null}
 
-            {/* Test notification button - only show when fully set up */}
-            {isFullySetUp && (
+            {/* Test notification button - show when we have a Player ID in DB */}
+            {canSendTest && (
               <div className="p-4 rounded-lg bg-muted/50 border">
                 <div className="flex items-center justify-between">
                   <div>
