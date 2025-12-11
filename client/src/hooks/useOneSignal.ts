@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useAuth } from './useAuth';
+import { supabase } from '@/lib/supabase';
 
 interface NativelyNotificationsInstance {
   getOneSignalId: (callback: (resp: { playerId: string | null }) => void) => void;
@@ -63,23 +64,42 @@ export function useOneSignal() {
   const registerPlayerId = useCallback(async (playerIdToRegister: string, retryCount = 0) => {
     if (!playerIdToRegister) return;
     
-    const MAX_RETRIES = 5;
+    const MAX_RETRIES = 10; // More retries since we're waiting for session
     const RETRY_DELAY_MS = 2000; // 2 seconds
     
     console.log(`[Natively] Attempting to register Player ID (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, playerIdToRegister.substring(0, 8) + '...');
     
     try {
+      // Get the current Supabase session for Bearer token auth
+      // This is more reliable than cookies in BuildNatively
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        if (retryCount < MAX_RETRIES) {
+          console.log(`[Natively] No session/token yet, waiting for auth... retrying in ${RETRY_DELAY_MS}ms`);
+          setTimeout(() => registerPlayerId(playerIdToRegister, retryCount + 1), RETRY_DELAY_MS);
+          return;
+        }
+        console.error('[Natively] No auth session after max retries');
+        return;
+      }
+      
+      console.log('[Natively] Got Supabase session, using Bearer token auth');
+      
       const playerIdResponse = await fetch('/api/notification-preferences/player-id', {
         method: 'POST',
         body: JSON.stringify({ playerId: playerIdToRegister }),
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
       });
       
-      // If 401, auth might not be ready yet - retry
+      // If 401, session might have expired - retry
       if (playerIdResponse.status === 401) {
         if (retryCount < MAX_RETRIES) {
-          console.log(`[Natively] Auth not ready (401), retrying in ${RETRY_DELAY_MS}ms...`);
+          console.log(`[Natively] Auth rejected (401), refreshing session and retrying in ${RETRY_DELAY_MS}ms...`);
+          await supabase.auth.refreshSession();
           setTimeout(() => registerPlayerId(playerIdToRegister, retryCount + 1), RETRY_DELAY_MS);
           return;
         }
@@ -108,8 +128,10 @@ export function useOneSignal() {
             newsAnnouncements: true,
           }
         }),
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
       });
       if (!prefsResponse.ok) {
         console.warn('[Natively] Failed to enable push preferences:', prefsResponse.status);
@@ -130,11 +152,19 @@ export function useOneSignal() {
   const linkExternalIdViaBackend = useCallback(async (oneSignalId: string, externalUserId: string) => {
     try {
       console.log('[Natively] Calling backend to link External ID via REST API');
+      
+      // Get Supabase session for Bearer token auth
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      
       const response = await fetch('/api/notification-preferences/link-external-id', {
         method: 'POST',
         body: JSON.stringify({ oneSignalId, userId: externalUserId }),
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers,
+        credentials: 'include', // Keep as fallback
       });
       if (response.ok) {
         console.log('[Natively] Backend successfully linked External ID');
