@@ -54,10 +54,10 @@ export function useOneSignal() {
   const webInitializedRef = useRef(false);
   const consentGrantedRef = useRef(false);
 
-  // Reset login flag when displayId changes (Fix #4 from analysis)
+  // Reset login flag when displayId changes (allows re-login on user switch)
   useEffect(() => {
     if (displayId) {
-      console.log('[OneSignal] displayId changed, resetting login flag');
+      console.log('[OneSignal] displayId changed to:', displayId, '- resetting login flag');
       hasCalledLoginRef.current = false;
       setExternalIdSet(false);
     }
@@ -120,102 +120,39 @@ export function useOneSignal() {
     fetchDisplayId();
   }, [isAuthenticated, user?.id]);
 
-  // Backend helper to link External ID via REST API
-  const linkExternalIdViaBackend = useCallback(async (oneSignalId: string, externalUserId: string) => {
-    try {
-      console.log('[OneSignal] Calling backend to link External ID');
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-      }
-      
-      const response = await fetch('/api/notification-preferences/link-external-id', {
-        method: 'POST',
-        body: JSON.stringify({ oneSignalId, userId: externalUserId }),
-        headers,
-        credentials: 'include',
-      });
-      if (response.ok) {
-        console.log('[OneSignal] Backend linked External ID successfully');
-        return true;
-      }
-      console.warn('[OneSignal] Backend link failed:', response.status);
-      return false;
-    } catch (error) {
-      console.error('[OneSignal] Backend link error:', error);
-      return false;
-    }
-  }, []);
-
-  // Register player ID with backend
-  const registerPlayerId = useCallback(async (playerIdToRegister: string, retryCount = 0) => {
-    if (!playerIdToRegister) return;
-    
-    const MAX_RETRIES = 10;
-    const RETRY_DELAY_MS = 2000;
-    
+  // Enable push preferences after successful login
+  const enablePushPreferences = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
       
-      if (!session?.access_token) {
-        if (retryCount < MAX_RETRIES) {
-          setTimeout(() => registerPlayerId(playerIdToRegister, retryCount + 1), RETRY_DELAY_MS);
-          return;
-        }
-        return;
-      }
-      
-      const playerIdResponse = await fetch('/api/notification-preferences/player-id', {
-        method: 'POST',
-        body: JSON.stringify({ playerId: playerIdToRegister }),
+      await fetch('/api/notification-preferences', {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          pushEnabled: true,
+          notificationSettings: {
+            inAppMessages: true,
+            paymentRequests: true,
+            substitutionRequests: true,
+            joinRequests: true,
+            upcomingEvents: true,
+            newsAnnouncements: true,
+          }
+        }),
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
       });
-      
-      if (playerIdResponse.status === 401 && retryCount < MAX_RETRIES) {
-        await supabase.auth.refreshSession();
-        setTimeout(() => registerPlayerId(playerIdToRegister, retryCount + 1), RETRY_DELAY_MS);
-        return;
-      }
-      
-      if (playerIdResponse.ok) {
-        console.log('[OneSignal] Player ID registered with backend');
-        
-        // Also enable push preferences
-        await fetch('/api/notification-preferences', {
-          method: 'PUT',
-          body: JSON.stringify({ 
-            pushEnabled: true,
-            notificationSettings: {
-              inAppMessages: true,
-              paymentRequests: true,
-              substitutionRequests: true,
-              joinRequests: true,
-              upcomingEvents: true,
-              newsAnnouncements: true,
-            }
-          }),
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        });
-      }
+      console.log('[OneSignal] Push preferences enabled');
     } catch (error) {
-      console.error('[OneSignal] Failed to register player ID:', error);
-      if (retryCount < MAX_RETRIES) {
-        setTimeout(() => registerPlayerId(playerIdToRegister, retryCount + 1), RETRY_DELAY_MS);
-      }
+      console.error('[OneSignal] Failed to enable push preferences:', error);
     }
   }, []);
 
-  // SINGLE unified login function (Fix #5 from analysis)
+  // SIMPLIFIED: Just call login() with External ID - let OneSignal handle the rest
   const performLogin = useCallback(async (
     userId: string, 
-    currentPlayerId: string | null,
     notifications: NativelyNotificationsInstance | null
   ) => {
     if (hasCalledLoginRef.current) {
@@ -224,23 +161,18 @@ export function useOneSignal() {
     }
 
     console.log('[OneSignal] === PERFORMING LOGIN ===');
-    console.log('[OneSignal] External ID:', userId);
-    console.log('[OneSignal] Player ID:', currentPlayerId);
+    console.log('[OneSignal] External ID (displayId):', userId);
 
     hasCalledLoginRef.current = true;
 
-    // Method 1: Use window.OneSignal.login() - PRIMARY method
+    // Method 1: Use window.OneSignal.login() - PRIMARY method for both web and native
     if (window.OneSignal?.login) {
       try {
         console.log('[OneSignal] Calling window.OneSignal.login()...');
         await window.OneSignal.login(userId);
         console.log('[OneSignal] ✓ OneSignal.login() SUCCESS for:', userId);
         setExternalIdSet(true);
-        
-        // Also register with backend for redundancy
-        if (currentPlayerId) {
-          await linkExternalIdViaBackend(currentPlayerId, userId);
-        }
+        await enablePushPreferences();
         return;
       } catch (err) {
         console.error('[OneSignal] ✗ OneSignal.login() failed:', err);
@@ -248,7 +180,7 @@ export function useOneSignal() {
         hasCalledLoginRef.current = false;
       }
     } else {
-      console.log('[OneSignal] window.OneSignal.login not available');
+      console.log('[OneSignal] window.OneSignal.login not available, trying alternatives');
     }
 
     // Method 2: Use NativelyNotifications.login() if available
@@ -259,17 +191,14 @@ export function useOneSignal() {
         console.log('[OneSignal] ✓ NativelyNotifications.login() called for:', userId);
         hasCalledLoginRef.current = true;
         setExternalIdSet(true);
-        
-        if (currentPlayerId) {
-          await linkExternalIdViaBackend(currentPlayerId, userId);
-        }
+        await enablePushPreferences();
         return;
       } catch (err) {
         console.error('[OneSignal] ✗ NativelyNotifications.login() failed:', err);
       }
     }
 
-    // Method 3: Use setExternalId as fallback
+    // Method 3: Use setExternalId as last resort fallback
     if (notifications) {
       console.log('[OneSignal] Calling setExternalId() as fallback...');
       notifications.setExternalId({ externalId: userId }, async (resp) => {
@@ -277,33 +206,15 @@ export function useOneSignal() {
           console.log('[OneSignal] ✓ setExternalId() SUCCESS:', resp.externalId);
           hasCalledLoginRef.current = true;
           setExternalIdSet(true);
-          if (currentPlayerId) {
-            await linkExternalIdViaBackend(currentPlayerId, userId);
-          }
+          await enablePushPreferences();
         } else {
           console.error('[OneSignal] ✗ setExternalId() failed:', resp);
-          // Last resort: backend API only
-          if (currentPlayerId) {
-            const success = await linkExternalIdViaBackend(currentPlayerId, userId);
-            if (success) {
-              hasCalledLoginRef.current = true;
-              setExternalIdSet(true);
-            }
-          }
         }
       });
-    } else if (currentPlayerId) {
-      // No SDK methods available, try backend only
-      console.log('[OneSignal] No SDK methods, using backend API only');
-      const success = await linkExternalIdViaBackend(currentPlayerId, userId);
-      if (success) {
-        hasCalledLoginRef.current = true;
-        setExternalIdSet(true);
-      }
     }
-  }, [linkExternalIdViaBackend]);
+  }, [enablePushPreferences]);
 
-  // Grant consent - must be called BEFORE login (Fix #3 from analysis)
+  // Grant consent - must be called BEFORE login
   const grantConsent = useCallback(async () => {
     if (consentGrantedRef.current) {
       console.log('[OneSignal] Consent already granted');
@@ -357,16 +268,14 @@ export function useOneSignal() {
           console.log('[OneSignal Native] Permission status:', status);
         });
 
-        // Step 3: Get OneSignal ID, then login
+        // Step 3: Get OneSignal ID (for display purposes only), then login
         const getPlayerIdAndLogin = () => {
           notifications.getOneSignalId(async (resp) => {
             if (resp.playerId) {
               console.log('[OneSignal Native] Got Player ID:', resp.playerId);
               setPlayerId(resp.playerId);
-              registerPlayerId(resp.playerId);
-              
-              // Step 4: Perform login with External ID
-              await performLogin(displayId, resp.playerId, notifications);
+              // Login with External ID - OneSignal will link it internally
+              await performLogin(displayId, notifications);
             } else {
               console.log('[OneSignal Native] No Player ID yet, retrying in 2s...');
               setTimeout(() => {
@@ -374,11 +283,10 @@ export function useOneSignal() {
                   if (retryResp.playerId) {
                     console.log('[OneSignal Native] Got Player ID on retry:', retryResp.playerId);
                     setPlayerId(retryResp.playerId);
-                    registerPlayerId(retryResp.playerId);
-                    await performLogin(displayId, retryResp.playerId, notifications);
+                    await performLogin(displayId, notifications);
                   } else {
                     console.warn('[OneSignal Native] Still no Player ID, attempting login anyway');
-                    await performLogin(displayId, null, notifications);
+                    await performLogin(displayId, notifications);
                   }
                 });
               }, 2000);
@@ -496,12 +404,8 @@ export function useOneSignal() {
           setPermissionState(permission ? 'granted' : 'denied');
           if (permission && displayId) {
             const subId = OneSignal.User.PushSubscription.id;
-            if (subId) {
-              setPlayerId(subId);
-              registerPlayerId(subId);
-              // Step 3: Login after permission granted
-              await performLogin(displayId, subId, null);
-            }
+            if (subId) setPlayerId(subId);
+            await performLogin(displayId, null);
           }
         });
 
@@ -511,9 +415,7 @@ export function useOneSignal() {
           if (subId) {
             console.log('[OneSignal Web] Already has permission, logging in...');
             setPlayerId(subId);
-            registerPlayerId(subId);
-            // Step 3: Login
-            await performLogin(displayId, subId, null);
+            await performLogin(displayId, null);
           }
         }
 
@@ -527,7 +429,7 @@ export function useOneSignal() {
     return () => {
       notificationsRef.current = null;
     };
-  }, [isAuthenticated, user?.id, displayId, grantConsent, performLogin, registerPlayerId]);
+  }, [isAuthenticated, user?.id, displayId, grantConsent, performLogin]);
 
   const requestPermission = useCallback(async () => {
     // Native app path
@@ -543,9 +445,8 @@ export function useOneSignal() {
             notifications.getOneSignalId(async (idResp) => {
               if (idResp.playerId) {
                 setPlayerId(idResp.playerId);
-                registerPlayerId(idResp.playerId);
                 if (displayId) {
-                  await performLogin(displayId, idResp.playerId, notifications);
+                  await performLogin(displayId, notifications);
                 }
               }
             });
@@ -568,7 +469,7 @@ export function useOneSignal() {
     }
 
     return false;
-  }, [displayId, performLogin, registerPlayerId]);
+  }, [displayId, performLogin]);
 
   const getNotificationPreferences = useCallback(async () => {
     try {
@@ -625,9 +526,9 @@ export function useOneSignal() {
   }, []);
 
   // Logout function: Reset local state so next user login will set their External ID
-  // NOTE: We intentionally do NOT call OneSignal.logout() or removeExternalId() 
-  // because on native SDKs this destroys the device subscription entirely.
-  // Instead, the next login() call will REPLACE the old External ID with the new one.
+  // NOTE: We do NOT call OneSignal.logout() or removeExternalId() because on native SDKs 
+  // this can break the device subscription. Instead, the next login() call will REPLACE 
+  // the old External ID with the new one.
   const logoutOneSignal = useCallback(async () => {
     console.log('[OneSignal] === LOGOUT - Resetting state for next user ===');
     
