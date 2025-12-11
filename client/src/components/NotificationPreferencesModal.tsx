@@ -224,11 +224,11 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
               <p><strong>Debug Info:</strong></p>
               <p>SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
               <p>Permission: {permissionState}</p>
-              <p>Player ID (SDK): {playerId || 'Not set'}</p>
-              <p>Player ID (DB): {preferences?.oneSignalPlayerId || 'Not in DB'}</p>
+              <p>OneSignal ID (SDK): {playerId || 'Not set'}</p>
+              <p>OneSignal ID (DB): {preferences?.oneSignalPlayerId || 'Not saved'}</p>
               <p>External ID (SDK): {externalIdSet ? '✅ Set' : '❌ Not set'}</p>
               <p>External ID (DB): {preferences?.oneSignalExternalId || 'Not linked'}</p>
-              <p>Display ID: {displayId || 'Unknown'}</p>
+              <p>Display ID: {displayId || 'Loading...'}</p>
               <p>Push Enabled: {preferences?.pushEnabled ? 'Yes' : 'No'}</p>
             </div>
 
