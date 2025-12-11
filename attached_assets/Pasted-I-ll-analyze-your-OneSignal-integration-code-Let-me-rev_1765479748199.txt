@@ -1,0 +1,92 @@
+I'll analyze your OneSignal integration code. Let me review the key areas where External ID syncing could fail.
+
+## Issues Found
+
+### 1. **Race Condition: Multiple Login Attempts**
+Your code has overlapping login logic that can cause conflicts:
+
+```typescript
+// Line ~390: Initial setup calls setExternalIdImmediately
+setExternalIdImmediately(displayId, resp.playerId);
+
+// But completeNativeInit (line ~330) ALSO tries to login:
+const loginWithExternalId = async (currentPlayerId: string | null) => {
+  // This happens in the "immediate init" path
+}
+```
+
+**Problem**: Both code paths can execute, causing multiple login attempts that might conflict with each other.
+
+### 2. **Logout Before Login Issue**
+```typescript
+// Line ~257: You're logging out before logging in
+if (window.OneSignal?.logout) {
+  await window.OneSignal.logout();
+}
+await new Promise(resolve => setTimeout(resolve, 500));
+// Then login...
+```
+
+**Problem**: If there's no existing session, logout can fail or cause issues. Also, the 500ms delay is arbitrary and might not be enough for OneSignal to process the logout.
+
+### 3. **Consent Timing**
+```typescript
+// Line ~315: Consent is set AFTER initialization
+if (window.OneSignal?.setConsentGiven) {
+  await window.OneSignal.setConsentGiven(true);
+}
+```
+
+**Problem**: For OneSignal 5.x, consent should be granted BEFORE any user identification. Setting it after might cause the initial login to be ignored.
+
+### 4. **hasCalledLoginRef Not Reset Properly**
+```typescript
+// Line ~605: Only reset on cleanup
+return () => {
+  notificationsRef.current = null;
+  hasCalledLoginRef.current = false;
+};
+```
+
+**Problem**: If the effect re-runs (user changes), `hasCalledLoginRef` stays `true` and prevents the new login from executing.
+
+## Recommended Fixes
+
+Here's what I suggest changing:
+
+**Fix 1: Simplify the login flow** - Remove the duplicate `completeNativeInit` logic and consolidate everything into one path.
+
+**Fix 2: Don't logout before first login** - Only logout if you're changing users, not on initial setup.
+
+**Fix 3: Set consent immediately** - Move `setConsentGiven(true)` to happen before ANY login attempts.
+
+**Fix 4: Reset login ref when displayId changes**:
+```typescript
+useEffect(() => {
+  hasCalledLoginRef.current = false;
+}, [displayId]);
+```
+
+**Fix 5: Add a single login function** that all paths use:
+```typescript
+const performLogin = useCallback(async (userId: string, currentPlayerId: string | null) => {
+  if (hasCalledLoginRef.current) return;
+  hasCalledLoginRef.current = true;
+  
+  // Try window.OneSignal.login first
+  if (window.OneSignal?.login) {
+    try {
+      await window.OneSignal.login(userId);
+      setExternalIdSet(true);
+      if (currentPlayerId) await linkExternalIdViaBackend(currentPlayerId, userId);
+      return;
+    } catch (err) {
+      console.error('OneSignal.login failed:', err);
+    }
+  }
+  
+  // Fallback to other methods...
+}, [linkExternalIdViaBackend]);
+```
+
+Would you like me to create a refactored version of this hook with these fixes implemented? I can show you exactly how to restructure the flow to eliminate the race conditions and timing issues.
