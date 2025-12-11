@@ -12,16 +12,29 @@ interface NativelyNotificationsInstance {
   login?: (externalId: string) => void;
 }
 
+interface OneSignalWebInstance {
+  init: (config: { appId: string; allowLocalhostAsSecureOrigin?: boolean }) => Promise<void>;
+  login: (externalId: string) => Promise<void>;
+  logout: () => Promise<void>;
+  Notifications: {
+    permission: boolean;
+    requestPermission: () => Promise<boolean>;
+    addEventListener: (event: string, callback: (permission: boolean) => void) => void;
+  };
+  User: {
+    PushSubscription: {
+      id: string | null | undefined;
+      addEventListener: (event: string, callback: (change: { current: { id?: string } }) => void) => void;
+    };
+    addAlias: (label: string, id: string) => void;
+  };
+}
+
 declare global {
   interface Window {
     NativelyNotifications?: new () => NativelyNotificationsInstance;
-    OneSignal?: {
-      login: (externalId: string) => Promise<void>;
-      logout: () => Promise<void>;
-      User?: {
-        addAlias: (label: string, id: string) => void;
-      };
-    };
+    OneSignalDeferred?: ((OneSignal: OneSignalWebInstance) => void)[];
+    OneSignal?: OneSignalWebInstance;
   }
 }
 
@@ -32,8 +45,11 @@ export function useOneSignal() {
   const [displayId, setDisplayId] = useState<string | null>(null);
   const [externalIdSet, setExternalIdSet] = useState(false);
   const [permissionState, setPermissionState] = useState<string>('default');
+  const [isWebPush, setIsWebPush] = useState(false);
   const notificationsRef = useRef<NativelyNotificationsInstance | null>(null);
+  const webSdkRef = useRef<OneSignalWebInstance | null>(null);
   const hasCalledLoginRef = useRef(false);
+  const webInitializedRef = useRef(false);
 
   // Fetch the user's displayId from the backend using Bearer token auth
   // CRITICAL: Never fall back to UUID - only use the actual displayId
@@ -402,11 +418,151 @@ export function useOneSignal() {
           }
         } else if (pollCount >= maxPolls) {
           clearInterval(pollInterval);
-          console.log('[Natively] NativelyNotifications not available after polling (not running in Natively app)');
+          console.log('[OneSignal] NativelyNotifications not available - falling back to Web Push SDK');
+          
+          // Initialize OneSignal Web SDK as fallback for browser users
+          initializeWebPush();
         }
       }, 500);
       
       return () => clearInterval(pollInterval);
+    }
+
+    // Helper function to initialize web push
+    async function initializeWebPush() {
+      if (webInitializedRef.current) {
+        console.log('[OneSignal Web] Already initialized');
+        return;
+      }
+
+      const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+      if (!appId) {
+        console.error('[OneSignal Web] No VITE_ONESIGNAL_APP_ID environment variable');
+        return;
+      }
+
+      console.log('[OneSignal Web] Initializing Web Push SDK with appId:', appId);
+      
+      // Wait for the OneSignal object to be available
+      const waitForOneSignal = async (): Promise<OneSignalWebInstance | null> => {
+        // If already available, use it directly
+        if (window.OneSignal && typeof window.OneSignal.init === 'function') {
+          console.log('[OneSignal Web] SDK already available');
+          return window.OneSignal;
+        }
+        
+        // Otherwise wait for it via polling
+        return new Promise((resolve) => {
+          let attempts = 0;
+          const maxAttempts = 20;
+          const interval = setInterval(() => {
+            attempts++;
+            if (window.OneSignal && typeof window.OneSignal.init === 'function') {
+              clearInterval(interval);
+              console.log('[OneSignal Web] SDK became available after', attempts, 'attempts');
+              resolve(window.OneSignal);
+            } else if (attempts >= maxAttempts) {
+              clearInterval(interval);
+              console.error('[OneSignal Web] SDK not available after', maxAttempts, 'attempts');
+              resolve(null);
+            }
+          }, 200);
+        });
+      };
+
+      try {
+        const OneSignal = await waitForOneSignal();
+        if (!OneSignal) {
+          console.error('[OneSignal Web] Could not load OneSignal SDK');
+          return;
+        }
+
+        await OneSignal.init({
+          appId: appId,
+          allowLocalhostAsSecureOrigin: true,
+        });
+
+        webSdkRef.current = OneSignal;
+        webInitializedRef.current = true;
+        setIsWebPush(true);
+        setIsInitialized(true);
+        console.log('[OneSignal Web] SDK initialized successfully');
+
+        // Check current permission state
+        const hasPermission = OneSignal.Notifications.permission;
+        setPermissionState(hasPermission ? 'granted' : 'default');
+        console.log('[OneSignal Web] Permission status:', hasPermission ? 'granted' : 'default');
+
+        // Listen for permission changes
+        OneSignal.Notifications.addEventListener('permissionChange', (permission: boolean) => {
+          console.log('[OneSignal Web] Permission changed:', permission);
+          setPermissionState(permission ? 'granted' : 'denied');
+          
+          if (permission && displayId) {
+            // Permission granted, get subscription ID and login
+            const subId = OneSignal.User.PushSubscription.id;
+            if (subId) {
+              console.log('[OneSignal Web] Got subscription ID after permission:', subId);
+              setPlayerId(subId);
+              registerPlayerId(subId);
+              loginWebUser(displayId);
+            }
+          }
+        });
+
+        // Listen for subscription changes
+        OneSignal.User.PushSubscription.addEventListener('change', (change: { current: { id?: string } }) => {
+          const subId = change.current?.id;
+          if (subId) {
+            console.log('[OneSignal Web] Subscription ID changed:', subId);
+            setPlayerId(subId);
+            registerPlayerId(subId);
+          }
+        });
+
+        // If already has permission, get subscription and login
+        if (hasPermission && displayId) {
+          const subId = OneSignal.User.PushSubscription.id;
+          if (subId) {
+            console.log('[OneSignal Web] Already has subscription:', subId);
+            setPlayerId(subId);
+            registerPlayerId(subId);
+            loginWebUser(displayId);
+          }
+        }
+
+      } catch (error: unknown) {
+        // Better error logging - Error objects lose details when serialized
+        if (error instanceof Error) {
+          console.error('[OneSignal Web] Failed to initialize:', error.message, error.stack);
+        } else {
+          console.error('[OneSignal Web] Failed to initialize:', JSON.stringify(error), error);
+        }
+      }
+    }
+
+    // Login web user with External ID
+    async function loginWebUser(userDisplayId: string) {
+      if (!webSdkRef.current || hasCalledLoginRef.current) {
+        return;
+      }
+
+      console.log('[OneSignal Web] Calling login with External ID:', userDisplayId);
+      hasCalledLoginRef.current = true;
+
+      try {
+        await webSdkRef.current.login(userDisplayId);
+        console.log('[OneSignal Web] ✓ Login successful for:', userDisplayId);
+        setExternalIdSet(true);
+        
+        // Also call backend to link External ID
+        const subId = webSdkRef.current.User.PushSubscription.id;
+        if (subId) {
+          await linkExternalIdViaBackend(subId, userDisplayId);
+        }
+      } catch (error) {
+        console.error('[OneSignal Web] Login failed:', error);
+      }
     }
 
     // If immediate init succeeded, continue with setup
@@ -456,6 +612,47 @@ export function useOneSignal() {
   }, [isAuthenticated, user?.id, displayId, registerPlayerId, setExternalIdImmediately]);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
+    // Handle web push permission request
+    if (isWebPush && webSdkRef.current) {
+      console.log('[OneSignal Web] Requesting permission...');
+      try {
+        const granted = await webSdkRef.current.Notifications.requestPermission();
+        console.log('[OneSignal Web] Permission result:', granted);
+        setPermissionState(granted ? 'granted' : 'denied');
+        
+        if (granted && displayId) {
+          // Wait a bit for subscription to be created
+          setTimeout(async () => {
+            const subId = webSdkRef.current?.User.PushSubscription.id;
+            if (subId) {
+              console.log('[OneSignal Web] Got subscription after permission:', subId);
+              setPlayerId(subId);
+              registerPlayerId(subId);
+              
+              // Login with External ID
+              if (!hasCalledLoginRef.current && displayId) {
+                hasCalledLoginRef.current = true;
+                try {
+                  await webSdkRef.current?.login(displayId);
+                  console.log('[OneSignal Web] ✓ Login successful after permission');
+                  setExternalIdSet(true);
+                  await linkExternalIdViaBackend(subId, displayId);
+                } catch (err) {
+                  console.error('[OneSignal Web] Login failed after permission:', err);
+                }
+              }
+            }
+          }, 1000);
+        }
+        
+        return granted;
+      } catch (error) {
+        console.error('[OneSignal Web] Permission request failed:', error);
+        return false;
+      }
+    }
+
+    // Handle native app permission request
     return new Promise((resolve) => {
       if (!notificationsRef.current) {
         console.warn('[Natively] Not initialized yet');
@@ -488,7 +685,7 @@ export function useOneSignal() {
         resolve(isGranted);
       });
     });
-  }, [registerPlayerId, displayId, setExternalIdImmediately]);
+  }, [registerPlayerId, displayId, setExternalIdImmediately, isWebPush, linkExternalIdViaBackend]);
 
   return {
     isInitialized,
@@ -497,5 +694,6 @@ export function useOneSignal() {
     displayId,
     permissionState,
     requestPermission,
+    isWebPush,
   };
 }

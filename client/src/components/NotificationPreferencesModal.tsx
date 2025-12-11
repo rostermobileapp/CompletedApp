@@ -38,7 +38,7 @@ interface NotificationPreferencesModalProps {
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isInitialized, permissionState, requestPermission, playerId, externalIdSet, displayId } = useOneSignal();
+  const { isInitialized, permissionState, requestPermission, playerId, externalIdSet, displayId, isWebPush } = useOneSignal();
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
   const { data: preferences, isLoading, refetch } = useQuery<NotificationPreferences>({
@@ -227,6 +227,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
             {/* Debug section - shows SDK status */}
             <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs font-mono">
               <p><strong>Debug Info:</strong></p>
+              <p>Mode: {isWebPush ? '🌐 Web Push' : '📱 Native App'}</p>
               <p>SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
               <p>Permission: {permissionState}</p>
               <p>OneSignal ID (SDK): {playerId || 'Not set'}</p>
