@@ -101,7 +101,57 @@ export function useOneSignal() {
     }
   }, [isAuthenticated]);
 
-  const setExternalIdImmediately = useCallback((userId: string) => {
+  // Define linkExternalIdViaBackend BEFORE setExternalIdImmediately (dependency order)
+  const linkExternalIdViaBackend = useCallback(async (oneSignalId: string, externalUserId: string) => {
+    try {
+      console.log('[Natively] Calling backend to link External ID via REST API');
+      const response = await fetch('/api/notification-preferences/link-external-id', {
+        method: 'POST',
+        body: JSON.stringify({ oneSignalId, userId: externalUserId }),
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (response.ok) {
+        console.log('[Natively] Backend successfully linked External ID');
+        return true;
+      } else {
+        console.warn('[Natively] Backend failed to link External ID:', response.status);
+        return false;
+      }
+    } catch (error) {
+      console.error('[Natively] Error calling backend to link External ID:', error);
+      return false;
+    }
+  }, []);
+
+  const tryNativelyLogin = useCallback((notifications: NativelyNotificationsInstance, userId: string, currentPlayerId: string | null) => {
+    if (notifications.login) {
+      try {
+        console.log('[Natively] Trying NativelyNotifications.login() as backup...');
+        notifications.login(userId);
+        console.log('[Natively] ✓ Backup login called');
+        setExternalIdSet(true);
+      } catch (err) {
+        console.error('[Natively] ✗ Backup login failed:', err);
+        // Last resort: setExternalId, and if that fails try backend API
+        notifications.setExternalId({ externalId: userId }, async (resp) => {
+          if (resp && resp.externalId) {
+            console.log('[Natively] ✓ setExternalId successful:', resp.externalId);
+            setExternalIdSet(true);
+          } else {
+            console.error('[Natively] ✗ setExternalId failed:', resp);
+            // Try backend API as absolute last resort
+            if (currentPlayerId) {
+              console.log('[Natively] Trying backend API as last resort');
+              await linkExternalIdViaBackend(currentPlayerId, userId);
+            }
+          }
+        });
+      }
+    }
+  }, [linkExternalIdViaBackend]);
+
+  const setExternalIdImmediately = useCallback((userId: string, currentPlayerId: string | null) => {
     if (hasCalledLoginRef.current) {
       console.log('[Natively] Login already called, skipping');
       return;
@@ -134,7 +184,7 @@ export function useOneSignal() {
         .catch((err) => {
           console.error('[Natively] ✗ OneSignal.login() failed:', err);
           // Try backup method
-          tryNativelyLogin(notifications, userId);
+          tryNativelyLogin(notifications, userId, currentPlayerId);
         });
       return;
     }
@@ -161,37 +211,23 @@ export function useOneSignal() {
 
     // Priority 3: Fall back to setExternalId
     console.log('[Natively] Using setExternalId as fallback...');
-    notifications.setExternalId({ externalId: userId }, (resp) => {
+    notifications.setExternalId({ externalId: userId }, async (resp) => {
       if (resp && resp.externalId) {
         console.log('[Natively] ✓ setExternalId successful:', resp.externalId);
         setExternalIdSet(true);
       } else {
         console.error('[Natively] ✗ setExternalId failed:', resp);
+        // Absolute last resort: try backend API if we have playerId
+        if (currentPlayerId) {
+          console.log('[Natively] Trying backend API as absolute last resort');
+          const success = await linkExternalIdViaBackend(currentPlayerId, userId);
+          if (success) {
+            setExternalIdSet(true);
+          }
+        }
       }
     });
-  }, []);
-
-  const tryNativelyLogin = useCallback((notifications: NativelyNotificationsInstance, userId: string) => {
-    if (notifications.login) {
-      try {
-        console.log('[Natively] Trying NativelyNotifications.login() as backup...');
-        notifications.login(userId);
-        console.log('[Natively] ✓ Backup login called');
-        setExternalIdSet(true);
-      } catch (err) {
-        console.error('[Natively] ✗ Backup login failed:', err);
-        // Last resort: setExternalId
-        notifications.setExternalId({ externalId: userId }, (resp) => {
-          if (resp && resp.externalId) {
-            console.log('[Natively] ✓ setExternalId successful:', resp.externalId);
-            setExternalIdSet(true);
-          } else {
-            console.error('[Natively] ✗ setExternalId failed:', resp);
-          }
-        });
-      }
-    }
-  }, []);
+  }, [linkExternalIdViaBackend, tryNativelyLogin]);
 
   useEffect(() => {
     // Wait for both authentication and displayId to be available
@@ -226,7 +262,7 @@ export function useOneSignal() {
           // CRITICAL: Call login IMMEDIATELY after getting Player ID
           // This ensures the subscription is linked to the External ID
           console.log('[Natively] Calling login immediately after getting Player ID');
-          setExternalIdImmediately(displayId);
+          setExternalIdImmediately(displayId, resp.playerId);
         } else {
           console.log('[Natively] No Player ID available yet, will retry...');
           // Retry getting Player ID after a delay
@@ -239,7 +275,7 @@ export function useOneSignal() {
                 
                 // Call login immediately on retry as well
                 console.log('[Natively] Calling login immediately after retry');
-                setExternalIdImmediately(displayId);
+                setExternalIdImmediately(displayId, retryResp.playerId);
               } else {
                 console.warn('[Natively] Still no Player ID after retry');
               }
@@ -283,7 +319,7 @@ export function useOneSignal() {
               
               // Call login immediately after getting permission
               console.log('[Natively] Calling login immediately after permission granted');
-              setExternalIdImmediately(displayId);
+              setExternalIdImmediately(displayId, idResp.playerId);
             }
           });
         }

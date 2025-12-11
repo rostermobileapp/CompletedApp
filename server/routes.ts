@@ -516,35 +516,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manually link External ID for users who already have Player ID registered
+  // Can be called from frontend with { oneSignalId, userId } where userId is the displayId
   app.post('/api/notification-preferences/link-external-id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const authUserId = req.user.claims.sub;
+      const { oneSignalId, userId: requestDisplayId } = req.body;
       
-      // Get user to fetch their displayId
-      const user = await storage.getUser(userId);
-      const displayId = user?.displayId;
+      // If frontend provides oneSignalId and userId (displayId), use those directly
+      // Otherwise fall back to looking them up from the database
+      let playerIdToUse = oneSignalId;
+      let displayIdToUse = requestDisplayId;
       
-      if (!displayId) {
-        return res.status(400).json({ 
-          message: "No display ID found for user.",
-          hasDisplayId: false 
-        });
+      if (!playerIdToUse || !displayIdToUse) {
+        // Fall back to database lookup
+        const user = await storage.getUser(authUserId);
+        displayIdToUse = displayIdToUse || user?.displayId;
+        
+        if (!displayIdToUse) {
+          return res.status(400).json({ 
+            message: "No display ID found for user.",
+            hasDisplayId: false 
+          });
+        }
+        
+        const preferences = await storage.getNotificationPreferences(authUserId);
+        playerIdToUse = playerIdToUse || preferences?.oneSignalPlayerId;
+        
+        if (!playerIdToUse) {
+          return res.status(400).json({ 
+            message: "No Player ID found. Please enable notifications first.",
+            hasPlayerId: false 
+          });
+        }
       }
       
-      // Get current notification preferences to find the Player ID
-      const preferences = await storage.getNotificationPreferences(userId);
-      
-      if (!preferences || !preferences.oneSignalPlayerId) {
-        return res.status(400).json({ 
-          message: "No Player ID found. Please enable notifications first.",
-          hasPlayerId: false 
-        });
-      }
-      
-      console.log(`[Link External ID] User ${userId} (displayId: ${displayId}) linking to Player ID: ${preferences.oneSignalPlayerId}`);
+      console.log(`[Link External ID] User ${authUserId} linking displayId: ${displayIdToUse} to Player ID: ${playerIdToUse}`);
       
       // Set the External ID in OneSignal via API using displayId
-      const result = await notificationService.setExternalIdViaApi(preferences.oneSignalPlayerId, displayId);
+      const result = await notificationService.setExternalIdViaApi(playerIdToUse, displayIdToUse);
       
       console.log(`[Link External ID] Result: ${result}`);
       
