@@ -35,30 +35,70 @@ export function useOneSignal() {
   const notificationsRef = useRef<NativelyNotificationsInstance | null>(null);
   const hasCalledLoginRef = useRef(false);
 
-  // Fetch the user's displayId from the backend
+  // Fetch the user's displayId from the backend using Bearer token auth
+  // CRITICAL: Never fall back to UUID - only use the actual displayId
   useEffect(() => {
     if (!isAuthenticated || !user?.id) {
       setDisplayId(null);
       return;
     }
 
-    fetch('/api/user', {
-      credentials: 'include',
-    })
-      .then(res => res.json())
-      .then(data => {
+    const fetchDisplayId = async (retryCount = 0) => {
+      const MAX_RETRIES = 10;
+      const RETRY_DELAY_MS = 2000;
+      
+      try {
+        // Get Supabase session for Bearer token auth (works in BuildNatively)
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+          if (retryCount < MAX_RETRIES) {
+            console.log(`[Natively] No session yet for displayId fetch, retrying in ${RETRY_DELAY_MS}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+            setTimeout(() => fetchDisplayId(retryCount + 1), RETRY_DELAY_MS);
+            return;
+          }
+          console.error('[Natively] Failed to get session for displayId fetch after max retries');
+          return;
+        }
+        
+        const response = await fetch('/api/user', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        });
+        
+        if (response.status === 401) {
+          if (retryCount < MAX_RETRIES) {
+            console.log(`[Natively] 401 on displayId fetch, refreshing session and retrying...`);
+            await supabase.auth.refreshSession();
+            setTimeout(() => fetchDisplayId(retryCount + 1), RETRY_DELAY_MS);
+            return;
+          }
+          console.error('[Natively] Failed to fetch displayId after max retries (401)');
+          return;
+        }
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
         if (data.displayId) {
-          console.log('[Natively] Fetched displayId:', data.displayId);
+          console.log('[Natively] ✅ Fetched displayId:', data.displayId);
           setDisplayId(data.displayId);
         } else {
-          console.warn('[Natively] No displayId in user profile, using user.id as fallback');
-          setDisplayId(user.id);
+          console.error('[Natively] ❌ No displayId in user profile - cannot proceed with External ID linking');
+          // Do NOT fall back to UUID - this would break External ID linking
         }
-      })
-      .catch(err => {
-        console.error('[Natively] Failed to fetch user profile, using user.id as fallback:', err);
-        setDisplayId(user.id);
-      });
+      } catch (err) {
+        console.error('[Natively] Error fetching displayId:', err);
+        if (retryCount < MAX_RETRIES) {
+          setTimeout(() => fetchDisplayId(retryCount + 1), RETRY_DELAY_MS);
+        }
+      }
+    };
+    
+    fetchDisplayId();
   }, [isAuthenticated, user?.id]);
 
   const registerPlayerId = useCallback(async (playerIdToRegister: string, retryCount = 0) => {
