@@ -624,47 +624,27 @@ export function useOneSignal() {
     }
   }, []);
 
-  // CRITICAL: Logout function to clear OneSignal's cached External ID
-  // Must be called when user logs out to prevent ID leakage between users
+  // Logout function: Reset local state so next user login will set their External ID
+  // NOTE: We intentionally do NOT call OneSignal.logout() or removeExternalId() 
+  // because on native SDKs this destroys the device subscription entirely.
+  // Instead, the next login() call will REPLACE the old External ID with the new one.
   const logoutOneSignal = useCallback(async () => {
-    console.log('[OneSignal] === LOGOUT - Clearing cached IDs ===');
+    console.log('[OneSignal] === LOGOUT - Resetting state for next user ===');
     
-    // Reset all local state
+    // Reset all local state so next user's login will be processed
     hasCalledLoginRef.current = false;
     consentGrantedRef.current = false;
+    webInitializedRef.current = false;
     setExternalIdSet(false);
     setPlayerId(null);
     setDisplayId(null);
+    setIsInitialized(false);
     
-    // Method 1: Use window.OneSignal.logout() - PRIMARY method
-    if (window.OneSignal?.logout) {
-      try {
-        console.log('[OneSignal] Calling window.OneSignal.logout()...');
-        await window.OneSignal.logout();
-        console.log('[OneSignal] ✓ OneSignal.logout() SUCCESS - External ID cleared');
-      } catch (err) {
-        console.error('[OneSignal] ✗ OneSignal.logout() error:', err);
-      }
-    }
+    // Clear refs
+    notificationsRef.current = null;
+    webSdkRef.current = null;
     
-    // Method 2: Use NativelyNotifications.removeExternalId() as backup
-    const notifications = notificationsRef.current;
-    if (notifications?.removeExternalId) {
-      try {
-        console.log('[OneSignal] Calling NativelyNotifications.removeExternalId()...');
-        notifications.removeExternalId((resp) => {
-          if (resp?.error) {
-            console.error('[OneSignal] removeExternalId error:', resp.error);
-          } else {
-            console.log('[OneSignal] ✓ removeExternalId() SUCCESS');
-          }
-        });
-      } catch (err) {
-        console.error('[OneSignal] ✗ removeExternalId() error:', err);
-      }
-    }
-    
-    console.log('[OneSignal] Logout complete - ready for new user');
+    console.log('[OneSignal] State reset complete - next login will set new External ID');
   }, []);
 
   return {
