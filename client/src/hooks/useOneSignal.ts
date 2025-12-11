@@ -366,9 +366,48 @@ export function useOneSignal() {
       }
     };
 
+    // Helper function to complete native initialization (get player ID, set external ID)
+    const completeNativeInit = (notifications: NativelyNotificationsInstance) => {
+      notifications.getPermissionStatus((resp) => {
+        const status = resp.status ? 'granted' : 'default';
+        setPermissionState(status);
+        console.log('[Natively] Permission status:', status);
+      });
+
+      notifications.getOneSignalId((resp) => {
+        if (resp.playerId) {
+          console.log('[Natively] Got Player ID:', resp.playerId);
+          setPlayerId(resp.playerId);
+          registerPlayerId(resp.playerId);
+          console.log('[Natively] Calling login immediately after getting Player ID');
+          setExternalIdImmediately(displayId, resp.playerId);
+        } else {
+          console.log('[Natively] No Player ID available yet, will retry...');
+          setTimeout(() => {
+            notifications.getOneSignalId((retryResp) => {
+              if (retryResp.playerId) {
+                console.log('[Natively] Got Player ID on retry:', retryResp.playerId);
+                setPlayerId(retryResp.playerId);
+                registerPlayerId(retryResp.playerId);
+                console.log('[Natively] Calling login immediately after retry');
+                setExternalIdImmediately(displayId, retryResp.playerId);
+              } else {
+                console.warn('[Natively] Still no Player ID after retry');
+              }
+            });
+          }, 2000);
+        }
+      });
+    };
+
     // Try immediate initialization
     if (initializeNotifications()) {
-      // Continue with rest of initialization below
+      // NativelyNotifications was immediately available - complete the init
+      const notifications = notificationsRef.current;
+      if (notifications) {
+        console.log('[Natively] SDK immediately available, completing initialization...');
+        completeNativeInit(notifications);
+      }
     } else {
       // Poll for NativelyNotifications availability (BuildNatively might load it async)
       console.log('[Natively] NativelyNotifications not available yet, starting poll...');
@@ -383,39 +422,9 @@ export function useOneSignal() {
           clearInterval(pollInterval);
           console.log('[Natively] NativelyNotifications became available!');
           if (initializeNotifications()) {
-            // Trigger the rest of initialization manually
             const notifications = notificationsRef.current;
             if (notifications) {
-              notifications.getPermissionStatus((resp) => {
-                const status = resp.status ? 'granted' : 'default';
-                setPermissionState(status);
-                console.log('[Natively] Permission status:', status);
-              });
-
-              notifications.getOneSignalId((resp) => {
-                if (resp.playerId) {
-                  console.log('[Natively] Got Player ID:', resp.playerId);
-                  setPlayerId(resp.playerId);
-                  registerPlayerId(resp.playerId);
-                  console.log('[Natively] Calling login immediately after getting Player ID');
-                  setExternalIdImmediately(displayId, resp.playerId);
-                } else {
-                  console.log('[Natively] No Player ID available yet, will retry...');
-                  setTimeout(() => {
-                    notifications.getOneSignalId((retryResp) => {
-                      if (retryResp.playerId) {
-                        console.log('[Natively] Got Player ID on retry:', retryResp.playerId);
-                        setPlayerId(retryResp.playerId);
-                        registerPlayerId(retryResp.playerId);
-                        console.log('[Natively] Calling login immediately after retry');
-                        setExternalIdImmediately(displayId, retryResp.playerId);
-                      } else {
-                        console.warn('[Natively] Still no Player ID after retry');
-                      }
-                    });
-                  }, 2000);
-                }
-              });
+              completeNativeInit(notifications);
             }
           }
         } else if (pollCount >= maxPolls) {
