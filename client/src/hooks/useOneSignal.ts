@@ -60,8 +60,13 @@ export function useOneSignal() {
       });
   }, [isAuthenticated, user?.id]);
 
-  const registerPlayerId = useCallback(async (playerIdToRegister: string) => {
-    if (!isAuthenticated || !playerIdToRegister) return;
+  const registerPlayerId = useCallback(async (playerIdToRegister: string, retryCount = 0) => {
+    if (!playerIdToRegister) return;
+    
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY_MS = 2000; // 2 seconds
+    
+    console.log(`[Natively] Attempting to register Player ID (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, playerIdToRegister.substring(0, 8) + '...');
     
     try {
       const playerIdResponse = await fetch('/api/notification-preferences/player-id', {
@@ -70,10 +75,25 @@ export function useOneSignal() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       });
+      
+      // If 401, auth might not be ready yet - retry
+      if (playerIdResponse.status === 401) {
+        if (retryCount < MAX_RETRIES) {
+          console.log(`[Natively] Auth not ready (401), retrying in ${RETRY_DELAY_MS}ms...`);
+          setTimeout(() => registerPlayerId(playerIdToRegister, retryCount + 1), RETRY_DELAY_MS);
+          return;
+        }
+        console.error('[Natively] Auth failed after max retries');
+        return;
+      }
+      
       if (!playerIdResponse.ok) {
         throw new Error(`HTTP ${playerIdResponse.status}`);
       }
-      console.log('[Natively] Player ID registered with backend:', playerIdToRegister);
+      
+      const result = await playerIdResponse.json();
+      console.log('[Natively] Player ID registered with backend:', playerIdToRegister.substring(0, 8) + '...');
+      console.log('[Natively] External ID linked:', result.externalIdLinked, 'displayId:', result.displayId);
       
       const prefsResponse = await fetch('/api/notification-preferences', {
         method: 'PUT',
@@ -98,8 +118,13 @@ export function useOneSignal() {
       }
     } catch (error) {
       console.error('[Natively] Failed to register player ID:', error);
+      // Retry on network errors
+      if (retryCount < MAX_RETRIES) {
+        console.log(`[Natively] Network error, retrying in ${RETRY_DELAY_MS}ms...`);
+        setTimeout(() => registerPlayerId(playerIdToRegister, retryCount + 1), RETRY_DELAY_MS);
+      }
     }
-  }, [isAuthenticated]);
+  }, []);
 
   // Define linkExternalIdViaBackend BEFORE setExternalIdImmediately (dependency order)
   const linkExternalIdViaBackend = useCallback(async (oneSignalId: string, externalUserId: string) => {

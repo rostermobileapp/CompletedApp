@@ -32,16 +32,18 @@ interface OneSignalNotification {
 
 const ONESIGNAL_API_URL = 'https://onesignal.com/api/v1/notifications';
 
-export async function setExternalIdViaApi(oneSignalId: string, externalUserId: string): Promise<boolean> {
+export async function setExternalIdViaApi(oneSignalId: string, externalUserId: string, retryCount = 0): Promise<boolean> {
   const apiKey = process.env.ONESIGNAL_REST_API_KEY;
   const appId = process.env.ONESIGNAL_APP_ID;
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 2000; // 2 seconds between retries
   
   if (!apiKey || !appId) {
     console.error('[OneSignal] Missing API key or App ID for setExternalId');
     return false;
   }
 
-  console.log(`[OneSignal] Setting External ID via Identity API: oneSignalId=${oneSignalId.substring(0, 8)}..., externalUserId=${externalUserId}`);
+  console.log(`[OneSignal] Setting External ID via Identity API (attempt ${retryCount + 1}/${MAX_RETRIES + 1}): oneSignalId=${oneSignalId.substring(0, 8)}..., externalUserId=${externalUserId}`);
 
   try {
     // Use the newer OneSignal Identity API which accepts the OneSignal ID (alias) directly
@@ -66,6 +68,13 @@ export async function setExternalIdViaApi(oneSignalId: string, externalUserId: s
     console.log('[OneSignal] Set External ID Response body:', responseText);
 
     if (!response.ok) {
+      // Check if it's a "not found" error (404) - subscription might not be propagated yet
+      if (response.status === 404 && retryCount < MAX_RETRIES) {
+        console.log(`[OneSignal] Subscription not found yet, retrying in ${RETRY_DELAY_MS}ms...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+        return setExternalIdViaApi(oneSignalId, externalUserId, retryCount + 1);
+      }
+      
       // If Identity API fails, try the alternative approach using Users API
       console.log('[OneSignal] Identity API failed, trying Users API...');
       return await setExternalIdViaUsersApi(oneSignalId, externalUserId, appId, apiKey);
@@ -75,6 +84,14 @@ export async function setExternalIdViaApi(oneSignalId: string, externalUserId: s
     return true;
   } catch (error) {
     console.error('[OneSignal] Error setting External ID:', error);
+    
+    // Retry on network errors
+    if (retryCount < MAX_RETRIES) {
+      console.log(`[OneSignal] Network error, retrying in ${RETRY_DELAY_MS}ms...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+      return setExternalIdViaApi(oneSignalId, externalUserId, retryCount + 1);
+    }
+    
     return false;
   }
 }
