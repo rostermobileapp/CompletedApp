@@ -624,6 +624,49 @@ export function useOneSignal() {
     }
   }, []);
 
+  // CRITICAL: Logout function to clear OneSignal's cached External ID
+  // Must be called when user logs out to prevent ID leakage between users
+  const logoutOneSignal = useCallback(async () => {
+    console.log('[OneSignal] === LOGOUT - Clearing cached IDs ===');
+    
+    // Reset all local state
+    hasCalledLoginRef.current = false;
+    consentGrantedRef.current = false;
+    setExternalIdSet(false);
+    setPlayerId(null);
+    setDisplayId(null);
+    
+    // Method 1: Use window.OneSignal.logout() - PRIMARY method
+    if (window.OneSignal?.logout) {
+      try {
+        console.log('[OneSignal] Calling window.OneSignal.logout()...');
+        await window.OneSignal.logout();
+        console.log('[OneSignal] ✓ OneSignal.logout() SUCCESS - External ID cleared');
+      } catch (err) {
+        console.error('[OneSignal] ✗ OneSignal.logout() error:', err);
+      }
+    }
+    
+    // Method 2: Use NativelyNotifications.removeExternalId() as backup
+    const notifications = notificationsRef.current;
+    if (notifications?.removeExternalId) {
+      try {
+        console.log('[OneSignal] Calling NativelyNotifications.removeExternalId()...');
+        notifications.removeExternalId((resp) => {
+          if (resp?.error) {
+            console.error('[OneSignal] removeExternalId error:', resp.error);
+          } else {
+            console.log('[OneSignal] ✓ removeExternalId() SUCCESS');
+          }
+        });
+      } catch (err) {
+        console.error('[OneSignal] ✗ removeExternalId() error:', err);
+      }
+    }
+    
+    console.log('[OneSignal] Logout complete - ready for new user');
+  }, []);
+
   return {
     isInitialized,
     playerId,
@@ -634,5 +677,6 @@ export function useOneSignal() {
     requestPermission,
     getNotificationPreferences,
     updateNotificationPreferences,
+    logoutOneSignal,
   };
 }

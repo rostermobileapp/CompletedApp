@@ -13,6 +13,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationPreferencesModal } from '@/components/NotificationPreferencesModal';
 import { supabase } from '@/lib/supabase';
+import { useOneSignal } from '@/hooks/useOneSignal';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
@@ -43,6 +44,7 @@ export default function Profile() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { logoutOneSignal } = useOneSignal();
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingPaymentMethods, setIsEditingPaymentMethods] = useState(false);
   const [selectedTeamForLeagueRequest, setSelectedTeamForLeagueRequest] = useState<string | null>(null);
@@ -904,6 +906,9 @@ export default function Profile() {
           {/* Sign Out */}
           <button
             onClick={async () => {
+              // CRITICAL: Clear OneSignal External ID before signing out
+              // This prevents the old user's External ID from being used by the next user
+              await logoutOneSignal();
               await supabase.auth.signOut();
               // Clear all cached data to prevent stale user data from showing
               queryClient.clear();
