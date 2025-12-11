@@ -522,25 +522,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authUserId = req.user.claims.sub;
       const { oneSignalId, userId: requestDisplayId } = req.body;
       
-      // If frontend provides oneSignalId and userId (displayId), use those directly
-      // Otherwise fall back to looking them up from the database
-      let playerIdToUse = oneSignalId;
-      let displayIdToUse = requestDisplayId;
+      // Get the authenticated user's displayId for validation
+      const user = await storage.getUser(authUserId);
+      const userDisplayId = user?.displayId;
       
-      if (!playerIdToUse || !displayIdToUse) {
-        // Fall back to database lookup
-        const user = await storage.getUser(authUserId);
-        displayIdToUse = displayIdToUse || user?.displayId;
-        
-        if (!displayIdToUse) {
-          return res.status(400).json({ 
-            message: "No display ID found for user.",
-            hasDisplayId: false 
-          });
-        }
-        
+      // Security check: if displayId is provided, it must match the authenticated user's displayId
+      if (requestDisplayId && userDisplayId && requestDisplayId !== userDisplayId) {
+        console.warn(`[Link External ID] Security: displayId mismatch. Request: ${requestDisplayId}, User: ${userDisplayId}`);
+        return res.status(403).json({ 
+          message: "Display ID mismatch.",
+          success: false 
+        });
+      }
+      
+      // Use provided values or fall back to database
+      let playerIdToUse = oneSignalId;
+      let displayIdToUse = requestDisplayId || userDisplayId;
+      
+      if (!displayIdToUse) {
+        return res.status(400).json({ 
+          message: "No display ID found for user.",
+          hasDisplayId: false 
+        });
+      }
+      
+      if (!playerIdToUse) {
         const preferences = await storage.getNotificationPreferences(authUserId);
-        playerIdToUse = playerIdToUse || preferences?.oneSignalPlayerId;
+        playerIdToUse = preferences?.oneSignalPlayerId;
         
         if (!playerIdToUse) {
           return res.status(400).json({ 
@@ -560,8 +568,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ 
         success: result, 
         message: result ? "External ID linked successfully" : "Failed to link External ID",
-        playerId: preferences.oneSignalPlayerId,
-        externalId: displayId
+        playerId: playerIdToUse,
+        externalId: displayIdToUse
       });
     } catch (error) {
       console.error("Error linking External ID:", error);
