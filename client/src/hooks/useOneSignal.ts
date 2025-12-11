@@ -235,58 +235,124 @@ export function useOneSignal() {
       return;
     }
 
-    if (!window.NativelyNotifications) {
-      console.log('[Natively] NativelyNotifications not available (not running in Natively app)');
-      return;
-    }
+    // Function to initialize notifications
+    const initializeNotifications = () => {
+      if (!window.NativelyNotifications) {
+        return false;
+      }
 
-    try {
-      const notifications = new window.NativelyNotifications();
-      notificationsRef.current = notifications;
-      setIsInitialized(true);
-      console.log('[Natively] NativelyNotifications initialized for user:', user.id, 'displayId:', displayId);
+      try {
+        const notifications = new window.NativelyNotifications();
+        notificationsRef.current = notifications;
+        setIsInitialized(true);
+        console.log('[Natively] NativelyNotifications initialized for user:', user.id, 'displayId:', displayId);
+        return true;
+      } catch (error) {
+        console.error('[Natively] Failed to initialize NativelyNotifications:', error);
+        return false;
+      }
+    };
 
-      notifications.getPermissionStatus((resp) => {
-        const status = resp.status ? 'granted' : 'default';
-        setPermissionState(status);
-        console.log('[Natively] Permission status:', status);
-      });
+    // Try immediate initialization
+    if (initializeNotifications()) {
+      // Continue with rest of initialization below
+    } else {
+      // Poll for NativelyNotifications availability (BuildNatively might load it async)
+      console.log('[Natively] NativelyNotifications not available yet, starting poll...');
+      let pollCount = 0;
+      const maxPolls = 20; // Try for 10 seconds (20 * 500ms)
+      
+      const pollInterval = setInterval(() => {
+        pollCount++;
+        console.log(`[Natively] Polling for NativelyNotifications (${pollCount}/${maxPolls})...`);
+        
+        if (window.NativelyNotifications) {
+          clearInterval(pollInterval);
+          console.log('[Natively] NativelyNotifications became available!');
+          if (initializeNotifications()) {
+            // Trigger the rest of initialization manually
+            const notifications = notificationsRef.current;
+            if (notifications) {
+              notifications.getPermissionStatus((resp) => {
+                const status = resp.status ? 'granted' : 'default';
+                setPermissionState(status);
+                console.log('[Natively] Permission status:', status);
+              });
 
-      // Get Player ID and immediately set External ID
-      notifications.getOneSignalId((resp) => {
-        if (resp.playerId) {
-          console.log('[Natively] Got Player ID:', resp.playerId);
-          setPlayerId(resp.playerId);
-          registerPlayerId(resp.playerId);
-          
-          // CRITICAL: Call login IMMEDIATELY after getting Player ID
-          // This ensures the subscription is linked to the External ID
-          console.log('[Natively] Calling login immediately after getting Player ID');
-          setExternalIdImmediately(displayId, resp.playerId);
-        } else {
-          console.log('[Natively] No Player ID available yet, will retry...');
-          // Retry getting Player ID after a delay
-          setTimeout(() => {
-            notifications.getOneSignalId((retryResp) => {
-              if (retryResp.playerId) {
-                console.log('[Natively] Got Player ID on retry:', retryResp.playerId);
-                setPlayerId(retryResp.playerId);
-                registerPlayerId(retryResp.playerId);
-                
-                // Call login immediately on retry as well
-                console.log('[Natively] Calling login immediately after retry');
-                setExternalIdImmediately(displayId, retryResp.playerId);
-              } else {
-                console.warn('[Natively] Still no Player ID after retry');
-              }
-            });
-          }, 2000);
+              notifications.getOneSignalId((resp) => {
+                if (resp.playerId) {
+                  console.log('[Natively] Got Player ID:', resp.playerId);
+                  setPlayerId(resp.playerId);
+                  registerPlayerId(resp.playerId);
+                  console.log('[Natively] Calling login immediately after getting Player ID');
+                  setExternalIdImmediately(displayId, resp.playerId);
+                } else {
+                  console.log('[Natively] No Player ID available yet, will retry...');
+                  setTimeout(() => {
+                    notifications.getOneSignalId((retryResp) => {
+                      if (retryResp.playerId) {
+                        console.log('[Natively] Got Player ID on retry:', retryResp.playerId);
+                        setPlayerId(retryResp.playerId);
+                        registerPlayerId(retryResp.playerId);
+                        console.log('[Natively] Calling login immediately after retry');
+                        setExternalIdImmediately(displayId, retryResp.playerId);
+                      } else {
+                        console.warn('[Natively] Still no Player ID after retry');
+                      }
+                    });
+                  }, 2000);
+                }
+              });
+            }
+          }
+        } else if (pollCount >= maxPolls) {
+          clearInterval(pollInterval);
+          console.log('[Natively] NativelyNotifications not available after polling (not running in Natively app)');
         }
-      });
-
-    } catch (error) {
-      console.error('[Natively] Initialization error:', error);
+      }, 500);
+      
+      return () => clearInterval(pollInterval);
     }
+
+    // If immediate init succeeded, continue with setup
+    const notifications = notificationsRef.current;
+    if (!notifications) return;
+
+    console.log('[Natively] Continuing with notification setup...');
+
+    notifications.getPermissionStatus((resp) => {
+      const status = resp.status ? 'granted' : 'default';
+      setPermissionState(status);
+      console.log('[Natively] Permission status:', status);
+    });
+
+    // Get Player ID and immediately set External ID
+    notifications.getOneSignalId((resp) => {
+      if (resp.playerId) {
+        console.log('[Natively] Got Player ID:', resp.playerId);
+        setPlayerId(resp.playerId);
+        registerPlayerId(resp.playerId);
+        
+        // CRITICAL: Call login IMMEDIATELY after getting Player ID
+        console.log('[Natively] Calling login immediately after getting Player ID');
+        setExternalIdImmediately(displayId, resp.playerId);
+      } else {
+        console.log('[Natively] No Player ID available yet, will retry...');
+        setTimeout(() => {
+          notifications.getOneSignalId((retryResp) => {
+            if (retryResp.playerId) {
+              console.log('[Natively] Got Player ID on retry:', retryResp.playerId);
+              setPlayerId(retryResp.playerId);
+              registerPlayerId(retryResp.playerId);
+              console.log('[Natively] Calling login immediately after retry');
+              setExternalIdImmediately(displayId, retryResp.playerId);
+            } else {
+              console.warn('[Natively] Still no Player ID after retry');
+            }
+          });
+        }, 2000);
+      }
+    });
 
     return () => {
       notificationsRef.current = null;
