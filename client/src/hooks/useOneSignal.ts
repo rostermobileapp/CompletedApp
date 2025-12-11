@@ -454,6 +454,7 @@ export function useOneSignal() {
     isInitialized,
     playerId,
     externalIdSet,
+    displayId,
     permissionState,
     requestPermission,
   };

@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useOneSignal } from '@/hooks/useOneSignal';
-import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +11,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, DollarSign, Users, UserPlus, Calendar, Bell, Loader2, BellRing, AlertCircle, Newspaper, Send } from 'lucide-react';
+import { Bell, Loader2, BellRing, AlertCircle, Send, CheckCircle2 } from 'lucide-react';
 
 interface NotificationSettings {
   inAppMessages: boolean;
@@ -28,46 +27,8 @@ interface NotificationPreferences {
   notificationSettings: NotificationSettings;
   pushEnabled: boolean;
   oneSignalPlayerId: string | null;
+  oneSignalExternalId: string | null;
 }
-
-const NOTIFICATION_TYPES = [
-  {
-    key: 'inAppMessages' as const,
-    label: 'Messages',
-    description: 'New messages from teammates and other players',
-    icon: MessageSquare,
-  },
-  {
-    key: 'paymentRequests' as const,
-    label: 'Payment Requests',
-    description: 'When someone requests payment from you',
-    icon: DollarSign,
-  },
-  {
-    key: 'substitutionRequests' as const,
-    label: 'Substitution Requests',
-    description: 'When players need a substitute for games',
-    icon: Users,
-  },
-  {
-    key: 'joinRequests' as const,
-    label: 'Join Requests',
-    description: 'When someone wants to join your team or league',
-    icon: UserPlus,
-  },
-  {
-    key: 'upcomingEvents' as const,
-    label: 'Schedule Reminders',
-    description: 'Reminders for games, scrimmages, and claimed duties',
-    icon: Calendar,
-  },
-  {
-    key: 'newsAnnouncements' as const,
-    label: 'News & Announcements',
-    description: 'New posts in the News feed from your leagues and teams',
-    icon: Newspaper,
-  },
-];
 
 interface NotificationPreferencesModalProps {
   open: boolean;
@@ -77,79 +38,26 @@ interface NotificationPreferencesModalProps {
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isInitialized, permissionState, requestPermission, playerId } = useOneSignal();
+  const { isInitialized, permissionState, requestPermission, playerId, externalIdSet, displayId } = useOneSignal();
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  
-  const [settings, setSettings] = useState<NotificationSettings>({
-    inAppMessages: true,
-    paymentRequests: true,
-    substitutionRequests: true,
-    joinRequests: true,
-    upcomingEvents: true,
-    newsAnnouncements: true,
-  });
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
 
-  const { data: preferences, isLoading } = useQuery<NotificationPreferences>({
+  const { data: preferences, isLoading, refetch } = useQuery<NotificationPreferences>({
     queryKey: ['/api/notification-preferences'],
     enabled: open,
+    refetchInterval: 3000, // Poll every 3 seconds to catch External ID updates
   });
-
-  useEffect(() => {
-    if (preferences) {
-      // Merge with defaults to ensure new notification types are included
-      setSettings(prev => ({
-        ...prev,
-        ...preferences.notificationSettings,
-      }));
-      setPushEnabled(preferences.pushEnabled);
-      setHasChanges(false);
-    }
-  }, [preferences]);
-
-  const updateMutation = useMutation({
-    mutationFn: async (data: { notificationSettings: NotificationSettings; pushEnabled: boolean }) => {
-      const response = await apiRequest('PUT', '/api/notification-preferences', data);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({ title: 'Notification preferences saved' });
-      queryClient.invalidateQueries({ queryKey: ['/api/notification-preferences'] });
-      setHasChanges(false);
-      onOpenChange(false);
-    },
-    onError: () => {
-      toast({
-        title: 'Failed to save preferences',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const handleSettingChange = (key: keyof NotificationSettings, value: boolean) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    setHasChanges(true);
-  };
-
-  const handlePushEnabledChange = (value: boolean) => {
-    setPushEnabled(value);
-    setHasChanges(true);
-  };
 
   const handleRequestPermission = async () => {
     setIsRequestingPermission(true);
     try {
       const granted = await requestPermission();
       if (granted) {
-        setPushEnabled(true);
-        setHasChanges(true);
         toast({ title: 'Push notifications enabled!' });
         queryClient.invalidateQueries({ queryKey: ['/api/notification-preferences'] });
       } else {
         toast({ 
           title: 'Permission denied', 
-          description: 'You can enable notifications later in your browser settings.',
+          description: 'You can enable notifications later in your device settings.',
           variant: 'destructive' 
         });
       }
@@ -158,10 +66,6 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     } finally {
       setIsRequestingPermission(false);
     }
-  };
-
-  const handleSave = () => {
-    updateMutation.mutate({ notificationSettings: settings, pushEnabled });
   };
 
   const testNotificationMutation = useMutation({
@@ -192,16 +96,19 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     },
   });
 
+  // Determine if notifications are fully set up
+  const isFullySetUp = preferences?.oneSignalExternalId && preferences?.oneSignalPlayerId && preferences?.pushEnabled;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto" data-testid="modal-notification-preferences">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2" data-testid="title-notification-preferences">
             <Bell className="w-5 h-5" />
-            Notification Preferences
+            Push Notifications
           </DialogTitle>
           <DialogDescription>
-            Choose which notifications you want to receive on your device
+            Get notified about messages, payments, games, and more
           </DialogDescription>
         </DialogHeader>
 
@@ -210,158 +117,130 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              {permissionState !== 'granted' && isInitialized ? (
-                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                  <div className="flex items-start gap-3">
-                    <BellRing className="w-5 h-5 text-primary mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-medium">Enable Push Notifications</p>
-                      <p className="text-sm text-muted-foreground mt-1 mb-3">
-                        Get notified about messages, payments, and game reminders even when you're not in the app
-                      </p>
-                      <Button 
-                        onClick={handleRequestPermission}
-                        disabled={isRequestingPermission}
-                        size="sm"
-                        data-testid="button-enable-push"
-                      >
-                        {isRequestingPermission ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Requesting...
-                          </>
-                        ) : (
-                          'Enable Notifications'
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ) : permissionState === 'denied' ? (
-                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-destructive mt-0.5" />
-                    <div>
-                      <p className="font-medium">Notifications Blocked</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        You've blocked notifications. To enable them, go to your browser settings.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+          <div className="space-y-4">
+            {/* Status display */}
+            {isFullySetUp ? (
+              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-medium">Push Notifications</p>
-                    <p className="text-sm text-muted-foreground">
-                      {playerId ? 'Push notifications are enabled on this device' : 'Enable push notifications on this device'}
+                    <p className="font-medium text-green-700 dark:text-green-400">All Notifications Enabled</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      You'll receive push notifications for messages, payments, game reminders, join requests, and announcements.
                     </p>
                   </div>
-                  <Switch
-                    checked={pushEnabled}
-                    onCheckedChange={handlePushEnabledChange}
-                    data-testid="switch-push-enabled"
-                  />
                 </div>
-              )}
-
-              {/* Debug section - shows SDK status */}
-              <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs font-mono">
-                <p><strong>Debug Info:</strong></p>
-                <p>SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
-                <p>Permission: {permissionState}</p>
-                <p>Player ID (SDK): {playerId || 'Not set'}</p>
-                <p>Player ID (DB): {preferences?.oneSignalPlayerId || 'Not in DB'}</p>
-                <p>Push Enabled: {pushEnabled ? 'Yes' : 'No'}</p>
               </div>
-
-              {pushEnabled && (playerId || preferences?.oneSignalPlayerId) && (
-                <div className="p-4 rounded-lg bg-muted/50 border">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm">Test Push Notifications</p>
-                      <p className="text-xs text-muted-foreground">Send a test notification to this device</p>
-                    </div>
-                    <Button
-                      variant="outline"
+            ) : permissionState === 'denied' ? (
+              <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-destructive mt-0.5" />
+                  <div>
+                    <p className="font-medium">Notifications Blocked</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Notifications are blocked. Please enable them in your device settings and try again.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : !isInitialized ? (
+              <div className="p-4 rounded-lg bg-muted/50 border">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Initializing notification system...</p>
+                </div>
+              </div>
+            ) : permissionState !== 'granted' ? (
+              <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                <div className="flex items-start gap-3">
+                  <BellRing className="w-5 h-5 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-medium">Enable Push Notifications</p>
+                    <p className="text-sm text-muted-foreground mt-1 mb-3">
+                      Get notified about messages, payments, and game reminders even when you're not in the app.
+                    </p>
+                    <Button 
+                      onClick={handleRequestPermission}
+                      disabled={isRequestingPermission}
                       size="sm"
-                      onClick={() => testNotificationMutation.mutate()}
-                      disabled={testNotificationMutation.isPending}
-                      data-testid="button-test-notification"
+                      data-testid="button-enable-push"
                     >
-                      {testNotificationMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
+                      {isRequestingPermission ? (
                         <>
-                          <Send className="w-4 h-4 mr-1" />
-                          Send Test
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Enabling...
                         </>
+                      ) : (
+                        'Enable Notifications'
                       )}
                     </Button>
                   </div>
                 </div>
-              )}
-
-              <div className="border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground mb-3">
-                  Notification Types
-                </p>
-                <div className="space-y-3">
-                  {NOTIFICATION_TYPES.map((type) => {
-                    const Icon = type.icon;
-                    return (
-                      <div
-                        key={type.key}
-                        className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                        data-testid={`notification-type-${type.key}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Icon className="w-4 h-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm">{type.label}</p>
-                            <p className="text-xs text-muted-foreground">{type.description}</p>
-                          </div>
-                        </div>
-                        <Switch
-                          checked={settings[type.key]}
-                          onCheckedChange={(value) => handleSettingChange(type.key, value)}
-                          disabled={!pushEnabled}
-                          data-testid={`switch-${type.key}`}
-                        />
-                      </div>
-                    );
-                  })}
+              </div>
+            ) : !preferences?.oneSignalExternalId ? (
+              <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                <div className="flex items-start gap-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-yellow-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-medium text-yellow-700 dark:text-yellow-400">Setting Up Notifications</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Please wait while we connect your account to the notification system. This may take a few moments...
+                    </p>
+                  </div>
                 </div>
               </div>
+            ) : null}
+
+            {/* Test notification button - only show when fully set up */}
+            {isFullySetUp && (
+              <div className="p-4 rounded-lg bg-muted/50 border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-sm">Test Notifications</p>
+                    <p className="text-xs text-muted-foreground">Send a test notification to verify everything works</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testNotificationMutation.mutate()}
+                    disabled={testNotificationMutation.isPending}
+                    data-testid="button-test-notification"
+                  >
+                    {testNotificationMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-1" />
+                        Send Test
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Debug section - shows SDK status */}
+            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs font-mono">
+              <p><strong>Debug Info:</strong></p>
+              <p>SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
+              <p>Permission: {permissionState}</p>
+              <p>Player ID (SDK): {playerId || 'Not set'}</p>
+              <p>Player ID (DB): {preferences?.oneSignalPlayerId || 'Not in DB'}</p>
+              <p>External ID (SDK): {externalIdSet ? '✅ Set' : '❌ Not set'}</p>
+              <p>External ID (DB): {preferences?.oneSignalExternalId || 'Not linked'}</p>
+              <p>Display ID: {displayId || 'Unknown'}</p>
+              <p>Push Enabled: {preferences?.pushEnabled ? 'Yes' : 'No'}</p>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t">
+            {/* Close button */}
+            <div className="pt-2">
               <Button
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="flex-1"
-                data-testid="button-cancel-notifications"
+                className="w-full"
+                data-testid="button-close-notifications"
               >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={!hasChanges || updateMutation.isPending}
-                className="flex-1"
-                data-testid="button-save-notifications"
-              >
-                {updateMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save Preferences'
-                )}
+                Close
               </Button>
             </div>
           </div>
