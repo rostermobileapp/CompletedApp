@@ -590,6 +590,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Verify External ID is linked in OneSignal (for debugging)
+  app.get('/api/notification-preferences/verify-external-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const authUserId = req.user.claims.sub;
+      const user = await storage.getUser(authUserId);
+      
+      if (!user?.displayId) {
+        return res.json({ 
+          verified: false, 
+          error: 'No displayId found for user',
+          displayId: null
+        });
+      }
+      
+      const result = await notificationService.verifyExternalIdLink(user.displayId);
+      
+      res.json({
+        verified: result.linked,
+        displayId: user.displayId,
+        oneSignalData: result.userData,
+        error: result.error
+      });
+    } catch (error) {
+      console.error("Error verifying External ID:", error);
+      res.status(500).json({ verified: false, error: String(error) });
+    }
+  });
+
+  // Lookup OneSignal user by their OneSignal ID (for debugging)
+  app.get('/api/notification-preferences/lookup-onesignal/:oneSignalId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { oneSignalId } = req.params;
+      
+      if (!oneSignalId) {
+        return res.status(400).json({ found: false, error: 'No OneSignal ID provided' });
+      }
+      
+      const result = await notificationService.lookupOneSignalUser(oneSignalId);
+      
+      res.json({
+        found: result.found,
+        oneSignalId,
+        userData: result.userData,
+        error: result.error
+      });
+    } catch (error) {
+      console.error("Error looking up OneSignal user:", error);
+      res.status(500).json({ found: false, error: String(error) });
+    }
+  });
+
   // Test Push Notification Endpoint - Send a test notification to yourself
   app.post('/api/notification-preferences/test', isAuthenticated, async (req: any, res) => {
     try {

@@ -32,6 +32,76 @@ interface OneSignalNotification {
 
 const ONESIGNAL_API_URL = 'https://onesignal.com/api/v1/notifications';
 
+// Verify if an External ID is properly linked in OneSignal
+export async function verifyExternalIdLink(displayId: string): Promise<{ linked: boolean; userData?: any; error?: string }> {
+  const apiKey = process.env.ONESIGNAL_REST_API_KEY;
+  const appId = process.env.ONESIGNAL_APP_ID;
+  
+  if (!apiKey || !appId) {
+    return { linked: false, error: 'Missing API credentials' };
+  }
+
+  try {
+    // Query OneSignal to see if the external_id exists
+    const url = `https://onesignal.com/api/v1/apps/${appId}/users/by/external_id/${displayId}`;
+    console.log('[OneSignal] Verifying external_id:', displayId);
+    
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Basic ${apiKey}` }
+    });
+    
+    const responseText = await response.text();
+    console.log('[OneSignal] Verify response status:', response.status);
+    console.log('[OneSignal] Verify response body:', responseText);
+    
+    if (response.ok) {
+      const userData = JSON.parse(responseText);
+      console.log('[OneSignal] ✓ Found user with external_id:', displayId);
+      return { linked: true, userData };
+    } else {
+      console.log('[OneSignal] ✗ No user found with external_id:', displayId);
+      return { linked: false, error: `Status ${response.status}: ${responseText}` };
+    }
+  } catch (error) {
+    console.error('[OneSignal] Error verifying external_id:', error);
+    return { linked: false, error: String(error) };
+  }
+}
+
+// Lookup user by OneSignal ID (subscription ID) to check their properties
+export async function lookupOneSignalUser(oneSignalId: string): Promise<{ found: boolean; userData?: any; error?: string }> {
+  const apiKey = process.env.ONESIGNAL_REST_API_KEY;
+  const appId = process.env.ONESIGNAL_APP_ID;
+  
+  if (!apiKey || !appId) {
+    return { found: false, error: 'Missing API credentials' };
+  }
+
+  try {
+    const url = `https://onesignal.com/api/v1/apps/${appId}/users/by/onesignal_id/${oneSignalId}`;
+    console.log('[OneSignal] Looking up user by onesignal_id:', oneSignalId);
+    
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Basic ${apiKey}` }
+    });
+    
+    const responseText = await response.text();
+    console.log('[OneSignal] Lookup response status:', response.status);
+    
+    if (response.ok) {
+      const userData = JSON.parse(responseText);
+      console.log('[OneSignal] ✓ Found user:', JSON.stringify(userData, null, 2));
+      return { found: true, userData };
+    } else {
+      console.log('[OneSignal] ✗ User not found:', oneSignalId);
+      return { found: false, error: `Status ${response.status}` };
+    }
+  } catch (error) {
+    console.error('[OneSignal] Lookup error:', error);
+    return { found: false, error: String(error) };
+  }
+}
+
 export async function setExternalIdViaApi(oneSignalId: string, externalUserId: string, retryCount = 0): Promise<boolean> {
   const apiKey = process.env.ONESIGNAL_REST_API_KEY;
   const appId = process.env.ONESIGNAL_APP_ID;
@@ -43,7 +113,14 @@ export async function setExternalIdViaApi(oneSignalId: string, externalUserId: s
     return false;
   }
 
-  console.log(`[OneSignal] Setting External ID via Identity API (attempt ${retryCount + 1}/${MAX_RETRIES + 1}): oneSignalId=${oneSignalId.substring(0, 8)}..., externalUserId=${externalUserId}`);
+  // Enhanced logging to debug ID type issues
+  console.log(`[OneSignal] Setting External ID via Identity API (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
+  console.log('[OneSignal] ID type check:', {
+    oneSignalId,
+    idLength: oneSignalId.length,
+    format: oneSignalId.match(/^[a-f0-9-]{36}$/) ? 'UUID' : 'other',
+    externalUserId
+  });
 
   try {
     // Use the newer OneSignal Identity API which accepts the OneSignal ID (alias) directly
@@ -481,4 +558,7 @@ export const notificationService = {
   sendScrimmageReminderNotification,
   sendEventReminderNotification,
   sendNewsAnnouncementNotification,
+  setExternalIdViaApi,
+  verifyExternalIdLink,
+  lookupOneSignalUser,
 };

@@ -1,0 +1,148 @@
+Looking at your backend notification code alongside the frontend hook, I can see **a critical mismatch** that's likely causing your External ID sync issues:
+
+## Critical Issue: External ID Mismatch
+
+**Frontend (useOneSignal.ts):**
+```typescript
+// Line ~228: Sends displayId to backend
+await fetch('/api/notification-preferences/player-id', {
+  body: JSON.stringify({ playerId: playerIdToRegister }),
+  // This registers the OneSignal Player ID in your DB
+});
+
+// Line ~350+: Logs in with displayId as External ID
+await window.OneSignal.login(displayId); // e.g., "LFB3Kf"
+```
+
+**Backend (notificationService.ts):**
+```typescript
+// Line ~200: Uses displayId to target notifications
+const eligibleDisplayIds: string[] = [];
+if (user.displayId) {
+  eligibleDisplayIds.push(user.displayId); // ✓ Correct
+}
+
+// Line ~217: Sends to external_id
+include_aliases: {
+  external_id: eligibleDisplayIds, // ✓ This is correct
+}
+```
+
+**The backend notification code looks CORRECT** - it's properly using `displayId` as the `external_id`. The issue is in your frontend hook.
+
+## Problems in useOneSignal.ts
+
+### 1. **Backend API Endpoint May Not Be Linking Properly**
+
+Your `linkExternalIdViaBackend` function (line ~236) calls:
+```typescript
+await fetch('/api/notification-preferences/link-external-id', {
+  body: JSON.stringify({ oneSignalId, userId: externalUserId }),
+});
+```
+
+**Question**: Does this endpoint call `setExternalIdViaApi()` from your `notificationService.ts`? 
+
+Looking at `setExternalIdViaApi()` (line ~34), it uses:
+```typescript
+const identityUrl = `https://onesignal.com/api/v1/apps/${appId}/users/by/onesignal_id/${oneSignalId}/identity`;
+```
+
+This endpoint format is correct for OneSignal 5.x, **but** there's a potential issue with the OneSignal ID format.
+
+### 2. **OneSignal ID vs Subscription ID Confusion**
+
+In your web push code (line ~492+), you're using:
+```typescript
+const subId = OneSignal.User.PushSubscription.id;
+setPlayerId(subId);
+```
+
+**Critical Question**: Is `PushSubscription.id` the same as the OneSignal User ID?
+
+In OneSignal 5.x:
+- **`PushSubscription.id`** = subscription ID (device-specific)
+- **`User.onesignalId`** = user ID (what you need for the Identity API)
+
+### 3. **Verification Needed**
+
+Your `setExternalIdViaApi` looks good, but I need to verify you're passing the correct ID type. Try this:
+
+```typescript
+// In setExternalIdViaApi, add this logging BEFORE the API call:
+console.log('[OneSignal] ID type check:', {
+  oneSignalId,
+  idLength: oneSignalId.length,
+  format: oneSignalId.match(/^[a-f0-9-]{36}$/) ? 'UUID' : 'other'
+});
+```
+
+## Recommended Backend Changes
+
+### Change 1: Add Better Error Handling in setExternalIdViaApi
+
+```typescript
+if (!response.ok) {
+  const errorBody = JSON.parse(responseText);
+  console.error('[OneSignal] API Error Details:', {
+    status: response.status,
+    body: errorBody,
+    oneSignalId: oneSignalId.substring(0, 8),
+    externalUserId
+  });
+  
+  // 404 might mean subscription isn't ready OR wrong ID type
+  if (response.status === 404) {
+    console.error('[OneSignal] User not found - verify OneSignal ID format');
+  }
+  
+  // Rest of your retry logic...
+}
+```
+
+### Change 2: Verify the Backend Endpoint Implementation
+
+Can you show me the code for `/api/notification-preferences/link-external-id`? I need to see:
+
+1. Does it call `setExternalIdViaApi()`?
+2. What does it do with the response?
+3. Does it store the result anywhere?
+
+### Change 3: Add Verification Endpoint
+
+Add this to your backend to help debug:
+
+```typescript
+export async function verifyExternalIdLink(displayId: string): Promise<boolean> {
+  const apiKey = process.env.ONESIGNAL_REST_API_KEY;
+  const appId = process.env.ONESIGNAL_APP_ID;
+  
+  try {
+    // Query OneSignal to see if the external_id exists
+    const url = `https://onesignal.com/api/v1/apps/${appId}/users/by/external_id/${displayId}`;
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Basic ${apiKey}` }
+    });
+    
+    if (response.ok) {
+      const user = await response.json();
+      console.log('[OneSignal] Found user with external_id:', displayId, user);
+      return true;
+    } else {
+      console.log('[OneSignal] No user found with external_id:', displayId);
+      return false;
+    }
+  } catch (error) {
+    console.error('[OneSignal] Error verifying external_id:', error);
+    return false;
+  }
+}
+```
+
+## Key Questions to Answer
+
+1. **Show me** the `/api/notification-preferences/link-external-id` endpoint implementation
+2. **Run this** in your web console after login: `window.OneSignal.User` - what properties does it have?
+3. **Check OneSignal dashboard**: Do you see users with the `external_id` field populated?
+
+The notification sending code looks correct, so the issue is definitely in how the External ID is being set during login.
