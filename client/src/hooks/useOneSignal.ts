@@ -16,6 +16,8 @@ interface OneSignalWebInstance {
   init: (config: { appId: string; allowLocalhostAsSecureOrigin?: boolean }) => Promise<void>;
   login: (externalId: string) => Promise<void>;
   logout: () => Promise<void>;
+  setConsentGiven: (consent: boolean) => Promise<void>;
+  setConsentRequired: (required: boolean) => Promise<void>;
   Notifications: {
     permission: boolean;
     requestPermission: () => Promise<boolean>;
@@ -477,10 +479,28 @@ export function useOneSignal() {
           return;
         }
 
-        await OneSignal.init({
-          appId: appId,
-          allowLocalhostAsSecureOrigin: true,
-        });
+        // Try to initialize, but handle "already initialized" gracefully
+        try {
+          await OneSignal.init({
+            appId: appId,
+            allowLocalhostAsSecureOrigin: true,
+          });
+          console.log('[OneSignal Web] SDK init completed');
+        } catch (initError: unknown) {
+          if (initError instanceof Error && initError.message.includes('already initialized')) {
+            console.log('[OneSignal Web] SDK was already initialized, continuing...');
+          } else {
+            throw initError; // Re-throw if it's a different error
+          }
+        }
+
+        // Grant consent immediately to allow SDK to fully initialize and create users
+        try {
+          await OneSignal.setConsentGiven(true);
+          console.log('[OneSignal Web] Consent granted');
+        } catch (consentError) {
+          console.log('[OneSignal Web] Consent may already be set:', consentError);
+        }
 
         webSdkRef.current = OneSignal;
         webInitializedRef.current = true;
