@@ -11,7 +11,9 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Bell, Loader2, BellRing, AlertCircle, Send, CheckCircle2 } from 'lucide-react';
+import { Bell, Loader2, BellRing, AlertCircle, Send, CheckCircle2, MessageSquare, CreditCard, Users, Calendar, Newspaper, UserPlus } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface NotificationSettings {
   inAppMessages: boolean;
@@ -35,17 +37,56 @@ interface NotificationPreferencesModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const defaultSettings: NotificationSettings = {
+  inAppMessages: true,
+  paymentRequests: true,
+  substitutionRequests: true,
+  joinRequests: true,
+  upcomingEvents: true,
+  newsAnnouncements: true,
+};
+
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isInitialized, permissionState, requestPermission, playerId, externalIdSet, displayId, isWebPush } = useOneSignal();
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const [localSettings, setLocalSettings] = useState<NotificationSettings>(defaultSettings);
 
   const { data: preferences, isLoading, refetch } = useQuery<NotificationPreferences>({
     queryKey: ['/api/notification-preferences'],
     enabled: open,
-    refetchInterval: 3000, // Poll every 3 seconds to catch External ID updates
+    refetchInterval: 3000,
   });
+
+  useEffect(() => {
+    if (preferences?.notificationSettings) {
+      setLocalSettings(preferences.notificationSettings);
+    }
+  }, [preferences?.notificationSettings]);
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (settings: NotificationSettings) => {
+      const response = await apiRequest('PUT', '/api/notification-preferences', { notificationSettings: settings });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notification-preferences'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to update preferences',
+        description: String(error),
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleToggle = (key: keyof NotificationSettings) => {
+    const newSettings = { ...localSettings, [key]: !localSettings[key] };
+    setLocalSettings(newSettings);
+    updateSettingsMutation.mutate(newSettings);
+  };
 
   const handleRequestPermission = async () => {
     setIsRequestingPermission(true);
@@ -195,6 +236,87 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                 </div>
               </div>
             ) : null}
+
+            {/* Notification type toggles */}
+            {(isFullySetUp || hasPlayerId) && (
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm">Notification Types</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                      <Label htmlFor="toggle-messages" className="text-sm cursor-pointer">Messages</Label>
+                    </div>
+                    <Switch
+                      id="toggle-messages"
+                      checked={localSettings.inAppMessages}
+                      onCheckedChange={() => handleToggle('inAppMessages')}
+                      data-testid="toggle-messages"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-muted-foreground" />
+                      <Label htmlFor="toggle-payments" className="text-sm cursor-pointer">Payment Requests</Label>
+                    </div>
+                    <Switch
+                      id="toggle-payments"
+                      checked={localSettings.paymentRequests}
+                      onCheckedChange={() => handleToggle('paymentRequests')}
+                      data-testid="toggle-payments"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <Label htmlFor="toggle-subs" className="text-sm cursor-pointer">Substitution Requests</Label>
+                    </div>
+                    <Switch
+                      id="toggle-subs"
+                      checked={localSettings.substitutionRequests}
+                      onCheckedChange={() => handleToggle('substitutionRequests')}
+                      data-testid="toggle-subs"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="w-4 h-4 text-muted-foreground" />
+                      <Label htmlFor="toggle-joins" className="text-sm cursor-pointer">Join Requests</Label>
+                    </div>
+                    <Switch
+                      id="toggle-joins"
+                      checked={localSettings.joinRequests}
+                      onCheckedChange={() => handleToggle('joinRequests')}
+                      data-testid="toggle-joins"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <Label htmlFor="toggle-events" className="text-sm cursor-pointer">Schedule Reminders</Label>
+                    </div>
+                    <Switch
+                      id="toggle-events"
+                      checked={localSettings.upcomingEvents}
+                      onCheckedChange={() => handleToggle('upcomingEvents')}
+                      data-testid="toggle-events"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <Newspaper className="w-4 h-4 text-muted-foreground" />
+                      <Label htmlFor="toggle-news" className="text-sm cursor-pointer">News & Announcements</Label>
+                    </div>
+                    <Switch
+                      id="toggle-news"
+                      checked={localSettings.newsAnnouncements}
+                      onCheckedChange={() => handleToggle('newsAnnouncements')}
+                      data-testid="toggle-news"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Test notification button - show when we have a Player ID in DB */}
             {canSendTest && (
