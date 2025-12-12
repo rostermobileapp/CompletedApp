@@ -6,8 +6,33 @@ import { setupVite, serveStatic, log } from "./vite";
 const app = express();
 
 // CORS configuration for Vercel frontend
+// Handle multiple origins properly
+const getAllowedOrigins = () => {
+  const frontendUrl = process.env.FRONTEND_URL;
+  
+  if (!frontendUrl) {
+    return true; // Allow all origins in development
+  }
+  
+  // Split comma-separated URLs and clean them up
+  const origins = frontendUrl
+    .split(',')
+    .map(url => url.trim())
+    .filter(url => url.length > 0)
+    .map(url => {
+      // Ensure proper URL format (add https:// if missing)
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        return `https://${url}`;
+      }
+      return url;
+    });
+  
+  console.log('[CORS] Allowed origins:', origins);
+  return origins;
+};
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || true,
+  origin: getAllowedOrigins(),
   credentials: true,
   optionsSuccessStatus: 200
 };
