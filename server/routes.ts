@@ -740,6 +740,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Auto-link External ID for native apps (when SDK bridge isn't available)
+  // This endpoint finds recent subscriptions without External IDs and links them
+  app.post('/api/notification-preferences/auto-link-native', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const displayId = user?.displayId;
+      
+      if (!displayId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'No displayId found for user' 
+        });
+      }
+      
+      console.log(`[Auto-Link Native] Attempting to link External ID for user ${userId} (displayId: ${displayId})`);
+      
+      // First check if already linked
+      const verifyResult = await notificationService.verifyExternalIdLink(displayId);
+      if (verifyResult.linked) {
+        console.log(`[Auto-Link Native] External ID already linked for ${displayId}`);
+        return res.json({
+          success: true,
+          message: 'External ID already linked',
+          alreadyLinked: true,
+          displayId
+        });
+      }
+      
+      // External ID not linked - need to find the subscription and link it
+      // Since we can't get Player ID from React (native bridge issue), 
+      // we'll need to get it from OneSignal dashboard or have user provide it
+      
+      console.log(`[Auto-Link Native] External ID not linked yet. Need Player ID from device.`);
+      
+      res.json({
+        success: false,
+        message: 'Need Player ID from device to link External ID',
+        needsPlayerId: true,
+        instructions: 'Please provide the OneSignal Player ID from the device',
+        displayId
+      });
+    } catch (error) {
+      console.error('[Auto-Link Native] Error:', error);
+      res.status(500).json({ success: false, message: 'Failed to auto-link External ID' });
+    }
+  });
+
   // Debug endpoint - Get all OneSignal data for current user
   app.get('/api/notification-preferences/debug', isAuthenticated, async (req: any, res) => {
     try {

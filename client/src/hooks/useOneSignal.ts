@@ -277,6 +277,20 @@ export function useOneSignal() {
       console.log('[OneSignal Native] Skipping init - auth:', isAuthenticated, 'user:', !!user?.id, 'displayId:', displayId);
       return;
     }
+    
+    // CRITICAL: Wait for document to be fully loaded before checking for native bridge
+    if (document.readyState !== 'complete') {
+      console.log('[OneSignal Native] Document not ready yet, waiting for load event...');
+      const handleLoad = () => {
+        console.log('[OneSignal Native] Document loaded, will retry initialization');
+        // Small delay to ensure native bridge is attached
+        setTimeout(() => {
+          console.log('[OneSignal Native] Retrying after document load');
+        }, 1000);
+      };
+      window.addEventListener('load', handleLoad);
+      return () => window.removeEventListener('load', handleLoad);
+    }
 
     const initializeNative = async () => {
       // Check if NativelyNotifications is available
@@ -335,27 +349,39 @@ export function useOneSignal() {
 
     // Try immediate initialization
     const tryInit = async () => {
+      console.log('[OneSignal] === STARTING INITIALIZATION ===');
+      console.log('[OneSignal] Checking for NativelyNotifications...');
+      console.log('[OneSignal] window.NativelyNotifications exists:', typeof window.NativelyNotifications);
+      
       const initialized = await initializeNative();
       
       if (!initialized) {
-        // Poll for NativelyNotifications availability
-        console.log('[OneSignal] NativelyNotifications not available, polling...');
+        // Poll for NativelyNotifications availability with more attempts and logging
+        console.log('[OneSignal] NativelyNotifications not available yet, starting polling...');
         let pollCount = 0;
-        const maxPolls = 20;
+        const maxPolls = 40; // Increased from 20 to 40 (20 seconds)
         
         const pollInterval = setInterval(async () => {
           pollCount++;
+          console.log(`[OneSignal] Poll attempt ${pollCount}/${maxPolls}...`);
           
           if (window.NativelyNotifications) {
             clearInterval(pollInterval);
-            console.log('[OneSignal] NativelyNotifications became available!');
-            await initializeNative();
+            console.log('[OneSignal] ✓ NativelyNotifications became available!');
+            const retryInit = await initializeNative();
+            if (!retryInit) {
+              console.error('[OneSignal] ❌ Retry initialization failed, falling back to Web SDK');
+              initializeWebPush();
+            }
           } else if (pollCount >= maxPolls) {
             clearInterval(pollInterval);
+            console.log('[OneSignal] ⏱️ Polling timeout after', maxPolls * 500, 'ms');
             console.log('[OneSignal] Falling back to Web Push SDK');
             initializeWebPush();
           }
         }, 500);
+      } else {
+        console.log('[OneSignal] ✓ Native SDK initialized successfully');
       }
     };
 
