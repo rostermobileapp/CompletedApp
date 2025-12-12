@@ -162,42 +162,60 @@ export function useOneSignal() {
 
     console.log('[OneSignal] === PERFORMING LOGIN ===');
     console.log('[OneSignal] External ID (displayId):', userId);
+    console.log('[OneSignal] Has notifications object:', !!notifications);
+    console.log('[OneSignal] Has notifications.login:', !!notifications?.login);
+    console.log('[OneSignal] Has notifications.setExternalId:', !!notifications?.setExternalId);
+    console.log('[OneSignal] Has window.OneSignal.login:', !!window.OneSignal?.login);
 
     hasCalledLoginRef.current = true;
 
     // PRIORITY 1: Try Native SDK methods first (if native app)
     if (notifications?.login) {
       try {
+        console.log('[OneSignal Native] ✓ Method available: NativelyNotifications.login()');
         console.log('[OneSignal Native] Calling NativelyNotifications.login()...');
         notifications.login(userId);
         console.log('[OneSignal Native] ✓ NativelyNotifications.login() called for:', userId);
+        console.log('[OneSignal Native] ✓ Marking External ID as set');
         setExternalIdSet(true);
         await enablePushPreferences();
+        console.log('[OneSignal Native] ✓ Push preferences enabled');
         return;
       } catch (err) {
         console.error('[OneSignal Native] ✗ NativelyNotifications.login() failed:', err);
-        // Don't return, try web SDK fallback
+        console.error('[OneSignal Native] Error details:', JSON.stringify(err));
+        // Don't return, try fallback methods
       }
+    } else {
+      console.log('[OneSignal Native] ⚠️ NativelyNotifications.login() not available, trying fallback...');
     }
     
     // PRIORITY 2: Try setExternalId for native SDK (if login not available)
     if (notifications?.setExternalId) {
+      console.log('[OneSignal Native] ✓ Method available: setExternalId()');
       console.log('[OneSignal Native] Calling setExternalId() as native fallback...');
       notifications.setExternalId({ externalId: userId }, async (resp) => {
+        console.log('[OneSignal Native] setExternalId callback fired');
+        console.log('[OneSignal Native] Response:', JSON.stringify(resp));
+        
         if (resp && resp.externalId) {
           console.log('[OneSignal Native] ✓ setExternalId() SUCCESS:', resp.externalId);
           setExternalIdSet(true);
           await enablePushPreferences();
         } else if (resp && !resp.error) {
           // No error and no externalId returned = probably success
-          console.log('[OneSignal Native] setExternalId completed (no error)');
+          console.log('[OneSignal Native] ✓ setExternalId completed (no error returned)');
           setExternalIdSet(true);
           await enablePushPreferences();
         } else {
-          console.error('[OneSignal Native] ✗ setExternalId() failed:', resp);
+          console.error('[OneSignal Native] ✗ setExternalId() failed');
+          console.error('[OneSignal Native] Response details:', JSON.stringify(resp));
         }
       });
+      console.log('[OneSignal Native] ✓ setExternalId() called (waiting for callback)');
       return; // Return after calling callback-based method
+    } else {
+      console.log('[OneSignal Native] ⚠️ setExternalId() not available either');
     }
 
     // PRIORITY 3: Use window.OneSignal.login() for Web SDK
@@ -253,49 +271,64 @@ export function useOneSignal() {
     }
   }, []);
 
-  // Main initialization effect for NATIVE apps (BuildNatively)
+    // Main initialization effect for NATIVE apps (BuildNatively)
   useEffect(() => {
     if (!isAuthenticated || !user?.id || !displayId) {
+      console.log('[OneSignal Native] Skipping init - auth:', isAuthenticated, 'user:', !!user?.id, 'displayId:', displayId);
       return;
     }
 
     const initializeNative = async () => {
       // Check if NativelyNotifications is available
       if (!window.NativelyNotifications) {
+        console.log('[OneSignal Native] NativelyNotifications not available (not a native app)');
         return false;
       }
 
       try {
+        console.log('[OneSignal Native] === STARTING NATIVE INITIALIZATION ===');
         const notifications = new window.NativelyNotifications();
         notificationsRef.current = notifications;
         setIsInitialized(true);
-        console.log('[OneSignal Native] SDK initialized for displayId:', displayId);
+        console.log('[OneSignal Native] ✓ SDK instance created');
 
         // Step 1: Grant consent FIRST (before any user operations)
+        console.log('[OneSignal Native] Step 1: Granting consent...');
         await grantConsent();
+        console.log('[OneSignal Native] ✓ Consent granted');
 
         // Step 2: Get permission status
+        console.log('[OneSignal Native] Step 2: Checking permission status...');
         notifications.getPermissionStatus((resp) => {
           const status = resp.status ? 'granted' : 'default';
           setPermissionState(status);
-          console.log('[OneSignal Native] Permission status:', status);
+          console.log('[OneSignal Native] ✓ Permission status:', status);
         });
 
         // Step 3: Login with External ID immediately
         // We don't need to wait for Player ID - OneSignal manages the External ID → Player ID mapping
-        console.log('[OneSignal Native] Calling login with External ID (displayId):', displayId);
+        console.log('[OneSignal Native] Step 3: Logging in with External ID...');
+        console.log('[OneSignal Native] External ID (displayId):', displayId);
+        
         await performLogin(displayId, notifications);
         
-        // Optionally get Player ID for display purposes only (not stored)
+        console.log('[OneSignal Native] ✓ Login called successfully');
+        
+        // Step 4: Optionally get Player ID for display purposes only (not stored)
+        console.log('[OneSignal Native] Step 4: Getting Player ID for display...');
         notifications.getOneSignalId((resp) => {
           if (resp.playerId) {
-            console.log('[OneSignal Native] Player ID (for display only):', resp.playerId);
+            console.log('[OneSignal Native] ✓ Player ID (for display only):', resp.playerId);
             setPlayerId(resp.playerId);
+          } else {
+            console.log('[OneSignal Native] ⚠️ No Player ID yet');
           }
         });
+        
+        console.log('[OneSignal Native] === NATIVE INITIALIZATION COMPLETE ===');
         return true;
       } catch (error) {
-        console.error('[OneSignal Native] Failed to initialize:', error);
+        console.error('[OneSignal Native] ❌ Failed to initialize:', error);
         return false;
       }
     };
