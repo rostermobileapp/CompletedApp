@@ -9788,5 +9788,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /**
+   * POST /api/notification-preferences/test
+   * Send a test notification to the current user (for testing only)
+   */
+  app.post('/api/notification-preferences/test', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user?.displayId) {
+        return res.status(400).json({ message: 'User has no displayId' });
+      }
+
+      // Import notificationService dynamically to avoid circular dependencies
+      const { notificationService } = await import('./notificationService');
+
+      const result = await notificationService.sendNotification({
+        externalIds: [user.displayId],
+        headings: { en: '🎉 Test Notification' },
+        contents: { en: 'Your OneSignal integration is working perfectly!' },
+        data: { test: true, userId: user.id },
+      });
+
+      res.json({
+        success: true,
+        message: 'Test notification sent',
+        displayId: user.displayId,
+        result,
+      });
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      res.status(500).json({ 
+        message: 'Failed to send test notification',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   return httpServer;
 }
