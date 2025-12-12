@@ -75,6 +75,11 @@ export function useOneSignal(options: UseOneSignalOptions) {
           window.OneSignal.init({
             appId: options.appId,
             allowLocalhostAsSecureOrigin: true,
+            // Service Worker configuration for Vite
+            serviceWorkerParam: {
+              scope: '/'
+            },
+            serviceWorkerPath: 'OneSignalSDKWorker.js',
             // Don't auto-prompt - we'll request permission later if needed
             promptOptions: {
               autoPrompt: false,
@@ -144,10 +149,14 @@ export function useOneSignal(options: UseOneSignalOptions) {
         await (window as any).NativelyNotifications.login(displayId);
       } else {
         // Web login (v16 SDK push-based API)
-        await new Promise<void>((resolve) => {
-          window.OneSignal.push(function() {
-            window.OneSignal.login(displayId);
-            resolve();
+        await new Promise<void>((resolve, reject) => {
+          window.OneSignal.push(async function() {
+            try {
+              await window.OneSignal.login(displayId);
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
           });
         });
       }
