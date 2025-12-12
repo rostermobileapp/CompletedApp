@@ -9668,5 +9668,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==========================================
+  // NOTIFICATION PREFERENCES ROUTES
+  // ==========================================
+
+  /**
+   * POST /api/notification-preferences/player-id
+   * Register OneSignal Player ID and link External ID
+   */
+  app.post('/api/notification-preferences/player-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { onesignalPlayerId, onesignalSubscriptionId, externalId } = req.body;
+
+      if (!onesignalPlayerId) {
+        return res.status(400).json({ message: 'onesignalPlayerId is required' });
+      }
+
+      // Update user record with OneSignal IDs
+      await storage.updateUser(userId, {
+        onesignalPlayerId,
+        onesignalSubscriptionId: onesignalSubscriptionId || null,
+        onesignalExternalIdSyncedAt: new Date(),
+        pushNotificationsEnabled: true,
+      });
+
+      console.log(`[OneSignal] Player ID registered for user ${userId}:`, {
+        playerId: onesignalPlayerId,
+        subscriptionId: onesignalSubscriptionId,
+        externalId,
+      });
+
+      res.json({ 
+        success: true, 
+        message: 'OneSignal Player ID registered successfully',
+        playerId: onesignalPlayerId,
+        externalId,
+      });
+    } catch (error) {
+      console.error('Error registering OneSignal Player ID:', error);
+      res.status(500).json({ message: 'Failed to register Player ID' });
+    }
+  });
+
+  /**
+   * GET /api/notification-preferences
+   * Get current user's notification preferences
+   */
+  app.get('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json({
+        onesignalPlayerId: user.onesignalPlayerId,
+        onesignalSubscriptionId: user.onesignalSubscriptionId,
+        onesignalExternalIdSyncedAt: user.onesignalExternalIdSyncedAt,
+        pushNotificationsEnabled: user.pushNotificationsEnabled,
+        displayId: user.displayId,
+      });
+    } catch (error) {
+      console.error('Error fetching notification preferences:', error);
+      res.status(500).json({ message: 'Failed to fetch preferences' });
+    }
+  });
+
+  /**
+   * PATCH /api/notification-preferences
+   * Update notification preferences
+   */
+  app.patch('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { pushNotificationsEnabled } = req.body;
+
+      await storage.updateUser(userId, {
+        pushNotificationsEnabled: pushNotificationsEnabled ?? false,
+      });
+
+      res.json({ 
+        success: true, 
+        message: 'Preferences updated',
+        pushNotificationsEnabled,
+      });
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+      res.status(500).json({ message: 'Failed to update preferences' });
+    }
+  });
+
+  /**
+   * DELETE /api/notification-preferences
+   * Clear OneSignal Player ID (logout from push notifications)
+   */
+  app.delete('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      await storage.updateUser(userId, {
+        onesignalPlayerId: null,
+        onesignalSubscriptionId: null,
+        onesignalExternalIdSyncedAt: null,
+        pushNotificationsEnabled: false,
+      });
+
+      console.log(`[OneSignal] Player ID cleared for user ${userId}`);
+
+      res.json({ 
+        success: true, 
+        message: 'OneSignal Player ID cleared',
+      });
+    } catch (error) {
+      console.error('Error clearing OneSignal Player ID:', error);
+      res.status(500).json({ message: 'Failed to clear Player ID' });
+    }
+  });
+
   return httpServer;
 }

@@ -10,6 +10,7 @@ import { AdSenseBanner } from "@/components/AdSenseBanner";
 import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { useAuth } from "@/hooks/useAuth";
+import { useOneSignal } from "@/hooks/useOneSignal";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
@@ -48,6 +49,15 @@ import StripeAdmin from "@/pages/StripeAdmin";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+
+  // Initialize OneSignal for authenticated users
+  // Get APP_ID from environment variable (set in your hosting provider)
+  const oneSignalAppId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+  
+  useOneSignal({
+    appId: oneSignalAppId || '',
+    enabled: isAuthenticated && !!oneSignalAppId,
+  });
 
   if (isLoading) {
     return (

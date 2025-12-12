@@ -159,6 +159,11 @@ export const users = pgTable("users", {
   // Payment method fields for receiving payments
   venmoUsername: varchar("venmo_username"),
   cashappUsername: varchar("cashapp_username"),
+  // OneSignal push notification fields
+  onesignalPlayerId: varchar("onesignal_player_id"),
+  onesignalSubscriptionId: varchar("onesignal_subscription_id"),
+  onesignalExternalIdSyncedAt: timestamp("onesignal_external_id_synced_at"),
+  pushNotificationsEnabled: boolean("push_notifications_enabled").default(false),
   // Navigation preferences
   navigationPreferences: jsonb("navigation_preferences"),
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
