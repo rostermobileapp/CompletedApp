@@ -165,12 +165,47 @@ export function useOneSignal() {
 
     hasCalledLoginRef.current = true;
 
-    // Method 1: Use window.OneSignal.login() - PRIMARY method for both web and native
+    // PRIORITY 1: Try Native SDK methods first (if native app)
+    if (notifications?.login) {
+      try {
+        console.log('[OneSignal Native] Calling NativelyNotifications.login()...');
+        notifications.login(userId);
+        console.log('[OneSignal Native] ✓ NativelyNotifications.login() called for:', userId);
+        setExternalIdSet(true);
+        await enablePushPreferences();
+        return;
+      } catch (err) {
+        console.error('[OneSignal Native] ✗ NativelyNotifications.login() failed:', err);
+        // Don't return, try web SDK fallback
+      }
+    }
+    
+    // PRIORITY 2: Try setExternalId for native SDK (if login not available)
+    if (notifications?.setExternalId) {
+      console.log('[OneSignal Native] Calling setExternalId() as native fallback...');
+      notifications.setExternalId({ externalId: userId }, async (resp) => {
+        if (resp && resp.externalId) {
+          console.log('[OneSignal Native] ✓ setExternalId() SUCCESS:', resp.externalId);
+          setExternalIdSet(true);
+          await enablePushPreferences();
+        } else if (resp && !resp.error) {
+          // No error and no externalId returned = probably success
+          console.log('[OneSignal Native] setExternalId completed (no error)');
+          setExternalIdSet(true);
+          await enablePushPreferences();
+        } else {
+          console.error('[OneSignal Native] ✗ setExternalId() failed:', resp);
+        }
+      });
+      return; // Return after calling callback-based method
+    }
+
+    // PRIORITY 3: Use window.OneSignal.login() for Web SDK
     if (window.OneSignal?.login) {
       try {
-        console.log('[OneSignal] Calling window.OneSignal.login()...');
+        console.log('[OneSignal Web] Calling window.OneSignal.login()...');
         await window.OneSignal.login(userId);
-        console.log('[OneSignal] ✓ OneSignal.login() SUCCESS for:', userId);
+        console.log('[OneSignal Web] ✓ OneSignal.login() SUCCESS for:', userId);
         setExternalIdSet(true);
         await enablePushPreferences();
         return;
@@ -178,48 +213,18 @@ export function useOneSignal() {
         // Only reset flag and try fallback if it's a real failure (not "already logged in")
         const errorMsg = String(err?.message || err);
         if (errorMsg.toLowerCase().includes('already') || errorMsg.toLowerCase().includes('logged in')) {
-          console.log('[OneSignal] Already logged in, marking as success');
+          console.log('[OneSignal Web] Already logged in, marking as success');
           setExternalIdSet(true);
           await enablePushPreferences();
           return;
         }
         
-        console.error('[OneSignal] ✗ OneSignal.login() failed:', err);
-        hasCalledLoginRef.current = false; // Allow retry with fallback
-      }
-    } else {
-      console.log('[OneSignal] window.OneSignal.login not available, trying alternatives');
-    }
-
-    // Method 2: Use NativelyNotifications.login() if available
-    if (notifications?.login) {
-      try {
-        console.log('[OneSignal] Calling NativelyNotifications.login()...');
-        notifications.login(userId);
-        console.log('[OneSignal] ✓ NativelyNotifications.login() called for:', userId);
-        hasCalledLoginRef.current = true;
-        setExternalIdSet(true);
-        await enablePushPreferences();
-        return;
-      } catch (err) {
-        console.error('[OneSignal] ✗ NativelyNotifications.login() failed:', err);
+        console.error('[OneSignal Web] ✗ OneSignal.login() failed:', err);
+        hasCalledLoginRef.current = false; // Allow retry
       }
     }
-
-    // Method 3: Use setExternalId as last resort fallback
-    if (notifications) {
-      console.log('[OneSignal] Calling setExternalId() as fallback...');
-      notifications.setExternalId({ externalId: userId }, async (resp) => {
-        if (resp && resp.externalId) {
-          console.log('[OneSignal] ✓ setExternalId() SUCCESS:', resp.externalId);
-          hasCalledLoginRef.current = true;
-          setExternalIdSet(true);
-          await enablePushPreferences();
-        } else {
-          console.error('[OneSignal] ✗ setExternalId() failed:', resp);
-        }
-      });
-    }
+    
+    console.error('[OneSignal] ❌ No login methods available!');
   }, [enablePushPreferences]);
 
   // Grant consent - must be called BEFORE login
