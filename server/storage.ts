@@ -59,6 +59,8 @@ import {
   facilityMemberships,
   calendarEvents,
   eventParticipants,
+  // Notification preferences
+  notificationPreferences,
   type User,
   type UpsertUser,
   type League,
@@ -163,6 +165,8 @@ import {
   type InsertCalendarEvent,
   type EventParticipant,
   type InsertEventParticipant,
+  type NotificationPreferences,
+  type InsertNotificationPreferences,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, not } from "drizzle-orm";
@@ -7601,6 +7605,245 @@ export class DatabaseStorage implements IStorage {
       .where(eq(eventParticipants.id, id))
       .returning();
     return participant;
+  }
+
+  // ============================================
+  // NOTIFICATION PREFERENCES OPERATIONS
+  // ============================================
+
+  /**
+   * Get notification preferences for a user
+   */
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferences[]> {
+    return db
+      .select()
+      .from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
+  }
+
+  /**
+   * Get notification preferences by player ID (OneSignal subscription ID)
+   */
+  async getNotificationPreferencesByPlayerId(playerId: string): Promise<NotificationPreferences | undefined> {
+    const [pref] = await db
+      .select()
+      .from(notificationPreferences)
+      .where(eq(notificationPreferences.onesignalPlayerId, playerId));
+    return pref;
+  }
+
+  /**
+   * Register a new OneSignal player ID for a user
+   * Upserts based on user + player ID combination
+   */
+  async registerPlayerId(
+    userId: string,
+    playerId: string,
+    platform: 'web' | 'ios' | 'android' = 'web',
+    subscriptionId?: string,
+    deviceInfo?: { deviceModel?: string; osVersion?: string; appVersion?: string }
+  ): Promise<NotificationPreferences> {
+    const [existing] = await db
+      .select()
+      .from(notificationPreferences)
+      .where(
+        and(
+          eq(notificationPreferences.userId, userId),
+          eq(notificationPreferences.onesignalPlayerId, playerId)
+        )
+      );
+
+    if (existing) {
+      // Update existing record
+      const [updated] = await db
+        .update(notificationPreferences)
+        .set({
+          onesignalSubscriptionId: subscriptionId || existing.onesignalSubscriptionId,
+          platform,
+          deviceModel: deviceInfo?.deviceModel || existing.deviceModel,
+          osVersion: deviceInfo?.osVersion || existing.osVersion,
+          appVersion: deviceInfo?.appVersion || existing.appVersion,
+          lastActiveAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(notificationPreferences.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    // Create new record
+    const [created] = await db
+      .insert(notificationPreferences)
+      .values({
+        userId,
+        onesignalPlayerId: playerId,
+        onesignalSubscriptionId: subscriptionId,
+        platform,
+        deviceModel: deviceInfo?.deviceModel,
+        osVersion: deviceInfo?.osVersion,
+        appVersion: deviceInfo?.appVersion,
+        externalIdLinked: false,
+        pushEnabled: true,
+        gameReminders: true,
+        scrimmageUpdates: true,
+        messageNotifications: true,
+        announcementNotifications: true,
+        substituteRequests: true,
+        isActive: true,
+        lastActiveAt: new Date(),
+      })
+      .returning();
+
+    return created;
+  }
+
+  /**
+   * Mark external ID as linked for a player ID
+   */
+  async markExternalIdLinked(playerId: string): Promise<NotificationPreferences | undefined> {
+    const [updated] = await db
+      .update(notificationPreferences)
+      .set({
+        externalIdLinked: true,
+        externalIdLinkedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(notificationPreferences.onesignalPlayerId, playerId))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Mark external ID as unlinked for a player ID (for logout)
+   */
+  async markExternalIdUnlinked(playerId: string): Promise<NotificationPreferences | undefined> {
+    const [updated] = await db
+      .update(notificationPreferences)
+      .set({
+        externalIdLinked: false,
+        externalIdLinkedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(notificationPreferences.onesignalPlayerId, playerId))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Update notification preferences for a user
+   */
+  async updateNotificationPreferences(
+    userId: string,
+    updates: {
+      pushEnabled?: boolean;
+      gameReminders?: boolean;
+      scrimmageUpdates?: boolean;
+      messageNotifications?: boolean;
+      announcementNotifications?: boolean;
+      substituteRequests?: boolean;
+    }
+  ): Promise<NotificationPreferences[]> {
+    return db
+      .update(notificationPreferences)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(notificationPreferences.userId, userId))
+      .returning();
+  }
+
+  /**
+   * Deactivate all notification preferences for a user (soft delete)
+   */
+  async deactivateNotificationPreferences(userId: string): Promise<void> {
+    await db
+      .update(notificationPreferences)
+      .set({
+        isActive: false,
+        externalIdLinked: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(notificationPreferences.userId, userId));
+  }
+
+  /**
+   * Delete all notification preferences for a user (hard delete)
+   */
+  async deleteNotificationPreferences(userId: string): Promise<void> {
+    await db
+      .delete(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
+  }
+
+  /**
+   * Delete a specific player ID record
+   */
+  async deleteNotificationPreferenceByPlayerId(playerId: string): Promise<void> {
+    await db
+      .delete(notificationPreferences)
+      .where(eq(notificationPreferences.onesignalPlayerId, playerId));
+  }
+
+  /**
+   * Get all users with linked external IDs for sending notifications
+   */
+  async getUsersWithLinkedExternalIds(userIds: string[]): Promise<(NotificationPreferences & { user: User })[]> {
+    if (userIds.length === 0) return [];
+
+    const results = await db
+      .select()
+      .from(notificationPreferences)
+      .innerJoin(users, eq(notificationPreferences.userId, users.id))
+      .where(
+        and(
+          inArray(notificationPreferences.userId, userIds),
+          eq(notificationPreferences.externalIdLinked, true),
+          eq(notificationPreferences.isActive, true),
+          eq(notificationPreferences.pushEnabled, true)
+        )
+      );
+
+    return results.map(row => ({
+      ...row.notification_preferences,
+      user: row.users,
+    }));
+  }
+
+  /**
+   * Get external IDs (displayIds) for users who have push enabled
+   */
+  async getExternalIdsForUsers(userIds: string[]): Promise<string[]> {
+    if (userIds.length === 0) return [];
+
+    const results = await db
+      .select({ displayId: users.displayId })
+      .from(notificationPreferences)
+      .innerJoin(users, eq(notificationPreferences.userId, users.id))
+      .where(
+        and(
+          inArray(notificationPreferences.userId, userIds),
+          eq(notificationPreferences.externalIdLinked, true),
+          eq(notificationPreferences.isActive, true),
+          eq(notificationPreferences.pushEnabled, true)
+        )
+      );
+
+    return results
+      .map(r => r.displayId)
+      .filter((id): id is string => id !== null);
+  }
+
+  /**
+   * Clear stale notification preferences (for cleanup)
+   * Returns count of records cleaned
+   */
+  async clearStaleNotificationPreferences(userId: string): Promise<number> {
+    const result = await db
+      .delete(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId))
+      .returning();
+    return result.length;
   }
 }
 

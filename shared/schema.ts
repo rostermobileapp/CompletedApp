@@ -1138,6 +1138,46 @@ export const feedbackSubmissions = pgTable("feedback_submissions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Device platform enum for push notifications
+export const devicePlatformEnum = pgEnum("device_platform", [
+  "web",
+  "ios",
+  "android"
+]);
+
+// Notification preferences table - stores OneSignal Player IDs and preferences
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  // OneSignal identifiers
+  onesignalPlayerId: varchar("onesignal_player_id"), // OneSignal Player/Subscription ID
+  onesignalSubscriptionId: varchar("onesignal_subscription_id"), // OneSignal 5.x Subscription ID
+  externalIdLinked: boolean("external_id_linked").default(false).notNull(), // Whether displayId is linked as external_id
+  externalIdLinkedAt: timestamp("external_id_linked_at"), // When the external ID was linked
+  // Device information
+  platform: devicePlatformEnum("platform").default("web").notNull(),
+  deviceModel: varchar("device_model"), // e.g., "iPhone 14", "Pixel 7"
+  osVersion: varchar("os_version"), // e.g., "iOS 17.1", "Android 14"
+  appVersion: varchar("app_version"), // App version for tracking
+  // Push notification preferences
+  pushEnabled: boolean("push_enabled").default(true).notNull(),
+  gameReminders: boolean("game_reminders").default(true).notNull(),
+  scrimmageUpdates: boolean("scrimmage_updates").default(true).notNull(),
+  messageNotifications: boolean("message_notifications").default(true).notNull(),
+  announcementNotifications: boolean("announcement_notifications").default(true).notNull(),
+  substituteRequests: boolean("substitute_requests").default(true).notNull(),
+  // Status tracking
+  isActive: boolean("is_active").default(true).notNull(),
+  lastActiveAt: timestamp("last_active_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_user_player_id").on(table.userId, table.onesignalPlayerId),
+  index("idx_notification_preferences_user").on(table.userId),
+  index("idx_notification_preferences_player_id").on(table.onesignalPlayerId),
+  index("idx_notification_preferences_external_linked").on(table.externalIdLinked),
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   leagueMemberships: many(leagueMemberships),
@@ -2199,6 +2239,36 @@ export const createFeedbackSubmissionSchema = z.object({
   message: z.string().min(1, "Message is required").max(5000, "Message is too long"),
 });
 
+// Notification preferences schemas
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const registerPlayerIdSchema = z.object({
+  playerId: z.string().min(1, "Player ID is required"),
+  subscriptionId: z.string().optional(), // OneSignal 5.x subscription ID
+  platform: z.enum(["web", "ios", "android"]).default("web"),
+  deviceModel: z.string().optional(),
+  osVersion: z.string().optional(),
+  appVersion: z.string().optional(),
+});
+
+export const linkExternalIdSchema = z.object({
+  playerId: z.string().min(1, "Player ID is required"),
+  externalId: z.string().min(1, "External ID is required"), // This should be the user's displayId
+});
+
+export const updateNotificationPreferencesSchema = z.object({
+  pushEnabled: z.boolean().optional(),
+  gameReminders: z.boolean().optional(),
+  scrimmageUpdates: z.boolean().optional(),
+  messageNotifications: z.boolean().optional(),
+  announcementNotifications: z.boolean().optional(),
+  substituteRequests: z.boolean().optional(),
+});
+
 // Facility schemas
 export const insertFacilitySchema = createInsertSchema(facilities).omit({
   id: true,
@@ -2458,6 +2528,13 @@ export type UserTeam = Team;
 export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
 export type InsertFeedbackSubmission = z.infer<typeof insertFeedbackSubmissionSchema>;
 export type CreateFeedbackSubmissionRequest = z.infer<typeof createFeedbackSubmissionSchema>;
+
+// Notification preferences types
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
+export type RegisterPlayerIdRequest = z.infer<typeof registerPlayerIdSchema>;
+export type LinkExternalIdRequest = z.infer<typeof linkExternalIdSchema>;
+export type UpdateNotificationPreferencesRequest = z.infer<typeof updateNotificationPreferencesSchema>;
 
 // Facility types
 export type Facility = typeof facilities.$inferSelect;

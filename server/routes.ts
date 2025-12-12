@@ -9668,5 +9668,362 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // NOTIFICATION PREFERENCES & ONESIGNAL ROUTES
+  // ============================================
+
+  // Import the notification service dynamically to avoid circular imports
+  const { notificationService } = await import('./notificationService');
+
+  /**
+   * GET /api/notification-preferences
+   * Get current user's notification preferences
+   */
+  app.get('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const preferences = await storage.getNotificationPreferences(userId);
+      res.json(preferences);
+    } catch (error) {
+      console.error('Error fetching notification preferences:', error);
+      res.status(500).json({ message: 'Failed to fetch notification preferences' });
+    }
+  });
+
+  /**
+   * POST /api/notification-preferences/player-id
+   * Register a OneSignal Player ID for the current user
+   * 
+   * Body: {
+   *   playerId: string,
+   *   subscriptionId?: string,
+   *   platform: 'web' | 'ios' | 'android',
+   *   deviceModel?: string,
+   *   osVersion?: string,
+   *   appVersion?: string
+   * }
+   */
+  app.post('/api/notification-preferences/player-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { playerId, subscriptionId, platform, deviceModel, osVersion, appVersion } = req.body;
+
+      if (!playerId) {
+        return res.status(400).json({ message: 'Player ID is required' });
+      }
+
+      console.log(`📱 Registering Player ID for user ${userId}`);
+      console.log(`   Player ID: ${playerId}`);
+      console.log(`   Subscription ID: ${subscriptionId || 'N/A'}`);
+      console.log(`   Platform: ${platform || 'web'}`);
+
+      const preference = await storage.registerPlayerId(
+        userId,
+        playerId,
+        platform || 'web',
+        subscriptionId,
+        { deviceModel, osVersion, appVersion }
+      );
+
+      res.status(201).json({
+        success: true,
+        preference,
+        message: 'Player ID registered successfully'
+      });
+    } catch (error) {
+      console.error('Error registering player ID:', error);
+      res.status(500).json({ message: 'Failed to register player ID' });
+    }
+  });
+
+  /**
+   * POST /api/notification-preferences/link-external-id
+   * Link the user's displayId as the External ID in OneSignal
+   * 
+   * Body: {
+   *   playerId: string (the OneSignal subscription ID to link)
+   * }
+   */
+  app.post('/api/notification-preferences/link-external-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { playerId } = req.body;
+
+      if (!playerId) {
+        return res.status(400).json({ message: 'Player ID is required' });
+      }
+
+      // Get the user to retrieve their displayId
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      if (!user.displayId) {
+        return res.status(400).json({ message: 'User does not have a displayId' });
+      }
+
+      console.log(`🔗 Linking External ID for user ${userId}`);
+      console.log(`   Player ID: ${playerId}`);
+      console.log(`   External ID (displayId): ${user.displayId}`);
+
+      // Call OneSignal API to set the external ID
+      const result = await notificationService.setExternalIdViaApi(playerId, user.displayId);
+
+      if (!result.success) {
+        // If the primary method fails, try the alternative method
+        console.log('Primary external ID linking failed, trying alternative method...');
+        const altResult = await notificationService.createUserWithExternalId(user.displayId, playerId);
+        
+        if (!altResult.success) {
+          return res.status(500).json({
+            message: 'Failed to link external ID in OneSignal',
+            error: altResult.error
+          });
+        }
+      }
+
+      // Update database to mark external ID as linked
+      const updatedPreference = await storage.markExternalIdLinked(playerId);
+
+      res.json({
+        success: true,
+        externalId: user.displayId,
+        preference: updatedPreference,
+        onesignalUserId: result.onesignalUserId,
+        message: 'External ID linked successfully'
+      });
+    } catch (error) {
+      console.error('Error linking external ID:', error);
+      res.status(500).json({ message: 'Failed to link external ID' });
+    }
+  });
+
+  /**
+   * POST /api/notification-preferences/unlink-external-id
+   * Unlink the External ID from OneSignal (for logout)
+   * 
+   * Body: {
+   *   playerId: string
+   * }
+   */
+  app.post('/api/notification-preferences/unlink-external-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { playerId } = req.body;
+
+      if (!playerId) {
+        return res.status(400).json({ message: 'Player ID is required' });
+      }
+
+      console.log(`🔓 Unlinking External ID for user ${userId}, Player ID: ${playerId}`);
+
+      // Call OneSignal API to remove the external ID
+      const result = await notificationService.removeExternalId(playerId);
+
+      if (!result.success) {
+        console.warn(`Warning: OneSignal unlink failed: ${result.error}`);
+        // Continue anyway to update database
+      }
+
+      // Update database to mark external ID as unlinked
+      await storage.markExternalIdUnlinked(playerId);
+
+      res.json({
+        success: true,
+        message: 'External ID unlinked successfully'
+      });
+    } catch (error) {
+      console.error('Error unlinking external ID:', error);
+      res.status(500).json({ message: 'Failed to unlink external ID' });
+    }
+  });
+
+  /**
+   * PUT /api/notification-preferences
+   * Update notification preferences (push enabled, categories, etc.)
+   * 
+   * Body: {
+   *   pushEnabled?: boolean,
+   *   gameReminders?: boolean,
+   *   scrimmageUpdates?: boolean,
+   *   messageNotifications?: boolean,
+   *   announcementNotifications?: boolean,
+   *   substituteRequests?: boolean
+   * }
+   */
+  app.put('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const updates = req.body;
+
+      const validKeys = [
+        'pushEnabled', 'gameReminders', 'scrimmageUpdates',
+        'messageNotifications', 'announcementNotifications', 'substituteRequests'
+      ];
+
+      const filteredUpdates: Record<string, boolean> = {};
+      for (const key of validKeys) {
+        if (typeof updates[key] === 'boolean') {
+          filteredUpdates[key] = updates[key];
+        }
+      }
+
+      if (Object.keys(filteredUpdates).length === 0) {
+        return res.status(400).json({ message: 'No valid updates provided' });
+      }
+
+      const preferences = await storage.updateNotificationPreferences(userId, filteredUpdates);
+      res.json({
+        success: true,
+        preferences,
+        message: 'Preferences updated successfully'
+      });
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+      res.status(500).json({ message: 'Failed to update notification preferences' });
+    }
+  });
+
+  /**
+   * DELETE /api/notification-preferences/cleanup
+   * Complete cleanup of all notification preferences and OneSignal data for the user
+   * Use this for debugging/resetting when stale IDs are causing issues
+   */
+  app.delete('/api/notification-preferences/cleanup', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      console.log(`🧹 Starting complete notification cleanup for user ${userId}`);
+
+      // Get all existing preferences to unlink from OneSignal
+      const existingPrefs = await storage.getNotificationPreferences(userId);
+
+      // Unlink each player ID from OneSignal
+      for (const pref of existingPrefs) {
+        if (pref.onesignalPlayerId) {
+          try {
+            await notificationService.removeExternalId(pref.onesignalPlayerId);
+            console.log(`   Unlinked Player ID: ${pref.onesignalPlayerId}`);
+          } catch (err) {
+            console.warn(`   Warning: Failed to unlink Player ID ${pref.onesignalPlayerId}:`, err);
+          }
+        }
+      }
+
+      // Delete all notification preferences from database
+      const deletedCount = await storage.clearStaleNotificationPreferences(userId);
+
+      console.log(`✅ Cleanup complete. Deleted ${deletedCount} notification preference records.`);
+
+      res.json({
+        success: true,
+        deletedCount,
+        message: `Cleanup complete. Deleted ${deletedCount} notification preference records.`
+      });
+    } catch (error) {
+      console.error('Error during notification cleanup:', error);
+      res.status(500).json({ message: 'Failed to cleanup notification preferences' });
+    }
+  });
+
+  /**
+   * GET /api/notification-preferences/verify
+   * Verify the External ID is properly linked in OneSignal
+   */
+  app.get('/api/notification-preferences/verify', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Get the user's displayId
+      const user = await storage.getUser(userId);
+      if (!user?.displayId) {
+        return res.status(400).json({ message: 'User does not have a displayId' });
+      }
+
+      // Check OneSignal for the user
+      const result = await notificationService.getUserByExternalId(user.displayId);
+
+      // Get database preferences
+      const dbPrefs = await storage.getNotificationPreferences(userId);
+
+      res.json({
+        success: true,
+        externalId: user.displayId,
+        onesignalFound: result.success,
+        onesignalUser: result.user,
+        databasePreferences: dbPrefs,
+        isLinked: result.success && dbPrefs.some(p => p.externalIdLinked)
+      });
+    } catch (error) {
+      console.error('Error verifying notification preferences:', error);
+      res.status(500).json({ message: 'Failed to verify notification preferences' });
+    }
+  });
+
+  /**
+   * GET /api/onesignal/config
+   * Get OneSignal configuration status (for debugging)
+   */
+  app.get('/api/onesignal/config', isAuthenticated, async (req: any, res) => {
+    try {
+      const config = await notificationService.verifyOneSignalConfig();
+      res.json(config);
+    } catch (error) {
+      console.error('Error checking OneSignal config:', error);
+      res.status(500).json({ message: 'Failed to check OneSignal config' });
+    }
+  });
+
+  /**
+   * POST /api/notifications/send
+   * Send a push notification to specified users by their displayIds
+   * (For testing and admin purposes)
+   * 
+   * Body: {
+   *   externalIds: string[],
+   *   title: string,
+   *   message: string,
+   *   data?: Record<string, string>,
+   *   url?: string
+   * }
+   */
+  app.post('/api/notifications/send', isAuthenticated, async (req: any, res) => {
+    try {
+      const { externalIds, title, message, data, url } = req.body;
+
+      if (!externalIds || !Array.isArray(externalIds) || externalIds.length === 0) {
+        return res.status(400).json({ message: 'externalIds array is required' });
+      }
+
+      if (!title || !message) {
+        return res.status(400).json({ message: 'title and message are required' });
+      }
+
+      const result = await notificationService.sendNotificationByExternalIds(
+        externalIds,
+        { title, message, data, url }
+      );
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          error: result.error,
+          message: 'Failed to send notification'
+        });
+      }
+
+      res.json({
+        success: true,
+        notificationId: result.notificationId,
+        recipients: result.recipients,
+        message: `Notification sent to ${result.recipients} recipients`
+      });
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      res.status(500).json({ message: 'Failed to send notification' });
+    }
+  });
+
   return httpServer;
 }
