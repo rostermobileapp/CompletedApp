@@ -276,33 +276,18 @@ export function useOneSignal() {
           console.log('[OneSignal Native] Permission status:', status);
         });
 
-        // Step 3: Get OneSignal ID (for display purposes only), then login
-        const getPlayerIdAndLogin = () => {
-          notifications.getOneSignalId(async (resp) => {
-            if (resp.playerId) {
-              console.log('[OneSignal Native] Got Player ID:', resp.playerId);
-              setPlayerId(resp.playerId);
-              // Login with External ID - OneSignal will link it internally
-              await performLogin(displayId, notifications);
-            } else {
-              console.log('[OneSignal Native] No Player ID yet, retrying in 2s...');
-              setTimeout(() => {
-                notifications.getOneSignalId(async (retryResp) => {
-                  if (retryResp.playerId) {
-                    console.log('[OneSignal Native] Got Player ID on retry:', retryResp.playerId);
-                    setPlayerId(retryResp.playerId);
-                    await performLogin(displayId, notifications);
-                  } else {
-                    console.warn('[OneSignal Native] Still no Player ID, attempting login anyway');
-                    await performLogin(displayId, notifications);
-                  }
-                });
-              }, 2000);
-            }
-          });
-        };
-
-        getPlayerIdAndLogin();
+        // Step 3: Login with External ID immediately
+        // We don't need to wait for Player ID - OneSignal manages the External ID → Player ID mapping
+        console.log('[OneSignal Native] Calling login with External ID (displayId):', displayId);
+        await performLogin(displayId, notifications);
+        
+        // Optionally get Player ID for display purposes only (not stored)
+        notifications.getOneSignalId((resp) => {
+          if (resp.playerId) {
+            console.log('[OneSignal Native] Player ID (for display only):', resp.playerId);
+            setPlayerId(resp.playerId);
+          }
+        });
         return true;
       } catch (error) {
         console.error('[OneSignal Native] Failed to initialize:', error);
@@ -407,77 +392,39 @@ export function useOneSignal() {
         setPermissionState(hasPermission ? 'granted' : 'default');
         console.log('[OneSignal Web] Permission:', hasPermission ? 'granted' : 'default');
 
-        // Listen for permission changes and subscription ID updates
+        // Listen for permission changes
         OneSignal.Notifications.addEventListener('permissionChange', async (permission: boolean) => {
           setPermissionState(permission ? 'granted' : 'denied');
           console.log('[OneSignal Web] Permission changed to:', permission ? 'granted' : 'denied');
           
-          // When permission is granted, capture the subscription ID
-          if (permission) {
+          // When permission is granted, enable push preferences
+          if (permission && displayId) {
             const subId = OneSignal.User.PushSubscription.id;
             if (subId) {
-              console.log('[OneSignal Web] Permission granted, captured subscription ID:', subId);
-              setPlayerId(subId);
+              console.log('[OneSignal Web] Permission granted, subscription ID:', subId);
+              setPlayerId(subId); // For display purposes only
               
-              // Save Player ID to database (the backend will link External ID via API)
-              try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.access_token) {
-                  await fetch('/api/notification-preferences/player-id', {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${session.access_token}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ playerId: subId }),
-                  });
-                  console.log('[OneSignal Web] Player ID saved to database');
-                }
-              } catch (err) {
-                console.error('[OneSignal Web] Failed to save Player ID:', err);
-              }
+              // Enable push notifications in our app settings
+              await enablePushPreferences();
             }
           }
         });
 
-        // Listen for subscription ID changes (when user subscribes)
-        OneSignal.User.PushSubscription.addEventListener('change', async (change: { current: { id?: string } }) => {
+        // Listen for subscription ID changes (for display purposes only)
+        OneSignal.User.PushSubscription.addEventListener('change', (change: { current: { id?: string } }) => {
           const newSubId = change.current.id;
           if (newSubId) {
             console.log('[OneSignal Web] Subscription ID changed to:', newSubId);
-            setPlayerId(newSubId);
-            
-            // Save Player ID to database (the backend will link External ID via API)
-            try {
-              const { data: { session } } = await supabase.auth.getSession();
-              if (session?.access_token && displayId) {
-                const response = await fetch('/api/notification-preferences/player-id', {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ playerId: newSubId }),
-                });
-                
-                if (response.ok) {
-                  const result = await response.json();
-                  console.log('[OneSignal Web] Player ID saved and External ID linked:', result.externalIdLinked);
-                  setExternalIdSet(result.externalIdLinked || false);
-                  await enablePushPreferences();
-                }
-              }
-            } catch (err) {
-              console.error('[OneSignal Web] Failed to save Player ID on change:', err);
-            }
+            setPlayerId(newSubId); // For display purposes only - not stored in database
           }
         });
 
         // IMPORTANT: Call login() immediately after consent, even before permission is granted
-        // In OneSignal v5+, login() can be called before subscription exists
-        // When user grants permission later, the subscription will be automatically linked to this External ID
+        // In OneSignal v5+, login() links the External ID (displayId) to the user
+        // When user grants permission later, the subscription will be automatically linked
+        // We DON'T store the OneSignal Player ID - OneSignal manages the External ID → Player ID mapping
         if (displayId) {
-          console.log('[OneSignal Web] Calling login with displayId:', displayId);
+          console.log('[OneSignal Web] Calling login with External ID (displayId):', displayId);
           await performLogin(displayId, null);
         }
 
@@ -501,17 +448,18 @@ export function useOneSignal() {
         notifications.requestPermission(true, (resp) => {
           const granted = resp.status;
           setPermissionState(granted ? 'granted' : 'denied');
-          console.log('[OneSignal] Permission request result:', granted);
+          console.log('[OneSignal Native] Permission request result:', granted);
           
           if (granted) {
-            notifications.getOneSignalId(async (idResp) => {
+            // Get Player ID for display purposes only
+            notifications.getOneSignalId((idResp) => {
               if (idResp.playerId) {
+                console.log('[OneSignal Native] Player ID (for display only):', idResp.playerId);
                 setPlayerId(idResp.playerId);
-                if (displayId) {
-                  await performLogin(displayId, notifications);
-                }
               }
             });
+            // Enable push preferences in our app
+            enablePushPreferences();
           }
           resolve(granted);
         });
@@ -523,6 +471,19 @@ export function useOneSignal() {
       try {
         const granted = await webSdkRef.current.Notifications.requestPermission();
         setPermissionState(granted ? 'granted' : 'denied');
+        console.log('[OneSignal Web] Permission request result:', granted);
+        
+        if (granted) {
+          // Get Player ID for display purposes only
+          const subId = webSdkRef.current.User.PushSubscription.id;
+          if (subId) {
+            console.log('[OneSignal Web] Player ID (for display only):', subId);
+            setPlayerId(subId);
+          }
+          // Enable push preferences in our app
+          await enablePushPreferences();
+        }
+        
         return granted;
       } catch (error) {
         console.error('[OneSignal Web] Permission request failed:', error);
@@ -531,7 +492,7 @@ export function useOneSignal() {
     }
 
     return false;
-  }, [displayId, performLogin]);
+  }, [enablePushPreferences]);
 
   const getNotificationPreferences = useCallback(async () => {
     try {
