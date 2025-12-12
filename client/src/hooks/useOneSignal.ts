@@ -75,11 +75,23 @@ export function useOneSignal(options: UseOneSignalOptions) {
           window.OneSignal.init({
             appId: options.appId,
             allowLocalhostAsSecureOrigin: true,
+            // Don't auto-prompt - we'll request permission later if needed
+            promptOptions: {
+              autoPrompt: false,
+            },
           });
         });
 
         // Wait a moment for initialization to complete
         await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Check if permission is already granted
+        const permission = await window.OneSignal.Notifications.permission;
+        console.log('[OneSignal] Current permission:', permission);
+        
+        if (permission === 'default') {
+          console.log('[OneSignal] Skipping auto-prompt. User can enable notifications later.');
+        }
       }
 
       setState(prev => ({ ...prev, initialized: true }));
