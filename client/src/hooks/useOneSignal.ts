@@ -278,19 +278,36 @@ export function useOneSignal() {
       return;
     }
     
+    console.log('[OneSignal Native] Starting initialization...');
+    console.log('[OneSignal Native] Document ready state:', document.readyState);
+    
+    // Function to actually initialize
+    const performInit = async () => {
+      console.log('[OneSignal Native] Attempting initialization');
+      await tryInit();
+    };
+    
     // CRITICAL: Wait for document to be fully loaded before checking for native bridge
     if (document.readyState !== 'complete') {
-      console.log('[OneSignal Native] Document not ready yet, waiting for load event...');
+      console.log('[OneSignal Native] Document not ready yet (state: ' + document.readyState + ')');
+      console.log('[OneSignal Native] Waiting for load event...');
+      
       const handleLoad = () => {
-        console.log('[OneSignal Native] Document loaded, will retry initialization');
-        // Small delay to ensure native bridge is attached
+        console.log('[OneSignal Native] Document loaded!');
+        // Give native bridge extra time to attach after document load
         setTimeout(() => {
-          console.log('[OneSignal Native] Retrying after document load');
-        }, 1000);
+          console.log('[OneSignal Native] Retrying initialization after document load + delay');
+          performInit();
+        }, 2000); // Wait 2 seconds after load
       };
+      
       window.addEventListener('load', handleLoad);
       return () => window.removeEventListener('load', handleLoad);
     }
+    
+    // Document already loaded, try initialization
+    console.log('[OneSignal Native] Document already loaded, proceeding...');
+    performInit();
 
     const initializeNative = async () => {
       // Check if NativelyNotifications is available
