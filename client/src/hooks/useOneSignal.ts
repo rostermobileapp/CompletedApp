@@ -174,10 +174,18 @@ export function useOneSignal() {
         setExternalIdSet(true);
         await enablePushPreferences();
         return;
-      } catch (err) {
+      } catch (err: any) {
+        // Only reset flag and try fallback if it's a real failure (not "already logged in")
+        const errorMsg = String(err?.message || err);
+        if (errorMsg.toLowerCase().includes('already') || errorMsg.toLowerCase().includes('logged in')) {
+          console.log('[OneSignal] Already logged in, marking as success');
+          setExternalIdSet(true);
+          await enablePushPreferences();
+          return;
+        }
+        
         console.error('[OneSignal] ✗ OneSignal.login() failed:', err);
-        // Reset flag to allow retry with fallback
-        hasCalledLoginRef.current = false;
+        hasCalledLoginRef.current = false; // Allow retry with fallback
       }
     } else {
       console.log('[OneSignal] window.OneSignal.login not available, trying alternatives');
@@ -402,7 +410,7 @@ export function useOneSignal() {
         // Listen for permission changes
         OneSignal.Notifications.addEventListener('permissionChange', async (permission: boolean) => {
           setPermissionState(permission ? 'granted' : 'denied');
-          if (permission && displayId) {
+          if (permission && displayId && !hasCalledLoginRef.current) {
             const subId = OneSignal.User.PushSubscription.id;
             if (subId) setPlayerId(subId);
             await performLogin(displayId, null);
@@ -525,14 +533,71 @@ export function useOneSignal() {
     }
   }, []);
 
-  // Logout function: Reset local state so next user login will set their External ID
-  // NOTE: We do NOT call OneSignal.logout() or removeExternalId() because on native SDKs 
-  // this can break the device subscription. Instead, the next login() call will REPLACE 
-  // the old External ID with the new one.
+  // Logout function: Properly clear OneSignal data for next user
   const logoutOneSignal = useCallback(async () => {
-    console.log('[OneSignal] === LOGOUT - Resetting state for next user ===');
+    console.log('[OneSignal] === LOGOUT - Clearing OneSignal data ===');
     
-    // Reset all local state so next user's login will be processed
+    try {
+      // Step 1: Call OneSignal Web SDK logout (if available)
+      if (webSdkRef.current?.logout) {
+        console.log('[OneSignal] Calling OneSignal.logout()...');
+        try {
+          await webSdkRef.current.logout();
+          console.log('[OneSignal] ✓ Web SDK logout complete');
+        } catch (err) {
+          console.warn('[OneSignal] Web SDK logout warning:', err);
+        }
+      }
+      
+      // Step 2: Call Native SDK removeExternalId (if available)
+      if (notificationsRef.current?.removeExternalId) {
+        console.log('[OneSignal] Calling removeExternalId()...');
+        await new Promise<void>((resolve) => {
+          notificationsRef.current!.removeExternalId((resp) => {
+            if (resp?.error) {
+              console.warn('[OneSignal] removeExternalId warning:', resp.error);
+            } else {
+              console.log('[OneSignal] ✓ External ID removed');
+            }
+            resolve();
+          });
+        });
+      }
+      
+      // Step 3: Clear OneSignal-specific localStorage keys
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.toLowerCase().includes('onesignal')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => {
+        console.log('[OneSignal] Removing localStorage key:', key);
+        localStorage.removeItem(key);
+      });
+      
+      // Step 4: Call backend to clear database OneSignal columns
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        try {
+          await fetch('/api/notification-preferences/clear-onesignal', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          console.log('[OneSignal] ✓ Database OneSignal columns cleared');
+        } catch (err) {
+          console.warn('[OneSignal] Failed to clear database:', err);
+        }
+      }
+    } catch (error) {
+      console.error('[OneSignal] Error during logout:', error);
+    }
+    
+    // Step 5: Reset all local state
     hasCalledLoginRef.current = false;
     consentGrantedRef.current = false;
     webInitializedRef.current = false;
@@ -540,12 +605,10 @@ export function useOneSignal() {
     setPlayerId(null);
     setDisplayId(null);
     setIsInitialized(false);
-    
-    // Clear refs
     notificationsRef.current = null;
     webSdkRef.current = null;
     
-    console.log('[OneSignal] State reset complete - next login will set new External ID');
+    console.log('[OneSignal] === LOGOUT COMPLETE ===');
   }, []);
 
   return {

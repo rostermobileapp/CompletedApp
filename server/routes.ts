@@ -714,6 +714,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Clear OneSignal data on logout - removes Player ID and External ID from database
+  app.post('/api/notification-preferences/clear-onesignal', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      console.log(`[Clear OneSignal] Clearing OneSignal data for user ${userId}`);
+      
+      // Clear ONLY the OneSignal-specific columns, keep other notification preferences
+      const preferences = await storage.upsertNotificationPreferences(userId, {
+        oneSignalPlayerId: null,
+        oneSignalExternalId: null,
+      });
+      
+      console.log(`[Clear OneSignal] OneSignal data cleared successfully for user ${userId}`);
+      
+      res.json({
+        success: true,
+        message: 'OneSignal data cleared',
+        preferences
+      });
+    } catch (error) {
+      console.error('[Clear OneSignal] Error clearing OneSignal data:', error);
+      res.status(500).json({ success: false, message: 'Failed to clear OneSignal data' });
+    }
+  });
+
+  // Debug endpoint - Get all OneSignal data for current user
+  app.get('/api/notification-preferences/debug', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const preferences = await storage.getNotificationPreferences(userId);
+      
+      let oneSignalApiData = null;
+      let externalIdVerification = null;
+      
+      // If user has a Player ID stored, look it up in OneSignal
+      if (preferences?.oneSignalPlayerId) {
+        oneSignalApiData = await notificationService.lookupOneSignalUser(preferences.oneSignalPlayerId);
+      }
+      
+      // If user has a displayId, verify if it's linked as External ID in OneSignal
+      if (user?.displayId) {
+        externalIdVerification = await notificationService.verifyExternalIdLink(user.displayId);
+      }
+      
+      res.json({
+        user: {
+          userId: user?.id,
+          displayId: user?.displayId,
+          email: user?.email,
+        },
+        database: {
+          oneSignalPlayerId: preferences?.oneSignalPlayerId || null,
+          oneSignalExternalId: preferences?.oneSignalExternalId || null,
+          pushEnabled: preferences?.pushEnabled ?? false,
+          notificationSettings: preferences?.notificationSettings || null,
+          updatedAt: preferences?.updatedAt || null,
+        },
+        oneSignalApi: {
+          playerIdLookup: oneSignalApiData || null,
+          externalIdVerification: externalIdVerification || null,
+        },
+        summary: {
+          hasPlayerId: !!preferences?.oneSignalPlayerId,
+          hasExternalId: !!preferences?.oneSignalExternalId,
+          externalIdLinked: externalIdVerification?.linked ?? false,
+          externalIdMatchesDisplayId: preferences?.oneSignalExternalId === user?.displayId,
+        },
+      });
+    } catch (error) {
+      console.error('[Debug OneSignal] Error:', error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   // Personal Reminders Routes
   app.get('/api/user/personal-reminders', isAuthenticated, async (req: any, res) => {
     try {
