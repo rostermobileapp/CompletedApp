@@ -741,12 +741,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Auto-link External ID for native apps (when SDK bridge isn't available)
-  // This endpoint finds recent subscriptions without External IDs and links them
+  // Searches for recent subscriptions without External ID and links them
   app.post('/api/notification-preferences/auto-link-native', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       const displayId = user?.displayId;
+      const { oneSignalId } = req.body; // Optional: if they provide Player ID
       
       if (!displayId) {
         return res.status(400).json({ 
@@ -761,6 +762,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const verifyResult = await notificationService.verifyExternalIdLink(displayId);
       if (verifyResult.linked) {
         console.log(`[Auto-Link Native] External ID already linked for ${displayId}`);
+        
+        // Save to database
+        await storage.upsertNotificationPreferences(userId, { 
+          oneSignalExternalId: displayId 
+        });
+        
         return res.json({
           success: true,
           message: 'External ID already linked',
@@ -769,18 +776,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // External ID not linked - need to find the subscription and link it
-      // Since we can't get Player ID from React (native bridge issue), 
-      // we'll need to get it from OneSignal dashboard or have user provide it
+      // If Player ID was provided, use it
+      if (oneSignalId) {
+        console.log(`[Auto-Link Native] Player ID provided: ${oneSignalId}`);
+        const linkResult = await notificationService.setExternalIdViaApi(oneSignalId, displayId);
+        
+        if (linkResult) {
+          await storage.upsertNotificationPreferences(userId, { 
+            oneSignalExternalId: displayId 
+          });
+          
+          return res.json({
+            success: true,
+            message: 'External ID linked successfully',
+            displayId,
+            oneSignalId
+          });
+        } else {
+          return res.json({
+            success: false,
+            message: 'Failed to link External ID',
+            displayId,
+            oneSignalId
+          });
+        }
+      }
       
-      console.log(`[Auto-Link Native] External ID not linked yet. Need Player ID from device.`);
+      // No Player ID provided - return instructions
+      console.log(`[Auto-Link Native] No Player ID provided. User needs to get it from OneSignal dashboard.`);
       
       res.json({
         success: false,
-        message: 'Need Player ID from device to link External ID',
+        message: 'Need Player ID from OneSignal dashboard',
         needsPlayerId: true,
-        instructions: 'Please provide the OneSignal Player ID from the device',
-        displayId
+        instructions: {
+          step1: 'Go to OneSignal Dashboard → Audience → All Users',
+          step2: 'Find your device (newest Android subscriber)',
+          step3: 'Copy the Player ID',
+          step4: 'Call this endpoint again with: { "oneSignalId": "PLAYER_ID" }',
+          displayId
+        }
       });
     } catch (error) {
       console.error('[Auto-Link Native] Error:', error);
