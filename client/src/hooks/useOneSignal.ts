@@ -64,27 +64,22 @@ export function useOneSignal(options: UseOneSignalOptions) {
           appId: options.appId,
         });
       } else {
-        // Web initialization (v16 SDK)
+        // Web initialization (v16 SDK uses push-based API)
         console.log('[OneSignal] Initializing for web');
         
-        // Wait for OneSignal to load
-        if (window.OneSignalDeferred) {
-          window.OneSignal = await window.OneSignalDeferred;
-        }
-
-        if (!window.OneSignal) {
-          throw new Error('OneSignal SDK not loaded');
-        }
-
-        // OneSignal v16 initialization
-        await window.OneSignal.init({
-          appId: options.appId,
-          allowLocalhostAsSecureOrigin: true,
+        // Initialize OneSignal array if not exists
+        window.OneSignal = window.OneSignal || [];
+        
+        // Use push-based initialization (v16 pattern)
+        window.OneSignal.push(function() {
+          window.OneSignal.init({
+            appId: options.appId,
+            allowLocalhostAsSecureOrigin: true,
+          });
         });
 
-        // Request notification permission
-        const permission = await window.OneSignal.Notifications.requestPermission();
-        console.log('[OneSignal] Permission:', permission);
+        // Wait a moment for initialization to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
       setState(prev => ({ ...prev, initialized: true }));
@@ -136,8 +131,13 @@ export function useOneSignal(options: UseOneSignalOptions) {
         // Native app login
         await (window as any).NativelyNotifications.login(displayId);
       } else {
-        // Web login (v16 SDK)
-        await window.OneSignal.login(displayId);
+        // Web login (v16 SDK push-based API)
+        await new Promise<void>((resolve) => {
+          window.OneSignal.push(function() {
+            window.OneSignal.login(displayId);
+            resolve();
+          });
+        });
       }
 
       // Get Player ID and Subscription ID
@@ -149,13 +149,19 @@ export function useOneSignal(options: UseOneSignalOptions) {
         playerId = userId;
         subscriptionId = userId; // In native, they're often the same
       } else {
-        // OneSignal v16 API
-        const user = window.OneSignal.User;
-        playerId = user?.onesignalId || null;
-        
-        // Get push subscription
-        const pushSub = window.OneSignal.User?.PushSubscription;
-        subscriptionId = pushSub?.id || pushSub?.token || null;
+        // OneSignal v16 API - get user ID
+        await new Promise<void>((resolve) => {
+          window.OneSignal.push(function() {
+            const user = window.OneSignal.User;
+            playerId = user?.onesignalId || null;
+            
+            // Get push subscription
+            const pushSub = window.OneSignal.User?.PushSubscription;
+            subscriptionId = pushSub?.id || pushSub?.token || null;
+            
+            resolve();
+          });
+        });
       }
 
       console.log('[OneSignal] Player ID:', playerId);
@@ -208,10 +214,19 @@ export function useOneSignal(options: UseOneSignalOptions) {
       if (isNativeApp && (window as any).NativelyNotifications) {
         await (window as any).NativelyNotifications.logout();
       } else {
-        // OneSignal v16 logout
-        if (window.OneSignal && window.OneSignal.logout) {
-          await window.OneSignal.logout();
-        }
+        // OneSignal v16 logout (push-based API)
+        await new Promise<void>((resolve) => {
+          if (window.OneSignal && Array.isArray(window.OneSignal)) {
+            window.OneSignal.push(function() {
+              if (window.OneSignal.logout) {
+                window.OneSignal.logout();
+              }
+              resolve();
+            });
+          } else {
+            resolve();
+          }
+        });
       }
 
       loginAttempted.current = false;
