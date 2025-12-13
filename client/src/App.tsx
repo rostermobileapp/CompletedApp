@@ -11,7 +11,6 @@ import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { OneSignalProvider } from "@/components/OneSignalProvider";
-import { NativelyBridgeDebug } from "@/components/NativelyBridgeDebug";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
@@ -104,8 +103,6 @@ function Router() {
   return (
     <PermissionProvider>
       <OneSignalProvider>
-        {/* Temporary debug component - remove after fixing */}
-        <NativelyBridgeDebug />
         <ScrollToTop />
         <div className="relative min-h-screen w-full">
           <SlideOutMenu />

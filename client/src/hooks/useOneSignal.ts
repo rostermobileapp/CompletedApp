@@ -218,7 +218,7 @@ export function useOneSignal() {
       console.log('[OneSignal Native] ⚠️ setExternalId() not available either');
     }
 
-    // PRIORITY 3: Use window.OneSignal.login() for Web SDK
+    // PRIORITY 3: Use window.OneSignal.login() for Web SDK (and BuildNatively native)
     if (window.OneSignal?.login) {
       try {
         console.log('[OneSignal Web] Calling window.OneSignal.login()...');
@@ -271,255 +271,154 @@ export function useOneSignal() {
     }
   }, []);
 
-    // Main initialization effect for NATIVE apps (BuildNatively)
+  // Main initialization effect for BOTH Web and Native apps
+  // BuildNatively uses window.OneSignal (same as web), not window.NativelyNotifications
   useEffect(() => {
     if (!isAuthenticated || !user?.id || !displayId) {
-      console.log('[OneSignal Native] Skipping init - auth:', isAuthenticated, 'user:', !!user?.id, 'displayId:', displayId);
+      console.log('[OneSignal] Skipping init - auth:', isAuthenticated, 'user:', !!user?.id, 'displayId:', displayId);
       return;
     }
     
-    console.log('[OneSignal Native] Starting initialization...');
-    console.log('[OneSignal Native] Document ready state:', document.readyState);
+    console.log('[OneSignal] Starting initialization for both web and native...');
+    console.log('[OneSignal] Document ready state:', document.readyState);
     
-    // Function to actually initialize
+    // Both web and native use window.OneSignal
+    // Just initialize the Web SDK path - it works for both!
     const performInit = async () => {
-      console.log('[OneSignal Native] Attempting initialization');
-      await tryInit();
+      console.log('[OneSignal] Initializing via window.OneSignal (works for web and native)');
+      initializeWebPush();
     };
     
-    // CRITICAL: Wait for document to be fully loaded before checking for native bridge
+    // Wait for document to be fully loaded
     if (document.readyState !== 'complete') {
-      console.log('[OneSignal Native] Document not ready yet (state: ' + document.readyState + ')');
-      console.log('[OneSignal Native] Waiting for load event...');
-      
+      console.log('[OneSignal] Document not ready yet, waiting...');
       const handleLoad = () => {
-        console.log('[OneSignal Native] Document loaded!');
-        // Give native bridge extra time to attach after document load
-        setTimeout(() => {
-          console.log('[OneSignal Native] Retrying initialization after document load + delay');
-          performInit();
-        }, 2000); // Wait 2 seconds after load
+        console.log('[OneSignal] Document loaded, initializing...');
+        setTimeout(performInit, 1000);
       };
-      
       window.addEventListener('load', handleLoad);
       return () => window.removeEventListener('load', handleLoad);
     }
     
-    // Document already loaded, try initialization
-    console.log('[OneSignal Native] Document already loaded, proceeding...');
+    // Document ready, initialize now
     performInit();
 
-    const initializeNative = async () => {
-      // Check if NativelyNotifications is available
-      if (!window.NativelyNotifications) {
-        console.log('[OneSignal Native] NativelyNotifications not available (not a native app)');
-        return false;
-      }
-
-      try {
-        console.log('[OneSignal Native] === STARTING NATIVE INITIALIZATION ===');
-        const notifications = new window.NativelyNotifications();
-        notificationsRef.current = notifications;
-        setIsInitialized(true);
-        console.log('[OneSignal Native] ✓ SDK instance created');
-
-        // Step 1: Grant consent FIRST (before any user operations)
-        console.log('[OneSignal Native] Step 1: Granting consent...');
-        await grantConsent();
-        console.log('[OneSignal Native] ✓ Consent granted');
-
-        // Step 2: Get permission status
-        console.log('[OneSignal Native] Step 2: Checking permission status...');
-        notifications.getPermissionStatus((resp) => {
-          const status = resp.status ? 'granted' : 'default';
-          setPermissionState(status);
-          console.log('[OneSignal Native] ✓ Permission status:', status);
-        });
-
-        // Step 3: Login with External ID immediately
-        // We don't need to wait for Player ID - OneSignal manages the External ID → Player ID mapping
-        console.log('[OneSignal Native] Step 3: Logging in with External ID...');
-        console.log('[OneSignal Native] External ID (displayId):', displayId);
-        
-        await performLogin(displayId, notifications);
-        
-        console.log('[OneSignal Native] ✓ Login called successfully');
-        
-        // Step 4: Optionally get Player ID for display purposes only (not stored)
-        console.log('[OneSignal Native] Step 4: Getting Player ID for display...');
-        notifications.getOneSignalId((resp) => {
-          if (resp.playerId) {
-            console.log('[OneSignal Native] ✓ Player ID (for display only):', resp.playerId);
-            setPlayerId(resp.playerId);
-          } else {
-            console.log('[OneSignal Native] ⚠️ No Player ID yet');
-          }
-        });
-        
-        console.log('[OneSignal Native] === NATIVE INITIALIZATION COMPLETE ===');
-        return true;
-      } catch (error) {
-        console.error('[OneSignal Native] ❌ Failed to initialize:', error);
-        return false;
-      }
-    };
-
-    // Try immediate initialization
-    const tryInit = async () => {
-      console.log('[OneSignal] === STARTING INITIALIZATION ===');
-      console.log('[OneSignal] Checking for NativelyNotifications...');
-      console.log('[OneSignal] window.NativelyNotifications exists:', typeof window.NativelyNotifications);
-      
-      const initialized = await initializeNative();
-      
-      if (!initialized) {
-        // Poll for NativelyNotifications availability with more attempts and logging
-        console.log('[OneSignal] NativelyNotifications not available yet, starting polling...');
-        let pollCount = 0;
-        const maxPolls = 40; // Increased from 20 to 40 (20 seconds)
-        
-        const pollInterval = setInterval(async () => {
-          pollCount++;
-          console.log(`[OneSignal] Poll attempt ${pollCount}/${maxPolls}...`);
-          
-          if (window.NativelyNotifications) {
-            clearInterval(pollInterval);
-            console.log('[OneSignal] ✓ NativelyNotifications became available!');
-            const retryInit = await initializeNative();
-            if (!retryInit) {
-              console.error('[OneSignal] ❌ Retry initialization failed, falling back to Web SDK');
-              initializeWebPush();
-            }
-          } else if (pollCount >= maxPolls) {
-            clearInterval(pollInterval);
-            console.log('[OneSignal] ⏱️ Polling timeout after', maxPolls * 500, 'ms');
-            console.log('[OneSignal] Falling back to Web Push SDK');
-            initializeWebPush();
-          }
-        }, 500);
-      } else {
-        console.log('[OneSignal] ✓ Native SDK initialized successfully');
-      }
-    };
-
-    // Web Push SDK initialization (for browsers)
-    const initializeWebPush = async () => {
-      if (webInitializedRef.current) {
-        console.log('[OneSignal Web] Already initialized');
-        return;
-      }
-
-      const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
-      if (!appId) {
-        console.error('[OneSignal Web] No VITE_ONESIGNAL_APP_ID');
-        return;
-      }
-
-      console.log('[OneSignal Web] Initializing...');
-
-      // Wait for OneSignal to be available
-      const waitForOneSignal = async (): Promise<OneSignalWebInstance | null> => {
-        if (window.OneSignal && typeof window.OneSignal.init === 'function') {
-          return window.OneSignal;
-        }
-        
-        return new Promise((resolve) => {
-          let attempts = 0;
-          const interval = setInterval(() => {
-            attempts++;
-            if (window.OneSignal && typeof window.OneSignal.init === 'function') {
-              clearInterval(interval);
-              resolve(window.OneSignal);
-            } else if (attempts >= 20) {
-              clearInterval(interval);
-              resolve(null);
-            }
-          }, 200);
-        });
-      };
-
-      try {
-        const OneSignal = await waitForOneSignal();
-        if (!OneSignal) {
-          console.error('[OneSignal Web] SDK not available');
-          return;
-        }
-
-        // Step 1: Initialize SDK
-        try {
-          await OneSignal.init({
-            appId: appId,
-            allowLocalhostAsSecureOrigin: true,
-          });
-          console.log('[OneSignal Web] SDK initialized');
-        } catch (initError: unknown) {
-          if (initError instanceof Error && initError.message.includes('already initialized')) {
-            console.log('[OneSignal Web] SDK was already initialized');
-          } else {
-            throw initError;
-          }
-        }
-
-        // Step 2: Grant consent IMMEDIATELY after init
-        await grantConsent();
-
-        webSdkRef.current = OneSignal;
-        webInitializedRef.current = true;
-        setIsWebPush(true);
-        setIsInitialized(true);
-
-        // Check permission
-        const hasPermission = OneSignal.Notifications.permission;
-        setPermissionState(hasPermission ? 'granted' : 'default');
-        console.log('[OneSignal Web] Permission:', hasPermission ? 'granted' : 'default');
-
-        // Listen for permission changes
-        OneSignal.Notifications.addEventListener('permissionChange', async (permission: boolean) => {
-          setPermissionState(permission ? 'granted' : 'denied');
-          console.log('[OneSignal Web] Permission changed to:', permission ? 'granted' : 'denied');
-          
-          // When permission is granted, enable push preferences
-          if (permission && displayId) {
-            const subId = OneSignal.User.PushSubscription.id;
-            if (subId) {
-              console.log('[OneSignal Web] Permission granted, subscription ID:', subId);
-              setPlayerId(subId); // For display purposes only
-              
-              // Enable push notifications in our app settings
-              await enablePushPreferences();
-            }
-          }
-        });
-
-        // Listen for subscription ID changes (for display purposes only)
-        OneSignal.User.PushSubscription.addEventListener('change', (change: { current: { id?: string } }) => {
-          const newSubId = change.current.id;
-          if (newSubId) {
-            console.log('[OneSignal Web] Subscription ID changed to:', newSubId);
-            setPlayerId(newSubId); // For display purposes only - not stored in database
-          }
-        });
-
-        // IMPORTANT: Call login() immediately after consent, even before permission is granted
-        // In OneSignal v5+, login() links the External ID (displayId) to the user
-        // When user grants permission later, the subscription will be automatically linked
-        // We DON'T store the OneSignal Player ID - OneSignal manages the External ID → Player ID mapping
-        if (displayId) {
-          console.log('[OneSignal Web] Calling login with External ID (displayId):', displayId);
-          await performLogin(displayId, null);
-        }
-
-      } catch (error) {
-        console.error('[OneSignal Web] Init error:', error);
-      }
-    };
-
-    tryInit();
-
     return () => {
-      notificationsRef.current = null;
+      // Cleanup if needed
     };
-  }, [isAuthenticated, user?.id, displayId, grantConsent, performLogin]);
+  }, [isAuthenticated, user?.id, displayId]);
+
+  // Web Push SDK initialization (works for BOTH web and native with BuildNatively)
+  const initializeWebPush = useCallback(async () => {
+    if (webInitializedRef.current) {
+      console.log('[OneSignal] Already initialized');
+      return;
+    }
+
+    const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+    if (!appId) {
+      console.error('[OneSignal] No VITE_ONESIGNAL_APP_ID');
+      return;
+    }
+
+    console.log('[OneSignal] Initializing...');
+
+    // Wait for OneSignal to be available
+    const waitForOneSignal = async (): Promise<OneSignalWebInstance | null> => {
+      if (window.OneSignal && typeof window.OneSignal.init === 'function') {
+        return window.OneSignal;
+      }
+      
+      return new Promise((resolve) => {
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          if (window.OneSignal && typeof window.OneSignal.init === 'function') {
+            clearInterval(interval);
+            resolve(window.OneSignal);
+          } else if (attempts >= 20) {
+            clearInterval(interval);
+            resolve(null);
+          }
+        }, 200);
+      });
+    };
+
+    try {
+      const OneSignal = await waitForOneSignal();
+      if (!OneSignal) {
+        console.error('[OneSignal] SDK not available');
+        return;
+      }
+
+      // Step 1: Initialize SDK
+      try {
+        await OneSignal.init({
+          appId: appId,
+          allowLocalhostAsSecureOrigin: true,
+        });
+        console.log('[OneSignal] SDK initialized');
+      } catch (initError: unknown) {
+        if (initError instanceof Error && initError.message.includes('already initialized')) {
+          console.log('[OneSignal] SDK was already initialized');
+        } else {
+          throw initError;
+        }
+      }
+
+      // Step 2: Grant consent IMMEDIATELY after init
+      await grantConsent();
+
+      webSdkRef.current = OneSignal;
+      webInitializedRef.current = true;
+      setIsWebPush(true);
+      setIsInitialized(true);
+
+      // Check permission
+      const hasPermission = OneSignal.Notifications.permission;
+      setPermissionState(hasPermission ? 'granted' : 'default');
+      console.log('[OneSignal] Permission:', hasPermission ? 'granted' : 'default');
+
+      // Listen for permission changes
+      OneSignal.Notifications.addEventListener('permissionChange', async (permission: boolean) => {
+        setPermissionState(permission ? 'granted' : 'denied');
+        console.log('[OneSignal] Permission changed to:', permission ? 'granted' : 'denied');
+        
+        // When permission is granted, enable push preferences
+        if (permission && displayId) {
+          const subId = OneSignal.User.PushSubscription.id;
+          if (subId) {
+            console.log('[OneSignal] Permission granted, subscription ID:', subId);
+            setPlayerId(subId); // For display purposes only
+            
+            // Enable push notifications in our app settings
+            await enablePushPreferences();
+          }
+        }
+      });
+
+      // Listen for subscription ID changes (for display purposes only)
+      OneSignal.User.PushSubscription.addEventListener('change', (change: { current: { id?: string } }) => {
+        const newSubId = change.current.id;
+        if (newSubId) {
+          console.log('[OneSignal] Subscription ID changed to:', newSubId);
+          setPlayerId(newSubId); // For display purposes only - not stored in database
+        }
+      });
+
+      // IMPORTANT: Call login() immediately after consent, even before permission is granted
+      // In OneSignal v5+, login() links the External ID (displayId) to the user
+      // When user grants permission later, the subscription will be automatically linked
+      // We DON'T store the OneSignal Player ID - OneSignal manages the External ID → Player ID mapping
+      if (displayId) {
+        console.log('[OneSignal] Calling login with External ID (displayId):', displayId);
+        await performLogin(displayId, null);
+      }
+
+    } catch (error) {
+      console.error('[OneSignal] Init error:', error);
+    }
+  }, [displayId, grantConsent, performLogin, enablePushPreferences]);
 
   const requestPermission = useCallback(async () => {
     // Native app path
@@ -552,13 +451,13 @@ export function useOneSignal() {
       try {
         const granted = await webSdkRef.current.Notifications.requestPermission();
         setPermissionState(granted ? 'granted' : 'denied');
-        console.log('[OneSignal Web] Permission request result:', granted);
+        console.log('[OneSignal] Permission request result:', granted);
         
         if (granted) {
           // Get Player ID for display purposes only
           const subId = webSdkRef.current.User.PushSubscription.id;
           if (subId) {
-            console.log('[OneSignal Web] Player ID (for display only):', subId);
+            console.log('[OneSignal] Player ID (for display only):', subId);
             setPlayerId(subId);
           }
           // Enable push preferences in our app
@@ -567,7 +466,7 @@ export function useOneSignal() {
         
         return granted;
       } catch (error) {
-        console.error('[OneSignal Web] Permission request failed:', error);
+        console.error('[OneSignal] Permission request failed:', error);
         return false;
       }
     }
