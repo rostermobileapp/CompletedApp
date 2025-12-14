@@ -92,13 +92,55 @@ export function NativelyBridgeDebug() {
     };
   }, []);
 
+  const testManualLogin = async () => {
+    addLog('🧪 Starting manual login test...');
+    
+    if (!window.OneSignal) {
+      addLog('❌ window.OneSignal not available');
+      return;
+    }
+    
+    addLog('✅ window.OneSignal is available');
+    
+    if (!window.OneSignal.login) {
+      addLog('❌ window.OneSignal.login method not found');
+      return;
+    }
+    
+    addLog('✅ window.OneSignal.login method exists');
+    
+    try {
+      addLog('📞 Calling OneSignal.login("LFB3Kf")...');
+      await window.OneSignal.login('LFB3Kf');
+      addLog('✅ OneSignal.login() completed successfully!');
+      
+      // Wait 3 seconds then check External ID
+      setTimeout(async () => {
+        try {
+          const externalId = await window.OneSignal.User.getExternalId();
+          addLog(`🔍 External ID after login: ${externalId || 'STILL BLANK'}`);
+          
+          if (externalId) {
+            addLog('🎉 SUCCESS! External ID is now set!');
+          } else {
+            addLog('⚠️ Login succeeded but External ID not set yet. Check OneSignal dashboard in 1 minute.');
+          }
+        } catch (err) {
+          addLog(`❌ Error checking External ID: ${err}`);
+        }
+      }, 3000);
+    } catch (err: any) {
+      addLog(`❌ OneSignal.login() failed: ${err.message || err}`);
+    }
+  };
+
   return (
     <div style={{
       position: 'fixed',
       bottom: 0,
       left: 0,
       right: 0,
-      maxHeight: '300px',
+      maxHeight: '400px',
       overflow: 'auto',
       background: 'rgba(0,0,0,0.9)',
       color: bridgeAvailable ? '#0f0' : '#ff0',
@@ -112,6 +154,25 @@ export function NativelyBridgeDebug() {
         🔍 Natively Bridge Debug
         {bridgeAvailable ? ' ✅ AVAILABLE' : ' ⚠️ WAITING...'}
       </div>
+      
+      <button
+        onClick={testManualLogin}
+        style={{
+          width: '100%',
+          padding: '12px',
+          marginBottom: '10px',
+          background: '#2563eb',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          cursor: 'pointer'
+        }}
+      >
+        🧪 TEST MANUAL LOGIN
+      </button>
+      
       {logs.map((log, i) => (
         <div key={i}>{log}</div>
       ))}
