@@ -45,6 +45,8 @@ import {
   tournamentTeams,
   tournamentPhotos,
   leaguePhotos,
+  tournamentPhotoTags,
+  leaguePhotoTags,
   // New messaging tables
   conversations,
   conversationParticipants,
@@ -77,6 +79,10 @@ import {
   type InsertTournamentPhoto,
   type LeaguePhoto,
   type InsertLeaguePhoto,
+  type TournamentPhotoTag,
+  type InsertTournamentPhotoTag,
+  type LeaguePhotoTag,
+  type InsertLeaguePhotoTag,
   type League,
   type InsertLeague,
   type Season,
@@ -611,6 +617,19 @@ export interface IStorage {
   getLeaguePhoto(id: string): Promise<LeaguePhoto | undefined>;
   deleteLeaguePhoto(id: string): Promise<void>;
   getLeaguePhotoCount(leagueId: string): Promise<number>;
+  
+  // Photo tag operations
+  addTournamentPhotoTag(tag: InsertTournamentPhotoTag): Promise<TournamentPhotoTag>;
+  getTournamentPhotoTags(photoId: string): Promise<(TournamentPhotoTag & { user: User })[]>;
+  removeTournamentPhotoTag(photoId: string, userId: string): Promise<void>;
+  getTournamentPhotosByTaggedUser(tournamentId: string, userId: string): Promise<TournamentPhoto[]>;
+  getAllTournamentPhotoTags(tournamentId: string): Promise<Record<string, string[]>>;
+  
+  addLeaguePhotoTag(tag: InsertLeaguePhotoTag): Promise<LeaguePhotoTag>;
+  getLeaguePhotoTags(photoId: string): Promise<(LeaguePhotoTag & { user: User })[]>;
+  removeLeaguePhotoTag(photoId: string, userId: string): Promise<void>;
+  getLeaguePhotosByTaggedUser(leagueId: string, userId: string): Promise<LeaguePhoto[]>;
+  getAllLeaguePhotoTags(leagueId: string): Promise<Record<string, string[]>>;
 }
 
 // Helper function to generate unique 6-character alphanumeric display ID
@@ -8985,6 +9004,135 @@ export class DatabaseStorage implements IStorage {
       .from(leaguePhotos)
       .where(eq(leaguePhotos.leagueId, leagueId));
     return result?.count ?? 0;
+  }
+
+  // Photo tag operations
+  async addTournamentPhotoTag(tag: InsertTournamentPhotoTag): Promise<TournamentPhotoTag> {
+    const [result] = await db
+      .insert(tournamentPhotoTags)
+      .values(tag)
+      .onConflictDoNothing()
+      .returning();
+    return result;
+  }
+
+  async getTournamentPhotoTags(photoId: string): Promise<(TournamentPhotoTag & { user: User })[]> {
+    const tags = await db
+      .select()
+      .from(tournamentPhotoTags)
+      .innerJoin(users, eq(tournamentPhotoTags.userId, users.id))
+      .where(eq(tournamentPhotoTags.photoId, photoId));
+    
+    return tags.map(t => ({
+      ...t.tournament_photo_tags,
+      user: t.users,
+    }));
+  }
+
+  async removeTournamentPhotoTag(photoId: string, userId: string): Promise<void> {
+    await db.delete(tournamentPhotoTags)
+      .where(and(
+        eq(tournamentPhotoTags.photoId, photoId),
+        eq(tournamentPhotoTags.userId, userId)
+      ));
+  }
+
+  async getTournamentPhotosByTaggedUser(tournamentId: string, userId: string): Promise<TournamentPhoto[]> {
+    const photos = await db
+      .select({ photo: tournamentPhotos })
+      .from(tournamentPhotos)
+      .innerJoin(tournamentPhotoTags, eq(tournamentPhotos.id, tournamentPhotoTags.photoId))
+      .where(and(
+        eq(tournamentPhotos.tournamentId, tournamentId),
+        eq(tournamentPhotoTags.userId, userId)
+      ))
+      .orderBy(desc(tournamentPhotos.uploadedAt));
+    
+    return photos.map(p => p.photo);
+  }
+
+  async addLeaguePhotoTag(tag: InsertLeaguePhotoTag): Promise<LeaguePhotoTag> {
+    const [result] = await db
+      .insert(leaguePhotoTags)
+      .values(tag)
+      .onConflictDoNothing()
+      .returning();
+    return result;
+  }
+
+  async getLeaguePhotoTags(photoId: string): Promise<(LeaguePhotoTag & { user: User })[]> {
+    const tags = await db
+      .select()
+      .from(leaguePhotoTags)
+      .innerJoin(users, eq(leaguePhotoTags.userId, users.id))
+      .where(eq(leaguePhotoTags.photoId, photoId));
+    
+    return tags.map(t => ({
+      ...t.league_photo_tags,
+      user: t.users,
+    }));
+  }
+
+  async removeLeaguePhotoTag(photoId: string, userId: string): Promise<void> {
+    await db.delete(leaguePhotoTags)
+      .where(and(
+        eq(leaguePhotoTags.photoId, photoId),
+        eq(leaguePhotoTags.userId, userId)
+      ));
+  }
+
+  async getLeaguePhotosByTaggedUser(leagueId: string, userId: string): Promise<LeaguePhoto[]> {
+    const photos = await db
+      .select({ photo: leaguePhotos })
+      .from(leaguePhotos)
+      .innerJoin(leaguePhotoTags, eq(leaguePhotos.id, leaguePhotoTags.photoId))
+      .where(and(
+        eq(leaguePhotos.leagueId, leagueId),
+        eq(leaguePhotoTags.userId, userId)
+      ))
+      .orderBy(desc(leaguePhotos.uploadedAt));
+    
+    return photos.map(p => p.photo);
+  }
+
+  async getAllTournamentPhotoTags(tournamentId: string): Promise<Record<string, string[]>> {
+    const tags = await db
+      .select({
+        photoId: tournamentPhotoTags.photoId,
+        userId: tournamentPhotoTags.userId,
+      })
+      .from(tournamentPhotoTags)
+      .innerJoin(tournamentPhotos, eq(tournamentPhotoTags.photoId, tournamentPhotos.id))
+      .where(eq(tournamentPhotos.tournamentId, tournamentId));
+    
+    const tagsMap: Record<string, string[]> = {};
+    for (const tag of tags) {
+      if (!tagsMap[tag.photoId]) {
+        tagsMap[tag.photoId] = [];
+      }
+      tagsMap[tag.photoId].push(tag.userId);
+    }
+    return tagsMap;
+  }
+
+  async getAllLeaguePhotoTags(leagueId: string): Promise<Record<string, string[]>> {
+    const tags = await db
+      .select({
+        photoId: leaguePhotoTags.photoId,
+        userId: leaguePhotoTags.userId,
+      })
+      .from(leaguePhotoTags)
+      .innerJoin(leaguePhotos, eq(leaguePhotoTags.photoId, leaguePhotos.id))
+      .where(eq(leaguePhotos.leagueId, leagueId));
+    
+    const tagsMap: Record<string, string[]> = {};
+    for (const tag of tags) {
+      if (!tagsMap[tag.photoId]) {
+        tagsMap[tag.photoId] = [];
+      }
+      tagsMap[tag.photoId].push(tag.userId);
+    }
+    return tagsMap;
   }
 }
 

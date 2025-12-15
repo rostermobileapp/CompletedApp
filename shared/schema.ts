@@ -599,6 +599,32 @@ export const leaguePhotos = pgTable("league_photos", {
   index("idx_league_photos_uploaded_at").on(table.uploadedAt),
 ]);
 
+// Tournament photo tags - junction table for tagging users in tournament photos
+export const tournamentPhotoTags = pgTable("tournament_photo_tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  photoId: varchar("photo_id").references(() => tournamentPhotos.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  taggedBy: varchar("tagged_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  taggedAt: timestamp("tagged_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_tournament_photo_user_tag").on(table.photoId, table.userId),
+  index("idx_tournament_photo_tags_photo_id").on(table.photoId),
+  index("idx_tournament_photo_tags_user_id").on(table.userId),
+]);
+
+// League photo tags - junction table for tagging users in league photos
+export const leaguePhotoTags = pgTable("league_photo_tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  photoId: varchar("photo_id").references(() => leaguePhotos.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  taggedBy: varchar("tagged_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  taggedAt: timestamp("tagged_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_league_photo_user_tag").on(table.photoId, table.userId),
+  index("idx_league_photo_tags_photo_id").on(table.photoId),
+  index("idx_league_photo_tags_user_id").on(table.userId),
+]);
+
 // Personal reminders table
 export const personalReminders = pgTable("personal_reminders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2984,6 +3010,8 @@ export const insertTournamentStatsSchema = createInsertSchema(tournamentStats).o
 export const insertTournamentParticipantSchema = createInsertSchema(tournamentParticipants).omit({ id: true, createdAt: true });
 export const insertTournamentPhotoSchema = createInsertSchema(tournamentPhotos).omit({ id: true, uploadedAt: true });
 export const insertLeaguePhotoSchema = createInsertSchema(leaguePhotos).omit({ id: true, uploadedAt: true });
+export const insertTournamentPhotoTagSchema = createInsertSchema(tournamentPhotoTags).omit({ id: true, taggedAt: true });
+export const insertLeaguePhotoTagSchema = createInsertSchema(leaguePhotoTags).omit({ id: true, taggedAt: true });
 
 // Update tournament match schema for PATCH operations
 export const updateTournamentMatchSchema = z.object({
@@ -3012,6 +3040,10 @@ export type TournamentPhoto = typeof tournamentPhotos.$inferSelect;
 export type InsertTournamentPhoto = z.infer<typeof insertTournamentPhotoSchema>;
 export type LeaguePhoto = typeof leaguePhotos.$inferSelect;
 export type InsertLeaguePhoto = z.infer<typeof insertLeaguePhotoSchema>;
+export type TournamentPhotoTag = typeof tournamentPhotoTags.$inferSelect;
+export type InsertTournamentPhotoTag = z.infer<typeof insertTournamentPhotoTagSchema>;
+export type LeaguePhotoTag = typeof leaguePhotoTags.$inferSelect;
+export type InsertLeaguePhotoTag = z.infer<typeof insertLeaguePhotoTagSchema>;
 
 // Extended tournament types with relationships
 export type TournamentWithDetails = Tournament & {

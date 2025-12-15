@@ -17,6 +17,7 @@ import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { HPIBBanner } from '@/components/HPIBBanner';
 
 const profileSchema = z.object({
   email: z.string().email('Invalid email address').optional(),
@@ -348,6 +349,11 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="profile-page">
+      {/* HPIB Banner for paid users */}
+      <div className="px-6 pt-4">
+        <HPIBBanner placement="profile-header" />
+      </div>
+      
       {/* Profile Info */}
       <div className="px-6 mb-6 pt-[24px] pb-[24px]">
         <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">

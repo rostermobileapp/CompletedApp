@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PermissionProvider } from "@/context/SubscriptionContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { BottomNavigation } from "@/components/BottomNavigation";
-import { AdSenseBanner } from "@/components/AdSenseBanner";
+import { HPIBBanner } from "@/components/HPIBBanner";
 import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { ScrollToTop } from "@/components/ScrollToTop";
@@ -161,7 +161,7 @@ function Router() {
             <Route component={NotFound} />
           </Switch>
         </PageTransition>
-          <AdSenseBanner />
+          <HPIBBanner placement="bottom-nav" />
           <BottomNavigation />
         </div>
     </PermissionProvider>

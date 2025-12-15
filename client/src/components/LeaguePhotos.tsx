@@ -88,6 +88,7 @@ interface LeaguePhotosProps {
   onUploadStart?: () => void;
   onUploadComplete?: () => void;
   selectedTeamFilter?: string;
+  selectedUserFilter?: string;
   onTeamsLoaded?: (teams: any[]) => void;
   showOnlyMyPhotos?: boolean;
 }
@@ -100,6 +101,7 @@ export function LeaguePhotos({
   onUploadStart,
   onUploadComplete,
   selectedTeamFilter = "all",
+  selectedUserFilter,
   onTeamsLoaded,
   showOnlyMyPhotos = false
 }: LeaguePhotosProps) {
@@ -152,6 +154,13 @@ export function LeaguePhotos({
     enabled: isParticipant,
   });
 
+  // Fetch photo tags for all photos (always fetch when photos exist to enable filtering)
+  const { data: allPhotoTags = {} } = useQuery<Record<string, string[]>>({
+    queryKey: [`/api/leagues/${leagueId}/photos/tags-batch`],
+    enabled: photos.length > 0,
+    staleTime: 60000,
+  });
+
   // Fetch league teams for filtering
   const { data: leagueTeams = [] } = useQuery<any[]>({
     queryKey: [`/api/leagues/${leagueId}/teams`],
@@ -165,7 +174,7 @@ export function LeaguePhotos({
     }
   }, [leagueTeams, onTeamsLoaded]);
 
-  // Filter photos by selected team (using uploaderTeamId from photo response)
+  // Filter photos by selected team and tagged user
   const filteredPhotos = useMemo(() => {
     let result = photos;
     
@@ -174,13 +183,21 @@ export function LeaguePhotos({
       result = result.filter((photo) => photo.uploaderTeamId === selectedTeamFilter);
     }
     
+    // Filter by tagged user
+    if (selectedUserFilter) {
+      result = result.filter((photo) => {
+        const taggedUserIds = allPhotoTags[photo.id] || [];
+        return taggedUserIds.includes(selectedUserFilter) || photo.uploadedBy === selectedUserFilter;
+      });
+    }
+    
     // Filter by uploader (show only my photos)
     if (showOnlyMyPhotos && currentUserId) {
       result = result.filter((photo) => photo.uploadedBy === currentUserId);
     }
     
     return result;
-  }, [photos, selectedTeamFilter, showOnlyMyPhotos, currentUserId]);
+  }, [photos, selectedTeamFilter, selectedUserFilter, allPhotoTags, showOnlyMyPhotos, currentUserId]);
 
   const isLoading = leagueLoading || membershipLoading || photosLoading;
 

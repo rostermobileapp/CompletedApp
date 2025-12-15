@@ -1,13 +1,122 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2, Lock, User } from "lucide-react";
+import { ArrowLeft, Camera, Upload, Download, Trash2, Loader2, Lock, User, Tag, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { TournamentPhotos } from "@/components/TournamentPhotos";
 import { LeaguePhotos } from "@/components/LeaguePhotos";
 import { TeamPhotos } from "@/components/TeamPhotos";
 import { usePermissions } from "@/context/SubscriptionContext";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { getImageUrl } from "@/lib/queryClient";
+
+interface FilterUser {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  profileImageUrl?: string;
+}
+
+function UserFilterSearch({
+  tournamentId,
+  leagueId,
+  onUserSelect,
+}: {
+  tournamentId?: string;
+  leagueId?: string;
+  onUserSelect: (userId: string) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const { data: searchResults = [], isLoading } = useQuery<FilterUser[]>({
+    queryKey: ['/api/users/search', searchQuery, tournamentId, leagueId],
+    queryFn: async () => {
+      if (searchQuery.length < 2) return [];
+      const params = new URLSearchParams({ q: searchQuery });
+      if (tournamentId) params.append('tournamentId', tournamentId);
+      if (leagueId) params.append('leagueId', leagueId);
+      const response = await fetch(`/api/users/search?${params}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: searchQuery.length >= 2,
+    staleTime: 30000,
+  });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          placeholder="Search for a person to filter photos..."
+          className="pl-9"
+          data-testid="input-search-person-filter"
+        />
+      </div>
+      {isOpen && searchQuery.length >= 2 && (
+        <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+          {isLoading ? (
+            <div className="p-3 flex items-center justify-center">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          ) : searchResults.length === 0 ? (
+            <div className="p-3 text-sm text-muted-foreground text-center">
+              No users found
+            </div>
+          ) : (
+            searchResults.map((user) => (
+              <button
+                key={user.id}
+                onClick={() => {
+                  onUserSelect(user.id);
+                  setIsOpen(false);
+                }}
+                className="w-full px-3 py-2 flex items-center gap-3 hover:bg-accent text-left"
+                data-testid={`button-select-user-${user.id}`}
+              >
+                {user.profileImageUrl ? (
+                  <img
+                    src={getImageUrl(user.profileImageUrl)}
+                    alt=""
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                )}
+                <span className="text-sm font-medium">
+                  {user.firstName} {user.lastName}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MediaGalleryPage() {
   const [, tournamentParams] = useRoute("/media/tournament/:id");
@@ -17,8 +126,10 @@ export default function MediaGalleryPage() {
   const [showUploader, setShowUploader] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedTeamFilter, setSelectedTeamFilter] = useState("all");
+  const [selectedUserFilter, setSelectedUserFilter] = useState<string | undefined>(undefined);
   const [availableTeams, setAvailableTeams] = useState<any[]>([]);
   const [showOnlyMyPhotos, setShowOnlyMyPhotos] = useState(false);
+  const [showUserFilter, setShowUserFilter] = useState(false);
   const { role } = usePermissions();
 
   // Determine entity type and ID
@@ -162,6 +273,28 @@ export default function MediaGalleryPage() {
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">My Photos</span>
             </Button>
+
+            {/* Filter by Tagged Person */}
+            <Button
+              variant={selectedUserFilter ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowUserFilter(!showUserFilter)}
+              className="flex items-center gap-1.5"
+              data-testid="button-filter-by-person"
+            >
+              <Tag className="h-4 w-4" />
+              <span className="hidden sm:inline">{selectedUserFilter ? "Person" : "Find Person"}</span>
+            </Button>
+            {selectedUserFilter && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedUserFilter(undefined)}
+                data-testid="button-clear-person-filter"
+              >
+                Clear
+              </Button>
+            )}
           </div>
 
           {canUpload && (
@@ -180,6 +313,20 @@ export default function MediaGalleryPage() {
           )}
         </div>
       </div>
+      {/* User Filter Selector */}
+      {showUserFilter && (
+        <div className="px-4 py-3 border-b border-border bg-muted/50">
+          <UserFilterSearch
+            tournamentId={entityType === 'tournament' ? entityId : undefined}
+            leagueId={entityType === 'league' ? entityId : undefined}
+            onUserSelect={(userId: string) => {
+              setSelectedUserFilter(userId);
+              setShowUserFilter(false);
+            }}
+          />
+        </div>
+      )}
+
       {/* Photos Content */}
       <div className="pb-20">
         {entityType === 'tournament' && entityId && (
@@ -191,6 +338,7 @@ export default function MediaGalleryPage() {
             onUploadStart={() => setIsUploading(true)}
             onUploadComplete={() => setIsUploading(false)}
             selectedTeamFilter={selectedTeamFilter}
+            selectedUserFilter={selectedUserFilter}
             onTeamsLoaded={setAvailableTeams}
             showOnlyMyPhotos={showOnlyMyPhotos}
           />
@@ -226,6 +374,7 @@ export default function MediaGalleryPage() {
               onUploadStart={() => setIsUploading(true)}
               onUploadComplete={() => setIsUploading(false)}
               selectedTeamFilter={selectedTeamFilter}
+              selectedUserFilter={selectedUserFilter}
               onTeamsLoaded={setAvailableTeams}
               showOnlyMyPhotos={showOnlyMyPhotos}
             />

@@ -2376,6 +2376,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Photo tag routes - Tournament
+  app.post("/api/tournament-photos/:photoId/tags", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { photoId } = req.params;
+      const { taggedUserIds } = req.body;
+
+      if (!taggedUserIds || !Array.isArray(taggedUserIds)) {
+        return res.status(400).json({ error: "taggedUserIds must be an array" });
+      }
+
+      const photo = await storage.getTournamentPhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+
+      const results = [];
+      for (const taggedUserId of taggedUserIds) {
+        try {
+          const tag = await storage.addTournamentPhotoTag({
+            photoId,
+            userId: taggedUserId,
+            taggedBy: userId,
+          });
+          results.push(tag);
+        } catch (error) {
+          console.error(`Error tagging user ${taggedUserId}:`, error);
+        }
+      }
+
+      res.json({ success: true, tags: results });
+    } catch (error) {
+      console.error("Error adding photo tags:", error);
+      res.status(500).json({ error: "Failed to add photo tags" });
+    }
+  });
+
+  app.get("/api/tournament-photos/:photoId/tags", async (req, res) => {
+    try {
+      const { photoId } = req.params;
+      const tags = await storage.getTournamentPhotoTags(photoId);
+      res.json(tags);
+    } catch (error) {
+      console.error("Error fetching photo tags:", error);
+      res.status(500).json({ error: "Failed to fetch photo tags" });
+    }
+  });
+
+  // Batch endpoint to get tags for multiple tournament photos at once
+  app.get("/api/tournaments/:tournamentId/photos/tags-batch", isAuthenticated, async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+      
+      // Use efficient single-query batch method
+      const tagsMap = await storage.getAllTournamentPhotoTags(tournamentId);
+      
+      res.json(tagsMap);
+    } catch (error) {
+      console.error("Error fetching batch photo tags:", error);
+      res.status(500).json({ error: "Failed to fetch photo tags" });
+    }
+  });
+
+  app.delete("/api/tournament-photos/:photoId/tags/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const { photoId, userId } = req.params;
+
+      const photo = await storage.getTournamentPhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+
+      if (photo.uploadedBy !== currentUserId && userId !== currentUserId) {
+        return res.status(403).json({ error: "Unauthorized to remove this tag" });
+      }
+
+      await storage.removeTournamentPhotoTag(photoId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing photo tag:", error);
+      res.status(500).json({ error: "Failed to remove photo tag" });
+    }
+  });
+
+  // Photo tag routes - League
+  app.post("/api/league-photos/:photoId/tags", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { photoId } = req.params;
+      const { taggedUserIds } = req.body;
+
+      if (!taggedUserIds || !Array.isArray(taggedUserIds)) {
+        return res.status(400).json({ error: "taggedUserIds must be an array" });
+      }
+
+      const photo = await storage.getLeaguePhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+
+      const results = [];
+      for (const taggedUserId of taggedUserIds) {
+        try {
+          const tag = await storage.addLeaguePhotoTag({
+            photoId,
+            userId: taggedUserId,
+            taggedBy: userId,
+          });
+          results.push(tag);
+        } catch (error) {
+          console.error(`Error tagging user ${taggedUserId}:`, error);
+        }
+      }
+
+      res.json({ success: true, tags: results });
+    } catch (error) {
+      console.error("Error adding photo tags:", error);
+      res.status(500).json({ error: "Failed to add photo tags" });
+    }
+  });
+
+  app.get("/api/league-photos/:photoId/tags", async (req, res) => {
+    try {
+      const { photoId } = req.params;
+      const tags = await storage.getLeaguePhotoTags(photoId);
+      res.json(tags);
+    } catch (error) {
+      console.error("Error fetching photo tags:", error);
+      res.status(500).json({ error: "Failed to fetch photo tags" });
+    }
+  });
+
+  // Batch endpoint to get tags for multiple league photos at once
+  app.get("/api/leagues/:leagueId/photos/tags-batch", isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      
+      // Use efficient single-query batch method
+      const tagsMap = await storage.getAllLeaguePhotoTags(leagueId);
+      
+      res.json(tagsMap);
+    } catch (error) {
+      console.error("Error fetching batch photo tags:", error);
+      res.status(500).json({ error: "Failed to fetch photo tags" });
+    }
+  });
+
+  app.delete("/api/league-photos/:photoId/tags/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const { photoId, userId } = req.params;
+
+      const photo = await storage.getLeaguePhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+
+      if (photo.uploadedBy !== currentUserId && userId !== currentUserId) {
+        return res.status(403).json({ error: "Unauthorized to remove this tag" });
+      }
+
+      await storage.removeLeaguePhotoTag(photoId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing photo tag:", error);
+      res.status(500).json({ error: "Failed to remove photo tag" });
+    }
+  });
+
+  // User search for tagging
+  app.get("/api/users/search", isAuthenticated, async (req: any, res) => {
+    try {
+      const { q, leagueId, tournamentId } = req.query;
+      
+      if (!q || typeof q !== 'string' || q.length < 2) {
+        return res.json([]);
+      }
+
+      let usersQuery;
+      
+      if (tournamentId) {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .innerJoin(tournamentParticipants, eq(users.id, tournamentParticipants.userId))
+          .where(
+            and(
+              eq(tournamentParticipants.tournamentId, tournamentId as string),
+              eq(tournamentParticipants.status, 'approved'),
+              or(
+                sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+              )
+            )
+          )
+          .limit(10);
+      } else if (leagueId) {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .innerJoin(leagueMemberships, eq(users.id, leagueMemberships.userId))
+          .where(
+            and(
+              eq(leagueMemberships.leagueId, leagueId as string),
+              eq(leagueMemberships.status, 'approved'),
+              or(
+                sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+              )
+            )
+          )
+          .limit(10);
+      } else {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .where(
+            or(
+              sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+              sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+              sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+            )
+          )
+          .limit(10);
+      }
+
+      res.json(usersQuery);
+    } catch (error) {
+      console.error("Error searching users:", error);
+      res.status(500).json({ error: "Failed to search users" });
+    }
+  });
+
   // League routes
   app.get("/api/leagues", async (req, res) => {
     try {
