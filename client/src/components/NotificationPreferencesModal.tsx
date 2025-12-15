@@ -133,10 +133,12 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
   const isPushEnabled = !!preferences?.pushEnabled;
   const isFullySetUp = false; // OneSignal removed
   const canSendTest = false; // OneSignal removed
-  const permissionState = 'default'; // OneSignal removed
+  const permissionState: 'default' | 'granted' | 'denied' = 'default'; // OneSignal removed
   const isInitialized = false; // OneSignal removed
   const isWebPush = false; // OneSignal removed
   const displayId = null; // OneSignal removed
+  const playerId = null; // OneSignal removed
+  const externalIdSet = false; // OneSignal removed
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
