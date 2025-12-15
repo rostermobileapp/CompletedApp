@@ -27,8 +27,7 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
         <img
           src={hpibBannerImage}
           alt="Hockey Players in Business - Join for only $50/yr"
-          className="h-full w-auto max-w-full object-contain"
-          style={{ maxHeight: '50px' }}
+          className="w-full h-full object-cover"
         />
       </a>
     );
