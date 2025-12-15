@@ -74,7 +74,6 @@ import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail } from "./emails";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
-import { notificationService } from "./notificationService";
 
 
 // Helper function to format date as local time string without timezone suffix
