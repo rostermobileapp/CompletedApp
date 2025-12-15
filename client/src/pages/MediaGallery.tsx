@@ -233,9 +233,7 @@ export default function MediaGalleryPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
-            {entityType === 'league' ? (
-              <h1 className="text-xl font-semibold" data-testid="text-entity-name">Photos</h1>
-            ) : (
+            {entityType !== 'league' && (
               <>
                 <h1 className="text-xl font-semibold" data-testid="text-entity-name">{entityName}</h1>
                 <p className="text-sm text-muted-foreground">Photo Gallery</p>
