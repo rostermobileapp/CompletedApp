@@ -415,12 +415,10 @@ export default function Profile() {
           {/* Upgrade button removed as everyone is commissioner now */}
         </div>
       </div>
-      
       {/* HPIB Banner for paid users - below profile info */}
-      <div className="px-6 mb-4">
+      <div className="px-6 mt-[0px] mb-[0px]">
         <HPIBBanner placement="profile-header" />
       </div>
-      
       {/* Profile Details */}
       <div className="px-6 mb-6">
         <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
@@ -928,7 +926,6 @@ export default function Profile() {
           </button>
         </div>
       </div>
-
       {/* App Version */}
       <div className="px-6 py-8 text-center">
         <p className="text-sm text-muted-foreground" data-testid="text-app-version">
@@ -1009,7 +1006,6 @@ export default function Profile() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       <NotificationPreferencesModal
         open={showNotificationPreferences}
         onOpenChange={setShowNotificationPreferences}
