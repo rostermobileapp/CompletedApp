@@ -348,79 +348,85 @@ export default function Profile() {
   const tierDisplay = getTierDisplay();
 
   return (
-    <div className="min-h-screen flex flex-col pb-24" data-testid="profile-page">
-      {/* Profile Info */}
-      <div className="px-6 mb-2 pt-[24px] pb-[8px]">
-        <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
-          <div className="relative flex-shrink-0">
-            <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
-              {(user as any)?.profileImageUrl ? (
-                <img 
-                  src={getImageUrl((user as any).profileImageUrl) || ''}
-                  alt="Profile" 
-                  className="w-full h-full rounded-full object-cover"
-                  data-testid="img-profile-avatar"
-                />
-              ) : (
-                <span className="text-primary-foreground text-2xl font-bold" data-testid="text-profile-initials">
-                  {(user as any)?.firstName ? (user as any).firstName[0] : 'U'}
-                </span>
-              )}
-            </div>
-            <div className="absolute -bottom-2 -right-2">
-              <ObjectUploader
-                maxNumberOfFiles={1}
-                maxFileSize={15728640} // 15MB
-                onGetUploadParameters={handleGetUploadParameters}
-                onComplete={handleUploadComplete}
-                buttonClassName="w-8 h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full flex items-center justify-center border-2 border-background"
-              >
-                <Camera className="w-4 h-4" />
-              </ObjectUploader>
-            </div>
-          </div>
-          
-          <div className="flex-1 flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-bold mb-1" data-testid="text-user-name">
-                {(user as any)?.firstName && (user as any)?.lastName 
-                  ? `${(user as any).lastName}, ${(user as any).firstName}`
-                  : (user as any)?.firstName || 'User'
-                }
-              </h2>
-              <p className="text-xs text-muted-foreground/70 mb-2 font-mono font-bold" data-testid="text-user-id">
-                User ID: {user ? ((user as any)?.displayId || 'Not assigned') : 'Loading...'}
-              </p>
-              <div className="flex items-center gap-2">
-                <span 
-                  className={`tier-badge text-xs px-3 py-1 rounded-full font-semibold ${tierDisplay.class}`}
-                  data-testid="badge-user-tier"
-                >
-                  {tierDisplay.label}
-                </span>
-                
-                {/* Career Stats */}
-                {userStats && (
-                  <span className="text-xs px-3 py-1 rounded-full font-semibold text-[#212121] dark:text-[#ffffff] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="stat-career">
-                    <span data-testid="stat-goals">{userStats.goals} G</span>
-                    <span className="mx-1">•</span>
-                    <span data-testid="stat-assists">{userStats.assists} A</span>
-                    <span className="mx-1">•</span>
-                    <span data-testid="stat-points">{userStats.points} P</span>
+    <div className="min-h-screen flex flex-col" data-testid="profile-page">
+      {/* Fixed Header Section - Profile Info and Banner */}
+      <div className="sticky top-0 z-10 bg-background">
+        {/* Profile Info */}
+        <div className="px-6 pt-[24px] pb-[8px]">
+          <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
+            <div className="relative flex-shrink-0">
+              <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
+                {(user as any)?.profileImageUrl ? (
+                  <img 
+                    src={getImageUrl((user as any).profileImageUrl) || ''}
+                    alt="Profile" 
+                    className="w-full h-full rounded-full object-cover"
+                    data-testid="img-profile-avatar"
+                  />
+                ) : (
+                  <span className="text-primary-foreground text-2xl font-bold" data-testid="text-profile-initials">
+                    {(user as any)?.firstName ? (user as any).firstName[0] : 'U'}
                   </span>
                 )}
               </div>
+              <div className="absolute -bottom-2 -right-2">
+                <ObjectUploader
+                  maxNumberOfFiles={1}
+                  maxFileSize={15728640} // 15MB
+                  onGetUploadParameters={handleGetUploadParameters}
+                  onComplete={handleUploadComplete}
+                  buttonClassName="w-8 h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full flex items-center justify-center border-2 border-background"
+                >
+                  <Camera className="w-4 h-4" />
+                </ObjectUploader>
+              </div>
             </div>
+            
+            <div className="flex-1 flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold mb-1" data-testid="text-user-name">
+                  {(user as any)?.firstName && (user as any)?.lastName 
+                    ? `${(user as any).lastName}, ${(user as any).firstName}`
+                    : (user as any)?.firstName || 'User'
+                  }
+                </h2>
+                <p className="text-xs text-muted-foreground/70 mb-2 font-mono font-bold" data-testid="text-user-id">
+                  User ID: {user ? ((user as any)?.displayId || 'Not assigned') : 'Loading...'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <span 
+                    className={`tier-badge text-xs px-3 py-1 rounded-full font-semibold ${tierDisplay.class}`}
+                    data-testid="badge-user-tier"
+                  >
+                    {tierDisplay.label}
+                  </span>
+                  
+                  {/* Career Stats */}
+                  {userStats && (
+                    <span className="text-xs px-3 py-1 rounded-full font-semibold text-[#212121] dark:text-[#ffffff] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="stat-career">
+                      <span data-testid="stat-goals">{userStats.goals} G</span>
+                      <span className="mx-1">•</span>
+                      <span data-testid="stat-assists">{userStats.assists} A</span>
+                      <span className="mx-1">•</span>
+                      <span data-testid="stat-points">{userStats.points} P</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            {/* Upgrade button removed as everyone is commissioner now */}
           </div>
-          {/* Upgrade button removed as everyone is commissioner now */}
+        </div>
+        {/* HPIB Banner for paid users - below profile info */}
+        <div className="px-6 pb-2">
+          <HPIBBanner placement="profile-header" />
         </div>
       </div>
-      {/* HPIB Banner for paid users - below profile info */}
-      <div className="px-6 mt-[0px] mb-[0px]">
-        <HPIBBanner placement="profile-header" />
-      </div>
-      {/* Profile Details */}
-      <div className="px-6 mb-6">
+      
+      {/* Scrollable Content Section */}
+      <div className="flex-1 overflow-y-auto pb-24">
+        {/* Profile Details */}
+        <div className="px-6 mb-6 pt-2">
         <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold" data-testid="text-profile-details-title">Profile Details</h2>
@@ -926,11 +932,6 @@ export default function Profile() {
           </button>
         </div>
       </div>
-      {/* App Version */}
-      <div className="px-6 py-8 text-center">
-        <p className="text-sm text-muted-foreground" data-testid="text-app-version">
-          Version 1.0
-        </p>
       </div>
       {/* League Request Dialog */}
       <AlertDialog open={showLeagueRequestDialog} onOpenChange={setShowLeagueRequestDialog}>
