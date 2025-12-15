@@ -350,7 +350,7 @@ export default function Profile() {
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="profile-page">
       {/* Profile Info */}
-      <div className="px-6 mb-6 pt-[24px] pb-[24px]">
+      <div className="px-6 mb-2 pt-[24px] pb-[8px]">
         <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
           <div className="relative flex-shrink-0">
             <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
