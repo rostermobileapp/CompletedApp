@@ -482,395 +482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/notification-preferences/player-id', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { playerId } = req.body;
-      
-      if (!playerId || typeof playerId !== 'string') {
-        return res.status(400).json({ message: "Player ID is required" });
-      }
-      
-      // Get user to fetch their displayId for External ID linking
-      const user = await storage.getUser(userId);
-      const displayId = user?.displayId;
-      
-      console.log(`[Player ID Registration] User ${userId} (displayId: ${displayId}) registering Player ID: ${playerId}`);
-      
-      let preferences = await storage.updateOneSignalPlayerId(userId, playerId);
-      
-      // Set the External ID in OneSignal using displayId (e.g., "LFB3Kf") for easier tracking
-      let externalIdResult = false;
-      if (displayId) {
-        externalIdResult = await notificationService.setExternalIdViaApi(playerId, displayId);
-        console.log(`[Player ID Registration] External ID (displayId: ${displayId}) set via API: ${externalIdResult}`);
-        
-        // Save the External ID to database if linking was successful
-        if (externalIdResult) {
-          preferences = await storage.upsertNotificationPreferences(userId, { oneSignalExternalId: displayId });
-          console.log(`[Player ID Registration] Saved External ID to database: ${displayId}`);
-        }
-      } else {
-        console.warn(`[Player ID Registration] No displayId for user ${userId}, cannot link External ID`);
-      }
-      
-      res.json({ ...preferences, externalIdLinked: externalIdResult, displayId });
-    } catch (error) {
-      console.error("Error registering OneSignal player ID:", error);
-      res.status(500).json({ message: "Failed to register player ID" });
-    }
-  });
-
-  // Manually link External ID for users who already have Player ID registered
-  // Can be called from frontend with { oneSignalId, userId } where userId is the displayId
-  app.post('/api/notification-preferences/link-external-id', isAuthenticated, async (req: any, res) => {
-    try {
-      const authUserId = req.user.claims.sub;
-      const { oneSignalId, userId: requestDisplayId } = req.body;
-      
-      // Get the authenticated user's displayId for validation
-      const user = await storage.getUser(authUserId);
-      const userDisplayId = user?.displayId;
-      
-      // Security check: if displayId is provided, it must match the authenticated user's displayId
-      if (requestDisplayId && userDisplayId && requestDisplayId !== userDisplayId) {
-        console.warn(`[Link External ID] Security: displayId mismatch. Request: ${requestDisplayId}, User: ${userDisplayId}`);
-        return res.status(403).json({ 
-          message: "Display ID mismatch.",
-          success: false 
-        });
-      }
-      
-      // Use provided values or fall back to database
-      let playerIdToUse = oneSignalId;
-      let displayIdToUse = requestDisplayId || userDisplayId;
-      
-      if (!displayIdToUse) {
-        return res.status(400).json({ 
-          message: "No display ID found for user.",
-          hasDisplayId: false 
-        });
-      }
-      
-      if (!playerIdToUse) {
-        const preferences = await storage.getNotificationPreferences(authUserId);
-        playerIdToUse = preferences?.oneSignalPlayerId;
-        
-        if (!playerIdToUse) {
-          return res.status(400).json({ 
-            message: "No Player ID found. Please enable notifications first.",
-            hasPlayerId: false 
-          });
-        }
-      }
-      
-      console.log(`[Link External ID] User ${authUserId} linking displayId: ${displayIdToUse} to Player ID: ${playerIdToUse}`);
-      
-      // Set the External ID in OneSignal via API using displayId
-      const result = await notificationService.setExternalIdViaApi(playerIdToUse, displayIdToUse);
-      
-      console.log(`[Link External ID] Result: ${result}`);
-      
-      // Save the External ID to database if linking was successful
-      if (result) {
-        await storage.upsertNotificationPreferences(authUserId, { oneSignalExternalId: displayIdToUse });
-        console.log(`[Link External ID] Saved External ID to database: ${displayIdToUse}`);
-      }
-      
-      res.json({ 
-        success: result, 
-        message: result ? "External ID linked successfully" : "Failed to link External ID",
-        playerId: playerIdToUse,
-        externalId: displayIdToUse
-      });
-    } catch (error) {
-      console.error("Error linking External ID:", error);
-      res.status(500).json({ message: "Failed to link External ID" });
-    }
-  });
-
-  // Verify External ID is linked in OneSignal (for debugging)
-  app.get('/api/notification-preferences/verify-external-id', isAuthenticated, async (req: any, res) => {
-    try {
-      const authUserId = req.user.claims.sub;
-      const user = await storage.getUser(authUserId);
-      
-      if (!user?.displayId) {
-        return res.json({ 
-          verified: false, 
-          error: 'No displayId found for user',
-          displayId: null
-        });
-      }
-      
-      const result = await notificationService.verifyExternalIdLink(user.displayId);
-      
-      res.json({
-        verified: result.linked,
-        displayId: user.displayId,
-        oneSignalData: result.userData,
-        error: result.error
-      });
-    } catch (error) {
-      console.error("Error verifying External ID:", error);
-      res.status(500).json({ verified: false, error: String(error) });
-    }
-  });
-
-  // Lookup OneSignal user by their OneSignal ID (for debugging)
-  app.get('/api/notification-preferences/lookup-onesignal/:oneSignalId', isAuthenticated, async (req: any, res) => {
-    try {
-      const { oneSignalId } = req.params;
-      
-      if (!oneSignalId) {
-        return res.status(400).json({ found: false, error: 'No OneSignal ID provided' });
-      }
-      
-      const result = await notificationService.lookupOneSignalUser(oneSignalId);
-      
-      res.json({
-        found: result.found,
-        oneSignalId,
-        userData: result.userData,
-        error: result.error
-      });
-    } catch (error) {
-      console.error("Error looking up OneSignal user:", error);
-      res.status(500).json({ found: false, error: String(error) });
-    }
-  });
-
-  // Test Push Notification Endpoint - Send a test notification to yourself
-  app.post('/api/notification-preferences/test', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { type = 'message' } = req.body;
-      
-      // Get user info for personalization
-      const user = await storage.getUser(userId);
-      const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Test User' : 'Test User';
-      
-      console.log(`[Test Notification] Sending test ${type} notification to user ${userId}`);
-      
-      let result;
-      switch (type) {
-        case 'message':
-          result = await notificationService.sendMessageNotification(
-            [userId],
-            'Test Sender',
-            'This is a test message notification to verify push notifications are working!',
-            undefined
-          );
-          break;
-        case 'payment':
-          result = await notificationService.sendPaymentRequestNotification(
-            [userId],
-            userName,
-            1000, // $10.00 test amount
-            'Test payment notification'
-          );
-          break;
-        case 'event':
-          result = await notificationService.sendEventReminderNotification(
-            [userId],
-            'Test Event',
-            'Today at 7:00 PM'
-          );
-          break;
-        case 'join':
-          result = await notificationService.sendJoinRequestNotification(
-            [userId],
-            'Test Player',
-            'team',
-            'Test Team'
-          );
-          break;
-        default:
-          result = await notificationService.sendMessageNotification(
-            [userId],
-            'Test Sender',
-            'This is a test notification!',
-            undefined
-          );
-      }
-      
-      console.log(`[Test Notification] Result: sent=${result.sent}, skipped=${result.skipped}`);
-      
-      res.json({
-        success: result.sent > 0,
-        message: result.sent > 0 
-          ? 'Test notification sent successfully! Check your device.'
-          : 'Notification was skipped - please ensure push notifications are enabled and the notification type is turned on in your preferences.',
-        details: {
-          sent: result.sent,
-          skipped: result.skipped,
-          type
-        }
-      });
-    } catch (error) {
-      console.error("[Test Notification] Error:", error);
-      res.status(500).json({ message: "Failed to send test notification", error: String(error) });
-    }
-  });
-
-  // Clear OneSignal data on logout - removes Player ID and External ID from database
-  app.post('/api/notification-preferences/clear-onesignal', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      
-      console.log(`[Clear OneSignal] Clearing OneSignal data for user ${userId}`);
-      
-      // Clear ONLY the OneSignal-specific columns, keep other notification preferences
-      const preferences = await storage.upsertNotificationPreferences(userId, {
-        oneSignalPlayerId: null,
-        oneSignalExternalId: null,
-      });
-      
-      console.log(`[Clear OneSignal] OneSignal data cleared successfully for user ${userId}`);
-      
-      res.json({
-        success: true,
-        message: 'OneSignal data cleared',
-        preferences
-      });
-    } catch (error) {
-      console.error('[Clear OneSignal] Error clearing OneSignal data:', error);
-      res.status(500).json({ success: false, message: 'Failed to clear OneSignal data' });
-    }
-  });
-
-  // Auto-link External ID for native apps (when SDK bridge isn't available)
-  // Searches for recent subscriptions without External ID and links them
-  app.post('/api/notification-preferences/auto-link-native', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      const displayId = user?.displayId;
-      const { oneSignalId } = req.body; // Optional: if they provide Player ID
-      
-      if (!displayId) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'No displayId found for user' 
-        });
-      }
-      
-      console.log(`[Auto-Link Native] Attempting to link External ID for user ${userId} (displayId: ${displayId})`);
-      
-      // First check if already linked
-      const verifyResult = await notificationService.verifyExternalIdLink(displayId);
-      if (verifyResult.linked) {
-        console.log(`[Auto-Link Native] External ID already linked for ${displayId}`);
-        
-        // Save to database
-        await storage.upsertNotificationPreferences(userId, { 
-          oneSignalExternalId: displayId 
-        });
-        
-        return res.json({
-          success: true,
-          message: 'External ID already linked',
-          alreadyLinked: true,
-          displayId
-        });
-      }
-      
-      // If Player ID was provided, use it
-      if (oneSignalId) {
-        console.log(`[Auto-Link Native] Player ID provided: ${oneSignalId}`);
-        const linkResult = await notificationService.setExternalIdViaApi(oneSignalId, displayId);
-        
-        if (linkResult) {
-          await storage.upsertNotificationPreferences(userId, { 
-            oneSignalExternalId: displayId 
-          });
-          
-          return res.json({
-            success: true,
-            message: 'External ID linked successfully',
-            displayId,
-            oneSignalId
-          });
-        } else {
-          return res.json({
-            success: false,
-            message: 'Failed to link External ID',
-            displayId,
-            oneSignalId
-          });
-        }
-      }
-      
-      // No Player ID provided - return instructions
-      console.log(`[Auto-Link Native] No Player ID provided. User needs to get it from OneSignal dashboard.`);
-      
-      res.json({
-        success: false,
-        message: 'Need Player ID from OneSignal dashboard',
-        needsPlayerId: true,
-        instructions: {
-          step1: 'Go to OneSignal Dashboard → Audience → All Users',
-          step2: 'Find your device (newest Android subscriber)',
-          step3: 'Copy the Player ID',
-          step4: 'Call this endpoint again with: { "oneSignalId": "PLAYER_ID" }',
-          displayId
-        }
-      });
-    } catch (error) {
-      console.error('[Auto-Link Native] Error:', error);
-      res.status(500).json({ success: false, message: 'Failed to auto-link External ID' });
-    }
-  });
-
-  // Debug endpoint - Get all OneSignal data for current user
-  app.get('/api/notification-preferences/debug', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      const preferences = await storage.getNotificationPreferences(userId);
-      
-      let oneSignalApiData = null;
-      let externalIdVerification = null;
-      
-      // If user has a Player ID stored, look it up in OneSignal
-      if (preferences?.oneSignalPlayerId) {
-        oneSignalApiData = await notificationService.lookupOneSignalUser(preferences.oneSignalPlayerId);
-      }
-      
-      // If user has a displayId, verify if it's linked as External ID in OneSignal
-      if (user?.displayId) {
-        externalIdVerification = await notificationService.verifyExternalIdLink(user.displayId);
-      }
-      
-      res.json({
-        user: {
-          userId: user?.id,
-          displayId: user?.displayId,
-          email: user?.email,
-        },
-        database: {
-          oneSignalPlayerId: preferences?.oneSignalPlayerId || null,
-          oneSignalExternalId: preferences?.oneSignalExternalId || null,
-          pushEnabled: preferences?.pushEnabled ?? false,
-          notificationSettings: preferences?.notificationSettings || null,
-          updatedAt: preferences?.updatedAt || null,
-        },
-        oneSignalApi: {
-          playerIdLookup: oneSignalApiData || null,
-          externalIdVerification: externalIdVerification || null,
-        },
-        summary: {
-          hasPlayerId: !!preferences?.oneSignalPlayerId,
-          hasExternalId: !!preferences?.oneSignalExternalId,
-          externalIdLinked: externalIdVerification?.linked ?? false,
-          externalIdMatchesDisplayId: preferences?.oneSignalExternalId === user?.displayId,
-        },
-      });
-    } catch (error) {
-      console.error('[Debug OneSignal] Error:', error);
-      res.status(500).json({ error: String(error) });
-    }
-  });
+  // OneSignal endpoints removed - will be re-implemented step by step
 
   // Personal Reminders Routes
   app.get('/api/user/personal-reminders', isAuthenticated, async (req: any, res) => {
@@ -3176,13 +2788,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? `${requestingUser.firstName} ${requestingUser.lastName}`.trim() || requestingUser.email 
               : 'Someone';
             
-            await notificationService.sendJoinRequestNotification(
-              [league.commissionerId],
-              requesterName,
-              'league',
-              league.name || 'your league',
-              membership.id
-            );
+            // Push notification removed - will be re-implemented
+            // await notificationService.sendJoinRequestNotification(...)
           }
         } catch (notifError) {
           console.error('[Notifications] Failed to send join request notification:', notifError);
@@ -4911,13 +4518,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (league.commissionerId) {
             const requesterName = team.name || 'A team';
             
-            await notificationService.sendJoinRequestNotification(
-              [league.commissionerId],
-              requesterName,
-              'league',
-              league.name || 'your league',
-              request.id
-            );
+            // Push notification removed - will be re-implemented  
+            // await notificationService.sendJoinRequestNotification(...)
           }
         } catch (notifError) {
           console.error('[Notifications] Failed to send team join request notification:', notifError);
@@ -6545,12 +6147,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const requesterName = requester ? `${requester.firstName} ${requester.lastName}`.trim() || requester.email : 'Someone';
           const gameInfo = `${homeTeam?.name || 'Home'} vs ${awayTeam?.name || 'Away'}`;
           
-          await notificationService.sendSubstitutionRequestNotification(
-            [substitutePlayerId],
-            requesterName,
-            gameInfo,
-            request.id
-          );
+          // Push notification removed - will be re-implemented
+          // await notificationService.sendSubstitutionRequestNotification(...)
         }
       } catch (notifyError) {
         console.error('Error notifying substitute player:', notifyError);
@@ -8461,16 +8059,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (recipientUserIds.length > 0) {
-          await notificationService.sendNewsAnnouncementNotification(
-            recipientUserIds,
-            authorName,
-            announcementData.content?.substring(0, 50) || 'New announcement',
-            teamId ? 'team' : 'league',
-            teamId ? (captainTeam?.name || league.name) : league.name,
-            announcement.id,
-            teamId || leagueId
-          );
-          console.log(`📲 Sent push notifications for announcement to ${recipientUserIds.length} users`);
+          // Push notification removed - will be re-implemented
+          // await notificationService.sendNewsAnnouncementNotification(...);
+          console.log(`📲 Push notifications disabled - will be re-implemented`);
         }
       } catch (notificationError) {
         console.error('Failed to send announcement push notifications:', notificationError);
@@ -9037,15 +8628,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (recipientUserIds.length > 0) {
-          await notificationService.sendNewsAnnouncementNotification(
-            recipientUserIds,
-            authorName,
-            announcementData.content?.substring(0, 50) || 'New announcement',
-            'tournament',
-            tournament.name,
-            announcement.id,
-            tournamentId
-          );
+          // Push notification removed - will be re-implemented
+          // await notificationService.sendNewsAnnouncementNotification(...)
           console.log(`📲 Sent push notifications for tournament announcement to ${recipientUserIds.length} users`);
         }
       } catch (notificationError) {
@@ -11096,13 +10680,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (recipientIds.length > 0) {
             console.log('[Message Notification Debug] Calling sendMessageNotification for', recipientIds.length, 'recipients');
-            const result = await notificationService.sendMessageNotification(
-              recipientIds,
-              senderName,
-              content,
-              conversationId
-            );
-            console.log('[Message Notification Debug] Notification result:', result);
+            // Push notification removed - will be re-implemented
+            // const result = await notificationService.sendMessageNotification(...);
+            console.log('[Message Notification Debug] Notifications disabled');
           } else {
             console.log('[Message Notification Debug] No recipients to notify (empty list after filtering)');
           }
@@ -12586,13 +12166,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const creatorName = creator ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email : 'Someone';
           
           if (validatedData.recipientUserIds.length > 0) {
-            await notificationService.sendPaymentRequestNotification(
-              validatedData.recipientUserIds,
-              creatorName,
-              validatedData.amountPerPerson,
-              validatedData.title,
-              paymentRequest.id
-            );
+            // Push notification removed - will be re-implemented
+            // await notificationService.sendPaymentRequestNotification(...);
           }
         } catch (notifError) {
           console.error('[Notifications] Failed to send payment request notifications:', notifError);
