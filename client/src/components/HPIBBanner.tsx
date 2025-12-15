@@ -1,4 +1,4 @@
-import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/context/SubscriptionContext';
 import hpibBannerImage from '@assets/HPIB-Red2_1765832928238.png';
 
 interface HPIBBannerProps {
@@ -6,12 +6,19 @@ interface HPIBBannerProps {
 }
 
 export function HPIBBanner({ placement }: HPIBBannerProps) {
-  const { user } = useAuth();
+  const { role, isLoading } = usePermissions();
 
-  const isPaidUser = user?.role === 'player_pro' || user?.role === 'commissioner';
+  // Don't render while loading to prevent flash
+  if (isLoading) {
+    return null;
+  }
+
+  const isFreeUser = role === 'free_tier';
+  const isPaidUser = role === 'player_pro' || role === 'commissioner' || role === 'secondary_commissioner';
 
   if (placement === 'bottom-nav') {
-    if (!user || isPaidUser) {
+    // Only show for free tier users
+    if (!isFreeUser) {
       return null;
     }
 
@@ -34,7 +41,8 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
   }
 
   if (placement === 'profile-header') {
-    if (!user || !isPaidUser) {
+    // Only show for paid tier users on their profile
+    if (!isPaidUser) {
       return null;
     }
 
