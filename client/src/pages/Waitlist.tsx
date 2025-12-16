@@ -49,11 +49,7 @@ export default function Waitlist() {
 
   const submitMutation = useMutation({
     mutationFn: async (data: WaitlistFormValues) => {
-      return await apiRequest("/api/waitlist", {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return await apiRequest("POST", "/api/waitlist", data);
     },
     onSuccess: () => {
       setIsSubmitted(true);

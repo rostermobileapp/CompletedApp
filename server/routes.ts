@@ -173,6 +173,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Waitlist signup (public)
+  app.post('/api/waitlist', async (req, res) => {
+    try {
+      const { firstName, email, phone, howHeard } = req.body;
+      
+      if (!firstName || !email) {
+        return res.status(400).json({ message: "First name and email are required" });
+      }
+
+      // Insert into Supabase via our db connection
+      const result = await db.execute(sql`
+        INSERT INTO waitlist_signups (id, first_name, email, phone, how_heard, created_at)
+        VALUES (gen_random_uuid(), ${firstName}, ${email}, ${phone || null}, ${howHeard || null}, NOW())
+        RETURNING *
+      `);
+      
+      res.json({ success: true, message: "Successfully joined waitlist" });
+    } catch (error) {
+      console.error("Error adding to waitlist:", error);
+      res.status(500).json({ message: "Failed to join waitlist" });
+    }
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
