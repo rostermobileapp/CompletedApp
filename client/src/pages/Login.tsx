@@ -202,7 +202,7 @@ export default function Login() {
                   </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-3">
+                <form onSubmit={handleSubmit} className="space-y-3 pl-[8px] pr-[8px] pt-[0px] pb-[0px] mt-[0px] mb-[0px] ml-[8px] mr-[8px]">
                   <div className="space-y-1">
                     <Label htmlFor="email" className="text-white text-sm">Email</Label>
                     <Input
