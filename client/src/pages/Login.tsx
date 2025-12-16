@@ -188,7 +188,7 @@ export default function Login() {
                   ease: [0.4, 0, 0.2, 1],
                 }}
               >
-                <div className="text-center mb-4">
+                <div className="text-center pt-[0px] pb-[0px] mt-[12px] mb-[12px]">
                   <img 
                     src={logoWhite} 
                     alt="Roster" 
