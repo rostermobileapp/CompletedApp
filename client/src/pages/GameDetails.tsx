@@ -567,7 +567,11 @@ export default function GameDetails() {
               size="sm"
               onClick={() => {
                 setPageTransitionDirection('down');
-                navigate("/calendar");
+                if (window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  navigate("/");
+                }
               }}
               className="p-2"
               data-testid="button-back"
