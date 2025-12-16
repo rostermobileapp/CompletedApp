@@ -102,12 +102,13 @@ export default function Login() {
         </button>
       </motion.div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6">
+      <div className="flex-1 flex flex-col items-center px-6">
         <motion.div
           className="flex flex-col items-center"
+          style={{ marginTop: '25vh' }}
           animate={{
-            y: showForm ? '-30vh' : 0,
-            scale: showForm ? 0.7 : 1,
+            marginTop: showForm ? '10vh' : '25vh',
+            scale: showForm ? 0.65 : 1,
           }}
           transition={{
             duration: 0.4,
@@ -117,13 +118,14 @@ export default function Login() {
           <motion.img
             src={logoWhite}
             alt="Roster Logo"
-            className="w-64 max-w-[80vw] mb-12"
+            className="w-64 max-w-[80vw]"
             data-testid="logo-image"
           />
 
           <AnimatePresence>
             {!showForm && (
               <motion.div
+                className="mt-12"
                 initial={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.2 }}
@@ -153,31 +155,30 @@ export default function Login() {
               />
 
               <motion.div
-                className="fixed bottom-0 left-0 right-0 z-50 bg-[#1a1a1a] rounded-t-3xl px-6 pt-8 pb-10 max-h-[75vh] overflow-y-auto"
-                initial={{ y: '100%', opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: '100%', opacity: 0 }}
+                className="fixed left-6 right-6 z-50 bg-[#1a1a1a] rounded-2xl px-5 py-6"
+                style={{ top: '33%' }}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
                 transition={{
-                  duration: 0.4,
+                  duration: 0.35,
                   ease: [0.4, 0, 0.2, 1],
                 }}
               >
-                <div className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-6" />
-                
-                <div className="space-y-2 text-center mb-6">
-                  <h1 className="text-2xl font-semibold tracking-tight text-white" data-testid="text-auth-title">
+                <div className="text-center mb-4">
+                  <h1 className="text-xl font-semibold tracking-tight text-white" data-testid="text-auth-title">
                     {isSignUp ? 'Create Account' : 'Sign In'}
                   </h1>
-                  <p className="text-sm text-gray-400" data-testid="text-auth-description">
+                  <p className="text-xs text-gray-400 mt-1" data-testid="text-auth-description">
                     {isSignUp
                       ? 'Enter your email and password to create an account'
                       : 'Enter your email and password to sign in'}
                   </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-white">Email</Label>
+                <form onSubmit={handleSubmit} className="space-y-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="email" className="text-white text-sm">Email</Label>
                     <Input
                       id="email"
                       type="email"
@@ -185,13 +186,13 @@ export default function Login() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="min-h-[48px] bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500"
+                      className="min-h-[44px] bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500"
                       data-testid="input-email"
                     />
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-white">Password</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="password" className="text-white text-sm">Password</Label>
                     <div className="relative">
                       <Input
                         id="password"
@@ -201,7 +202,7 @@ export default function Login() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         minLength={6}
-                        className="min-h-[48px] bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500 pr-12"
+                        className="min-h-[44px] bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500 pr-12"
                         data-testid="input-password"
                       />
                       <button
@@ -220,7 +221,7 @@ export default function Login() {
                       <button
                         type="button"
                         onClick={() => setLocation('/forgot-password')}
-                        className="text-[#3c82f4] hover:underline text-sm min-h-[44px] px-2"
+                        className="text-[#3c82f4] hover:underline text-xs min-h-[36px] px-1"
                         data-testid="link-forgot-password"
                       >
                         Forgot password?
@@ -230,18 +231,18 @@ export default function Login() {
                   
                   <Button
                     type="submit"
-                    className="w-full min-h-[52px] bg-[#3c82f4] hover:bg-[#3c82f4]/90 text-white font-semibold text-base rounded-xl"
+                    className="w-full min-h-[48px] bg-[#3c82f4] hover:bg-[#3c82f4]/90 text-white font-semibold text-base rounded-xl"
                     disabled={loading}
                     data-testid="button-submit"
                   >
                     {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
                   </Button>
                   
-                  <div className="text-center pt-2">
+                  <div className="text-center">
                     <button
                       type="button"
                       onClick={() => setIsSignUp(!isSignUp)}
-                      className="text-gray-400 hover:text-white transition-colors text-sm min-h-[44px] px-2"
+                      className="text-gray-400 hover:text-white transition-colors text-xs min-h-[36px] px-2"
                       data-testid="button-toggle-mode"
                     >
                       {isSignUp
