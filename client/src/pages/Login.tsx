@@ -111,7 +111,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex flex-col overflow-hidden" data-testid="login-page">
+    <div className="min-h-screen bg-[#1161f4] flex flex-col overflow-hidden" data-testid="login-page">
       <motion.div
         className="absolute top-4 left-4 z-50"
         initial={{ opacity: 0 }}
