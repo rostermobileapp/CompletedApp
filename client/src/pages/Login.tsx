@@ -127,7 +127,7 @@ export default function Login() {
           <X className="w-5 h-5" />
         </button>
       </motion.div>
-      <div className="flex-1 flex flex-col items-center justify-center px-6 bg-[#1161f4]">
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
         <motion.div
           className="flex flex-col items-center"
           animate={{
