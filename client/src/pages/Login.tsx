@@ -163,9 +163,12 @@ export default function Login() {
                 }}
               >
                 <div className="text-center mb-4">
-                  <h1 className="text-xl font-semibold tracking-tight text-white pt-[1px] pb-[1px]" data-testid="text-auth-title">
-                    {isSignUp ? 'Create Account' : 'Sign In'}
-                  </h1>
+                  <img 
+                    src={logoWhite} 
+                    alt="Roster" 
+                    className="h-8 mx-auto mb-2"
+                    data-testid="modal-logo"
+                  />
                   <p className="text-xs text-gray-400 mt-1" data-testid="text-auth-description">
                     {isSignUp
                       ? 'Enter your email and password to create an account'
