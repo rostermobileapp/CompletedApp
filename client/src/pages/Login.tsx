@@ -101,12 +101,11 @@ export default function Login() {
           <X className="w-5 h-5" />
         </button>
       </motion.div>
-      <div className="flex-1 flex flex-col items-center px-6">
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
         <motion.div
           className="flex flex-col items-center"
-          style={{ marginTop: '25vh' }}
           animate={{
-            marginTop: showForm ? '10vh' : '25vh',
+            y: showForm ? '-25vh' : 0,
             scale: showForm ? 0.65 : 1,
           }}
           transition={{
@@ -129,13 +128,13 @@ export default function Login() {
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.2 }}
               >
-                <Button
+                <button
                   onClick={() => setShowForm(true)}
-                  className="px-12 py-6 text-lg font-semibold bg-[#3c82f4] hover:bg-[#3c82f4]/90 rounded-full min-h-[52px]"
+                  className="px-12 py-6 text-lg font-semibold text-[#3c82f4] hover:text-[#3c82f4]/80 bg-transparent border-none min-h-[52px] transition-colors"
                   data-testid="button-login-initial"
                 >
                   Login
-                </Button>
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
