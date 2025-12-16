@@ -92,19 +92,10 @@ export default function Login() {
   if (showLoadingScreen) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center" data-testid="loading-screen">
-        <motion.img
+        <img
           src={logoR}
           alt="Roster"
-          className="w-24 h-24"
-          animate={{
-            scale: [1, 1.15, 1],
-            opacity: [0.8, 1, 0.8],
-          }}
-          transition={{
-            duration: 0.75,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          className="w-24 h-24 animate-pulse"
         />
       </div>
     );
