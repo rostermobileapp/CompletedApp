@@ -74,6 +74,7 @@ import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail } from "./emails";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
+import { getUncachableResendClient } from "./resend";
 
 
 // Helper function to format date as local time string without timezone suffix
@@ -182,12 +183,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "First name and email are required" });
       }
 
-      // Insert into Supabase via our db connection
-      const result = await db.execute(sql`
-        INSERT INTO waitlist_signups (id, first_name, email, phone, how_heard, created_at)
-        VALUES (gen_random_uuid(), ${firstName}, ${email}, ${phone || null}, ${howHeard || null}, NOW())
-        RETURNING *
-      `);
+      // Add contact to Resend for marketing campaigns
+      const { client: resend } = await getUncachableResendClient();
+      
+      const { data, error } = await resend.contacts.create({
+        email,
+        firstName,
+        unsubscribed: false,
+        audienceId: process.env.RESEND_WAITLIST_AUDIENCE_ID || '',
+      });
+
+      if (error) {
+        console.error("Resend contact creation error:", error);
+        // If it's a duplicate email error, still return success
+        if (error.message?.includes('already exists')) {
+          return res.json({ success: true, message: "You're already on the waitlist!" });
+        }
+        throw error;
+      }
       
       res.json({ success: true, message: "Successfully joined waitlist" });
     } catch (error) {
