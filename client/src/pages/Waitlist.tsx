@@ -24,11 +24,15 @@ const waitlistFormSchema = z.object({
 type WaitlistFormValues = z.infer<typeof waitlistFormSchema>;
 
 const howHeardOptions = [
+  { value: "tobin", label: "Tobin (Founder)" },
+  { value: "hpib", label: "Hockey Players in Business" },
+  { value: "reddit", label: "Reddit" },
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "facebook", label: "Facebook" },
+  { value: "instagram", label: "Instagram" },
+  { value: "word_of_mouth", label: "Word of Mouth" },
   { value: "friend", label: "Friend or teammate" },
-  { value: "social", label: "Social media" },
-  { value: "search", label: "Search engine" },
   { value: "league", label: "My league/team" },
-  { value: "ad", label: "Online advertisement" },
   { value: "other", label: "Other" },
 ];
 
