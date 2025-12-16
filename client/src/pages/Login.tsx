@@ -5,12 +5,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
-import { ArrowLeft } from 'lucide-react';
+import { X, Eye, EyeOff } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import logoWhite from '@assets/ROSTER_LOGO_WHITE_1765849625877.png';
 
 export default function Login() {
+  const [showForm, setShowForm] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -67,97 +71,192 @@ export default function Login() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col" data-testid="login-page">
-      <div className="p-4">
-        <button
-          onClick={() => setLocation('/')}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px]"
-          data-testid="button-back"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Back</span>
-        </button>
-      </div>
-      <div className="flex-1 flex items-center justify-center px-6 pb-20 bg-[#3c83f6]">
-        <div className="w-full max-w-md space-y-6">
-          <div className="space-y-2 text-center sm:text-left">
-            <h1 className="text-2xl font-semibold tracking-tight" data-testid="text-auth-title">
-              {isSignUp ? 'Create Account' : 'Sign In'}
-            </h1>
-            <p className="text-sm text-muted-foreground" data-testid="text-auth-description">
-              {isSignUp
-                ? 'Enter your email and password to create an account'
-                : 'Enter your email and password to sign in'}
-            </p>
-          </div>
+  const handleClose = () => {
+    setShowForm(false);
+    setEmail('');
+    setPassword('');
+    setIsSignUp(false);
+  };
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="min-h-[44px]"
-                data-testid="input-email"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="min-h-[44px]"
-                data-testid="input-password"
-              />
-            </div>
-            
-            <Button
-              type="submit"
-              className="w-full min-h-[44px] bg-[#212121]"
-              disabled={loading}
-              data-testid="button-submit"
-            >
-              {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
-            </Button>
-            
-            {!isSignUp && (
-              <div className="text-center text-sm">
-                <button
-                  type="button"
-                  onClick={() => setLocation('/forgot-password')}
-                  className="text-primary hover:underline min-h-[44px] px-2"
-                  data-testid="link-forgot-password"
-                >
-                  Forgot password?
-                </button>
-              </div>
-            )}
-            
-            <div className="text-center text-sm">
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-primary hover:underline min-h-[44px] px-2"
-                data-testid="button-toggle-mode"
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      handleClose();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-black flex flex-col overflow-hidden" data-testid="login-page">
+      <motion.div
+        className="absolute top-4 left-4 z-50"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: showForm ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <button
+          onClick={handleClose}
+          className="flex items-center justify-center w-11 h-11 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+          data-testid="button-close"
+          style={{ pointerEvents: showForm ? 'auto' : 'none' }}
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </motion.div>
+
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
+        <motion.div
+          className="flex flex-col items-center"
+          animate={{
+            y: showForm ? '-30vh' : 0,
+            scale: showForm ? 0.7 : 1,
+          }}
+          transition={{
+            duration: 0.4,
+            ease: [0.4, 0, 0.2, 1],
+          }}
+        >
+          <motion.img
+            src={logoWhite}
+            alt="Roster Logo"
+            className="w-64 max-w-[80vw] mb-12"
+            data-testid="logo-image"
+          />
+
+          <AnimatePresence>
+            {!showForm && (
+              <motion.div
+                initial={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.2 }}
               >
-                {isSignUp
-                  ? 'Already have an account? Sign in'
-                  : "Don't have an account? Sign up"}
-              </button>
-            </div>
-          </form>
-        </div>
+                <Button
+                  onClick={() => setShowForm(true)}
+                  className="px-12 py-6 text-lg font-semibold bg-[#3c82f4] hover:bg-[#3c82f4]/90 rounded-full min-h-[52px]"
+                  data-testid="button-login-initial"
+                >
+                  Login
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        <AnimatePresence>
+          {showForm && (
+            <>
+              <motion.div
+                className="fixed inset-0 bg-black/60 z-40"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                onClick={handleBackdropClick}
+              />
+
+              <motion.div
+                className="fixed bottom-0 left-0 right-0 z-50 bg-[#1a1a1a] rounded-t-3xl px-6 pt-8 pb-10 max-h-[75vh] overflow-y-auto"
+                initial={{ y: '100%', opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0 }}
+                transition={{
+                  duration: 0.4,
+                  ease: [0.4, 0, 0.2, 1],
+                }}
+              >
+                <div className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-6" />
+                
+                <div className="space-y-2 text-center mb-6">
+                  <h1 className="text-2xl font-semibold tracking-tight text-white" data-testid="text-auth-title">
+                    {isSignUp ? 'Create Account' : 'Sign In'}
+                  </h1>
+                  <p className="text-sm text-gray-400" data-testid="text-auth-description">
+                    {isSignUp
+                      ? 'Enter your email and password to create an account'
+                      : 'Enter your email and password to sign in'}
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-white">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="min-h-[48px] bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500"
+                      data-testid="input-email"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-white">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        className="min-h-[48px] bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500 pr-12"
+                        data-testid="input-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
+                        data-testid="button-toggle-password"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {!isSignUp && (
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => setLocation('/forgot-password')}
+                        className="text-[#3c82f4] hover:underline text-sm min-h-[44px] px-2"
+                        data-testid="link-forgot-password"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  )}
+                  
+                  <Button
+                    type="submit"
+                    className="w-full min-h-[52px] bg-[#3c82f4] hover:bg-[#3c82f4]/90 text-white font-semibold text-base rounded-xl"
+                    disabled={loading}
+                    data-testid="button-submit"
+                  >
+                    {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
+                  </Button>
+                  
+                  <div className="text-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsSignUp(!isSignUp)}
+                      className="text-gray-400 hover:text-white transition-colors text-sm min-h-[44px] px-2"
+                      data-testid="button-toggle-mode"
+                    >
+                      {isSignUp
+                        ? 'Already have an account? '
+                        : "Don't have an account? "}
+                      <span className="text-[#3c82f4]">
+                        {isSignUp ? 'Sign in' : 'Sign up'}
+                      </span>
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
