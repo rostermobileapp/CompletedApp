@@ -4349,11 +4349,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Determine the user's role in this game
       let submitterRole = '';
       
-      // Check if user is commissioner (only for league games)
+      // Check if user is commissioner or secondary commissioner (only for league games)
       if (game.leagueId) {
         const league = await storage.getLeague(game.leagueId);
         if (league && league.commissionerId === userId) {
           submitterRole = 'commissioner';
+        } else {
+          // Check if user is a secondary commissioner via league membership
+          const leaguePermissions = await storage.getUserLeaguePermissions(userId, game.leagueId);
+          if (leaguePermissions && leaguePermissions.leagueRole === 'secondary_commissioner') {
+            submitterRole = 'commissioner';
+          }
         }
       }
       
