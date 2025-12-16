@@ -257,7 +257,7 @@ export default function Login() {
                   
                   <Button
                     type="submit"
-                    className="w-full min-h-[48px] bg-[#3c82f400] hover:bg-[#3c82f4]/90 text-white font-semibold text-base rounded-xl"
+                    className="w-full min-h-[48px] bg-transparent text-white font-semibold text-base rounded-xl hover:bg-transparent"
                     disabled={loading}
                     data-testid="button-submit"
                   >
