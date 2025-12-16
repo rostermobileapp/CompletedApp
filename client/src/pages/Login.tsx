@@ -79,8 +79,7 @@ export default function Login() {
           <span>Back</span>
         </button>
       </div>
-
-      <div className="flex-1 flex items-center justify-center px-6 pb-20">
+      <div className="flex-1 flex items-center justify-center px-6 pb-20 bg-[#3c83f6]">
         <div className="w-full max-w-md space-y-6">
           <div className="space-y-2 text-center sm:text-left">
             <h1 className="text-2xl font-semibold tracking-tight" data-testid="text-auth-title">
