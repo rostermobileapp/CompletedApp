@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { useLocation } from 'wouter';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoWhite from '@assets/ROSTER_LOGO_WHITE_1765849625877.png';
-import { useSplashVideo } from '@/context/SplashVideoContext';
+import logoR from '@assets/ROSTER_R_WHITE_1765851477059.png';
 
 export default function Login() {
   const [showForm, setShowForm] = useState(false);
@@ -17,13 +17,9 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const { preload, play } = useSplashVideo();
-
-  useEffect(() => {
-    preload();
-  }, [preload]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,14 +56,14 @@ export default function Login() {
         
         if (error) throw error;
         
-        toast({
-          title: 'Welcome back!',
-          description: 'You have successfully signed in.',
-        });
-        
-        play(() => {
+        setShowLoadingScreen(true);
+        setTimeout(() => {
+          toast({
+            title: 'Welcome back!',
+            description: 'You have successfully signed in.',
+          });
           setLocation('/');
-        });
+        }, 2000);
       }
     } catch (error: any) {
       toast({
@@ -92,6 +88,18 @@ export default function Login() {
       handleClose();
     }
   };
+
+  if (showLoadingScreen) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center" data-testid="loading-screen">
+        <img
+          src={logoR}
+          alt="Roster"
+          className="w-24 h-24 animate-pulse"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#1161f4] flex flex-col overflow-hidden" data-testid="login-page">
