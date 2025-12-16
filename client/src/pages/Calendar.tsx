@@ -245,7 +245,7 @@ export default function Calendar() {
                 return (
                   <div 
                     key={`scrimmage-${event.id}`}
-                    className="rounded-xl border border-blue-200 dark:border-blue-800 p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                    className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                     onClick={() => navigate(`/scrimmage-management`)}
                     data-testid={`card-scrimmage-${event.id}`}
                   >
@@ -254,9 +254,11 @@ export default function Calendar() {
                         <Users className="w-6 h-6 text-white" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-semibold" data-testid={`text-scrimmage-title-${event.id}`}>
-                          {event.title}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold" data-testid={`text-scrimmage-title-${event.id}`}>
+                            {event.title}
+                          </h3>
+                        </div>
                         <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${event.id}`}>
                           {format(new Date(event.scheduledAt), 'MMM d • h:mm a')}
                         </p>
