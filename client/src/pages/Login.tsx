@@ -156,7 +156,7 @@ export default function Login() {
               >
                 <button
                   onClick={() => setShowForm(true)}
-                  className="px-12 py-6 text-lg font-semibold text-[#3c82f4] hover:text-[#3c82f4]/80 bg-transparent border-none min-h-[52px] transition-colors"
+                  className="px-12 py-6 text-lg font-semibold hover:text-[#3c82f4]/80 bg-transparent border-none min-h-[52px] transition-colors text-[#212121]"
                   data-testid="button-login-initial"
                 >
                   Login
