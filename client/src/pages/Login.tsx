@@ -90,7 +90,7 @@ export default function Login() {
         className="absolute top-4 left-4 z-50"
         initial={{ opacity: 0 }}
         animate={{ opacity: showForm ? 1 : 0 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.6 }}
       >
         <button
           onClick={handleClose}
@@ -109,7 +109,7 @@ export default function Login() {
             scale: showForm ? 0.65 : 1,
           }}
           transition={{
-            duration: 0.4,
+            duration: 0.8,
             ease: [0.4, 0, 0.2, 1],
           }}
         >
@@ -126,7 +126,7 @@ export default function Login() {
                 className="mt-12"
                 initial={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.4 }}
               >
                 <button
                   onClick={() => setShowForm(true)}
@@ -148,7 +148,7 @@ export default function Login() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.6 }}
                 onClick={handleBackdropClick}
               />
 
@@ -158,7 +158,7 @@ export default function Login() {
                 animate={{ opacity: 1, scale: 1, top: '8%' }}
                 exit={{ opacity: 0, scale: 0.95, top: '33%' }}
                 transition={{
-                  duration: 0.4,
+                  duration: 0.8,
                   ease: [0.4, 0, 0.2, 1],
                 }}
               >
