@@ -242,7 +242,7 @@ export default function Login() {
                       <button
                         type="button"
                         onClick={() => setLocation('/forgot-password')}
-                        className="text-[#3c82f4] hover:underline text-xs min-h-[36px] px-1"
+                        className="hover:underline text-xs min-h-[36px] px-1 text-[#212121]"
                         data-testid="link-forgot-password"
                       >
                         Forgot password?
