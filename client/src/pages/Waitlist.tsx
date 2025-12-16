@@ -138,7 +138,7 @@ export default function Waitlist() {
             <h1 className="text-4xl font-bold mb-4" data-testid="text-waitlist-title">
               Join the Waitlist
             </h1>
-            <ul className="text-gray-400 text-left space-y-2" data-testid="text-waitlist-subtitle">
+            <ul className="text-gray-400 space-y-2 list-disc inline-block text-left" data-testid="text-waitlist-subtitle">
               <li>Release Date Notice</li>
               <li>2 Month Free Trial</li>
               <li>First 250 get Lifetime Deal Offers</li>
