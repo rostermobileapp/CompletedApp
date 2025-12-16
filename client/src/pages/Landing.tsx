@@ -1,13 +1,12 @@
 import { Users, Calendar, Trophy, MessageCircle, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link } from 'wouter';
-import { AuthModal } from '@/components/AuthModal';
+import { Link, useLocation } from 'wouter';
 import logoWhite from '@assets/Roster Logo White_1759233840726.png';
 import heroImage from '@assets/previewed_1761963923150.png';
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -17,8 +16,6 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-black text-white" data-testid="landing-page">
-      <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />
-      
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -30,7 +27,7 @@ export default function Landing() {
             data-testid="logo-image"
           />
           <button
-            onClick={() => setShowAuthModal(true)}
+            onClick={() => setLocation('/login')}
             className="px-6 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
             data-testid="button-login-header"
           >
@@ -317,7 +314,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => setLocation('/login')}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
                 data-testid="button-pricing-free"
               >
@@ -370,7 +367,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => setLocation('/login')}
                 className="w-full py-3 px-6 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold"
                 data-testid="button-pricing-player"
               >
@@ -416,7 +413,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => setLocation('/login')}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
                 data-testid="button-pricing-commissioner"
               >
