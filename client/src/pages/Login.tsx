@@ -101,7 +101,6 @@ export default function Login() {
           <X className="w-5 h-5" />
         </button>
       </motion.div>
-
       <div className="flex-1 flex flex-col items-center px-6">
         <motion.div
           className="flex flex-col items-center"
@@ -155,7 +154,7 @@ export default function Login() {
               />
 
               <motion.div
-                className="fixed left-6 right-6 z-50 bg-[#1a1a1a] rounded-2xl px-5 py-6"
+                className="fixed left-6 right-6 z-50 bg-[#1a1a1a] rounded-2xl px-5 py-6 pl-[4px] pr-[4px] pt-[4px] pb-[4px]"
                 initial={{ opacity: 0, scale: 0.95, top: '33%' }}
                 animate={{ opacity: 1, scale: 1, top: '8%' }}
                 exit={{ opacity: 0, scale: 0.95, top: '33%' }}
