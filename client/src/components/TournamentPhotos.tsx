@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest, getImageUrl } from "@/lib/queryClient";
 import { EnhancedMediaUploader } from "@/components/EnhancedMediaUploader";
 import { PhotoViewer } from "@/components/PhotoViewer";
+import { PhotoTaggingDialog } from "@/components/PhotoTaggingDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -79,6 +80,17 @@ interface TournamentPhoto {
   };
 }
 
+interface TournamentParticipant {
+  userId: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl?: string;
+  };
+  status: string;
+}
+
 interface TournamentPhotosProps {
   tournamentId: string;
   currentUserId?: string;
@@ -109,6 +121,8 @@ export function TournamentPhotos({
   const [internalShowUploader, setInternalShowUploader] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
+  const [showTaggingDialog, setShowTaggingDialog] = useState(false);
+  const [newlyUploadedPhotos, setNewlyUploadedPhotos] = useState<{ id: string; url: string; fileName: string }[]>([]);
   
   // Use external show uploader state if provided, otherwise use internal
   const showUploader = externalShowUploader !== undefined ? externalShowUploader : internalShowUploader;
@@ -148,11 +162,29 @@ export function TournamentPhotos({
     }
   }, [tournamentTeams, onTeamsLoaded]);
 
-  // Check if current user is an approved participant
-  const { data: participants = [] } = useQuery<any[]>({
+  // Fetch tournament participants for tagging
+  const { data: participants = [] } = useQuery<TournamentParticipant[]>({
     queryKey: [`/api/tournaments/${tournamentId}/participants`],
-    enabled: !!currentUserId,
   });
+
+  // Get available users for tagging (approved participants)
+  const availableUsersForTagging = useMemo(() => {
+    return participants
+      .filter((p) => p.status === 'approved' && p.user)
+      .map((p) => ({
+        id: p.user.id || p.userId,
+        firstName: p.user.firstName,
+        lastName: p.user.lastName,
+        profileImageUrl: p.user.profileImageUrl,
+      }));
+  }, [participants]);
+
+  // Show tagging dialog when newly uploaded photos exist and users are available
+  useEffect(() => {
+    if (newlyUploadedPhotos.length > 0 && availableUsersForTagging.length > 0 && !showTaggingDialog) {
+      setShowTaggingDialog(true);
+    }
+  }, [newlyUploadedPhotos, availableUsersForTagging, showTaggingDialog]);
 
   // Create a map of userId to their tournament team
   const userTeamMap = useMemo(() => {
@@ -253,6 +285,8 @@ export function TournamentPhotos({
       onUploadStart();
     }
 
+    const uploadedPhotos: { id: string; url: string; fileName: string }[] = [];
+
     try {
       for (const mediaFile of mediaFiles) {
         const fileToUpload = mediaFile.compressed || mediaFile.file;
@@ -283,11 +317,25 @@ export function TournamentPhotos({
           throw new Error('Failed to upload file');
         }
 
-        await uploadPhotoMutation.mutateAsync({
+        const savedPhoto = await uploadPhotoMutation.mutateAsync({
           fileUrl: path,
           fileName: mediaFile.file.name,
           fileSize: mediaFile.file.size,
         });
+        
+        // Track the uploaded photo for tagging
+        if (savedPhoto?.id) {
+          uploadedPhotos.push({
+            id: savedPhoto.id,
+            url: getImageUrl(savedPhoto.fileUrl) || savedPhoto.fileUrl,
+            fileName: savedPhoto.fileName,
+          });
+        }
+      }
+      
+      // Store uploaded photos for tagging (dialog will show via useEffect when users are available)
+      if (uploadedPhotos.length > 0) {
+        setNewlyUploadedPhotos(uploadedPhotos);
       }
     } catch (error) {
       console.error('Error uploading photos:', error);
@@ -430,9 +478,15 @@ export function TournamentPhotos({
             url: getImageUrl(p.fileUrl) || p.fileUrl,
             caption: p.caption ?? undefined,
             uploader: `${p.uploader.firstName} ${p.uploader.lastName}`,
+            id: p.id,
+            uploadedBy: p.uploadedBy,
           }))}
           initialIndex={selectedPhotoIndex}
           onClose={() => setSelectedPhotoIndex(null)}
+          context="tournament"
+          contextId={tournamentId}
+          currentUserId={currentUserId}
+          availableUsers={availableUsersForTagging}
         />
       )}
 
@@ -457,6 +511,19 @@ export function TournamentPhotos({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Photo Tagging Dialog (after upload) */}
+      <PhotoTaggingDialog
+        open={showTaggingDialog}
+        onClose={() => {
+          setShowTaggingDialog(false);
+          setNewlyUploadedPhotos([]);
+        }}
+        photos={newlyUploadedPhotos}
+        context="tournament"
+        contextId={tournamentId}
+        availableUsers={availableUsersForTagging}
+      />
     </div>
   );
 }
