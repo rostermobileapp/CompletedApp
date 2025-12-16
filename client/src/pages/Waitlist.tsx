@@ -91,9 +91,15 @@ export default function Waitlist() {
             <h1 className="text-3xl font-bold mb-4" data-testid="text-success-title">
               You're on the list!
             </h1>
-            <p className="text-gray-400 mb-8" data-testid="text-success-message">
-              Thanks for your interest in Roster. We'll be in touch soon with updates and early access information.
+            <p className="text-gray-400 mb-4" data-testid="text-success-message">
+              We will send updates on:
             </p>
+            <ul className="text-gray-400 space-y-2 list-disc inline-block text-left mb-8">
+              <li>BETA Date</li>
+              <li>Official Release Date</li>
+              <li>Other "Founder" status offers</li>
+              <li>New Features</li>
+            </ul>
             <Button
               onClick={() => setLocation("/")}
               className="px-8 py-3 rounded-full bg-[#3c82f4] hover:bg-[#3c82f4]/90 text-white font-semibold"
