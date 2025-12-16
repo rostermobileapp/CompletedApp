@@ -597,6 +597,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User search for tagging - MUST be before /api/users/:userId to avoid route conflict
+  app.get("/api/users/search", isAuthenticated, async (req: any, res) => {
+    try {
+      const { q, leagueId, tournamentId } = req.query;
+      
+      if (!q || typeof q !== 'string' || q.length < 2) {
+        return res.json([]);
+      }
+
+      let usersQuery;
+      
+      if (tournamentId) {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .innerJoin(tournamentParticipants, eq(users.id, tournamentParticipants.userId))
+          .where(
+            and(
+              eq(tournamentParticipants.tournamentId, tournamentId as string),
+              eq(tournamentParticipants.status, 'approved'),
+              or(
+                sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+              )
+            )
+          )
+          .limit(10);
+      } else if (leagueId) {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .innerJoin(leagueMemberships, eq(users.id, leagueMemberships.userId))
+          .where(
+            and(
+              eq(leagueMemberships.leagueId, leagueId as string),
+              eq(leagueMemberships.status, 'approved'),
+              or(
+                sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+              )
+            )
+          )
+          .limit(10);
+      } else {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .where(
+            or(
+              sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+              sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+              sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+            )
+          )
+          .limit(10);
+      }
+
+      res.json(usersQuery);
+    } catch (error) {
+      console.error("Error searching users:", error);
+      res.status(500).json({ error: "Failed to search users" });
+    }
+  });
+
   // Get any user's public profile by ID
   app.get('/api/users/:userId', isAuthenticated, async (req: any, res) => {
     try {
