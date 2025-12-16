@@ -8,7 +8,6 @@ import { useLocation } from 'wouter';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoWhite from '@assets/ROSTER_LOGO_WHITE_1765849625877.png';
-import logoR from '@assets/ROSTER_R_WHITE_1765851477059.png';
 
 export default function Login() {
   const [showForm, setShowForm] = useState(false);
@@ -17,7 +16,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -56,14 +54,11 @@ export default function Login() {
         
         if (error) throw error;
         
-        setShowLoadingScreen(true);
-        setTimeout(() => {
-          toast({
-            title: 'Welcome back!',
-            description: 'You have successfully signed in.',
-          });
-          setLocation('/');
-        }, 2000);
+        toast({
+          title: 'Welcome back!',
+          description: 'You have successfully signed in.',
+        });
+        setLocation('/');
       }
     } catch (error: any) {
       toast({
@@ -88,18 +83,6 @@ export default function Login() {
       handleClose();
     }
   };
-
-  if (showLoadingScreen) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center" data-testid="loading-screen">
-        <img
-          src={logoR}
-          alt="Roster"
-          className="w-24 h-24 animate-pulse"
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#1161f4] flex flex-col overflow-hidden" data-testid="login-page">
