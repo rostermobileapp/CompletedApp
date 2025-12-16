@@ -239,7 +239,7 @@ export default function Landing() {
                   <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Registration System</td>
+                  <td className="p-4 text-white">Registration Notices</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
                   <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
                   <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
