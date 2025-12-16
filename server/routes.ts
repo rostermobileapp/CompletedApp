@@ -3765,6 +3765,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Consolidated calendar endpoint - fetches all calendar data in one request
+  app.get("/api/user/calendar", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Fetch all data in parallel for maximum performance
+      const [
+        userTeams,
+        allGames,
+        createdScrimmages,
+        scrimmageRequests,
+        substituteRequests,
+        personalReminders
+      ] = await Promise.all([
+        storage.getUserTeams(userId),
+        storage.getAllUserGames(userId),
+        storage.getUserScrimmages(userId),
+        storage.getScrimmageRequestsByPlayer(userId),
+        storage.getSubstituteRequests({ status: 'approved', userId }),
+        storage.getUserPersonalReminders(userId)
+      ]);
+      
+      // Filter substitute requests to only include those where user is the substitute
+      const mySubstitutions = substituteRequests.filter(
+        req => req.substitutePlayerId === userId
+      );
+      
+      // Format games with date strings
+      const formattedGames = allGames.map(formatGameForResponse);
+      
+      res.json({
+        userTeams,
+        allGames: formattedGames,
+        createdScrimmages,
+        scrimmageRequests,
+        mySubstitutions,
+        personalReminders
+      });
+    } catch (error) {
+      console.error("Error fetching calendar data:", error);
+      res.status(500).json({ message: "Failed to fetch calendar data" });
+    }
+  });
+
   // Get team record (wins, losses, ties) based on game scores
   app.get("/api/teams/:teamId/record", isAuthenticated, async (req: any, res) => {
     try {

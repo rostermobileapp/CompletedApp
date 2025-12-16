@@ -52,10 +52,27 @@ export default function Calendar() {
     setSubstituteRequestData(null);
   };
 
-  // Fetch user's teams
-  const { data: userTeams } = useQuery({
-    queryKey: ["/api/user/teams"],
+  // Consolidated calendar data fetch - single API call for all data
+  interface CalendarData {
+    userTeams: any[];
+    allGames: any[];
+    createdScrimmages: (Scrimmage & { creator: User })[];
+    scrimmageRequests: (ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[];
+    mySubstitutions: any[];
+    personalReminders: any[];
+  }
+  
+  const { data: calendarData, isLoading: gamesLoading } = useQuery<CalendarData>({
+    queryKey: ["/api/user/calendar"],
   });
+
+  // Extract data from consolidated response
+  const userTeams = calendarData?.userTeams || [];
+  const allGames = calendarData?.allGames || [];
+  const createdScrimmages = calendarData?.createdScrimmages || [];
+  const scrimmageRequests = calendarData?.scrimmageRequests || [];
+  const mySubstitutions = calendarData?.mySubstitutions || [];
+  const personalReminders = calendarData?.personalReminders || [];
 
   // Get active team based on Dashboard selection (or first team if none selected/invalid)
   const activeTeam = (() => {
@@ -70,38 +87,13 @@ export default function Calendar() {
     return userTeams[0];
   })();
 
-  // Fetch all games (past and future)
-  const { data: allGames, isLoading: gamesLoading } = useQuery({
-    queryKey: ["/api/user/games/all"],
-  });
-
-  // Fetch user's created scrimmages
-  const { data: createdScrimmages = [] } = useQuery({
-    queryKey: ["/api/users", "scrimmages"],
-  }) as { data: (Scrimmage & { creator: User })[] };
-
-  // Fetch user's scrimmage requests (to find approved ones they're participating in)
-  const { data: scrimmageRequests = [] } = useQuery({
-    queryKey: ["/api/users", "scrimmage-requests"],
-  }) as { data: (ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[] };
-
-  // Fetch user's approved substitute requests (games they're subbing for)
-  const { data: mySubstitutions = [] } = useQuery({
-    queryKey: ["/api/substitute-requests/my-substitutions"],
-  });
-
-  // Fetch user's personal reminders
-  const { data: personalReminders = [] } = useQuery({
-    queryKey: ["/api/user/personal-reminders"],
-  });
-
   // Delete personal reminder mutation
   const deleteReminderMutation = useMutation({
     mutationFn: async (reminderId: string) => {
       await apiRequest("DELETE", `/api/personal-reminders/${reminderId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user/personal-reminders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/calendar"] });
       toast({
         title: "Reminder Dismissed",
         description: "Your reminder has been removed from your calendar.",
