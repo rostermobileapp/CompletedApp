@@ -1954,9 +1954,7 @@ export default function LeagueManagement() {
             onClick={() => setShowEditLeague(true)}
             className="px-3 py-1.5 text-sm text-primary hover:text-primary/80 font-medium"
             data-testid="button-edit-league"
-          >
-            Edit
-          </button>
+          >Settings</button>
         </div>
 
         {/* Season Selector */}
