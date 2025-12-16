@@ -85,7 +85,7 @@ export default function Landing() {
             </div>
             <div className="flex items-center justify-center gap-3" data-testid="highlight-1">
               <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0" />
-              <span className="font-medium text-white">Roster populates your whole season in seconds</span>
+              <span className="font-medium text-white">Get notifications of everything in your league</span>
             </div>
             <div className="flex items-center justify-center gap-3" data-testid="highlight-2">
               <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0" />
