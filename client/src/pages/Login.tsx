@@ -269,7 +269,7 @@ export default function Login() {
                       {isSignUp
                         ? 'Already have an account? '
                         : "Don't have an account? "}
-                      <span className="text-[#3c82f4]">
+                      <span className="text-[#212121] bg-[#ffffff00] font-extrabold">
                         {isSignUp ? 'Sign in' : 'Sign up'}
                       </span>
                     </button>
