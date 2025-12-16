@@ -9,7 +9,7 @@ import { LeaguePhotos } from "@/components/LeaguePhotos";
 import { TeamPhotos } from "@/components/TeamPhotos";
 import { usePermissions } from "@/context/SubscriptionContext";
 import { useState, useRef, useEffect } from "react";
-import { getImageUrl } from "@/lib/queryClient";
+import { getImageUrl, apiRequest } from "@/lib/queryClient";
 
 interface FilterUser {
   id: string;
@@ -38,9 +38,7 @@ function UserFilterSearch({
       const params = new URLSearchParams({ q: searchQuery });
       if (tournamentId) params.append('tournamentId', tournamentId);
       if (leagueId) params.append('leagueId', leagueId);
-      const response = await fetch(`/api/users/search?${params}`, {
-        credentials: 'include',
-      });
+      const response = await apiRequest('GET', `/api/users/search?${params}`);
       if (!response.ok) return [];
       return response.json();
     },
