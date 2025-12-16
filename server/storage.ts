@@ -4479,29 +4479,30 @@ export class DatabaseStorage implements IStorage {
             const isHomeTeam = goalie.teamId === game.homeTeamId;
             const goalsAgainst = isHomeTeam ? (game.awayScore || 0) : (game.homeScore || 0);
 
-            // Check if record already exists
+            // Check if record already exists for this team (unique constraint is on game_id, team_id)
             const [existingRecord] = await tx
               .select()
               .from(gameGoalies)
               .where(
                 and(
                   eq(gameGoalies.gameId, gameId),
-                  eq(gameGoalies.goalieUserId, goalie.userId)
+                  eq(gameGoalies.teamId, goalie.teamId)
                 )
               );
 
             if (existingRecord) {
-              // Update existing record with new goals against
+              // Update existing record with new goals against and potentially new goalie
               await tx
                 .update(gameGoalies)
                 .set({
+                  goalieUserId: goalie.userId,
                   goalsAgainst,
                   minutesPlayed: 60,
                 })
                 .where(
                   and(
                     eq(gameGoalies.gameId, gameId),
-                    eq(gameGoalies.goalieUserId, goalie.userId)
+                    eq(gameGoalies.teamId, goalie.teamId)
                   )
                 );
             } else {
@@ -4604,29 +4605,30 @@ export class DatabaseStorage implements IStorage {
             const isHomeTeam = goalie.teamId === game.homeTeamId;
             const goalsAgainst = isHomeTeam ? (game.awayScore || 0) : (game.homeScore || 0);
 
-            // Check if record already exists
+            // Check if record already exists for this team (unique constraint is on game_id, team_id)
             const [existingRecord] = await tx
               .select()
               .from(gameGoalies)
               .where(
                 and(
                   eq(gameGoalies.gameId, game.id),
-                  eq(gameGoalies.goalieUserId, goalie.userId)
+                  eq(gameGoalies.teamId, goalie.teamId)
                 )
               );
 
             if (existingRecord) {
-              // Update existing record
+              // Update existing record with potentially new goalie
               await tx
                 .update(gameGoalies)
                 .set({
+                  goalieUserId: goalie.userId,
                   goalsAgainst,
                   minutesPlayed: 60,
                 })
                 .where(
                   and(
                     eq(gameGoalies.gameId, game.id),
-                    eq(gameGoalies.goalieUserId, goalie.userId)
+                    eq(gameGoalies.teamId, goalie.teamId)
                   )
                 );
             } else {
