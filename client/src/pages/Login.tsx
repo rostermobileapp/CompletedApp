@@ -94,7 +94,7 @@ export default function Login() {
       >
         <button
           onClick={handleClose}
-          className="flex items-center justify-center w-11 h-11 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+          className="flex items-center justify-center w-11 h-11 rounded-full text-white hover:bg-white/20 transition-colors bg-[#ffffff00]"
           data-testid="button-close"
           style={{ pointerEvents: showForm ? 'auto' : 'none' }}
         >
