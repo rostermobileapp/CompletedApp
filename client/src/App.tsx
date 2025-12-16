@@ -162,7 +162,7 @@ function Router() {
             <Route path="/privacy-policy" component={PrivacyPolicy} />
             <Route path="/terms-of-service" component={TermsOfService} />
             <Route path="/admin/stripe" component={StripeAdmin} />
-            <Route component={NotFound} />
+            <Route component={Dashboard} />
           </Switch>
         </PageTransition>
           <HPIBBanner placement="bottom-nav" />
