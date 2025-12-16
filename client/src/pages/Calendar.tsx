@@ -2,10 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format, isBefore, isAfter, addHours } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, ArrowLeft, Check, X, Clock, Users } from "lucide-react";
-import { RSVPButtons } from "@/components/RSVPButtons";
-import { RSVPStatusIcon } from "@/components/RSVPStatusIcon";
-import { RSVPAlertIcon } from "@/components/RSVPAlertIcon";
+import { Trophy, ArrowLeft, Clock, Users } from "lucide-react";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
 import { Button } from "@/components/ui/button";
@@ -14,10 +11,7 @@ import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
 import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
-import { ScrimmageRSVPButtons } from "@/components/ScrimmageRSVPButtons";
-import { ScrimmageRSVPStatusIcon } from "@/components/ScrimmageRSVPStatusIcon";
 import { useDashboardSelection } from "@/hooks/useDashboardSelection";
-import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 
 export default function Calendar() {
   const { user } = useAuth();
@@ -99,27 +93,6 @@ export default function Calendar() {
   // Fetch user's personal reminders
   const { data: personalReminders = [] } = useQuery({
     queryKey: ["/api/user/personal-reminders"],
-  });
-
-  // Claim beverage duty mutation
-  const claimBeverageDutyMutation = useMutation({
-    mutationFn: async ({ gameId, teamId }: { gameId: string; teamId: string }) => {
-      await apiRequest("POST", `/api/games/${gameId}/beverage-duty`, { teamId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
-      toast({
-        title: "Beverage Duty Claimed",
-        description: "You've successfully claimed beverage duty for this game.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to claim beverage duty. Please try again.",
-        variant: "destructive",
-      });
-    },
   });
 
   // Delete personal reminder mutation
@@ -272,7 +245,7 @@ export default function Calendar() {
                 return (
                   <div 
                     key={`scrimmage-${event.id}`}
-                    className="bg-card rounded-xl border border-blue-200 dark:border-blue-800 p-4 relative cursor-pointer hover:bg-muted/50 transition-colors" 
+                    className="rounded-xl border border-blue-200 dark:border-blue-800 p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                     onClick={() => navigate(`/scrimmage-management`)}
                     data-testid={`card-scrimmage-${event.id}`}
                   >
@@ -292,28 +265,6 @@ export default function Calendar() {
                             {event.location}
                           </p>
                         )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
-                            {event.userRole === 'creator' ? 'Creator' : 'Participant'}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            Scrimmage
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        {/* RSVP Status Icon */}
-                        {user && event.userRole !== 'creator' && (
-                          <ScrimmageRSVPStatusIcon scrimmageId={event.id} />
-                        )}
-                        
-                        {/* RSVP Buttons for non-creators */}
-                        {user && event.userRole !== 'creator' && (
-                          <ScrimmageRSVPButtons 
-                            scrimmageId={event.id} 
-                            className="mb-1"
-                          />
-                        )}
                       </div>
                     </div>
                   </div>
@@ -325,7 +276,7 @@ export default function Calendar() {
                 return (
                   <div 
                     key={`reminder-${event.id}`}
-                    className="bg-card rounded-xl border border-green-200 dark:border-green-800 p-4 relative" 
+                    className="rounded-xl border border-green-200 dark:border-green-800 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                     data-testid={`card-reminder-${event.id}`}
                   >
                     <div className="flex items-center gap-4">
@@ -340,15 +291,10 @@ export default function Calendar() {
                           {format(new Date(event.scheduledAt), 'MMM d • h:mm a')}
                         </p>
                         {event.description && (
-                          <p className="text-xs text-muted-foreground mt-1" data-testid={`text-reminder-description-${event.id}`}>
+                          <p className="text-xs text-muted-foreground" data-testid={`text-reminder-description-${event.id}`}>
                             {event.description}
                           </p>
                         )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-1 rounded-full">
-                            Reminder
-                          </span>
-                        </div>
                       </div>
                       <button
                         onClick={(e) => {
@@ -369,22 +315,29 @@ export default function Calendar() {
               // Handle substitute games
               if (event.type === 'substitute') {
                 const game = event;
-                const isCompleted = game.isCompleted || (game.homeScore !== null && game.awayScore !== null);
-                const isPastGame = isBefore(addHours(new Date(game.scheduledAt), 2), new Date());
                 return (
                   <div 
                     key={game.id} 
-                    className="bg-card rounded-xl border border-border p-4 relative hover:bg-muted/50 transition-colors" 
+                    className="rounded-xl border border-orange-200 dark:border-orange-800 p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                     data-testid={`card-substitute-game-${game.id}`}
+                    onClick={() => {
+                      setPageTransitionDirection('up');
+                      navigate(`/game/${game.id}`);
+                    }}
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
-                        <Trophy className="w-6 h-6 text-primary-foreground" />
+                      <div className="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center relative">
+                        <Trophy className="w-6 h-6 text-white" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-semibold" data-testid={`text-substitute-team-${game.id}`}>
-                          Subbing for {event.substituteForTeam?.name || 'Team'}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold" data-testid={`text-substitute-team-${game.id}`}>
+                            Subbing for {event.substituteForTeam?.name || 'Team'}
+                          </h3>
+                          <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded font-medium">
+                            SUB
+                          </span>
+                        </div>
                         <p className="text-sm text-muted-foreground" data-testid={`text-substitute-time-${game.id}`}>
                           {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
                         </p>
@@ -393,11 +346,6 @@ export default function Calendar() {
                             {game.venue}
                           </p>
                         )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-full">
-                            Substitute
-                          </span>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -411,7 +359,7 @@ export default function Calendar() {
               return (
               <div 
                 key={game.id} 
-                className="bg-card rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors" 
+                className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                 data-testid={`card-game-${game.id}`}
                 onMouseEnter={() => {
                   queryClient.prefetchQuery({
@@ -449,9 +397,6 @@ export default function Calendar() {
                           SUB
                         </span>
                       )}
-                      {!isCompleted && !isPastGame && activeTeam && (
-                        <RSVPAlertIcon gameId={game.id} teamId={activeTeam.id} />
-                      )}
                     </div>
                     <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
                       {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
@@ -461,7 +406,6 @@ export default function Calendar() {
                         {game.venue}
                       </p>
                     )}
-                    {/* Score display for completed games */}
                     {isCompleted && (
                       <div className="text-sm font-medium mt-1" data-testid={`text-game-score-${game.id}`}>
                         <span className={game.homeTeam?.id === activeTeam?.id ? "text-primary" : "text-muted-foreground"}>
@@ -473,90 +417,6 @@ export default function Calendar() {
                         </span>
                       </div>
                     )}
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    {/* RSVP Status Icon */}
-                    {!isCompleted && !isPastGame && user && (
-                      <RSVPStatusIcon gameId={game.id} userId={(user as any).id} />
-                    )}
-                    
-                    {/* View Details Button for upcoming games */}
-                    {!isCompleted && !isPastGame && user && activeTeam && (game.homeTeam?.id === activeTeam.id || game.awayTeam?.id === activeTeam.id) && (
-                      <Button
-                        size="sm"
-                        variant="outline" 
-                        className="mb-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewDetails(game);
-                        }}
-                        data-testid={`button-view-details-${game.id}`}
-                      >
-                        <Users className="w-3 h-3 mr-1" />
-                        View Details
-                      </Button>
-                    )}
-
-                    {/* RSVP Buttons for upcoming games */}
-                    {!isCompleted && !isPastGame && user && activeTeam && (game.homeTeam?.id === activeTeam.id || game.awayTeam?.id === activeTeam.id) && (
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <RSVPButtons 
-                          gameId={game.id} 
-                          userId={(user as any).id}
-                          userTeamId={activeTeam.id}
-                          className="mb-1"
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center gap-2">
-                      {/* Beverage Duty Icon - Left side */}
-                      {(() => {
-                        // Show beverage icon if user has beverage duty
-                        const hasBeverageDuty = game.homeBeverageDutyUserId === (user as any)?.id || game.awayBeverageDutyUserId === (user as any)?.id;
-                        
-                        return hasBeverageDuty ? (
-                          <div className="flex items-center">
-                            <img 
-                              src={beverageJarUrl}
-                              alt="Beverage Duty"
-                              className="h-8 w-auto invert dark:invert-0"
-                              style={{ aspectRatio: '9/16' }}
-                              data-testid={`icon-beverage-duty-${game.id}`}
-                            />
-                          </div>
-                        ) : null;
-                      })()}
-                      {/* Claim Beverage Duty Button */}
-                      {(() => {
-                        // Show claim button only if no one has claimed beverage duty
-                        const noBeverageDutyClaimed = !(game.homeBeverageDutyUserId || game.awayBeverageDutyUserId);
-                        
-                        return noBeverageDutyClaimed;
-                      })() && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 w-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const userTeam = game.homeTeam?.id === activeTeam?.id ? game.homeTeam : game.awayTeam;
-                            if (userTeam && activeTeam) {
-                              claimBeverageDutyMutation.mutate({ gameId: game.id, teamId: userTeam.id });
-                            }
-                          }}
-                          disabled={claimBeverageDutyMutation.isPending}
-                          data-testid={`button-claim-beverage-duty-${game.id}`}
-                        >
-                          <img 
-                            src={beverageJarUrl}
-                            alt="Claim Beverage Duty"
-                            className="h-4 w-auto invert dark:invert-0"
-                            style={{ aspectRatio: '9/16' }}
-                          />
-                        </Button>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>
