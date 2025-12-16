@@ -156,12 +156,11 @@ export default function Login() {
 
               <motion.div
                 className="fixed left-6 right-6 z-50 bg-[#1a1a1a] rounded-2xl px-5 py-6"
-                style={{ top: '33%' }}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.95, top: '58%' }}
+                animate={{ opacity: 1, scale: 1, top: '33%' }}
+                exit={{ opacity: 0, scale: 0.95, top: '58%' }}
                 transition={{
-                  duration: 0.35,
+                  duration: 0.4,
                   ease: [0.4, 0, 0.2, 1],
                 }}
               >
