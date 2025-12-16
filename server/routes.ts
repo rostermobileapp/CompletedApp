@@ -3331,8 +3331,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const members = await storage.getLeagueMembers(leagueId);
       const players = members.map(member => ({
         id: member.user.id,
-        firstName: member.user.firstName,
-        lastName: member.user.lastName,
+        // Use displayFirstName/displayLastName from membership if set, otherwise fall back to user's names
+        firstName: member.displayFirstName || member.user.firstName || '',
+        lastName: member.displayLastName || member.user.lastName || '',
         email: member.user.email,
         isGoalie: member.isGoalie || false,
         teamName: member.assignedTeamId ? null : null // Will be populated if we have team info
@@ -5312,8 +5313,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return {
           id: member.user.id,
           userId: member.user.id,
-          firstName: member.user.firstName,
-          lastName: member.user.lastName,
+          // Use displayFirstName/displayLastName from league membership if set, otherwise fall back to user's names
+          firstName: leagueMembership?.displayFirstName || member.user.firstName || '',
+          lastName: leagueMembership?.displayLastName || member.user.lastName || '',
           email: member.user.email,
           isGoalie: leagueMembership?.isGoalie || false,
           teamName: member.teamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name
