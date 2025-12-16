@@ -186,11 +186,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add contact to Resend for marketing campaigns
       const { client: resend } = await getUncachableResendClient();
       
+      // Build properties object for custom fields
+      const properties: Record<string, string> = {};
+      if (howHeard) properties.howHeard = howHeard;
+      if (phone) properties.phone = phone;
+      
       const { data, error } = await resend.contacts.create({
         email,
         firstName,
         unsubscribed: false,
         audienceId: process.env.RESEND_WAITLIST_AUDIENCE_ID || '',
+        ...(Object.keys(properties).length > 0 && { properties }),
       });
 
       if (error) {
