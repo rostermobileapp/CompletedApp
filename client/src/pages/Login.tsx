@@ -170,7 +170,7 @@ export default function Login() {
           {showForm && (
             <>
               <motion.div
-                className="fixed inset-0 z-40 bg-[#3c82f4]"
+                className="fixed inset-0 z-40 bg-[#1161f4]"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
