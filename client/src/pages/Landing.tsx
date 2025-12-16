@@ -37,7 +37,7 @@ export default function Landing() {
         />
         <div className="max-w-5xl mx-auto text-center relative z-10">
           <button
-            onClick={() => setLocation('/login')}
+            onClick={() => setLocation('/waitlist')}
             className="px-8 py-3 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg mb-8"
             data-testid="button-join-waitlist"
           >

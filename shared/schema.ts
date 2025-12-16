@@ -3059,3 +3059,23 @@ export type TournamentMatchWithTeams = TournamentMatch & {
   team2?: TournamentTeam;
   winner?: TournamentTeam;
 };
+
+// Waitlist signups table for marketing and interest tracking
+export const waitlistSignups = pgTable("waitlist_signups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName: varchar("first_name").notNull(),
+  email: varchar("email").notNull(),
+  phone: varchar("phone"),
+  howHeard: varchar("how_heard"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_waitlist_signups_email").on(table.email),
+]);
+
+export const insertWaitlistSignupSchema = createInsertSchema(waitlistSignups).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
+export type InsertWaitlistSignup = z.infer<typeof insertWaitlistSignupSchema>;
