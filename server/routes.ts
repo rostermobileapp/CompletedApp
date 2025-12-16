@@ -10889,15 +10889,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const messages = await messagingService.getConversationMessagesForUser(id, userId, limit);
       
+      // Import Supabase storage service for signed URLs
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      
       // Get attachments and read receipts for each message
       const messagesWithDetails = await Promise.all(
         messages.map(async (message) => {
           const attachments = await messagingService.getMessageAttachments(message.id);
           const readReceipts = await messagingService.getMessageReadReceipts(message.id);
+          
+          // Convert attachment paths to signed URLs for images
+          const attachmentsWithSignedUrls = await Promise.all(
+            attachments.map(async (attachment) => {
+              // Only convert paths that start with /message-attachments/
+              if (attachment.url && attachment.url.startsWith('/message-attachments/')) {
+                const signedUrl = await supabaseStorageService.getMessageAttachmentSignedUrl(attachment.url);
+                return {
+                  ...attachment,
+                  url: signedUrl || attachment.url
+                };
+              }
+              return attachment;
+            })
+          );
+          
           return {
             ...message,
             sentAt: message.createdAt, // Map createdAt to sentAt for frontend compatibility
-            attachments,
+            attachments: attachmentsWithSignedUrls,
             readReceipts
           };
         })
@@ -10948,10 +10968,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Add attachments if any
       let messageAttachments = [];
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      
       if (attachments && attachments.length > 0) {
-        const { ObjectStorageService } = await import('./objectStorage');
-        const objectStorageService = new ObjectStorageService();
-        
         for (const attachment of attachments) {
           // Validate file size (10MB limit)
           if (attachment.fileSize > 10 * 1024 * 1024) {
@@ -10959,7 +10979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Normalize the file URL to use app route
-          const normalizedUrl = objectStorageService.normalizeMessageAttachmentPath(attachment.fileUrl);
+          const normalizedUrl = supabaseStorageService.normalizeMessageAttachmentPath(attachment.fileUrl);
           
           // Determine attachment type from MIME type
           let attachmentType = 'file';
@@ -10979,6 +10999,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Convert attachment paths to signed URLs
+      const attachmentsWithSignedUrls = await Promise.all(
+        messageAttachments.map(async (attachment) => {
+          if (attachment.url && attachment.url.startsWith('/message-attachments/')) {
+            const signedUrl = await supabaseStorageService.getMessageAttachmentSignedUrl(attachment.url);
+            return {
+              ...attachment,
+              url: signedUrl || attachment.url
+            };
+          }
+          return attachment;
+        })
+      );
+      
       // Broadcast message to all participants via WebSocket
       const participants = await messagingService.getConversationParticipants(conversationId);
       broadcastToParticipants(participants, {
@@ -10987,7 +11021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: {
           ...message,
           sentAt: message.createdAt, // Map for frontend compatibility
-          attachments: messageAttachments,
+          attachments: attachmentsWithSignedUrls,
           readReceipts: []
         }
       });
@@ -11026,7 +11060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json({
         ...message,
         sentAt: message.createdAt, // Map for frontend compatibility
-        attachments: messageAttachments,
+        attachments: attachmentsWithSignedUrls,
         readReceipts: []
       });
     } catch (error) {

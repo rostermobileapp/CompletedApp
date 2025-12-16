@@ -226,6 +226,26 @@ export class SupabaseStorageService {
     };
   }
 
+  async getMessageAttachmentSignedUrl(messageAttachmentPath: string, expiresIn: number = 3600): Promise<string | null> {
+    if (!messageAttachmentPath.startsWith("/message-attachments/")) {
+      return messageAttachmentPath;
+    }
+
+    const objectId = messageAttachmentPath.slice("/message-attachments/".length);
+    const filePath = `message-attachments/${objectId}`;
+
+    const { data, error } = await this.supabase.storage
+      .from("private")
+      .createSignedUrl(filePath, expiresIn);
+
+    if (error || !data) {
+      console.error("Error creating signed URL for message attachment:", error);
+      return null;
+    }
+
+    return data.signedUrl;
+  }
+
   // Announcement Media
   async getAnnouncementMediaUploadURL(): Promise<{ uploadURL: string; path: string }> {
     const objectId = randomUUID();
