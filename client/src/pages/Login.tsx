@@ -124,7 +124,7 @@ export default function Login() {
             
             <Button
               type="submit"
-              className="w-full min-h-[44px]"
+              className="w-full min-h-[44px] bg-[#212121]"
               disabled={loading}
               data-testid="button-submit"
             >
