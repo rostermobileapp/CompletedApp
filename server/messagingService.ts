@@ -57,6 +57,15 @@ export class MessagingService {
   }
 
   async getConversationParticipants(conversationId: string): Promise<ConversationParticipant[]> {
+    // First get the conversation to find its leagueId
+    const [conversation] = await db
+      .select({ leagueId: conversations.leagueId })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
+    
+    const leagueId = conversation?.leagueId;
+    
     const result = await db
       .select({
         // Get participant fields
@@ -65,17 +74,36 @@ export class MessagingService {
         userId: conversationParticipants.userId,
         joinedAt: conversationParticipants.joinedAt,
         // Get user fields and create user object
+        // Use league membership display names if available, otherwise fall back to user names
         user: {
           id: users.id,
           email: users.email,
-          firstName: users.firstName,
-          lastName: users.lastName,
+          firstName: leagueId 
+            ? sql<string>`COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName})`.as('firstName')
+            : users.firstName,
+          lastName: leagueId
+            ? sql<string>`COALESCE(${leagueMemberships.displayLastName}, ${users.lastName})`.as('lastName')
+            : users.lastName,
           profileImageUrl: users.profileImageUrl,
-          displayName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
+          displayName: leagueId
+            ? sql<string>`COALESCE(
+                COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName}) || ' ' || COALESCE(${leagueMemberships.displayLastName}, ${users.lastName}),
+                ${users.email}
+              )`.as('displayName')
+            : sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
         }
       })
       .from(conversationParticipants)
       .innerJoin(users, eq(conversationParticipants.userId, users.id))
+      .leftJoin(
+        leagueMemberships,
+        leagueId 
+          ? and(
+              eq(leagueMemberships.userId, users.id),
+              eq(leagueMemberships.leagueId, leagueId)
+            )
+          : sql`false`
+      )
       .where(eq(conversationParticipants.conversationId, conversationId));
     
     return result as any[] as ConversationParticipant[];
@@ -158,6 +186,15 @@ export class MessagingService {
   }
 
   async getConversationMessages(conversationId: string, limit: number = 50): Promise<any[]> {
+    // First get the conversation to find its leagueId
+    const [conversation] = await db
+      .select({ leagueId: conversations.leagueId })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
+    
+    const leagueId = conversation?.leagueId;
+    
     const result = await db
       .select({
         id: messages.id,
@@ -173,12 +210,25 @@ export class MessagingService {
         updatedAt: messages.updatedAt,
         sender: {
           id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
+          firstName: leagueId 
+            ? sql<string>`COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName})`.as('firstName')
+            : users.firstName,
+          lastName: leagueId
+            ? sql<string>`COALESCE(${leagueMemberships.displayLastName}, ${users.lastName})`.as('lastName')
+            : users.lastName,
         }
       })
       .from(messages)
       .innerJoin(users, eq(messages.senderId, users.id))
+      .leftJoin(
+        leagueMemberships,
+        leagueId 
+          ? and(
+              eq(leagueMemberships.userId, users.id),
+              eq(leagueMemberships.leagueId, leagueId)
+            )
+          : sql`false`
+      )
       .where(eq(messages.conversationId, conversationId))
       .orderBy(messages.createdAt)
       .limit(limit);
@@ -206,6 +256,15 @@ export class MessagingService {
     if (!participant) {
       return []; // User not in conversation
     }
+
+    // Get the conversation to find its leagueId
+    const [conversation] = await db
+      .select({ leagueId: conversations.leagueId })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
+    
+    const leagueId = conversation?.leagueId;
 
     // Build where conditions based on user's history
     const whereConditions = [eq(messages.conversationId, conversationId)];
@@ -235,12 +294,25 @@ export class MessagingService {
         updatedAt: messages.updatedAt,
         sender: {
           id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
+          firstName: leagueId 
+            ? sql<string>`COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName})`.as('firstName')
+            : users.firstName,
+          lastName: leagueId
+            ? sql<string>`COALESCE(${leagueMemberships.displayLastName}, ${users.lastName})`.as('lastName')
+            : users.lastName,
         }
       })
       .from(messages)
       .innerJoin(users, eq(messages.senderId, users.id))
+      .leftJoin(
+        leagueMemberships,
+        leagueId 
+          ? and(
+              eq(leagueMemberships.userId, users.id),
+              eq(leagueMemberships.leagueId, leagueId)
+            )
+          : sql`false`
+      )
       .where(and(...whereConditions))
       .orderBy(messages.createdAt)
       .limit(limit);
@@ -1150,6 +1222,15 @@ export class MessagingService {
   }
 
   async getConversationMembersWithStatus(conversationId: string): Promise<any[]> {
+    // First get the conversation to find its leagueId
+    const [conversation] = await db
+      .select({ leagueId: conversations.leagueId })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
+    
+    const leagueId = conversation?.leagueId;
+    
     const result = await db
       .select({
         userId: conversationParticipants.userId,
@@ -1157,9 +1238,18 @@ export class MessagingService {
         user: {
           id: users.id,
           email: users.email,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          displayName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
+          firstName: leagueId 
+            ? sql<string>`COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName})`.as('firstName')
+            : users.firstName,
+          lastName: leagueId
+            ? sql<string>`COALESCE(${leagueMemberships.displayLastName}, ${users.lastName})`.as('lastName')
+            : users.lastName,
+          displayName: leagueId
+            ? sql<string>`COALESCE(
+                COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName}) || ' ' || COALESCE(${leagueMemberships.displayLastName}, ${users.lastName}),
+                ${users.email}
+              )`.as('displayName')
+            : sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
         },
         onlineStatus: userOnlineStatus.status,
         lastSeenAt: userOnlineStatus.lastSeenAt
@@ -1167,6 +1257,15 @@ export class MessagingService {
       .from(conversationParticipants)
       .innerJoin(users, eq(conversationParticipants.userId, users.id))
       .leftJoin(userOnlineStatus, eq(users.id, userOnlineStatus.userId))
+      .leftJoin(
+        leagueMemberships,
+        leagueId 
+          ? and(
+              eq(leagueMemberships.userId, users.id),
+              eq(leagueMemberships.leagueId, leagueId)
+            )
+          : sql`false`
+      )
       .where(and(
         eq(conversationParticipants.conversationId, conversationId),
         sql`conversation_participants.left_at IS NULL`
@@ -1213,6 +1312,17 @@ export class MessagingService {
   }
 
   async getChatPollResults(pollId: string): Promise<(ChatPollVote & { user: any })[]> {
+    // Get the leagueId through poll -> message -> conversation
+    const [pollInfo] = await db
+      .select({ leagueId: conversations.leagueId })
+      .from(chatPolls)
+      .innerJoin(messages, eq(chatPolls.messageId, messages.id))
+      .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+      .where(eq(chatPolls.id, pollId))
+      .limit(1);
+    
+    const leagueId = pollInfo?.leagueId;
+    
     const results = await db
       .select({
         id: chatPollVotes.id,
@@ -1223,13 +1333,31 @@ export class MessagingService {
         user: {
           id: users.id,
           email: users.email,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          displayName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
+          firstName: leagueId 
+            ? sql<string>`COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName})`.as('firstName')
+            : users.firstName,
+          lastName: leagueId
+            ? sql<string>`COALESCE(${leagueMemberships.displayLastName}, ${users.lastName})`.as('lastName')
+            : users.lastName,
+          displayName: leagueId
+            ? sql<string>`COALESCE(
+                COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName}) || ' ' || COALESCE(${leagueMemberships.displayLastName}, ${users.lastName}),
+                ${users.email}
+              )`.as('displayName')
+            : sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
         }
       })
       .from(chatPollVotes)
       .innerJoin(users, eq(chatPollVotes.userId, users.id))
+      .leftJoin(
+        leagueMemberships,
+        leagueId 
+          ? and(
+              eq(leagueMemberships.userId, users.id),
+              eq(leagueMemberships.leagueId, leagueId)
+            )
+          : sql`false`
+      )
       .where(eq(chatPollVotes.pollId, pollId));
     
     return results as (ChatPollVote & { user: any })[];
