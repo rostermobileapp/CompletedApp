@@ -81,7 +81,7 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="flex items-center justify-center gap-3" data-testid="highlight-0">
               <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0" />
-              <span className="font-medium text-white">Upload your roster & schedule</span>
+              <span className="font-medium text-white">Upload & watch your season populate</span>
             </div>
             <div className="flex items-center justify-center gap-3" data-testid="highlight-1">
               <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0" />
