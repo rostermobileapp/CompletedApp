@@ -31,7 +31,6 @@ const howHeardOptions = [
   { value: "facebook", label: "Facebook" },
   { value: "instagram", label: "Instagram" },
   { value: "word_of_mouth", label: "Word of Mouth" },
-  { value: "friend", label: "Friend or teammate" },
   { value: "league", label: "My league/team" },
   { value: "other", label: "Other" },
 ];
