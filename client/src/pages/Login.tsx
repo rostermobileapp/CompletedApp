@@ -263,7 +263,7 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => setIsSignUp(!isSignUp)}
-                      className="text-gray-400 hover:text-white transition-colors text-xs min-h-[36px] px-2"
+                      className="hover:text-white transition-colors text-xs min-h-[36px] px-2 text-[#212121]"
                       data-testid="button-toggle-mode"
                     >
                       {isSignUp
