@@ -195,11 +195,6 @@ export default function Login() {
                     className="h-8 mx-auto mb-2"
                     data-testid="modal-logo"
                   />
-                  <p className="text-xs text-gray-400 mt-1" data-testid="text-auth-description">
-                    {isSignUp
-                      ? 'Enter your email and password to create an account'
-                      : 'Enter your email and password to sign in'}
-                  </p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-3 pl-[8px] pr-[8px] pt-[0px] pb-[0px] mt-[0px] mb-[0px] ml-[8px] mr-[8px]">
