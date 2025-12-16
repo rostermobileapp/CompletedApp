@@ -26,13 +26,7 @@ export default function Landing() {
             className="h-8"
             data-testid="logo-image"
           />
-          <button
-            onClick={() => setLocation('/login')}
-            className="px-6 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
-            data-testid="button-login-header"
-          >
-            Login
-          </button>
+          <div className="w-24"></div>
         </div>
       </header>
       {/* Hero Section */}
@@ -42,6 +36,13 @@ export default function Landing() {
           style={{ transform: `translateY(${scrollY * 0.5}px)` }}
         />
         <div className="max-w-5xl mx-auto text-center relative z-10">
+          <button
+            onClick={() => setLocation('/login')}
+            className="px-8 py-3 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg mb-8"
+            data-testid="button-join-waitlist"
+          >
+            Join the Waitlist
+          </button>
           <h1 
             className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight text-white"
             data-testid="text-hero-title"
