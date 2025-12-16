@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { useLocation } from 'wouter';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoWhite from '@assets/ROSTER_LOGO_WHITE_1765849625877.png';
+import { useSplashVideo } from '@/context/SplashVideoContext';
 
 export default function Login() {
   const [showForm, setShowForm] = useState(false);
@@ -18,6 +19,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { preload, play } = useSplashVideo();
+
+  useEffect(() => {
+    preload();
+  }, [preload]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,13 +60,14 @@ export default function Login() {
         
         if (error) throw error;
         
-        // Set flag to show splash video on home page
-        sessionStorage.setItem('showSplashVideo', 'true');
         toast({
           title: 'Welcome back!',
           description: 'You have successfully signed in.',
         });
-        setLocation('/');
+        
+        play(() => {
+          setLocation('/');
+        });
       }
     } catch (error: any) {
       toast({
