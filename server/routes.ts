@@ -183,34 +183,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "First name and email are required" });
       }
 
+      const audienceId = process.env.RESEND_WAITLIST_AUDIENCE_ID;
+      if (!audienceId) {
+        console.error("RESEND_WAITLIST_AUDIENCE_ID is not configured");
+        return res.status(500).json({ message: "Waitlist is not configured properly" });
+      }
+
       // Add contact to Resend for marketing campaigns
       const { client: resend } = await getUncachableResendClient();
-      
-      // Build properties object for custom fields
-      const properties: Record<string, string> = {};
-      if (howHeard) properties.howHeard = howHeard;
-      if (phone) properties.phone = phone;
       
       const { data, error } = await resend.contacts.create({
         email,
         firstName,
         unsubscribed: false,
-        audienceId: process.env.RESEND_WAITLIST_AUDIENCE_ID || '',
-        ...(Object.keys(properties).length > 0 && { properties }),
+        audienceId,
       });
 
       if (error) {
-        console.error("Resend contact creation error:", error);
+        console.error("Resend contact creation error:", JSON.stringify(error, null, 2));
         // If it's a duplicate email error, still return success
-        if (error.message?.includes('already exists')) {
+        if (error.message?.includes('already exists') || error.message?.includes('Contact already exists')) {
           return res.json({ success: true, message: "You're already on the waitlist!" });
         }
         throw error;
       }
       
+      console.log("Successfully added to waitlist:", email);
       res.json({ success: true, message: "Successfully joined waitlist" });
-    } catch (error) {
-      console.error("Error adding to waitlist:", error);
+    } catch (error: any) {
+      console.error("Error adding to waitlist:", error?.message || error);
       res.status(500).json({ message: "Failed to join waitlist" });
     }
   });
