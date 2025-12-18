@@ -32,6 +32,8 @@ declare global {
         addAlias: (label: string, id: string) => void;
       };
     };
+    natively?: boolean;
+    nativelyReady?: boolean;
   }
 }
 
@@ -263,60 +265,83 @@ export function useNativelyNotifications() {
       return;
     }
 
-    // Check if NativelyNotifications is available (only in Natively app)
-    if (!window.NativelyNotifications) {
-      console.log('[Natively] NativelyNotifications not available (not running in Natively app)');
-      return;
-    }
+    // Function to setup notifications once SDK is available
+    const setupNotifications = () => {
+      if (!window.NativelyNotifications) {
+        console.log('[Natively] NativelyNotifications not available');
+        return;
+      }
 
-    try {
-      // Create new instance of NativelyNotifications
-      const notifications = new window.NativelyNotifications();
-      notificationsRef.current = notifications;
-      setIsInitialized(true);
-      console.log('[Natively] NativelyNotifications initialized for user:', user.id, 'displayId:', displayId);
+      try {
+        // Create new instance of NativelyNotifications
+        const notifications = new window.NativelyNotifications();
+        notificationsRef.current = notifications;
+        setIsInitialized(true);
+        console.log('[Natively] NativelyNotifications initialized for user:', user.id, 'displayId:', displayId);
 
-      // Get current permission status
-      notifications.getPermissionStatus((resp) => {
-        const status = resp.status ? 'granted' : 'default';
-        setPermissionState(status);
-        console.log('[Natively] Permission status:', status);
-      });
+        // Get current permission status
+        notifications.getPermissionStatus((resp) => {
+          const status = resp.status ? 'granted' : 'default';
+          setPermissionState(status);
+          console.log('[Natively] Permission status:', status);
+        });
 
-      // Get OneSignal Player ID
-      notifications.getOneSignalId((resp) => {
-        if (resp.playerId) {
-          console.log('[Natively] Got Player ID:', resp.playerId);
-          setPlayerId(resp.playerId);
-          registerPlayerId(resp.playerId);
-          
-          // Set External ID immediately after getting Player ID
-          // This links the device subscription to our user
-          console.log('[Natively] Calling setExternalId immediately after getting Player ID');
-          setExternalIdImmediately(displayId);
-        } else {
-          console.log('[Natively] No Player ID available yet, will retry...');
-          // Retry getting Player ID after a delay
-          setTimeout(() => {
-            notifications.getOneSignalId((retryResp) => {
-              if (retryResp.playerId) {
-                console.log('[Natively] Got Player ID on retry:', retryResp.playerId);
-                setPlayerId(retryResp.playerId);
-                registerPlayerId(retryResp.playerId);
-                
-                // Set External ID on retry as well
-                console.log('[Natively] Calling setExternalId after retry');
-                setExternalIdImmediately(displayId);
-              } else {
-                console.warn('[Natively] Still no Player ID after retry');
-              }
-            });
-          }, 2000);
-        }
-      });
+        // Get OneSignal Player ID
+        notifications.getOneSignalId((resp) => {
+          if (resp.playerId) {
+            console.log('[Natively] Got Player ID:', resp.playerId);
+            setPlayerId(resp.playerId);
+            registerPlayerId(resp.playerId);
+            
+            // Set External ID immediately after getting Player ID
+            // This links the device subscription to our user
+            console.log('[Natively] Calling setExternalId immediately after getting Player ID');
+            setExternalIdImmediately(displayId);
+          } else {
+            console.log('[Natively] No Player ID available yet, will retry...');
+            // Retry getting Player ID after a delay
+            setTimeout(() => {
+              notifications.getOneSignalId((retryResp) => {
+                if (retryResp.playerId) {
+                  console.log('[Natively] Got Player ID on retry:', retryResp.playerId);
+                  setPlayerId(retryResp.playerId);
+                  registerPlayerId(retryResp.playerId);
+                  
+                  // Set External ID on retry as well
+                  console.log('[Natively] Calling setExternalId after retry');
+                  setExternalIdImmediately(displayId);
+                } else {
+                  console.warn('[Natively] Still no Player ID after retry');
+                }
+              });
+            }, 2000);
+          }
+        });
+      } catch (error) {
+        console.error('[Natively] Initialization error:', error);
+      }
+    };
 
-    } catch (error) {
-      console.error('[Natively] Initialization error:', error);
+    // Check if SDK is already available
+    if (window.NativelyNotifications) {
+      setupNotifications();
+    } else {
+      // SDK not ready yet, wait for it
+      console.log('[Natively] Waiting for SDK to load...');
+      const handleNativelyReady = () => {
+        console.log('[Natively] SDK ready event received');
+        setupNotifications();
+      };
+      
+      window.addEventListener('nativelyReady', handleNativelyReady);
+      
+      // Cleanup event listener
+      return () => {
+        window.removeEventListener('nativelyReady', handleNativelyReady);
+        notificationsRef.current = null;
+        hasCalledLoginRef.current = false;
+        isSettingExternalIdRef.current = false;
+      };
     }
 
     // Cleanup on unmount
@@ -416,8 +441,9 @@ export function useNativelyNotifications() {
 
   /**
    * Check if we're running in a Natively app
+   * Either the SDK is loaded or the natively flag is set
    */
-  const isNativelyApp = typeof window !== 'undefined' && !!window.NativelyNotifications;
+  const isNativelyApp = typeof window !== 'undefined' && (!!window.NativelyNotifications || !!window.natively || !!window.nativelyReady);
 
   return {
     isInitialized,
