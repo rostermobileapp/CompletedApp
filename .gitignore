@@ -4,3 +4,7 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Firebase configuration (contains sensitive keys)
+google-services.json
+GoogleService-Info.plist

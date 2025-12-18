@@ -1,0 +1,83 @@
+Implementation Request: Advertisement Banner & Photo Tagging Feature
+1. Advertisement Banner Implementation
+Requirement: Add a clickable advertisement banner with tier-based placement logic.
+Banner Specifications:
+
+Destination URL: https://hockeyplayersinbusiness.org/
+Clickable: Yes - entire banner should be clickable and open URL in new tab
+Design: Create a visually appealing banner that fits the app's design system
+
+Placement Logic by User Tier:
+Free Tier Users:
+
+Location: Positioned IMMEDIATELY above the bottom navigation bar (fixed position)
+Visibility: Present on all pages/screens where bottom navigation is visible
+Behavior: Should remain fixed above navigation during scrolling
+
+Paid Tier Users (Player Pro & Commissioner):
+
+Location: Profile page only, IMMEDIATELY below the header
+Visibility: Only appears on their profile page, nowhere else in the app
+Behavior: Static positioning within profile page content
+
+Technical Requirements:
+
+Check user tier/subscription status to determine banner placement
+Ensure banner doesn't overlap or interfere with existing UI elements
+Banner should be responsive and work across all device sizes
+Use appropriate z-index layering for fixed positioning (free tier)
+
+
+2. Photo Tagging Feature
+Requirement: Add user tagging functionality to photos with filtering capability.
+Photo Upload Enhancement:
+
+During photo upload flow, add option to tag users
+Implement user search functionality (search by username/name)
+Allow multiple users to be tagged per photo
+Tagged users should be stored in photo metadata/database
+
+User Search Component:
+
+Real-time search as user types
+Display search results in dropdown/modal
+Show user avatar and name in search results
+Allow selection of multiple users
+Visual indication of already-tagged users
+
+Filtering Enhancement:
+
+Location: Photos page, top section next to existing team dropdown filter
+New Filter: "Filter by User" dropdown/search
+Functionality:
+
+Search/select any user to display photos they're tagged in
+Works in conjunction with existing team filter (both filters can be applied simultaneously)
+Clear filter option to return to all photos
+
+
+
+UI Layout:
+[Team Filter Dropdown] [User Filter Dropdown/Search] [Other existing controls]
+Data Structure Considerations:
+
+Store tagged user IDs with each photo
+Ensure efficient querying when filtering by tagged users
+Consider how tags display on photo detail view (show list of tagged users)
+
+Additional Features to Consider:
+
+Show tagged user names on photo thumbnails or detail view
+Notification system when users are tagged (optional)
+Ability to remove tags or untag yourself
+
+
+Testing Requirements:
+
+Verify banner appears correctly for free vs paid tiers
+Test banner clickability and URL navigation
+Test photo tagging during upload
+Test user search functionality
+Test filtering photos by tagged users
+Test combined filters (team + user)
+Test responsive behavior on mobile and desktop

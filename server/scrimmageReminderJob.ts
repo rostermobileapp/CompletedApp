@@ -3,7 +3,8 @@ import { scrimmages, scrimmageRequests, scrimmageRemindersSent, users, userNotif
 import { and, eq, gt, lt, inArray, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { format } from "date-fns";
-import { sendScrimmageReminderNotification } from "./notificationService";
+// Push notifications removed - will be re-implemented
+// import { sendScrimmageReminderNotification } from "./notificationService";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -109,14 +110,8 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
               scrimmageId: scrimmage.id,
             });
             
-            // Send push notification
-            await sendScrimmageReminderNotification(
-              player.id,
-              scrimmage.title,
-              scrimmage.location,
-              `in ${timeLabel}`,
-              scrimmage.id
-            );
+            // Push notification removed - will be re-implemented
+            // await sendScrimmageReminderNotification(...)
             
             // Record that we sent this reminder
             await db.insert(scrimmageRemindersSent).values({

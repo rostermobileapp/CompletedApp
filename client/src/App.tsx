@@ -6,14 +6,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PermissionProvider } from "@/context/SubscriptionContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { BottomNavigation } from "@/components/BottomNavigation";
-import { AdSenseBanner } from "@/components/AdSenseBanner";
+import { HPIBBanner } from "@/components/HPIBBanner";
 import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { ScrollToTop } from "@/components/ScrollToTop";
-import { OneSignalProvider } from "@/components/OneSignalProvider";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
+import Waitlist from "@/pages/Waitlist";
+import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
@@ -91,6 +92,8 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/waitlist" component={Waitlist} />
+        <Route path="/login" component={Login} />
         <Route path="/privacy-policy" component={PrivacyPolicy} />
         <Route path="/terms-of-service" component={TermsOfService} />
         <Route path="/facilities" component={FacilityBrowse} />
@@ -102,11 +105,10 @@ function Router() {
 
   return (
     <PermissionProvider>
-      <OneSignalProvider>
-        <ScrollToTop />
-        <div className="relative min-h-screen w-full">
-          <SlideOutMenu />
-          <PageTransition>
+      <ScrollToTop />
+      <div className="relative min-h-screen w-full">
+        <SlideOutMenu />
+        <PageTransition>
             <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
@@ -160,13 +162,12 @@ function Router() {
             <Route path="/privacy-policy" component={PrivacyPolicy} />
             <Route path="/terms-of-service" component={TermsOfService} />
             <Route path="/admin/stripe" component={StripeAdmin} />
-            <Route component={NotFound} />
+            <Route component={Dashboard} />
           </Switch>
         </PageTransition>
-          <AdSenseBanner />
+          <HPIBBanner placement="bottom-nav" />
           <BottomNavigation />
         </div>
-      </OneSignalProvider>
     </PermissionProvider>
   );
 }

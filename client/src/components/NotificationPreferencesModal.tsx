@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { useOneSignal } from '@/hooks/useOneSignal';
 import {
   Dialog,
   DialogContent,
@@ -49,7 +48,7 @@ const defaultSettings: NotificationSettings = {
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isInitialized, permissionState, requestPermission, playerId, externalIdSet, displayId, isWebPush } = useOneSignal();
+  // OneSignal hook removed - will be re-implemented
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [localSettings, setLocalSettings] = useState<NotificationSettings>(defaultSettings);
 
@@ -91,17 +90,8 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
   const handleRequestPermission = async () => {
     setIsRequestingPermission(true);
     try {
-      const granted = await requestPermission();
-      if (granted) {
-        toast({ title: 'Push notifications enabled!' });
-        queryClient.invalidateQueries({ queryKey: ['/api/notification-preferences'] });
-      } else {
-        toast({ 
-          title: 'Permission denied', 
-          description: 'You can enable notifications later in your device settings.',
-          variant: 'destructive' 
-        });
-      }
+      // OneSignal removed - will be re-implemented
+      toast({ title: 'Push notifications not yet implemented' });
     } catch (error) {
       toast({ title: 'Failed to request permission', variant: 'destructive' });
     } finally {
@@ -138,12 +128,17 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
   });
 
   // Determine notification status
-  const hasPlayerId = !!preferences?.oneSignalPlayerId;
-  const hasExternalId = !!preferences?.oneSignalExternalId;
+  const hasPlayerId = false; // OneSignal removed
+  const hasExternalId = false; // OneSignal removed
   const isPushEnabled = !!preferences?.pushEnabled;
-  const isFullySetUp = hasExternalId && hasPlayerId && isPushEnabled;
-  // Can send test if we have a Player ID in DB (even without External ID)
-  const canSendTest = hasPlayerId;
+  const isFullySetUp = false; // OneSignal removed
+  const canSendTest = false; // OneSignal removed
+  const permissionState: 'default' | 'granted' | 'denied' = 'default'; // OneSignal removed
+  const isInitialized = false; // OneSignal removed
+  const isWebPush = false; // OneSignal removed
+  const displayId = null; // OneSignal removed
+  const playerId = null; // OneSignal removed
+  const externalIdSet = false; // OneSignal removed
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -1,13 +1,12 @@
 import { Users, Calendar, Trophy, MessageCircle, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link } from 'wouter';
-import { AuthModal } from '@/components/AuthModal';
+import { Link, useLocation } from 'wouter';
 import logoWhite from '@assets/Roster Logo White_1759233840726.png';
 import heroImage from '@assets/previewed_1761963923150.png';
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -17,8 +16,6 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-black text-white" data-testid="landing-page">
-      <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />
-      
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -29,13 +26,7 @@ export default function Landing() {
             className="h-8"
             data-testid="logo-image"
           />
-          <button
-            onClick={() => setShowAuthModal(true)}
-            className="px-6 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
-            data-testid="button-login-header"
-          >
-            Login
-          </button>
+          <div className="w-24"></div>
         </div>
       </header>
       {/* Hero Section */}
@@ -45,6 +36,13 @@ export default function Landing() {
           style={{ transform: `translateY(${scrollY * 0.5}px)` }}
         />
         <div className="max-w-5xl mx-auto text-center relative z-10">
+          <button
+            onClick={() => setLocation('/waitlist')}
+            className="px-8 py-3 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg mb-8"
+            data-testid="button-join-waitlist"
+          >
+            Join the Waitlist
+          </button>
           <h1 
             className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight text-white"
             data-testid="text-hero-title"
@@ -79,17 +77,15 @@ export default function Landing() {
       {/* Highlights Bar */}
       <section className="py-16 px-6 border-y border-gray-800/50 bg-gray-900/30">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-white" data-testid="text-highlights-heading">
-            Running on spreadsheets?
-          </h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-white" data-testid="text-highlights-heading">Running on spreadsheets / Emails / Text Threads?</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="flex items-center justify-center gap-3" data-testid="highlight-0">
               <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0" />
-              <span className="font-medium text-white">Upload your roster & schedule</span>
+              <span className="font-medium text-white">Upload & watch your season populate</span>
             </div>
             <div className="flex items-center justify-center gap-3" data-testid="highlight-1">
               <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0" />
-              <span className="font-medium text-white">Roster populates your whole season in seconds</span>
+              <span className="font-medium text-white">Get notifications of everything in your league</span>
             </div>
             <div className="flex items-center justify-center gap-3" data-testid="highlight-2">
               <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0" />
@@ -243,7 +239,7 @@ export default function Landing() {
                   <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Registration System</td>
+                  <td className="p-4 text-white">Registration Notices</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
                   <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
                   <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
@@ -317,7 +313,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => setLocation('/login')}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
                 data-testid="button-pricing-free"
               >
@@ -370,7 +366,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => setLocation('/login')}
                 className="w-full py-3 px-6 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold"
                 data-testid="button-pricing-player"
               >
@@ -416,7 +412,7 @@ export default function Landing() {
                 </li>
               </ul>
               <button 
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => setLocation('/login')}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
                 data-testid="button-pricing-commissioner"
               >

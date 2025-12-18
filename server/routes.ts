@@ -74,7 +74,7 @@ import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail } from "./emails";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
-import { notificationService } from "./notificationService";
+import { getUncachableResendClient } from "./resend";
 
 
 // Helper function to format date as local time string without timezone suffix
@@ -171,6 +171,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error incrementing visitor count:", error);
       res.status(500).json({ message: "Failed to increment visitor count" });
+    }
+  });
+
+  // Waitlist signup (public)
+  app.post('/api/waitlist', async (req, res) => {
+    try {
+      const { firstName, email, phone, howHeard } = req.body;
+      
+      if (!firstName || !email) {
+        return res.status(400).json({ message: "First name and email are required" });
+      }
+
+      const audienceId = process.env.RESEND_WAITLIST_AUDIENCE_ID;
+      if (!audienceId) {
+        console.error("RESEND_WAITLIST_AUDIENCE_ID is not configured");
+        return res.status(500).json({ message: "Waitlist is not configured properly" });
+      }
+
+      // Add contact to Resend for marketing campaigns
+      const { client: resend } = await getUncachableResendClient();
+      
+      const { data, error } = await resend.contacts.create({
+        email,
+        firstName,
+        unsubscribed: false,
+        audienceId,
+      });
+
+      if (error) {
+        console.error("Resend contact creation error:", JSON.stringify(error, null, 2));
+        // If it's a duplicate email error, still return success
+        if (error.message?.includes('already exists') || error.message?.includes('Contact already exists')) {
+          return res.json({ success: true, message: "You're already on the waitlist!" });
+        }
+        throw error;
+      }
+      
+      console.log("Successfully added to waitlist:", email);
+      res.json({ success: true, message: "Successfully joined waitlist" });
+    } catch (error: any) {
+      console.error("Error adding to waitlist:", error?.message || error);
+      res.status(500).json({ message: "Failed to join waitlist" });
     }
   });
 
@@ -483,236 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/notification-preferences/player-id', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { playerId } = req.body;
-      
-      if (!playerId || typeof playerId !== 'string') {
-        return res.status(400).json({ message: "Player ID is required" });
-      }
-      
-      // Get user to fetch their displayId for External ID linking
-      const user = await storage.getUser(userId);
-      const displayId = user?.displayId;
-      
-      console.log(`[Player ID Registration] User ${userId} (displayId: ${displayId}) registering Player ID: ${playerId}`);
-      
-      let preferences = await storage.updateOneSignalPlayerId(userId, playerId);
-      
-      // Set the External ID in OneSignal using displayId (e.g., "LFB3Kf") for easier tracking
-      let externalIdResult = false;
-      if (displayId) {
-        externalIdResult = await notificationService.setExternalIdViaApi(playerId, displayId);
-        console.log(`[Player ID Registration] External ID (displayId: ${displayId}) set via API: ${externalIdResult}`);
-        
-        // Save the External ID to database if linking was successful
-        if (externalIdResult) {
-          preferences = await storage.upsertNotificationPreferences(userId, { oneSignalExternalId: displayId });
-          console.log(`[Player ID Registration] Saved External ID to database: ${displayId}`);
-        }
-      } else {
-        console.warn(`[Player ID Registration] No displayId for user ${userId}, cannot link External ID`);
-      }
-      
-      res.json({ ...preferences, externalIdLinked: externalIdResult, displayId });
-    } catch (error) {
-      console.error("Error registering OneSignal player ID:", error);
-      res.status(500).json({ message: "Failed to register player ID" });
-    }
-  });
-
-  // Manually link External ID for users who already have Player ID registered
-  // Can be called from frontend with { oneSignalId, userId } where userId is the displayId
-  app.post('/api/notification-preferences/link-external-id', isAuthenticated, async (req: any, res) => {
-    try {
-      const authUserId = req.user.claims.sub;
-      const { oneSignalId, userId: requestDisplayId } = req.body;
-      
-      // Get the authenticated user's displayId for validation
-      const user = await storage.getUser(authUserId);
-      const userDisplayId = user?.displayId;
-      
-      // Security check: if displayId is provided, it must match the authenticated user's displayId
-      if (requestDisplayId && userDisplayId && requestDisplayId !== userDisplayId) {
-        console.warn(`[Link External ID] Security: displayId mismatch. Request: ${requestDisplayId}, User: ${userDisplayId}`);
-        return res.status(403).json({ 
-          message: "Display ID mismatch.",
-          success: false 
-        });
-      }
-      
-      // Use provided values or fall back to database
-      let playerIdToUse = oneSignalId;
-      let displayIdToUse = requestDisplayId || userDisplayId;
-      
-      if (!displayIdToUse) {
-        return res.status(400).json({ 
-          message: "No display ID found for user.",
-          hasDisplayId: false 
-        });
-      }
-      
-      if (!playerIdToUse) {
-        const preferences = await storage.getNotificationPreferences(authUserId);
-        playerIdToUse = preferences?.oneSignalPlayerId;
-        
-        if (!playerIdToUse) {
-          return res.status(400).json({ 
-            message: "No Player ID found. Please enable notifications first.",
-            hasPlayerId: false 
-          });
-        }
-      }
-      
-      console.log(`[Link External ID] User ${authUserId} linking displayId: ${displayIdToUse} to Player ID: ${playerIdToUse}`);
-      
-      // Set the External ID in OneSignal via API using displayId
-      const result = await notificationService.setExternalIdViaApi(playerIdToUse, displayIdToUse);
-      
-      console.log(`[Link External ID] Result: ${result}`);
-      
-      // Save the External ID to database if linking was successful
-      if (result) {
-        await storage.upsertNotificationPreferences(authUserId, { oneSignalExternalId: displayIdToUse });
-        console.log(`[Link External ID] Saved External ID to database: ${displayIdToUse}`);
-      }
-      
-      res.json({ 
-        success: result, 
-        message: result ? "External ID linked successfully" : "Failed to link External ID",
-        playerId: playerIdToUse,
-        externalId: displayIdToUse
-      });
-    } catch (error) {
-      console.error("Error linking External ID:", error);
-      res.status(500).json({ message: "Failed to link External ID" });
-    }
-  });
-
-  // Verify External ID is linked in OneSignal (for debugging)
-  app.get('/api/notification-preferences/verify-external-id', isAuthenticated, async (req: any, res) => {
-    try {
-      const authUserId = req.user.claims.sub;
-      const user = await storage.getUser(authUserId);
-      
-      if (!user?.displayId) {
-        return res.json({ 
-          verified: false, 
-          error: 'No displayId found for user',
-          displayId: null
-        });
-      }
-      
-      const result = await notificationService.verifyExternalIdLink(user.displayId);
-      
-      res.json({
-        verified: result.linked,
-        displayId: user.displayId,
-        oneSignalData: result.userData,
-        error: result.error
-      });
-    } catch (error) {
-      console.error("Error verifying External ID:", error);
-      res.status(500).json({ verified: false, error: String(error) });
-    }
-  });
-
-  // Lookup OneSignal user by their OneSignal ID (for debugging)
-  app.get('/api/notification-preferences/lookup-onesignal/:oneSignalId', isAuthenticated, async (req: any, res) => {
-    try {
-      const { oneSignalId } = req.params;
-      
-      if (!oneSignalId) {
-        return res.status(400).json({ found: false, error: 'No OneSignal ID provided' });
-      }
-      
-      const result = await notificationService.lookupOneSignalUser(oneSignalId);
-      
-      res.json({
-        found: result.found,
-        oneSignalId,
-        userData: result.userData,
-        error: result.error
-      });
-    } catch (error) {
-      console.error("Error looking up OneSignal user:", error);
-      res.status(500).json({ found: false, error: String(error) });
-    }
-  });
-
-  // Test Push Notification Endpoint - Send a test notification to yourself
-  app.post('/api/notification-preferences/test', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { type = 'message' } = req.body;
-      
-      // Get user info for personalization
-      const user = await storage.getUser(userId);
-      const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Test User' : 'Test User';
-      
-      console.log(`[Test Notification] Sending test ${type} notification to user ${userId}`);
-      
-      let result;
-      switch (type) {
-        case 'message':
-          result = await notificationService.sendMessageNotification(
-            [userId],
-            'Test Sender',
-            'This is a test message notification to verify push notifications are working!',
-            undefined
-          );
-          break;
-        case 'payment':
-          result = await notificationService.sendPaymentRequestNotification(
-            [userId],
-            userName,
-            1000, // $10.00 test amount
-            'Test payment notification'
-          );
-          break;
-        case 'event':
-          result = await notificationService.sendEventReminderNotification(
-            [userId],
-            'Test Event',
-            'Today at 7:00 PM'
-          );
-          break;
-        case 'join':
-          result = await notificationService.sendJoinRequestNotification(
-            [userId],
-            'Test Player',
-            'team',
-            'Test Team'
-          );
-          break;
-        default:
-          result = await notificationService.sendMessageNotification(
-            [userId],
-            'Test Sender',
-            'This is a test notification!',
-            undefined
-          );
-      }
-      
-      console.log(`[Test Notification] Result: sent=${result.sent}, skipped=${result.skipped}`);
-      
-      res.json({
-        success: result.sent > 0,
-        message: result.sent > 0 
-          ? 'Test notification sent successfully! Check your device.'
-          : 'Notification was skipped - please ensure push notifications are enabled and the notification type is turned on in your preferences.',
-        details: {
-          sent: result.sent,
-          skipped: result.skipped,
-          type
-        }
-      });
-    } catch (error) {
-      console.error("[Test Notification] Error:", error);
-      res.status(500).json({ message: "Failed to send test notification", error: String(error) });
-    }
-  });
+  // OneSignal endpoints removed - will be re-implemented step by step
 
   // Personal Reminders Routes
   app.get('/api/user/personal-reminders', isAuthenticated, async (req: any, res) => {
@@ -824,6 +637,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching user scrimmage invites:', error);
       res.status(500).json({ message: 'Failed to fetch scrimmage invites' });
+    }
+  });
+
+  // User search for tagging - MUST be before /api/users/:userId to avoid route conflict
+  app.get("/api/users/search", isAuthenticated, async (req: any, res) => {
+    try {
+      const { q, leagueId, tournamentId } = req.query;
+      
+      if (!q || typeof q !== 'string' || q.length < 2) {
+        return res.json([]);
+      }
+
+      let usersQuery;
+      
+      if (tournamentId) {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .innerJoin(tournamentParticipants, eq(users.id, tournamentParticipants.userId))
+          .where(
+            and(
+              eq(tournamentParticipants.tournamentId, tournamentId as string),
+              eq(tournamentParticipants.status, 'approved'),
+              or(
+                sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+              )
+            )
+          )
+          .limit(10);
+      } else if (leagueId) {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .innerJoin(leagueMemberships, eq(users.id, leagueMemberships.userId))
+          .where(
+            and(
+              eq(leagueMemberships.leagueId, leagueId as string),
+              eq(leagueMemberships.status, 'approved'),
+              or(
+                sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+              )
+            )
+          )
+          .limit(10);
+      } else {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .where(
+            or(
+              sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+              sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+              sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+            )
+          )
+          .limit(10);
+      }
+
+      res.json(usersQuery);
+    } catch (error) {
+      console.error("Error searching users:", error);
+      res.status(500).json({ error: "Failed to search users" });
     }
   });
 
@@ -2606,6 +2500,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Photo tag routes - Tournament
+  app.post("/api/tournament-photos/:photoId/tags", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { photoId } = req.params;
+      const { taggedUserIds } = req.body;
+
+      if (!taggedUserIds || !Array.isArray(taggedUserIds)) {
+        return res.status(400).json({ error: "taggedUserIds must be an array" });
+      }
+
+      const photo = await storage.getTournamentPhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+
+      const results = [];
+      for (const taggedUserId of taggedUserIds) {
+        try {
+          const tag = await storage.addTournamentPhotoTag({
+            photoId,
+            userId: taggedUserId,
+            taggedBy: userId,
+          });
+          results.push(tag);
+        } catch (error) {
+          console.error(`Error tagging user ${taggedUserId}:`, error);
+        }
+      }
+
+      res.json({ success: true, tags: results });
+    } catch (error) {
+      console.error("Error adding photo tags:", error);
+      res.status(500).json({ error: "Failed to add photo tags" });
+    }
+  });
+
+  app.get("/api/tournament-photos/:photoId/tags", async (req, res) => {
+    try {
+      const { photoId } = req.params;
+      const tags = await storage.getTournamentPhotoTags(photoId);
+      res.json(tags);
+    } catch (error) {
+      console.error("Error fetching photo tags:", error);
+      res.status(500).json({ error: "Failed to fetch photo tags" });
+    }
+  });
+
+  // Batch endpoint to get tags for multiple tournament photos at once
+  app.get("/api/tournaments/:tournamentId/photos/tags-batch", isAuthenticated, async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+      
+      // Use efficient single-query batch method
+      const tagsMap = await storage.getAllTournamentPhotoTags(tournamentId);
+      
+      res.json(tagsMap);
+    } catch (error) {
+      console.error("Error fetching batch photo tags:", error);
+      res.status(500).json({ error: "Failed to fetch photo tags" });
+    }
+  });
+
+  app.delete("/api/tournament-photos/:photoId/tags/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const { photoId, userId } = req.params;
+
+      const photo = await storage.getTournamentPhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+
+      if (photo.uploadedBy !== currentUserId && userId !== currentUserId) {
+        return res.status(403).json({ error: "Unauthorized to remove this tag" });
+      }
+
+      await storage.removeTournamentPhotoTag(photoId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing photo tag:", error);
+      res.status(500).json({ error: "Failed to remove photo tag" });
+    }
+  });
+
+  // Photo tag routes - League
+  app.post("/api/league-photos/:photoId/tags", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { photoId } = req.params;
+      const { taggedUserIds } = req.body;
+
+      if (!taggedUserIds || !Array.isArray(taggedUserIds)) {
+        return res.status(400).json({ error: "taggedUserIds must be an array" });
+      }
+
+      const photo = await storage.getLeaguePhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+
+      const results = [];
+      for (const taggedUserId of taggedUserIds) {
+        try {
+          const tag = await storage.addLeaguePhotoTag({
+            photoId,
+            userId: taggedUserId,
+            taggedBy: userId,
+          });
+          results.push(tag);
+        } catch (error) {
+          console.error(`Error tagging user ${taggedUserId}:`, error);
+        }
+      }
+
+      res.json({ success: true, tags: results });
+    } catch (error) {
+      console.error("Error adding photo tags:", error);
+      res.status(500).json({ error: "Failed to add photo tags" });
+    }
+  });
+
+  app.get("/api/league-photos/:photoId/tags", async (req, res) => {
+    try {
+      const { photoId } = req.params;
+      const tags = await storage.getLeaguePhotoTags(photoId);
+      res.json(tags);
+    } catch (error) {
+      console.error("Error fetching photo tags:", error);
+      res.status(500).json({ error: "Failed to fetch photo tags" });
+    }
+  });
+
+  // Batch endpoint to get tags for multiple league photos at once
+  app.get("/api/leagues/:leagueId/photos/tags-batch", isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      
+      // Use efficient single-query batch method
+      const tagsMap = await storage.getAllLeaguePhotoTags(leagueId);
+      
+      res.json(tagsMap);
+    } catch (error) {
+      console.error("Error fetching batch photo tags:", error);
+      res.status(500).json({ error: "Failed to fetch photo tags" });
+    }
+  });
+
+  app.delete("/api/league-photos/:photoId/tags/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const { photoId, userId } = req.params;
+
+      const photo = await storage.getLeaguePhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
+      }
+
+      if (photo.uploadedBy !== currentUserId && userId !== currentUserId) {
+        return res.status(403).json({ error: "Unauthorized to remove this tag" });
+      }
+
+      await storage.removeLeaguePhotoTag(photoId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing photo tag:", error);
+      res.status(500).json({ error: "Failed to remove photo tag" });
+    }
+  });
+
+  // User search for tagging
+  app.get("/api/users/search", isAuthenticated, async (req: any, res) => {
+    try {
+      const { q, leagueId, tournamentId } = req.query;
+      
+      if (!q || typeof q !== 'string' || q.length < 2) {
+        return res.json([]);
+      }
+
+      let usersQuery;
+      
+      if (tournamentId) {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .innerJoin(tournamentParticipants, eq(users.id, tournamentParticipants.userId))
+          .where(
+            and(
+              eq(tournamentParticipants.tournamentId, tournamentId as string),
+              eq(tournamentParticipants.status, 'approved'),
+              or(
+                sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+              )
+            )
+          )
+          .limit(10);
+      } else if (leagueId) {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .innerJoin(leagueMemberships, eq(users.id, leagueMemberships.userId))
+          .where(
+            and(
+              eq(leagueMemberships.leagueId, leagueId as string),
+              eq(leagueMemberships.status, 'approved'),
+              or(
+                sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+              )
+            )
+          )
+          .limit(10);
+      } else {
+        usersQuery = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .where(
+            or(
+              sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+              sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+              sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+            )
+          )
+          .limit(10);
+      }
+
+      res.json(usersQuery);
+    } catch (error) {
+      console.error("Error searching users:", error);
+      res.status(500).json({ error: "Failed to search users" });
+    }
+  });
+
   // League routes
   app.get("/api/leagues", async (req, res) => {
     try {
@@ -3018,13 +3163,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? `${requestingUser.firstName} ${requestingUser.lastName}`.trim() || requestingUser.email 
               : 'Someone';
             
-            await notificationService.sendJoinRequestNotification(
-              [league.commissionerId],
-              requesterName,
-              'league',
-              league.name || 'your league',
-              membership.id
-            );
+            // Push notification removed - will be re-implemented
+            // await notificationService.sendJoinRequestNotification(...)
           }
         } catch (notifError) {
           console.error('[Notifications] Failed to send join request notification:', notifError);
@@ -3192,8 +3332,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const members = await storage.getLeagueMembers(leagueId);
       const players = members.map(member => ({
         id: member.user.id,
-        firstName: member.user.firstName,
-        lastName: member.user.lastName,
+        // Use displayFirstName/displayLastName from membership if set, otherwise fall back to user's names
+        firstName: member.displayFirstName || member.user.firstName || '',
+        lastName: member.displayLastName || member.user.lastName || '',
         email: member.user.email,
         isGoalie: member.isGoalie || false,
         teamName: member.assignedTeamId ? null : null // Will be populated if we have team info
@@ -3623,6 +3764,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching all user games:", error);
       res.status(500).json({ message: "Failed to fetch all user games" });
+    }
+  });
+
+  // Consolidated calendar endpoint - fetches all calendar data in one request
+  app.get("/api/user/calendar", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Fetch all data in parallel for maximum performance
+      const [
+        userTeams,
+        allGames,
+        createdScrimmages,
+        scrimmageRequests,
+        substituteRequests,
+        personalReminders
+      ] = await Promise.all([
+        storage.getUserTeams(userId),
+        storage.getAllUserGames(userId),
+        storage.getUserScrimmages(userId),
+        storage.getScrimmageRequestsByPlayer(userId),
+        storage.getSubstituteRequests({ status: 'approved', userId }),
+        storage.getUserPersonalReminders(userId)
+      ]);
+      
+      // Filter substitute requests to only include those where user is the substitute
+      const mySubstitutions = substituteRequests.filter(
+        req => req.substitutePlayerId === userId
+      );
+      
+      // Format games with date strings
+      const formattedGames = allGames.map(formatGameForResponse);
+      
+      res.json({
+        userTeams,
+        allGames: formattedGames,
+        createdScrimmages,
+        scrimmageRequests,
+        mySubstitutions,
+        personalReminders
+      });
+    } catch (error) {
+      console.error("Error fetching calendar data:", error);
+      res.status(500).json({ message: "Failed to fetch calendar data" });
     }
   });
 
@@ -4166,11 +4351,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Determine the user's role in this game
       let submitterRole = '';
       
-      // Check if user is commissioner (only for league games)
+      // Check if user is commissioner or secondary commissioner (only for league games)
       if (game.leagueId) {
         const league = await storage.getLeague(game.leagueId);
         if (league && league.commissionerId === userId) {
           submitterRole = 'commissioner';
+        } else {
+          // Check if user is a secondary commissioner via league membership
+          const leaguePermissions = await storage.getUserLeaguePermissions(userId, game.leagueId);
+          if (leaguePermissions && leaguePermissions.leagueRole === 'secondary_commissioner') {
+            submitterRole = 'commissioner';
+          }
         }
       }
       
@@ -4753,13 +4944,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (league.commissionerId) {
             const requesterName = team.name || 'A team';
             
-            await notificationService.sendJoinRequestNotification(
-              [league.commissionerId],
-              requesterName,
-              'league',
-              league.name || 'your league',
-              request.id
-            );
+            // Push notification removed - will be re-implemented  
+            // await notificationService.sendJoinRequestNotification(...)
           }
         } catch (notifError) {
           console.error('[Notifications] Failed to send team join request notification:', notifError);
@@ -5128,8 +5314,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return {
           id: member.user.id,
           userId: member.user.id,
-          firstName: member.user.firstName,
-          lastName: member.user.lastName,
+          // Use displayFirstName/displayLastName from league membership if set, otherwise fall back to user's names
+          firstName: leagueMembership?.displayFirstName || member.user.firstName || '',
+          lastName: leagueMembership?.displayLastName || member.user.lastName || '',
           email: member.user.email,
           isGoalie: leagueMembership?.isGoalie || false,
           teamName: member.teamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name
@@ -6387,12 +6574,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const requesterName = requester ? `${requester.firstName} ${requester.lastName}`.trim() || requester.email : 'Someone';
           const gameInfo = `${homeTeam?.name || 'Home'} vs ${awayTeam?.name || 'Away'}`;
           
-          await notificationService.sendSubstitutionRequestNotification(
-            [substitutePlayerId],
-            requesterName,
-            gameInfo,
-            request.id
-          );
+          // Push notification removed - will be re-implemented
+          // await notificationService.sendSubstitutionRequestNotification(...)
         }
       } catch (notifyError) {
         console.error('Error notifying substitute player:', notifyError);
@@ -8303,16 +8486,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (recipientUserIds.length > 0) {
-          await notificationService.sendNewsAnnouncementNotification(
-            recipientUserIds,
-            authorName,
-            announcementData.content?.substring(0, 50) || 'New announcement',
-            teamId ? 'team' : 'league',
-            teamId ? (captainTeam?.name || league.name) : league.name,
-            announcement.id,
-            teamId || leagueId
-          );
-          console.log(`📲 Sent push notifications for announcement to ${recipientUserIds.length} users`);
+          // Push notification removed - will be re-implemented
+          // await notificationService.sendNewsAnnouncementNotification(...);
+          console.log(`📲 Push notifications disabled - will be re-implemented`);
         }
       } catch (notificationError) {
         console.error('Failed to send announcement push notifications:', notificationError);
@@ -8879,15 +9055,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (recipientUserIds.length > 0) {
-          await notificationService.sendNewsAnnouncementNotification(
-            recipientUserIds,
-            authorName,
-            announcementData.content?.substring(0, 50) || 'New announcement',
-            'tournament',
-            tournament.name,
-            announcement.id,
-            tournamentId
-          );
+          // Push notification removed - will be re-implemented
+          // await notificationService.sendNewsAnnouncementNotification(...)
           console.log(`📲 Sent push notifications for tournament announcement to ${recipientUserIds.length} users`);
         }
       } catch (notificationError) {
@@ -10815,15 +10984,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const messages = await messagingService.getConversationMessagesForUser(id, userId, limit);
       
+      // Import Supabase storage service for signed URLs
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      
       // Get attachments and read receipts for each message
       const messagesWithDetails = await Promise.all(
         messages.map(async (message) => {
           const attachments = await messagingService.getMessageAttachments(message.id);
           const readReceipts = await messagingService.getMessageReadReceipts(message.id);
+          
+          // Convert attachment paths to signed URLs for images
+          const attachmentsWithSignedUrls = await Promise.all(
+            attachments.map(async (attachment) => {
+              // Only convert paths that start with /message-attachments/
+              if (attachment.url && attachment.url.startsWith('/message-attachments/')) {
+                const signedUrl = await supabaseStorageService.getMessageAttachmentSignedUrl(attachment.url);
+                return {
+                  ...attachment,
+                  url: signedUrl || attachment.url
+                };
+              }
+              return attachment;
+            })
+          );
+          
           return {
             ...message,
             sentAt: message.createdAt, // Map createdAt to sentAt for frontend compatibility
-            attachments,
+            attachments: attachmentsWithSignedUrls,
             readReceipts
           };
         })
@@ -10874,10 +11063,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Add attachments if any
       let messageAttachments = [];
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      
       if (attachments && attachments.length > 0) {
-        const { ObjectStorageService } = await import('./objectStorage');
-        const objectStorageService = new ObjectStorageService();
-        
         for (const attachment of attachments) {
           // Validate file size (10MB limit)
           if (attachment.fileSize > 10 * 1024 * 1024) {
@@ -10885,7 +11074,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Normalize the file URL to use app route
-          const normalizedUrl = objectStorageService.normalizeMessageAttachmentPath(attachment.fileUrl);
+          const normalizedUrl = supabaseStorageService.normalizeMessageAttachmentPath(attachment.fileUrl);
           
           // Determine attachment type from MIME type
           let attachmentType = 'file';
@@ -10905,6 +11094,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Convert attachment paths to signed URLs
+      const attachmentsWithSignedUrls = await Promise.all(
+        messageAttachments.map(async (attachment) => {
+          if (attachment.url && attachment.url.startsWith('/message-attachments/')) {
+            const signedUrl = await supabaseStorageService.getMessageAttachmentSignedUrl(attachment.url);
+            return {
+              ...attachment,
+              url: signedUrl || attachment.url
+            };
+          }
+          return attachment;
+        })
+      );
+      
       // Broadcast message to all participants via WebSocket
       const participants = await messagingService.getConversationParticipants(conversationId);
       broadcastToParticipants(participants, {
@@ -10913,7 +11116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: {
           ...message,
           sentAt: message.createdAt, // Map for frontend compatibility
-          attachments: messageAttachments,
+          attachments: attachmentsWithSignedUrls,
           readReceipts: []
         }
       });
@@ -10938,13 +11141,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (recipientIds.length > 0) {
             console.log('[Message Notification Debug] Calling sendMessageNotification for', recipientIds.length, 'recipients');
-            const result = await notificationService.sendMessageNotification(
-              recipientIds,
-              senderName,
-              content,
-              conversationId
-            );
-            console.log('[Message Notification Debug] Notification result:', result);
+            // Push notification removed - will be re-implemented
+            // const result = await notificationService.sendMessageNotification(...);
+            console.log('[Message Notification Debug] Notifications disabled');
           } else {
             console.log('[Message Notification Debug] No recipients to notify (empty list after filtering)');
           }
@@ -10956,7 +11155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json({
         ...message,
         sentAt: message.createdAt, // Map for frontend compatibility
-        attachments: messageAttachments,
+        attachments: attachmentsWithSignedUrls,
         readReceipts: []
       });
     } catch (error) {
@@ -12428,13 +12627,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const creatorName = creator ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email : 'Someone';
           
           if (validatedData.recipientUserIds.length > 0) {
-            await notificationService.sendPaymentRequestNotification(
-              validatedData.recipientUserIds,
-              creatorName,
-              validatedData.amountPerPerson,
-              validatedData.title,
-              paymentRequest.id
-            );
+            // Push notification removed - will be re-implemented
+            // await notificationService.sendPaymentRequestNotification(...);
           }
         } catch (notifError) {
           console.error('[Notifications] Failed to send payment request notifications:', notifError);

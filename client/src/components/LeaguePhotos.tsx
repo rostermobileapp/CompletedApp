@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest, getImageUrl } from "@/lib/queryClient";
 import { EnhancedMediaUploader } from "@/components/EnhancedMediaUploader";
 import { PhotoViewer } from "@/components/PhotoViewer";
+import { PhotoTaggingDialog } from "@/components/PhotoTaggingDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,6 +81,17 @@ interface LeaguePhoto {
   uploaderTeamId?: string | null;
 }
 
+interface LeagueMember {
+  userId: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl?: string;
+  };
+  status: string;
+}
+
 interface LeaguePhotosProps {
   leagueId: string;
   currentUserId?: string;
@@ -88,6 +100,7 @@ interface LeaguePhotosProps {
   onUploadStart?: () => void;
   onUploadComplete?: () => void;
   selectedTeamFilter?: string;
+  selectedUserFilter?: string;
   onTeamsLoaded?: (teams: any[]) => void;
   showOnlyMyPhotos?: boolean;
 }
@@ -100,6 +113,7 @@ export function LeaguePhotos({
   onUploadStart,
   onUploadComplete,
   selectedTeamFilter = "all",
+  selectedUserFilter,
   onTeamsLoaded,
   showOnlyMyPhotos = false
 }: LeaguePhotosProps) {
@@ -108,6 +122,8 @@ export function LeaguePhotos({
   const [internalShowUploader, setInternalShowUploader] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
+  const [showTaggingDialog, setShowTaggingDialog] = useState(false);
+  const [newlyUploadedPhotos, setNewlyUploadedPhotos] = useState<{ id: string; url: string; fileName: string }[]>([]);
   
   // Use external show uploader state if provided, otherwise use internal
   const showUploader = externalShowUploader !== undefined ? externalShowUploader : internalShowUploader;
@@ -146,10 +162,42 @@ export function LeaguePhotos({
   // User is a participant if they are the commissioner OR an approved member
   const isParticipant = isLeagueCommissioner || isApprovedMember;
 
+  // Fetch league members for tagging
+  const { data: leagueMembers = [] } = useQuery<LeagueMember[]>({
+    queryKey: [`/api/leagues/${leagueId}/members`],
+    enabled: !!leagueId,
+  });
+
+  // Get available users for tagging (approved members)
+  const availableUsersForTagging = useMemo(() => {
+    return leagueMembers
+      .filter((m) => m.status === 'approved' && m.user)
+      .map((m) => ({
+        id: m.user.id || m.userId,
+        firstName: m.user.firstName,
+        lastName: m.user.lastName,
+        profileImageUrl: m.user.profileImageUrl,
+      }));
+  }, [leagueMembers]);
+
+  // Show tagging dialog when newly uploaded photos exist and users are available
+  useEffect(() => {
+    if (newlyUploadedPhotos.length > 0 && availableUsersForTagging.length > 0 && !showTaggingDialog) {
+      setShowTaggingDialog(true);
+    }
+  }, [newlyUploadedPhotos, availableUsersForTagging, showTaggingDialog]);
+
   // Fetch photos if user has any form of access
   const { data: photos = [], isLoading: photosLoading } = useQuery<LeaguePhoto[]>({
     queryKey: ['/api/league-photos', leagueId],
     enabled: isParticipant,
+  });
+
+  // Fetch photo tags for all photos (always fetch when photos exist to enable filtering)
+  const { data: allPhotoTags = {} } = useQuery<Record<string, string[]>>({
+    queryKey: [`/api/leagues/${leagueId}/photos/tags-batch`],
+    enabled: photos.length > 0,
+    staleTime: 60000,
   });
 
   // Fetch league teams for filtering
@@ -165,7 +213,7 @@ export function LeaguePhotos({
     }
   }, [leagueTeams, onTeamsLoaded]);
 
-  // Filter photos by selected team (using uploaderTeamId from photo response)
+  // Filter photos by selected team and tagged user
   const filteredPhotos = useMemo(() => {
     let result = photos;
     
@@ -174,13 +222,21 @@ export function LeaguePhotos({
       result = result.filter((photo) => photo.uploaderTeamId === selectedTeamFilter);
     }
     
+    // Filter by tagged user
+    if (selectedUserFilter) {
+      result = result.filter((photo) => {
+        const taggedUserIds = allPhotoTags[photo.id] || [];
+        return taggedUserIds.includes(selectedUserFilter) || photo.uploadedBy === selectedUserFilter;
+      });
+    }
+    
     // Filter by uploader (show only my photos)
     if (showOnlyMyPhotos && currentUserId) {
       result = result.filter((photo) => photo.uploadedBy === currentUserId);
     }
     
     return result;
-  }, [photos, selectedTeamFilter, showOnlyMyPhotos, currentUserId]);
+  }, [photos, selectedTeamFilter, selectedUserFilter, allPhotoTags, showOnlyMyPhotos, currentUserId]);
 
   const isLoading = leagueLoading || membershipLoading || photosLoading;
 
@@ -235,6 +291,8 @@ export function LeaguePhotos({
       onUploadStart();
     }
 
+    const uploadedPhotos: { id: string; url: string; fileName: string }[] = [];
+
     try {
       for (const mediaFile of mediaFiles) {
         const fileToUpload = mediaFile.compressed || mediaFile.file;
@@ -265,11 +323,25 @@ export function LeaguePhotos({
           throw new Error('Failed to upload file');
         }
 
-        await uploadPhotoMutation.mutateAsync({
+        const savedPhoto = await uploadPhotoMutation.mutateAsync({
           fileUrl: path,
           fileName: mediaFile.file.name,
           fileSize: mediaFile.file.size,
         });
+        
+        // Track the uploaded photo for tagging
+        if (savedPhoto?.id) {
+          uploadedPhotos.push({
+            id: savedPhoto.id,
+            url: getImageUrl(savedPhoto.fileUrl) || savedPhoto.fileUrl,
+            fileName: savedPhoto.fileName,
+          });
+        }
+      }
+      
+      // Store uploaded photos for tagging (dialog will show via useEffect when users are available)
+      if (uploadedPhotos.length > 0) {
+        setNewlyUploadedPhotos(uploadedPhotos);
       }
     } catch (error) {
       console.error('Error uploading photos:', error);
@@ -426,9 +498,15 @@ export function LeaguePhotos({
             url: getImageUrl(p.fileUrl) || '',
             caption: p.caption ?? undefined,
             uploader: `${p.uploader.firstName} ${p.uploader.lastName}`,
+            id: p.id,
+            uploadedBy: p.uploadedBy,
           }))}
           initialIndex={selectedPhotoIndex}
           onClose={() => setSelectedPhotoIndex(null)}
+          context="league"
+          contextId={leagueId}
+          currentUserId={currentUserId}
+          availableUsers={availableUsersForTagging}
         />
       )}
 
@@ -453,6 +531,19 @@ export function LeaguePhotos({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Photo Tagging Dialog (after upload) */}
+      <PhotoTaggingDialog
+        open={showTaggingDialog}
+        onClose={() => {
+          setShowTaggingDialog(false);
+          setNewlyUploadedPhotos([]);
+        }}
+        photos={newlyUploadedPhotos}
+        context="league"
+        contextId={leagueId}
+        availableUsers={availableUsersForTagging}
+      />
     </div>
   );
 }
