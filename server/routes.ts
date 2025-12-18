@@ -525,7 +525,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // OneSignal endpoints removed - will be re-implemented step by step
+  // Register OneSignal Player ID (from BuildNatively SDK)
+  app.post('/api/notification-preferences/register-player-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { playerId } = req.body;
+      
+      if (!playerId || typeof playerId !== 'string') {
+        return res.status(400).json({ message: "Valid playerId is required" });
+      }
+      
+      console.log(`[Natively Backend] Registering Player ID for user ${userId}:`, playerId);
+      
+      // Update the user's notification preferences with the player ID
+      const preferences = await storage.upsertNotificationPreferences(userId, {
+        oneSignalPlayerId: playerId,
+        pushEnabled: true, // Enable push when player ID is registered
+      });
+      
+      console.log(`[Natively Backend] ✓ Player ID registered successfully`);
+      res.json({ 
+        success: true, 
+        playerId,
+        preferences 
+      });
+    } catch (error) {
+      console.error("[Natively Backend] Error registering player ID:", error);
+      res.status(500).json({ message: "Failed to register player ID" });
+    }
+  });
+
+  // Link External ID (from BuildNatively SDK)
+  app.post('/api/notification-preferences/link-external-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { externalId } = req.body;
+      
+      if (!externalId || typeof externalId !== 'string') {
+        return res.status(400).json({ message: "Valid externalId is required" });
+      }
+      
+      console.log(`[Natively Backend] Linking External ID for user ${userId}:`, externalId);
+      
+      // Update the user's notification preferences with the external ID
+      const preferences = await storage.upsertNotificationPreferences(userId, {
+        oneSignalExternalId: externalId,
+      });
+      
+      console.log(`[Natively Backend] ✓ External ID linked successfully`);
+      res.json({ 
+        success: true, 
+        externalId,
+        preferences 
+      });
+    } catch (error) {
+      console.error("[Natively Backend] Error linking external ID:", error);
+      res.status(500).json({ message: "Failed to link external ID" });
+    }
+  });
+
+  // Send test notification (for testing purposes)
+  app.post('/api/notification-preferences/test', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const preferences = await storage.getNotificationPreferences(userId);
+      
+      if (!preferences?.oneSignalPlayerId) {
+        return res.status(400).json({ 
+          success: false,
+          message: "No OneSignal Player ID registered. Please enable push notifications first." 
+        });
+      }
+      
+      // TODO: Implement actual test notification sending via OneSignal API
+      // For now, just return success
+      console.log(`[Natively Backend] Test notification requested for user ${userId}, player ID: ${preferences.oneSignalPlayerId}`);
+      
+      res.json({ 
+        success: true,
+        message: "Test notification endpoint ready (actual sending not yet implemented)" 
+      });
+    } catch (error) {
+      console.error("[Natively Backend] Error sending test notification:", error);
+      res.status(500).json({ message: "Failed to send test notification" });
+    }
+  });
 
   // Personal Reminders Routes
   app.get('/api/user/personal-reminders', isAuthenticated, async (req: any, res) => {

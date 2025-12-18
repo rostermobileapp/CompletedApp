@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useNativelyNotifications } from '@/hooks/useNativelyNotifications';
 import {
   Dialog,
   DialogContent,
@@ -48,7 +49,13 @@ const defaultSettings: NotificationSettings = {
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  // OneSignal hook removed - will be re-implemented
+  const {
+    isInitialized,
+    playerId,
+    externalIdSet,
+    permissionStatus,
+    requestPermission: sdkRequestPermission,
+  } = useNativelyNotifications();
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [localSettings, setLocalSettings] = useState<NotificationSettings>(defaultSettings);
 
@@ -90,10 +97,27 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
   const handleRequestPermission = async () => {
     setIsRequestingPermission(true);
     try {
-      // OneSignal removed - will be re-implemented
-      toast({ title: 'Push notifications not yet implemented' });
+      const granted = await sdkRequestPermission();
+      if (granted) {
+        toast({ 
+          title: 'Push notifications enabled!', 
+          description: 'You will now receive notifications for your selected preferences.'
+        });
+        // Refetch preferences to update UI
+        refetch();
+      } else {
+        toast({ 
+          title: 'Permission denied', 
+          description: 'Push notifications were not enabled. Please check your device settings.',
+          variant: 'destructive'
+        });
+      }
     } catch (error) {
-      toast({ title: 'Failed to request permission', variant: 'destructive' });
+      toast({ 
+        title: 'Failed to request permission', 
+        description: String(error),
+        variant: 'destructive' 
+      });
     } finally {
       setIsRequestingPermission(false);
     }
@@ -128,17 +152,13 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
   });
 
   // Determine notification status
-  const hasPlayerId = false; // OneSignal removed
-  const hasExternalId = false; // OneSignal removed
+  const hasPlayerId = !!playerId;
+  const hasExternalId = externalIdSet;
   const isPushEnabled = !!preferences?.pushEnabled;
-  const isFullySetUp = false; // OneSignal removed
-  const canSendTest = false; // OneSignal removed
-  const permissionState: 'default' | 'granted' | 'denied' = 'default'; // OneSignal removed
-  const isInitialized = false; // OneSignal removed
-  const isWebPush = false; // OneSignal removed
-  const displayId = null; // OneSignal removed
-  const playerId = null; // OneSignal removed
-  const externalIdSet = false; // OneSignal removed
+  const isFullySetUp = hasPlayerId && hasExternalId && isPushEnabled;
+  const canSendTest = hasPlayerId;
+  const permissionState: 'default' | 'granted' | 'denied' = permissionStatus ? 'granted' : 'default';
+  const isNativelyApp = isInitialized;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -344,14 +364,13 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
             {/* Debug section - shows SDK status */}
             <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs font-mono">
               <p><strong>Debug Info:</strong></p>
-              <p>Mode: {isWebPush ? '🌐 Web Push' : '📱 Native App'}</p>
+              <p>Mode: {isNativelyApp ? '📱 Natively App' : '🌐 Web Browser'}</p>
               <p>SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
               <p>Permission: {permissionState}</p>
               <p>OneSignal ID (SDK): {playerId || 'Not set'}</p>
               <p>OneSignal ID (DB): {preferences?.oneSignalPlayerId || 'Not saved'}</p>
               <p>External ID (SDK): {externalIdSet ? '✅ Set' : '❌ Not set'}</p>
               <p>External ID (DB): {preferences?.oneSignalExternalId || 'Not linked'}</p>
-              <p>Display ID: {displayId || 'Loading...'}</p>
               <p>Push Enabled: {preferences?.pushEnabled ? 'Yes' : 'No'}</p>
             </div>
 
