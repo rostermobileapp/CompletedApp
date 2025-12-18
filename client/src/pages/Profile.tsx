@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useNativelyNotifications } from '@/hooks/useNativelyNotifications';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -40,6 +41,7 @@ type PaymentMethodsForm = z.infer<typeof paymentMethodsSchema>;
 
 export default function Profile() {
   const { user: supabaseUser } = useAuth();
+  const { removeExternalId } = useNativelyNotifications();
   const { role, hasRole, canManageLeague, canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -915,6 +917,8 @@ export default function Profile() {
           {/* Sign Out */}
           <button
             onClick={async () => {
+              // Remove OneSignal external ID to unlink this device from the user
+              await removeExternalId();
               // Sign out user
               await supabase.auth.signOut();
               // Clear all cached data to prevent stale user data from showing

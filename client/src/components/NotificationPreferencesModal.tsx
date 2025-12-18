@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useNativelyNotifications } from '@/hooks/useNativelyNotifications';
 import {
   Dialog,
   DialogContent,
@@ -48,7 +49,15 @@ const defaultSettings: NotificationSettings = {
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  // OneSignal hook removed - will be re-implemented
+  const { 
+    isInitialized, 
+    isNativelyApp,
+    playerId, 
+    displayId,
+    externalIdSet, 
+    permissionState, 
+    requestPermission 
+  } = useNativelyNotifications();
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [localSettings, setLocalSettings] = useState<NotificationSettings>(defaultSettings);
 
@@ -90,8 +99,18 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
   const handleRequestPermission = async () => {
     setIsRequestingPermission(true);
     try {
-      // OneSignal removed - will be re-implemented
-      toast({ title: 'Push notifications not yet implemented' });
+      const granted = await requestPermission();
+      if (granted) {
+        toast({ title: 'Push notifications enabled!' });
+        // Refresh preferences from server
+        queryClient.invalidateQueries({ queryKey: ['/api/notification-preferences'] });
+      } else {
+        toast({ 
+          title: 'Permission not granted', 
+          description: 'Please enable notifications in your device settings.',
+          variant: 'destructive' 
+        });
+      }
     } catch (error) {
       toast({ title: 'Failed to request permission', variant: 'destructive' });
     } finally {
@@ -127,18 +146,16 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     },
   });
 
-  // Determine notification status
-  const hasPlayerId = false; // OneSignal removed
-  const hasExternalId = false; // OneSignal removed
+  // Determine notification status from hook and server preferences
+  const hasPlayerId = !!(playerId || preferences?.oneSignalPlayerId);
+  const hasExternalId = !!(externalIdSet || preferences?.oneSignalExternalId);
   const isPushEnabled = !!preferences?.pushEnabled;
-  const isFullySetUp = false; // OneSignal removed
-  const canSendTest = false; // OneSignal removed
-  const permissionState: 'default' | 'granted' | 'denied' = 'default'; // OneSignal removed
-  const isInitialized = false; // OneSignal removed
-  const isWebPush = false; // OneSignal removed
-  const displayId = null; // OneSignal removed
-  const playerId = null; // OneSignal removed
-  const externalIdSet = false; // OneSignal removed
+  
+  // Fully set up means we have both player ID and external ID linked
+  const isFullySetUp = hasPlayerId && hasExternalId && permissionState === 'granted';
+  
+  // Can send test if we have a player ID saved in the database
+  const canSendTest = !!preferences?.oneSignalPlayerId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -160,7 +177,21 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
         ) : (
           <div className="space-y-4">
             {/* Status display */}
-            {isFullySetUp ? (
+            {!isNativelyApp ? (
+              // Not running in Natively app (web browser)
+              <div className="p-4 rounded-lg bg-muted/50 border">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-muted-foreground mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-medium">Push Notifications Unavailable</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Push notifications are only available in the mobile app. Download the app to receive notifications on your device.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : isFullySetUp ? (
+              // All set up and working
               <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
@@ -173,6 +204,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                 </div>
               </div>
             ) : hasPlayerId && !hasExternalId ? (
+              // Player ID saved, waiting for External ID to link
               <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
                 <div className="flex items-start gap-3">
                   <Loader2 className="w-5 h-5 animate-spin text-yellow-600 mt-0.5" />
@@ -185,6 +217,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                 </div>
               </div>
             ) : permissionState === 'denied' ? (
+              // Permission denied
               <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-destructive mt-0.5" />
@@ -196,14 +229,16 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                   </div>
                 </div>
               </div>
-            ) : !isInitialized && !hasPlayerId ? (
+            ) : !isInitialized ? (
+              // SDK not yet initialized
               <div className="p-4 rounded-lg bg-muted/50 border">
                 <div className="flex items-center gap-3">
                   <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Waiting for notification SDK...</p>
+                  <p className="text-sm text-muted-foreground">Initializing notification service...</p>
                 </div>
               </div>
-            ) : permissionState !== 'granted' && !hasPlayerId ? (
+            ) : permissionState !== 'granted' ? (
+              // Permission not yet requested
               <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                 <div className="flex items-start gap-3">
                   <BellRing className="w-5 h-5 text-primary mt-0.5" />
@@ -232,8 +267,8 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
               </div>
             ) : null}
 
-            {/* Notification type toggles */}
-            {(isFullySetUp || hasPlayerId) && (
+            {/* Notification type toggles - show when in app and have some setup */}
+            {isNativelyApp && (isFullySetUp || hasPlayerId) && (
               <div className="space-y-3">
                 <h4 className="font-medium text-sm">Notification Types</h4>
                 <div className="space-y-2">
@@ -313,8 +348,8 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
               </div>
             )}
 
-            {/* Test notification button - show when we have a Player ID in DB */}
-            {canSendTest && (
+            {/* Test notification button - show when we have a Player ID in DB and in Natively app */}
+            {isNativelyApp && canSendTest && (
               <div className="p-4 rounded-lg bg-muted/50 border">
                 <div className="flex items-center justify-between">
                   <div>
@@ -341,19 +376,22 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
               </div>
             )}
 
-            {/* Debug section - shows SDK status */}
-            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs font-mono">
-              <p><strong>Debug Info:</strong></p>
-              <p>Mode: {isWebPush ? '🌐 Web Push' : '📱 Native App'}</p>
-              <p>SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
-              <p>Permission: {permissionState}</p>
-              <p>OneSignal ID (SDK): {playerId || 'Not set'}</p>
-              <p>OneSignal ID (DB): {preferences?.oneSignalPlayerId || 'Not saved'}</p>
-              <p>External ID (SDK): {externalIdSet ? '✅ Set' : '❌ Not set'}</p>
-              <p>External ID (DB): {preferences?.oneSignalExternalId || 'Not linked'}</p>
-              <p>Display ID: {displayId || 'Loading...'}</p>
-              <p>Push Enabled: {preferences?.pushEnabled ? 'Yes' : 'No'}</p>
-            </div>
+            {/* Debug section - shows SDK status (only in development) */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs font-mono">
+                <p><strong>Debug Info:</strong></p>
+                <p>Mode: {isNativelyApp ? '📱 Natively App' : '🌐 Web Browser'}</p>
+                <p>SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
+                <p>Permission: {permissionState}</p>
+                <p>OneSignal ID (SDK): {playerId || 'Not set'}</p>
+                <p>OneSignal ID (DB): {preferences?.oneSignalPlayerId || 'Not saved'}</p>
+                <p>External ID (SDK): {externalIdSet ? '✅ Set' : '❌ Not set'}</p>
+                <p>External ID (DB): {preferences?.oneSignalExternalId || 'Not linked'}</p>
+                <p>Display ID: {displayId || 'Loading...'}</p>
+                <p>Push Enabled: {preferences?.pushEnabled ? 'Yes' : 'No'}</p>
+                <p>Fully Set Up: {isFullySetUp ? '✅ Yes' : '❌ No'}</p>
+              </div>
+            )}
 
             {/* Close button */}
             <div className="pt-2">

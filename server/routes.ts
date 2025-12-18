@@ -525,7 +525,192 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // OneSignal endpoints removed - will be re-implemented step by step
+  // OneSignal / BuildNatively Push Notification Endpoints
+  
+  // Register OneSignal Player ID (subscription ID)
+  app.post('/api/notification-preferences/player-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { playerId } = req.body;
+      
+      if (!playerId || typeof playerId !== 'string') {
+        return res.status(400).json({ message: "playerId is required and must be a string" });
+      }
+      
+      const preferences = await storage.updateOneSignalPlayerId(userId, playerId);
+      console.log(`[OneSignal] Player ID registered for user ${userId}: ${playerId}`);
+      
+      res.json({ 
+        success: true, 
+        playerId: preferences.oneSignalPlayerId 
+      });
+    } catch (error) {
+      console.error("Error registering OneSignal player ID:", error);
+      res.status(500).json({ message: "Failed to register player ID" });
+    }
+  });
+
+  // Link External ID to OneSignal subscription via backend REST API
+  // This is a fallback method when the SDK methods fail
+  app.post('/api/notification-preferences/link-external-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { oneSignalId, userId: externalId } = req.body;
+      
+      if (!oneSignalId || !externalId) {
+        return res.status(400).json({ message: "oneSignalId and userId are required" });
+      }
+      
+      // Get user's displayId to use as external ID
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const externalIdToUse = user.displayId || externalId;
+      
+      // Save the external ID to our database
+      const preferences = await storage.upsertNotificationPreferences(userId, {
+        oneSignalPlayerId: oneSignalId,
+        oneSignalExternalId: externalIdToUse,
+      });
+      
+      // Try to link via OneSignal REST API if API key is configured
+      const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
+      const oneSignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
+      
+      if (oneSignalAppId && oneSignalRestApiKey) {
+        try {
+          // Use OneSignal's REST API to set the external user ID
+          const response = await fetch(`https://onesignal.com/api/v1/players/${oneSignalId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Basic ${oneSignalRestApiKey}`,
+            },
+            body: JSON.stringify({
+              app_id: oneSignalAppId,
+              external_user_id: externalIdToUse,
+            }),
+          });
+          
+          if (response.ok) {
+            console.log(`[OneSignal] External ID linked via REST API for user ${userId}: ${externalIdToUse}`);
+          } else {
+            const errorData = await response.text();
+            console.warn(`[OneSignal] REST API link failed:`, errorData);
+          }
+        } catch (apiError) {
+          console.error('[OneSignal] REST API error:', apiError);
+          // Continue - we've saved to our DB at least
+        }
+      } else {
+        console.log(`[OneSignal] External ID saved to DB only (no REST API key configured): ${externalIdToUse}`);
+      }
+      
+      res.json({ 
+        success: true, 
+        externalId: preferences.oneSignalExternalId 
+      });
+    } catch (error) {
+      console.error("Error linking external ID:", error);
+      res.status(500).json({ message: "Failed to link external ID" });
+    }
+  });
+
+  // Send test push notification
+  app.post('/api/notification-preferences/test', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { type = 'message' } = req.body;
+      
+      // Get user's notification preferences
+      const preferences = await storage.getNotificationPreferences(userId);
+      
+      if (!preferences?.oneSignalPlayerId) {
+        return res.json({ 
+          success: false, 
+          message: "No OneSignal Player ID registered. Please enable push notifications first." 
+        });
+      }
+      
+      const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
+      const oneSignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
+      
+      if (!oneSignalAppId || !oneSignalRestApiKey) {
+        return res.json({ 
+          success: false, 
+          message: "OneSignal is not configured on the server." 
+        });
+      }
+      
+      // Get user info for personalized message
+      const user = await storage.getUser(userId);
+      const userName = user?.firstName || 'there';
+      
+      // Create test notification content based on type
+      const notificationContent: Record<string, { title: string; message: string }> = {
+        message: {
+          title: '💬 Test Message',
+          message: `Hey ${userName}! This is a test notification. If you see this, push notifications are working!`,
+        },
+        payment: {
+          title: '💳 Test Payment Request',
+          message: `This is a test payment notification. Your push notifications are set up correctly!`,
+        },
+        reminder: {
+          title: '🏒 Test Game Reminder',
+          message: `This is a test game reminder. You'll receive notifications like this before your games!`,
+        },
+      };
+      
+      const content = notificationContent[type] || notificationContent.message;
+      
+      // Send notification via OneSignal REST API
+      // Try to target by external_user_id first (more reliable), fall back to player_id
+      const targetFilter = preferences.oneSignalExternalId
+        ? { include_external_user_ids: [preferences.oneSignalExternalId] }
+        : { include_player_ids: [preferences.oneSignalPlayerId] };
+      
+      const response = await fetch('https://onesignal.com/api/v1/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${oneSignalRestApiKey}`,
+        },
+        body: JSON.stringify({
+          app_id: oneSignalAppId,
+          ...targetFilter,
+          headings: { en: content.title },
+          contents: { en: content.message },
+          // iOS specific
+          ios_badgeType: 'Increase',
+          ios_badgeCount: 1,
+          // Android specific  
+          android_channel_id: process.env.ONESIGNAL_ANDROID_CHANNEL_ID,
+        }),
+      });
+      
+      const responseData = await response.json();
+      
+      if (response.ok && responseData.id) {
+        console.log(`[OneSignal] Test notification sent to user ${userId}:`, responseData.id);
+        res.json({ 
+          success: true, 
+          notificationId: responseData.id 
+        });
+      } else {
+        console.warn(`[OneSignal] Test notification failed:`, responseData);
+        res.json({ 
+          success: false, 
+          message: responseData.errors?.[0] || "Failed to send test notification" 
+        });
+      }
+    } catch (error) {
+      console.error("Error sending test notification:", error);
+      res.status(500).json({ message: "Failed to send test notification" });
+    }
+  });
 
   // Personal Reminders Routes
   app.get('/api/user/personal-reminders', isAuthenticated, async (req: any, res) => {
