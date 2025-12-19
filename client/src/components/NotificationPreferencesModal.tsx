@@ -73,7 +73,8 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     displayId,
     externalIdSet, 
     permissionState, 
-    requestPermission 
+    requestPermission,
+    refreshDetection
   } = useNativelyNotifications();
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [localSettings, setLocalSettings] = useState<NotificationSettings>(defaultSettings);
@@ -403,17 +404,68 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                 {showDebug ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
               {showDebug && (
-                <div className="p-3 pt-0 text-xs font-mono space-y-1 border-t">
-                  <p>📱 Natively App: {isNativelyApp ? '✅ Yes' : '❌ No'}</p>
-                  <p>🔧 SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
-                  <p>🔔 Permission: {permissionState}</p>
-                  <p>🆔 Player ID (SDK): {playerId || 'Not set'}</p>
-                  <p>💾 Player ID (DB): {preferences?.oneSignalPlayerId || 'Not saved'}</p>
-                  <p>🔗 External ID Set: {externalIdSet ? '✅ Yes' : '❌ No'}</p>
-                  <p>📝 External ID (DB): {preferences?.oneSignalExternalId || 'Not linked'}</p>
-                  <p>👤 Display ID: {displayId || 'Loading...'}</p>
-                  <p>✅ Fully Set Up: {isFullySetUp ? 'Yes' : 'No'}</p>
-                  <p>📤 Can Send Test: {canSendTest ? 'Yes' : 'No'}</p>
+                <div className="p-3 pt-0 border-t space-y-3">
+                  <div className="text-xs font-mono space-y-1">
+                    <p>📱 Natively App: {isNativelyApp ? '✅ Yes' : '❌ No'}</p>
+                    <p>🔧 SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
+                    <p>🔔 Permission: {permissionState}</p>
+                    <p>🆔 Player ID (SDK): {playerId || 'Not set'}</p>
+                    <p>💾 Player ID (DB): {preferences?.oneSignalPlayerId || 'Not saved'}</p>
+                    <p>🔗 External ID Set: {externalIdSet ? '✅ Yes' : '❌ No'}</p>
+                    <p>📝 External ID (DB): {preferences?.oneSignalExternalId || 'Not linked'}</p>
+                    <p>👤 Display ID: {displayId || 'Loading...'}</p>
+                    <p>✅ Fully Set Up: {isFullySetUp ? 'Yes' : 'No'}</p>
+                    <p>📤 Can Send Test: {canSendTest ? 'Yes' : 'No'}</p>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const result = refreshDetection();
+                        toast({
+                          title: result ? 'SDK Detected!' : 'SDK Not Found',
+                          description: result 
+                            ? 'BuildNatively SDK is now detected.' 
+                            : 'Make sure you are running this in the BuildNatively app.',
+                        });
+                      }}
+                    >
+                      🔄 Refresh Detection
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        console.log('[Debug] Window objects:', {
+                          natively: (window as any).natively,
+                          nativelyReady: (window as any).nativelyReady,
+                          NativelyNotifications: typeof (window as any).NativelyNotifications,
+                          webkit: !!(window as any).webkit?.messageHandlers?.natively,
+                          userAgent: navigator.userAgent,
+                        });
+                        toast({ title: 'Check browser console for debug info' });
+                      }}
+                    >
+                      📋 Log to Console
+                    </Button>
+                  </div>
+                  
+                  {!isNativelyApp && (
+                    <div className="p-2 bg-yellow-500/10 rounded text-xs">
+                      <p className="font-medium text-yellow-700 dark:text-yellow-400">SDK Not Detected</p>
+                      <p className="text-muted-foreground mt-1">
+                        This usually means you're viewing in a web browser instead of the BuildNatively app. 
+                        Make sure:
+                      </p>
+                      <ul className="list-disc list-inside text-muted-foreground mt-1 space-y-0.5">
+                        <li>Push notifications are enabled in BuildNatively settings</li>
+                        <li>OneSignal is configured in BuildNatively</li>
+                        <li>You've rebuilt and installed the app</li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

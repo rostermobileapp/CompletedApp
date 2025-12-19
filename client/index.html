@@ -5,18 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     
     <!-- BuildNatively SDK for Push Notifications -->
-    <script async onload="nativelyOnLoad()" src="https://cdn.jsdelivr.net/npm/@buildnatively/[email protected]/natively-frontend.min.js"></script>
+    <script async onload="nativelyOnLoad()" src="https://cdn.jsdelivr.net/npm/@buildnatively/sdk@latest/natively-frontend.min.js"></script>
     <script>
+      // Debug: Log when script starts
+      console.log('[BuildNatively] Initializing SDK loader...');
+      
       // This function runs when BuildNatively SDK is ready
       function nativelyOnLoad() {
-        if (window.natively) {
-          console.log('[BuildNatively] SDK loaded successfully!');
-          // The React app will handle push notification setup via useNativelyNotifications hook
+        console.log('[BuildNatively] SDK script loaded, checking environment...');
+        console.log('[BuildNatively] window.natively:', window.natively);
+        console.log('[BuildNatively] window.NativelyNotifications:', typeof window.NativelyNotifications);
+        
+        // Check if we're in a Natively app
+        if (window.natively || window.NativelyNotifications) {
+          console.log('[BuildNatively] ✅ Running inside Natively app!');
           window.nativelyReady = true;
-          // Dispatch event so React can know SDK is ready
           window.dispatchEvent(new CustomEvent('nativelyReady'));
+        } else {
+          console.log('[BuildNatively] ⚠️ Not running in Natively app (web browser mode)');
+          // Still set ready flag so the app knows SDK loaded
+          window.nativelySDKLoaded = true;
         }
       }
+      
+      // Fallback: Check after a delay in case SDK loads differently
+      setTimeout(function() {
+        if (!window.nativelyReady && !window.nativelySDKLoaded) {
+          console.log('[BuildNatively] Fallback check...');
+          console.log('[BuildNatively] window.natively:', window.natively);
+          console.log('[BuildNatively] window.NativelyNotifications:', typeof window.NativelyNotifications);
+          
+          if (window.natively || window.NativelyNotifications) {
+            console.log('[BuildNatively] ✅ SDK detected on fallback check!');
+            window.nativelyReady = true;
+            window.dispatchEvent(new CustomEvent('nativelyReady'));
+          }
+        }
+      }, 2000);
     </script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">

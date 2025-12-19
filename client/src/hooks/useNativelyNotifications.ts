@@ -34,6 +34,14 @@ declare global {
     };
     natively?: boolean;
     nativelyReady?: boolean;
+    nativelySDKLoaded?: boolean;
+    webkit?: {
+      messageHandlers?: {
+        natively?: unknown;
+      };
+    };
+    // Android bridge
+    nativelyAndroid?: unknown;
   }
 }
 
@@ -441,9 +449,103 @@ export function useNativelyNotifications() {
 
   /**
    * Check if we're running in a Natively app
-   * Either the SDK is loaded or the natively flag is set
+   * Multiple detection methods for different platforms
    */
-  const isNativelyApp = typeof window !== 'undefined' && (!!window.NativelyNotifications || !!window.natively || !!window.nativelyReady);
+  const checkIsNativelyApp = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+    
+    // Check all possible indicators
+    const indicators = {
+      NativelyNotifications: !!window.NativelyNotifications,
+      natively: !!window.natively,
+      nativelyReady: !!window.nativelyReady,
+      // iOS WebView bridge
+      webkitBridge: !!window.webkit?.messageHandlers?.natively,
+      // Android bridge
+      androidBridge: !!window.nativelyAndroid,
+      // User agent check for WebView
+      isWebView: /wv|WebView/i.test(navigator.userAgent),
+    };
+    
+    console.log('[Natively] Detection indicators:', indicators);
+    
+    return indicators.NativelyNotifications || 
+           indicators.natively || 
+           indicators.nativelyReady ||
+           indicators.webkitBridge ||
+           indicators.androidBridge;
+  }, []);
+
+  const [isNativelyApp, setIsNativelyApp] = useState(false);
+  
+  // Check for Natively app on mount and when SDK loads
+  useEffect(() => {
+    const check = () => {
+      const result = checkIsNativelyApp();
+      console.log('[Natively] isNativelyApp:', result);
+      setIsNativelyApp(result);
+    };
+    
+    // Check immediately
+    check();
+    
+    // Listen for SDK ready event
+    const handleReady = () => {
+      console.log('[Natively] nativelyReady event received');
+      check();
+    };
+    
+    window.addEventListener('nativelyReady', handleReady);
+    
+    // Also check after delays in case SDK loads late
+    const timeout1 = setTimeout(check, 1000);
+    const timeout2 = setTimeout(check, 3000);
+    
+    return () => {
+      window.removeEventListener('nativelyReady', handleReady);
+      clearTimeout(timeout1);
+      clearTimeout(timeout2);
+    };
+  }, [checkIsNativelyApp]);
+
+  /**
+   * Manually refresh SDK detection
+   * Useful for debugging or if SDK loads late
+   */
+  const refreshDetection = useCallback(() => {
+    console.log('[Natively] Manual refresh triggered');
+    const result = checkIsNativelyApp();
+    setIsNativelyApp(result);
+    
+    // Also try to initialize if SDK is now available
+    if (result && window.NativelyNotifications && !isInitialized) {
+      console.log('[Natively] Attempting to initialize after refresh...');
+      try {
+        const notifications = new window.NativelyNotifications();
+        notificationsRef.current = notifications;
+        setIsInitialized(true);
+        
+        // Get permission status
+        notifications.getPermissionStatus((resp) => {
+          const status = resp.status ? 'granted' : 'default';
+          setPermissionState(status);
+          console.log('[Natively] Permission status after refresh:', status);
+        });
+        
+        // Get player ID
+        notifications.getOneSignalId((resp) => {
+          if (resp.playerId) {
+            console.log('[Natively] Got Player ID after refresh:', resp.playerId);
+            setPlayerId(resp.playerId);
+          }
+        });
+      } catch (error) {
+        console.error('[Natively] Failed to initialize after refresh:', error);
+      }
+    }
+    
+    return result;
+  }, [checkIsNativelyApp, isInitialized]);
 
   return {
     isInitialized,
@@ -454,5 +556,6 @@ export function useNativelyNotifications() {
     permissionState,
     requestPermission,
     removeExternalId,
+    refreshDetection,
   };
 }
