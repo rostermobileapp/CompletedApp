@@ -73,7 +73,7 @@ export function useNativelyNotifications() {
     };
   }, [checkSDK]);
 
-  // Fetch user's displayId
+  // Fetch user's displayId (the short ID like "LFB3Kf", NOT the UUID)
   useEffect(() => {
     if (!isAuthenticated || !user?.id) {
       setDisplayId(null);
@@ -83,13 +83,26 @@ export function useNativelyNotifications() {
     fetch('/api/user', { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
-        const id = data.displayId || user.id;
-        console.log('[OneSignal] User displayId:', id);
-        setDisplayId(id);
+        console.log('[OneSignal] User data received:', { 
+          id: data.id, 
+          displayId: data.displayId,
+          hasDisplayId: !!data.displayId 
+        });
+        
+        // IMPORTANT: Only use displayId if it exists - do NOT fall back to UUID
+        // The displayId should be a short string like "LFB3Kf"
+        if (data.displayId) {
+          console.log('[OneSignal] Using displayId:', data.displayId);
+          setDisplayId(data.displayId);
+        } else {
+          console.error('[OneSignal] ERROR: User has no displayId! This needs to be set in the database.');
+          // Don't set displayId at all if not available - this will prevent wrong External ID
+          setDisplayId(null);
+        }
       })
       .catch(err => {
-        console.error('[OneSignal] Failed to fetch displayId:', err);
-        setDisplayId(user.id);
+        console.error('[OneSignal] Failed to fetch user:', err);
+        setDisplayId(null);
       });
   }, [isAuthenticated, user?.id]);
 
@@ -123,7 +136,17 @@ export function useNativelyNotifications() {
 
   // Initialize and sync with OneSignal when user is authenticated
   useEffect(() => {
+    // Don't proceed without a valid displayId (short ID like "LFB3Kf")
     if (!isAuthenticated || !user?.id || !displayId || hasInitialized.current) {
+      if (!displayId && isAuthenticated && user?.id) {
+        console.log('[OneSignal] Waiting for displayId before initializing...');
+      }
+      return;
+    }
+
+    // Validate displayId is not a UUID (should be short like "LFB3Kf")
+    if (displayId.length > 10 || displayId.includes('-')) {
+      console.error('[OneSignal] ERROR: displayId appears to be a UUID, not a short ID:', displayId);
       return;
     }
 
@@ -132,7 +155,7 @@ export function useNativelyNotifications() {
       if (window.OneSignalDeferred) {
         window.OneSignalDeferred.push(async (OneSignal) => {
           try {
-            console.log('[OneSignal] Initializing for user:', displayId);
+            console.log('[OneSignal] Initializing for user with displayId:', displayId);
             hasInitialized.current = true;
             setIsInitialized(true);
 
@@ -152,8 +175,9 @@ export function useNativelyNotifications() {
 
             // Login with external ID to link user
             try {
+              console.log('[OneSignal] Calling OneSignal.login() with External ID:', displayId);
               await OneSignal.login(displayId);
-              console.log('[OneSignal] Logged in with external ID:', displayId);
+              console.log('[OneSignal] ✅ Successfully logged in with External ID:', displayId);
               setExternalIdSet(true);
               
               // Save external ID to backend
