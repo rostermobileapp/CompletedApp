@@ -418,7 +418,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                     <p>📤 Can Send Test: {canSendTest ? 'Yes' : 'No'}</p>
                   </div>
                   
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -432,7 +432,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                         });
                       }}
                     >
-                      🔄 Refresh Detection
+                      🔄 Refresh
                     </Button>
                     <Button
                       variant="outline"
@@ -448,7 +448,55 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                         toast({ title: 'Check browser console for debug info' });
                       }}
                     >
-                      📋 Log to Console
+                      📋 Log
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        try {
+                          if (typeof (window as any).NativelyNotifications === 'function') {
+                            const notif = new (window as any).NativelyNotifications();
+                            console.log('[Debug] Created NativelyNotifications instance:', notif);
+                            
+                            // Try to get player ID
+                            notif.getOneSignalId((resp: any) => {
+                              console.log('[Debug] getOneSignalId response:', resp);
+                              if (resp.playerId) {
+                                toast({ 
+                                  title: '✅ Player ID Found!', 
+                                  description: resp.playerId.substring(0, 20) + '...'
+                                });
+                              } else {
+                                toast({ 
+                                  title: 'No Player ID yet', 
+                                  description: 'Try enabling notifications first' 
+                                });
+                              }
+                            });
+                            
+                            // Try to get permission status
+                            notif.getPermissionStatus((resp: any) => {
+                              console.log('[Debug] Permission status:', resp);
+                            });
+                          } else {
+                            toast({ 
+                              title: 'NativelyNotifications not available', 
+                              description: 'Type: ' + typeof (window as any).NativelyNotifications,
+                              variant: 'destructive'
+                            });
+                          }
+                        } catch (err) {
+                          console.error('[Debug] Error:', err);
+                          toast({ 
+                            title: 'Error', 
+                            description: String(err),
+                            variant: 'destructive'
+                          });
+                        }
+                      }}
+                    >
+                      🔧 Try Init
                     </Button>
                   </div>
                   

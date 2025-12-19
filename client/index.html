@@ -4,23 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     
-    <!-- BuildNatively Push Notifications -->
-    <!-- Note: BuildNatively injects NativelyNotifications directly into the WebView -->
-    <!-- We just need to detect it, not load an external SDK -->
+    <!-- BuildNatively JavaScript SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@nicely-limited/natively@1.2.3/nicely.min.js"></script>
     <script>
       (function() {
-        console.log('[BuildNatively] Checking for native SDK injection...');
+        console.log('[Natively] Initializing BuildNatively SDK detection...');
         
-        // Function to check if BuildNatively SDK is available
-        function checkNativelySDK() {
-          var hasNatively = typeof window.NativelyNotifications !== 'undefined';
-          var hasNativelyFlag = window.natively === true;
+        function logWindowState() {
+          console.log('[Natively] === Window State ===');
+          console.log('  NativelyNotifications:', typeof window.NativelyNotifications);
+          console.log('  natively:', window.natively);
+          console.log('  NativelyInfo:', typeof window.NativelyInfo);
+          console.log('  NativelyCamera:', typeof window.NativelyCamera);
+          console.log('  NativelyStorage:', typeof window.NativelyStorage);
           
-          console.log('[BuildNatively] Check - NativelyNotifications:', hasNatively);
-          console.log('[BuildNatively] Check - natively flag:', hasNativelyFlag);
-          
-          if (hasNatively || hasNativelyFlag) {
-            console.log('[BuildNatively] ✅ SDK detected!');
+          // List all Natively-related window properties
+          var nativelyProps = Object.keys(window).filter(function(k) {
+            return k.toLowerCase().indexOf('natively') !== -1 || 
+                   k.toLowerCase().indexOf('nicely') !== -1;
+          });
+          console.log('  All Natively props:', nativelyProps);
+        }
+        
+        function markReady() {
+          if (!window.nativelyReady && typeof window.NativelyNotifications === 'function') {
+            console.log('[Natively] ✅ SDK is ready!');
             window.nativelyReady = true;
             window.dispatchEvent(new CustomEvent('nativelyReady'));
             return true;
@@ -28,31 +36,25 @@
           return false;
         }
         
-        // Check immediately
-        if (checkNativelySDK()) return;
+        // Initial check
+        logWindowState();
+        markReady();
         
-        // Check again after DOM is ready
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', function() {
-            console.log('[BuildNatively] DOM ready, checking again...');
-            checkNativelySDK();
-          });
-        }
-        
-        // Poll for SDK availability (BuildNatively may inject it after page load)
-        var attempts = 0;
-        var maxAttempts = 20; // Check for 10 seconds
-        var pollInterval = setInterval(function() {
-          attempts++;
-          console.log('[BuildNatively] Poll attempt ' + attempts + '/' + maxAttempts);
+        // Poll for SDK availability
+        var pollCount = 0;
+        var pollMax = 10;
+        var pollId = setInterval(function() {
+          pollCount++;
+          console.log('[Natively] Poll ' + pollCount + '/' + pollMax);
+          logWindowState();
           
-          if (checkNativelySDK() || attempts >= maxAttempts) {
-            clearInterval(pollInterval);
-            if (attempts >= maxAttempts && !window.nativelyReady) {
-              console.log('[BuildNatively] ⚠️ SDK not found after polling. Running in web browser?');
+          if (markReady() || pollCount >= pollMax) {
+            clearInterval(pollId);
+            if (!window.nativelyReady) {
+              console.log('[Natively] ⚠️ SDK not detected after polling');
             }
           }
-        }, 500);
+        }, 1000);
       })();
     </script>
     
