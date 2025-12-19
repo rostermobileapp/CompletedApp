@@ -30,6 +30,13 @@ declare global {
       logout: () => Promise<void>;
       User?: {
         addAlias: (label: string, id: string) => void;
+        pushSubscription?: {
+          id?: string;
+        };
+      };
+      Notifications?: {
+        permission?: boolean;
+        requestPermission?: () => Promise<boolean>;
       };
     };
     natively?: boolean;
@@ -38,10 +45,17 @@ declare global {
     webkit?: {
       messageHandlers?: {
         natively?: unknown;
+        nativelyNotifications?: unknown;
+        onesignal?: unknown;
       };
     };
-    // Android bridge
+    // Android bridges
     nativelyAndroid?: unknown;
+    NativelyAndroid?: unknown;
+    Android?: unknown;
+    // Other possible BuildNatively objects
+    Natively?: unknown;
+    nativelyBridge?: unknown;
   }
 }
 
@@ -456,24 +470,48 @@ export function useNativelyNotifications() {
     
     // Check all possible indicators
     const indicators = {
-      NativelyNotifications: !!window.NativelyNotifications,
-      natively: !!window.natively,
-      nativelyReady: !!window.nativelyReady,
-      // iOS WebView bridge
-      webkitBridge: !!window.webkit?.messageHandlers?.natively,
-      // Android bridge
-      androidBridge: !!window.nativelyAndroid,
-      // User agent check for WebView
-      isWebView: /wv|WebView/i.test(navigator.userAgent),
+      // Primary: NativelyNotifications class
+      NativelyNotifications: typeof window.NativelyNotifications === 'function',
+      // Natively flag
+      natively: window.natively === true,
+      nativelyReady: window.nativelyReady === true,
+      // iOS WebView bridges
+      webkitNatively: !!window.webkit?.messageHandlers?.natively,
+      webkitNotifications: !!window.webkit?.messageHandlers?.nativelyNotifications,
+      webkitOnesignal: !!window.webkit?.messageHandlers?.onesignal,
+      // Android bridges
+      nativelyAndroid: !!window.nativelyAndroid,
+      NativelyAndroid: !!window.NativelyAndroid,
+      Android: !!window.Android,
+      // Other possible objects
+      Natively: !!window.Natively,
+      nativelyBridge: !!window.nativelyBridge,
+      // OneSignal (might be injected by BuildNatively)
+      OneSignal: !!window.OneSignal,
+      // User agent checks
+      isAndroidWebView: /wv/.test(navigator.userAgent) && /Android/.test(navigator.userAgent),
+      isIOSWebView: /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(navigator.userAgent),
     };
     
     console.log('[Natively] Detection indicators:', indicators);
     
+    // Also log all window properties that contain "natively" or "onesignal"
+    const relevantProps = Object.keys(window).filter(key => 
+      /natively|onesignal|notification/i.test(key)
+    );
+    if (relevantProps.length > 0) {
+      console.log('[Natively] Relevant window properties:', relevantProps);
+    }
+    
     return indicators.NativelyNotifications || 
            indicators.natively || 
            indicators.nativelyReady ||
-           indicators.webkitBridge ||
-           indicators.androidBridge;
+           indicators.webkitNatively ||
+           indicators.webkitNotifications ||
+           indicators.nativelyAndroid ||
+           indicators.NativelyAndroid ||
+           indicators.Natively ||
+           indicators.OneSignal;
   }, []);
 
   const [isNativelyApp, setIsNativelyApp] = useState(false);

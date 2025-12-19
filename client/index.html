@@ -4,44 +4,56 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     
-    <!-- BuildNatively SDK for Push Notifications -->
-    <script async onload="nativelyOnLoad()" src="https://cdn.jsdelivr.net/npm/@buildnatively/sdk@latest/natively-frontend.min.js"></script>
+    <!-- BuildNatively Push Notifications -->
+    <!-- Note: BuildNatively injects NativelyNotifications directly into the WebView -->
+    <!-- We just need to detect it, not load an external SDK -->
     <script>
-      // Debug: Log when script starts
-      console.log('[BuildNatively] Initializing SDK loader...');
-      
-      // This function runs when BuildNatively SDK is ready
-      function nativelyOnLoad() {
-        console.log('[BuildNatively] SDK script loaded, checking environment...');
-        console.log('[BuildNatively] window.natively:', window.natively);
-        console.log('[BuildNatively] window.NativelyNotifications:', typeof window.NativelyNotifications);
+      (function() {
+        console.log('[BuildNatively] Checking for native SDK injection...');
         
-        // Check if we're in a Natively app
-        if (window.natively || window.NativelyNotifications) {
-          console.log('[BuildNatively] ✅ Running inside Natively app!');
-          window.nativelyReady = true;
-          window.dispatchEvent(new CustomEvent('nativelyReady'));
-        } else {
-          console.log('[BuildNatively] ⚠️ Not running in Natively app (web browser mode)');
-          // Still set ready flag so the app knows SDK loaded
-          window.nativelySDKLoaded = true;
-        }
-      }
-      
-      // Fallback: Check after a delay in case SDK loads differently
-      setTimeout(function() {
-        if (!window.nativelyReady && !window.nativelySDKLoaded) {
-          console.log('[BuildNatively] Fallback check...');
-          console.log('[BuildNatively] window.natively:', window.natively);
-          console.log('[BuildNatively] window.NativelyNotifications:', typeof window.NativelyNotifications);
+        // Function to check if BuildNatively SDK is available
+        function checkNativelySDK() {
+          var hasNatively = typeof window.NativelyNotifications !== 'undefined';
+          var hasNativelyFlag = window.natively === true;
           
-          if (window.natively || window.NativelyNotifications) {
-            console.log('[BuildNatively] ✅ SDK detected on fallback check!');
+          console.log('[BuildNatively] Check - NativelyNotifications:', hasNatively);
+          console.log('[BuildNatively] Check - natively flag:', hasNativelyFlag);
+          
+          if (hasNatively || hasNativelyFlag) {
+            console.log('[BuildNatively] ✅ SDK detected!');
             window.nativelyReady = true;
             window.dispatchEvent(new CustomEvent('nativelyReady'));
+            return true;
           }
+          return false;
         }
-      }, 2000);
+        
+        // Check immediately
+        if (checkNativelySDK()) return;
+        
+        // Check again after DOM is ready
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', function() {
+            console.log('[BuildNatively] DOM ready, checking again...');
+            checkNativelySDK();
+          });
+        }
+        
+        // Poll for SDK availability (BuildNatively may inject it after page load)
+        var attempts = 0;
+        var maxAttempts = 20; // Check for 10 seconds
+        var pollInterval = setInterval(function() {
+          attempts++;
+          console.log('[BuildNatively] Poll attempt ' + attempts + '/' + maxAttempts);
+          
+          if (checkNativelySDK() || attempts >= maxAttempts) {
+            clearInterval(pollInterval);
+            if (attempts >= maxAttempts && !window.nativelyReady) {
+              console.log('[BuildNatively] ⚠️ SDK not found after polling. Running in web browser?');
+            }
+          }
+        }, 500);
+      })();
     </script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">

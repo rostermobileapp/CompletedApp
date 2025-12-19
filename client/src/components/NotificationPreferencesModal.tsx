@@ -452,17 +452,30 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                     </Button>
                   </div>
                   
+                  {/* Show all window detection values */}
+                  <div className="p-2 bg-muted/50 rounded text-xs font-mono">
+                    <p className="font-medium mb-1">Window Objects:</p>
+                    <p>NativelyNotifications: {typeof (window as any).NativelyNotifications}</p>
+                    <p>natively: {String((window as any).natively)}</p>
+                    <p>nativelyReady: {String((window as any).nativelyReady)}</p>
+                    <p>OneSignal: {typeof (window as any).OneSignal}</p>
+                    <p>webkit.messageHandlers: {(window as any).webkit?.messageHandlers ? 'exists' : 'none'}</p>
+                    <p>Android/NativelyAndroid: {(window as any).Android || (window as any).NativelyAndroid ? 'exists' : 'none'}</p>
+                    <p>User Agent: {navigator.userAgent.substring(0, 50)}...</p>
+                  </div>
+                  
                   {!isNativelyApp && (
                     <div className="p-2 bg-yellow-500/10 rounded text-xs">
                       <p className="font-medium text-yellow-700 dark:text-yellow-400">SDK Not Detected</p>
                       <p className="text-muted-foreground mt-1">
-                        This usually means you're viewing in a web browser instead of the BuildNatively app. 
-                        Make sure:
+                        BuildNatively should inject NativelyNotifications into the WebView. 
+                        Check:
                       </p>
                       <ul className="list-disc list-inside text-muted-foreground mt-1 space-y-0.5">
-                        <li>Push notifications are enabled in BuildNatively settings</li>
-                        <li>OneSignal is configured in BuildNatively</li>
-                        <li>You've rebuilt and installed the app</li>
+                        <li>Push notifications enabled in BuildNatively dashboard</li>
+                        <li>OneSignal App ID configured in BuildNatively</li>
+                        <li>App was rebuilt AFTER enabling push notifications</li>
+                        <li>You're running the latest APK build</li>
                       </ul>
                     </div>
                   )}
