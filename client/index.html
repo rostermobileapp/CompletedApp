@@ -25,17 +25,29 @@
         });
       
       function initOneSignal(appId) {
+        // Prevent double initialization
+        if (window.OneSignalInitialized) {
+          console.log('[OneSignal] Already initialized, skipping');
+          return;
+        }
+        
         OneSignalDeferred.push(async function(OneSignal) {
           try {
+            // Enable debug logging to see detailed errors
+            OneSignal.Debug.setLogLevel('trace');
+            
             await OneSignal.init({
               appId: appId,
               allowLocalhostAsSecureOrigin: true,
             });
             console.log('[OneSignal] SDK initialized successfully');
             window.OneSignalReady = true;
+            window.OneSignalInitialized = true;
             window.dispatchEvent(new CustomEvent('onesignalReady'));
           } catch (err) {
             console.error('[OneSignal] Init error:', err);
+            console.error('[OneSignal] Error message:', err && err.message);
+            console.error('[OneSignal] Error details:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
           }
         });
       }
