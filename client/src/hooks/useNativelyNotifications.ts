@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useAuth } from './useAuth';
+import { getAuthHeaders } from '@/lib/queryClient';
 
 /**
  * OneSignal Web SDK interface
@@ -80,9 +81,21 @@ export function useNativelyNotifications() {
       return;
     }
 
-    fetch('/api/user', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
+    const fetchUserData = async () => {
+      try {
+        const authHeaders = await getAuthHeaders();
+        const res = await fetch('/api/user', { 
+          credentials: 'include',
+          headers: authHeaders,
+        });
+        
+        if (!res.ok) {
+          console.error('[OneSignal] Failed to fetch user, status:', res.status);
+          setDisplayId(null);
+          return;
+        }
+        
+        const data = await res.json();
         console.log('[OneSignal] User data received:', { 
           id: data.id, 
           displayId: data.displayId,
@@ -99,11 +112,13 @@ export function useNativelyNotifications() {
           // Don't set displayId at all if not available - this will prevent wrong External ID
           setDisplayId(null);
         }
-      })
-      .catch(err => {
+      } catch (err) {
         console.error('[OneSignal] Failed to fetch user:', err);
         setDisplayId(null);
-      });
+      }
+    };
+
+    fetchUserData();
   }, [isAuthenticated, user?.id]);
 
   // Register Player ID with backend
@@ -111,10 +126,11 @@ export function useNativelyNotifications() {
     if (!isAuthenticated || !playerIdToRegister) return;
     
     try {
+      const authHeaders = await getAuthHeaders();
       const response = await fetch('/api/notification-preferences/player-id', {
         method: 'POST',
         body: JSON.stringify({ playerId: playerIdToRegister }),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
         credentials: 'include',
       });
       
@@ -125,7 +141,7 @@ export function useNativelyNotifications() {
         await fetch('/api/notification-preferences', {
           method: 'PUT',
           body: JSON.stringify({ pushEnabled: true }),
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
           credentials: 'include',
         });
       }
@@ -181,13 +197,14 @@ export function useNativelyNotifications() {
               setExternalIdSet(true);
               
               // Save external ID to backend
+              const authHeaders = await getAuthHeaders();
               await fetch('/api/notification-preferences/link-external-id', {
                 method: 'POST',
                 body: JSON.stringify({ 
                   oneSignalId: subscriptionId || '', 
                   userId: displayId 
                 }),
-                headers: { 'Content-Type': 'application/json' },
+                headers: { ...authHeaders, 'Content-Type': 'application/json' },
                 credentials: 'include',
               });
             } catch (loginError) {
