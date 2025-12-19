@@ -4,7 +4,41 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     
-    <!-- BuildNatively uses native push notifications (no JavaScript SDK needed) -->
+    <!-- BuildNatively SDK - NativelyNotifications should be injected by the native app -->
+    <script>
+      // BuildNatively injects NativelyNotifications into the WebView
+      // We poll to detect when it becomes available
+      (function() {
+        console.log('[Natively] Waiting for BuildNatively SDK...');
+        
+        function checkSDK() {
+          var available = typeof window.NativelyNotifications === 'function';
+          console.log('[Natively] NativelyNotifications available:', available);
+          
+          if (available) {
+            console.log('[Natively] ✅ SDK detected!');
+            window.nativelyReady = true;
+            window.dispatchEvent(new CustomEvent('nativelyReady'));
+            return true;
+          }
+          return false;
+        }
+        
+        // Check immediately and keep polling
+        if (!checkSDK()) {
+          var attempts = 0;
+          var interval = setInterval(function() {
+            attempts++;
+            if (checkSDK() || attempts > 30) {
+              clearInterval(interval);
+              if (attempts > 30) {
+                console.log('[Natively] SDK not found after 30 attempts');
+              }
+            }
+          }, 500);
+        }
+      })();
+    </script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
