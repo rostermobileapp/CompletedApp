@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { useNativelyNotifications } from '@/hooks/useNativelyNotifications';
 import {
   Dialog,
   DialogContent,
@@ -11,12 +10,10 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
   Bell, 
   Loader2, 
-  BellRing, 
-  AlertCircle, 
-  Send, 
   CheckCircle2, 
   MessageSquare, 
   CreditCard, 
@@ -24,9 +21,10 @@ import {
   Calendar, 
   Newspaper, 
   UserPlus,
-  Smartphone,
-  ChevronDown,
-  ChevronUp
+  Copy,
+  ExternalLink,
+  AlertCircle,
+  Send
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -66,24 +64,19 @@ const defaultSettings: NotificationSettings = {
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { 
-    isInitialized, 
-    isNativelyApp,
-    playerId, 
-    displayId,
-    externalIdSet, 
-    permissionState, 
-    requestPermission,
-    refreshDetection
-  } = useNativelyNotifications();
-  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [localSettings, setLocalSettings] = useState<NotificationSettings>(defaultSettings);
-  const [showDebug, setShowDebug] = useState(false);
+  const [playerIdInput, setPlayerIdInput] = useState('');
+  const [isLinking, setIsLinking] = useState(false);
+
+  // Fetch user data to get displayId
+  const { data: userData } = useQuery<{ displayId: string }>({
+    queryKey: ['/api/user'],
+    enabled: open,
+  });
 
   const { data: preferences, isLoading } = useQuery<NotificationPreferences>({
     queryKey: ['/api/notification-preferences'],
     enabled: open,
-    refetchInterval: 3000,
   });
 
   useEffect(() => {
@@ -110,31 +103,52 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     },
   });
 
+  const linkPlayerIdMutation = useMutation({
+    mutationFn: async (playerId: string) => {
+      const response = await apiRequest('POST', '/api/notification-preferences/player-id', { playerId });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notification-preferences'] });
+      toast({ title: '✅ Device linked successfully!' });
+      setPlayerIdInput('');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to link device',
+        description: String(error),
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleToggle = (key: keyof NotificationSettings) => {
     const newSettings = { ...localSettings, [key]: !localSettings[key] };
     setLocalSettings(newSettings);
     updateSettingsMutation.mutate(newSettings);
   };
 
-  const handleRequestPermission = async () => {
-    setIsRequestingPermission(true);
-    try {
-      const granted = await requestPermission();
-      if (granted) {
-        toast({ title: 'Push notifications enabled!' });
-        queryClient.invalidateQueries({ queryKey: ['/api/notification-preferences'] });
-      } else {
-        toast({ 
-          title: 'Permission not granted', 
-          description: 'Please enable notifications in your device settings.',
-          variant: 'destructive' 
-        });
-      }
-    } catch (error) {
-      toast({ title: 'Failed to request permission', variant: 'destructive' });
-    } finally {
-      setIsRequestingPermission(false);
+  const handleLinkPlayerId = () => {
+    const trimmedId = playerIdInput.trim();
+    if (!trimmedId) {
+      toast({ title: 'Please enter a Player ID', variant: 'destructive' });
+      return;
     }
+    // Basic UUID validation
+    if (!/^[a-f0-9-]{36}$/i.test(trimmedId)) {
+      toast({ 
+        title: 'Invalid Player ID format', 
+        description: 'Player ID should be a UUID like: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+        variant: 'destructive' 
+      });
+      return;
+    }
+    linkPlayerIdMutation.mutate(trimmedId);
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: `${label} copied to clipboard` });
   };
 
   const testNotificationMutation = useMutation({
@@ -145,13 +159,13 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     onSuccess: (data) => {
       if (data.success) {
         toast({ 
-          title: 'Test notification sent!', 
+          title: '🔔 Test notification sent!', 
           description: 'Check your device for the notification.' 
         });
       } else {
         toast({ 
           title: 'Could not send notification', 
-          description: data.message || 'Please ensure push notifications are enabled.',
+          description: data.message || 'Please make sure your device is linked.',
           variant: 'destructive'
         });
       }
@@ -165,11 +179,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     },
   });
 
-  // Determine notification status
-  const hasPlayerId = !!(playerId || preferences?.oneSignalPlayerId);
-  const hasExternalId = !!(externalIdSet || preferences?.oneSignalExternalId);
-  const isFullySetUp = hasPlayerId && hasExternalId && permissionState === 'granted';
-  const canSendTest = !!preferences?.oneSignalPlayerId;
+  const isLinked = !!preferences?.oneSignalPlayerId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -180,7 +190,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
             Push Notifications
           </DialogTitle>
           <DialogDescription>
-            Manage your notification preferences
+            Manage your push notification preferences
           </DialogDescription>
         </DialogHeader>
 
@@ -192,71 +202,94 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
           <div className="space-y-4">
             
             {/* Status Card */}
-            <Card className={isFullySetUp ? 'border-green-500/50 bg-green-500/5' : hasPlayerId ? 'border-yellow-500/50 bg-yellow-500/5' : 'border-primary/30 bg-primary/5'}>
-              <CardContent className="pt-4">
-                <div className="flex items-start gap-3">
-                  {isFullySetUp ? (
+            {isLinked ? (
+              <Card className="border-green-500/50 bg-green-500/5">
+                <CardContent className="pt-4">
+                  <div className="flex items-start gap-3">
                     <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                  ) : hasPlayerId ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-yellow-600 mt-0.5 flex-shrink-0" />
-                  ) : (
-                    <BellRing className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                  )}
-                  <div className="flex-1">
-                    {isFullySetUp ? (
-                      <>
-                        <p className="font-medium text-green-700 dark:text-green-400">Push Notifications Active</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          You're all set to receive push notifications!
-                        </p>
-                      </>
-                    ) : hasPlayerId ? (
-                      <>
-                        <p className="font-medium text-yellow-700 dark:text-yellow-400">Setting Up...</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Linking your device. This may take a moment.
-                        </p>
-                      </>
-                    ) : isNativelyApp && isInitialized ? (
-                      <>
-                        <p className="font-medium">Enable Push Notifications</p>
-                        <p className="text-sm text-muted-foreground mt-1 mb-3">
-                          Tap the button below to enable notifications on this device.
-                        </p>
-                        <Button 
-                          onClick={handleRequestPermission}
-                          disabled={isRequestingPermission}
-                          size="sm"
-                          data-testid="button-enable-push"
-                        >
-                          {isRequestingPermission ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Enabling...
-                            </>
-                          ) : (
-                            <>
-                              <Bell className="w-4 h-4 mr-2" />
-                              Enable Notifications
-                            </>
-                          )}
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="font-medium">Push Notifications</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          <Smartphone className="w-4 h-4 inline mr-1" />
-                          Open this app on your mobile device to enable push notifications.
-                        </p>
-                      </>
-                    )}
+                    <div className="flex-1">
+                      <p className="font-medium text-green-700 dark:text-green-400">Device Linked</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Your device is set up to receive push notifications.
+                      </p>
+                      <p className="text-xs font-mono text-muted-foreground mt-2 break-all">
+                        ID: {preferences?.oneSignalPlayerId?.substring(0, 18)}...
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-orange-500/50 bg-orange-500/5">
+                <CardContent className="pt-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium text-orange-700 dark:text-orange-400">Link Your Device</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        To receive push notifications, you need to link your device using your OneSignal Player ID.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Notification Type Toggles - Always visible */}
+            {/* Link Device Section */}
+            {!isLinked && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">How to Link Your Device</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <p><strong>Step 1:</strong> Open <a href="https://dashboard.onesignal.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">OneSignal Dashboard</a></p>
+                    <p><strong>Step 2:</strong> Go to Audience → Subscriptions</p>
+                    <p><strong>Step 3:</strong> Find your device and click on it</p>
+                    <p><strong>Step 4:</strong> Copy the "Subscription ID" (Player ID)</p>
+                    <p><strong>Step 5:</strong> Paste it below</p>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      value={playerIdInput}
+                      onChange={(e) => setPlayerIdInput(e.target.value)}
+                      className="font-mono text-sm"
+                    />
+                    <Button 
+                      onClick={handleLinkPlayerId}
+                      disabled={linkPlayerIdMutation.isPending || !playerIdInput.trim()}
+                    >
+                      {linkPlayerIdMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        'Link'
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Your Display ID for reference */}
+                  {userData?.displayId && (
+                    <div className="p-2 bg-muted/50 rounded text-xs">
+                      <p className="text-muted-foreground mb-1">Your User ID (for reference):</p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 break-all">{userData.displayId}</code>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => copyToClipboard(userData.displayId, 'User ID')}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Notification Type Toggles */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium">Notification Types</CardTitle>
@@ -271,7 +304,6 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                     id="toggle-messages"
                     checked={localSettings.inAppMessages}
                     onCheckedChange={() => handleToggle('inAppMessages')}
-                    data-testid="toggle-messages"
                   />
                 </div>
                 
@@ -284,7 +316,6 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                     id="toggle-payments"
                     checked={localSettings.paymentRequests}
                     onCheckedChange={() => handleToggle('paymentRequests')}
-                    data-testid="toggle-payments"
                   />
                 </div>
                 
@@ -297,7 +328,6 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                     id="toggle-subs"
                     checked={localSettings.substitutionRequests}
                     onCheckedChange={() => handleToggle('substitutionRequests')}
-                    data-testid="toggle-subs"
                   />
                 </div>
                 
@@ -310,7 +340,6 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                     id="toggle-joins"
                     checked={localSettings.joinRequests}
                     onCheckedChange={() => handleToggle('joinRequests')}
-                    data-testid="toggle-joins"
                   />
                 </div>
                 
@@ -323,7 +352,6 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                     id="toggle-events"
                     checked={localSettings.upcomingEvents}
                     onCheckedChange={() => handleToggle('upcomingEvents')}
-                    data-testid="toggle-events"
                   />
                 </div>
                 
@@ -336,14 +364,13 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                     id="toggle-news"
                     checked={localSettings.newsAnnouncements}
                     onCheckedChange={() => handleToggle('newsAnnouncements')}
-                    data-testid="toggle-news"
                   />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Test Notifications Card - Show when we can send tests */}
-            {canSendTest && (
+            {/* Test Notifications - Only show when linked */}
+            {isLinked && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium">Test Notifications</CardTitle>
@@ -358,185 +385,43 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                       size="sm"
                       onClick={() => testNotificationMutation.mutate('message')}
                       disabled={testNotificationMutation.isPending}
-                      data-testid="button-test-message"
                     >
                       {testNotificationMutation.isPending ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
-                          <MessageSquare className="w-4 h-4 mr-1" />
-                          Message
+                          <Send className="w-4 h-4 mr-1" />
+                          Send Test
                         </>
                       )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => testNotificationMutation.mutate('payment')}
-                      disabled={testNotificationMutation.isPending}
-                      data-testid="button-test-payment"
-                    >
-                      <CreditCard className="w-4 h-4 mr-1" />
-                      Payment
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => testNotificationMutation.mutate('reminder')}
-                      disabled={testNotificationMutation.isPending}
-                      data-testid="button-test-reminder"
-                    >
-                      <Calendar className="w-4 h-4 mr-1" />
-                      Reminder
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Debug Section - Collapsible */}
-            <div className="border rounded-lg">
-              <button
-                onClick={() => setShowDebug(!showDebug)}
-                className="w-full flex items-center justify-between p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
-              >
-                <span>Debug Information</span>
-                {showDebug ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-              {showDebug && (
-                <div className="p-3 pt-0 border-t space-y-3">
-                  <div className="text-xs font-mono space-y-1">
-                    <p>📱 Natively App: {isNativelyApp ? '✅ Yes' : '❌ No'}</p>
-                    <p>🔧 SDK Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</p>
-                    <p>🔔 Permission: {permissionState}</p>
-                    <p>🆔 Player ID (SDK): {playerId || 'Not set'}</p>
-                    <p>💾 Player ID (DB): {preferences?.oneSignalPlayerId || 'Not saved'}</p>
-                    <p>🔗 External ID Set: {externalIdSet ? '✅ Yes' : '❌ No'}</p>
-                    <p>📝 External ID (DB): {preferences?.oneSignalExternalId || 'Not linked'}</p>
-                    <p>👤 Display ID: {displayId || 'Loading...'}</p>
-                    <p>✅ Fully Set Up: {isFullySetUp ? 'Yes' : 'No'}</p>
-                    <p>📤 Can Send Test: {canSendTest ? 'Yes' : 'No'}</p>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const result = refreshDetection();
-                        toast({
-                          title: result ? 'SDK Detected!' : 'SDK Not Found',
-                          description: result 
-                            ? 'BuildNatively SDK is now detected.' 
-                            : 'Make sure you are running this in the BuildNatively app.',
-                        });
-                      }}
-                    >
-                      🔄 Refresh
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        console.log('[Debug] Window objects:', {
-                          natively: (window as any).natively,
-                          nativelyReady: (window as any).nativelyReady,
-                          NativelyNotifications: typeof (window as any).NativelyNotifications,
-                          webkit: !!(window as any).webkit?.messageHandlers?.natively,
-                          userAgent: navigator.userAgent,
-                        });
-                        toast({ title: 'Check browser console for debug info' });
-                      }}
-                    >
-                      📋 Log
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        try {
-                          if (typeof (window as any).NativelyNotifications === 'function') {
-                            const notif = new (window as any).NativelyNotifications();
-                            console.log('[Debug] Created NativelyNotifications instance:', notif);
-                            
-                            // Try to get player ID
-                            notif.getOneSignalId((resp: any) => {
-                              console.log('[Debug] getOneSignalId response:', resp);
-                              if (resp.playerId) {
-                                toast({ 
-                                  title: '✅ Player ID Found!', 
-                                  description: resp.playerId.substring(0, 20) + '...'
-                                });
-                              } else {
-                                toast({ 
-                                  title: 'No Player ID yet', 
-                                  description: 'Try enabling notifications first' 
-                                });
-                              }
-                            });
-                            
-                            // Try to get permission status
-                            notif.getPermissionStatus((resp: any) => {
-                              console.log('[Debug] Permission status:', resp);
-                            });
-                          } else {
-                            toast({ 
-                              title: 'NativelyNotifications not available', 
-                              description: 'Type: ' + typeof (window as any).NativelyNotifications,
-                              variant: 'destructive'
-                            });
-                          }
-                        } catch (err) {
-                          console.error('[Debug] Error:', err);
-                          toast({ 
-                            title: 'Error', 
-                            description: String(err),
-                            variant: 'destructive'
-                          });
-                        }
-                      }}
-                    >
-                      🔧 Try Init
-                    </Button>
-                  </div>
-                  
-                  {/* Show all window detection values */}
-                  <div className="p-2 bg-muted/50 rounded text-xs font-mono">
-                    <p className="font-medium mb-1">Window Objects:</p>
-                    <p>NativelyNotifications: {typeof (window as any).NativelyNotifications}</p>
-                    <p>natively: {String((window as any).natively)}</p>
-                    <p>nativelyReady: {String((window as any).nativelyReady)}</p>
-                    <p>OneSignal: {typeof (window as any).OneSignal}</p>
-                    <p>webkit.messageHandlers: {(window as any).webkit?.messageHandlers ? 'exists' : 'none'}</p>
-                    <p>Android/NativelyAndroid: {(window as any).Android || (window as any).NativelyAndroid ? 'exists' : 'none'}</p>
-                    <p>User Agent: {navigator.userAgent.substring(0, 50)}...</p>
-                  </div>
-                  
-                  {!isNativelyApp && (
-                    <div className="p-2 bg-yellow-500/10 rounded text-xs">
-                      <p className="font-medium text-yellow-700 dark:text-yellow-400">SDK Not Detected</p>
-                      <p className="text-muted-foreground mt-1">
-                        BuildNatively should inject NativelyNotifications into the WebView. 
-                        Check:
-                      </p>
-                      <ul className="list-disc list-inside text-muted-foreground mt-1 space-y-0.5">
-                        <li>Push notifications enabled in BuildNatively dashboard</li>
-                        <li>OneSignal App ID configured in BuildNatively</li>
-                        <li>App was rebuilt AFTER enabling push notifications</li>
-                        <li>You're running the latest APK build</li>
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* Unlink option */}
+            {isLinked && (
+              <div className="text-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground text-xs"
+                  onClick={() => {
+                    // Clear the player ID
+                    linkPlayerIdMutation.mutate('');
+                  }}
+                >
+                  Unlink this device
+                </Button>
+              </div>
+            )}
 
             {/* Close button */}
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
               className="w-full"
-              data-testid="button-close-notifications"
             >
               Close
             </Button>

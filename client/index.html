@@ -4,59 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     
-    <!-- BuildNatively JavaScript SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@nicely-limited/natively@1.2.3/nicely.min.js"></script>
-    <script>
-      (function() {
-        console.log('[Natively] Initializing BuildNatively SDK detection...');
-        
-        function logWindowState() {
-          console.log('[Natively] === Window State ===');
-          console.log('  NativelyNotifications:', typeof window.NativelyNotifications);
-          console.log('  natively:', window.natively);
-          console.log('  NativelyInfo:', typeof window.NativelyInfo);
-          console.log('  NativelyCamera:', typeof window.NativelyCamera);
-          console.log('  NativelyStorage:', typeof window.NativelyStorage);
-          
-          // List all Natively-related window properties
-          var nativelyProps = Object.keys(window).filter(function(k) {
-            return k.toLowerCase().indexOf('natively') !== -1 || 
-                   k.toLowerCase().indexOf('nicely') !== -1;
-          });
-          console.log('  All Natively props:', nativelyProps);
-        }
-        
-        function markReady() {
-          if (!window.nativelyReady && typeof window.NativelyNotifications === 'function') {
-            console.log('[Natively] ✅ SDK is ready!');
-            window.nativelyReady = true;
-            window.dispatchEvent(new CustomEvent('nativelyReady'));
-            return true;
-          }
-          return false;
-        }
-        
-        // Initial check
-        logWindowState();
-        markReady();
-        
-        // Poll for SDK availability
-        var pollCount = 0;
-        var pollMax = 10;
-        var pollId = setInterval(function() {
-          pollCount++;
-          console.log('[Natively] Poll ' + pollCount + '/' + pollMax);
-          logWindowState();
-          
-          if (markReady() || pollCount >= pollMax) {
-            clearInterval(pollId);
-            if (!window.nativelyReady) {
-              console.log('[Natively] ⚠️ SDK not detected after polling');
-            }
-          }
-        }, 1000);
-      })();
-    </script>
+    <!-- BuildNatively uses native push notifications (no JavaScript SDK needed) -->
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
