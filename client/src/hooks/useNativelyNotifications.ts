@@ -2,22 +2,34 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 import { useAuth } from './useAuth';
 
 /**
- * Interface matching BuildNatively's NativelyNotifications JavaScript SDK
- * Reference: https://docs.buildnatively.com/guides/integration/push-notifications-onesignal
+ * OneSignal Web SDK interface
+ * Reference: https://documentation.onesignal.com/docs/web-sdk-reference
  */
-interface NativelyNotificationsInstance {
-  getOneSignalId: (callback: (resp: { playerId: string | null }) => void) => void;
-  getPermissionStatus: (callback: (resp: { status: boolean }) => void) => void;
-  requestPermission: (fallbackToSettings: boolean, callback: (resp: { status: boolean }) => void) => void;
-  getExternalId: (callback: (resp: Array<{ externalId?: string; error?: string; message?: string }>) => void) => void;
-  setExternalId: (params: { externalId: string }, callback: (resp: { externalId?: string; error?: string; message?: string }) => void) => void;
-  removeExternalId: (callback: (resp: { error?: string; message?: string } | null) => void) => void;
+interface OneSignalSDK {
+  init: (config: { appId: string; allowLocalhostAsSecureOrigin?: boolean }) => Promise<void>;
+  login: (externalId: string) => Promise<void>;
+  logout: () => Promise<void>;
+  User: {
+    PushSubscription: {
+      id: string | null | undefined;
+      optIn: () => Promise<void>;
+      optOut: () => Promise<void>;
+    };
+    addAlias: (label: string, id: string) => void;
+  };
+  Notifications: {
+    permission: boolean;
+    requestPermission: () => Promise<boolean>;
+    addEventListener: (event: string, callback: (data: any) => void) => void;
+  };
 }
 
 declare global {
   interface Window {
-    NativelyNotifications?: new () => NativelyNotificationsInstance;
-    nativelyReady?: boolean;
+    OneSignal?: OneSignalSDK;
+    OneSignalDeferred?: Array<(OneSignal: OneSignalSDK) => void>;
+    OneSignalReady?: boolean;
+    ONESIGNAL_APP_ID?: string;
   }
 }
 
@@ -29,38 +41,35 @@ export function useNativelyNotifications() {
   const [displayId, setDisplayId] = useState<string | null>(null);
   const [externalIdSet, setExternalIdSet] = useState(false);
   const [permissionState, setPermissionState] = useState<'default' | 'granted' | 'denied'>('default');
-  const notificationsRef = useRef<NativelyNotificationsInstance | null>(null);
+  const hasInitialized = useRef(false);
 
-  // Check if NativelyNotifications is available
+  // Check if OneSignal SDK is available
   const checkSDK = useCallback(() => {
-    const available = typeof window.NativelyNotifications === 'function';
-    console.log('[Natively] SDK check - available:', available);
+    const available = !!window.OneSignal || !!window.OneSignalDeferred;
+    console.log('[OneSignal] SDK check - available:', available, 'ready:', window.OneSignalReady);
     setIsNativelyApp(available);
     return available;
   }, []);
 
-  // Check for SDK on mount and when nativelyReady event fires
+  // Check for SDK on mount and when ready event fires
   useEffect(() => {
     checkSDK();
     
     const handleReady = () => {
-      console.log('[Natively] nativelyReady event received');
+      console.log('[OneSignal] Ready event received');
       checkSDK();
+      setIsInitialized(true);
     };
     
-    window.addEventListener('nativelyReady', handleReady);
+    window.addEventListener('onesignalReady', handleReady);
     
-    // Also poll a few times in case SDK loads late
-    const timeouts = [
-      setTimeout(checkSDK, 500),
-      setTimeout(checkSDK, 1000),
-      setTimeout(checkSDK, 2000),
-      setTimeout(checkSDK, 5000),
-    ];
+    // Check if already ready
+    if (window.OneSignalReady) {
+      setIsInitialized(true);
+    }
     
     return () => {
-      window.removeEventListener('nativelyReady', handleReady);
-      timeouts.forEach(clearTimeout);
+      window.removeEventListener('onesignalReady', handleReady);
     };
   }, [checkSDK]);
 
@@ -75,11 +84,11 @@ export function useNativelyNotifications() {
       .then(res => res.json())
       .then(data => {
         const id = data.displayId || user.id;
-        console.log('[Natively] User displayId:', id);
+        console.log('[OneSignal] User displayId:', id);
         setDisplayId(id);
       })
       .catch(err => {
-        console.error('[Natively] Failed to fetch displayId:', err);
+        console.error('[OneSignal] Failed to fetch displayId:', err);
         setDisplayId(user.id);
       });
   }, [isAuthenticated, user?.id]);
@@ -97,7 +106,7 @@ export function useNativelyNotifications() {
       });
       
       if (response.ok) {
-        console.log('[Natively] Player ID registered:', playerIdToRegister);
+        console.log('[OneSignal] Player ID registered:', playerIdToRegister);
         
         // Also enable push preferences
         await fetch('/api/notification-preferences', {
@@ -108,100 +117,131 @@ export function useNativelyNotifications() {
         });
       }
     } catch (error) {
-      console.error('[Natively] Failed to register player ID:', error);
+      console.error('[OneSignal] Failed to register player ID:', error);
     }
   }, [isAuthenticated]);
 
-  // Initialize SDK when available and user is authenticated
+  // Initialize and sync with OneSignal when user is authenticated
   useEffect(() => {
-    if (!isAuthenticated || !user?.id || !displayId || !isNativelyApp) {
+    if (!isAuthenticated || !user?.id || !displayId || hasInitialized.current) {
       return;
     }
 
-    if (!window.NativelyNotifications) {
-      console.log('[Natively] NativelyNotifications not available');
-      return;
-    }
+    const initOneSignal = async () => {
+      // Use OneSignalDeferred to ensure SDK is ready
+      if (window.OneSignalDeferred) {
+        window.OneSignalDeferred.push(async (OneSignal) => {
+          try {
+            console.log('[OneSignal] Initializing for user:', displayId);
+            hasInitialized.current = true;
+            setIsInitialized(true);
 
-    try {
-      console.log('[Natively] Initializing SDK...');
-      const notifications = new window.NativelyNotifications();
-      notificationsRef.current = notifications;
-      setIsInitialized(true);
+            // Check permission status
+            const permission = OneSignal.Notifications.permission;
+            console.log('[OneSignal] Permission:', permission);
+            setPermissionState(permission ? 'granted' : 'default');
 
-      // Get permission status
-      notifications.getPermissionStatus((resp) => {
-        const status = resp.status ? 'granted' : 'default';
-        console.log('[Natively] Permission status:', status);
-        setPermissionState(status);
-      });
-
-      // Get OneSignal Player ID
-      notifications.getOneSignalId((resp) => {
-        console.log('[Natively] getOneSignalId response:', resp);
-        if (resp.playerId) {
-          setPlayerId(resp.playerId);
-          registerPlayerId(resp.playerId);
-          
-          // Set external ID to link user
-          notifications.setExternalId({ externalId: displayId }, (setResp) => {
-            console.log('[Natively] setExternalId response:', setResp);
-            if (setResp?.externalId) {
-              setExternalIdSet(true);
+            // Get the subscription ID (Player ID)
+            const subscriptionId = OneSignal.User.PushSubscription.id;
+            console.log('[OneSignal] Subscription ID:', subscriptionId);
+            
+            if (subscriptionId) {
+              setPlayerId(subscriptionId);
+              await registerPlayerId(subscriptionId);
             }
-          });
-        }
-      });
 
-    } catch (error) {
-      console.error('[Natively] Initialization error:', error);
-    }
+            // Login with external ID to link user
+            try {
+              await OneSignal.login(displayId);
+              console.log('[OneSignal] Logged in with external ID:', displayId);
+              setExternalIdSet(true);
+              
+              // Save external ID to backend
+              await fetch('/api/notification-preferences/link-external-id', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                  oneSignalId: subscriptionId || '', 
+                  userId: displayId 
+                }),
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+              });
+            } catch (loginError) {
+              console.error('[OneSignal] Login error:', loginError);
+            }
 
-    return () => {
-      notificationsRef.current = null;
+            // Listen for subscription changes
+            OneSignal.Notifications.addEventListener('permissionChange', (granted: boolean) => {
+              console.log('[OneSignal] Permission changed:', granted);
+              setPermissionState(granted ? 'granted' : 'denied');
+            });
+
+          } catch (error) {
+            console.error('[OneSignal] Initialization error:', error);
+          }
+        });
+      }
     };
-  }, [isAuthenticated, user?.id, displayId, isNativelyApp, registerPlayerId]);
+
+    initOneSignal();
+  }, [isAuthenticated, user?.id, displayId, registerPlayerId]);
 
   // Request permission
   const requestPermission = useCallback(async (): Promise<boolean> => {
     return new Promise((resolve) => {
-      if (!notificationsRef.current) {
-        console.warn('[Natively] SDK not initialized');
+      if (!window.OneSignalDeferred) {
+        console.warn('[OneSignal] SDK not available');
         resolve(false);
         return;
       }
 
-      notificationsRef.current.requestPermission(true, (resp) => {
-        const granted = resp.status === true;
-        console.log('[Natively] Permission request result:', granted);
-        setPermissionState(granted ? 'granted' : 'denied');
-        
-        if (granted && displayId) {
-          // Get Player ID after permission granted
-          notificationsRef.current?.getOneSignalId((idResp) => {
-            if (idResp.playerId) {
-              setPlayerId(idResp.playerId);
-              registerPlayerId(idResp.playerId);
-            }
-          });
+      window.OneSignalDeferred.push(async (OneSignal) => {
+        try {
+          console.log('[OneSignal] Requesting permission...');
+          const granted = await OneSignal.Notifications.requestPermission();
+          console.log('[OneSignal] Permission result:', granted);
+          setPermissionState(granted ? 'granted' : 'denied');
+
+          if (granted) {
+            // Opt in to push
+            await OneSignal.User.PushSubscription.optIn();
+            
+            // Get subscription ID after opt-in
+            setTimeout(async () => {
+              const subscriptionId = OneSignal.User.PushSubscription.id;
+              console.log('[OneSignal] Subscription ID after opt-in:', subscriptionId);
+              if (subscriptionId) {
+                setPlayerId(subscriptionId);
+                await registerPlayerId(subscriptionId);
+              }
+            }, 1000);
+          }
+
+          resolve(granted);
+        } catch (error) {
+          console.error('[OneSignal] Permission request error:', error);
+          resolve(false);
         }
-        
-        resolve(granted);
       });
     });
-  }, [displayId, registerPlayerId]);
+  }, [registerPlayerId]);
 
   // Remove external ID (for logout)
   const removeExternalId = useCallback(async (): Promise<void> => {
     return new Promise((resolve) => {
-      if (!notificationsRef.current) {
+      if (!window.OneSignalDeferred) {
         resolve();
         return;
       }
 
-      notificationsRef.current.removeExternalId((resp) => {
-        console.log('[Natively] removeExternalId response:', resp);
-        setExternalIdSet(false);
+      window.OneSignalDeferred.push(async (OneSignal) => {
+        try {
+          await OneSignal.logout();
+          console.log('[OneSignal] Logged out');
+          setExternalIdSet(false);
+        } catch (error) {
+          console.error('[OneSignal] Logout error:', error);
+        }
         resolve();
       });
     });
@@ -209,7 +249,20 @@ export function useNativelyNotifications() {
 
   // Manual refresh
   const refreshDetection = useCallback(() => {
-    return checkSDK();
+    const result = checkSDK();
+    
+    // Try to get subscription ID if SDK is available
+    if (window.OneSignalDeferred) {
+      window.OneSignalDeferred.push((OneSignal) => {
+        const subscriptionId = OneSignal.User.PushSubscription.id;
+        if (subscriptionId) {
+          setPlayerId(subscriptionId);
+          setIsInitialized(true);
+        }
+      });
+    }
+    
+    return result;
   }, [checkSDK]);
 
   return {

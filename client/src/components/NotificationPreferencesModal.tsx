@@ -427,14 +427,16 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
               </button>
               {showDebug && (
                 <div className="p-3 pt-0 border-t text-xs font-mono space-y-1">
-                  <p>SDK Available: {isNativelyApp ? '✅' : '❌'}</p>
+                  <p>OneSignal SDK: {isNativelyApp ? '✅' : '❌'}</p>
                   <p>SDK Initialized: {isInitialized ? '✅' : '❌'}</p>
                   <p>Permission: {permissionState}</p>
                   <p>Player ID (SDK): {sdkPlayerId || 'none'}</p>
                   <p>Player ID (DB): {preferences?.oneSignalPlayerId || 'none'}</p>
                   <p>External ID Set: {externalIdSet ? '✅' : '❌'}</p>
+                  <p>External ID (DB): {preferences?.oneSignalExternalId || 'none'}</p>
                   <p>Display ID: {displayId || userData?.displayId || 'loading...'}</p>
-                  <p>window.NativelyNotifications: {typeof (window as any).NativelyNotifications}</p>
+                  <p>window.OneSignal: {typeof (window as any).OneSignal}</p>
+                  <p>OneSignalReady: {(window as any).OneSignalReady ? '✅' : '❌'}</p>
                   
                   {userData?.displayId && (
                     <div className="mt-2 p-2 bg-muted rounded">

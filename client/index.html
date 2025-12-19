@@ -4,40 +4,41 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     
-    <!-- BuildNatively SDK - NativelyNotifications should be injected by the native app -->
+    <!-- OneSignal Web SDK for Push Notifications -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
-      // BuildNatively injects NativelyNotifications into the WebView
-      // We poll to detect when it becomes available
-      (function() {
-        console.log('[Natively] Waiting for BuildNatively SDK...');
-        
-        function checkSDK() {
-          var available = typeof window.NativelyNotifications === 'function';
-          console.log('[Natively] NativelyNotifications available:', available);
-          
-          if (available) {
-            console.log('[Natively] ✅ SDK detected!');
-            window.nativelyReady = true;
-            window.dispatchEvent(new CustomEvent('nativelyReady'));
-            return true;
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      
+      // Fetch OneSignal App ID from server config
+      fetch('/api/config/onesignal')
+        .then(function(res) { return res.json(); })
+        .then(function(config) {
+          if (config.appId) {
+            console.log('[OneSignal] App ID loaded from server');
+            initOneSignal(config.appId);
+          } else {
+            console.warn('[OneSignal] No App ID configured');
           }
-          return false;
-        }
-        
-        // Check immediately and keep polling
-        if (!checkSDK()) {
-          var attempts = 0;
-          var interval = setInterval(function() {
-            attempts++;
-            if (checkSDK() || attempts > 30) {
-              clearInterval(interval);
-              if (attempts > 30) {
-                console.log('[Natively] SDK not found after 30 attempts');
-              }
-            }
-          }, 500);
-        }
-      })();
+        })
+        .catch(function(err) {
+          console.error('[OneSignal] Failed to load config:', err);
+        });
+      
+      function initOneSignal(appId) {
+        OneSignalDeferred.push(async function(OneSignal) {
+          try {
+            await OneSignal.init({
+              appId: appId,
+              allowLocalhostAsSecureOrigin: true,
+            });
+            console.log('[OneSignal] SDK initialized successfully');
+            window.OneSignalReady = true;
+            window.dispatchEvent(new CustomEvent('onesignalReady'));
+          } catch (err) {
+            console.error('[OneSignal] Init error:', err);
+          }
+        });
+      }
     </script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -151,6 +151,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // OneSignal config endpoint (public - needed before auth)
+  app.get('/api/config/onesignal', (req, res) => {
+    const appId = process.env.ONESIGNAL_APP_ID;
+    if (appId) {
+      res.json({ appId });
+    } else {
+      res.json({ appId: null, error: 'ONESIGNAL_APP_ID not configured' });
+    }
+  });
+
   app.post('/api/visitor-count/increment', async (req, res) => {
     try {
       // Atomic increment using SQL to prevent race conditions
