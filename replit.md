@@ -107,6 +107,34 @@ The platform allows scrimmage creators to designate co-hosts who can help manage
 
 Key files: `shared/schema.ts` (scrimmageCoHosts table), `server/storage.ts` (co-host CRUD operations), `server/routes.ts` (co-host endpoints), `client/src/pages/ScrimmageManagement.tsx` (co-host UI).
 
+# Mobile App (Expo)
+
+The `/mobile` folder contains a native Expo React Native app that provides push notification support via OneSignal.
+
+## OneSignal Push Notifications
+
+The mobile app integrates OneSignal for native push notifications with External ID support for targeted notifications.
+
+### Configuration
+- **OneSignal App ID**: Configured in `mobile/app.json` under `extra.oneSignalAppId`
+- **Plugin**: Uses `onesignal-expo-plugin` for native iOS/Android integration
+- **External ID**: User's `displayId` (6-character ID like "LFB3Kf") is used as the OneSignal External ID
+
+### Key Files
+- `mobile/hooks/useOneSignal.ts` - OneSignal initialization, permission handling, and External ID login/logout
+- `mobile/App.tsx` - Main app with authentication and External ID sync
+- `mobile/app.json` - Expo configuration with OneSignal plugin
+
+### Building the App
+1. Navigate to `/mobile` directory
+2. Run `npm install` to install dependencies
+3. Run `eas build --profile development --platform ios` (or android) for development builds
+4. For production: `eas build --profile production --platform all`
+
+### Environment Variables Required
+- `ONESIGNAL_APP_ID` - OneSignal App ID (server-side)
+- `ONESIGNAL_REST_API_KEY` - OneSignal REST API Key (server-side)
+
 # External Dependencies
 
 ## Third-Party Services
@@ -116,6 +144,7 @@ Key files: `shared/schema.ts` (scrimmageCoHosts table), `server/storage.ts` (co-
 -   **Neon Database**: PostgreSQL hosting.
 -   **Stripe**: Payment processing and subscription management.
 -   **Resend**: Email delivery service.
+-   **OneSignal**: Push notification service for mobile app.
 
 ## UI and Component Libraries
 

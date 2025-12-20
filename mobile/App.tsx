@@ -65,17 +65,27 @@ export default function App() {
 
     try {
       console.log('[App] Syncing External ID:', user.displayId);
+      
       await login(user.displayId);
       
-      await fetch(`${API_BASE_URL}/api/notifications/onesignal-sync`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          playerId: playerId,
-          externalId: user.displayId,
-        }),
-      });
+      if (playerId) {
+        await fetch(`${API_BASE_URL}/api/notifications/register-onesignal`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId }),
+        });
+        
+        await fetch(`${API_BASE_URL}/api/notifications/link-external-id`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            oneSignalId: playerId,
+            userId: user.displayId,
+          }),
+        });
+      }
       
       console.log('[App] External ID synced successfully');
     } catch (error) {
