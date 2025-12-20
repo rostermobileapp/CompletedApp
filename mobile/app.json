@@ -14,7 +14,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.roster.app"
+      "bundleIdentifier": "com.roster.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      },
+      "entitlements": {
+        "aps-environment": "development",
+        "com.apple.security.application-groups": ["group.com.roster.app.onesignal"]
+      }
     },
     "android": {
       "adaptiveIcon": {
