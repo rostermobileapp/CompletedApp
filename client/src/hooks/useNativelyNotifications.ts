@@ -1,6 +1,8 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { getAuthHeaders } from '@/lib/queryClient';
+// Import Natively SDK from NPM package
+import { NativelyNotifications, NativelyInfo, useNatively } from 'natively';
 
 /**
  * OneSignal Web SDK interface
@@ -66,31 +68,41 @@ export function useNativelyNotifications() {
 
   // Check which SDK is available - prefer Natively native SDK over web SDK
   const checkSDK = useCallback(() => {
-    // Check for Natively native SDK first (runs in Natively wrapped app)
-    const hasNativelySDK = typeof window.NativelyNotifications === 'function';
+    // Check for Natively native SDK using the NPM package
+    let isInNativeApp = false;
+    try {
+      const nativelyInfo = new NativelyInfo();
+      const browserInfo = nativelyInfo.browserInfo();
+      isInNativeApp = browserInfo?.isNativeApp === true;
+      console.log('[OneSignal] NativelyInfo.browserInfo():', browserInfo);
+    } catch (err) {
+      console.log('[OneSignal] NativelyInfo check error:', err);
+    }
+    
+    // Also check window globals as fallback
     const hasNativelyGlobal = typeof window.natively !== 'undefined';
-    const isInNativeApp = window.isNativelyApp === true;
+    const hasNativelySDK = typeof NativelyNotifications === 'function' || typeof window.NativelyNotifications === 'function';
     
     // Check for OneSignal web SDK
     const hasWebSDK = !!window.OneSignal || !!window.OneSignalDeferred;
     
     console.log('[OneSignal] SDK check - NativelyNotifications:', hasNativelySDK, 
       'window.natively:', hasNativelyGlobal,
-      'isNativelyApp:', isInNativeApp,
+      'isNativeApp:', isInNativeApp,
       'Web SDK:', hasWebSDK, 
       'ready:', window.OneSignalReady);
     
     // If we're in a native app with NativelyNotifications available
-    if (hasNativelySDK && (isInNativeApp || hasNativelyGlobal)) {
+    if (isInNativeApp && hasNativelySDK) {
       setIsNativeSDK(true);
       setIsNativelyApp(true);
-      console.log('[OneSignal] Using Natively native SDK');
+      console.log('[OneSignal] Using Natively native SDK (NPM package)');
       return true;
-    } else if (hasNativelySDK) {
-      // NativelyNotifications exists but we might not be in native app
+    } else if (hasNativelySDK && hasNativelyGlobal) {
+      // NativelyNotifications exists with window.natively
       setIsNativeSDK(true);
       setIsNativelyApp(true);
-      console.log('[OneSignal] NativelyNotifications available, trying native SDK');
+      console.log('[OneSignal] NativelyNotifications available with window.natively');
       return true;
     } else if (hasWebSDK) {
       setIsNativeSDK(false);
@@ -103,16 +115,26 @@ export function useNativelyNotifications() {
     return false;
   }, []);
 
-  // Initialize Natively SDK instance
+  // Initialize Natively SDK instance using NPM package
   const getNativelyInstance = useCallback((): NativelyNotificationsSDK | null => {
     if (nativelyInstanceRef.current) {
       return nativelyInstanceRef.current;
     }
     
+    // Try NPM package first
+    try {
+      nativelyInstanceRef.current = new NativelyNotifications() as unknown as NativelyNotificationsSDK;
+      console.log('[OneSignal] Created NativelyNotifications instance from NPM package');
+      return nativelyInstanceRef.current;
+    } catch (err) {
+      console.log('[OneSignal] NPM NativelyNotifications error:', err);
+    }
+    
+    // Fallback to window global
     if (typeof window.NativelyNotifications === 'function') {
       try {
         nativelyInstanceRef.current = new window.NativelyNotifications();
-        console.log('[OneSignal] Created NativelyNotifications instance');
+        console.log('[OneSignal] Created NativelyNotifications instance from window global');
         return nativelyInstanceRef.current;
       } catch (err) {
         console.error('[OneSignal] Failed to create NativelyNotifications instance:', err);
