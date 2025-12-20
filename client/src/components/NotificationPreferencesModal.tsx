@@ -78,6 +78,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
   const {
     isInitialized,
     isNativelyApp,
+    isNativeSDK,
     playerId: sdkPlayerId,
     displayId,
     externalIdSet,
@@ -428,6 +429,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
               {showDebug && (
                 <div className="p-3 pt-0 border-t text-xs font-mono space-y-1">
                   <p>OneSignal SDK: {isNativelyApp ? '✅' : '❌'}</p>
+                  <p>SDK Type: {isNativeSDK ? 'Natively Native' : 'Web SDK'}</p>
                   <p>SDK Initialized: {isInitialized ? '✅' : '❌'}</p>
                   <p>Permission: {permissionState}</p>
                   <p>Player ID (SDK): {sdkPlayerId || 'none'}</p>
@@ -436,6 +438,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                   <p>External ID (DB): {preferences?.oneSignalExternalId || 'none'}</p>
                   <p>Display ID: {displayId || userData?.displayId || 'loading...'}</p>
                   <p>window.OneSignal: {typeof (window as any).OneSignal}</p>
+                  <p>window.NativelyNotifications: {typeof (window as any).NativelyNotifications}</p>
                   <p>OneSignalReady: {(window as any).OneSignalReady ? '✅' : '❌'}</p>
                   
                   {userData?.displayId && (
