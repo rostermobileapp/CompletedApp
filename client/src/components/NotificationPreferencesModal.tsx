@@ -440,9 +440,12 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                   <p>window.OneSignal: {typeof (window as any).OneSignal}</p>
                   <p>window.natively: {typeof (window as any).natively}</p>
                   <p>window.NativelyNotifications: {typeof (window as any).NativelyNotifications}</p>
+                  <p>window.NativelyInfo: {typeof (window as any).NativelyInfo}</p>
                   <p>window.nativelyLoaded: {String((window as any).nativelyLoaded)}</p>
                   <p>window.isNativelyApp: {String((window as any).isNativelyApp)}</p>
+                  <p>Script error: {(window as any).nativelyScriptError ? 'Yes' : 'No'}</p>
                   <p>OneSignalReady: {(window as any).OneSignalReady ? '✅' : '❌'}</p>
+                  <p>UserAgent: {navigator.userAgent.substring(0, 50)}...</p>
                   
                   {userData?.displayId && (
                     <div className="mt-2 p-2 bg-muted rounded">

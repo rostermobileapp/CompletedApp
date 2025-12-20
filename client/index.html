@@ -5,21 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     
     <!-- Natively.io SDK for native app features (push notifications, etc.) -->
-    <script async onload="nativelyOnLoad()" src="https://cdn.jsdelivr.net/npm/natively@3.1.3/natively-frontend.min.js"></script>
     <script>
       // Track Natively SDK state
       window.nativelyLoaded = false;
       window.isNativelyApp = false;
+      window.nativelyScriptError = null;
       
       function nativelyOnLoad() {
-        console.log('[Natively] SDK script loaded');
+        console.log('[Natively] SDK script loaded successfully');
         window.nativelyLoaded = true;
         
         // Enable debug mode to see errors
         if (window.natively) {
           window.natively.setDebug(true);
-          console.log('[Natively] Debug mode enabled');
+          console.log('[Natively] Debug mode enabled, window.natively:', window.natively);
+        } else {
+          console.log('[Natively] window.natively is undefined after script load');
         }
+        
+        // Log all Natively-related globals
+        console.log('[Natively] Available globals:', {
+          natively: typeof window.natively,
+          NativelyNotifications: typeof window.NativelyNotifications,
+          NativelyInfo: typeof window.NativelyInfo,
+          NativelyPurchase: typeof window.NativelyPurchase
+        });
         
         // Check if running in native app using NativelyInfo
         try {
@@ -38,6 +48,11 @@
         window.dispatchEvent(new CustomEvent('nativelyReady', { detail: { isNativeApp: window.isNativelyApp } }));
       }
       
+      function nativelyOnError(e) {
+        console.error('[Natively] SDK script failed to load:', e);
+        window.nativelyScriptError = e;
+      }
+      
       // Fallback check if onload doesn't fire
       var nativelyCheckCount = 0;
       var nativelyCheckInterval = setInterval(function() {
@@ -48,12 +63,22 @@
         var hasNativelyNotifications = typeof window.NativelyNotifications !== 'undefined';
         var hasNativelyInfo = typeof window.NativelyInfo !== 'undefined';
         
+        if (nativelyCheckCount <= 10 || nativelyCheckCount % 10 === 0) {
+          console.log('[Natively] Check ' + nativelyCheckCount + '/50 - natively:', hasNatively, 
+            'NativelyNotifications:', hasNativelyNotifications);
+        }
+        
         if (hasNatively || hasNativelyNotifications || hasNativelyInfo) {
           window.nativelyLoaded = true;
           console.log('[Natively] SDK detected on check ' + nativelyCheckCount + 
             ' - natively:', hasNatively + 
             ', NativelyNotifications:', hasNativelyNotifications +
             ', NativelyInfo:', hasNativelyInfo);
+          
+          // Enable debug mode
+          if (hasNatively && window.natively.setDebug) {
+            window.natively.setDebug(true);
+          }
           
           // Try to detect native app
           if (hasNativelyInfo) {
@@ -67,12 +92,13 @@
           
           window.dispatchEvent(new CustomEvent('nativelyReady', { detail: { isNativeApp: window.isNativelyApp } }));
           clearInterval(nativelyCheckInterval);
-        } else if (nativelyCheckCount > 50) {
-          console.log('[Natively] SDK not available after 5s, likely running in browser');
+        } else if (nativelyCheckCount >= 50) {
+          console.log('[Natively] SDK not available after 5s, scriptError:', window.nativelyScriptError);
           clearInterval(nativelyCheckInterval);
         }
       }, 100);
     </script>
+    <script onload="nativelyOnLoad()" onerror="nativelyOnError(event)" src="https://cdn.jsdelivr.net/npm/natively@3.1.3/natively-frontend.min.js"></script>
     
     <!-- OneSignal Web SDK for Push Notifications (browser fallback) -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
