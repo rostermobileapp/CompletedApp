@@ -45,6 +45,10 @@ declare global {
     OneSignalReady?: boolean;
     ONESIGNAL_APP_ID?: string;
     NativelyNotifications?: new () => NativelyNotificationsSDK;
+    natively?: any;
+    nativelyLoaded?: boolean;
+    isNativelyApp?: boolean;
+    NativelyInfo?: new () => { browserInfo: () => { isNativeApp: boolean } };
   }
 }
 
@@ -64,16 +68,29 @@ export function useNativelyNotifications() {
   const checkSDK = useCallback(() => {
     // Check for Natively native SDK first (runs in Natively wrapped app)
     const hasNativelySDK = typeof window.NativelyNotifications === 'function';
+    const hasNativelyGlobal = typeof window.natively !== 'undefined';
+    const isInNativeApp = window.isNativelyApp === true;
     
     // Check for OneSignal web SDK
     const hasWebSDK = !!window.OneSignal || !!window.OneSignalDeferred;
     
-    console.log('[OneSignal] SDK check - Natively native:', hasNativelySDK, 'Web SDK:', hasWebSDK, 'ready:', window.OneSignalReady);
+    console.log('[OneSignal] SDK check - NativelyNotifications:', hasNativelySDK, 
+      'window.natively:', hasNativelyGlobal,
+      'isNativelyApp:', isInNativeApp,
+      'Web SDK:', hasWebSDK, 
+      'ready:', window.OneSignalReady);
     
-    if (hasNativelySDK) {
+    // If we're in a native app with NativelyNotifications available
+    if (hasNativelySDK && (isInNativeApp || hasNativelyGlobal)) {
       setIsNativeSDK(true);
       setIsNativelyApp(true);
       console.log('[OneSignal] Using Natively native SDK');
+      return true;
+    } else if (hasNativelySDK) {
+      // NativelyNotifications exists but we might not be in native app
+      setIsNativeSDK(true);
+      setIsNativelyApp(true);
+      console.log('[OneSignal] NativelyNotifications available, trying native SDK');
       return true;
     } else if (hasWebSDK) {
       setIsNativeSDK(false);
@@ -106,15 +123,46 @@ export function useNativelyNotifications() {
 
   // Check for SDK on mount and when ready event fires
   useEffect(() => {
+    // Initial check
     checkSDK();
     
-    const handleReady = () => {
-      console.log('[OneSignal] Ready event received');
+    // Retry SDK detection multiple times (Natively SDK may load async)
+    let retryCount = 0;
+    const maxRetries = 30; // 6 seconds total
+    const retryInterval = setInterval(() => {
+      retryCount++;
+      const hasNativelySDK = typeof window.NativelyNotifications === 'function';
+      const hasNativelyGlobal = typeof window.natively !== 'undefined';
+      
+      if (retryCount <= 5 || retryCount % 5 === 0) {
+        console.log(`[OneSignal] SDK retry check ${retryCount}/${maxRetries} - NativelyNotifications:`, hasNativelySDK, 'window.natively:', hasNativelyGlobal);
+      }
+      
+      if (hasNativelySDK) {
+        console.log('[OneSignal] Natively SDK detected on retry', retryCount);
+        setIsNativeSDK(true);
+        setIsNativelyApp(true);
+        clearInterval(retryInterval);
+      } else if (retryCount >= maxRetries) {
+        console.log('[OneSignal] Max retries reached, using web SDK fallback');
+        clearInterval(retryInterval);
+      }
+    }, 200);
+    
+    // Listen for Natively SDK ready event
+    const handleNativelyReady = (event: CustomEvent) => {
+      console.log('[OneSignal] Natively ready event received:', event.detail);
+      checkSDK();
+    };
+    
+    const handleOneSignalReady = () => {
+      console.log('[OneSignal] OneSignal ready event received');
       checkSDK();
       setIsInitialized(true);
     };
     
-    window.addEventListener('onesignalReady', handleReady);
+    window.addEventListener('nativelyReady', handleNativelyReady as EventListener);
+    window.addEventListener('onesignalReady', handleOneSignalReady);
     
     // Check if already ready
     if (window.OneSignalReady) {
@@ -122,7 +170,9 @@ export function useNativelyNotifications() {
     }
     
     return () => {
-      window.removeEventListener('onesignalReady', handleReady);
+      clearInterval(retryInterval);
+      window.removeEventListener('nativelyReady', handleNativelyReady as EventListener);
+      window.removeEventListener('onesignalReady', handleOneSignalReady);
     };
   }, [checkSDK]);
 
@@ -339,10 +389,11 @@ export function useNativelyNotifications() {
     }
 
     // Check which SDK is available and initialize accordingly
-    checkSDK();
+    const hasNativelySDK = typeof window.NativelyNotifications === 'function';
+    console.log('[OneSignal] Init check - isNativeSDK state:', isNativeSDK, 'hasNativelySDK now:', hasNativelySDK);
     
-    // Use Natively native SDK if available, otherwise use web SDK
-    if (typeof window.NativelyNotifications === 'function') {
+    // Use Natively native SDK if available (check both state and current window object)
+    if (hasNativelySDK || isNativeSDK) {
       console.log('[OneSignal] Detected Natively app, using native SDK');
       initNativelySDK(displayId);
     } else if (window.OneSignalDeferred) {
@@ -351,7 +402,7 @@ export function useNativelyNotifications() {
     } else {
       console.log('[OneSignal] No SDK available');
     }
-  }, [isAuthenticated, user?.id, displayId, checkSDK, initNativelySDK, initWebSDK]);
+  }, [isAuthenticated, user?.id, displayId, isNativeSDK, initNativelySDK, initWebSDK]);
 
   // Request permission
   const requestPermission = useCallback(async (): Promise<boolean> => {

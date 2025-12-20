@@ -438,7 +438,10 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                   <p>External ID (DB): {preferences?.oneSignalExternalId || 'none'}</p>
                   <p>Display ID: {displayId || userData?.displayId || 'loading...'}</p>
                   <p>window.OneSignal: {typeof (window as any).OneSignal}</p>
+                  <p>window.natively: {typeof (window as any).natively}</p>
                   <p>window.NativelyNotifications: {typeof (window as any).NativelyNotifications}</p>
+                  <p>window.nativelyLoaded: {String((window as any).nativelyLoaded)}</p>
+                  <p>window.isNativelyApp: {String((window as any).isNativelyApp)}</p>
                   <p>OneSignalReady: {(window as any).OneSignalReady ? '✅' : '❌'}</p>
                   
                   {userData?.displayId && (
