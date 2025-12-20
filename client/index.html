@@ -15,6 +15,12 @@
         console.log('[Natively] SDK script loaded');
         window.nativelyLoaded = true;
         
+        // Enable debug mode to see errors
+        if (window.natively) {
+          window.natively.setDebug(true);
+          console.log('[Natively] Debug mode enabled');
+        }
+        
         // Check if running in native app using NativelyInfo
         try {
           if (typeof NativelyInfo !== 'undefined') {
