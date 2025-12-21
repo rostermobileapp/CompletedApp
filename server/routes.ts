@@ -677,10 +677,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const content = notificationContent[type] || notificationContent.message;
       
       // Send notification via OneSignal REST API
-      // Try to target by external_user_id first (more reliable), fall back to player_id
+      // Try to target by external_user_id first (more reliable), fall back to subscription_id
       const targetFilter = preferences.oneSignalExternalId
         ? { include_external_user_ids: [preferences.oneSignalExternalId] }
-        : { include_player_ids: [preferences.oneSignalPlayerId] };
+        : { include_subscription_ids: [preferences.oneSignalPlayerId] };
+      
+      console.log(`[OneSignal Test] Targeting user ${userId} with:`, JSON.stringify(targetFilter));
       
       const response = await fetch('https://onesignal.com/api/v1/notifications', {
         method: 'POST',

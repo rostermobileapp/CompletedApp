@@ -26,9 +26,13 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
       return false;
     }
     
+    // Use include_subscription_ids (modern API) instead of deprecated include_player_ids
+    // Player ID and Subscription ID are the same value in OneSignal
     const targetFilter = preferences.oneSignalExternalId
       ? { include_external_user_ids: [preferences.oneSignalExternalId] }
-      : { include_player_ids: [preferences.oneSignalPlayerId] };
+      : { include_subscription_ids: [preferences.oneSignalPlayerId] };
+    
+    console.log(`[OneSignal] Targeting user ${userId} with:`, JSON.stringify(targetFilter));
     
     const response = await fetch('https://onesignal.com/api/v1/notifications', {
       method: 'POST',
