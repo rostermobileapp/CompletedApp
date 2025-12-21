@@ -10,6 +10,7 @@ interface UseOneSignalResult {
   login: (externalId: string) => Promise<void>;
   logout: () => Promise<void>;
   requestPermission: () => Promise<boolean>;
+  getPlayerId: () => Promise<string | null>;
 }
 
 export function useOneSignal(): UseOneSignalResult {
@@ -107,6 +108,40 @@ export function useOneSignal(): UseOneSignalResult {
     }
   }, [isInitialized]);
 
+  const getPlayerId = useCallback(async (): Promise<string | null> => {
+    if (!isInitialized) {
+      console.warn('[OneSignal] Cannot get player ID - SDK not initialized');
+      return null;
+    }
+
+    try {
+      const currentId = OneSignal.User.pushSubscription.getPushSubscriptionId();
+      if (currentId) {
+        setPlayerId(currentId);
+        return currentId;
+      }
+      
+      return new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          const id = OneSignal.User.pushSubscription.getPushSubscriptionId();
+          if (id) {
+            clearInterval(checkInterval);
+            setPlayerId(id);
+            resolve(id);
+          }
+        }, 100);
+        
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          resolve(null);
+        }, 5000);
+      });
+    } catch (error) {
+      console.error('[OneSignal] Get player ID error:', error);
+      return null;
+    }
+  }, [isInitialized]);
+
   return {
     isInitialized,
     playerId,
@@ -115,5 +150,6 @@ export function useOneSignal(): UseOneSignalResult {
     login,
     logout,
     requestPermission,
+    getPlayerId,
   };
 }

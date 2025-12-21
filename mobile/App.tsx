@@ -22,18 +22,20 @@ export default function App() {
     externalIdSet, 
     permissionGranted, 
     login, 
-    requestPermission 
+    requestPermission,
+    getPlayerId 
   } = useOneSignal();
+  const [registeredWithBackend, setRegisteredWithBackend] = useState(false);
 
   useEffect(() => {
     checkAuthStatus();
   }, []);
 
   useEffect(() => {
-    if (isInitialized && user?.displayId && !externalIdSet) {
+    if (isInitialized && user?.displayId && !registeredWithBackend && permissionGranted) {
       syncExternalId();
     }
-  }, [isInitialized, user, externalIdSet]);
+  }, [isInitialized, user, registeredWithBackend, permissionGranted]);
 
   const checkAuthStatus = async () => {
     try {
@@ -68,26 +70,40 @@ export default function App() {
       
       await login(user.displayId);
       
-      if (playerId) {
-        await fetch(`${API_BASE_URL}/api/notifications/register-onesignal`, {
+      const currentPlayerId = await getPlayerId();
+      console.log('[App] Got player ID:', currentPlayerId);
+      
+      if (currentPlayerId) {
+        console.log('[App] Registering player ID with backend...');
+        const registerResponse = await fetch(`${API_BASE_URL}/api/notifications/register-onesignal`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId }),
+          body: JSON.stringify({ playerId: currentPlayerId }),
         });
+        console.log('[App] Register response:', registerResponse.status);
         
-        await fetch(`${API_BASE_URL}/api/notifications/link-external-id`, {
+        console.log('[App] Linking external ID with backend...');
+        const linkResponse = await fetch(`${API_BASE_URL}/api/notifications/link-external-id`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            oneSignalId: playerId,
+            oneSignalId: currentPlayerId,
             userId: user.displayId,
           }),
         });
+        console.log('[App] Link response:', linkResponse.status);
+        
+        if (registerResponse.ok && linkResponse.ok) {
+          setRegisteredWithBackend(true);
+          console.log('[App] Successfully registered with backend');
+        } else {
+          console.error('[App] Backend registration failed');
+        }
+      } else {
+        console.warn('[App] No player ID available - cannot register with backend');
       }
-      
-      console.log('[App] External ID synced successfully');
     } catch (error) {
       console.error('[App] External ID sync error:', error);
     }
@@ -145,6 +161,9 @@ export default function App() {
         <Text style={styles.statusText}>
           External ID: {externalIdSet ? `✅ ${user?.displayId}` : '❌ Not set'}
         </Text>
+        <Text style={styles.statusText}>
+          Backend Registered: {registeredWithBackend ? '✅ Yes' : '❌ No'}
+        </Text>
       </View>
 
       {!permissionGranted && (
@@ -153,9 +172,9 @@ export default function App() {
         </TouchableOpacity>
       )}
 
-      {user && !externalIdSet && isInitialized && (
+      {user && !registeredWithBackend && isInitialized && permissionGranted && (
         <TouchableOpacity style={styles.button} onPress={syncExternalId}>
-          <Text style={styles.buttonText}>Sync External ID</Text>
+          <Text style={styles.buttonText}>Register with Backend</Text>
         </TouchableOpacity>
       )}
 

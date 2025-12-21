@@ -11336,9 +11336,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (recipientIds.length > 0) {
             console.log('[Message Notification Debug] Calling sendMessageNotification for', recipientIds.length, 'recipients');
-            // Push notification removed - will be re-implemented
-            // const result = await notificationService.sendMessageNotification(...);
-            console.log('[Message Notification Debug] Notifications disabled');
+            const { sendMessagePushNotification } = await import('./oneSignalNotifications');
+            for (const recipientId of recipientIds) {
+              await sendMessagePushNotification(
+                userId,
+                senderName,
+                recipientId,
+                conversationId,
+                content
+              );
+            }
+            console.log('[Message Notification Debug] Push notifications sent');
           } else {
             console.log('[Message Notification Debug] No recipients to notify (empty list after filtering)');
           }
