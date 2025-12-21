@@ -262,6 +262,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
     joinRequests: true,
     upcomingEvents: true,
     newsAnnouncements: true,
+    scrimmageInvites: true,
   }).notNull(),
   pushEnabled: boolean("push_enabled").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -2170,6 +2171,8 @@ export const notificationSettingsSchema = z.object({
   substitutionRequests: z.boolean().default(true),
   joinRequests: z.boolean().default(true),
   upcomingEvents: z.boolean().default(true),
+  newsAnnouncements: z.boolean().default(true),
+  scrimmageInvites: z.boolean().default(true),
 });
 
 export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({

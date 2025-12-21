@@ -1,5 +1,6 @@
 import { storage } from './storage';
 import { format, addDays, subDays, isBefore, isAfter, startOfDay, setHours, setMinutes } from 'date-fns';
+import { sendScrimmageInvitePushNotification } from './oneSignalNotifications';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -81,6 +82,14 @@ async function checkAndSendInvitations() {
         const leagueMembers = await storage.getLeagueMembers(scrimmage.leagueId);
         const approvedMembers = leagueMembers.filter(m => m.status === 'approved');
         
+        // Get the creator's name for the push notification
+        const creator = await storage.getUser(scrimmage.creatorId);
+        const organizerName = creator 
+          ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
+          : 'Organizer';
+        
+        const scrimmageDateTime = format(new Date(scrimmage.dateTime), 'EEE, MMM d @ h:mm a');
+        
         // Send in-app notifications to all approved league members (with idempotency check)
         let sentCount = 0;
         for (const member of approvedMembers) {
@@ -95,7 +104,19 @@ async function checkAndSendInvitations() {
             actionText: 'View & RSVP',
             scrimmageId: scrimmage.id,
           });
-          if (notification) sentCount++;
+          
+          if (notification) {
+            sentCount++;
+            // Send push notification to device
+            sendScrimmageInvitePushNotification(
+              member.userId,
+              organizerName,
+              scrimmage.title,
+              scrimmageDateTime,
+              scrimmage.location || 'TBD',
+              scrimmage.id
+            ).catch(console.error);
+          }
         }
 
         // Mark the invite as sent

@@ -89,3 +89,162 @@ export async function sendMessagePushNotification(
     },
   });
 }
+
+export async function sendPaymentRequestPushNotification(
+  recipientId: string,
+  requesterName: string,
+  amount: string,
+  description: string,
+  paymentRequestId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.paymentRequests === false) {
+    console.log(`[OneSignal] Payment request notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `💰 Payment Request from ${requesterName}`,
+    message: `$${amount} - ${description}`,
+    data: {
+      type: 'payment_request',
+      paymentRequestId,
+    },
+  });
+}
+
+export async function sendSubstitutionPushNotification(
+  recipientId: string,
+  title: string,
+  message: string,
+  gameId: string,
+  requestId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.substitutionRequests === false) {
+    console.log(`[OneSignal] Substitution notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🔄 ${title}`,
+    message,
+    data: {
+      type: 'substitution',
+      gameId,
+      requestId,
+    },
+  });
+}
+
+export async function sendJoinRequestPushNotification(
+  recipientId: string,
+  requesterName: string,
+  entityType: 'team' | 'league',
+  entityName: string,
+  requestId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.joinRequests === false) {
+    console.log(`[OneSignal] Join request notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `👋 New ${entityType} join request`,
+    message: `${requesterName} wants to join ${entityName}`,
+    data: {
+      type: 'join_request',
+      entityType,
+      requestId,
+    },
+  });
+}
+
+export async function sendScheduleReminderPushNotification(
+  recipientId: string,
+  eventTitle: string,
+  timeLabel: string,
+  location: string,
+  eventId: string,
+  eventType: 'scrimmage' | 'game'
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.upcomingEvents === false) {
+    console.log(`[OneSignal] Schedule reminder notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `⏰ Reminder: ${eventTitle}`,
+    message: `Starting in ${timeLabel} at ${location}`,
+    data: {
+      type: 'schedule_reminder',
+      eventType,
+      eventId,
+    },
+  });
+}
+
+export async function sendAnnouncementPushNotification(
+  recipientId: string,
+  authorName: string,
+  announcementPreview: string,
+  leagueOrTournamentName: string,
+  announcementId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.newsAnnouncements === false) {
+    console.log(`[OneSignal] Announcement notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  const truncatedPreview = announcementPreview.length > 50 
+    ? announcementPreview.substring(0, 50) + '...' 
+    : announcementPreview;
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `📢 ${leagueOrTournamentName}`,
+    message: `${authorName}: ${truncatedPreview}`,
+    data: {
+      type: 'announcement',
+      announcementId,
+    },
+  });
+}
+
+export async function sendScrimmageInvitePushNotification(
+  recipientId: string,
+  organizerName: string,
+  scrimmageTitle: string,
+  dateTime: string,
+  location: string,
+  scrimmageId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.scrimmageInvites === false) {
+    console.log(`[OneSignal] Scrimmage invite notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🏒 Scrimmage Invite: ${scrimmageTitle}`,
+    message: `${organizerName} invited you - ${dateTime} at ${location}`,
+    data: {
+      type: 'scrimmage_invite',
+      scrimmageId,
+    },
+  });
+}

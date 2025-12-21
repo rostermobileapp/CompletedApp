@@ -1007,6 +1007,7 @@ export class DatabaseStorage implements IStorage {
             joinRequests: true,
             upcomingEvents: true,
             newsAnnouncements: true,
+            scrimmageInvites: true,
           },
           pushEnabled: data.pushEnabled ?? true,
         })
@@ -5669,6 +5670,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const leagueId = originalRequest.game.leagueId;
       const gameId = originalRequest.gameId;
+      const { sendSubstitutionPushNotification } = await import('./oneSignalNotifications');
       
       if (decision === 'denied') {
         // Handle denials based on new workflow
@@ -5676,15 +5678,19 @@ export class DatabaseStorage implements IStorage {
           // Opposing captain denied → notify commissioner for final decision
           const league = await tx.select().from(leagues).where(eq(leagues.id, leagueId)).limit(1);
           if (league[0]?.commissionerId) {
-            // Push notification (bell icon) for commissioner
+            const notifTitle = 'Commissioner Decision Needed';
+            const notifMessage = `A substitution request for the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game was denied by the opposing captain. Check your To-Do section to make a final decision.`;
+            // In-app notification (bell icon) for commissioner
             await tx.insert(userNotifications).values({
               userId: league[0].commissionerId,
               type: 'general',
-              title: 'Commissioner Decision Needed',
-              message: `A substitution request for the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game was denied by the opposing captain. Check your To-Do section to make a final decision.`,
+              title: notifTitle,
+              message: notifMessage,
               actionUrl: `/game/${gameId}`,
               actionText: 'View Game',
             });
+            // Push notification to device
+            sendSubstitutionPushNotification(league[0].commissionerId, notifTitle, notifMessage, gameId, originalRequest.id).catch(console.error);
           }
         } else {
           // All other denials (substitute player or commissioner) - notify requesting team captain
@@ -5694,15 +5700,19 @@ export class DatabaseStorage implements IStorage {
           
           if (requestingTeam.captainId) {
             const approverRole = approverType === 'commissioner' ? 'league commissioner' : 'substitute player';
-            // Push notification (bell icon) for requesting captain
+            const notifTitle = 'Substitute Request Denied';
+            const notifMessage = `Your substitution request for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} was denied by the ${approverRole}.`;
+            // In-app notification (bell icon) for requesting captain
             await tx.insert(userNotifications).values({
               userId: requestingTeam.captainId,
               type: 'general',
-              title: 'Substitute Request Denied',
-              message: `Your substitution request for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} was denied by the ${approverRole}.`,
+              title: notifTitle,
+              message: notifMessage,
               actionUrl: `/game/${gameId}`,
               actionText: 'View Game',
             });
+            // Push notification to device
+            sendSubstitutionPushNotification(requestingTeam.captainId, notifTitle, notifMessage, gameId, originalRequest.id).catch(console.error);
           }
         }
       } else if (decision === 'approved') {
@@ -5728,15 +5738,20 @@ export class DatabaseStorage implements IStorage {
                 ? `${originalRequest.substitutePlayer.firstName} ${originalRequest.substitutePlayer.lastName}`
                 : 'a substitute player';
               
-              // Push notification (bell icon) for opposing captain
+              const pendingTitle = 'Substitute Request Needs Your Approval';
+              const pendingMessage = `${requestingTeamForNotify?.name || 'A team'} is requesting ${substitutePlayerNameForCaptain} to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName}. The substitute has confirmed availability. Check your To-Do section to approve or deny.`;
+              
+              // In-app notification (bell icon) for opposing captain
               await tx.insert(userNotifications).values({
                 userId: opposingTeamForNotify.captainId,
                 type: 'general',
-                title: 'Substitute Request Needs Your Approval',
-                message: `${requestingTeamForNotify?.name || 'A team'} is requesting ${substitutePlayerNameForCaptain} to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName}. The substitute has confirmed availability. Check your To-Do section to approve or deny.`,
+                title: pendingTitle,
+                message: pendingMessage,
                 actionUrl: `/game/${gameId}`,
                 actionText: 'View Game',
               });
+              // Push notification to device
+              sendSubstitutionPushNotification(opposingTeamForNotify.captainId, pendingTitle, pendingMessage, gameId, originalRequest.id).catch(console.error);
             }
             break;
             
@@ -5782,15 +5797,20 @@ export class DatabaseStorage implements IStorage {
               ? `${originalRequest.substitutePlayer.firstName} ${originalRequest.substitutePlayer.lastName}`
               : 'the substitute player';
             
+            const approvedTitle = 'Substitution Approved!';
+            const approvedMessage = `${substitutePlayerName} will substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game.`;
+            
             for (const visitorId of uniqueParticipants) {
               // Final approval notifications are informational only - no action needed
               // Do NOT include actionUrl to prevent clickable notifications that lead to errors
               await tx.insert(userNotifications).values({
                 userId: visitorId,
                 type: 'general',
-                title: 'Substitution Approved!',
-                message: `${substitutePlayerName} will substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} in the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game.`,
+                title: approvedTitle,
+                message: approvedMessage,
               });
+              // Push notification to device
+              sendSubstitutionPushNotification(visitorId, approvedTitle, approvedMessage, gameId, originalRequest.id).catch(console.error);
             }
             break;
         }

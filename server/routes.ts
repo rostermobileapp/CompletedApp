@@ -509,7 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData: any = {};
       if (notificationSettings !== undefined) {
         // Validate notification settings structure
-        const validKeys = ['inAppMessages', 'paymentRequests', 'substitutionRequests', 'joinRequests', 'upcomingEvents', 'newsAnnouncements'];
+        const validKeys = ['inAppMessages', 'paymentRequests', 'substitutionRequests', 'joinRequests', 'upcomingEvents', 'newsAnnouncements', 'scrimmageInvites'];
         const settings: Record<string, boolean> = {};
         
         for (const key of validKeys) {
@@ -3350,23 +3350,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: req.body.message,
       });
       
-      // Send push notification to league commissioner (async, don't wait)
-      (async () => {
-        try {
-          const league = await storage.getLeague(leagueId);
-          if (league && league.commissionerId) {
-            const requestingUser = await storage.getUser(userId);
-            const requesterName = requestingUser 
-              ? `${requestingUser.firstName} ${requestingUser.lastName}`.trim() || requestingUser.email 
-              : 'Someone';
-            
-            // Push notification removed - will be re-implemented
-            // await notificationService.sendJoinRequestNotification(...)
-          }
-        } catch (notifError) {
-          console.error('[Notifications] Failed to send join request notification:', notifError);
+      // Send push notification to league commissioner (fire and forget)
+      storage.getLeague(leagueId).then(async (league) => {
+        if (league && league.commissionerId) {
+          const requestingUser = await storage.getUser(userId);
+          const requesterName = requestingUser 
+            ? `${requestingUser.firstName} ${requestingUser.lastName}`.trim() || requestingUser.email 
+            : 'Someone';
+          
+          const { sendJoinRequestPushNotification } = await import('./oneSignalNotifications');
+          sendJoinRequestPushNotification(
+            league.commissionerId,
+            requesterName,
+            'league',
+            league.name,
+            membership.id
+          ).catch(console.error);
         }
-      })();
+      }).catch(err => console.error('[Notifications] Failed to send join request notification:', err));
       
       res.json(membership);
     } catch (error) {
@@ -5135,19 +5136,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const request = await storage.requestTeamJoinLeague(teamId, leagueId, userId, message);
       
-      // Send push notification to league commissioner (async, don't wait)
-      (async () => {
-        try {
-          if (league.commissionerId) {
-            const requesterName = team.name || 'A team';
-            
-            // Push notification removed - will be re-implemented  
-            // await notificationService.sendJoinRequestNotification(...)
-          }
-        } catch (notifError) {
-          console.error('[Notifications] Failed to send team join request notification:', notifError);
-        }
-      })();
+      // Send push notification to league commissioner (fire and forget)
+      if (league.commissionerId) {
+        import('./oneSignalNotifications').then(({ sendJoinRequestPushNotification }) => {
+          sendJoinRequestPushNotification(
+            league.commissionerId,
+            team.name || 'A team',
+            'team',
+            league.name,
+            request.id
+          ).catch(err => console.error('[Notifications] Failed to send team join request notification:', err));
+        }).catch(console.error);
+      }
       
       res.json(request);
     } catch (error) {
@@ -8683,9 +8683,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (recipientUserIds.length > 0) {
-          // Push notification removed - will be re-implemented
-          // await notificationService.sendNewsAnnouncementNotification(...);
-          console.log(`📲 Push notifications disabled - will be re-implemented`);
+          const { sendAnnouncementPushNotification } = await import('./oneSignalNotifications');
+          const contentPreview = announcementData.content || '';
+          for (const recipientId of recipientUserIds) {
+            sendAnnouncementPushNotification(
+              recipientId,
+              authorName,
+              contentPreview,
+              league.name,
+              announcement.id
+            ).catch(console.error);
+          }
+          console.log(`📲 Sent push notifications to ${recipientUserIds.length} users`);
         }
       } catch (notificationError) {
         console.error('Failed to send announcement push notifications:', notificationError);
@@ -9252,8 +9261,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (recipientUserIds.length > 0) {
-          // Push notification removed - will be re-implemented
-          // await notificationService.sendNewsAnnouncementNotification(...)
+          const { sendAnnouncementPushNotification } = await import('./oneSignalNotifications');
+          const contentPreview = announcementData.content || '';
+          for (const recipientId of recipientUserIds) {
+            sendAnnouncementPushNotification(
+              recipientId,
+              authorName,
+              contentPreview,
+              tournament.name,
+              announcement.id
+            ).catch(console.error);
+          }
           console.log(`📲 Sent push notifications for tournament announcement to ${recipientUserIds.length} users`);
         }
       } catch (notificationError) {
@@ -12833,8 +12851,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const creatorName = creator ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email : 'Someone';
           
           if (validatedData.recipientUserIds.length > 0) {
-            // Push notification removed - will be re-implemented
-            // await notificationService.sendPaymentRequestNotification(...);
+            const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
+            for (const recipientId of validatedData.recipientUserIds) {
+              await sendPaymentRequestPushNotification(
+                recipientId,
+                creatorName,
+                validatedData.amountPerPerson,
+                validatedData.title,
+                paymentRequest.id
+              );
+            }
           }
         } catch (notifError) {
           console.error('[Notifications] Failed to send payment request notifications:', notifError);
