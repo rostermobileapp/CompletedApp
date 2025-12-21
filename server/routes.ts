@@ -11321,18 +11321,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           console.log('[Message Notification Debug] Starting notification process for message in conversation:', conversationId);
           console.log('[Message Notification Debug] Sender userId:', userId);
-          console.log('[Message Notification Debug] All participants:', JSON.stringify(participants.map(p => ({ id: p.id, name: p.firstName }))));
+          console.log('[Message Notification Debug] All participants:', JSON.stringify(participants.map(p => ({ id: p.id, oderId: p.userId, name: (p as any).firstName }))));
           
           const sender = await storage.getUser(userId);
           const senderName = sender ? `${sender.firstName} ${sender.lastName}`.trim() || sender.email : 'Someone';
           console.log('[Message Notification Debug] Sender name:', senderName);
           
+          // Use userId (actual user UUID) instead of id (participant record ID)
           const recipientIds = participants
-            .filter(p => p.id !== undefined && p.id !== null)
-            .map(p => p.id as string)
+            .filter(p => p.userId !== undefined && p.userId !== null)
+            .map(p => p.userId as string)
             .filter(id => id !== userId);
           
-          console.log('[Message Notification Debug] Recipient IDs (after filtering sender):', recipientIds);
+          console.log('[Message Notification Debug] Recipient user IDs (after filtering sender):', recipientIds);
           
           if (recipientIds.length > 0) {
             console.log('[Message Notification Debug] Calling sendMessageNotification for', recipientIds.length, 'recipients');
