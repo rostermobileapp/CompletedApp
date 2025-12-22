@@ -9554,7 +9554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           for (const memberId of req.body.selectedMemberIds) {
             try {
-              const notification = await storage.createNotificationIfNotExists({
+              await storage.createNotificationIfNotExists({
                 userId: memberId,
                 type: 'scrimmage_invite',
                 title: `You're Invited: ${scrimmageData.title}`,
@@ -9563,19 +9563,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 scrimmageId: parentScrimmage.id,
               });
               
-              // Send push notification if in-app notification was created
-              if (notification) {
-                import('./oneSignalNotifications').then(({ sendScrimmageInvitePushNotification }) => {
-                  sendScrimmageInvitePushNotification(
-                    memberId,
-                    organizerName,
-                    scrimmageData.title,
-                    scrimmageDateTime,
-                    scrimmageData.location || 'TBD',
-                    parentScrimmage.id
-                  ).catch(err => console.error(`[Push] Failed to send scrimmage invite push:`, err));
-                }).catch(console.error);
-              }
+              // Always send push notification when invite is sent
+              import('./oneSignalNotifications').then(({ sendScrimmageInvitePushNotification }) => {
+                sendScrimmageInvitePushNotification(
+                  memberId,
+                  organizerName,
+                  scrimmageData.title,
+                  scrimmageDateTime,
+                  scrimmageData.location || 'TBD',
+                  parentScrimmage.id
+                ).catch(err => console.error(`[Push] Failed to send scrimmage invite push:`, err));
+              }).catch(console.error);
             } catch (notifError) {
               console.error(`Failed to create notification for user ${memberId}:`, notifError);
             }
@@ -9679,7 +9677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           for (const memberId of req.body.selectedMemberIds) {
             try {
-              const notification = await storage.createNotificationIfNotExists({
+              await storage.createNotificationIfNotExists({
                 userId: memberId,
                 type: 'scrimmage_invite',
                 title: `You're Invited: ${scrimmageData.title}`,
@@ -9688,19 +9686,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 scrimmageId: scrimmage.id,
               });
               
-              // Send push notification if in-app notification was created
-              if (notification) {
-                import('./oneSignalNotifications').then(({ sendScrimmageInvitePushNotification }) => {
-                  sendScrimmageInvitePushNotification(
-                    memberId,
-                    organizerName,
-                    scrimmageData.title,
-                    scrimmageDateTime,
-                    scrimmageData.location || 'TBD',
-                    scrimmage.id
-                  ).catch(err => console.error(`[Push] Failed to send scrimmage invite push:`, err));
-                }).catch(console.error);
-              }
+              // Always send push notification when invite is sent
+              import('./oneSignalNotifications').then(({ sendScrimmageInvitePushNotification }) => {
+                sendScrimmageInvitePushNotification(
+                  memberId,
+                  organizerName,
+                  scrimmageData.title,
+                  scrimmageDateTime,
+                  scrimmageData.location || 'TBD',
+                  scrimmage.id
+                ).catch(err => console.error(`[Push] Failed to send scrimmage invite push:`, err));
+              }).catch(console.error);
             } catch (notifError) {
               console.error(`Failed to create notification for user ${memberId}:`, notifError);
             }
