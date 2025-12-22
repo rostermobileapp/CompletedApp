@@ -197,7 +197,7 @@ import {
   type InsertEventParticipant,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike } from "drizzle-orm";
 
 // Helper function to generate unique 6-character alphanumeric team IDs (ABC123 format)
 async function generateUniqueTeamId(): Promise<string> {
@@ -5912,13 +5912,12 @@ export class DatabaseStorage implements IStorage {
     // Build scrimmage filter condition
     // Logic: Hide ALL scrimmage announcements from the News page - they should only appear in Alerts
     // Filter by: 1) linked scrimmage records, 2) content pattern for unlinked scrimmage invites
-    const scrimmageFilter = sql`(
-      NOT EXISTS (
-        SELECT 1 FROM ${scrimmages} s 
-        WHERE s.announcement_id = ${announcements.id}
-      )
-      AND ${announcements.content} NOT LIKE '%🏒 You''re Invited!%'
+    const scrimmageLinkedFilter = sql`NOT EXISTS (
+      SELECT 1 FROM ${scrimmages} s 
+      WHERE s.announcement_id = ${announcements.id}
     )`;
+    const scrimmageContentFilter = notLike(announcements.content, '%🏒 You\'re Invited!%');
+    const scrimmageFilter = and(scrimmageLinkedFilter, scrimmageContentFilter);
 
     // First get the total count with visibility, team, and scrimmage filtering
     const [countResult] = await db
@@ -6094,13 +6093,12 @@ export class DatabaseStorage implements IStorage {
 
     // Build scrimmage filter condition - exclude scrimmage announcements from News
     // Filter by: 1) linked scrimmage records, 2) content pattern for unlinked scrimmage invites
-    const scrimmageFilter = sql`(
-      NOT EXISTS (
-        SELECT 1 FROM ${scrimmages} s 
-        WHERE s.announcement_id = ${announcements.id}
-      )
-      AND ${announcements.content} NOT LIKE '%🏒 You''re Invited!%'
+    const scrimmageLinkedFilter = sql`NOT EXISTS (
+      SELECT 1 FROM ${scrimmages} s 
+      WHERE s.announcement_id = ${announcements.id}
     )`;
+    const scrimmageContentFilter = notLike(announcements.content, '%🏒 You\'re Invited!%');
+    const scrimmageFilter = and(scrimmageLinkedFilter, scrimmageContentFilter);
 
     // Count announcements that user has NOT read AND can see (respecting visibility), excluding scrimmage announcements
     const [result] = await db
