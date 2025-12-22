@@ -6756,7 +6756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const requestingTeam = await storage.getTeam(requestingTeamId);
           const originalPlayer = await storage.getUser(originalPlayerId);
           
-          // Create a push notification (bell icon) for the substitute player
+          // Create an in-app notification (bell icon) for the substitute player
           await storage.createNotification({
             userId: substitutePlayerId,
             type: 'general',
@@ -6766,13 +6766,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             actionText: 'View Game',
           });
           
-          // Send push notification via OneSignal
-          const requester = await storage.getUser(userId);
-          const requesterName = requester ? `${requester.firstName} ${requester.lastName}`.trim() || requester.email : 'Someone';
+          // Send push notification to device (fire and forget)
           const gameInfo = `${homeTeam?.name || 'Home'} vs ${awayTeam?.name || 'Away'}`;
-          
-          // Push notification removed - will be re-implemented
-          // await notificationService.sendSubstitutionRequestNotification(...)
+          import('./oneSignalNotifications').then(({ sendSubstitutionPushNotification }) => {
+            sendSubstitutionPushNotification(
+              substitutePlayerId,
+              'Substitute Request',
+              `${requestingTeam?.name || 'A team'} wants you to sub for ${gameInfo}`,
+              gameId,
+              request.id
+            ).catch(err => console.error('[Push] Failed to send substitution push:', err));
+          }).catch(console.error);
         }
       } catch (notifyError) {
         console.error('Error notifying substitute player:', notifyError);
@@ -10122,7 +10126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const approvedCount = allRequests.filter(r => r.status === 'approved').length;
           
           if (player) {
-            // Send in-app push notification
+            // Send in-app notification
             await storage.createNotification({
               userId: player.id,
               type: 'scrimmage_approved',
@@ -10132,7 +10136,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               actionText: 'View Details',
               scrimmageId: scrimmage.id,
             });
-            console.log(`✅ Sent scrimmage approval push notification to ${player.firstName || player.id}`);
+            
+            // Send push notification to device (fire and forget)
+            const scrimmageDateTime = format(new Date(scrimmage.dateTime), 'EEE, MMM d @ h:mm a');
+            import('./oneSignalNotifications').then(({ sendScrimmageApprovalPushNotification }) => {
+              sendScrimmageApprovalPushNotification(
+                player.id,
+                scrimmage.title,
+                scrimmageDateTime,
+                scrimmage.id
+              ).catch(err => console.error('[Push] Failed to send scrimmage approval push:', err));
+            }).catch(console.error);
+            
+            console.log(`✅ Sent scrimmage approval notification to ${player.firstName || player.id}`);
             
             // Also send email if available
             if (player.email && creator) {

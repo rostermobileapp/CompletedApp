@@ -248,3 +248,27 @@ export async function sendScrimmageInvitePushNotification(
     },
   });
 }
+
+export async function sendScrimmageApprovalPushNotification(
+  recipientId: string,
+  scrimmageTitle: string,
+  dateTime: string,
+  scrimmageId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.scrimmageInvites === false) {
+    console.log(`[OneSignal] Scrimmage notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `✅ You're in! ${scrimmageTitle}`,
+    message: `Your request has been approved - ${dateTime}`,
+    data: {
+      type: 'scrimmage_approved',
+      scrimmageId,
+    },
+  });
+}
