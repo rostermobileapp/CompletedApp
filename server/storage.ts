@@ -5911,11 +5911,13 @@ export class DatabaseStorage implements IStorage {
 
     // Build scrimmage filter condition
     // Logic: Hide ALL scrimmage announcements from the News page - they should only appear in Alerts
+    // Filter by: 1) linked scrimmage records, 2) content pattern for unlinked scrimmage invites
     const scrimmageFilter = sql`(
       NOT EXISTS (
         SELECT 1 FROM ${scrimmages} s 
         WHERE s.announcement_id = ${announcements.id}
       )
+      AND ${announcements.content} NOT LIKE '%🏒 You''re Invited!%'
     )`;
 
     // First get the total count with visibility, team, and scrimmage filtering
@@ -6091,11 +6093,13 @@ export class DatabaseStorage implements IStorage {
     )`;
 
     // Build scrimmage filter condition - exclude scrimmage announcements from News
+    // Filter by: 1) linked scrimmage records, 2) content pattern for unlinked scrimmage invites
     const scrimmageFilter = sql`(
       NOT EXISTS (
         SELECT 1 FROM ${scrimmages} s 
         WHERE s.announcement_id = ${announcements.id}
       )
+      AND ${announcements.content} NOT LIKE '%🏒 You''re Invited!%'
     )`;
 
     // Count announcements that user has NOT read AND can see (respecting visibility), excluding scrimmage announcements
