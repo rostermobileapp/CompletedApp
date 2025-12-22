@@ -5909,13 +5909,12 @@ export class DatabaseStorage implements IStorage {
       )
     )` : sql`1=1`; // If no userId provided, show all (for commissioner access)
 
-    // Build scrimmage date filter condition
-    // Logic: Hide scrimmage announcements if the associated scrimmage date has passed
+    // Build scrimmage filter condition
+    // Logic: Hide ALL scrimmage announcements from the News page - they should only appear in Alerts
     const scrimmageFilter = sql`(
       NOT EXISTS (
         SELECT 1 FROM ${scrimmages} s 
         WHERE s.announcement_id = ${announcements.id}
-        AND s.date_time < NOW()
       )
     )`;
 
@@ -6091,7 +6090,15 @@ export class DatabaseStorage implements IStorage {
       )
     )`;
 
-    // Count announcements that user has NOT read AND can see (respecting visibility)
+    // Build scrimmage filter condition - exclude scrimmage announcements from News
+    const scrimmageFilter = sql`(
+      NOT EXISTS (
+        SELECT 1 FROM ${scrimmages} s 
+        WHERE s.announcement_id = ${announcements.id}
+      )
+    )`;
+
+    // Count announcements that user has NOT read AND can see (respecting visibility), excluding scrimmage announcements
     const [result] = await db
       .select({ 
         count: sql<number>`CAST(COUNT(*) AS INTEGER)` 
@@ -6108,7 +6115,8 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(announcements.leagueId, leagueId),
           isNull(announcementReadStatus.id),
-          visibilityFilter
+          visibilityFilter,
+          scrimmageFilter
         )
       );
 
