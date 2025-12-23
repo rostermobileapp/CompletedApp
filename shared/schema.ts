@@ -189,7 +189,9 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "scrimmage_approved",
   "scrimmage_updated",
   "scrimmage_canceled",
-  "game_reminder"
+  "game_reminder",
+  "scrimmage_cohost_added",
+  "scrimmage_cohost_removed"
 ]);
 
 // Users table (required for Replit Auth)
