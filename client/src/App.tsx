@@ -126,6 +126,7 @@ function Router() {
             <Route path="/create-league" component={CreateLeague} />
             <Route path="/create-team" component={CreateTeam} />
             <Route path="/create-scrimmage" component={CreateScrimmage} />
+            <Route path="/edit-scrimmage/:id" component={CreateScrimmage} />
             <Route path="/scrimmage-management" component={ScrimmageManagement} />
             <Route path="/invite-groups" component={InviteGroups} />
             <Route path="/invite-groups/new" component={EditInviteGroup} />

@@ -8,7 +8,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked } from 'lucide-react';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
-import { useLocation } from 'wouter';
+import { useLocation, useRoute } from 'wouter';
 import { createScrimmageRequestSchema } from '@shared/schema';
 import { z } from 'zod';
 import { usePermissions } from '@/context/SubscriptionContext';
@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
 
 // Create form schema - includes UI fields that map to database fields
 const createScrimmageSchema = createScrimmageRequestSchema.extend({
@@ -60,6 +61,10 @@ type CreateScrimmageForm = z.infer<typeof createScrimmageSchema>;
 
 export default function CreateScrimmage() {
   const [, navigate] = useLocation();
+  const [, params] = useRoute('/edit-scrimmage/:id');
+  const scrimmageId = params?.id;
+  const isEditMode = !!scrimmageId;
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { canAccessPremiumFeatures } = usePermissions();
@@ -70,6 +75,7 @@ export default function CreateScrimmage() {
   const [coHostSearchTerm, setCoHostSearchTerm] = useState("");
   const [showCoHostDropdown, setShowCoHostDropdown] = useState(false);
   const coHostSearchRef = useRef<HTMLDivElement>(null);
+  const [formInitialized, setFormInitialized] = useState(false);
   
   // Email invite states
   const [emailSearchTerm, setEmailSearchTerm] = useState("");
@@ -86,6 +92,16 @@ export default function CreateScrimmage() {
   // Time picker state
   const [showTimePicker, setShowTimePicker] = useState(false);
   const timePickerRef = useRef<HTMLDivElement>(null);
+
+  // Fetch existing scrimmage data for edit mode
+  const { data: existingScrimmage, isLoading: scrimmageLoading } = useQuery({
+    queryKey: ['/api/scrimmages', scrimmageId],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/scrimmages/${scrimmageId}`);
+      return response.json();
+    },
+    enabled: isEditMode,
+  });
 
   // Fetch user's facility memberships
   const { data: facilityMemberships, isLoading: facilitiesLoading } = useQuery<Array<{ facility: { id: string; name: string; address: string; city: string; state: string } }>>({
@@ -202,12 +218,48 @@ export default function CreateScrimmage() {
     return facilities;
   })();
 
-  // Set default venue to league facility when it loads
+  // Set default venue to league facility when it loads (only for create mode)
   useEffect(() => {
-    if (leagueFacility && !form.watch('venue')) {
+    if (!isEditMode && leagueFacility && !form.watch('venue')) {
       form.setValue('venue', leagueFacility.name);
     }
-  }, [leagueFacility, form]);
+  }, [leagueFacility, form, isEditMode]);
+
+  // Pre-populate form when editing an existing scrimmage
+  useEffect(() => {
+    if (isEditMode && existingScrimmage && !formInitialized) {
+      const dateTime = new Date(existingScrimmage.dateTime);
+      const dateStr = format(dateTime, 'yyyy-MM-dd');
+      const timeStr = format(dateTime, 'HH:mm');
+      
+      form.reset({
+        title: existingScrimmage.title || '',
+        notes: existingScrimmage.notes || '',
+        skillLevel: existingScrimmage.skillLevel || '',
+        date: dateStr,
+        time: timeStr,
+        venue: existingScrimmage.location || '',
+        maxParticipants: existingScrimmage.maxPlayers || 20,
+        costPerPlayer: existingScrimmage.costPerPlayer || '',
+        isRecurring: existingScrimmage.isRecurring || false,
+        recurrenceType: existingScrimmage.recurrenceType || 'none',
+        recurrenceDays: existingScrimmage.recurrenceDays || [],
+        recurrenceEndType: existingScrimmage.recurrenceEndDate ? 'date' : existingScrimmage.recurrenceCount ? 'count' : 'never',
+        recurrenceEndDate: existingScrimmage.recurrenceEndDate ? format(new Date(existingScrimmage.recurrenceEndDate), 'yyyy-MM-dd') : '',
+        recurrenceCount: existingScrimmage.recurrenceCount || 1,
+        enableInviteScheduling: !!existingScrimmage.inviteDaysBefore,
+        sendInviteNow: false, // Don't send invites again on edit
+        inviteDaysBefore: existingScrimmage.inviteDaysBefore || 5,
+        inviteTimeOfDay: existingScrimmage.inviteTimeOfDay || '09:00',
+        enableReminders: !!existingScrimmage.reminderHoursBefore,
+        reminderHoursBefore: existingScrimmage.reminderHoursBefore || [24],
+        selectedMemberIds: [],
+        selectedEmails: [],
+        coHostIds: [],
+      });
+      setFormInitialized(true);
+    }
+  }, [isEditMode, existingScrimmage, form, formInitialized]);
 
   // Close date picker when clicking outside
   useEffect(() => {
@@ -262,8 +314,8 @@ export default function CreateScrimmage() {
 
   const createScrimmageRequest = useMutation({
     mutationFn: async (data: CreateScrimmageForm) => {
-      // Guard against no leagues
-      if (!selectedLeague?.id) {
+      // Guard against no leagues (only for create mode)
+      if (!isEditMode && !selectedLeague?.id) {
         throw new Error('No league available. Please join a league first.');
       }
       
@@ -275,7 +327,6 @@ export default function CreateScrimmage() {
         location: data.venue, // Map venue to location
         maxPlayers: data.maxParticipants, // Map maxParticipants to maxPlayers
         dateTime: new Date(`${data.date}T${data.time}`), // Combine date and time
-        leagueId: selectedLeague.id, // Required by server
         costPerPlayer: data.costPerPlayer ? data.costPerPlayer : null, // Optional cost
         // Recurring event data
         isRecurring: data.isRecurring,
@@ -290,46 +341,57 @@ export default function CreateScrimmage() {
         inviteTimeOfDay: data.isRecurring && data.enableInviteScheduling ? data.inviteTimeOfDay : null,
         // Reminder settings
         reminderHoursBefore: data.enableReminders ? data.reminderHoursBefore : null,
-        // Send invite immediately when scrimmage is created
-        sendInviteNow: data.sendInviteNow,
+        // Send invite immediately when scrimmage is created (only for new scrimmages)
+        sendInviteNow: !isEditMode && data.sendInviteNow,
       };
 
-      // Filter out the creator from selectedMemberIds (they don't need to invite themselves)
-      const userId = (user as any)?.id;
-      const filteredMemberIds = userId 
-        ? data.selectedMemberIds.filter(id => id !== userId)
-        : data.selectedMemberIds;
+      if (isEditMode && scrimmageId) {
+        // Update existing scrimmage
+        const response = await apiRequest('PATCH', `/api/scrimmages/${scrimmageId}`, scrimmageData);
+        return response.json();
+      } else {
+        // Create new scrimmage
+        // Filter out the creator from selectedMemberIds (they don't need to invite themselves)
+        const userId = (user as any)?.id;
+        const filteredMemberIds = userId 
+          ? data.selectedMemberIds.filter(id => id !== userId)
+          : data.selectedMemberIds;
 
-      const response = await apiRequest('POST', '/api/scrimmages', {
-        ...scrimmageData,
-        selectedMemberIds: filteredMemberIds, // Include for targeted announcements/invitations
-        selectedEmails: data.selectedEmails || [], // Include email invites
-        coHostIds: data.coHostIds || [], // Include co-hosts who can help manage
-      });
-      return response.json();
+        const response = await apiRequest('POST', '/api/scrimmages', {
+          ...scrimmageData,
+          leagueId: selectedLeague.id, // Required by server for new scrimmages
+          selectedMemberIds: filteredMemberIds, // Include for targeted announcements/invitations
+          selectedEmails: data.selectedEmails || [], // Include email invites
+          coHostIds: data.coHostIds || [], // Include co-hosts who can help manage
+        });
+        return response.json();
+      }
     },
     onSuccess: (scrimmage) => {
       toast({
-        title: 'Scrimmage Request Created',
-        description: `"${scrimmage.title}" has been created. Selected members will be notified.`,
+        title: isEditMode ? 'Scrimmage Updated' : 'Scrimmage Request Created',
+        description: isEditMode 
+          ? `"${scrimmage.title}" has been updated successfully.`
+          : `"${scrimmage.title}" has been created. Selected members will be notified.`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', scrimmageId] });
       queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
       setPageTransitionDirection('down');
       navigate(`/scrimmage/${scrimmage.id}`);
     },
     onError: (error: any) => {
       toast({
-        title: 'Failed to Create Scrimmage',
-        description: error.message || 'An error occurred while creating the scrimmage request',
+        title: isEditMode ? 'Failed to Update Scrimmage' : 'Failed to Create Scrimmage',
+        description: error.message || `An error occurred while ${isEditMode ? 'updating' : 'creating'} the scrimmage`,
         variant: 'destructive',
       });
     },
   });
 
   const onSubmit = (data: CreateScrimmageForm) => {
-    // Additional validation for member selection when league is available
-    if (selectedLeague && selectedMemberIds.length === 0 && selectedEmails.length === 0) {
+    // Additional validation for member selection when league is available (only for create mode)
+    if (!isEditMode && selectedLeague && selectedMemberIds.length === 0 && selectedEmails.length === 0) {
       form.setError('selectedMemberIds', {
         type: 'required',
         message: 'Please select at least one member or add an email invite'
@@ -474,11 +536,15 @@ export default function CreateScrimmage() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Schedule Scrimmage</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">
+            {isEditMode ? 'Edit Scrimmage' : 'Schedule Scrimmage'}
+          </h1>
           <Calendar className="w-6 h-6 text-primary" />
         </div>
         <p className="text-muted-foreground">
-          Create a scrimmage request and invite league members to join
+          {isEditMode 
+            ? 'Update the scrimmage details below'
+            : 'Create a scrimmage request and invite league members to join'}
         </p>
       </div>
       {/* Form */}
@@ -1454,16 +1520,19 @@ export default function CreateScrimmage() {
             className="w-full"
             disabled={
               createScrimmageRequest.isPending || 
-              !selectedLeague?.id || 
-              (selectedMemberIds.length === 0 && selectedEmails.length === 0)
+              scrimmageLoading ||
+              (!isEditMode && !selectedLeague?.id) || 
+              (!isEditMode && selectedMemberIds.length === 0 && selectedEmails.length === 0)
             }
             data-testid="button-create-scrimmage"
           >
             {createScrimmageRequest.isPending 
-              ? 'Creating...' 
-              : !selectedLeague?.id 
-                ? 'Join a League First' 
-                : 'Create Scrimmage Request'
+              ? (isEditMode ? 'Updating...' : 'Creating...') 
+              : isEditMode
+                ? 'Update Scrimmage'
+                : !selectedLeague?.id 
+                  ? 'Join a League First' 
+                  : 'Create Scrimmage Request'
             }
           </Button>
         </div>

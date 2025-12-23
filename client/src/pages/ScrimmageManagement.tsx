@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Clock, MapPin, Users, Check, X, Calendar, Crown, Trash2, Eye, DollarSign, UserPlus, Shield } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Users, Check, X, Calendar, Crown, Trash2, Eye, DollarSign, UserPlus, Shield, Pencil } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
@@ -374,7 +374,7 @@ export default function ScrimmageManagement() {
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="space-y-3">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Button
                           variant={isSelected ? "default" : "outline"}
                           size="sm"
@@ -399,6 +399,19 @@ export default function ScrimmageManagement() {
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           {viewRosterScrimmage === scrimmage.id ? 'Hide Roster' : 'View Roster'}
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setPageTransitionDirection('up');
+                            navigate(`/edit-scrimmage/${scrimmage.id}`);
+                          }}
+                          data-testid={`button-edit-${scrimmage.id}`}
+                        >
+                          <Pencil className="w-4 h-4 mr-1" />
+                          Edit
                         </Button>
                         
                         <Button
