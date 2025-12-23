@@ -9569,17 +9569,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 scrimmageId: parentScrimmage.id,
               });
               
-              // Always send push notification when invite is sent
-              import('./oneSignalNotifications').then(({ sendScrimmageInvitePushNotification }) => {
-                sendScrimmageInvitePushNotification(
-                  memberId,
-                  organizerName,
-                  scrimmageData.title,
-                  scrimmageDateTime,
-                  scrimmageData.location || 'TBD',
-                  parentScrimmage.id
-                ).catch(err => console.error(`[Push] Failed to send scrimmage invite push:`, err));
-              }).catch(console.error);
+              // Send IMMEDIATE push notification - await to ensure delivery
+              const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
+              const pushResult = await sendScrimmageInvitePushNotification(
+                memberId,
+                organizerName,
+                scrimmageData.title,
+                scrimmageDateTime,
+                scrimmageData.location || 'TBD',
+                parentScrimmage.id
+              );
+              console.log(`[Push] Scrimmage invite push to ${memberId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
             } catch (notifError) {
               console.error(`Failed to create notification for user ${memberId}:`, notifError);
             }
@@ -9692,17 +9692,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 scrimmageId: scrimmage.id,
               });
               
-              // Always send push notification when invite is sent
-              import('./oneSignalNotifications').then(({ sendScrimmageInvitePushNotification }) => {
-                sendScrimmageInvitePushNotification(
-                  memberId,
-                  organizerName,
-                  scrimmageData.title,
-                  scrimmageDateTime,
-                  scrimmageData.location || 'TBD',
-                  scrimmage.id
-                ).catch(err => console.error(`[Push] Failed to send scrimmage invite push:`, err));
-              }).catch(console.error);
+              // Send IMMEDIATE push notification - await to ensure delivery
+              const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
+              const pushResult = await sendScrimmageInvitePushNotification(
+                memberId,
+                organizerName,
+                scrimmageData.title,
+                scrimmageDateTime,
+                scrimmageData.location || 'TBD',
+                scrimmage.id
+              );
+              console.log(`[Push] Scrimmage invite push to ${memberId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
             } catch (notifError) {
               console.error(`Failed to create notification for user ${memberId}:`, notifError);
             }
@@ -10139,16 +10139,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               scrimmageId: scrimmage.id,
             });
             
-            // Send push notification to device (fire and forget)
+            // Send IMMEDIATE push notification - await to ensure delivery
             const scrimmageDateTime = format(new Date(scrimmage.dateTime), 'EEE, MMM d @ h:mm a');
-            import('./oneSignalNotifications').then(({ sendScrimmageApprovalPushNotification }) => {
-              sendScrimmageApprovalPushNotification(
-                player.id,
-                scrimmage.title,
-                scrimmageDateTime,
-                scrimmage.id
-              ).catch(err => console.error('[Push] Failed to send scrimmage approval push:', err));
-            }).catch(console.error);
+            const { sendScrimmageApprovalPushNotification } = await import('./oneSignalNotifications');
+            const pushResult = await sendScrimmageApprovalPushNotification(
+              player.id,
+              scrimmage.title,
+              scrimmageDateTime,
+              scrimmage.id
+            );
+            console.log(`[Push] Scrimmage approval push to ${player.id}: ${pushResult ? 'sent' : 'skipped/failed'}`);
             
             console.log(`✅ Sent scrimmage approval notification to ${player.firstName || player.id}`);
             
