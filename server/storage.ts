@@ -5909,15 +5909,17 @@ export class DatabaseStorage implements IStorage {
       )
     )` : sql`1=1`; // If no userId provided, show all (for commissioner access)
 
-    // Build scrimmage filter condition
-    // Logic: Hide ALL scrimmage announcements from the News page - they should only appear in Alerts
-    // Filter by: 1) linked scrimmage records, 2) content pattern for unlinked scrimmage invites
+    // Build automated announcement filter condition
+    // Logic: Hide ALL automated announcements from the News page - they should only appear in Alerts
+    // Filter by: 1) linked scrimmage records, 2) content patterns for various automated announcement types
     const scrimmageLinkedFilter = sql`NOT EXISTS (
       SELECT 1 FROM ${scrimmages} s 
       WHERE s.announcement_id = ${announcements.id}
     )`;
+    // Filter out: scrimmage invites, substitute player requests, and other automated announcements
     const scrimmageContentFilter = notLike(announcements.content, '%🏒 You\'re Invited!%');
-    const scrimmageFilter = and(scrimmageLinkedFilter, scrimmageContentFilter);
+    const substituteContentFilter = notLike(announcements.content, '%🏆 You\'ve been requested as a substitute player!%');
+    const automatedFilter = and(scrimmageLinkedFilter, scrimmageContentFilter, substituteContentFilter);
 
     // First get the total count with visibility, team, and scrimmage filtering
     const [countResult] = await db
@@ -5927,7 +5929,7 @@ export class DatabaseStorage implements IStorage {
         eq(announcements.leagueId, leagueId),
         visibilityFilter,
         teamFilter,
-        scrimmageFilter
+        automatedFilter
       ));
     
     const total = countResult.count;
@@ -5940,7 +5942,7 @@ export class DatabaseStorage implements IStorage {
         eq(announcements.leagueId, leagueId),
         visibilityFilter,
         teamFilter,
-        scrimmageFilter
+        automatedFilter
       ))
       .orderBy(
         desc(announcements.isPinned),
@@ -6091,14 +6093,16 @@ export class DatabaseStorage implements IStorage {
       )
     )`;
 
-    // Build scrimmage filter condition - exclude scrimmage announcements from News
-    // Filter by: 1) linked scrimmage records, 2) content pattern for unlinked scrimmage invites
+    // Build automated announcement filter condition - exclude all automated announcements from News
+    // Filter by: 1) linked scrimmage records, 2) content patterns for various automated announcement types
     const scrimmageLinkedFilter = sql`NOT EXISTS (
       SELECT 1 FROM ${scrimmages} s 
       WHERE s.announcement_id = ${announcements.id}
     )`;
+    // Filter out: scrimmage invites, substitute player requests, and other automated announcements
     const scrimmageContentFilter = notLike(announcements.content, '%🏒 You\'re Invited!%');
-    const scrimmageFilter = and(scrimmageLinkedFilter, scrimmageContentFilter);
+    const substituteContentFilter = notLike(announcements.content, '%🏆 You\'ve been requested as a substitute player!%');
+    const automatedFilter = and(scrimmageLinkedFilter, scrimmageContentFilter, substituteContentFilter);
 
     // Count announcements that user has NOT read AND can see (respecting visibility), excluding scrimmage announcements
     const [result] = await db
@@ -6118,7 +6122,7 @@ export class DatabaseStorage implements IStorage {
           eq(announcements.leagueId, leagueId),
           isNull(announcementReadStatus.id),
           visibilityFilter,
-          scrimmageFilter
+          automatedFilter
         )
       );
 
