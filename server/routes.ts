@@ -9956,6 +9956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
+      console.log(`[Scrimmage Request] Creating request for scrimmage ${scrimmageId} by user ${userId}`);
       
       const user = await storage.getUser(userId);
       if (!user) {
@@ -9965,8 +9966,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if scrimmage exists and get details
       const scrimmage = await storage.getScrimmage(scrimmageId);
       if (!scrimmage) {
+        console.log(`[Scrimmage Request] Scrimmage ${scrimmageId} not found`);
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
+      console.log(`[Scrimmage Request] Found scrimmage: ${scrimmage.title}, leagueId: ${scrimmage.leagueId}`);
       
       // Business invariant: Cannot join scrimmage that has passed or is imminent
       const now = new Date();
@@ -9980,7 +9983,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Verify user is a member of the league
+      console.log(`[Scrimmage Request] Checking league membership for user ${userId} in league ${scrimmage.leagueId}`);
       const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
+      console.log(`[Scrimmage Request] Membership result:`, membership ? `status=${membership.status}` : 'none');
       if (!membership || membership.status !== 'approved') {
         return res.status(403).json({ message: "Must be an approved league member to join scrimmages" });
       }
@@ -10004,6 +10009,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isCreator = scrimmage.creatorId === userId;
       const isCoHost = await storage.isUserScrimmageCoHost(scrimmageId, userId);
       const shouldAutoApprove = isCreator || isCoHost;
+      console.log(`[Scrimmage Request] isCreator=${isCreator}, isCoHost=${isCoHost}, shouldAutoApprove=${shouldAutoApprove}`);
+      
       let requestData;
       try {
         requestData = insertScrimmageRequestSchema.parse({
@@ -10012,15 +10019,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: shouldAutoApprove ? 'approved' : 'pending',
         });
       } catch (validationError) {
-        console.error('Validation error creating scrimmage request:', validationError);
+        console.error('[Scrimmage Request] Validation error:', validationError);
         return res.status(400).json({ message: "Invalid request data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
       }
 
+      console.log(`[Scrimmage Request] Creating request with data:`, requestData);
       const request = await storage.createScrimmageRequest(requestData);
+      console.log(`[Scrimmage Request] Successfully created request ${request.id}`);
       res.status(201).json(request);
     } catch (error) {
-      console.error('Error creating scrimmage request:', error);
-      res.status(500).json({ message: 'Failed to create scrimmage request' });
+      console.error('[Scrimmage Request] Error creating scrimmage request:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ message: 'Failed to create scrimmage request', error: errorMessage });
     }
   });
 
