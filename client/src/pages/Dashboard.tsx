@@ -1352,16 +1352,12 @@ export default function Dashboard() {
         return [];
       }
       
-      // Filter by team if team is selected
-      if (selectedType === 'team' && selectedId) {
-        return invites.filter((invite: any) => invite.teamId === selectedId);
-      }
-      
       // Filter by league if league is selected
       if (selectedType === 'league' && selectedLeagueId) {
         return invites.filter((invite: any) => invite.leagueId === selectedLeagueId);
       }
       
+      // Scrimmages are league-level, so when a team is selected, show all scrimmages
       return invites;
     }
   });
@@ -1377,16 +1373,13 @@ export default function Dashboard() {
         return [];
       }
       
-      // Filter by team if team is selected
-      if (selectedType === 'team' && selectedId) {
-        return requests.filter((request: any) => request.teamId === selectedId);
-      }
-      
       // Filter by league if league is selected
       if (selectedType === 'league' && selectedLeagueId) {
         return requests.filter((request: any) => request.scrimmage?.leagueId === selectedLeagueId);
       }
       
+      // Scrimmages are league-level, so when a team is selected, show all scrimmages
+      // (they don't have a teamId - they belong to the league)
       return requests;
     }
   });
