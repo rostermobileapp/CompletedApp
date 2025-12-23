@@ -7,6 +7,7 @@ import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPSummary } from "@/components/RSVPSummary";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
+import { ScrimmageRSVPButtons } from "@/components/ScrimmageRSVPButtons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -373,6 +374,13 @@ export default function GameDetails() {
                 <p className="text-sm" data-testid="text-scrimmage-notes">
                   {scrimmage.notes}
                 </p>
+              </div>
+            )}
+
+            {/* RSVP Buttons for players to join/leave */}
+            {scrimmage.creatorId !== (user as any)?.id && (
+              <div className="mt-6 pt-4 border-t border-border">
+                <ScrimmageRSVPButtons scrimmageId={gameId!} />
               </div>
             )}
           </div>
