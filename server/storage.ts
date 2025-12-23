@@ -5959,11 +5959,6 @@ export class DatabaseStorage implements IStorage {
       leagueAnnouncements = await baseQuery;
     }
 
-    console.log('[DEBUG] getLeagueAnnouncements - Raw results:', leagueAnnouncements.length, 'announcements');
-    leagueAnnouncements.forEach((a, i) => {
-      console.log(`[DEBUG] Announcement ${i}: id=${a.id}, content preview="${a.content.substring(0, 50)}..."`);
-    });
-
     const result = [];
     for (const announcement of leagueAnnouncements) {
       const enrichedAnnouncement = await this.getAnnouncement(announcement.id);
