@@ -72,7 +72,7 @@ import * as path from 'path';
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail } from "./emails";
-import { startScrimmageReminderJob } from "./scrimmageReminderJob";
+import { startEventReminderJob } from "./eventReminderJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
 import { getUncachableResendClient } from "./resend";
 
@@ -16467,8 +16467,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Start the scrimmage reminder job
-  startScrimmageReminderJob();
+  // Start the unified event reminder job (games and scrimmages)
+  startEventReminderJob();
   
   // Start the scrimmage invitation job (for recurring scrimmage invites)
   startScrimmageInviteJob();

@@ -188,7 +188,8 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "scrimmage_reminder",
   "scrimmage_approved",
   "scrimmage_updated",
-  "scrimmage_canceled"
+  "scrimmage_canceled",
+  "game_reminder"
 ]);
 
 // Users table (required for Replit Auth)
@@ -238,13 +239,15 @@ export const userNotifications = pgTable("user_notifications", {
   actionText: varchar("action_text"),
   isRead: boolean("is_read").default(false).notNull(),
   isDismissed: boolean("is_dismissed").default(false).notNull(),
-  // Optional reference to related entities (scrimmage, etc.)
+  // Optional reference to related entities (scrimmage, game, etc.)
   scrimmageId: varchar("scrimmage_id"), // Reference to scrimmage for scrimmage notifications
+  gameId: varchar("game_id"), // Reference to game for game notifications
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_user_notifications_user").on(table.userId),
   index("idx_user_notifications_read").on(table.isRead),
   index("idx_user_notifications_scrimmage").on(table.scrimmageId),
+  index("idx_user_notifications_game").on(table.gameId),
 ]);
 
 // Push notification preferences table - stores user's OneSignal player ID and notification settings
@@ -3082,3 +3085,31 @@ export const insertWaitlistSignupSchema = createInsertSchema(waitlistSignups).om
 
 export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
 export type InsertWaitlistSignup = z.infer<typeof insertWaitlistSignupSchema>;
+
+// Event type enum for unified reminders
+export const eventTypeEnum = pgEnum("event_type", ["game", "scrimmage"]);
+
+// Trigger key enum for different reminder types
+export const reminderTriggerEnum = pgEnum("reminder_trigger", ["2_days_6pm", "2_hours"]);
+
+// Unified event reminders sent table - tracks reminders for both games and scrimmages
+export const eventRemindersSent = pgTable("event_reminders_sent", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventType: eventTypeEnum("event_type").notNull(), // 'game' or 'scrimmage'
+  eventId: varchar("event_id").notNull(), // game ID or scrimmage ID
+  playerId: varchar("player_id").references(() => users.id).notNull(),
+  triggerKey: reminderTriggerEnum("trigger_key").notNull(), // '2_days_6pm' or '2_hours'
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_event_reminder").on(table.eventType, table.eventId, table.playerId, table.triggerKey),
+  index("idx_event_reminders_event").on(table.eventType, table.eventId),
+  index("idx_event_reminders_player").on(table.playerId),
+]);
+
+export const insertEventReminderSentSchema = createInsertSchema(eventRemindersSent).omit({
+  id: true,
+  sentAt: true,
+});
+
+export type EventReminderSent = typeof eventRemindersSent.$inferSelect;
+export type InsertEventReminderSent = z.infer<typeof insertEventReminderSentSchema>;

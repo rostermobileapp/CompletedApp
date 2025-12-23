@@ -79,11 +79,25 @@ The platform includes a comprehensive notification system for scrimmages with bo
 #### Email Notifications
 1. **Approval Notifications**: When a commissioner approves a player's scrimmage request, both an email and in-app push notification are sent.
 
-2. **Automated Reminders**: The `scrimmageReminderJob` sends in-app push notifications at configured intervals (2 hours, 1 day, 2 days, 1 week before). Reminders are only sent to approved players.
+### Unified Event Reminder System
 
-3. **Duplicate Prevention**: The `scrimmageRemindersSent` table tracks sent reminders. Each combination of scrimmage ID, user ID, and hours-before interval is recorded.
+A unified reminder system handles push notifications for both **games** and **scrimmages**:
 
-Key files: `server/emails.ts`, `server/scrimmageReminderJob.ts`, `server/scrimmageInviteJob.ts`, `client/src/components/NotificationCenter.tsx`, `shared/schema.ts`.
+#### Reminder Timing
+- **2 days before at 6PM**: Players receive a reminder notification 2 days before the event at 6:00 PM
+- **2 hours before**: A final reminder is sent 2 hours before the event starts
+
+#### How It Works
+1. **Job Scheduler**: The `eventReminderJob` runs every 5 minutes, checking for upcoming events within the next 3 days
+2. **Participant Detection**: For games, it finds all approved team members on both teams. For scrimmages, it finds all approved players
+3. **Push + In-App**: Each reminder triggers both a push notification (via OneSignal) and an in-app alert
+4. **Duplicate Prevention**: The `event_reminders_sent` table tracks sent reminders using a composite key of (eventType, eventId, playerId, triggerKey)
+
+#### Notification Types
+- `scrimmage_reminder`: Used for scrimmage reminders
+- `game_reminder`: Used for game reminders
+
+Key files: `server/eventReminderJob.ts`, `server/oneSignalNotifications.ts`, `shared/schema.ts` (event_reminders_sent table), `client/src/components/NotificationCenter.tsx`.
 
 ### Scrimmage Co-Host System
 
