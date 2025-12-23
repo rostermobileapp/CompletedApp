@@ -914,24 +914,33 @@ export default function Profile() {
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* Sign Out */}
+          {/* Log Out */}
           <button
             onClick={async () => {
-              // Remove OneSignal external ID to unlink this device from the user
-              await removeExternalId();
-              // Sign out user
-              await supabase.auth.signOut();
+              try {
+                // Remove OneSignal external ID to unlink this device from the user
+                await removeExternalId();
+              } catch (e) {
+                // Ignore errors from removeExternalId - continue with logout
+                console.log('Failed to remove external ID, continuing with logout');
+              }
+              try {
+                // Sign out user
+                await supabase.auth.signOut();
+              } catch (e) {
+                console.error('Error signing out:', e);
+              }
               // Clear all cached data to prevent stale user data from showing
               queryClient.clear();
               // Force a full page reload to the login page to clear all state
               window.location.href = '/login';
             }}
             className="w-full border border-border rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-card/80 bg-[#e2e2e2] dark:bg-[#212121] font-bold"
-            data-testid="button-sign-out"
+            data-testid="button-log-out"
           >
             <div className="flex items-center gap-3">
               <LogOut className="w-5 h-5" />
-              <span>Sign Out</span>
+              <span>Log Out</span>
             </div>
           </button>
         </div>
