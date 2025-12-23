@@ -3220,6 +3220,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         actionText: 'View League Management'
       });
       
+      // Send push notification
+      try {
+        const { sendCoCommissionerPushNotification } = await import('./oneSignalNotifications');
+        const pushResult = await sendCoCommissionerPushNotification(
+          targetUser.id,
+          league.name,
+          commissionerName,
+          leagueId
+        );
+        console.log(`[Push] Co-commissioner notification to ${targetUser.id}: ${pushResult ? 'sent' : 'skipped/failed'}`);
+      } catch (pushError) {
+        console.error('[Push] Failed to send co-commissioner notification:', pushError);
+      }
+      
       return res.json(updatedMembership);
     } catch (error) {
       console.error("Error adding co-commissioner:", error);
@@ -8695,16 +8709,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (recipientUserIds.length > 0) {
           const { sendAnnouncementPushNotification } = await import('./oneSignalNotifications');
           const contentPreview = announcementData.content || '';
+          let pushSuccessCount = 0;
           for (const recipientId of recipientUserIds) {
-            sendAnnouncementPushNotification(
-              recipientId,
-              authorName,
-              contentPreview,
-              league.name,
-              announcement.id
-            ).catch(console.error);
+            try {
+              const pushResult = await sendAnnouncementPushNotification(
+                recipientId,
+                authorName,
+                contentPreview,
+                league.name,
+                announcement.id
+              );
+              if (pushResult) pushSuccessCount++;
+              console.log(`[Push] Announcement push to ${recipientId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
+            } catch (pushError) {
+              console.error(`[Push] Failed to send announcement push to ${recipientId}:`, pushError);
+            }
           }
-          console.log(`📲 Sent push notifications to ${recipientUserIds.length} users`);
+          console.log(`📲 Sent ${pushSuccessCount}/${recipientUserIds.length} push notifications for announcement`);
         }
       } catch (notificationError) {
         console.error('Failed to send announcement push notifications:', notificationError);
@@ -9273,16 +9294,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (recipientUserIds.length > 0) {
           const { sendAnnouncementPushNotification } = await import('./oneSignalNotifications');
           const contentPreview = announcementData.content || '';
+          let pushSuccessCount = 0;
           for (const recipientId of recipientUserIds) {
-            sendAnnouncementPushNotification(
-              recipientId,
-              authorName,
-              contentPreview,
-              tournament.name,
-              announcement.id
-            ).catch(console.error);
+            try {
+              const pushResult = await sendAnnouncementPushNotification(
+                recipientId,
+                authorName,
+                contentPreview,
+                tournament.name,
+                announcement.id
+              );
+              if (pushResult) pushSuccessCount++;
+              console.log(`[Push] Tournament announcement push to ${recipientId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
+            } catch (pushError) {
+              console.error(`[Push] Failed to send tournament announcement push to ${recipientId}:`, pushError);
+            }
           }
-          console.log(`📲 Sent push notifications for tournament announcement to ${recipientUserIds.length} users`);
+          console.log(`📲 Sent ${pushSuccessCount}/${recipientUserIds.length} push notifications for tournament announcement`);
         }
       } catch (notificationError) {
         console.error('Failed to send tournament announcement push notifications:', notificationError);
@@ -10445,14 +10473,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Notify the new co-host
+      const dateTimeStr = format(new Date(scrimmage.dateTime), 'MMM d, yyyy \'at\' h:mm a');
       await storage.createNotification({
         userId: coHostUserId,
         type: 'scrimmage_cohost_added',
         title: `You're a co-host for ${scrimmage.title}`,
-        message: `You have been added as a co-host for "${scrimmage.title}" on ${format(new Date(scrimmage.dateTime), 'MMM d, yyyy \'at\' h:mm a')}. You can now help manage players and payments.`,
+        message: `You have been added as a co-host for "${scrimmage.title}" on ${dateTimeStr}. You can now help manage players and payments.`,
         actionUrl: `/scrimmage/${scrimmageId}`,
         scrimmageId: scrimmageId,
       });
+      
+      // Send push notification
+      try {
+        const { sendCoHostPushNotification } = await import('./oneSignalNotifications');
+        const pushResult = await sendCoHostPushNotification(
+          coHostUserId,
+          scrimmage.title,
+          dateTimeStr,
+          scrimmageId
+        );
+        console.log(`[Push] Co-host notification to ${coHostUserId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
+      } catch (pushError) {
+        console.error('[Push] Failed to send co-host notification:', pushError);
+      }
       
       res.status(201).json(coHost);
     } catch (error) {

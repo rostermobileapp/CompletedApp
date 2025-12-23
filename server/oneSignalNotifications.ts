@@ -272,3 +272,44 @@ export async function sendScrimmageApprovalPushNotification(
     },
   });
 }
+
+export async function sendCoHostPushNotification(
+  recipientId: string,
+  scrimmageTitle: string,
+  dateTime: string,
+  scrimmageId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.scrimmageInvites === false) {
+    console.log(`[OneSignal] Scrimmage notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🎯 You're a Co-Host!`,
+    message: `You've been added as co-host for "${scrimmageTitle}" on ${dateTime}`,
+    data: {
+      type: 'scrimmage_cohost_added',
+      scrimmageId,
+    },
+  });
+}
+
+export async function sendCoCommissionerPushNotification(
+  recipientId: string,
+  leagueName: string,
+  commissionerName: string,
+  leagueId: string
+): Promise<boolean> {
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🏆 Co-Commissioner Role Granted`,
+    message: `${commissionerName} added you as co-commissioner for ${leagueName}`,
+    data: {
+      type: 'co_commissioner_added',
+      leagueId,
+    },
+  });
+}
