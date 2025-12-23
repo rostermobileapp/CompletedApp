@@ -32,6 +32,7 @@ import {
   inviteGroups,
   inviteGroupMembers,
   scrimmageInvites,
+  scrimmageRemindersSent,
   playerImports,
   importedPlayers,
   playerMergeRequests,
@@ -6463,7 +6464,12 @@ export class DatabaseStorage implements IStorage {
     // Delete associated records first to avoid referential integrity issues
     await db.delete(scrimmageCoHosts).where(eq(scrimmageCoHosts.scrimmageId, scrimmageId));
     await db.delete(scrimmageInvites).where(eq(scrimmageInvites.scrimmageId, scrimmageId));
+    await db.delete(scrimmageRemindersSent).where(eq(scrimmageRemindersSent.scrimmageId, scrimmageId));
     await db.delete(scrimmageRequests).where(eq(scrimmageRequests.scrimmageId, scrimmageId));
+    // Nullify references in related tables instead of deleting
+    await db.update(calendarEvents).set({ scrimmageId: null }).where(eq(calendarEvents.scrimmageId, scrimmageId));
+    await db.update(paymentRequests).set({ relatedScrimmageId: null }).where(eq(paymentRequests.relatedScrimmageId, scrimmageId));
+    await db.update(userNotifications).set({ scrimmageId: null }).where(eq(userNotifications.scrimmageId, scrimmageId));
     // Then delete the scrimmage
     await db.delete(scrimmages).where(eq(scrimmages.id, scrimmageId));
   }

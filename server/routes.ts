@@ -3900,66 +3900,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get game IDs where user is an approved substitute
       const substituteGameIds = await storage.getUserSubstituteGameIds(userId);
       
-      console.log(`📅 getUpcomingGames for user ${userId}: returned ${games.length} roster games, ${substituteGameIds.length} substitute game IDs`);
-      console.log(`📅 Substitute game IDs: ${JSON.stringify(substituteGameIds)}`);
+      // Get approved scrimmages for the user
+      const scrimmageRequests = await storage.getScrimmageRequestsByPlayer(userId);
+      const approvedScrimmageRequests = scrimmageRequests.filter(req => req.status === 'approved');
+      
+      console.log(`📅 getUpcomingGames for user ${userId}: returned ${games.length} roster games, ${substituteGameIds.length} substitute game IDs, ${approvedScrimmageRequests.length} approved scrimmages`);
       
       // Create a set of existing game IDs for deduplication
       const existingGameIds = new Set(games.map(g => g.id));
-      console.log(`📅 Existing roster game IDs: ${JSON.stringify([...existingGameIds])}`);
       
       // Fetch and add substitute games that aren't already in the list
       const substituteGames: typeof games = [];
       for (const gameId of substituteGameIds) {
         const alreadyInRoster = existingGameIds.has(gameId);
-        console.log(`📅 Checking substitute game ${gameId}: alreadyInRoster=${alreadyInRoster}`);
         
         if (!alreadyInRoster) {
           const game = await storage.getGameById(gameId);
-          console.log(`📅 Fetched game ${gameId}: exists=${!!game}, scheduledAt=${game?.scheduledAt}`);
           
           if (game) {
             // Only include future games
             const gameDate = new Date(game.scheduledAt);
             const now = new Date();
             const isFuture = gameDate >= now;
-            console.log(`📅 Game ${gameId}: gameDate=${gameDate.toISOString()}, now=${now.toISOString()}, isFuture=${isFuture}`);
             
             if (isFuture) {
               substituteGames.push(game);
-              console.log(`🔄 Added substitute game ${gameId} to schedule for user ${userId}`);
-            } else {
-              console.log(`⏰ Skipped substitute game ${gameId} - game is in the past`);
             }
-          } else {
-            console.log(`❌ Substitute game ${gameId} not found in database`);
           }
-        } else {
-          console.log(`✅ Substitute game ${gameId} already in roster games - will mark with isSubstitute flag`);
         }
       }
       
       // Combine roster games and substitute games
       const allGames = [...games, ...substituteGames];
       
-      // Sort by date
-      allGames.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
-      
+      // Format regular games
       const formattedGames = allGames.map(game => {
         const formatted = formatGameForResponse(game);
         const isSubstitute = substituteGameIds.includes(game.id);
         return {
           ...formatted,
-          isSubstitute
+          isSubstitute,
+          isScrimmage: false
         };
       });
       
-      const substituteGamesInResponse = formattedGames.filter(g => g.isSubstitute);
-      console.log(`📅 Final response: ${formattedGames.length} total games, ${substituteGamesInResponse.length} marked as substitute`);
-      console.log(`📅 Substitute games in response: ${JSON.stringify(substituteGamesInResponse.map(g => ({ id: g.id, scheduledAt: g.scheduledAt, isSubstitute: g.isSubstitute })))}`);
+      // Add approved scrimmages as schedule items
+      const now = new Date();
+      const formattedScrimmages = approvedScrimmageRequests
+        .filter(req => new Date(req.scrimmage.dateTime) >= now)
+        .map(req => ({
+          id: req.scrimmage.id,
+          scheduledAt: req.scrimmage.dateTime,
+          location: req.scrimmage.location,
+          isScrimmage: true,
+          scrimmageTitle: req.scrimmage.title,
+          scrimmageCreator: req.scrimmage.creator,
+          isSubstitute: false,
+          homeTeam: null,
+          awayTeam: null,
+          homeScore: null,
+          awayScore: null,
+          status: req.scrimmage.status,
+        }));
+      
+      // Combine games and scrimmages
+      const allItems = [...formattedGames, ...formattedScrimmages];
+      
+      // Sort by date
+      allItems.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+      
+      console.log(`📅 Final response: ${formattedGames.length} games + ${formattedScrimmages.length} scrimmages = ${allItems.length} total items`);
       
       // Disable caching to force fresh response
       res.setHeader('Cache-Control', 'no-store');
-      res.json(formattedGames);
+      res.json(allItems);
     } catch (error) {
       console.error("Error fetching upcoming games:", error);
       res.status(500).json({ message: "Failed to fetch upcoming games" });
