@@ -6460,7 +6460,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteScrimmage(scrimmageId: string): Promise<void> {
-    // Delete associated requests first to avoid referential integrity issues
+    // Delete associated records first to avoid referential integrity issues
+    await db.delete(scrimmageCoHosts).where(eq(scrimmageCoHosts.scrimmageId, scrimmageId));
+    await db.delete(scrimmageInvites).where(eq(scrimmageInvites.scrimmageId, scrimmageId));
     await db.delete(scrimmageRequests).where(eq(scrimmageRequests.scrimmageId, scrimmageId));
     // Then delete the scrimmage
     await db.delete(scrimmages).where(eq(scrimmages.id, scrimmageId));
