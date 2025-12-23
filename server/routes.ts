@@ -8511,6 +8511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
+      console.log(`[DEBUG] GET /api/leagues/${leagueId}/announcements called by user ${userId}`);
 
       // Check if user is member of the league
       const membership = await storage.getUserLeagueMembership(userId, leagueId);
