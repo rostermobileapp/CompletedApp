@@ -1,6 +1,7 @@
 import { storage } from './storage';
-import { format, addDays, subDays, isBefore, isAfter, startOfDay, setHours, setMinutes } from 'date-fns';
+import { addDays, subDays, isBefore, isAfter, startOfDay, setHours, setMinutes } from 'date-fns';
 import { sendScrimmageInvitePushNotification } from './oneSignalNotifications';
+import { formatScrimmageDateTime, formatDayAndTime } from './dateUtils';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -88,7 +89,12 @@ async function checkAndSendInvitations() {
           ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
           : 'Organizer';
         
-        const scrimmageDateTime = format(new Date(scrimmage.dateTime), 'EEE, MMM d @ h:mm a');
+        // Get league timezone for proper date formatting
+        const league = await storage.getLeague(scrimmage.leagueId);
+        const timezone = league?.timezone || 'America/New_York';
+        
+        const scrimmageDateTime = formatScrimmageDateTime(scrimmage.dateTime, timezone);
+        const { date: formattedDate, time: formattedTime } = formatDayAndTime(scrimmage.dateTime, timezone);
         
         // Send in-app notifications to all approved league members (with idempotency check)
         let sentCount = 0;
@@ -99,7 +105,7 @@ async function checkAndSendInvitations() {
             userId: member.userId,
             type: 'scrimmage_invite',
             title: `You're Invited: ${scrimmage.title}`,
-            message: `Join us on ${format(new Date(scrimmage.dateTime), 'EEEE, MMMM d')} at ${format(new Date(scrimmage.dateTime), 'h:mm a')} at ${scrimmage.location}`,
+            message: `Join us on ${formattedDate} at ${formattedTime} at ${scrimmage.location}`,
             actionUrl: `/scrimmage/${scrimmage.id}`,
             actionText: 'View & RSVP',
             scrimmageId: scrimmage.id,

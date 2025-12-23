@@ -285,6 +285,7 @@ export const leagues = pgTable("leagues", {
   sport: sportEnum("sport").notNull(),
   description: text("description"),
   location: varchar("location"),
+  timezone: varchar("timezone").default("America/New_York"), // IANA timezone for date formatting
   rinkName: varchar("rink_name"), // Added for commissioner feature
   rinkAddress: text("rink_address"), // Added for commissioner feature
   facilityId: varchar("facility_id"), // Link to facility - will add reference after facilities table is defined

@@ -20,6 +20,7 @@ import { generateSingleElimination, generateDoubleElimination, generateRoundRobi
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
+import { formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime } from "./dateUtils";
 import {
   insertLeagueSchema,
   insertTeamSchema,
@@ -9409,7 +9410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           console.log(`📬 Creating scrimmage invitations for members:`, req.body.selectedMemberIds);
           
-          const invitationContent = `🏒 You're Invited! "${scrimmageData.title}" on ${format(scrimmageData.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmageData.location}. Click to RSVP!`;
+          const invitationContent = `🏒 You're Invited! "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)} at ${scrimmageData.location}. Click to RSVP!`;
           
           // Create announcement for the scrimmage invitation
           const announcement = await storage.createAnnouncement({
@@ -9550,7 +9551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 userId: coHostId,
                 type: 'scrimmage_cohost_added',
                 title: `You're a co-host for ${scrimmageData.title}`,
-                message: `You have been added as a co-host for "${scrimmageData.title}" on ${format(new Date(scrimmageData.dateTime), 'MMM d, yyyy \'at\' h:mm a')}. You can now help manage players and payments.`,
+                message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)}. You can now help manage players and payments.`,
                 actionUrl: `/scrimmage/${parentScrimmage.id}`,
                 scrimmageId: parentScrimmage.id,
               });
@@ -9598,7 +9599,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
             : 'Organizer';
-          const scrimmageDateTime = format(scrimmageData.dateTime, 'EEE, MMM d @ h:mm a');
+          const scrimmageDateTime = formatScrimmageDateTime(scrimmageData.dateTime, league.timezone);
+          const { date: inviteDate, time: inviteTime } = formatShortDayAndTime(scrimmageData.dateTime, league.timezone);
           
           for (const memberId of req.body.selectedMemberIds) {
             try {
@@ -9607,7 +9609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 userId: memberId,
                 type: 'scrimmage_invite',
                 title: `You're Invited: ${scrimmageData.title}`,
-                message: `Join us on ${format(scrimmageData.dateTime, 'MMM d')} at ${format(scrimmageData.dateTime, 'h:mm a')} at ${scrimmageData.location}. Tap to RSVP!`,
+                message: `Join us on ${inviteDate} at ${inviteTime} at ${scrimmageData.location}. Tap to RSVP!`,
                 actionUrl: `/scrimmage/${parentScrimmage.id}`,
                 scrimmageId: parentScrimmage.id,
               });
@@ -9707,7 +9709,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 userId: coHostId,
                 type: 'scrimmage_cohost_added',
                 title: `You're a co-host for ${scrimmageData.title}`,
-                message: `You have been added as a co-host for "${scrimmageData.title}" on ${format(new Date(scrimmageData.dateTime), 'MMM d, yyyy \'at\' h:mm a')}. You can now help manage players and payments.`,
+                message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)}. You can now help manage players and payments.`,
                 actionUrl: `/scrimmage/${scrimmage.id}`,
                 scrimmageId: scrimmage.id,
               });
@@ -9725,7 +9727,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
             : 'Organizer';
-          const scrimmageDateTime = format(scrimmageData.dateTime, 'EEE, MMM d @ h:mm a');
+          const scrimmageDateTime = formatScrimmageDateTime(scrimmageData.dateTime, league.timezone);
+          const { date: singleInviteDate, time: singleInviteTime } = formatShortDayAndTime(scrimmageData.dateTime, league.timezone);
           
           for (const memberId of req.body.selectedMemberIds) {
             try {
@@ -9734,7 +9737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 userId: memberId,
                 type: 'scrimmage_invite',
                 title: `You're Invited: ${scrimmageData.title}`,
-                message: `Join us on ${format(scrimmageData.dateTime, 'MMM d')} at ${format(scrimmageData.dateTime, 'h:mm a')} at ${scrimmageData.location}. Tap to RSVP!`,
+                message: `Join us on ${singleInviteDate} at ${singleInviteTime} at ${scrimmageData.location}. Tap to RSVP!`,
                 actionUrl: `/scrimmage/${scrimmage.id}`,
                 scrimmageId: scrimmage.id,
               });
@@ -10188,19 +10191,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const approvedCount = allRequests.filter(r => r.status === 'approved').length;
           
           if (player) {
+            // Get league timezone for proper date formatting
+            const league = await storage.getLeague(scrimmage.leagueId);
+            const timezone = league?.timezone || 'America/New_York';
+            const { date: approvalDate, time: approvalTime } = formatDayAndTime(scrimmage.dateTime, timezone);
+            
             // Send in-app notification
             await storage.createNotification({
               userId: player.id,
               type: 'scrimmage_approved',
               title: `You're in! ${scrimmage.title}`,
-              message: `Your request to join "${scrimmage.title}" on ${format(new Date(scrimmage.dateTime), 'EEEE, MMMM d')} at ${format(new Date(scrimmage.dateTime), 'h:mm a')} has been approved!`,
+              message: `Your request to join "${scrimmage.title}" on ${approvalDate} at ${approvalTime} has been approved!`,
               actionUrl: `/scrimmage/${scrimmage.id}`,
               actionText: 'View Details',
               scrimmageId: scrimmage.id,
             });
             
             // Send IMMEDIATE push notification - await to ensure delivery
-            const scrimmageDateTime = format(new Date(scrimmage.dateTime), 'EEE, MMM d @ h:mm a');
+            const scrimmageDateTime = formatScrimmageDateTime(scrimmage.dateTime, timezone);
             const { sendScrimmageApprovalPushNotification } = await import('./oneSignalNotifications');
             const pushResult = await sendScrimmageApprovalPushNotification(
               player.id,
@@ -10336,13 +10344,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send in-app notifications to approved players (shows in Alerts, not News)
       const approvedUserIds = approvedRequests.map(req => req.playerId);
       
+      // Get league timezone for proper date formatting
+      const league = await storage.getLeague(scrimmage.leagueId);
+      const timezone = league?.timezone || 'America/New_York';
+      
       try {
         for (const playerId of approvedUserIds) {
           await storage.createNotification({
             userId: playerId,
             type: 'scrimmage_approved',
             title: `Scrimmage Confirmed: ${scrimmage.title}`,
-            message: `Your spot in "${scrimmage.title}" has been confirmed for ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location}. See you on the ice!`,
+            message: `Your spot in "${scrimmage.title}" has been confirmed for ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}. See you on the ice!`,
             actionUrl: `/scrimmage/${scrimmage.id}`,
             actionText: 'View Details',
             scrimmageId: scrimmage.id,
@@ -10368,7 +10380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             {
               creatorId: userId,
               title: `Payment for ${scrimmage.title}`,
-              description: `Payment for scrimmage on ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location}`,
+              description: `Payment for scrimmage on ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}`,
               amountPerPerson: scrimmage.costPerPlayer,
               relatedScrimmageId: scrimmageId,
               deadline: null,
@@ -10475,8 +10487,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         addedBy: userId,
       });
       
+      // Get league timezone for proper date formatting
+      const league = await storage.getLeague(scrimmage.leagueId);
+      const timezone = league?.timezone || 'America/New_York';
+      
       // Notify the new co-host
-      const dateTimeStr = format(new Date(scrimmage.dateTime), 'MMM d, yyyy \'at\' h:mm a');
+      const dateTimeStr = formatFullDateTime(scrimmage.dateTime, timezone);
       await storage.createNotification({
         userId: coHostUserId,
         type: 'scrimmage_cohost_added',
@@ -10594,8 +10610,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send cancellation notification to approved players
       if (approvedRequests.length > 0) {
+        // Get league timezone for proper date formatting
+        const league = await storage.getLeague(scrimmage.leagueId);
+        const timezone = league?.timezone || 'America/New_York';
+        
         const targetUserIds = approvedRequests.map(req => req.playerId);
-        const announcementContent = `❌ Scrimmage Cancelled: "${scrimmage.title}" scheduled for ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location} has been cancelled by the organizer.`;
+        const announcementContent = `❌ Scrimmage Cancelled: "${scrimmage.title}" scheduled for ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location} has been cancelled by the organizer.`;
         
         try {
           // Create announcement
