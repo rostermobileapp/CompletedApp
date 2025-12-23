@@ -993,7 +993,7 @@ export default function CreateScrimmage() {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="enableReminders" className="text-base">Push Notifications</Label>
-                  <p className="text-sm text-muted-foreground">Send in-app reminders to approved players before the scrimmage</p>
+                  <p className="text-sm text-muted-foreground">Send push notification reminders to approved players before the scrimmage</p>
                 </div>
                 <Switch
                   id="enableReminders"
@@ -1006,7 +1006,7 @@ export default function CreateScrimmage() {
               {form.watch('enableReminders') && (
                 <div className="pt-2">
                   <p className="text-sm text-muted-foreground">
-                    Reminders will be sent the day prior to the scrimmage at 8AM for approved players.
+                    Reminders will be sent 2 days before (at 6PM) and 2 hours before the scrimmage.
                   </p>
                 </div>
               )}
