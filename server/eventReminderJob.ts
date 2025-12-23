@@ -141,23 +141,7 @@ async function sendEventReminder(
       ? "2 hours" 
       : "2 days";
     
-    const notificationType = event.eventType === "game" ? "game_reminder" : "scrimmage_reminder";
-    const actionUrl = event.eventType === "game" 
-      ? `/game/${event.id}` 
-      : `/scrimmage/${event.id}`;
-    
-    // Create in-app notification
-    await storage.createNotification({
-      userId: player.id,
-      type: notificationType as any,
-      title: `Reminder: ${event.title}`,
-      message: `Starting in ${timeLabel} at ${event.location} on ${format(event.eventTime, 'EEEE, MMMM d')} at ${format(event.eventTime, 'h:mm a')}`,
-      actionUrl,
-      actionText: 'View Details',
-      ...(event.eventType === "scrimmage" ? { scrimmageId: event.id } : { gameId: event.id }),
-    });
-    
-    // Send push notification to device
+    // Send push notification only (no in-app alert)
     await sendScheduleReminderPushNotification(
       player.id,
       event.title,
