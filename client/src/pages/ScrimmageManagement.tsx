@@ -485,7 +485,7 @@ export default function ScrimmageManagement() {
                             {rosterData.approvedPlayers.map((request) => (
                               <div
                                 key={request.id}
-                                className="flex items-center gap-3 p-3 rounded-lg dark:bg-white border bg-[#000000] text-[#212121] dark:text-[#ffffff]"
+                                className="flex items-center gap-3 p-3 rounded-lg bg-[#212121] border border-gray-700"
                                 data-testid={`roster-player-${request.id}`}
                               >
                                 <Avatar className="h-8 w-8">
@@ -495,7 +495,7 @@ export default function ScrimmageManagement() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1">
-                                  <p className="font-medium text-[#212121] dark:text-[#ffffff] text-[16px]">
+                                  <p className="font-medium text-white text-[16px]">
                                     {request.player.firstName} {request.player.lastName}
                                   </p>
                                 </div>
