@@ -10237,9 +10237,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not found" });
       }
 
-      // Get all requests to find this one and check permissions
-      const requests = await storage.getScrimmageRequests(requestId);
-      const request = requests.find(r => r.id === requestId);
+      // Get the request by ID
+      const request = await storage.getScrimmageRequestById(requestId);
       
       if (!request) {
         return res.status(404).json({ message: 'Request not found' });
