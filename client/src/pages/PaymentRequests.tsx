@@ -13,7 +13,7 @@ import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<'created' | 'received'>('created');
-  const { selectedTeamId } = useDashboardSelection();
+  const { selectedType, selectedId, selectedTeamId, selectedLeagueId, selectedTournamentId } = useDashboardSelection();
 
   // Fetch unpaid count for badge
   const { data: unpaidCount } = useQuery({
@@ -25,19 +25,54 @@ export default function PaymentRequests() {
     refetchInterval: 30000, // Check every 30 seconds
   });
 
-  // Fetch conversations to map payment requests to teams
+  // Fetch conversations to map payment requests to teams/leagues
   const { data: allConversations = [] } = useQuery<any[]>({
     queryKey: ['/api/conversations'],
   });
 
-  // Create a map of conversationId to teamId for filtering
-  const conversationTeamMap = useMemo(() => {
-    const map: Record<string, string | null> = {};
+  // Fetch user's scrimmages for league filtering
+  const { data: userScrimmages = [] } = useQuery<any[]>({
+    queryKey: ['/api/users/scrimmage-requests'],
+  });
+
+  // Fetch user's teams to get team-to-league mapping
+  const { data: userTeams = [] } = useQuery<any[]>({
+    queryKey: ['/api/user/teams'],
+  });
+
+  // Create a map of conversationId to teamId and leagueId for filtering
+  const conversationDataMap = useMemo(() => {
+    const map: Record<string, { teamId: string | null; leagueId: string | null }> = {};
     allConversations.forEach((conv: any) => {
-      map[conv.id] = conv.teamId || null;
+      map[conv.id] = { 
+        teamId: conv.teamId || null,
+        leagueId: conv.team?.leagueId || null
+      };
     });
     return map;
   }, [allConversations]);
+
+  // Create a map of scrimmageId to leagueId for filtering
+  const scrimmageLeagueMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    userScrimmages.forEach((req: any) => {
+      if (req.scrimmage?.id && req.scrimmage?.leagueId) {
+        map[req.scrimmage.id] = req.scrimmage.leagueId;
+      }
+    });
+    return map;
+  }, [userScrimmages]);
+
+  // Create a map of teamId to leagueId
+  const teamLeagueMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    userTeams.forEach((team: any) => {
+      if (team.id && team.leagueId) {
+        map[team.id] = team.leagueId;
+      }
+    });
+    return map;
+  }, [userTeams]);
 
   // Fetch payment requests created by the user
   const { data: allCreatedRequests = [], isLoading: createdLoading } = useQuery({
@@ -49,34 +84,61 @@ export default function PaymentRequests() {
     queryKey: ['/api/payment-requests/received/by-me'],
   });
 
-  // Filter payment requests by selected team
+  // Filter payment requests based on selection context
+  const filterPaymentRequests = (requests: any[]) => {
+    // If tournament is selected, no payments are applicable
+    if (selectedType === 'tournament') {
+      return [];
+    }
+
+    // If league is selected, filter by league
+    if (selectedType === 'league' && selectedLeagueId) {
+      return requests.filter(request => {
+        // Check if linked to a scrimmage in this league
+        if (request.relatedScrimmageId) {
+          return scrimmageLeagueMap[request.relatedScrimmageId] === selectedLeagueId;
+        }
+        // Check if linked to a conversation whose team is in this league
+        if (request.relatedConversationId) {
+          const convData = conversationDataMap[request.relatedConversationId];
+          if (convData?.leagueId) {
+            return convData.leagueId === selectedLeagueId;
+          }
+          if (convData?.teamId) {
+            return teamLeagueMap[convData.teamId] === selectedLeagueId;
+          }
+        }
+        return false;
+      });
+    }
+
+    // If team is selected, filter by team
+    if (selectedType === 'team' && selectedTeamId) {
+      return requests.filter(request => {
+        // Check if linked to a conversation belonging to the team
+        if (request.relatedConversationId) {
+          return conversationDataMap[request.relatedConversationId]?.teamId === selectedTeamId;
+        }
+        // Scrimmage payments are league-level, check if team is in that league
+        if (request.relatedScrimmageId) {
+          const scrimmageLeagueId = scrimmageLeagueMap[request.relatedScrimmageId];
+          return scrimmageLeagueId && teamLeagueMap[selectedTeamId] === scrimmageLeagueId;
+        }
+        return false;
+      });
+    }
+
+    // No selection, show all
+    return requests;
+  };
+
   const createdRequestsArray = useMemo(() => {
-    const requests = allCreatedRequests as any[];
-    if (!selectedTeamId) return requests;
-    
-    return requests.filter(request => {
-      // If payment request is linked to a conversation, check if that conversation belongs to the selected team
-      if (request.relatedConversationId) {
-        return conversationTeamMap[request.relatedConversationId] === selectedTeamId;
-      }
-      // If not linked to a conversation, show it (standalone payment requests should always be visible)
-      return true;
-    });
-  }, [allCreatedRequests, selectedTeamId, conversationTeamMap]);
+    return filterPaymentRequests(allCreatedRequests as any[]);
+  }, [allCreatedRequests, selectedType, selectedId, scrimmageLeagueMap, conversationDataMap, teamLeagueMap]);
 
   const receivedRequestsArray = useMemo(() => {
-    const requests = allReceivedRequests as any[];
-    if (!selectedTeamId) return requests;
-    
-    return requests.filter(request => {
-      // If payment request is linked to a conversation, check if that conversation belongs to the selected team
-      if (request.relatedConversationId) {
-        return conversationTeamMap[request.relatedConversationId] === selectedTeamId;
-      }
-      // If not linked to a conversation, show it (standalone payment requests should always be visible)
-      return true;
-    });
-  }, [allReceivedRequests, selectedTeamId, conversationTeamMap]);
+    return filterPaymentRequests(allReceivedRequests as any[]);
+  }, [allReceivedRequests, selectedType, selectedId, scrimmageLeagueMap, conversationDataMap, teamLeagueMap]);
 
   const getPaymentStatus = (request: any, isCreator: boolean) => {
     if (isCreator) {
