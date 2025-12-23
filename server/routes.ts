@@ -8533,7 +8533,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderDirection,
       }, userId);
 
+      console.log(`[ANNOUNCEMENTS] League ${leagueId}: Returning ${result.announcements.length} announcements (scrimmage invites filtered out)`);
+
       // Pagination is now accurate since visibility filtering happens in SQL
+      // Add no-cache headers to ensure fresh data
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.json({
         announcements: result.announcements,
         pagination: {
