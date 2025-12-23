@@ -10333,52 +10333,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update scrimmage status to finalized
       const updatedScrimmage = await storage.updateScrimmage(scrimmageId, { status: 'roster_confirmed' });
       
-      // Send targeted announcement to approved players
+      // Send in-app notifications to approved players (shows in Alerts, not News)
       const approvedUserIds = approvedRequests.map(req => req.playerId);
-      const approvedAnnouncementContent = `🏒 Scrimmage Confirmed! Your spot in "${scrimmage.title}" has been confirmed for ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location}. See you on the ice!`;
       
       try {
-        // Create announcement for approved players
-        const approvedAnnouncement = await storage.createAnnouncement({
-          content: approvedAnnouncementContent,
-          leagueId: scrimmage.leagueId,
-          authorId: userId,
-          isPinned: false,
-        });
-        
-        // Create visibility records for approved players
-        await storage.createAnnouncementVisibility(approvedAnnouncement.id, approvedUserIds);
-        
+        for (const playerId of approvedUserIds) {
+          await storage.createNotification({
+            userId: playerId,
+            type: 'scrimmage_approved',
+            title: `Scrimmage Confirmed: ${scrimmage.title}`,
+            message: `Your spot in "${scrimmage.title}" has been confirmed for ${format(scrimmage.dateTime, 'MMM d, yyyy \'at\' h:mm a')} at ${scrimmage.location}. See you on the ice!`,
+            actionUrl: `/scrimmage/${scrimmage.id}`,
+            actionText: 'View Details',
+            scrimmageId: scrimmage.id,
+          });
+        }
         console.log(`✅ Sent confirmation notifications to ${approvedUserIds.length} approved players`);
-      } catch (announcementError) {
-        console.error('Error sending confirmation notifications:', announcementError);
-        // Don't fail the finalization if announcement fails
+      } catch (notificationError) {
+        console.error('Error sending confirmation notifications:', notificationError);
+        // Don't fail the finalization if notification fails
       }
 
-      // Send targeted announcement to non-approved players
-      const nonApprovedRequests = requests.filter(req => req.status !== 'approved');
-      const nonApprovedUserIds = nonApprovedRequests.map(req => req.playerId);
-      
-      if (nonApprovedUserIds.length > 0) {
-        const noticeAnnouncementContent = `NOTICE - The Skate for ${format(scrimmage.dateTime, 'MMM d')} is full at this time`;
-        
-        try {
-          // Create announcement for non-approved players
-          const noticeAnnouncement = await storage.createAnnouncement({
-            content: noticeAnnouncementContent,
-            leagueId: scrimmage.leagueId,
-            authorId: userId,
-            isPinned: false,
-          });
-          
-          // Create visibility records for non-approved players
-          await storage.createAnnouncementVisibility(noticeAnnouncement.id, nonApprovedUserIds);
-          
-          console.log(`✅ Sent notice notifications to ${nonApprovedUserIds.length} non-approved players`);
-        } catch (announcementError) {
-          console.error('Error sending notice notifications:', announcementError);
-          // Don't fail the finalization if announcement fails
-        }
+      // Non-approved players don't receive notifications - they weren't approved so no notification needed
+      // They can check the scrimmage status if interested
+      const nonApprovedCount = requests.filter(req => req.status !== 'approved').length;
+      if (nonApprovedCount > 0) {
+        console.log(`ℹ️ ${nonApprovedCount} non-approved players - no notification sent`);
       }
 
       // Automatically create payment request if there's a cost
