@@ -1286,6 +1286,7 @@ export default function Dashboard() {
   
   const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
+    staleTime: 30000,
     select: (games) => {
       if (!Array.isArray(games)) return games;
       
@@ -1344,6 +1345,7 @@ export default function Dashboard() {
 
   const { data: scrimmageInvites, isLoading: invitesLoading } = useQuery({
     queryKey: ['/api/users/scrimmage-invites'],
+    staleTime: 30000,
     select: (invites) => {
       if (!Array.isArray(invites)) return invites;
       
@@ -1365,6 +1367,7 @@ export default function Dashboard() {
   // Fetch user's scrimmage requests (to find approved ones they're participating in)
   const { data: scrimmageRequests = [], isLoading: requestsLoading } = useQuery({
     queryKey: ['/api/users/scrimmage-requests'],
+    staleTime: 30000,
     select: (requests) => {
       if (!Array.isArray(requests)) return [];
       
@@ -1387,6 +1390,7 @@ export default function Dashboard() {
   // Fetch user's personal reminders
   const { data: personalReminders = [], isLoading: remindersLoading } = useQuery({
     queryKey: ['/api/user/personal-reminders'],
+    staleTime: 30000,
   });
 
   const { data: userTeams } = useQuery({
@@ -1771,6 +1775,7 @@ export default function Dashboard() {
   // Fetch needs attention data for the permanent bar - parallelized for performance
   const { data: needsAttentionData, isLoading: isLoadingNeedsAttention } = useQuery({
     queryKey: ['/api/needs-attention-summary', effectiveLeagueId],
+    staleTime: 30000,
     queryFn: async () => {
       if (!effectiveLeagueId) return { pendingMembers: 0, gamesNeedingVerification: 0, notifications: 0, total: 0 };
       
@@ -2305,12 +2310,12 @@ export default function Dashboard() {
                 {isLoadingNeedsAttention ? (
                   <div className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2">
                     <div className="flex items-center gap-3">
-                      <Bell className="w-4 h-4 text-white" />
-                      <span className="text-white font-medium text-sm">To-Do</span>
+                      <Bell className="w-4 h-4 text-[#212121] dark:text-white" />
+                      <span className="font-medium text-sm text-[#212121] dark:text-white">Alerts</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-gray-700 rounded-full animate-pulse"></div>
-                      <ChevronDown className="w-4 h-4 text-white" />
+                      <div className="w-6 h-6 bg-gray-400 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                      <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
                     </div>
                   </div>
                 ) : needsAttentionData ? (
