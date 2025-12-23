@@ -9549,9 +9549,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`✅ Created ${dates.length - 1} recurring scrimmages linked to parent ${parentScrimmage.id}`);
         
-        // Send in-app push notifications if sendInviteNow is enabled
-        if (req.body.sendInviteNow && req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
-          console.log(`📲 Sending immediate in-app notifications to ${req.body.selectedMemberIds.length} members for recurring scrimmage`);
+        // ALWAYS send in-app notifications when members are invited
+        if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+          console.log(`📲 Creating in-app notifications for ${req.body.selectedMemberIds.length} members for recurring scrimmage`);
           const creator = await storage.getUser(userId);
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
@@ -9560,6 +9560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           for (const memberId of req.body.selectedMemberIds) {
             try {
+              // ALWAYS create in-app notification for Alerts
               await storage.createNotificationIfNotExists({
                 userId: memberId,
                 type: 'scrimmage_invite',
@@ -9568,23 +9569,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 actionUrl: `/scrimmage/${parentScrimmage.id}`,
                 scrimmageId: parentScrimmage.id,
               });
+              console.log(`[Notification] Created in-app notification for ${memberId}`);
               
-              // Send IMMEDIATE push notification - await to ensure delivery
-              const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
-              const pushResult = await sendScrimmageInvitePushNotification(
-                memberId,
-                organizerName,
-                scrimmageData.title,
-                scrimmageDateTime,
-                scrimmageData.location || 'TBD',
-                parentScrimmage.id
-              );
-              console.log(`[Push] Scrimmage invite push to ${memberId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
+              // Only send push notification if sendInviteNow is enabled
+              if (req.body.sendInviteNow) {
+                const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
+                const pushResult = await sendScrimmageInvitePushNotification(
+                  memberId,
+                  organizerName,
+                  scrimmageData.title,
+                  scrimmageDateTime,
+                  scrimmageData.location || 'TBD',
+                  parentScrimmage.id
+                );
+                console.log(`[Push] Scrimmage invite push to ${memberId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
+              }
             } catch (notifError) {
               console.error(`Failed to create notification for user ${memberId}:`, notifError);
             }
           }
-          console.log(`✅ Sent immediate in-app notifications and push notifications`);
+          console.log(`✅ Created in-app notifications${req.body.sendInviteNow ? ' and push notifications' : ''}`);
         }
         
         // Save email invites if provided
@@ -9672,9 +9676,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`✅ Added co-hosts to scrimmage`);
         }
         
-        // Send in-app push notifications if sendInviteNow is enabled
-        if (req.body.sendInviteNow && req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
-          console.log(`📲 Sending immediate in-app notifications to ${req.body.selectedMemberIds.length} members`);
+        // ALWAYS send in-app notifications when members are invited
+        if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+          console.log(`📲 Creating in-app notifications for ${req.body.selectedMemberIds.length} members`);
           const creator = await storage.getUser(userId);
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
@@ -9683,6 +9687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           for (const memberId of req.body.selectedMemberIds) {
             try {
+              // ALWAYS create in-app notification for Alerts
               await storage.createNotificationIfNotExists({
                 userId: memberId,
                 type: 'scrimmage_invite',
@@ -9691,23 +9696,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 actionUrl: `/scrimmage/${scrimmage.id}`,
                 scrimmageId: scrimmage.id,
               });
+              console.log(`[Notification] Created in-app notification for ${memberId}`);
               
-              // Send IMMEDIATE push notification - await to ensure delivery
-              const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
-              const pushResult = await sendScrimmageInvitePushNotification(
-                memberId,
-                organizerName,
-                scrimmageData.title,
-                scrimmageDateTime,
-                scrimmageData.location || 'TBD',
-                scrimmage.id
-              );
-              console.log(`[Push] Scrimmage invite push to ${memberId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
+              // Only send push notification if sendInviteNow is enabled
+              if (req.body.sendInviteNow) {
+                const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
+                const pushResult = await sendScrimmageInvitePushNotification(
+                  memberId,
+                  organizerName,
+                  scrimmageData.title,
+                  scrimmageDateTime,
+                  scrimmageData.location || 'TBD',
+                  scrimmage.id
+                );
+                console.log(`[Push] Scrimmage invite push to ${memberId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
+              }
             } catch (notifError) {
               console.error(`Failed to create notification for user ${memberId}:`, notifError);
             }
           }
-          console.log(`✅ Sent immediate in-app notifications and push notifications`);
+          console.log(`✅ Created in-app notifications${req.body.sendInviteNow ? ' and push notifications' : ''}`);
         }
         
         // Save email invites if provided
