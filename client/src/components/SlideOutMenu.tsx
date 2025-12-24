@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target } from 'lucide-react';
+import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target, Lock } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 
@@ -172,7 +172,7 @@ export function SlideOutMenu() {
               <button
                 key={item.path}
                 onClick={() => handleNavigate(item.path, item.locked)}
-                className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50"
+                className={`w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50 ${item.locked ? 'opacity-50' : ''}`}
                 data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
               >
                 <div className="flex items-center gap-3">
@@ -183,7 +183,11 @@ export function SlideOutMenu() {
                     {item.label}
                   </span>
                 </div>
-                <div className="text-muted-foreground text-base">→</div>
+                {item.locked ? (
+                  <Lock className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <div className="text-muted-foreground text-base">→</div>
+                )}
               </button>
             ))}
           </div>
