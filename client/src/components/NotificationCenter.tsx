@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Bell, X, Check, Calendar, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Bell, X, Check, Calendar, CheckCircle2, XCircle, AlertCircle, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLocation } from 'wouter';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { motion, useMotionValue, useTransform, PanInfo, AnimatePresence } from 'framer-motion';
 
 interface Notification {
   id: string;
@@ -20,6 +21,69 @@ interface Notification {
   isDismissed: boolean;
   scrimmageId?: string;
   createdAt: string;
+}
+
+const SWIPE_THRESHOLD = 100;
+
+function SwipeableNotificationItem({
+  notification,
+  onDismiss,
+  onClick,
+  children,
+}: {
+  notification: Notification;
+  onDismiss: (id: string) => void;
+  onClick?: () => void;
+  children: ReactNode;
+}) {
+  const x = useMotionValue(0);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  const background = useTransform(
+    x,
+    [-SWIPE_THRESHOLD, 0, SWIPE_THRESHOLD],
+    ['rgba(239, 68, 68, 1)', 'rgba(239, 68, 68, 0)', 'rgba(239, 68, 68, 1)']
+  );
+
+  const handleDragEnd = (_: any, info: PanInfo) => {
+    setIsDragging(false);
+    if (Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
+      onDismiss(notification.id);
+    }
+  };
+
+  const handleDragStart = () => {
+    setIsDragging(true);
+  };
+
+  return (
+    <div className="relative overflow-hidden">
+      <motion.div
+        className="absolute inset-0 flex items-center justify-between px-4"
+        style={{ backgroundColor: background }}
+      >
+        <Trash2 className="w-5 h-5 text-white" />
+        <Trash2 className="w-5 h-5 text-white" />
+      </motion.div>
+      <motion.div
+        drag="x"
+        dragDirectionLock
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        animate={{ x: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        style={{ x }}
+        onClick={() => {
+          if (!isDragging && onClick) {
+            onClick();
+          }
+        }}
+        className="relative bg-background cursor-grab active:cursor-grabbing"
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
 }
 
 export function NotificationCenter() {
@@ -150,72 +214,62 @@ export function NotificationCenter() {
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {notifications.map((notification) => {
-                  const isClickable = !!notification.actionUrl;
-                  return (
-                  <div
-                    key={notification.id}
-                    className={cn(
-                      "px-4 py-3 transition-colors relative group",
-                      isClickable && "hover:bg-muted/50 cursor-pointer",
-                      !notification.isRead && "bg-primary/5"
-                    )}
-                    onClick={isClickable ? () => handleNotificationClick(notification) : undefined}
-                    data-testid={`notification-item-${notification.id}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-0.5">
-                        {getNotificationIcon(notification.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className={cn(
-                            "text-sm truncate",
-                            !notification.isRead ? "font-semibold text-foreground" : "text-foreground"
-                          )}>
-                            {notification.title}
-                          </p>
-                          {!notification.isRead && (
-                            <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">
-                          {format(new Date(notification.createdAt), 'MMM d, h:mm a')}
-                        </p>
-                        {!isClickable && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-2 text-xs h-7"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              dismissMutation.mutate(notification.id);
-                            }}
-                            data-testid={`button-clear-notification-${notification.id}`}
-                          >
-                            <X className="w-3 h-3 mr-1" />
-                            Clear
-                          </Button>
-                        )}
-                      </div>
-                      {isClickable && (
-                        <button
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            dismissMutation.mutate(notification.id);
-                          }}
-                          data-testid={`button-dismiss-notification-${notification.id}`}
+                <AnimatePresence mode="popLayout">
+                  {notifications.map((notification) => {
+                    const isClickable = !!notification.actionUrl;
+                    return (
+                      <motion.div
+                        key={notification.id}
+                        initial={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <SwipeableNotificationItem
+                          notification={notification}
+                          onDismiss={(id) => dismissMutation.mutate(id)}
+                          onClick={isClickable ? () => handleNotificationClick(notification) : undefined}
                         >
-                          <X className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )})}
+                          <div
+                            className={cn(
+                              "px-4 py-3 transition-colors relative group",
+                              isClickable && "hover:bg-muted/50 cursor-pointer",
+                              !notification.isRead && "bg-primary/5"
+                            )}
+                            data-testid={`notification-item-${notification.id}`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 mt-0.5">
+                                {getNotificationIcon(notification.type)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className={cn(
+                                    "text-sm truncate",
+                                    !notification.isRead ? "font-semibold text-foreground" : "text-foreground"
+                                  )}>
+                                    {notification.title}
+                                  </p>
+                                  {!notification.isRead && (
+                                    <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                  {notification.message}
+                                </p>
+                                <p className="text-xs text-muted-foreground/70 mt-1">
+                                  {format(new Date(notification.createdAt), 'MMM d, h:mm a')}
+                                </p>
+                              </div>
+                              <div className="flex-shrink-0 text-xs text-muted-foreground opacity-60">
+                                Swipe to clear
+                              </div>
+                            </div>
+                          </div>
+                        </SwipeableNotificationItem>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
               </div>
             )}
           </ScrollArea>
