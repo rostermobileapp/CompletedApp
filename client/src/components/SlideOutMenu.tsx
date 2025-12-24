@@ -182,29 +182,32 @@ export function SlideOutMenu() {
           </SheetHeader>
           
           <div className="flex-1 flex flex-col justify-evenly px-6 pb-6">
-            {menuItems.map((item) => (
-              <button
-                key={item.path}
-                onClick={() => handleNavigate(item.path, item.locked)}
-                disabled={isLoading}
-                className={`w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50 ${item.locked ? 'opacity-50' : ''} ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
-                data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-xl ${item.bgColor}`}>
-                    <item.icon className={`w-5 h-5 ${item.iconColor}`} />
+            {menuItems.map((item) => {
+              const showLock = item.locked;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => handleNavigate(item.path, item.locked)}
+                  disabled={isLoading}
+                  className={`w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50 ${showLock ? 'opacity-50' : ''} ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
+                  data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl ${item.bgColor}`}>
+                      <item.icon className={`w-5 h-5 ${item.iconColor}`} />
+                    </div>
+                    <span className="text-base font-semibold text-left text-foreground">
+                      {item.label}
+                    </span>
                   </div>
-                  <span className="text-base font-semibold text-left text-foreground">
-                    {item.label}
-                  </span>
-                </div>
-                {item.locked ? (
-                  <Lock className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <div className="text-muted-foreground text-base">→</div>
-                )}
-              </button>
-            ))}
+                  {showLock ? (
+                    <Lock className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <div className="text-muted-foreground text-base">→</div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </SheetContent>
       </Sheet>
