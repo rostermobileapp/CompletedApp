@@ -18,9 +18,9 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
   const pendingPathRef = useRef<string | null>(null);
   const { canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague, isLoading } = usePermissions();
 
-  const isControlled = externalOpen !== undefined;
+  const isControlled = externalOpen !== undefined && externalOnOpenChange !== undefined;
   const open = isControlled ? externalOpen : internalOpen;
-  const setOpen = isControlled ? externalOnOpenChange! : setInternalOpen;
+  const setOpen = isControlled ? externalOnOpenChange : setInternalOpen;
 
   const shouldShowHamburger = !isControlled && (location === '/' || location === '/profile');
 
