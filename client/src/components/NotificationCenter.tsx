@@ -5,9 +5,8 @@ import { format } from 'date-fns';
 import { useLocation } from 'wouter';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { motion, useMotionValue, useTransform, PanInfo, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Notification {
   id: string;
@@ -23,7 +22,7 @@ interface Notification {
   createdAt: string;
 }
 
-const SWIPE_THRESHOLD = 100;
+const SWIPE_THRESHOLD = 80;
 
 function SwipeableNotificationItem({
   notification,
@@ -36,52 +35,95 @@ function SwipeableNotificationItem({
   onClick?: () => void;
   children: ReactNode;
 }) {
-  const x = useMotionValue(0);
+  const [translateX, setTranslateX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  
-  const background = useTransform(
-    x,
-    [-SWIPE_THRESHOLD, 0, SWIPE_THRESHOLD],
-    ['rgba(239, 68, 68, 1)', 'rgba(239, 68, 68, 0)', 'rgba(239, 68, 68, 1)']
-  );
+  const [isAnimating, setIsAnimating] = useState(false);
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const currentXRef = useRef(0);
+  const hasMovedRef = useRef(false);
+  const isHorizontalSwipeRef = useRef<boolean | null>(null);
 
-  const handleDragEnd = (_: any, info: PanInfo) => {
-    setIsDragging(false);
-    if (Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
-      onDismiss(notification.id);
-    }
-  };
-
-  const handleDragStart = () => {
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (isAnimating) return;
+    startXRef.current = e.touches[0].clientX;
+    startYRef.current = e.touches[0].clientY;
+    currentXRef.current = 0;
+    hasMovedRef.current = false;
+    isHorizontalSwipeRef.current = null;
     setIsDragging(true);
   };
 
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || isAnimating) return;
+    
+    const deltaX = e.touches[0].clientX - startXRef.current;
+    const deltaY = e.touches[0].clientY - startYRef.current;
+    
+    if (isHorizontalSwipeRef.current === null) {
+      if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+        isHorizontalSwipeRef.current = Math.abs(deltaX) > Math.abs(deltaY);
+      }
+    }
+    
+    if (isHorizontalSwipeRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      currentXRef.current = deltaX;
+      hasMovedRef.current = true;
+      setTranslateX(deltaX);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    
+    if (Math.abs(currentXRef.current) > SWIPE_THRESHOLD) {
+      setIsAnimating(true);
+      const direction = currentXRef.current > 0 ? 1 : -1;
+      setTranslateX(direction * 400);
+      setTimeout(() => {
+        onDismiss(notification.id);
+      }, 200);
+    } else {
+      setTranslateX(0);
+    }
+    
+    currentXRef.current = 0;
+    isHorizontalSwipeRef.current = null;
+  };
+
+  const handleClick = () => {
+    if (!hasMovedRef.current && onClick) {
+      onClick();
+    }
+  };
+
+  const backgroundOpacity = Math.min(Math.abs(translateX) / SWIPE_THRESHOLD, 1);
+
   return (
-    <div className="relative overflow-hidden">
-      <motion.div
-        className="absolute inset-0 flex items-center justify-between px-4"
-        style={{ backgroundColor: background }}
+    <div className="relative overflow-hidden touch-pan-y">
+      <div
+        className="absolute inset-0 flex items-center justify-between px-4 bg-red-500"
+        style={{ opacity: backgroundOpacity }}
       >
         <Trash2 className="w-5 h-5 text-white" />
         <Trash2 className="w-5 h-5 text-white" />
-      </motion.div>
-      <motion.div
-        drag="x"
-        dragDirectionLock
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        animate={{ x: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        style={{ x }}
-        onClick={() => {
-          if (!isDragging && onClick) {
-            onClick();
-          }
+      </div>
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onClick={handleClick}
+        className="relative bg-background"
+        style={{
+          transform: `translateX(${translateX}px)`,
+          transition: isDragging ? 'none' : 'transform 0.2s ease-out',
         }}
-        className="relative bg-background cursor-grab active:cursor-grabbing"
       >
         {children}
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -202,7 +244,7 @@ export function NotificationCenter() {
             )}
           </div>
 
-          <ScrollArea className="h-[300px]">
+          <div className="h-[300px] overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center h-20">
                 <div className="text-sm text-muted-foreground">Loading...</div>
@@ -272,7 +314,7 @@ export function NotificationCenter() {
                 </AnimatePresence>
               </div>
             )}
-          </ScrollArea>
+          </div>
         </div>
       )}
     </div>
