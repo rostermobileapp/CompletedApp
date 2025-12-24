@@ -167,7 +167,7 @@ export function NotificationCenter() {
                           e.stopPropagation();
                           dismissMutation.mutate(notification.id);
                         }}
-                        className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded"
+                        className="absolute top-2 right-2 p-1 rounded"
                         data-testid={`button-dismiss-notification-${notification.id}`}
                       >
                         <X className="w-4 h-4 text-blue-500 font-bold" strokeWidth={3} />

@@ -804,14 +804,14 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                             </p>
                           </div>
                           <button
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
+                            className="p-1 rounded"
                             onClick={(e) => {
                               e.stopPropagation();
                               dismissNotificationMutation.mutate(notification.id);
                             }}
                             data-testid={`button-dismiss-notification-${notification.id}`}
                           >
-                            <X className="w-4 h-4 text-muted-foreground" />
+                            <X className="w-4 h-4 text-blue-500" strokeWidth={3} />
                           </button>
                         </div>
                       ))}
