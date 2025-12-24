@@ -3,15 +3,15 @@ import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target, Lock } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 
 export function SlideOutMenu() {
   const [open, setOpen] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [location, navigate] = useLocation();
-  const pendingNavigationRef = useRef<string | null>(null);
-  const { canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague } = usePermissions();
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const { canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague, isLoading } = usePermissions();
 
   // Only show hamburger menu on home and profile screens
   const shouldShowHamburger = location === '/' || location === '/profile';
@@ -28,7 +28,7 @@ export function SlideOutMenu() {
       icon: Calendar,
       label: 'Schedule Scrimmage',
       path: '/create-scrimmage',
-      locked: !isPlayerPro && !isCommissioner,
+      locked: !isLoading && !isPlayerPro && !isCommissioner,
       requiredTier: 'PRO',
       bgColor: 'bg-blue-500/20',
       iconColor: 'text-blue-500',
@@ -37,7 +37,7 @@ export function SlideOutMenu() {
       icon: UserPlus,
       label: 'Invite Groups',
       path: '/invite-groups',
-      locked: !isPlayerPro && !isCommissioner,
+      locked: !isLoading && !isPlayerPro && !isCommissioner,
       requiredTier: 'PRO',
       bgColor: 'bg-teal-500/20',
       iconColor: 'text-teal-500',
@@ -46,7 +46,7 @@ export function SlideOutMenu() {
       icon: Settings,
       label: 'Scrimmage Management',
       path: '/scrimmage-management',
-      locked: !isPlayerPro && !isCommissioner,
+      locked: !isLoading && !isPlayerPro && !isCommissioner,
       requiredTier: 'PRO',
       bgColor: 'bg-purple-500/20',
       iconColor: 'text-purple-500',
@@ -55,7 +55,7 @@ export function SlideOutMenu() {
       icon: Users,
       label: 'Create a Team',
       path: '/create-team',
-      locked: !isPlayerPro && !isCommissioner,
+      locked: !isLoading && !isPlayerPro && !isCommissioner,
       requiredTier: 'PRO',
       bgColor: 'bg-cyan-500/20',
       iconColor: 'text-cyan-500',
@@ -64,7 +64,7 @@ export function SlideOutMenu() {
       icon: Plus,
       label: 'Create a League',
       path: '/create-league',
-      locked: !isCommissioner,
+      locked: !isLoading && !isCommissioner,
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-green-500/20',
       iconColor: 'text-green-500',
@@ -73,7 +73,7 @@ export function SlideOutMenu() {
       icon: Crown,
       label: 'League Management',
       path: '/league-list',
-      locked: !isCoCommissionerOfAnyLeague(),
+      locked: !isLoading && !isCoCommissionerOfAnyLeague(),
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-amber-500/20',
       iconColor: 'text-amber-500',
@@ -82,7 +82,7 @@ export function SlideOutMenu() {
       icon: Trophy,
       label: 'Tournaments',
       path: '/tournaments',
-      locked: !isCommissioner,
+      locked: !isLoading && !isCommissioner,
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-orange-500/20',
       iconColor: 'text-orange-500',
@@ -91,43 +91,40 @@ export function SlideOutMenu() {
       icon: Target,
       label: 'Scorekeeper',
       path: '/scorekeeper',
-      locked: !hasStatManagerAccess(),
+      locked: !isLoading && !hasStatManagerAccess(),
       requiredTier: 'SCOREKEEPER',
       bgColor: 'bg-red-500/20',
       iconColor: 'text-red-500',
     },
   ];
 
-  // Close sheet when navigating away from allowed screens
+  // Handle navigation after sheet closes
   useEffect(() => {
-    if (!shouldShowHamburger && open) {
-      setOpen(false);
+    if (!open && pendingPath) {
+      const path = pendingPath;
+      setPendingPath(null);
+      // Navigate after the sheet animation completes
+      const timer = setTimeout(() => {
+        navigate(path);
+      }, 350);
+      return () => clearTimeout(timer);
     }
-  }, [shouldShowHamburger, open]);
+  }, [open, pendingPath, navigate]);
 
   const handleNavigate = (path: string, locked: boolean) => {
+    // Block navigation while permissions are loading
+    if (isLoading) {
+      return;
+    }
+    
     if (locked) {
       setShowPremiumAlert(true);
       return;
     }
     
     setPageTransitionDirection('up');
-    // Store the path and close the sheet
-    pendingNavigationRef.current = path;
+    setPendingPath(path);
     setOpen(false);
-  };
-
-  const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen);
-    // When sheet closes and we have a pending navigation, execute it
-    if (!isOpen && pendingNavigationRef.current) {
-      const path = pendingNavigationRef.current;
-      pendingNavigationRef.current = null;
-      // Wait for sheet animation to fully complete
-      setTimeout(() => {
-        navigate(path);
-      }, 350);
-    }
   };
 
   // Always render the Sheet component to ensure proper cleanup
@@ -148,7 +145,7 @@ export function SlideOutMenu() {
       )}
       
       {/* Sheet is always rendered to ensure proper overlay cleanup */}
-      <Sheet open={open} onOpenChange={handleOpenChange}>
+      <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent 
           side="right" 
           className="w-[85%] sm:w-[400px] h-screen border-l border-border bg-background flex flex-col [&>button]:hidden"
@@ -172,7 +169,8 @@ export function SlideOutMenu() {
               <button
                 key={item.path}
                 onClick={() => handleNavigate(item.path, item.locked)}
-                className={`w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50 ${item.locked ? 'opacity-50' : ''}`}
+                disabled={isLoading}
+                className={`w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50 ${item.locked ? 'opacity-50' : ''} ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
                 data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
               >
                 <div className="flex items-center gap-3">
