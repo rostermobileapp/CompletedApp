@@ -22,6 +22,9 @@ export function SlideOutMenu() {
   // Commissioner: All menu items
   const isCommissioner = canManageLeague();
   const isPlayerPro = canAccessPremiumFeatures();
+  
+  // Debug logging
+  console.log('[SlideOutMenu] Permissions:', { isLoading, isCommissioner, isPlayerPro });
 
   const menuItems = [
     {
