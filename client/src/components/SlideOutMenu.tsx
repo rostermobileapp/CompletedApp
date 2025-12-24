@@ -23,19 +23,29 @@ export function SlideOutMenu() {
   const isCommissioner = canManageLeague();
   const isPlayerPro = canAccessPremiumFeatures();
   
-  // Debug logging
-  console.log('[SlideOutMenu] Permissions:', { isLoading, isCommissioner, isPlayerPro });
-
-  // For commissioner-only items: locked when NOT commissioner
-  const commissionerOnlyLocked = !isLoading && !isCommissioner;
-  console.log('[SlideOutMenu] Commissioner items locked:', commissionerOnlyLocked);
+  // Lock logic: While loading, show locks. After loading, check actual permissions.
+  // This prevents briefly showing unlocked items before permissions are checked.
+  
+  // PRO items: locked if user is NOT player_pro AND NOT commissioner
+  const proItemsLocked = isLoading || (!isPlayerPro && !isCommissioner);
+  
+  // Commissioner items: locked if user is NOT commissioner
+  const commissionerItemsLocked = isLoading || !isCommissioner;
+  
+  // League Management: locked if user is NOT a co-commissioner of any league
+  const leagueManagementLocked = isLoading || !isCoCommissionerOfAnyLeague();
+  
+  // Scorekeeper: locked if user doesn't have stat manager access
+  const scorekeeperLocked = isLoading || !hasStatManagerAccess();
+  
+  console.log('[SlideOutMenu] Permissions:', { isLoading, isCommissioner, isPlayerPro, proItemsLocked, commissionerItemsLocked });
 
   const menuItems = [
     {
       icon: Calendar,
       label: 'Schedule Scrimmage',
       path: '/create-scrimmage',
-      locked: !isLoading && !isPlayerPro && !isCommissioner,
+      locked: proItemsLocked,
       requiredTier: 'PRO',
       bgColor: 'bg-blue-500/20',
       iconColor: 'text-blue-500',
@@ -44,7 +54,7 @@ export function SlideOutMenu() {
       icon: UserPlus,
       label: 'Invite Groups',
       path: '/invite-groups',
-      locked: !isLoading && !isPlayerPro && !isCommissioner,
+      locked: proItemsLocked,
       requiredTier: 'PRO',
       bgColor: 'bg-teal-500/20',
       iconColor: 'text-teal-500',
@@ -53,7 +63,7 @@ export function SlideOutMenu() {
       icon: Settings,
       label: 'Scrimmage Management',
       path: '/scrimmage-management',
-      locked: !isLoading && !isPlayerPro && !isCommissioner,
+      locked: proItemsLocked,
       requiredTier: 'PRO',
       bgColor: 'bg-purple-500/20',
       iconColor: 'text-purple-500',
@@ -62,7 +72,7 @@ export function SlideOutMenu() {
       icon: Users,
       label: 'Create a Team',
       path: '/create-team',
-      locked: !isLoading && !isPlayerPro && !isCommissioner,
+      locked: proItemsLocked,
       requiredTier: 'PRO',
       bgColor: 'bg-cyan-500/20',
       iconColor: 'text-cyan-500',
@@ -71,7 +81,7 @@ export function SlideOutMenu() {
       icon: Plus,
       label: 'Create a League',
       path: '/create-league',
-      locked: !isLoading && !isCommissioner,
+      locked: commissionerItemsLocked,
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-green-500/20',
       iconColor: 'text-green-500',
@@ -80,7 +90,7 @@ export function SlideOutMenu() {
       icon: Crown,
       label: 'League Management',
       path: '/league-list',
-      locked: !isLoading && !isCoCommissionerOfAnyLeague(),
+      locked: leagueManagementLocked,
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-amber-500/20',
       iconColor: 'text-amber-500',
@@ -89,7 +99,7 @@ export function SlideOutMenu() {
       icon: Trophy,
       label: 'Tournaments',
       path: '/tournaments',
-      locked: !isLoading && !isCommissioner,
+      locked: commissionerItemsLocked,
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-orange-500/20',
       iconColor: 'text-orange-500',
@@ -98,7 +108,7 @@ export function SlideOutMenu() {
       icon: Target,
       label: 'Scorekeeper',
       path: '/scorekeeper',
-      locked: !isLoading && !hasStatManagerAccess(),
+      locked: scorekeeperLocked,
       requiredTier: 'SCOREKEEPER',
       bgColor: 'bg-red-500/20',
       iconColor: 'text-red-500',
