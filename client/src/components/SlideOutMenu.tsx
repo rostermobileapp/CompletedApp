@@ -208,16 +208,6 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
                       {item.label}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
-                    {showLock ? (
-                      <>
-                        <Lock className="w-5 h-5 text-red-500" />
-                        <span className="text-xs text-red-500 font-bold uppercase">Locked</span>
-                      </>
-                    ) : (
-                      <span className="text-foreground text-xl font-bold">→</span>
-                    )}
-                  </div>
                 </button>
               );
             })}
