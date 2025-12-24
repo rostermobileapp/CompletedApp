@@ -26,6 +26,10 @@ export function SlideOutMenu() {
   // Debug logging
   console.log('[SlideOutMenu] Permissions:', { isLoading, isCommissioner, isPlayerPro });
 
+  // For commissioner-only items: locked when NOT commissioner
+  const commissionerOnlyLocked = !isLoading && !isCommissioner;
+  console.log('[SlideOutMenu] Commissioner items locked:', commissionerOnlyLocked);
+
   const menuItems = [
     {
       icon: Calendar,
