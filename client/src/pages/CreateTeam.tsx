@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Papa from 'papaparse';
-import { Loader } from '@googlemaps/js-api-loader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,25 +60,35 @@ export default function CreateTeam() {
   const [manualJerseyNumber, setManualJerseyNumber] = useState('');
   const [manualPosition, setManualPosition] = useState('');
 
-  // Initialize Google Maps API
+  // Initialize Google Maps API using dynamic script loading
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     if (!apiKey) return;
 
-    const loader = new Loader({
-      apiKey: apiKey,
-      version: 'weekly',
-      libraries: ['places'],
-    });
+    // Check if already loaded
+    if ((window as any).google?.maps?.places) {
+      autocompleteServiceRef.current = new (window as any).google.maps.places.AutocompleteService();
+      placesServiceRef.current = new (window as any).google.maps.places.PlacesService(
+        document.createElement('div')
+      );
+      return;
+    }
 
-    loader.load().then(() => {
-      if (window.google?.maps?.places) {
-        autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
-        placesServiceRef.current = new window.google.maps.places.PlacesService(
+    // Load the Google Maps script dynamically
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      if ((window as any).google?.maps?.places) {
+        autocompleteServiceRef.current = new (window as any).google.maps.places.AutocompleteService();
+        placesServiceRef.current = new (window as any).google.maps.places.PlacesService(
           document.createElement('div')
         );
       }
-    }).catch(err => console.error('Failed to load Google Maps API:', err));
+    };
+    script.onerror = () => console.error('Failed to load Google Maps API');
+    document.head.appendChild(script);
   }, []);
 
   // Fetch facilities
@@ -358,7 +367,7 @@ export default function CreateTeam() {
         componentRestrictions: { country: 'us' },
       },
       (predictions: any[], status: any) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+        if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && predictions) {
           setAddressSuggestions(predictions);
           setShowAddressSuggestions(true);
         } else {
@@ -374,7 +383,7 @@ export default function CreateTeam() {
     placesServiceRef.current.getDetails(
       { placeId, fields: ['formatted_address', 'address_components'] },
       (place: any, status: any) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
+        if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && place) {
           setNewFacilityAddress(place.formatted_address || '');
           
           // Extract city and state from address components
