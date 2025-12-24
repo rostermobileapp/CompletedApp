@@ -6,15 +6,23 @@ import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Targ
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 
-export function SlideOutMenu() {
-  const [open, setOpen] = useState(false);
+interface SlideOutMenuProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenChange }: SlideOutMenuProps = {}) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [location, navigate] = useLocation();
   const pendingPathRef = useRef<string | null>(null);
   const { canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague, isLoading } = usePermissions();
 
-  // Only show hamburger menu on home and profile screens
-  const shouldShowHamburger = location === '/' || location === '/profile';
+  const isControlled = externalOpen !== undefined;
+  const open = isControlled ? externalOpen : internalOpen;
+  const setOpen = isControlled ? externalOnOpenChange! : setInternalOpen;
+
+  const shouldShowHamburger = !isControlled && (location === '/' || location === '/profile');
 
   // Permission checks:
   // Free tier: Only Scorekeeper (if assigned by commissioner)

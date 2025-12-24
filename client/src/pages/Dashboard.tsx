@@ -28,6 +28,7 @@ import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 import FeedbackModal from '@/components/FeedbackModal';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
+import { SlideOutMenu } from '@/components/SlideOutMenu';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -1902,84 +1903,14 @@ export default function Dashboard() {
                 </span>
               )}
             </button>
-            <Sheet open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu}>
-              <SheetTrigger asChild>
-                <button
-                  className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
-                  data-testid="button-hamburger-menu"
-                >
-                  <Menu className="w-8 h-8 text-foreground" />
-                </button>
-              </SheetTrigger>
-              <SheetContent 
-                side="right" 
-                className="w-[85%] sm:w-[400px] h-screen border-l border-border bg-background flex flex-col [&>button]:hidden"
-              >
-                <SheetHeader className="flex-shrink-0 px-6 pt-[4px] pb-[4px]">
-                  <div className="flex items-center justify-between">
-                    <SheetTitle className="text-2xl font-bold">Menu</SheetTitle>
-                    <SheetClose asChild>
-                      <button
-                        className="w-10 h-10 bg-red-600 hover:bg-red-700 rounded flex items-center justify-center transition-colors"
-                        data-testid="button-close-menu"
-                      >
-                        <X className="w-5 h-5 text-white" />
-                      </button>
-                    </SheetClose>
-                  </div>
-                </SheetHeader>
-                <div className="flex-1 flex flex-col justify-evenly px-6 pb-6">
-                  <button onClick={() => { navigate('/create-scrimmage'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-start text-left" data-testid="menu-item-scrimmage">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-blue-500/20"><Calendar className="w-5 h-5 text-blue-500" /></div>
-                      <span className="text-base font-semibold">Schedule Scrimmage</span>
-                    </div>
-                  </button>
-                  <button onClick={() => { navigate('/invite-groups'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-start text-left" data-testid="menu-item-invite-groups">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-teal-500/20"><UserPlus className="w-5 h-5 text-teal-500" /></div>
-                      <span className="text-base font-semibold">Invite Groups</span>
-                    </div>
-                  </button>
-                  <button onClick={() => { navigate('/scrimmage-management'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-start text-left" data-testid="menu-item-scrimmage-management">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-purple-500/20"><Settings className="w-5 h-5 text-purple-500" /></div>
-                      <span className="text-base font-semibold">Scrimmage Management</span>
-                    </div>
-                  </button>
-                  <button onClick={() => { navigate('/create-team'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-start text-left" data-testid="menu-item-team">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-cyan-500/20"><Users className="w-5 h-5 text-cyan-500" /></div>
-                      <span className="text-base font-semibold">Create a Team</span>
-                    </div>
-                  </button>
-                  <button onClick={() => { navigate('/create-league'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-start text-left" data-testid="menu-item-league">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-green-500/20"><Plus className="w-5 h-5 text-green-500" /></div>
-                      <span className="text-base font-semibold">Create a League</span>
-                    </div>
-                  </button>
-                  <button onClick={() => { navigate('/league-list'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-start text-left" data-testid="menu-item-league-management">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-amber-500/20"><Crown className="w-5 h-5 text-amber-500" /></div>
-                      <span className="text-base font-semibold">League Management</span>
-                    </div>
-                  </button>
-                  <button onClick={() => { navigate('/tournaments'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-start text-left" data-testid="menu-item-tournaments">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-orange-500/20"><Trophy className="w-5 h-5 text-orange-500" /></div>
-                      <span className="text-base font-semibold">Tournaments</span>
-                    </div>
-                  </button>
-                  <button onClick={() => { navigate('/scorekeeper'); setShowHamburgerMenu(false); }} className="w-full bg-card border border-border rounded-lg p-3 flex items-center justify-start text-left" data-testid="menu-item-scorekeeper">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-red-500/20"><Target className="w-5 h-5 text-red-500" /></div>
-                      <span className="text-base font-semibold">Scorekeeper</span>
-                    </div>
-                  </button>
-                </div>
-              </SheetContent>
-            </Sheet>
+            <button
+              onClick={() => setShowHamburgerMenu(true)}
+              className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
+              data-testid="button-hamburger-menu"
+            >
+              <Menu className="w-8 h-8 text-foreground" />
+            </button>
+            <SlideOutMenu open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu} />
           </div>
         </div>
       </div>
