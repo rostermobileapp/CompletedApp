@@ -10,7 +10,7 @@ export function SlideOutMenu() {
   const [open, setOpen] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [location, navigate] = useLocation();
-  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const pendingPathRef = useRef<string | null>(null);
   const { canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague, isLoading } = usePermissions();
 
   // Only show hamburger menu on home and profile screens
@@ -100,16 +100,16 @@ export function SlideOutMenu() {
 
   // Handle navigation after sheet closes
   useEffect(() => {
-    if (!open && pendingPath) {
-      const path = pendingPath;
-      setPendingPath(null);
+    if (!open && pendingPathRef.current) {
+      const path = pendingPathRef.current;
+      pendingPathRef.current = null;
       // Navigate after the sheet animation completes
       const timer = setTimeout(() => {
         navigate(path);
       }, 350);
       return () => clearTimeout(timer);
     }
-  }, [open, pendingPath, navigate]);
+  }, [open, navigate]);
 
   const handleNavigate = (path: string, locked: boolean) => {
     // Block navigation while permissions are loading
@@ -123,7 +123,7 @@ export function SlideOutMenu() {
     }
     
     setPageTransitionDirection('up');
-    setPendingPath(path);
+    pendingPathRef.current = path;
     setOpen(false);
   };
 
