@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -10,18 +10,26 @@ export function SlideOutMenu() {
   const [open, setOpen] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [location, navigate] = useLocation();
-  const { canAccessPremiumFeatures, canManageLeague, hasRole, hasStatManagerAccess, isCoCommissionerOfAnyLeague } = usePermissions();
+  const pendingNavigationRef = useRef<string | null>(null);
+  const { canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague } = usePermissions();
 
   // Only show hamburger menu on home and profile screens
   const shouldShowHamburger = location === '/' || location === '/profile';
+
+  // Permission checks:
+  // Free tier: Only Scorekeeper (if assigned by commissioner)
+  // Player Pro: Schedule Scrimmage, Invite Groups, Scrimmage Management, Create a Team
+  // Commissioner: All menu items
+  const isCommissioner = canManageLeague();
+  const isPlayerPro = canAccessPremiumFeatures();
 
   const menuItems = [
     {
       icon: Calendar,
       label: 'Schedule Scrimmage',
       path: '/create-scrimmage',
-      locked: false,
-      requiredTier: null,
+      locked: !isPlayerPro && !isCommissioner,
+      requiredTier: 'PRO',
       bgColor: 'bg-blue-500/20',
       iconColor: 'text-blue-500',
     },
@@ -29,8 +37,8 @@ export function SlideOutMenu() {
       icon: UserPlus,
       label: 'Invite Groups',
       path: '/invite-groups',
-      locked: false,
-      requiredTier: null,
+      locked: !isPlayerPro && !isCommissioner,
+      requiredTier: 'PRO',
       bgColor: 'bg-teal-500/20',
       iconColor: 'text-teal-500',
     },
@@ -38,7 +46,7 @@ export function SlideOutMenu() {
       icon: Settings,
       label: 'Scrimmage Management',
       path: '/scrimmage-management',
-      locked: !canAccessPremiumFeatures(),
+      locked: !isPlayerPro && !isCommissioner,
       requiredTier: 'PRO',
       bgColor: 'bg-purple-500/20',
       iconColor: 'text-purple-500',
@@ -47,8 +55,8 @@ export function SlideOutMenu() {
       icon: Users,
       label: 'Create a Team',
       path: '/create-team',
-      locked: false,
-      requiredTier: null,
+      locked: !isPlayerPro && !isCommissioner,
+      requiredTier: 'PRO',
       bgColor: 'bg-cyan-500/20',
       iconColor: 'text-cyan-500',
     },
@@ -56,7 +64,7 @@ export function SlideOutMenu() {
       icon: Plus,
       label: 'Create a League',
       path: '/create-league',
-      locked: !canManageLeague(),
+      locked: !isCommissioner,
       requiredTier: 'COMMISSIONER',
       bgColor: 'bg-green-500/20',
       iconColor: 'text-green-500',
@@ -74,8 +82,8 @@ export function SlideOutMenu() {
       icon: Trophy,
       label: 'Tournaments',
       path: '/tournaments',
-      locked: false,
-      requiredTier: null,
+      locked: !isCommissioner,
+      requiredTier: 'COMMISSIONER',
       bgColor: 'bg-orange-500/20',
       iconColor: 'text-orange-500',
     },
@@ -97,12 +105,21 @@ export function SlideOutMenu() {
     }
     
     setPageTransitionDirection('up');
-    // Close the sheet first, then navigate after a short delay
-    // This ensures the overlay closes properly before route change
+    pendingNavigationRef.current = path;
     setOpen(false);
-    setTimeout(() => {
-      navigate(path);
-    }, 150);
+  };
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    // When sheet closes and we have a pending navigation, execute it
+    if (!isOpen && pendingNavigationRef.current) {
+      const path = pendingNavigationRef.current;
+      pendingNavigationRef.current = null;
+      // Wait for sheet animation to fully complete (300ms is typical for Radix animations)
+      setTimeout(() => {
+        navigate(path);
+      }, 300);
+    }
   };
 
   // Don't render if not on allowed screens
@@ -114,7 +131,7 @@ export function SlideOutMenu() {
     <>
       {/* Fixed header bar with menu icon */}
       <div className="fixed top-[32px] right-6 z-50 flex items-center gap-2">
-        <Sheet open={open} onOpenChange={setOpen}>
+        <Sheet open={open} onOpenChange={handleOpenChange}>
           <SheetTrigger asChild>
             <button
               className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
