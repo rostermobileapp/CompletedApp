@@ -97,8 +97,12 @@ export function SlideOutMenu() {
     }
     
     setPageTransitionDirection('up');
-    navigate(path);
+    // Close the sheet first, then navigate after a short delay
+    // This ensures the overlay closes properly before route change
     setOpen(false);
+    setTimeout(() => {
+      navigate(path);
+    }, 150);
   };
 
   // Don't render if not on allowed screens
