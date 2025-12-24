@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -98,6 +98,13 @@ export function SlideOutMenu() {
     },
   ];
 
+  // Close sheet when navigating away from allowed screens
+  useEffect(() => {
+    if (!shouldShowHamburger && open) {
+      setOpen(false);
+    }
+  }, [shouldShowHamburger, open]);
+
   const handleNavigate = (path: string, locked: boolean) => {
     if (locked) {
       setShowPremiumAlert(true);
@@ -105,6 +112,7 @@ export function SlideOutMenu() {
     }
     
     setPageTransitionDirection('up');
+    // Store the path and close the sheet
     pendingNavigationRef.current = path;
     setOpen(false);
   };
@@ -115,31 +123,32 @@ export function SlideOutMenu() {
     if (!isOpen && pendingNavigationRef.current) {
       const path = pendingNavigationRef.current;
       pendingNavigationRef.current = null;
-      // Wait for sheet animation to fully complete (300ms is typical for Radix animations)
+      // Wait for sheet animation to fully complete
       setTimeout(() => {
         navigate(path);
-      }, 300);
+      }, 350);
     }
   };
 
-  // Don't render if not on allowed screens
-  if (!shouldShowHamburger) {
-    return null;
-  }
-
+  // Always render the Sheet component to ensure proper cleanup
+  // Just hide the trigger button when not on allowed screens
   return (
     <>
-      {/* Fixed header bar with menu icon */}
-      <div className="fixed top-[32px] right-6 z-50 flex items-center gap-2">
-        <Sheet open={open} onOpenChange={handleOpenChange}>
-          <SheetTrigger asChild>
-            <button
-              className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
-              data-testid="button-hamburger-menu"
-            >
-              <Menu className="w-8 h-8 text-foreground" />
-            </button>
-          </SheetTrigger>
+      {/* Fixed header bar with menu icon - only visible on allowed screens */}
+      {shouldShowHamburger && (
+        <div className="fixed top-[32px] right-6 z-50 flex items-center gap-2">
+          <button
+            onClick={() => setOpen(true)}
+            className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
+            data-testid="button-hamburger-menu"
+          >
+            <Menu className="w-8 h-8 text-foreground" />
+          </button>
+        </div>
+      )}
+      
+      {/* Sheet is always rendered to ensure proper overlay cleanup */}
+      <Sheet open={open} onOpenChange={handleOpenChange}>
         <SheetContent 
           side="right" 
           className="w-[85%] sm:w-[400px] h-screen border-l border-border bg-background flex flex-col [&>button]:hidden"
@@ -179,8 +188,7 @@ export function SlideOutMenu() {
             ))}
           </div>
         </SheetContent>
-        </Sheet>
-      </div>
+      </Sheet>
       
       <PremiumFeatureAlert 
         open={showPremiumAlert} 
