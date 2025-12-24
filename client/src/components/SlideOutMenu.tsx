@@ -200,14 +200,16 @@ export function SlideOutMenu() {
                       {item.label}
                     </span>
                   </div>
-                  {showLock ? (
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-red-500">LOCKED</span>
-                      <Lock className="w-4 h-4 text-red-500" />
-                    </div>
-                  ) : (
-                    <div className="text-muted-foreground text-base">→</div>
-                  )}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {showLock ? (
+                      <>
+                        <span className="text-xs text-red-500 font-bold">LOCKED</span>
+                        <Lock className="w-5 h-5 text-red-500" />
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground text-lg font-bold">→</span>
+                    )}
+                  </div>
                 </button>
               );
             })}
