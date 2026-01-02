@@ -1,0 +1,77 @@
+UI Enhancement: Implement Swipeable Screen Navigation with Bottom Nav Bar
+I need to create a fluid, swipeable interface between the main screens that are linked to the bottom navigation bar.
+Screens Involved (Left to Right Order):
+
+My Team
+Messages
+Home
+Payments
+Profile
+
+CRITICAL REQUIREMENT - Zero Lag/Loading:
+
+ALL 5 screens MUST be pre-loaded and kept in memory at all times
+There should be ZERO loading time, lag, or delay when swiping between screens
+No loading spinners, skeleton screens, or "loading..." states during navigation
+All screen data should be fetched and cached before user initiates navigation
+Screens should be fully rendered in the background (off-screen) and ready to display instantly
+Navigation should feel completely instantaneous - like flipping between pages in a book
+Pre-render all components, images, and data for each screen on initial app load
+
+Required Functionality:
+Swipe Gestures:
+
+Users should be able to swipe left/right to navigate between adjacent screens
+Swipe right: move to the previous screen (e.g., Home → Messages → My Team)
+Swipe left: move to the next screen (e.g., Home → Payments → Profile)
+Smooth, fluid transitions with natural scrolling momentum
+Visual feedback during swipe (screen should follow finger/touch movement)
+If user is on first screen (My Team), swiping right should not navigate anywhere
+If user is on last screen (Profile), swiping left should not navigate anywhere
+
+Bottom Navigation Bar Integration:
+
+When clicking a navigation icon, the screen should slide/transition smoothly to the selected screen (not just instantly switch)
+The active screen indicator should update to match the current screen
+Navigation bar should remain fixed at the bottom during all transitions
+Badge notifications (like the "2" on Payments) should remain visible and update appropriately
+
+Implementation Notes:
+
+Consider using a carousel/swiper component (like Swiper.js, React Swipeable Views, or similar) with preloadImages and lazy: false options
+Mount all 5 screens simultaneously in the DOM from app initialization
+Use CSS transforms (translateX) for positioning screens, not conditional rendering
+All screens should exist in a horizontal container that shifts position, not load/unload dynamically
+Implement touch event listeners for swipe detection
+Set transition animations (recommend 300-400ms duration with ease-out easing)
+Maintain component state and scroll position for ALL screens at all times
+Disable vertical scrolling during horizontal swipe gesture to prevent conflict
+Pre-fetch all API data needed for each screen on app load or in background
+Cache images and assets to prevent any load time
+
+Performance Strategy:
+
+Initialize all 5 screen components on app load
+Keep all screens mounted and in memory (do not unmount when navigating away)
+Use CSS visibility/positioning to show/hide screens rather than conditional rendering
+Pre-load all data, images, and resources before allowing navigation
+Consider using service workers or aggressive caching strategies
+
+User Experience Goals:
+
+Natural, app-like navigation similar to iOS/Android native apps
+Absolutely zero perceivable delay or loading when switching screens
+Smooth animations without lag or jank
+Clear visual feedback during interaction
+Consistent behavior whether navigating via swipe or bottom nav clicks
+Should feel like a native mobile app, not a web app
+
+Edge Cases to Handle:
+
+Rapid successive swipes (should remain smooth with no lag)
+Swipe gestures that don't complete (user releases before threshold)
+Clicking nav bar during an active swipe transition
+Screen orientation changes
+Background data updates while user is on different screens
+
+Please implement this swipeable navigation system with emphasis on zero loading time and instant transitions to create the smoothest possible mobile app experience.
