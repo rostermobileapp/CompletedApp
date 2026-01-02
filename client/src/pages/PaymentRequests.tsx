@@ -136,9 +136,11 @@ export default function PaymentRequests() {
     return filterPaymentRequests(allCreatedRequests as any[]);
   }, [allCreatedRequests, selectedType, selectedId, scrimmageLeagueMap, conversationDataMap, teamLeagueMap]);
 
+  // For "Requests for Me", show ALL payment requests sent to the user regardless of dashboard selection
+  // These are personal requests addressed to the user and should always be visible
   const receivedRequestsArray = useMemo(() => {
-    return filterPaymentRequests(allReceivedRequests as any[]);
-  }, [allReceivedRequests, selectedType, selectedId, scrimmageLeagueMap, conversationDataMap, teamLeagueMap]);
+    return allReceivedRequests as any[];
+  }, [allReceivedRequests]);
 
   const getPaymentStatus = (request: any, isCreator: boolean) => {
     if (isCreator) {
