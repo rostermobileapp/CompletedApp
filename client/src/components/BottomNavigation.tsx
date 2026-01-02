@@ -4,14 +4,25 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useKeyboard } from '@/hooks/use-keyboard';
+import { useSwipeableNav, SCREEN_ORDER, ScreenId } from '@/context/SwipeableNavContext';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
-export function BottomNavigation() {
+interface BottomNavigationProps {
+  useSwipeNav?: boolean;
+}
+
+export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps) {
   const [location, navigate] = useLocation();
   const { selectedType, selectedId } = useDashboardSelection();
   const { isOpen: isKeyboardOpen } = useKeyboard();
   
-  // Fetch unread message count
+  let swipeNav: ReturnType<typeof useSwipeableNav> | null = null;
+  try {
+    swipeNav = useSwipeableNav();
+  } catch {
+    swipeNav = null;
+  }
+  
   const { data: unreadData } = useQuery({
     queryKey: ['/api/messages/unread-count'],
     refetchInterval: 10000,
@@ -20,7 +31,6 @@ export function BottomNavigation() {
   
   const unreadCount = (unreadData as { count: number } | undefined)?.count ?? 0;
 
-  // Fetch unpaid payment requests count
   const { data: unpaidPaymentData } = useQuery({
     queryKey: ['/api/payment-requests/unpaid-count'],
     refetchInterval: 10000,
@@ -29,7 +39,7 @@ export function BottomNavigation() {
   
   const unpaidPaymentCount = (unpaidPaymentData as { count: number } | undefined)?.count ?? 0;
   
-  const getActiveId = (pathname: string) => {
+  const getActiveId = (pathname: string): ScreenId | '' => {
     if (pathname === '/') return 'home';
     if (pathname.startsWith('/teams') || pathname.startsWith('/tournament-teams')) return 'teams';
     if (pathname.startsWith('/messages')) return 'messages';
@@ -38,33 +48,31 @@ export function BottomNavigation() {
     return '';
   };
   
-  const activeId = getActiveId(location);
+  const activeId = useSwipeNav && swipeNav ? SCREEN_ORDER[swipeNav.activeIndex] : getActiveId(location);
   
-  const handleNavClick = (shortcutId: string) => {
-    // Handle dynamic routing based on dashboard selection
-    if (shortcutId === 'teams') {
-      if (selectedType === 'tournament' && selectedId) {
-        // Navigate to tournament teams page (matching league My Team design)
-        navigate(`/tournament-teams/${selectedId}`);
-      } else {
-        // Navigate to teams page for league teams
-        navigate('/teams');
+  const handleNavClick = (shortcutId: ScreenId) => {
+    if (useSwipeNav && swipeNav) {
+      swipeNav.navigateToScreen(shortcutId, true);
+    } else {
+      if (shortcutId === 'teams') {
+        if (selectedType === 'tournament' && selectedId) {
+          navigate(`/tournament-teams/${selectedId}`);
+        } else {
+          navigate('/teams');
+        }
+      } else if (shortcutId === 'messages') {
+        navigate('/messages');
+      } else if (shortcutId === 'home') {
+        navigate('/');
+      } else if (shortcutId === 'payments') {
+        navigate('/payment-requests');
+      } else if (shortcutId === 'profile') {
+        navigate('/profile');
       }
-    } else if (shortcutId === 'messages') {
-      // Messages page filters automatically based on dashboard selection
-      navigate('/messages');
-    } else if (shortcutId === 'home') {
-      // Always navigate to main dashboard - it will show filtered content based on selection
-      navigate('/');
-    } else if (shortcutId === 'payments') {
-      navigate('/payment-requests');
-    } else if (shortcutId === 'profile') {
-      navigate('/profile');
     }
   };
   
-  // Define fixed navigation shortcuts
-  const FIXED_SHORTCUTS = [
+  const FIXED_SHORTCUTS: { id: ScreenId; icon: typeof Users | null; label: string }[] = [
     { id: 'teams', icon: Users, label: 'My Team' },
     { id: 'messages', icon: MessageCircle, label: 'Messages' },
     { id: 'home', icon: null, label: 'Home' },
