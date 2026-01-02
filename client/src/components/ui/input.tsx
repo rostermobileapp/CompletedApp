@@ -1,9 +1,17 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { useKeyboardAwareInput } from "@/hooks/use-keyboard"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, onFocus, ...props }, ref) => {
+    const { handleFocus: keyboardFocus } = useKeyboardAwareInput();
+    
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      keyboardFocus(e);
+      onFocus?.(e);
+    };
+    
     return (
       <input
         type={type}
@@ -12,6 +20,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className
         )}
         ref={ref}
+        onFocus={handleFocus}
         {...props}
       />
     )

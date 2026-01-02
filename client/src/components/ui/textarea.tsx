@@ -1,11 +1,19 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { useKeyboardAwareInput } from "@/hooks/use-keyboard"
 
 const Textarea = React.forwardRef<
   HTMLTextAreaElement,
   React.ComponentProps<"textarea">
->(({ className, ...props }, ref) => {
+>(({ className, onFocus, ...props }, ref) => {
+  const { handleFocus: keyboardFocus } = useKeyboardAwareInput();
+  
+  const handleFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    keyboardFocus(e);
+    onFocus?.(e);
+  };
+  
   return (
     <textarea
       className={cn(
@@ -13,6 +21,7 @@ const Textarea = React.forwardRef<
         className
       )}
       ref={ref}
+      onFocus={handleFocus}
       {...props}
     />
   )

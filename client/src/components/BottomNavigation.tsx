@@ -3,11 +3,13 @@ import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
+import { useKeyboard } from '@/hooks/use-keyboard';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
 export function BottomNavigation() {
   const [location, navigate] = useLocation();
   const { selectedType, selectedId } = useDashboardSelection();
+  const { isOpen: isKeyboardOpen } = useKeyboard();
   
   // Fetch unread message count
   const { data: unreadData } = useQuery({
@@ -70,6 +72,10 @@ export function BottomNavigation() {
     { id: 'profile', icon: User, label: 'Profile' },
   ];
   
+  if (isKeyboardOpen) {
+    return null;
+  }
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50" data-testid="bottom-navigation">
       <div className="grid py-2 grid-cols-5 bg-[#e2e2e2] dark:bg-[#212121]">
