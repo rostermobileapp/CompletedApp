@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { FixedBottomButton } from '@/components/FixedBottomButton';
 
 // Create form schema - includes UI fields that map to database fields
 const createScrimmageSchema = createScrimmageRequestSchema.extend({
@@ -522,7 +523,7 @@ export default function CreateScrimmage() {
   // All users now have free access to scrimmage creation
 
   return (
-    <div className="min-h-screen flex flex-col pb-24" data-testid="create-scrimmage-page">
+    <div className="min-h-screen flex flex-col pb-48" data-testid="create-scrimmage-page">
       {/* Header */}
       <div className="p-6 pt-[4px] pb-[4px] mt-[20px] mb-[20px] pl-[24px] pr-[24px]">
         <div className="flex items-center gap-4 mb-6">
@@ -548,7 +549,7 @@ export default function CreateScrimmage() {
         </p>
       </div>
       {/* Form */}
-      <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 space-y-6">
+      <form id="create-scrimmage-form" onSubmit={form.handleSubmit(onSubmit)} className="px-6 space-y-6">
         {/* Scrimmage Details */}
         <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] pl-[4px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -1512,31 +1513,32 @@ export default function CreateScrimmage() {
           </div>
         )}
 
-        {/* Submit Button */}
-        <div className="pb-6">
-          <Button
-            type="submit"
-            size="lg"
-            className="w-full"
-            disabled={
-              createScrimmageRequest.isPending || 
-              scrimmageLoading ||
-              (!isEditMode && !selectedLeague?.id) || 
-              (!isEditMode && selectedMemberIds.length === 0 && selectedEmails.length === 0)
-            }
-            data-testid="button-create-scrimmage"
-          >
-            {createScrimmageRequest.isPending 
-              ? (isEditMode ? 'Updating...' : 'Creating...') 
-              : isEditMode
-                ? 'Update Scrimmage'
-                : !selectedLeague?.id 
-                  ? 'Join a League First' 
-                  : 'Create Scrimmage Request'
-            }
-          </Button>
-        </div>
       </form>
+      
+      <FixedBottomButton>
+        <Button
+          type="submit"
+          form="create-scrimmage-form"
+          size="lg"
+          className="w-full"
+          disabled={
+            createScrimmageRequest.isPending || 
+            scrimmageLoading ||
+            (!isEditMode && !selectedLeague?.id) || 
+            (!isEditMode && selectedMemberIds.length === 0 && selectedEmails.length === 0)
+          }
+          data-testid="button-create-scrimmage"
+        >
+          {createScrimmageRequest.isPending 
+            ? (isEditMode ? 'Updating...' : 'Creating...') 
+            : isEditMode
+              ? 'Update Scrimmage'
+              : !selectedLeague?.id 
+                ? 'Join a League First' 
+                : 'Create Scrimmage Request'
+          }
+        </Button>
+      </FixedBottomButton>
     </div>
   );
 }

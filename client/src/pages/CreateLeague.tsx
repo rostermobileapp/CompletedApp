@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Crown, MapPin, Calendar } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { FixedBottomButton } from '@/components/FixedBottomButton';
 import { insertLeagueSchema } from '@shared/schema';
 import type { z } from 'zod';
 import { usePermissions } from '@/context/SubscriptionContext';
@@ -77,7 +78,7 @@ export default function CreateLeague() {
   // All users now have commissioner access to create leagues
 
   return (
-    <div className="min-h-screen flex flex-col pb-24" data-testid="create-league-page">
+    <div className="min-h-screen flex flex-col pb-48" data-testid="create-league-page">
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
@@ -101,7 +102,7 @@ export default function CreateLeague() {
       
       {/* Form */}
       <div className="px-6">
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form id="create-league-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Basic Information */}
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
@@ -275,17 +276,20 @@ export default function CreateLeague() {
             </div>
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={createLeagueMutation.isPending}
-            className="w-full bg-warning text-black rounded-lg py-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="button-create-league"
-          >
-            {createLeagueMutation.isPending ? 'Creating League...' : 'Create League'}
-          </button>
         </form>
       </div>
+      
+      <FixedBottomButton>
+        <button
+          type="submit"
+          form="create-league-form"
+          disabled={createLeagueMutation.isPending}
+          className="w-full bg-warning text-black rounded-lg py-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="button-create-league"
+        >
+          {createLeagueMutation.isPending ? 'Creating League...' : 'Create League'}
+        </button>
+      </FixedBottomButton>
     </div>
   );
 }

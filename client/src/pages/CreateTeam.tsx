@@ -11,6 +11,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Upload, Copy, CheckCircle2, Users, UserPlus, Image as ImageIcon, Building2, Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { FixedBottomButton } from '@/components/FixedBottomButton';
 
 interface TeamResponse {
   id: string;
@@ -488,19 +489,20 @@ export default function CreateTeam() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-4xl pb-48">
       <h1 className="text-3xl font-bold mb-6">Create a Standalone Team</h1>
       
       {!createdTeam ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Team Details</CardTitle>
-            <CardDescription>
-              Create a team independent of any league. You can invite players and request to join a league later.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreateTeam} className="space-y-4">
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Team Details</CardTitle>
+              <CardDescription>
+                Create a team independent of any league. You can invite players and request to join a league later.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form id="create-team-form" onSubmit={handleCreateTeam} className="space-y-4">
               <div>
                 <label htmlFor="teamName" className="block text-sm font-medium mb-2">
                   Team Name *
@@ -576,17 +578,22 @@ export default function CreateTeam() {
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                data-testid="button-create-team"
-                disabled={createTeamMutation.isPending || !teamName.trim()}
-                className="w-full"
-              >
-                {createTeamMutation.isPending ? 'Creating...' : 'Create Team'}
-              </Button>
             </form>
           </CardContent>
         </Card>
+        
+        <FixedBottomButton>
+          <Button
+            type="submit"
+            form="create-team-form"
+            data-testid="button-create-team"
+            disabled={createTeamMutation.isPending || !teamName.trim()}
+            className="w-full"
+          >
+            {createTeamMutation.isPending ? 'Creating...' : 'Create Team'}
+          </Button>
+        </FixedBottomButton>
+        </>
       ) : (
         <div className="space-y-6">
           <Card className="border-green-500/50 bg-green-500/10">

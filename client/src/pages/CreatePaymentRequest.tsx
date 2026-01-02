@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
+import { FixedBottomButton } from '@/components/FixedBottomButton';
 
 type CreatePaymentRequestForm = z.infer<typeof createPaymentRequestSchema>;
 
@@ -168,7 +169,7 @@ export default function CreatePaymentRequest() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-24" data-testid="create-payment-request-page">
+    <div className="min-h-screen flex flex-col pb-48" data-testid="create-payment-request-page">
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
@@ -189,7 +190,7 @@ export default function CreatePaymentRequest() {
         </div>
 
         {/* Form */}
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form id="create-payment-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Payment Details Card */}
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="flex items-center gap-2 mb-4">
@@ -389,17 +390,20 @@ export default function CreatePaymentRequest() {
             )}
           </div>
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={createPaymentRequestMutation.isPending || !selectedLeague}
-            data-testid="button-submit"
-          >
-            {createPaymentRequestMutation.isPending ? 'Creating...' : 'Create Payment Request'}
-          </Button>
         </form>
       </div>
+
+      <FixedBottomButton>
+        <Button
+          type="submit"
+          form="create-payment-form"
+          className="w-full"
+          disabled={createPaymentRequestMutation.isPending || !selectedLeague}
+          data-testid="button-submit"
+        >
+          {createPaymentRequestMutation.isPending ? 'Creating...' : 'Create Payment Request'}
+        </Button>
+      </FixedBottomButton>
 
       {/* Premium Feature Alert */}
       <PremiumFeatureAlert 
