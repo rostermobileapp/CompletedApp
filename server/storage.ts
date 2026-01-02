@@ -8467,15 +8467,67 @@ export class DatabaseStorage implements IStorage {
           user: r.users,
         }));
 
+        // Hydrate leagueId and teamId from related scrimmage or conversation
+        let leagueId: string | null = null;
+        let teamId: string | null = null;
+
+        if (request.relatedScrimmageId) {
+          const [scrimmage] = await db
+            .select({ leagueId: scrimmages.leagueId })
+            .from(scrimmages)
+            .where(eq(scrimmages.id, request.relatedScrimmageId));
+          if (scrimmage) {
+            leagueId = scrimmage.leagueId;
+          }
+        }
+
+        if (request.relatedConversationId) {
+          const [conversation] = await db
+            .select({ teamId: conversations.teamId, leagueId: conversations.leagueId })
+            .from(conversations)
+            .where(eq(conversations.id, request.relatedConversationId));
+          if (conversation) {
+            teamId = conversation.teamId;
+            if (!leagueId) {
+              leagueId = conversation.leagueId;
+            }
+            if (teamId && !leagueId) {
+              const [team] = await db
+                .select({ leagueId: teams.leagueId })
+                .from(teams)
+                .where(eq(teams.id, teamId));
+              if (team) {
+                leagueId = team.leagueId;
+              }
+            }
+          }
+        }
+
+        // Fallback: if no direct links, try to infer from creator's team membership
+        if (!leagueId && !teamId) {
+          const creatorRosters = await db
+            .select({ teamId: rosters.teamId, leagueId: teams.leagueId })
+            .from(rosters)
+            .innerJoin(teams, eq(rosters.teamId, teams.id))
+            .where(eq(rosters.userId, request.creatorId))
+            .limit(1);
+          if (creatorRosters.length > 0) {
+            teamId = creatorRosters[0].teamId;
+            leagueId = creatorRosters[0].leagueId;
+          }
+        }
+
         return {
           ...request,
           recipients,
+          leagueId,
+          teamId,
         };
       })
     );
   }
 
-  async getPaymentRequestsByRecipient(userId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]> {
+  async getPaymentRequestsByRecipient(userId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[]; leagueId?: string | null; teamId?: string | null })[]> {
     const recipientEntries = await db
       .select()
       .from(paymentRequestRecipients)
@@ -8509,10 +8561,66 @@ export class DatabaseStorage implements IStorage {
           user: r.users,
         }));
 
+        // Hydrate leagueId and teamId from related scrimmage or conversation
+        let leagueId: string | null = null;
+        let teamId: string | null = null;
+
+        if (request.relatedScrimmageId) {
+          const [scrimmage] = await db
+            .select({ leagueId: scrimmages.leagueId })
+            .from(scrimmages)
+            .where(eq(scrimmages.id, request.relatedScrimmageId));
+          if (scrimmage) {
+            leagueId = scrimmage.leagueId;
+          }
+        }
+
+        if (request.relatedConversationId) {
+          const [conversation] = await db
+            .select({ teamId: conversations.teamId, leagueId: conversations.leagueId })
+            .from(conversations)
+            .where(eq(conversations.id, request.relatedConversationId));
+          if (conversation) {
+            teamId = conversation.teamId;
+            // Use conversation's leagueId if not already set from scrimmage
+            if (!leagueId) {
+              leagueId = conversation.leagueId;
+            }
+            // If conversation has teamId but no leagueId, get league from team
+            if (teamId && !leagueId) {
+              const [team] = await db
+                .select({ leagueId: teams.leagueId })
+                .from(teams)
+                .where(eq(teams.id, teamId));
+              if (team) {
+                leagueId = team.leagueId;
+              }
+            }
+          }
+        }
+
+        // Fallback: if no direct links, try to infer from the current recipient's team membership
+        // This handles standalone payment requests by associating them with the recipient's team/league
+        // since we're viewing "Requests for Me" - show payments for teams the recipient is on
+        if (!leagueId && !teamId) {
+          const recipientRosters = await db
+            .select({ teamId: rosters.teamId, leagueId: teams.leagueId })
+            .from(rosters)
+            .innerJoin(teams, eq(rosters.teamId, teams.id))
+            .where(eq(rosters.userId, userId))
+            .limit(1);
+          if (recipientRosters.length > 0) {
+            teamId = recipientRosters[0].teamId;
+            leagueId = recipientRosters[0].leagueId;
+          }
+        }
+
         return {
           ...request,
           creator,
           recipients,
+          leagueId,
+          teamId,
         };
       })
     );
