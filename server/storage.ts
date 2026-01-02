@@ -8503,17 +8503,48 @@ export class DatabaseStorage implements IStorage {
           }
         }
 
-        // Fallback: if no direct links, try to infer from creator's team membership
-        if (!leagueId && !teamId) {
-          const creatorRosters = await db
-            .select({ teamId: rosters.teamId, leagueId: teams.leagueId })
-            .from(rosters)
-            .innerJoin(teams, eq(rosters.teamId, teams.id))
-            .where(eq(rosters.userId, request.creatorId))
-            .limit(1);
-          if (creatorRosters.length > 0) {
-            teamId = creatorRosters[0].teamId;
-            leagueId = creatorRosters[0].leagueId;
+        // Fallback: if no direct links, derive from recipients' team memberships
+        // Find teams that ALL recipients are members of (common teams)
+        if (!leagueId && !teamId && recipients.length > 0) {
+          const recipientUserIds = recipients.map(r => r.userId);
+          
+          // Get all team memberships for all recipients
+          const allMemberships = await db
+            .select({ userId: teamMemberships.userId, teamId: teamMemberships.teamId, leagueId: teams.leagueId })
+            .from(teamMemberships)
+            .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+            .where(inArray(teamMemberships.userId, recipientUserIds));
+          
+          // Group by team and count how many recipients are in each team
+          const teamCounts = new Map<string, { count: number; leagueId: string | null }>();
+          for (const m of allMemberships) {
+            const existing = teamCounts.get(m.teamId) || { count: 0, leagueId: m.leagueId };
+            teamCounts.set(m.teamId, { count: existing.count + 1, leagueId: m.leagueId });
+          }
+          
+          // Find the first team where ALL recipients are members
+          for (const [tId, data] of teamCounts) {
+            if (data.count >= recipientUserIds.length) {
+              teamId = tId;
+              leagueId = data.leagueId;
+              break;
+            }
+          }
+          
+          // If no common team, try to find a common league
+          if (!leagueId) {
+            const leagueCounts = new Map<string, number>();
+            for (const m of allMemberships) {
+              if (m.leagueId) {
+                leagueCounts.set(m.leagueId, (leagueCounts.get(m.leagueId) || 0) + 1);
+              }
+            }
+            for (const [lId, count] of leagueCounts) {
+              if (count >= recipientUserIds.length) {
+                leagueId = lId;
+                break;
+              }
+            }
           }
         }
 
@@ -8599,19 +8630,48 @@ export class DatabaseStorage implements IStorage {
           }
         }
 
-        // Fallback: if no direct links, try to infer from the current recipient's team membership
-        // This handles standalone payment requests by associating them with the recipient's team/league
-        // since we're viewing "Requests for Me" - show payments for teams the recipient is on
-        if (!leagueId && !teamId) {
-          const recipientRosters = await db
-            .select({ teamId: rosters.teamId, leagueId: teams.leagueId })
-            .from(rosters)
-            .innerJoin(teams, eq(rosters.teamId, teams.id))
-            .where(eq(rosters.userId, userId))
-            .limit(1);
-          if (recipientRosters.length > 0) {
-            teamId = recipientRosters[0].teamId;
-            leagueId = recipientRosters[0].leagueId;
+        // Fallback: if no direct links, derive from recipients' team memberships
+        // Find teams that ALL recipients are members of (common teams)
+        if (!leagueId && !teamId && recipients.length > 0) {
+          const recipientUserIds = recipients.map(r => r.userId);
+          
+          // Get all team memberships for all recipients
+          const allMemberships = await db
+            .select({ userId: teamMemberships.userId, teamId: teamMemberships.teamId, leagueId: teams.leagueId })
+            .from(teamMemberships)
+            .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+            .where(inArray(teamMemberships.userId, recipientUserIds));
+          
+          // Group by team and count how many recipients are in each team
+          const teamCounts = new Map<string, { count: number; leagueId: string | null }>();
+          for (const m of allMemberships) {
+            const existing = teamCounts.get(m.teamId) || { count: 0, leagueId: m.leagueId };
+            teamCounts.set(m.teamId, { count: existing.count + 1, leagueId: m.leagueId });
+          }
+          
+          // Find the first team where ALL recipients are members
+          for (const [tId, data] of teamCounts) {
+            if (data.count >= recipientUserIds.length) {
+              teamId = tId;
+              leagueId = data.leagueId;
+              break;
+            }
+          }
+          
+          // If no common team, try to find a common league
+          if (!leagueId) {
+            const leagueCounts = new Map<string, number>();
+            for (const m of allMemberships) {
+              if (m.leagueId) {
+                leagueCounts.set(m.leagueId, (leagueCounts.get(m.leagueId) || 0) + 1);
+              }
+            }
+            for (const [lId, count] of leagueCounts) {
+              if (count >= recipientUserIds.length) {
+                leagueId = lId;
+                break;
+              }
+            }
           }
         }
 
