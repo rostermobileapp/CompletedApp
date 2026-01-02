@@ -5,11 +5,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PermissionProvider } from "@/context/SubscriptionContext";
 import { ThemeProvider } from "@/context/ThemeContext";
-import { SwipeableNavProvider } from "@/context/SwipeableNavContext";
 import { BottomNavigation } from "@/components/BottomNavigation";
-import { SwipeableScreenContainer } from "@/components/SwipeableScreenContainer";
 import { HPIBBanner } from "@/components/HPIBBanner";
+import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
+import { SwipeableMainScreens } from "@/components/SwipeableMainScreens";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { useAuth } from "@/hooks/useAuth";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
@@ -22,9 +22,7 @@ import ResetPassword from "@/pages/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
 import LeagueSearch from "@/pages/LeagueSearch";
 import TeamSearch from "@/pages/TeamSearch";
-import Teams from "@/pages/Teams";
 import Messages from "@/pages/Messages";
-import Profile from "@/pages/Profile";
 import UserProfile from "@/pages/UserProfile";
 import Subscription from "@/pages/Subscription";
 import Roster from "@/pages/Roster";
@@ -44,7 +42,6 @@ import Stats from "@/pages/Stats";
 import StatsManagement from "@/pages/StatsManagement";
 import ScorekeeperDashboard from "@/pages/ScorekeeperDashboard";
 import CreatePaymentRequest from "@/pages/CreatePaymentRequest";
-import PaymentRequests from "@/pages/PaymentRequests";
 import PaymentRequestDetail from "@/pages/PaymentRequestDetail";
 import ScoreVerification from "@/pages/ScoreVerification";
 import FacilityBrowse from "@/pages/FacilityBrowse";
@@ -67,114 +64,11 @@ import LeagueTournamentSearch from "@/pages/LeagueTournamentSearch";
 import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 import MediaGalleryPage from "@/pages/MediaGallery";
 
-const MAIN_SCREEN_ROUTES = ['/', '/teams', '/messages', '/payment-requests', '/profile'];
-
-function isMainScreenRoute(path: string): boolean {
-  return MAIN_SCREEN_ROUTES.includes(path);
-}
-
-function MainScreensSwipeable() {
-  const { user } = useAuth();
-  const bottomPadding = user?.role === 'free_tier' ? '132px' : '82px';
-  
-  const screens = [
-    <Teams key="teams" />,
-    <Messages key="messages" />,
-    <Dashboard key="home" />,
-    <PaymentRequests key="payments" />,
-    <Profile key="profile" />,
-  ];
-
-  return <SwipeableScreenContainer screens={screens} />;
-}
-
-function SubPageRoutes() {
-  const { user } = useAuth();
-  const bottomPadding = user?.role === 'free_tier' ? '132px' : '82px';
-  
-  return (
-    <div className="w-full min-h-screen bg-background" style={{ paddingBottom: bottomPadding }}>
-      <Switch>
-        <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
-        <Route path="/league-search" component={LeagueSearch} />
-        <Route path="/team-search" component={TeamSearch} />
-        <Route path="/user/:userId" component={UserProfile} />
-        <Route path="/subscription" component={Subscription} />
-        <Route path="/roster" component={Roster} />
-        <Route path="/create-league" component={CreateLeague} />
-        <Route path="/create-team" component={CreateTeam} />
-        <Route path="/create-scrimmage" component={CreateScrimmage} />
-        <Route path="/edit-scrimmage/:id" component={CreateScrimmage} />
-        <Route path="/scrimmage-management" component={ScrimmageManagement} />
-        <Route path="/invite-groups" component={InviteGroups} />
-        <Route path="/invite-groups/new" component={EditInviteGroup} />
-        <Route path="/invite-groups/:id" component={EditInviteGroup} />
-        <Route path="/league-management" component={LeagueManagement} />
-        <Route path="/league/:leagueId/score-verification" component={ScoreVerification} />
-        <Route path="/league-list" component={LeagueList} />
-        <Route path="/calendar" component={Calendar} />
-        <Route path="/game/:id" component={GameDetails} />
-        <Route path="/scrimmage/:id" component={GameDetails} />
-        <Route path="/announcements" component={Announcements} />
-        <Route path="/substitute-confirmations" component={SubstituteConfirmations} />
-        <Route path="/stats" component={Stats} />
-        <Route path="/stats-management" component={StatsManagement} />
-        <Route path="/scorekeeper" component={ScorekeeperDashboard} />
-        <Route path="/create-payment-request" component={CreatePaymentRequest} />
-        <Route path="/payment-requests/:id" component={PaymentRequestDetail} />
-        <Route path="/facilities" component={FacilityBrowse} />
-        <Route path="/facilities/:id" component={FacilityDetail} />
-        <Route path="/facility-memberships" component={FacilityMemberships} />
-        <Route path="/calendar-events/create" component={CreateCalendarEvent} />
-        <Route path="/tournaments" component={TournamentsLanding} />
-        <Route path="/tournament-search" component={TournamentSearch} />
-        <Route path="/tournaments/create" component={TournamentCreateStandalone} />
-        <Route path="/leagues/:leagueId/tournaments/create" component={TournamentCreate} />
-        <Route path="/leagues/:leagueId/tournaments" component={Tournaments} />
-        <Route path="/tournaments/:tournamentId/edit" component={TournamentEdit} />
-        <Route path="/tournaments/:tournamentId/custom-builder" component={CustomBracketBuilderPage} />
-        <Route path="/tournament-teams/:tournamentId" component={TournamentTeams} />
-        <Route path="/tournaments/:tournamentId" component={TournamentDetail} />
-        <Route path="/media/tournament/:id" component={MediaGalleryPage} />
-        <Route path="/media/league/:id" component={MediaGalleryPage} />
-        <Route path="/media/team/:id" component={MediaGalleryPage} />
-        <Route path="/privacy" component={Privacy} />
-        <Route path="/privacy-policy" component={PrivacyPolicy} />
-        <Route path="/terms-of-service" component={TermsOfService} />
-        <Route path="/admin/stripe" component={StripeAdmin} />
-        <Route path="/messages/:conversationId" component={Messages} />
-        <Route component={NotFound} />
-      </Switch>
-    </div>
-  );
-}
-
-function AuthenticatedApp() {
-  const [location] = useLocation();
-  const isMainScreen = isMainScreenRoute(location);
-
-  return (
-    <SwipeableNavProvider>
-      <ScrollToTop />
-      <NativelyNotificationsInitializer />
-      <div className="relative min-h-screen w-full">
-        <SlideOutMenu />
-        {isMainScreen ? (
-          <MainScreensSwipeable />
-        ) : (
-          <SubPageRoutes />
-        )}
-        <HPIBBanner placement="bottom-nav" />
-        <BottomNavigation useSwipeNav={isMainScreen} />
-      </div>
-    </SwipeableNavProvider>
-  );
-}
-
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
 
+  // Always render password reset pages standalone, regardless of auth state
   if (location === '/reset-password') {
     return <ResetPassword />;
   }
@@ -210,7 +104,68 @@ function Router() {
 
   return (
     <PermissionProvider>
-      <AuthenticatedApp />
+      <ScrollToTop />
+      <NativelyNotificationsInitializer />
+      <div className="relative min-h-screen w-full">
+        <SlideOutMenu />
+        <SwipeableMainScreens>
+          <PageTransition>
+              <Switch>
+              <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
+              <Route path="/league-search" component={LeagueSearch} />
+              <Route path="/team-search" component={TeamSearch} />
+              <Route path="/messages/:conversationId" component={Messages} />
+              <Route path="/user/:userId" component={UserProfile} />
+              <Route path="/subscription" component={Subscription} />
+              <Route path="/roster" component={Roster} />
+              <Route path="/create-league" component={CreateLeague} />
+              <Route path="/create-team" component={CreateTeam} />
+              <Route path="/create-scrimmage" component={CreateScrimmage} />
+              <Route path="/edit-scrimmage/:id" component={CreateScrimmage} />
+              <Route path="/scrimmage-management" component={ScrimmageManagement} />
+              <Route path="/invite-groups" component={InviteGroups} />
+              <Route path="/invite-groups/new" component={EditInviteGroup} />
+              <Route path="/invite-groups/:id" component={EditInviteGroup} />
+              <Route path="/league-management" component={LeagueManagement} />
+              <Route path="/league/:leagueId/score-verification" component={ScoreVerification} />
+              <Route path="/league-list" component={LeagueList} />
+              <Route path="/calendar" component={Calendar} />
+              <Route path="/game/:id" component={GameDetails} />
+              <Route path="/scrimmage/:id" component={GameDetails} />
+              <Route path="/announcements" component={Announcements} />
+              <Route path="/substitute-confirmations" component={SubstituteConfirmations} />
+              <Route path="/stats" component={Stats} />
+              <Route path="/stats-management" component={StatsManagement} />
+              <Route path="/scorekeeper" component={ScorekeeperDashboard} />
+              <Route path="/create-payment-request" component={CreatePaymentRequest} />
+              <Route path="/payment-requests/:id" component={PaymentRequestDetail} />
+              <Route path="/facilities" component={FacilityBrowse} />
+              <Route path="/facilities/:id" component={FacilityDetail} />
+              <Route path="/facility-memberships" component={FacilityMemberships} />
+              <Route path="/calendar-events/create" component={CreateCalendarEvent} />
+              <Route path="/tournaments" component={TournamentsLanding} />
+              <Route path="/tournament-search" component={TournamentSearch} />
+              <Route path="/tournaments/create" component={TournamentCreateStandalone} />
+              <Route path="/leagues/:leagueId/tournaments/create" component={TournamentCreate} />
+              <Route path="/leagues/:leagueId/tournaments" component={Tournaments} />
+              <Route path="/tournaments/:tournamentId/edit" component={TournamentEdit} />
+              <Route path="/tournaments/:tournamentId/custom-builder" component={CustomBracketBuilderPage} />
+              <Route path="/tournament-teams/:tournamentId" component={TournamentTeams} />
+              <Route path="/tournaments/:tournamentId" component={TournamentDetail} />
+              <Route path="/media/tournament/:id" component={MediaGalleryPage} />
+              <Route path="/media/league/:id" component={MediaGalleryPage} />
+              <Route path="/media/team/:id" component={MediaGalleryPage} />
+              <Route path="/privacy" component={Privacy} />
+              <Route path="/privacy-policy" component={PrivacyPolicy} />
+              <Route path="/terms-of-service" component={TermsOfService} />
+              <Route path="/admin/stripe" component={StripeAdmin} />
+              <Route component={Dashboard} />
+            </Switch>
+          </PageTransition>
+        </SwipeableMainScreens>
+          <HPIBBanner placement="bottom-nav" />
+          <BottomNavigation />
+        </div>
     </PermissionProvider>
   );
 }
