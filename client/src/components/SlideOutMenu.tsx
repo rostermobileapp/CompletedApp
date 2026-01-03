@@ -22,7 +22,7 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
   const open = isControlled ? externalOpen : internalOpen;
   const setOpen = isControlled ? externalOnOpenChange : setInternalOpen;
 
-  const shouldShowHamburger = !isControlled && (location === '/' || location === '/profile');
+  const shouldShowHamburger = !isControlled && location === '/profile';
 
   // Permission checks:
   // Free tier: Only Scorekeeper (if assigned by commissioner)
