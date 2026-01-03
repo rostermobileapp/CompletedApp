@@ -3,6 +3,7 @@
 import * as React from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { cva, type VariantProps } from "class-variance-authority"
+import { motion, AnimatePresence } from "framer-motion"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -21,7 +22,7 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/80 transition-opacity duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
+      "fixed inset-0 z-50 bg-black/80",
       className
     )}
     {...props}
@@ -31,14 +32,14 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-6 shadow-lg transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+  "fixed z-50 gap-4 bg-background p-6 shadow-lg",
   {
     variants: {
       side: {
-        top: "inset-x-0 top-0 border-b data-[state=closed]:-translate-y-full data-[state=open]:translate-y-0",
-        bottom: "inset-x-0 bottom-0 border-t data-[state=closed]:translate-y-full data-[state=open]:translate-y-0",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm data-[state=closed]:-translate-x-full data-[state=open]:translate-x-0",
-        right: "inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm data-[state=closed]:translate-x-full data-[state=open]:translate-x-0",
+        top: "inset-x-0 top-0 border-b",
+        bottom: "inset-x-0 bottom-0 border-t",
+        left: "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
+        right: "inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
       },
     },
     defaultVariants: {
@@ -71,6 +72,77 @@ const SheetContent = React.forwardRef<
   </SheetPortal>
 ))
 SheetContent.displayName = SheetPrimitive.Content.displayName
+
+interface AnimatedSheetContentProps extends Omit<SheetContentProps, 'ref'> {
+  open?: boolean
+}
+
+const AnimatedSheetContent = React.forwardRef<
+  HTMLDivElement,
+  AnimatedSheetContentProps
+>(({ open, side = "right", className, children, ...props }, ref) => {
+  const slideVariants = {
+    right: {
+      initial: { x: "100%" },
+      animate: { x: 0 },
+      exit: { x: "100%" },
+    },
+    left: {
+      initial: { x: "-100%" },
+      animate: { x: 0 },
+      exit: { x: "-100%" },
+    },
+    top: {
+      initial: { y: "-100%" },
+      animate: { y: 0 },
+      exit: { y: "-100%" },
+    },
+    bottom: {
+      initial: { y: "100%" },
+      animate: { y: 0 },
+      exit: { y: "100%" },
+    },
+  }
+
+  const variant = slideVariants[side || "right"]
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <SheetPortal forceMount>
+          <motion.div
+            className="fixed inset-0 z-50 bg-black/80"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+          />
+          <SheetPrimitive.Content asChild forceMount {...props}>
+            <motion.div
+              ref={ref}
+              className={cn(sheetVariants({ side }), className)}
+              initial={variant.initial}
+              animate={variant.animate}
+              exit={variant.exit}
+              transition={{ 
+                type: "tween",
+                duration: 0.4,
+                ease: [0.32, 0.72, 0, 1]
+              }}
+            >
+              {children}
+              <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </SheetPrimitive.Close>
+            </motion.div>
+          </SheetPrimitive.Content>
+        </SheetPortal>
+      )}
+    </AnimatePresence>
+  )
+})
+AnimatedSheetContent.displayName = "AnimatedSheetContent"
 
 const SheetHeader = ({
   className,
@@ -131,6 +203,7 @@ export {
   SheetTrigger,
   SheetClose,
   SheetContent,
+  AnimatedSheetContent,
   SheetHeader,
   SheetFooter,
   SheetTitle,

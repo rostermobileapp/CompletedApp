@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target, Lock } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
+import { Sheet, AnimatedSheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 
 interface SlideOutMenuProps {
@@ -171,7 +171,8 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
       
       {/* Sheet is always rendered to ensure proper overlay cleanup */}
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent 
+        <AnimatedSheetContent 
+          open={open}
           side="right" 
           className="w-[85%] sm:w-[400px] h-screen border-l border-border bg-background flex flex-col [&>button]:hidden"
         >
@@ -212,7 +213,7 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
               );
             })}
           </div>
-        </SheetContent>
+        </AnimatedSheetContent>
       </Sheet>
       
       <PremiumFeatureAlert 
