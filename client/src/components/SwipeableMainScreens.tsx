@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect, memo, useMemo } from 'react';
+import { useState, useCallback, useEffect, memo, useMemo, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { motion, AnimatePresence, PanInfo } from 'framer-motion';
+import { motion, useSpring, useMotionValue, PanInfo } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
@@ -32,7 +32,7 @@ function getScreenFromPath(path: string): ScreenId | null {
 }
 
 const SWIPE_THRESHOLD = 50;
-const SWIPE_VELOCITY_THRESHOLD = 500;
+const SWIPE_VELOCITY_THRESHOLD = 300;
 
 interface SwipeableMainScreensProps {
   children?: React.ReactNode;
@@ -42,6 +42,7 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
   const [location, navigate] = useLocation();
   const { user } = useAuth();
   const { selectedType, selectedId } = useDashboardSelection();
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const currentScreen = getScreenFromPath(location);
   const isMainScreen = currentScreen !== null;
@@ -49,15 +50,36 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
   const [activeIndex, setActiveIndex] = useState(() => 
     currentScreen ? SCREEN_ORDER.indexOf(currentScreen) : 2
   );
-  const [direction, setDirection] = useState(0);
   
+  const dragOffset = useMotionValue(0);
+  const springX = useSpring(0, { 
+    stiffness: 400, 
+    damping: 40,
+    mass: 0.8,
+  });
+  
+  const [containerWidth, setContainerWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 375);
   const bottomPadding = user?.role === 'free_tier' ? 132 : 82;
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  useEffect(() => {
+    springX.set(-activeIndex * containerWidth);
+  }, [activeIndex, containerWidth, springX]);
 
   useEffect(() => {
     if (currentScreen) {
       const newIndex = SCREEN_ORDER.indexOf(currentScreen);
       if (newIndex !== activeIndex) {
-        setDirection(newIndex > activeIndex ? 1 : -1);
         setActiveIndex(newIndex);
       }
     }
@@ -78,89 +100,90 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
     navigate(SCREEN_ROUTES[screenId]);
   }, [navigate, selectedType, selectedId]);
 
+  const handleDrag = useCallback((_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const baseX = -activeIndex * containerWidth;
+    let newX = baseX + info.offset.x;
+    
+    if (activeIndex === 0 && info.offset.x > 0) {
+      newX = baseX + info.offset.x * 0.3;
+    } else if (activeIndex === SCREEN_ORDER.length - 1 && info.offset.x < 0) {
+      newX = baseX + info.offset.x * 0.3;
+    }
+    
+    dragOffset.set(info.offset.x);
+    springX.set(newX);
+  }, [activeIndex, containerWidth, dragOffset, springX]);
+
   const handleDragEnd = useCallback((_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const { offset, velocity } = info;
+    
+    let newIndex = activeIndex;
     
     const swipedLeft = offset.x < -SWIPE_THRESHOLD || velocity.x < -SWIPE_VELOCITY_THRESHOLD;
     const swipedRight = offset.x > SWIPE_THRESHOLD || velocity.x > SWIPE_VELOCITY_THRESHOLD;
     
     if (swipedLeft && activeIndex < SCREEN_ORDER.length - 1) {
-      setDirection(1);
-      const newIndex = activeIndex + 1;
-      setActiveIndex(newIndex);
-      navigateToIndex(newIndex);
+      newIndex = activeIndex + 1;
     } else if (swipedRight && activeIndex > 0) {
-      setDirection(-1);
-      const newIndex = activeIndex - 1;
-      setActiveIndex(newIndex);
+      newIndex = activeIndex - 1;
+    }
+    
+    dragOffset.set(0);
+    setActiveIndex(newIndex);
+    springX.set(-newIndex * containerWidth);
+    
+    if (newIndex !== activeIndex) {
       navigateToIndex(newIndex);
     }
-  }, [activeIndex, navigateToIndex]);
+  }, [activeIndex, containerWidth, dragOffset, springX, navigateToIndex]);
 
-  const screens = useMemo(() => ({
-    teams: <Teams />,
-    messages: <Messages />,
-    home: <Dashboard />,
-    payments: <PaymentRequests />,
-    profile: <Profile />,
-  }), []);
-
-  const variants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? '100%' : '-100%',
-      opacity: 0,
-    }),
-    center: {
-      x: 0,
-      opacity: 1,
-    },
-    exit: (direction: number) => ({
-      x: direction < 0 ? '100%' : '-100%',
-      opacity: 0,
-    }),
-  };
+  const screens = useMemo(() => [
+    { id: 'teams', component: <Teams /> },
+    { id: 'messages', component: <Messages /> },
+    { id: 'home', component: <Dashboard /> },
+    { id: 'payments', component: <PaymentRequests /> },
+    { id: 'profile', component: <Profile /> },
+  ], []);
 
   if (!isMainScreen) {
     return <>{children}</>;
   }
 
-  const currentScreenId = SCREEN_ORDER[activeIndex];
-
   return (
     <div 
+      ref={containerRef}
       className="fixed inset-0 overflow-hidden bg-background"
       style={{ paddingBottom: `${bottomPadding}px` }}
       data-testid="swipeable-container"
     >
-      <AnimatePresence initial={false} custom={direction} mode="popLayout">
-        <motion.div
-          key={currentScreenId}
-          custom={direction}
-          variants={variants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{
-            x: { type: 'spring', stiffness: 300, damping: 30 },
-            opacity: { duration: 0.2 },
-          }}
-          drag="x"
-          dragDirectionLock
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.2}
-          onDragEnd={handleDragEnd}
-          onDirectionLock={(axis) => {
-            if (axis === 'y') {
-              return;
-            }
-          }}
-          className="absolute inset-0 overflow-y-auto overflow-x-hidden bg-background"
-          style={{ paddingBottom: `${bottomPadding}px` }}
-          data-testid={`screen-${currentScreenId}`}
-        >
-          {screens[currentScreenId]}
-        </motion.div>
-      </AnimatePresence>
+      <motion.div
+        className="flex h-full"
+        style={{ 
+          x: springX,
+          width: `${screens.length * 100}%`,
+          willChange: 'transform',
+        }}
+        drag="x"
+        dragDirectionLock
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0}
+        onDrag={handleDrag}
+        onDragEnd={handleDragEnd}
+      >
+        {screens.map((screen, index) => (
+          <div
+            key={screen.id}
+            className="h-full overflow-y-auto overflow-x-hidden bg-background"
+            style={{ 
+              width: `${100 / screens.length}%`,
+              flexShrink: 0,
+            }}
+            data-testid={`screen-${screen.id}`}
+          >
+            {screen.component}
+          </div>
+        ))}
+      </motion.div>
     </div>
   );
 }
