@@ -145,9 +145,15 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
             opacity: { duration: 0.2 },
           }}
           drag="x"
+          dragDirectionLock
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.2}
           onDragEnd={handleDragEnd}
+          onDirectionLock={(axis) => {
+            if (axis === 'y') {
+              return;
+            }
+          }}
           className="absolute inset-0 overflow-y-auto overflow-x-hidden bg-background"
           style={{ paddingBottom: `${bottomPadding}px` }}
           data-testid={`screen-${currentScreenId}`}
