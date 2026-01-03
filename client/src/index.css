@@ -128,23 +128,14 @@
     pointer-events: none;
   }
 
-  /* Custom scrollbars */
-  ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+  /* Hide scrollbars while keeping scroll functionality */
+  * {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
   }
-
-  ::-webkit-scrollbar-track {
-    background: hsl(var(--muted));
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground));
-    border-radius: 2px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--primary));
+  
+  *::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari, Opera */
   }
 
   /* Input and form styling */
