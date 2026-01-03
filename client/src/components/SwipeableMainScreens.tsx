@@ -1,5 +1,6 @@
-import { useRef, useState, useCallback, useEffect, memo, ReactNode, useMemo } from 'react';
+import { useState, useCallback, useEffect, memo, useMemo } from 'react';
 import { useLocation } from 'wouter';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
@@ -21,14 +22,6 @@ const SCREEN_ROUTES: Record<ScreenId, string> = {
   profile: '/profile',
 };
 
-const ROUTE_TO_SCREEN: Record<string, ScreenId> = {
-  '/': 'home',
-  '/teams': 'teams',
-  '/messages': 'messages',
-  '/payment-requests': 'payments',
-  '/profile': 'profile',
-};
-
 function getScreenFromPath(path: string): ScreenId | null {
   if (path === '/') return 'home';
   if (path === '/teams') return 'teams';
@@ -39,10 +32,10 @@ function getScreenFromPath(path: string): ScreenId | null {
 }
 
 const SWIPE_THRESHOLD = 50;
-const TRANSITION_DURATION = 300;
+const SWIPE_VELOCITY_THRESHOLD = 500;
 
 interface SwipeableMainScreensProps {
-  children?: ReactNode;
+  children?: React.ReactNode;
 }
 
 function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
@@ -53,23 +46,22 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
   const currentScreen = getScreenFromPath(location);
   const isMainScreen = currentScreen !== null;
   
-  const activeIndex = currentScreen ? SCREEN_ORDER.indexOf(currentScreen) : 2;
-  
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [displayIndex, setDisplayIndex] = useState(activeIndex);
+  const [activeIndex, setActiveIndex] = useState(() => 
+    currentScreen ? SCREEN_ORDER.indexOf(currentScreen) : 2
+  );
+  const [direction, setDirection] = useState(0);
   
   const bottomPadding = user?.role === 'free_tier' ? 132 : 82;
 
   useEffect(() => {
-    if (!isTransitioning) {
-      setDisplayIndex(activeIndex);
+    if (currentScreen) {
+      const newIndex = SCREEN_ORDER.indexOf(currentScreen);
+      if (newIndex !== activeIndex) {
+        setDirection(newIndex > activeIndex ? 1 : -1);
+        setActiveIndex(newIndex);
+      }
     }
-  }, [activeIndex, isTransitioning]);
+  }, [currentScreen, activeIndex]);
 
   const navigateToIndex = useCallback((index: number) => {
     if (index < 0 || index >= SCREEN_ORDER.length) return;
@@ -86,123 +78,83 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
     navigate(SCREEN_ROUTES[screenId]);
   }, [navigate, selectedType, selectedId]);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (isTransitioning || !isMainScreen) return;
-    setTouchStart(e.touches[0].clientX);
-    setTouchEnd(null);
-    setIsDragging(true);
-    setDragOffset(0);
-  }, [isTransitioning, isMainScreen]);
+  const handleDragEnd = useCallback((_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const { offset, velocity } = info;
+    
+    const swipedLeft = offset.x < -SWIPE_THRESHOLD || velocity.x < -SWIPE_VELOCITY_THRESHOLD;
+    const swipedRight = offset.x > SWIPE_THRESHOLD || velocity.x > SWIPE_VELOCITY_THRESHOLD;
+    
+    if (swipedLeft && activeIndex < SCREEN_ORDER.length - 1) {
+      setDirection(1);
+      const newIndex = activeIndex + 1;
+      setActiveIndex(newIndex);
+      navigateToIndex(newIndex);
+    } else if (swipedRight && activeIndex > 0) {
+      setDirection(-1);
+      const newIndex = activeIndex - 1;
+      setActiveIndex(newIndex);
+      navigateToIndex(newIndex);
+    }
+  }, [activeIndex, navigateToIndex]);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchStart || !isDragging || !isMainScreen) return;
-    
-    const currentTouch = e.touches[0].clientX;
-    const diff = currentTouch - touchStart;
-    
-    if (displayIndex === 0 && diff > 0) {
-      setDragOffset(diff * 0.3);
-      return;
-    }
-    if (displayIndex === SCREEN_ORDER.length - 1 && diff < 0) {
-      setDragOffset(diff * 0.3);
-      return;
-    }
-    
-    setDragOffset(diff);
-    setTouchEnd(currentTouch);
-  }, [touchStart, isDragging, displayIndex, isMainScreen]);
+  const screens = useMemo(() => ({
+    teams: <Teams />,
+    messages: <Messages />,
+    home: <Dashboard />,
+    payments: <PaymentRequests />,
+    profile: <Profile />,
+  }), []);
 
-  const handleTouchEnd = useCallback(() => {
-    if (!touchStart || touchEnd === null || isTransitioning || !isMainScreen) {
-      setIsDragging(false);
-      setDragOffset(0);
-      return;
-    }
-    
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > SWIPE_THRESHOLD;
-    const isRightSwipe = distance < -SWIPE_THRESHOLD;
-    
-    setIsDragging(false);
-    setDragOffset(0);
-    
-    let newIndex = displayIndex;
-    if (isLeftSwipe && displayIndex < SCREEN_ORDER.length - 1) {
-      newIndex = displayIndex + 1;
-    } else if (isRightSwipe && displayIndex > 0) {
-      newIndex = displayIndex - 1;
-    }
-    
-    if (newIndex !== displayIndex) {
-      setIsTransitioning(true);
-      setDisplayIndex(newIndex);
-      
-      setTimeout(() => {
-        navigateToIndex(newIndex);
-        setIsTransitioning(false);
-      }, TRANSITION_DURATION);
-    }
-    
-    setTouchStart(null);
-    setTouchEnd(null);
-  }, [touchStart, touchEnd, displayIndex, navigateToIndex, isTransitioning, isMainScreen]);
-
-  const getTransform = () => {
-    const baseOffset = -displayIndex * 100;
-    if (isDragging && containerRef.current) {
-      const containerWidth = containerRef.current.offsetWidth;
-      const dragPercent = (dragOffset / containerWidth) * 100;
-      return `translateX(calc(${baseOffset}% + ${dragPercent}%))`;
-    }
-    return `translateX(${baseOffset}%)`;
+  const variants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (direction: number) => ({
+      x: direction < 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
   };
-
-  const screens = useMemo(() => [
-    <Teams key="teams" />,
-    <Messages key="messages" />,
-    <Dashboard key="home" />,
-    <PaymentRequests key="payments" />,
-    <Profile key="profile" />,
-  ], []);
 
   if (!isMainScreen) {
     return <>{children}</>;
   }
 
+  const currentScreenId = SCREEN_ORDER[activeIndex];
+
   return (
     <div 
-      ref={containerRef}
-      className="fixed inset-0 overflow-hidden touch-pan-y bg-background"
+      className="fixed inset-0 overflow-hidden bg-background"
       style={{ paddingBottom: `${bottomPadding}px` }}
       data-testid="swipeable-container"
     >
-      <div
-        className="flex h-full"
-        style={{
-          width: `${screens.length * 100}%`,
-          transform: getTransform(),
-          transition: isDragging ? 'none' : `transform ${TRANSITION_DURATION}ms ease-out`,
-          willChange: 'transform',
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        {screens.map((screen, index) => (
-          <div
-            key={SCREEN_ORDER[index]}
-            className="h-full overflow-y-auto overflow-x-hidden bg-background"
-            style={{ 
-              width: `${100 / screens.length}%`,
-              flexShrink: 0,
-            }}
-            data-testid={`screen-${SCREEN_ORDER[index]}`}
-          >
-            {screen}
-          </div>
-        ))}
-      </div>
+      <AnimatePresence initial={false} custom={direction} mode="popLayout">
+        <motion.div
+          key={currentScreenId}
+          custom={direction}
+          variants={variants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{
+            x: { type: 'spring', stiffness: 300, damping: 30 },
+            opacity: { duration: 0.2 },
+          }}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.2}
+          onDragEnd={handleDragEnd}
+          className="absolute inset-0 overflow-y-auto overflow-x-hidden bg-background"
+          style={{ paddingBottom: `${bottomPadding}px` }}
+          data-testid={`screen-${currentScreenId}`}
+        >
+          {screens[currentScreenId]}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
