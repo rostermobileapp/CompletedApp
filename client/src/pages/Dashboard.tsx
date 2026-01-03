@@ -2328,10 +2328,10 @@ export default function Dashboard() {
           <div className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid="loading-upcoming-games">
             <div className="h-16 bg-muted rounded"></div>
           </div>
-        ) : (Array.isArray(upcomingGames) && upcomingGames.length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.length > 0) || (Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved').length > 0) || (Array.isArray(personalReminders) && personalReminders.length > 0) ? (
+        ) : (Array.isArray(upcomingGames) && upcomingGames.filter((g: any) => new Date(g.scheduledAt) >= new Date()).length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => new Date(i.dateTime) >= new Date()).length > 0) || (Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved' && r.scrimmage && new Date(r.scrimmage.dateTime) >= new Date()).length > 0) || (Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && new Date(r.scheduledAt) >= new Date()).length > 0) ? (
           <div className="space-y-3">
-            {/* First show scrimmage invites */}
-            {Array.isArray(scrimmageInvites) && scrimmageInvites.map((invite: any) => (
+            {/* First show scrimmage invites (future only) */}
+            {Array.isArray(scrimmageInvites) && scrimmageInvites.filter((invite: any) => new Date(invite.dateTime) >= new Date()).map((invite: any) => (
               <div 
                 key={`invite-${invite.id}`}
                 className="rounded-xl border border-yellow-500/50 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
@@ -2372,9 +2372,9 @@ export default function Dashboard() {
               </div>
             ))}
             
-            {/* Show approved scrimmages */}
+            {/* Show approved scrimmages (future only) */}
             {Array.isArray(scrimmageRequests) && scrimmageRequests
-              .filter((request: any) => request.status === 'approved' && request.scrimmage)
+              .filter((request: any) => request.status === 'approved' && request.scrimmage && new Date(request.scrimmage.dateTime) >= new Date())
               .slice(0, 5)
               .map((request: any) => {
                 const scrimmage = request.scrimmage;
@@ -2407,9 +2407,9 @@ export default function Dashboard() {
                 );
               })}
             
-            {/* Show personal reminders */}
+            {/* Show personal reminders (future only) */}
             {Array.isArray(personalReminders) && personalReminders
-              .filter((reminder: any) => !reminder.isCompleted)
+              .filter((reminder: any) => !reminder.isCompleted && new Date(reminder.scheduledAt) >= new Date())
               .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
               .slice(0, 5)
               .map((reminder: any) => (
@@ -2453,9 +2453,13 @@ export default function Dashboard() {
                 </div>
               ))}
             
-            {/* Then show regular games */}
+            {/* Then show regular games (future only) */}
             {(upcomingGames as any[])
               .filter((game: any) => {
+                // Filter out past games
+                if (new Date(game.scheduledAt) < new Date()) {
+                  return false;
+                }
                 // Always show scrimmages (user is already approved)
                 if (game.isScrimmage) {
                   return true;
