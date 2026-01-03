@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, memo, useMemo, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { motion, useSpring, useMotionValue, PanInfo } from 'framer-motion';
+import { motion, useSpring } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
@@ -31,8 +31,6 @@ function getScreenFromPath(path: string): ScreenId | null {
   return null;
 }
 
-const SWIPE_THRESHOLD = 50;
-const SWIPE_VELOCITY_THRESHOLD = 300;
 
 interface SwipeableMainScreensProps {
   children?: React.ReactNode;
@@ -51,7 +49,6 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
     currentScreen ? SCREEN_ORDER.indexOf(currentScreen) : 2
   );
   
-  const dragOffset = useMotionValue(0);
   const springX = useSpring(0, { 
     stiffness: 400, 
     damping: 40,
@@ -100,42 +97,6 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
     navigate(SCREEN_ROUTES[screenId]);
   }, [navigate, selectedType, selectedId]);
 
-  const handleDrag = useCallback((_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const baseX = -activeIndex * containerWidth;
-    let newX = baseX + info.offset.x;
-    
-    if (activeIndex === 0 && info.offset.x > 0) {
-      newX = baseX + info.offset.x * 0.3;
-    } else if (activeIndex === SCREEN_ORDER.length - 1 && info.offset.x < 0) {
-      newX = baseX + info.offset.x * 0.3;
-    }
-    
-    dragOffset.set(info.offset.x);
-    springX.set(newX);
-  }, [activeIndex, containerWidth, dragOffset, springX]);
-
-  const handleDragEnd = useCallback((_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const { offset, velocity } = info;
-    
-    let newIndex = activeIndex;
-    
-    const swipedLeft = offset.x < -SWIPE_THRESHOLD || velocity.x < -SWIPE_VELOCITY_THRESHOLD;
-    const swipedRight = offset.x > SWIPE_THRESHOLD || velocity.x > SWIPE_VELOCITY_THRESHOLD;
-    
-    if (swipedLeft && activeIndex < SCREEN_ORDER.length - 1) {
-      newIndex = activeIndex + 1;
-    } else if (swipedRight && activeIndex > 0) {
-      newIndex = activeIndex - 1;
-    }
-    
-    dragOffset.set(0);
-    setActiveIndex(newIndex);
-    springX.set(-newIndex * containerWidth);
-    
-    if (newIndex !== activeIndex) {
-      navigateToIndex(newIndex);
-    }
-  }, [activeIndex, containerWidth, dragOffset, springX, navigateToIndex]);
 
   const screens = useMemo(() => [
     { id: 'teams', component: <Teams /> },
@@ -163,12 +124,6 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
           width: `${screens.length * 100}%`,
           willChange: 'transform',
         }}
-        drag="x"
-        dragDirectionLock
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0}
-        onDrag={handleDrag}
-        onDragEnd={handleDragEnd}
       >
         {screens.map((screen, index) => (
           <div
