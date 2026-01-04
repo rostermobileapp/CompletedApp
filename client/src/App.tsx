@@ -1,4 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
+import { useState, useEffect, useRef } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -84,6 +85,25 @@ function Router() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
   const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
+  
+  // Minimum 3-second display time for the loading screen
+  const [minDelayElapsed, setMinDelayElapsed] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    // Start timer when authenticated and auth loading is complete
+    if (isAuthenticated && !authLoading && !minDelayElapsed) {
+      timerRef.current = setTimeout(() => {
+        setMinDelayElapsed(true);
+      }, 3000);
+    }
+    
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [isAuthenticated, authLoading, minDelayElapsed]);
 
   // Always render password reset pages standalone, regardless of auth state
   if (location === '/reset-password') {
@@ -113,8 +133,8 @@ function Router() {
     );
   }
 
-  // Wait for all navigation screen data to be loaded before showing the app
-  if (dataLoading) {
+  // Wait for BOTH: minimum 3 seconds AND data to be loaded before showing the app
+  if (!minDelayElapsed || dataLoading) {
     return <LoadingScreen />;
   }
 
