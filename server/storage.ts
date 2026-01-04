@@ -44,6 +44,7 @@ import {
   drafts,
   draftPicks,
   tournamentTeams,
+  tournamentMatches,
   tournamentPhotos,
   leaguePhotos,
   tournamentPhotoTags,
@@ -4060,23 +4061,51 @@ export class DatabaseStorage implements IStorage {
       
       // 1. Delete score submissions
       console.log(`Deleting score submissions for game ${id}`);
-      const deletedSubmissions = await db.delete(gameScoreSubmissions).where(eq(gameScoreSubmissions.gameId, id));
-      console.log(`Deleted ${deletedSubmissions.rowCount || 0} score submissions`);
+      await db.delete(gameScoreSubmissions).where(eq(gameScoreSubmissions.gameId, id));
       
       // 2. Delete game goalies
       console.log(`Deleting game goalies for game ${id}`);
-      const deletedGoalies = await db.delete(gameGoalies).where(eq(gameGoalies.gameId, id));
-      console.log(`Deleted ${deletedGoalies.rowCount || 0} game goalies`);
+      await db.delete(gameGoalies).where(eq(gameGoalies.gameId, id));
       
       // 3. Delete game stars
       console.log(`Deleting game stars for game ${id}`);
-      const deletedStars = await db.delete(gameStars).where(eq(gameStars.gameId, id));
-      console.log(`Deleted ${deletedStars.rowCount || 0} game stars`);
+      await db.delete(gameStars).where(eq(gameStars.gameId, id));
       
       // 4. Delete game RSVPs
       console.log(`Deleting game RSVPs for game ${id}`);
-      const deletedRsvps = await db.delete(gameRsvps).where(eq(gameRsvps.gameId, id));
-      console.log(`Deleted ${deletedRsvps.rowCount || 0} game RSVPs`);
+      await db.delete(gameRsvps).where(eq(gameRsvps.gameId, id));
+      
+      // 5. Delete calendar events
+      console.log(`Deleting calendar events for game ${id}`);
+      await db.delete(calendarEvents).where(eq(calendarEvents.gameId, id));
+      
+      // 6. Delete duty assignments
+      console.log(`Deleting duty assignments for game ${id}`);
+      await db.delete(dutyAssignments).where(eq(dutyAssignments.gameId, id));
+      
+      // 7. Delete imported schedules
+      console.log(`Deleting imported schedules for game ${id}`);
+      await db.delete(importedSchedules).where(eq(importedSchedules.gameId, id));
+      
+      // 8. Delete line combinations
+      console.log(`Deleting line combinations for game ${id}`);
+      await db.delete(lineCombinations).where(eq(lineCombinations.gameId, id));
+      
+      // 9. Delete substitute requests
+      console.log(`Deleting substitute requests for game ${id}`);
+      await db.delete(substituteRequests).where(eq(substituteRequests.gameId, id));
+      
+      // 10. Delete tournament matches (unlink game from tournament)
+      console.log(`Unlinking tournament matches for game ${id}`);
+      await db.update(tournamentMatches).set({ gameId: null }).where(eq(tournamentMatches.gameId, id));
+      
+      // 11. Delete game goals
+      console.log(`Deleting game goals for game ${id}`);
+      await db.delete(gameGoals).where(eq(gameGoals.gameId, id));
+      
+      // 12. Delete game penalties
+      console.log(`Deleting game penalties for game ${id}`);
+      await db.delete(gamePenalties).where(eq(gamePenalties.gameId, id));
       
       // Finally, delete the game itself
       const deletedGame = await db.delete(games).where(eq(games.id, id));
