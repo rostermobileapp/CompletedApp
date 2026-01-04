@@ -4091,19 +4091,30 @@ export class DatabaseStorage implements IStorage {
       console.log(`Deleting line combinations for game ${id}`);
       await db.delete(lineCombinations).where(eq(lineCombinations.gameId, id));
       
-      // 9. Delete substitute requests
+      // 9. Delete substitution approvals for substitute requests related to this game
+      console.log(`Deleting substitution approvals for game ${id}`);
+      const gameSubRequests = await db.select({ id: substituteRequests.id })
+        .from(substituteRequests)
+        .where(eq(substituteRequests.gameId, id));
+      
+      if (gameSubRequests.length > 0) {
+        const subRequestIds = gameSubRequests.map(r => r.id);
+        await db.delete(substitutionApprovals).where(inArray(substitutionApprovals.substitutionRequestId, subRequestIds));
+      }
+      
+      // 10. Delete substitute requests
       console.log(`Deleting substitute requests for game ${id}`);
       await db.delete(substituteRequests).where(eq(substituteRequests.gameId, id));
       
-      // 10. Delete tournament matches (unlink game from tournament)
+      // 11. Unlink tournament matches (unlink game from tournament)
       console.log(`Unlinking tournament matches for game ${id}`);
       await db.update(tournamentMatches).set({ gameId: null }).where(eq(tournamentMatches.gameId, id));
       
-      // 11. Delete game goals
+      // 12. Delete game goals
       console.log(`Deleting game goals for game ${id}`);
       await db.delete(gameGoals).where(eq(gameGoals.gameId, id));
       
-      // 12. Delete game penalties
+      // 13. Delete game penalties
       console.log(`Deleting game penalties for game ${id}`);
       await db.delete(gamePenalties).where(eq(gamePenalties.gameId, id));
       
