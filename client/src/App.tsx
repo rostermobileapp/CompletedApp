@@ -12,6 +12,7 @@ import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { SwipeableMainScreens } from "@/components/SwipeableMainScreens";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { useAuth } from "@/hooks/useAuth";
+import { useAppDataPrefetch } from "@/hooks/useAppDataPrefetch";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
@@ -64,9 +65,25 @@ import LeagueTournamentSearch from "@/pages/LeagueTournamentSearch";
 import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 import MediaGalleryPage from "@/pages/MediaGallery";
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background px-6" data-testid="loading-app">
+      <div className="animate-pulse text-center max-w-md">
+        <div className="text-xl md:text-2xl font-bold text-primary italic leading-relaxed">
+          "Hockey is a game of fun. If you're not having fun, you're not doing it right."
+        </div>
+        <div className="text-lg md:text-xl font-bold text-primary mt-4">
+          - Mark Messier
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
+  const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
 
   // Always render password reset pages standalone, regardless of auth state
   if (location === '/reset-password') {
@@ -77,14 +94,8 @@ function Router() {
     return <ForgotPassword />;
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background" data-testid="loading-app">
-        <div className="animate-pulse">
-          <div className="text-2xl font-bold text-primary">Rosters</div>
-        </div>
-      </div>
-    );
+  if (authLoading) {
+    return <LoadingScreen />;
   }
 
   if (!isAuthenticated) {
@@ -100,6 +111,11 @@ function Router() {
         <Route component={Landing} />
       </Switch>
     );
+  }
+
+  // Wait for all navigation screen data to be loaded before showing the app
+  if (dataLoading) {
+    return <LoadingScreen />;
   }
 
   return (
