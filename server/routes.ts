@@ -5644,7 +5644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete duty from a specific game only (captain only)
+  // Delete duty from a specific game only (captain or commissioner)
   app.delete('/api/games/:gameId/duties/:dutyTemplateId', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -5656,10 +5656,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Duty template not found' });
       }
 
-      // Verify user is team captain
+      // Verify user is team captain or league commissioner
       const team = await storage.getTeam(template.teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: 'Only team captains can delete duty assignments' });
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+      
+      const isCaptain = team.captainId === userId;
+      let isCommissioner = false;
+      if (team.leagueId) {
+        const league = await storage.getLeague(team.leagueId);
+        isCommissioner = league?.commissionerId === userId;
+      }
+      
+      if (!isCaptain && !isCommissioner) {
+        return res.status(403).json({ message: 'Only team captains or commissioners can delete duty assignments' });
       }
 
       // Delete assignments for this specific game and template
@@ -5693,8 +5704,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const team = await storage.getTeam(template.teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: 'Only team captains can delete duties' });
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+      
+      const isCaptain = team.captainId === userId;
+      let isCommissioner = false;
+      if (team.leagueId) {
+        const league = await storage.getLeague(team.leagueId);
+        isCommissioner = league?.commissionerId === userId;
+      }
+      
+      if (!isCaptain && !isCommissioner) {
+        return res.status(403).json({ message: 'Only team captains or commissioners can delete duties' });
       }
 
       await storage.deleteDutyTemplate(dutyId);
