@@ -5986,6 +5986,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get approved substitutes for a game
+  app.get('/api/games/:gameId/substitutes', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const userId = req.user.claims.sub;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      const substitutes = await storage.getApprovedSubstitutesForGame(gameId);
+      res.json(substitutes);
+    } catch (error) {
+      console.error('Error fetching game substitutes:', error);
+      res.status(500).json({ message: 'Failed to fetch game substitutes' });
+    }
+  });
+
+  // Revoke an approved substitute (captain/commissioner only)
+  app.delete('/api/games/:gameId/substitutes/:requestId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId, requestId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User ID not found' });
+      }
+
+      const game = await storage.getGameById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+
+      // Verify the substitute request exists and belongs to this game
+      const request = await storage.getSubstituteRequest(requestId);
+      if (!request || request.gameId !== gameId) {
+        return res.status(404).json({ message: 'Substitute request not found for this game' });
+      }
+
+      // Check if user is captain of requesting team, opposing team, or commissioner
+      const homeTeam = await storage.getTeam(game.homeTeamId);
+      const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId) : null;
+      const isHomeCaptain = homeTeam && homeTeam.captainId === userId;
+      const isAwayCaptain = awayTeam && awayTeam.captainId === userId;
+      
+      let isCommissioner = false;
+      if (game.leagueId) {
+        const league = await storage.getLeague(game.leagueId);
+        isCommissioner = !!(league && league.commissionerId === userId);
+      }
+
+      if (!isHomeCaptain && !isAwayCaptain && !isCommissioner) {
+        return res.status(403).json({ message: 'Only team captains or commissioners can revoke substitutes' });
+      }
+
+      await storage.revokeSubstituteApproval(requestId);
+      res.json({ message: 'Substitute revoked successfully' });
+    } catch (error) {
+      console.error('Error revoking substitute:', error);
+      res.status(500).json({ message: 'Failed to revoke substitute' });
+    }
+  });
+
   app.get('/api/games/:gameId/rsvp', isAuthenticated, async (req: any, res) => {
     try {
       const gameId = req.params.gameId;

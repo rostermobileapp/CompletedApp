@@ -395,6 +395,8 @@ export interface IStorage {
   getSubstitutionApprovals(requestId: string): Promise<(SubstitutionApproval & { approver: User })[]>;
   getUserPendingApprovals(userId: string, approverType?: 'opposing_captain' | 'commissioner' | 'substitute_player'): Promise<(SubstitutionApproval & { substitutionRequest: SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User } })[]>;
   processApproval(requestId: string, approverId: string, approverType: 'opposing_captain' | 'commissioner' | 'substitute_player', status: 'approved' | 'denied', comments?: string): Promise<{ approval: SubstitutionApproval; updatedRequest: SubstituteRequest }>;
+  getApprovedSubstitutesForGame(gameId: string): Promise<{ requestId: string; substitutePlayer: User; originalPlayer: User; requestingTeamId: string; teamName: string }[]>;
+  revokeSubstituteApproval(requestId: string): Promise<void>;
   
   
   // Line combinations operations
@@ -5908,6 +5910,79 @@ export class DatabaseStorage implements IStorage {
       default:
         throw new Error(`Invalid approver type: ${approverType}`);
     }
+  }
+
+  // Get approved substitutes for a specific game
+  async getApprovedSubstitutesForGame(gameId: string): Promise<{ requestId: string; substitutePlayer: User; originalPlayer: User; requestingTeamId: string; teamName: string }[]> {
+    const results = await db
+      .select({
+        requestId: substituteRequests.id,
+        substitutePlayer: users,
+        originalPlayerId: substituteRequests.originalPlayerId,
+        requestingTeamId: substituteRequests.requestingTeamId,
+        teamName: teams.name,
+      })
+      .from(substituteRequests)
+      .innerJoin(users, eq(substituteRequests.substitutePlayerId, users.id))
+      .innerJoin(teams, eq(substituteRequests.requestingTeamId, teams.id))
+      .where(
+        and(
+          eq(substituteRequests.gameId, gameId),
+          eq(substituteRequests.status, 'approved')
+        )
+      );
+
+    // Fetch original player details for each result
+    const enrichedResults = await Promise.all(
+      results.map(async (result) => {
+        const originalPlayer = await this.getUser(result.originalPlayerId);
+        return {
+          requestId: result.requestId,
+          substitutePlayer: result.substitutePlayer,
+          originalPlayer: originalPlayer!,
+          requestingTeamId: result.requestingTeamId,
+          teamName: result.teamName,
+        };
+      })
+    );
+
+    return enrichedResults;
+  }
+
+  // Revoke an approved substitute (delete approval, mark request as denied)
+  async revokeSubstituteApproval(requestId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // 1. Get the request to find the substitute player and team
+      const request = await this.getSubstituteRequest(requestId);
+      if (!request) {
+        throw new Error(`Substitute request ${requestId} not found`);
+      }
+
+      // 2. Delete all substitution approvals for this request
+      await tx.delete(substitutionApprovals)
+        .where(eq(substitutionApprovals.substitutionRequestId, requestId));
+
+      // 3. Update the request status to denied
+      await tx.update(substituteRequests)
+        .set({
+          status: 'denied',
+          finalizedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(substituteRequests.id, requestId));
+
+      // 4. Remove the substitute player's RSVP for this game/team
+      if (request.substitutePlayerId) {
+        await tx.delete(gameRsvps)
+          .where(
+            and(
+              eq(gameRsvps.gameId, request.gameId),
+              eq(gameRsvps.userId, request.substitutePlayerId),
+              eq(gameRsvps.teamId, request.requestingTeamId)
+            )
+          );
+      }
+    });
   }
 
   // Announcement operations
