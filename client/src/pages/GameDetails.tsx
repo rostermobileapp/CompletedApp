@@ -659,6 +659,8 @@ export default function GameDetails() {
                     gameId={game.id} 
                     userId={(user as User).id}
                     userTeamId={userTeam.id}
+                    isCaptain={isCaptain}
+                    isCommissioner={isCommissioner}
                     onRequestSubstitute={isCaptain ? (playerId, playerName) => {
                       setSubstituteRequestData({ 
                         playerId, 
