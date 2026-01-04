@@ -555,8 +555,10 @@ export default function GameDetails() {
   const validAwayTeamBeverageDutyClaimed = awayTeamBeverageDutyClaimed && (awayTeamClaimantExists || awayTeamHasBeverageDuty);
   const validAwayTeamBeverageDutyClaimedByOther = validAwayTeamBeverageDutyClaimed && !awayTeamHasBeverageDuty;
 
-  // Check if user can delete the game (captain of home team or commissioner)
-  const canDeleteGame = isHomeCaptain || isCommissioner;
+  // Check if user can delete the game (captain/creator of either team, or commissioner)
+  const isHomeTeamCreator = game.homeTeam?.creatorId === (user as User)?.id;
+  const isAwayTeamCreator = game.awayTeam?.creatorId === (user as User)?.id;
+  const canDeleteGame = isHomeCaptain || isAwayCaptain || isHomeTeamCreator || isAwayTeamCreator || isCommissioner;
 
   const handleDeleteGame = () => {
     if (window.confirm('Are you sure you want to delete this game? This action cannot be undone.')) {
