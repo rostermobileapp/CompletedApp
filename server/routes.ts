@@ -5673,8 +5673,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only team captains or commissioners can delete duty assignments' });
       }
 
-      // Delete assignments for this specific game and template
-      await storage.deleteDutyAssignmentsForGameAndTemplate(gameId, dutyTemplateId);
+      // Delete assignments for this specific game and template (and add exclusion)
+      await storage.deleteDutyAssignmentsForGameAndTemplate(gameId, dutyTemplateId, template.teamId, userId);
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting duty assignment:', error);

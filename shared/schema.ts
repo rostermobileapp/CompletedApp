@@ -456,6 +456,20 @@ export const dutyAssignments = pgTable("duty_assignments", {
   index("idx_duty_assignments_template_id").on(table.dutyTemplateId),
 ]);
 
+// Duty exclusions table - tracks which duties are excluded from specific games
+export const dutyExclusions = pgTable("duty_exclusions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dutyTemplateId: varchar("duty_template_id").references(() => dutyTemplates.id).notNull(),
+  gameId: varchar("game_id").references(() => games.id).notNull(),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  excludedAt: timestamp("excluded_at").defaultNow().notNull(),
+  excludedBy: varchar("excluded_by").references(() => users.id).notNull(),
+}, (table) => [
+  unique("unique_duty_game_exclusion").on(table.dutyTemplateId, table.gameId, table.teamId),
+  index("idx_duty_exclusions_game_id").on(table.gameId),
+  index("idx_duty_exclusions_template_id").on(table.dutyTemplateId),
+]);
+
 // Tournaments table
 export const tournaments = pgTable("tournaments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1706,6 +1720,25 @@ export const dutyAssignmentsRelations = relations(dutyAssignments, ({ one }) => 
   }),
 }));
 
+export const dutyExclusionsRelations = relations(dutyExclusions, ({ one }) => ({
+  dutyTemplate: one(dutyTemplates, {
+    fields: [dutyExclusions.dutyTemplateId],
+    references: [dutyTemplates.id],
+  }),
+  game: one(games, {
+    fields: [dutyExclusions.gameId],
+    references: [games.id],
+  }),
+  team: one(teams, {
+    fields: [dutyExclusions.teamId],
+    references: [teams.id],
+  }),
+  excludedByUser: one(users, {
+    fields: [dutyExclusions.excludedBy],
+    references: [users.id],
+  }),
+}));
+
 // Messaging relations
 export const conversationsRelations = relations(conversations, ({ one, many }) => ({
   league: one(leagues, {
@@ -2784,6 +2817,8 @@ export type DutyTemplate = typeof dutyTemplates.$inferSelect;
 export type InsertDutyTemplate = z.infer<typeof insertDutyTemplateSchema>;
 export type DutyAssignment = typeof dutyAssignments.$inferSelect;
 export type InsertDutyAssignment = z.infer<typeof insertDutyAssignmentSchema>;
+export type DutyExclusion = typeof dutyExclusions.$inferSelect;
+export type InsertDutyExclusion = typeof dutyExclusions.$inferInsert;
 export type PersonalReminder = typeof personalReminders.$inferSelect;
 export type InsertPersonalReminder = z.infer<typeof insertPersonalReminderSchema>;
 export type GameScoreSubmission = typeof gameScoreSubmissions.$inferSelect;

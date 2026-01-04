@@ -11,6 +11,7 @@ import {
   games,
   dutyTemplates,
   dutyAssignments,
+  dutyExclusions,
   personalReminders,
   gameScoreSubmissions,
   gameRsvps,
@@ -353,7 +354,7 @@ export interface IStorage {
   getDutyTemplateById(id: string): Promise<DutyTemplate | undefined>;
   updateDutyTemplate(id: string, updates: Partial<Pick<DutyTemplate, 'name' | 'icon' | 'scope'>>): Promise<DutyTemplate>;
   deleteDutyTemplate(id: string): Promise<void>;
-  deleteDutyAssignmentsForGameAndTemplate(gameId: string, dutyTemplateId: string): Promise<void>;
+  deleteDutyAssignmentsForGameAndTemplate(gameId: string, dutyTemplateId: string, teamId: string, excludedBy: string): Promise<void>;
   claimDuty(assignment: InsertDutyAssignment): Promise<DutyAssignment>;
   releaseDuty(dutyTemplateId: string, gameId: string, teamId: string): Promise<void>;
   getDutyAssignmentsByGame(gameId: string): Promise<(DutyAssignment & { dutyTemplate: DutyTemplate; user: User })[]>;
@@ -3541,10 +3542,28 @@ export class DatabaseStorage implements IStorage {
       .from(dutyAssignments)
       .where(eq(dutyAssignments.teamId, teamId));
     
-    // Filter templates based on scope
+    // Get all exclusions for this specific game
+    const gameExclusions = await db
+      .select()
+      .from(dutyExclusions)
+      .where(
+        and(
+          eq(dutyExclusions.gameId, gameId),
+          eq(dutyExclusions.teamId, teamId)
+        )
+      );
+    
+    const excludedTemplateIds = new Set(gameExclusions.map(e => e.dutyTemplateId));
+    
+    // Filter templates based on scope and exclusions
     const filteredTemplates = allTemplates.filter(template => {
+      // First check if explicitly excluded from this game
+      if (excludedTemplateIds.has(template.id)) {
+        return false;
+      }
+      
       if (template.scope === 'every_game') {
-        // Always show every_game duties
+        // Always show every_game duties (unless excluded)
         return true;
       }
       
@@ -3587,13 +3606,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteDutyTemplate(id: string): Promise<void> {
-    // First delete all assignments for this template
+    // First delete all exclusions for this template
+    await db.delete(dutyExclusions).where(eq(dutyExclusions.dutyTemplateId, id));
+    // Delete all assignments for this template
     await db.delete(dutyAssignments).where(eq(dutyAssignments.dutyTemplateId, id));
     // Then delete the template itself
     await db.delete(dutyTemplates).where(eq(dutyTemplates.id, id));
   }
 
-  async deleteDutyAssignmentsForGameAndTemplate(gameId: string, dutyTemplateId: string): Promise<void> {
+  async deleteDutyAssignmentsForGameAndTemplate(gameId: string, dutyTemplateId: string, teamId: string, excludedBy: string): Promise<void> {
+    // Delete any existing assignments
     await db
       .delete(dutyAssignments)
       .where(
@@ -3602,6 +3624,17 @@ export class DatabaseStorage implements IStorage {
           eq(dutyAssignments.dutyTemplateId, dutyTemplateId)
         )
       );
+    
+    // Add an exclusion to prevent this duty from showing for this game
+    await db
+      .insert(dutyExclusions)
+      .values({
+        dutyTemplateId,
+        gameId,
+        teamId,
+        excludedBy,
+      })
+      .onConflictDoNothing(); // Ignore if already excluded
   }
 
   async claimDuty(assignment: InsertDutyAssignment): Promise<DutyAssignment> {
@@ -4081,7 +4114,11 @@ export class DatabaseStorage implements IStorage {
       console.log(`Deleting calendar events for game ${id}`);
       await db.delete(calendarEvents).where(eq(calendarEvents.gameId, id));
       
-      // 6. Delete duty assignments
+      // 6. Delete duty exclusions
+      console.log(`Deleting duty exclusions for game ${id}`);
+      await db.delete(dutyExclusions).where(eq(dutyExclusions.gameId, id));
+      
+      // 7. Delete duty assignments
       console.log(`Deleting duty assignments for game ${id}`);
       await db.delete(dutyAssignments).where(eq(dutyAssignments.gameId, id));
       
