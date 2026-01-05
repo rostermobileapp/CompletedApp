@@ -28,7 +28,8 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
-  BellRing
+  BellRing,
+  UserCheck
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -41,6 +42,7 @@ interface NotificationSettings {
   joinRequests: boolean;
   upcomingEvents: boolean;
   newsAnnouncements: boolean;
+  playerRsvpUpdates?: boolean;
 }
 
 interface NotificationPreferences {
@@ -63,6 +65,7 @@ const defaultSettings: NotificationSettings = {
   joinRequests: true,
   upcomingEvents: true,
   newsAnnouncements: true,
+  playerRsvpUpdates: true,
 };
 
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
@@ -92,6 +95,13 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     queryKey: ['/api/user'],
     enabled: open,
   });
+
+  // Check if user is a team captain
+  const { data: captainTeams } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['/api/user/captain-teams'],
+    enabled: open,
+  });
+  const isCaptain = (captainTeams?.length ?? 0) > 0;
 
   const { data: preferences, isLoading } = useQuery<NotificationPreferences>({
     queryKey: ['/api/notification-preferences'],
@@ -388,6 +398,23 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                     />
                   </div>
                 ))}
+                
+                {/* Captain-only: Player RSVP Updates */}
+                {isCaptain && (
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 border-t mt-2 pt-3">
+                    <div className="flex items-center gap-3">
+                      <UserCheck className="w-4 h-4 text-emerald-500" />
+                      <div>
+                        <Label className="text-sm cursor-pointer font-normal">Player RSVPs</Label>
+                        <p className="text-xs text-muted-foreground">Captain only</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={localSettings.playerRsvpUpdates ?? true}
+                      onCheckedChange={() => handleToggle('playerRsvpUpdates')}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
 

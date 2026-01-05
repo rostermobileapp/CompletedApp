@@ -191,7 +191,8 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "scrimmage_canceled",
   "game_reminder",
   "scrimmage_cohost_added",
-  "scrimmage_cohost_removed"
+  "scrimmage_cohost_removed",
+  "player_rsvp"
 ]);
 
 // Users table (required for Replit Auth)
@@ -268,6 +269,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
     upcomingEvents: true,
     newsAnnouncements: true,
     scrimmageInvites: true,
+    playerRsvpUpdates: true,
   }).notNull(),
   pushEnabled: boolean("push_enabled").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

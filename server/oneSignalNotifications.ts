@@ -313,3 +313,33 @@ export async function sendCoCommissionerPushNotification(
     },
   });
 }
+
+export async function sendPlayerRsvpPushNotification(
+  captainId: string,
+  playerName: string,
+  rsvpStatus: 'attending' | 'not_attending',
+  gameTitle: string,
+  gameId: string,
+  teamId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(captainId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.playerRsvpUpdates === false) {
+    console.log(`[OneSignal] Player RSVP notifications disabled for user ${captainId}`);
+    return false;
+  }
+  
+  const statusText = rsvpStatus === 'attending' ? 'IN' : 'OUT';
+  const emoji = rsvpStatus === 'attending' ? '✅' : '❌';
+  
+  return sendPushNotificationToUser({
+    userId: captainId,
+    title: `${emoji} RSVP Update`,
+    message: `${playerName} is ${statusText} for ${gameTitle}`,
+    data: {
+      type: 'player_rsvp',
+      gameId,
+      teamId,
+    },
+  });
+}
