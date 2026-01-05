@@ -358,6 +358,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get teams where user is a captain
+  app.get('/api/user/captain-teams', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const captainTeams = await storage.getTeamsWhereCaptain(userId);
+      res.json(captainTeams);
+    } catch (error) {
+      console.error("Error fetching captain teams:", error);
+      res.status(500).json({ message: "Failed to fetch captain teams" });
+    }
+  });
+
   // Onboarding Routes
   app.get('/api/user/onboarding', isAuthenticated, async (req: any, res) => {
     try {
@@ -5887,6 +5899,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const rsvp = await storage.createOrUpdateRsvp(rsvpData);
+      
+      // Send push notification to team captain (if user is not the captain themselves)
+      try {
+        const team = await storage.getTeam(teamId);
+        if (team?.captainId && team.captainId !== userId) {
+          const player = await storage.getUser(userId);
+          const playerName = player?.firstName && player?.lastName 
+            ? `${player.firstName} ${player.lastName}`
+            : player?.firstName || 'A player';
+          
+          // Create a game title from opponent and date
+          let gameTitle = 'upcoming game';
+          if (game.scheduledAt) {
+            const gameDate = new Date(game.scheduledAt);
+            const dateStr = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            gameTitle = `${dateStr} game`;
+          }
+          
+          const { sendPlayerRsvpPushNotification } = await import('./oneSignalNotifications');
+          sendPlayerRsvpPushNotification(
+            team.captainId,
+            playerName,
+            status as 'attending' | 'not_attending',
+            gameTitle,
+            gameId,
+            teamId
+          ).catch(err => console.error('Failed to send RSVP push notification:', err));
+        }
+      } catch (notifError) {
+        console.error('Error sending RSVP notification:', notifError);
+        // Don't fail the RSVP if notification fails
+      }
+      
       res.json(rsvp);
     } catch (error) {
       console.error('Error updating RSVP:', error);
