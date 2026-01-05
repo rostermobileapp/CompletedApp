@@ -2328,10 +2328,29 @@ export default function Dashboard() {
           <div className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid="loading-upcoming-games">
             <div className="h-16 bg-muted rounded"></div>
           </div>
-        ) : (Array.isArray(upcomingGames) && upcomingGames.filter((g: any) => new Date(g.scheduledAt) >= new Date()).length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => new Date(i.dateTime) >= new Date()).length > 0) || (Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved' && r.scrimmage && new Date(r.scrimmage.dateTime) >= new Date()).length > 0) || (Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && new Date(r.scheduledAt) >= new Date()).length > 0) ? (
+        ) : (() => {
+          // Helper to check if a date is today or in the future (comparing local dates, not timestamps)
+          // Games should remain visible until the day AFTER they are scheduled
+          const isYesterdayOrLater = (dateStr: string) => {
+            const eventDate = new Date(dateStr);
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            yesterday.setHours(0, 0, 0, 0);
+            const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+            return eventDateOnly >= yesterday;
+          };
+          return (Array.isArray(upcomingGames) && upcomingGames.filter((g: any) => isYesterdayOrLater(g.scheduledAt)).length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => isYesterdayOrLater(i.dateTime)).length > 0) || (Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved' && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0) || (Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && isYesterdayOrLater(r.scheduledAt)).length > 0);
+        })() ? (
           <div className="space-y-3">
-            {/* First show scrimmage invites (future only) */}
-            {Array.isArray(scrimmageInvites) && scrimmageInvites.filter((invite: any) => new Date(invite.dateTime) >= new Date()).map((invite: any) => (
+            {/* First show scrimmage invites (yesterday and future - visible until day after) */}
+            {Array.isArray(scrimmageInvites) && scrimmageInvites.filter((invite: any) => {
+              const eventDate = new Date(invite.dateTime);
+              const yesterday = new Date();
+              yesterday.setDate(yesterday.getDate() - 1);
+              yesterday.setHours(0, 0, 0, 0);
+              const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+              return eventDateOnly >= yesterday;
+            }).map((invite: any) => (
               <div 
                 key={`invite-${invite.id}`}
                 className="rounded-xl border border-yellow-500/50 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
@@ -2372,9 +2391,17 @@ export default function Dashboard() {
               </div>
             ))}
             
-            {/* Show approved scrimmages (future only) */}
+            {/* Show approved scrimmages (yesterday and future - visible until day after) */}
             {Array.isArray(scrimmageRequests) && scrimmageRequests
-              .filter((request: any) => request.status === 'approved' && request.scrimmage && new Date(request.scrimmage.dateTime) >= new Date())
+              .filter((request: any) => {
+                if (request.status !== 'approved' || !request.scrimmage) return false;
+                const eventDate = new Date(request.scrimmage.dateTime);
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                yesterday.setHours(0, 0, 0, 0);
+                const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                return eventDateOnly >= yesterday;
+              })
               .slice(0, 5)
               .map((request: any) => {
                 const scrimmage = request.scrimmage;
@@ -2407,9 +2434,17 @@ export default function Dashboard() {
                 );
               })}
             
-            {/* Show personal reminders (future only) */}
+            {/* Show personal reminders (yesterday and future - visible until day after) */}
             {Array.isArray(personalReminders) && personalReminders
-              .filter((reminder: any) => !reminder.isCompleted && new Date(reminder.scheduledAt) >= new Date())
+              .filter((reminder: any) => {
+                if (reminder.isCompleted) return false;
+                const eventDate = new Date(reminder.scheduledAt);
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                yesterday.setHours(0, 0, 0, 0);
+                const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                return eventDateOnly >= yesterday;
+              })
               .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
               .slice(0, 5)
               .map((reminder: any) => (
@@ -2453,11 +2488,17 @@ export default function Dashboard() {
                 </div>
               ))}
             
-            {/* Then show regular games (future only) */}
+            {/* Then show regular games (yesterday and future - visible until day after) */}
             {(upcomingGames as any[])
               .filter((game: any) => {
-                // Filter out past games
-                if (new Date(game.scheduledAt) < new Date()) {
+                // Games remain visible until the day AFTER they are scheduled
+                // Compare local dates only (not timestamps) to handle timezone differences correctly
+                const eventDate = new Date(game.scheduledAt);
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                yesterday.setHours(0, 0, 0, 0);
+                const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                if (eventDateOnly < yesterday) {
                   return false;
                 }
                 // Always show scrimmages (user is already approved)

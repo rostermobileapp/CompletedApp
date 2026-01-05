@@ -3911,6 +3911,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingGameIds = new Set(games.map(g => g.id));
       
       // Fetch and add substitute games that aren't already in the list
+      // Use start of yesterday in UTC to ensure games remain visible regardless of timezone
+      const startOfYesterdayUTC = new Date();
+      startOfYesterdayUTC.setUTCDate(startOfYesterdayUTC.getUTCDate() - 1);
+      startOfYesterdayUTC.setUTCHours(0, 0, 0, 0);
+      
       const substituteGames: typeof games = [];
       for (const gameId of substituteGameIds) {
         const alreadyInRoster = existingGameIds.has(gameId);
@@ -3919,12 +3924,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const game = await storage.getGameById(gameId);
           
           if (game) {
-            // Only include future games
+            // Include games from today onwards (not just future by exact time)
             const gameDate = new Date(game.scheduledAt);
-            const now = new Date();
-            const isFuture = gameDate >= now;
+            const isTodayOrFuture = gameDate >= startOfYesterdayUTC;
             
-            if (isFuture) {
+            if (isTodayOrFuture) {
               substituteGames.push(game);
             }
           }
@@ -3946,9 +3950,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Add approved scrimmages as schedule items
-      const now = new Date();
+      // Use start of yesterday in UTC to ensure scrimmages remain visible regardless of timezone
+      const scrimmageStartOfYesterdayUTC = new Date();
+      scrimmageStartOfYesterdayUTC.setUTCDate(scrimmageStartOfYesterdayUTC.getUTCDate() - 1);
+      scrimmageStartOfYesterdayUTC.setUTCHours(0, 0, 0, 0);
       const formattedScrimmages = approvedScrimmageRequests
-        .filter(req => new Date(req.scrimmage.dateTime) >= now)
+        .filter(req => new Date(req.scrimmage.dateTime) >= scrimmageStartOfYesterdayUTC)
         .map(req => ({
           id: req.scrimmage.id,
           scheduledAt: req.scrimmage.dateTime,

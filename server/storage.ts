@@ -2926,6 +2926,12 @@ export class DatabaseStorage implements IStorage {
     const userLeagues = await this.getUserLeagues(userId);
     const leagueIds = userLeagues.map(l => l.id);
     
+    // Use start of yesterday in UTC as cutoff to ensure games remain visible
+    // for all users regardless of timezone (gives 24+ hour buffer)
+    const startOfYesterdayUTC = new Date();
+    startOfYesterdayUTC.setUTCDate(startOfYesterdayUTC.getUTCDate() - 1);
+    startOfYesterdayUTC.setUTCHours(0, 0, 0, 0);
+    
     // Get games where user has an attending RSVP (for substitute players)
     const rsvpGames = await db
       .select({ gameId: gameRsvps.gameId })
@@ -2935,7 +2941,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(gameRsvps.userId, userId),
           eq(gameRsvps.status, 'attending'),
-          gte(games.scheduledAt, new Date())
+          gte(games.scheduledAt, startOfYesterdayUTC)
         )
       );
     const rsvpGameIds = rsvpGames.map(r => r.gameId);
@@ -2949,7 +2955,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(substituteRequests.substitutePlayerId, userId),
           eq(substituteRequests.status, 'approved'),
-          gte(games.scheduledAt, new Date())
+          gte(games.scheduledAt, startOfYesterdayUTC)
         )
       );
     const substituteGameIds = substituteGames.map(r => r.gameId);
@@ -2982,7 +2988,7 @@ export class DatabaseStorage implements IStorage {
       .from(games)
       .where(
         and(
-          gte(games.scheduledAt, new Date()),
+          gte(games.scheduledAt, startOfYesterdayUTC),
           or(...conditions)
         )
       )
@@ -3001,7 +3007,11 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Get approved scrimmages for the user
+    // Get approved scrimmages for the user (use start of yesterday in UTC for timezone safety)
+    const scrimmageStartOfYesterdayUTC = new Date();
+    scrimmageStartOfYesterdayUTC.setUTCDate(scrimmageStartOfYesterdayUTC.getUTCDate() - 1);
+    scrimmageStartOfYesterdayUTC.setUTCHours(0, 0, 0, 0);
+    
     const approvedScrimmages = await db
       .select({
         scrimmage: scrimmages,
@@ -3014,7 +3024,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(scrimmageRequests.playerId, userId),
           eq(scrimmageRequests.status, 'approved'),
-          gte(scrimmages.dateTime, new Date()),
+          gte(scrimmages.dateTime, scrimmageStartOfYesterdayUTC),
           // Only roster_confirmed scrimmages should show on schedule
           eq(scrimmages.status, 'roster_confirmed')
         )
