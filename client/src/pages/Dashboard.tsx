@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { useAuth } from '@/hooks/useAuth';
 // 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
@@ -391,9 +392,9 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
 
   if (!isOpen) return null;
 
-  return (
+  return ReactDOM.createPortal(
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 pb-24 z-50">
-      <div className="bg-card rounded-lg border border-border w-full max-w-6xl h-[90vh] flex flex-col">
+      <div className="bg-card rounded-lg border border-border w-full max-w-md h-[90vh] flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-border pt-[4px] pb-[4px]">
           <h2 className="text-2xl font-semibold text-center">Needs Attention</h2>
@@ -836,7 +837,8 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -950,9 +952,9 @@ function StandingsModal({ isOpen, onClose, leagueId, tournamentId }: {
 
   if (!isOpen) return null;
 
-  return (
+  return ReactDOM.createPortal(
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-card rounded-lg border border-border w-full max-w-6xl h-[90vh] flex flex-col">
+      <div className="bg-card rounded-lg border border-border w-full max-w-md h-[90vh] flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-border relative">
           <h2 className="text-2xl font-semibold text-center">
@@ -1042,7 +1044,8 @@ function StandingsModal({ isOpen, onClose, leagueId, tournamentId }: {
         </div>
         </FeatureLockOverlay>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
