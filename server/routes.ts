@@ -5914,7 +5914,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (game.scheduledAt) {
             const gameDate = new Date(game.scheduledAt);
             const dateStr = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            gameTitle = `${dateStr} game`;
+            
+            // Get opposing team name
+            const opposingTeamId = game.homeTeamId === teamId ? game.awayTeamId : game.homeTeamId;
+            if (opposingTeamId) {
+              const opposingTeam = await storage.getTeam(opposingTeamId);
+              if (opposingTeam?.name) {
+                gameTitle = `${dateStr} game against ${opposingTeam.name}`;
+              } else {
+                gameTitle = `${dateStr} game`;
+              }
+            } else {
+              gameTitle = `${dateStr} game`;
+            }
           }
           
           const { sendPlayerRsvpPushNotification } = await import('./oneSignalNotifications');
