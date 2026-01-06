@@ -216,6 +216,7 @@ export class MessagingService {
           lastName: leagueId
             ? sql<string>`COALESCE(${leagueMemberships.displayLastName}, ${users.lastName})`.as('lastName')
             : users.lastName,
+          profileImageUrl: users.profileImageUrl,
         }
       })
       .from(messages)
@@ -300,6 +301,7 @@ export class MessagingService {
           lastName: leagueId
             ? sql<string>`COALESCE(${leagueMemberships.displayLastName}, ${users.lastName})`.as('lastName')
             : users.lastName,
+          profileImageUrl: users.profileImageUrl,
         }
       })
       .from(messages)
