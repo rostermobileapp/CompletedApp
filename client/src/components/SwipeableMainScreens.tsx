@@ -123,20 +123,15 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
           x: springX,
           width: `${screens.length * 100}%`,
           willChange: 'transform',
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
-          transform: 'translateZ(0)',
         }}
       >
         {screens.map((screen, index) => (
           <div
             key={screen.id}
-            className="h-full overflow-y-auto overflow-x-hidden bg-background"
+            className="relative h-full flex flex-col bg-background"
             style={{ 
               width: `${100 / screens.length}%`,
               flexShrink: 0,
-              backfaceVisibility: 'hidden',
-              WebkitBackfaceVisibility: 'hidden',
             }}
             data-testid={`screen-${screen.id}`}
           >

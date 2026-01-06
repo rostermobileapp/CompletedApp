@@ -1830,8 +1830,8 @@ export default function Messages() {
           </div>
         </DialogContent>
       </Dialog>
-      <div className="min-h-screen flex flex-col pb-24" data-testid="messages-page">
-        <FeatureLockOverlay isLocked={false} className="min-h-screen flex flex-col">
+      <div className="h-full flex flex-col relative" data-testid="messages-page">
+        <FeatureLockOverlay isLocked={false} className="h-full flex flex-col">
       {!selectedConversation ? (
         <>
           {/* Conversations List Header */}
@@ -2214,10 +2214,9 @@ export default function Messages() {
         </>
       )}
         </FeatureLockOverlay>
-      </div>
-      {/* Fixed Message Input - only show when conversation is selected */}
+      {/* Message Input - only show when conversation is selected */}
       {selectedConversation && !canAccessPremiumFeatures() && (
-        <div className="fixed left-0 right-0 bg-background border-t border-border p-4 z-40" style={{ bottom: '132px' }} data-testid="message-input-locked">
+        <div className="absolute left-0 right-0 bg-background border-t border-border p-4 z-40 bottom-[50px]" data-testid="message-input-locked">
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -2239,7 +2238,7 @@ export default function Messages() {
         </div>
       )}
       {selectedConversation && canAccessPremiumFeatures() && (
-        <div className="fixed left-0 right-0 bg-background border-t border-border p-4 z-40" style={{ bottom: '82px' }} data-testid="message-input-container">
+        <div className="absolute left-0 right-0 bg-background border-t border-border p-4 z-40 bottom-0" data-testid="message-input-container">
           {/* File previews */}
           {selectedFiles.length > 0 && (
             <div className="mb-3 space-y-2" data-testid="selected-files">
@@ -2524,6 +2523,7 @@ export default function Messages() {
           </div>
         </div>
       )}
+      </div>
       {/* Media Gallery */}
       <MediaGallery
         items={galleryItems}
