@@ -2041,7 +2041,7 @@ export default function Messages() {
                 <img 
                   src={getImageUrl(conversationTeam.logoUrl) || ''} 
                   alt="" 
-                  className="w-full object-contain opacity-100"
+                  className="w-full object-contain opacity-90"
                   style={{ maxHeight: '100%' }}
                 />
               </div>
