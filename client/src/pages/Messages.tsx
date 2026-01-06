@@ -1917,7 +1917,7 @@ export default function Messages() {
                           </div>)
                         ) : (
                           // Direct message avatar - show profile pic if available
-                          (() => {
+                          ((() => {
                             const profileImageUrl = getOtherParticipantProfileImage(conversation);
                             const imageUrl = getImageUrl(profileImageUrl);
                             return imageUrl ? (
@@ -1933,7 +1933,7 @@ export default function Messages() {
                                 </span>
                               </div>
                             );
-                          })()
+                          })())
                         )}
                       </div>
                       
@@ -1998,7 +1998,7 @@ export default function Messages() {
       ) : (
         <>
           {/* Chat Header */}
-          <div className="sticky top-0 z-50 p-4 pt-12 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" data-testid="chat-header">
+          <div className="sticky top-0 z-50 p-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[12px] pb-[12px] pl-[12px] pr-[12px]" data-testid="chat-header">
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => setSelectedConversation(null)}
