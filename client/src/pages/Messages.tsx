@@ -2079,7 +2079,7 @@ export default function Messages() {
                   <div 
                     key={message.id} 
                     ref={isFirstUnread ? firstUnreadMessageRef : null}
-                    className={`flex gap-3 ${isCurrentUser ? 'justify-end' : 'justify-start'}`} 
+                    className={`flex gap-3 items-start ${isCurrentUser ? 'justify-end' : 'justify-start'}`} 
                     data-testid={`message-${message.id}`}
                   >
                     {!isCurrentUser && message.sender && (
