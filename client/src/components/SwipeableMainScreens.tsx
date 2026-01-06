@@ -123,6 +123,9 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
           x: springX,
           width: `${screens.length * 100}%`,
           willChange: 'transform',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          transform: 'translateZ(0)',
         }}
       >
         {screens.map((screen, index) => (
@@ -132,6 +135,8 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
             style={{ 
               width: `${100 / screens.length}%`,
               flexShrink: 0,
+              backfaceVisibility: 'hidden',
+              WebkitBackfaceVisibility: 'hidden',
             }}
             data-testid={`screen-${screen.id}`}
           >
