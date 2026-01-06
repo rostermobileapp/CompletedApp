@@ -56,7 +56,7 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
   });
   
   const [containerWidth, setContainerWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 375);
-  const bottomPadding = user?.role === 'free_tier' ? 132 : 82;
+  const bottomPadding = currentScreen === 'messages' ? 0 : (user?.role === 'free_tier' ? 132 : 82);
 
   useEffect(() => {
     const updateWidth = () => {
