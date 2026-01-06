@@ -8,6 +8,7 @@ import { getImageUrl } from '@/lib/queryClient';
 
 interface UserProfileData {
   id: string;
+  displayId?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   email?: string | null;
@@ -161,7 +162,7 @@ export default function UserProfile() {
               }
             </h2>
             <p className="text-xs text-muted-foreground/70 mb-2" data-testid="text-user-id">
-              ID: {user.id}
+              ID: {user.displayId || 'Not assigned'}
             </p>
             <div className="flex items-center gap-2">
               <span 
