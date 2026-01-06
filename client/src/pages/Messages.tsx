@@ -2046,7 +2046,7 @@ export default function Messages() {
                 />
               </div>
             )}
-            <div className="relative z-10 p-4 space-y-4 pb-20">
+            <div className="relative z-10 p-4 space-y-4 pb-36">
             {messagesLoading ? (
               <div className="space-y-4" data-testid="messages-loading">
                 {[1, 2, 3].map(i => (
@@ -2262,7 +2262,7 @@ export default function Messages() {
         </FeatureLockOverlay>
       {/* Message Input - only show when conversation is selected */}
       {selectedConversation && !canAccessPremiumFeatures() && (
-        <div className="fixed left-0 right-0 bg-background border-t border-border p-4 z-40 bottom-0 pb-[env(safe-area-inset-bottom,0px)]" data-testid="message-input-locked">
+        <div className="fixed left-0 right-0 bg-background border-t border-border p-4 z-40 bottom-16" data-testid="message-input-locked">
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -2284,7 +2284,7 @@ export default function Messages() {
         </div>
       )}
       {selectedConversation && canAccessPremiumFeatures() && (
-        <div className="fixed left-0 right-0 bg-background border-t border-border p-4 z-40 bottom-0 pb-[env(safe-area-inset-bottom,0px)]" data-testid="message-input-container">
+        <div className="fixed left-0 right-0 bg-background border-t border-border p-4 z-40 bottom-16" data-testid="message-input-container">
           {/* File previews */}
           {selectedFiles.length > 0 && (
             <div className="mb-3 space-y-2" data-testid="selected-files">
