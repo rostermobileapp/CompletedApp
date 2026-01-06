@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
@@ -1515,6 +1515,13 @@ export default function Messages() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  // Get other participant's profile image for direct messages
+  const getOtherParticipantProfileImage = (conversation: Conversation) => {
+    if (conversation.type !== 'direct' || !conversation.participants) return null;
+    const otherParticipant = conversation.participants.find(p => p.user?.id !== currentUserId);
+    return otherParticipant?.user?.profileImageUrl || null;
+  };
+
   // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
   // All users now have free access to messaging features
 
@@ -1909,12 +1916,24 @@ export default function Messages() {
                             <Users className="w-5 h-5 text-muted-foreground" />
                           </div>)
                         ) : (
-                          // Direct message avatar
-                          (<div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-                            <span className="text-muted-foreground text-sm font-semibold">
-                              {getInitials(getParticipantName(conversation))}
-                            </span>
-                          </div>)
+                          // Direct message avatar - show profile pic if available
+                          (() => {
+                            const profileImageUrl = getOtherParticipantProfileImage(conversation);
+                            const imageUrl = getImageUrl(profileImageUrl);
+                            return imageUrl ? (
+                              <img 
+                                src={imageUrl} 
+                                alt=""
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                                <span className="text-muted-foreground text-sm font-semibold">
+                                  {getInitials(getParticipantName(conversation))}
+                                </span>
+                              </div>
+                            );
+                          })()
                         )}
                       </div>
                       
@@ -2020,7 +2039,7 @@ export default function Messages() {
                 className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden"
               >
                 <img 
-                  src={conversationTeam.logoUrl} 
+                  src={getImageUrl(conversationTeam.logoUrl) || ''} 
                   alt="" 
                   className="w-full object-contain opacity-20"
                   style={{ maxHeight: '100%' }}
