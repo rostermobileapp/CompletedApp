@@ -1,6 +1,7 @@
 import { useLocation } from 'wouter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { setPageTransitionDirection } from '@/components/PageTransition';
+import { getImageUrl } from '@/lib/queryClient';
 
 interface ClickableAvatarProps {
   userId: string;
@@ -49,7 +50,7 @@ export function ClickableAvatar({
       data-testid={`button-avatar-${userId}`}
     >
       <Avatar className={`${sizeClasses[size]} ${className}`}>
-        <AvatarImage src={profileImageUrl || undefined} alt={firstName || 'User'} />
+        <AvatarImage src={getImageUrl(profileImageUrl) || undefined} alt={firstName || 'User'} />
         <AvatarFallback>{getInitials()}</AvatarFallback>
       </Avatar>
     </button>
