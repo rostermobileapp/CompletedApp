@@ -39,7 +39,14 @@
       [
         "onesignal-expo-plugin",
         {
-          "mode": "development"
+          "mode": "development",
+          "smallIcons": [
+            "./assets/notification/ic_stat_onesignal_default_mdpi.png",
+            "./assets/notification/ic_stat_onesignal_default_hdpi.png",
+            "./assets/notification/ic_stat_onesignal_default_xhdpi.png",
+            "./assets/notification/ic_stat_onesignal_default_xxhdpi.png",
+            "./assets/notification/ic_stat_onesignal_default_xxxhdpi.png"
+          ]
         }
       ]
     ],
