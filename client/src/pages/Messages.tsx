@@ -15,7 +15,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
-import { League, ChatPoll, ChatPollVote } from '@shared/schema';
+import { League, ChatPoll, ChatPollVote, Team } from '@shared/schema';
 
 import { MediaGallery } from '@/components/MediaGallery';
 import GifSearchModal from '@/components/GifSearchModal';
@@ -1456,6 +1456,12 @@ export default function Messages() {
   // Get the current conversation to display proper chat title
   const currentConversation = conversations.find(c => c.id === selectedConversation);
 
+  // Fetch team data for team group chats (to get logo)
+  const { data: conversationTeam } = useQuery<Team>({
+    queryKey: ['/api/teams', currentConversation?.teamId],
+    enabled: !!currentConversation?.teamId && currentConversation?.type === 'team_group'
+  });
+
   // Fetch available contacts that can be added to the current conversation
   const { data: availableContacts = [] } = useQuery<Contact[]>({
     queryKey: ['/api/leagues', currentConversation?.leagueId, 'contacts'],
@@ -2001,7 +2007,27 @@ export default function Messages() {
           </div>
           
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20" data-testid="messages-container">
+          <div 
+            className="flex-1 overflow-y-auto relative" 
+            data-testid="messages-container"
+            style={conversationTeam?.logoUrl ? {
+              backgroundColor: '#000',
+            } : undefined}
+          >
+            {/* Team logo background for team group chats */}
+            {conversationTeam?.logoUrl && (
+              <div 
+                className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden"
+              >
+                <img 
+                  src={conversationTeam.logoUrl} 
+                  alt="" 
+                  className="w-full object-contain opacity-20"
+                  style={{ maxHeight: '100%' }}
+                />
+              </div>
+            )}
+            <div className="relative z-10 p-4 space-y-4 pb-20">
             {messagesLoading ? (
               <div className="space-y-4" data-testid="messages-loading">
                 {[1, 2, 3].map(i => (
@@ -2052,9 +2078,9 @@ export default function Messages() {
                     <div className={`${message.messageType === 'poll' ? 'w-3/4 lg:max-w-[20%]' : 'max-w-[70%]'} ${isCurrentUser ? 'order-1' : 'order-2'}`}>
                       <div className={`rounded-lg p-3 ${
                         isCurrentUser 
-                          ? 'bg-primary/50 text-primary-foreground ml-auto' 
-                          : 'bg-muted/50'
-                      }`}>
+                          ? 'text-white ml-auto' 
+                          : 'text-white'
+                      }`} style={{ backgroundColor: isCurrentUser ? '#3c82f4' : '#212121' }}>
                         {!isCurrentUser && (
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold text-xs" data-testid={`text-message-sender-${message.id}`}>
@@ -2210,13 +2236,14 @@ export default function Messages() {
               </div>
             )}
             <div ref={messagesEndRef} />
+            </div>
           </div>
         </>
       )}
         </FeatureLockOverlay>
       {/* Message Input - only show when conversation is selected */}
       {selectedConversation && !canAccessPremiumFeatures() && (
-        <div className="absolute left-0 right-0 bg-background border-t border-border p-4 z-40 bottom-[50px]" data-testid="message-input-locked">
+        <div className="fixed left-0 right-0 bg-background border-t border-border p-4 z-40 bottom-0 pb-[env(safe-area-inset-bottom,0px)]" data-testid="message-input-locked">
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -2238,7 +2265,7 @@ export default function Messages() {
         </div>
       )}
       {selectedConversation && canAccessPremiumFeatures() && (
-        <div className="absolute left-0 right-0 bg-background border-t border-border p-4 z-40 bottom-0" data-testid="message-input-container">
+        <div className="fixed left-0 right-0 bg-background border-t border-border p-4 z-40 bottom-0 pb-[env(safe-area-inset-bottom,0px)]" data-testid="message-input-container">
           {/* File previews */}
           {selectedFiles.length > 0 && (
             <div className="mb-3 space-y-2" data-testid="selected-files">
