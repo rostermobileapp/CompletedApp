@@ -37,10 +37,10 @@ export function ClickableAvatar({
   };
 
   const sizeClasses = {
-    xs: 'h-6 w-6',
-    sm: 'h-8 w-8',
-    md: 'h-10 w-10',
-    lg: 'h-12 w-12'
+    xs: 'h-[30px] w-[30px]',
+    sm: 'h-10 w-10',
+    md: 'h-[50px] w-[50px]',
+    lg: 'h-[60px] w-[60px]'
   };
 
   return (
