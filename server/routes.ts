@@ -14507,11 +14507,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             updateData.gameId = newGame.id;
           }
         } else if (scheduledTime === null && match.gameId) {
-          console.log('🗑️ Clearing schedule - unlinking game from tournament match');
-          // Schedule cleared - unlink the game but don't delete (might have references)
-          // Just update the tournament match to remove the game link
+          console.log('🗑️ Clearing schedule - attempting to delete game');
+          // Schedule cleared - try to delete the linked game
+          try {
+            await db
+              .delete(games)
+              .where(eq(games.id, match.gameId));
+            console.log('✅ Game deleted successfully');
+          } catch (deleteError) {
+            console.log('⚠️ Could not delete game (may have references), game remains orphaned:', deleteError);
+          }
+          // Always unlink the game from the tournament match
           updateData.gameId = null;
-          console.log('✅ Game unlinked from tournament match');
         }
       } else {
         console.log('❌ Skipping game creation - missing requirements:', {
