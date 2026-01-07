@@ -33,7 +33,7 @@ const formSchema = z.object({
   name: z.string().min(1, "Tournament name is required"),
   type: z.enum(["season_playoff", "standalone"]),
   seasonId: z.string().optional(),
-  format: z.enum(["single_elimination", "double_elimination", "round_robin", "round_robin_split"]),
+  format: z.enum(["single_elimination", "double_elimination", "round_robin", "round_robin_split", "three_game_guarantee", "custom_bracket"]),
   description: z.string().optional(),
   teamIds: z.array(z.string()).min(2, "Select at least 2 teams"),
   byePolicy: z.enum(["top_seed_bye", "play_in_game"]).optional()
@@ -189,6 +189,8 @@ export default function TournamentEdit() {
     const labels: Record<string, string> = {
       single_elimination: 'Single Elimination',
       double_elimination: 'Double Elimination',
+      three_game_guarantee: '3-Game Guarantee',
+      custom_bracket: 'Custom Bracket',
       round_robin: 'Round Robin',
       round_robin_split: 'Round Robin + Playoffs'
     };
@@ -392,6 +394,8 @@ export default function TournamentEdit() {
                             <SelectItem value="double_elimination">Double Elimination (Beta)</SelectItem>
                             <SelectItem value="round_robin">Round Robin</SelectItem>
                             <SelectItem value="round_robin_split">Round Robin + Playoffs</SelectItem>
+                            <SelectItem value="three_game_guarantee">3-Game Guarantee</SelectItem>
+                            <SelectItem value="custom_bracket">Custom Bracket</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormDescription>

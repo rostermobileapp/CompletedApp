@@ -1635,7 +1635,7 @@ export default function TournamentDetail() {
                           {isBracketLocked && !isEditingBracket ? 'Your custom tournament structure is locked' : 'Design your own tournament bracket structure'}
                         </CardDescription>
                       </div>
-                      {isBracketLocked && !isEditingBracket && (tournament.settings as any)?.customBracket?.matchups?.length > 0 && (
+                      {tournament.status === 'draft' && isBracketLocked && !isEditingBracket && (
                         <Button
                           onClick={() => setIsEditingBracket(true)}
                           data-testid="button-unlock-bracket"
@@ -1653,7 +1653,7 @@ export default function TournamentDetail() {
                         tournamentId={tournamentId}
                         tournament={tournament}
                         embeddable={true}
-                        locked={isBracketLocked && !isEditingBracket}
+                        locked={tournament.status !== 'draft' || (isBracketLocked && !isEditingBracket)}
                         onSave={async (bracketData) => {
                           try {
                             // Set locked to true when saving
