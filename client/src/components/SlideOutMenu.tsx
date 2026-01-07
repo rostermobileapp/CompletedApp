@@ -2,9 +2,19 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target, Lock } from 'lucide-react';
+import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target, Lock, Monitor } from 'lucide-react';
 import { Sheet, AnimatedSheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SlideOutMenuProps {
   open?: boolean;
@@ -14,6 +24,7 @@ interface SlideOutMenuProps {
 export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenChange }: SlideOutMenuProps = {}) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
+  const [showTournamentWarning, setShowTournamentWarning] = useState(false);
   const [location, navigate] = useLocation();
   const pendingPathRef = useRef<string | null>(null);
   const { canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague, isLoading } = usePermissions();
@@ -147,9 +158,29 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
       return;
     }
     
+    // Show warning modal for Tournaments
+    if (path === '/tournaments') {
+      setShowTournamentWarning(true);
+      return;
+    }
+    
     setPageTransitionDirection('up');
     pendingPathRef.current = path;
     setOpen(false);
+  };
+
+  const handleTournamentProceed = () => {
+    setShowTournamentWarning(false);
+    setPageTransitionDirection('up');
+    pendingPathRef.current = '/tournaments';
+    setOpen(false);
+  };
+
+  const handleTournamentBack = () => {
+    setShowTournamentWarning(false);
+    setOpen(false);
+    // Navigate to home
+    navigate('/');
   };
 
   // Always render the Sheet component to ensure proper cleanup
@@ -220,6 +251,37 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
         open={showPremiumAlert} 
         onOpenChange={setShowPremiumAlert} 
       />
+
+      {/* Tournament Warning Modal */}
+      <AlertDialog open={showTournamentWarning} onOpenChange={setShowTournamentWarning}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex justify-center mb-4">
+              <Monitor className="h-12 w-12 text-primary" />
+            </div>
+            <AlertDialogTitle className="text-center">Desktop Recommended</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              Tournament Mode and our Custom Bracket Tool is best viewed on Desktop
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+            <AlertDialogAction 
+              onClick={handleTournamentProceed}
+              className="w-full"
+              data-testid="button-tournament-proceed"
+            >
+              Proceed Anyways
+            </AlertDialogAction>
+            <AlertDialogCancel 
+              onClick={handleTournamentBack}
+              className="w-full"
+              data-testid="button-tournament-back"
+            >
+              Back
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

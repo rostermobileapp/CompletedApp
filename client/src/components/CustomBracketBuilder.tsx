@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Plus, Trash2, ZoomIn, ZoomOut, Grid3x3, Move, Save, Download, Check } from "lucide-react";
+import dragIconPath from "@/assets/drag-icon.png";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -139,13 +140,10 @@ export function CustomBracketBuilder({
     setMatchups(matchups.map(m => m.id === id ? { ...m, ...updates } : m));
   };
 
-  const handleMouseDown = (e: React.MouseEvent, matchupId: string) => {
-    if ((e.target as HTMLElement).tagName === 'INPUT' || 
-        (e.target as HTMLElement).tagName === 'SELECT' ||
-        (e.target as HTMLElement).tagName === 'BUTTON') {
-      return;
-    }
-
+  const handleDragHandleMouseDown = (e: React.MouseEvent, matchupId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
     const matchup = matchups.find(m => m.id === matchupId);
     if (!matchup) return;
 
@@ -572,7 +570,7 @@ export function CustomBracketBuilder({
         {matchups.map(matchup => (
           <Card
             key={matchup.id}
-            className={`absolute ${locked ? 'cursor-default' : 'cursor-move'} ${matchup.type === 'losers' ? 'border-destructive' : 'border-primary'} ${draggingMatchup === matchup.id ? 'opacity-50' : ''}`}
+            className={`absolute ${matchup.type === 'losers' ? 'border-destructive' : 'border-primary'} ${draggingMatchup === matchup.id ? 'opacity-50' : ''}`}
             style={{
               width: CARD_WIDTH,
               height: CARD_HEIGHT,
@@ -582,12 +580,25 @@ export function CustomBracketBuilder({
               transformOrigin: 'top left',
               borderWidth: '4px'
             }}
-            onMouseDown={locked ? undefined : (e) => handleMouseDown(e, matchup.id)}
             data-testid={`matchup-card-${matchup.id}`}
           >
             <div className="h-full p-3 flex flex-col gap-2">
               {/* Header */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-1">
+                {/* Drag Handle - only way to drag the card */}
+                {!locked && (
+                  <div
+                    className="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 hover:bg-muted rounded"
+                    onMouseDown={(e) => handleDragHandleMouseDown(e, matchup.id)}
+                    data-testid={`drag-handle-${matchup.id}`}
+                  >
+                    <img 
+                      src={dragIconPath} 
+                      alt="Drag" 
+                      className="h-5 w-5 pointer-events-none dark:invert" 
+                    />
+                  </div>
+                )}
                 <Input
                   value={matchup.gameNumber}
                   onChange={(e) => updateMatchup(matchup.id, { gameNumber: e.target.value })}
@@ -600,7 +611,7 @@ export function CustomBracketBuilder({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6"
+                    className="h-6 w-6 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       deleteMatchup(matchup.id);
