@@ -174,7 +174,7 @@ function convertMatchesToMatchups(matches: TournamentMatch[], teams: TournamentT
         winner: match.team1Score !== null && match.team2Score !== null 
           ? (match.team1Score > match.team2Score ? 'team1' : 'team2') 
           : null,
-        winnerDestination: match.advancesToMatchId || null,
+        winnerDestination: null,
         loserDestination: null
       };
       
@@ -822,8 +822,8 @@ export function CustomBracketBuilder({
                       <span className="text-black">
                         {matchup.winnerDestination === 'final' 
                           ? 'Championship' 
-                          : matchup.winnerDestination 
-                            ? (matchups.find(m => m.id === matchup.winnerDestination)?.gameNumber || matchup.winnerDestination.substring(0, 6))
+                          : matchup.winnerDestination && matchups.find(m => m.id === matchup.winnerDestination)
+                            ? matchups.find(m => m.id === matchup.winnerDestination)?.gameNumber
                             : 'Moves to'}
                       </span>
                     </SelectTrigger>
@@ -846,8 +846,8 @@ export function CustomBracketBuilder({
                       <span className="text-white">
                         {matchup.loserDestination === 'eliminated' 
                           ? 'Eliminated' 
-                          : matchup.loserDestination 
-                            ? (matchups.find(m => m.id === matchup.loserDestination)?.gameNumber || matchup.loserDestination.substring(0, 6))
+                          : matchup.loserDestination && matchups.find(m => m.id === matchup.loserDestination)
+                            ? matchups.find(m => m.id === matchup.loserDestination)?.gameNumber
                             : 'Moves to'}
                       </span>
                     </SelectTrigger>
