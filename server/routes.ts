@@ -14542,6 +14542,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add a new match to an existing tournament (for bracket adjustments)
+  app.post('/api/tournaments/:tournamentId/matches', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+      const { round, team1Id, team2Id, notes, advancesToMatchId } = req.body;
+
+      // Verify tournament exists
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      // Get the highest match number in the tournament
+      const existingMatches = await db
+        .select()
+        .from(tournamentMatches)
+        .where(eq(tournamentMatches.tournamentId, tournamentId))
+        .orderBy(sql`${tournamentMatches.matchNumber} DESC`)
+        .limit(1);
+
+      const nextMatchNumber = existingMatches.length > 0 ? existingMatches[0].matchNumber + 1 : 1;
+
+      // Create the new match
+      const [newMatch] = await db
+        .insert(tournamentMatches)
+        .values({
+          id: nanoid(),
+          tournamentId,
+          gameId: null,
+          round: round || `Game ${nextMatchNumber}`,
+          matchNumber: nextMatchNumber,
+          bracketType: 'main',
+          team1Id: team1Id || null,
+          team2Id: team2Id || null,
+          winnerId: null,
+          team1Score: null,
+          team2Score: null,
+          advancesToMatchId: advancesToMatchId || null,
+          scheduledTime: null,
+          location: null,
+          status: 'scheduled',
+          notes: notes || null
+        })
+        .returning();
+
+      res.status(201).json(newMatch);
+    } catch (error) {
+      console.error("Error adding tournament match:", error);
+      res.status(500).json({ message: "Failed to add tournament match" });
+    }
+  });
+
   // Update tournament match scores with player stats
   app.post('/api/tournaments/:tournamentId/matches/:matchId/score', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {

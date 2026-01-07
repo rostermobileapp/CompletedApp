@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -837,6 +838,11 @@ export default function TournamentDetail() {
   const [scoringMatchId, setScoringMatchId] = useState<string | null>(null);
   const [isExportingSchedule, setIsExportingSchedule] = useState(false);
   const [isEditingBracket, setIsEditingBracket] = useState(false);
+  const [showAddMatchDialog, setShowAddMatchDialog] = useState(false);
+  const [newMatchRound, setNewMatchRound] = useState('');
+  const [newMatchTeam1, setNewMatchTeam1] = useState('');
+  const [newMatchTeam2, setNewMatchTeam2] = useState('');
+  const [newMatchNotes, setNewMatchNotes] = useState('');
   const [copiedTournamentId, setCopiedTournamentId] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isUploadingCsv, setIsUploadingCsv] = useState(false);
@@ -1053,6 +1059,31 @@ export default function TournamentDetail() {
       toast({
         title: "Error",
         description: error?.message || "Failed to reject participant",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const addMatchMutation = useMutation({
+    mutationFn: async (matchData: { round: string; team1Id?: string; team2Id?: string; notes?: string }) => {
+      return await apiRequest('POST', `/api/tournaments/${tournamentId}/matches`, matchData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'matches'] });
+      setShowAddMatchDialog(false);
+      setNewMatchRound('');
+      setNewMatchTeam1('');
+      setNewMatchTeam2('');
+      setNewMatchNotes('');
+      toast({
+        title: "Match added",
+        description: "The new match has been added to the bracket"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to add match",
         variant: "destructive"
       });
     }
@@ -1711,80 +1742,9 @@ export default function TournamentDetail() {
                       : rounds;
 
                     return (
-                      <>
-                        {/* Custom Bracket Builder for editing */}
-                        {tournament.status === 'draft' && canManageTournament() && (
-                          <Card className="mb-4">
-                            <CardHeader className="flex flex-row items-center justify-between">
-                              <div>
-                                <CardTitle>Bracket Editor</CardTitle>
-                                <CardDescription>
-                                  {isBracketLocked && !isEditingBracket ? 'Your custom bracket structure is saved' : 'Customize your tournament bracket structure'}
-                                </CardDescription>
-                              </div>
-                              {isBracketLocked && !isEditingBracket && (
-                                <Button
-                                  onClick={() => setIsEditingBracket(true)}
-                                  data-testid="button-unlock-bracket"
-                                  variant="outline"
-                                  className="gap-2"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                  Edit Bracket
-                                </Button>
-                              )}
-                            </CardHeader>
-                            {(!isBracketLocked || isEditingBracket) && (
-                              <CardContent>
-                                <CustomBracketBuilder
-                                  teams={teams || []}
-                                  tournamentId={tournamentId}
-                                  tournament={tournament}
-                                  embeddable={true}
-                                  locked={tournament.status !== 'draft' || (isBracketLocked && !isEditingBracket)}
-                                  onSave={async (bracketData) => {
-                                    try {
-                                      const bracketWithLock = {
-                                        ...bracketData,
-                                        locked: true
-                                      };
-                                      
-                                      const updatedSettings = {
-                                        ...(tournament.settings as any || {}),
-                                        customBracket: bracketWithLock
-                                      };
-                                      
-                                      await apiRequest('PATCH', `/api/tournaments/${tournamentId}`, {
-                                        settings: updatedSettings
-                                      });
-                                      
-                                      await queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
-                                      
-                                      setIsEditingBracket(false);
-                                      
-                                      toast({
-                                        title: "Bracket saved",
-                                        description: "Your bracket has been saved"
-                                      });
-                                    } catch (error) {
-                                      toast({
-                                        title: "Error",
-                                        description: "Failed to save bracket",
-                                        variant: "destructive"
-                                      });
-                                      throw error;
-                                    }
-                                  }}
-                                  onLock={() => setIsEditingBracket(false)}
-                                />
-                              </CardContent>
-                            )}
-                          </Card>
-                        )}
-                        
-                        {/* Bracket View */}
-                        <Card>
-                          <CardHeader className="pt-[2px] pb-[2px]">
+                      <Card>
+                        <CardHeader className="pt-[2px] pb-[2px] flex flex-row items-center justify-between">
+                          <div>
                             <CardTitle>
                               {tournament.format === 'round_robin_split' ? 'Playoff Bracket' : 'Tournament Bracket'}
                             </CardTitle>
@@ -1796,21 +1756,33 @@ export default function TournamentDetail() {
                                 </span>
                               )}
                             </CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <BracketView 
-                              matches={bracketMatches} 
-                              teams={teams || []} 
-                              format={tournament.format}
-                              settings={tournament.settings as TournamentSettings | undefined}
-                              tournamentName={tournament.name}
-                              tournamentId={tournamentId || ''}
-                              isCommissioner={tournament.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
-                              tournamentType={tournament.type}
-                            />
-                          </CardContent>
-                        </Card>
-                      </>
+                          </div>
+                          {canManageTournament() && (
+                            <Button
+                              onClick={() => setShowAddMatchDialog(true)}
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              data-testid="button-add-match"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Add Match
+                            </Button>
+                          )}
+                        </CardHeader>
+                        <CardContent>
+                          <BracketView 
+                            matches={bracketMatches} 
+                            teams={teams || []} 
+                            format={tournament.format}
+                            settings={tournament.settings as TournamentSettings | undefined}
+                            tournamentName={tournament.name}
+                            tournamentId={tournamentId || ''}
+                            isCommissioner={tournament.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
+                            tournamentType={tournament.type}
+                          />
+                        </CardContent>
+                      </Card>
                     );
                   })())
                 ) : (
@@ -2338,6 +2310,87 @@ export default function TournamentDetail() {
           team2Name={getTeamName(editingMatch.team2Id)}
         />
       )}
+
+      {/* Add Match Dialog */}
+      <Dialog open={showAddMatchDialog} onOpenChange={setShowAddMatchDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Match</DialogTitle>
+            <DialogDescription>
+              Add an extra match to the tournament bracket. You can use this for consolation games, championship best-of series, or other custom matches.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Round/Game Name</label>
+              <Input
+                value={newMatchRound}
+                onChange={(e) => setNewMatchRound(e.target.value)}
+                placeholder="e.g., Championship Game 2, Consolation Final"
+                data-testid="input-new-match-round"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Team 1 (Optional)</label>
+              <Select value={newMatchTeam1} onValueChange={setNewMatchTeam1}>
+                <SelectTrigger data-testid="select-new-match-team1">
+                  <SelectValue placeholder="Select team or leave blank" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {teams?.map(team => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.teamName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Team 2 (Optional)</label>
+              <Select value={newMatchTeam2} onValueChange={setNewMatchTeam2}>
+                <SelectTrigger data-testid="select-new-match-team2">
+                  <SelectValue placeholder="Select team or leave blank" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {teams?.map(team => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.teamName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Notes (Optional)</label>
+              <Input
+                value={newMatchNotes}
+                onChange={(e) => setNewMatchNotes(e.target.value)}
+                placeholder="e.g., Best of 3 series - Game 2"
+                data-testid="input-new-match-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddMatchDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => addMatchMutation.mutate({
+                round: newMatchRound || 'Custom Match',
+                team1Id: newMatchTeam1 && newMatchTeam1 !== 'unassigned' ? newMatchTeam1 : undefined,
+                team2Id: newMatchTeam2 && newMatchTeam2 !== 'unassigned' ? newMatchTeam2 : undefined,
+                notes: newMatchNotes || undefined
+              })}
+              disabled={addMatchMutation.isPending}
+              data-testid="button-confirm-add-match"
+            >
+              {addMatchMutation.isPending ? 'Adding...' : 'Add Match'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Tournament Match Score Modal */}
       {scoringMatchId && tournamentId && (
         <TournamentMatchScoreModal
