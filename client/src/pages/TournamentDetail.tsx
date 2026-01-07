@@ -1575,12 +1575,12 @@ export default function TournamentDetail() {
 
           {/* Bracket Tab */}
           <TabsContent value="bracket" className="space-y-4">
-            {matches && matches.length > 0 ? (
+            {(matches && matches.length > 0) || tournament.format === 'custom_bracket' ? (
               <div className="space-y-6">
                 {/* Round Robin + Playoffs Seeding Button */}
                 {tournament.format === 'round_robin_split' && (() => {
-                  const roundRobinMatches = matches.filter(m => m.round === 'Round Robin');
-                  const playoffMatches = matches.filter(m => m.round !== 'Round Robin');
+                  const roundRobinMatches = (matches || []).filter(m => m.round === 'Round Robin');
+                  const playoffMatches = (matches || []).filter(m => m.round !== 'Round Robin');
                   const playoffsSeeded = playoffMatches.some(m => m.team1Id !== null && m.team2Id !== null);
                   const allRRCompleted = roundRobinMatches.length > 0 && roundRobinMatches.every(m => m.status === 'completed');
                   
@@ -1702,8 +1702,8 @@ export default function TournamentDetail() {
                   ((() => {
                     // For Round Robin + Playoffs, only show playoff matches in the bracket
                     const bracketMatches = tournament.format === 'round_robin_split' 
-                      ? matches.filter(m => m.round !== 'Round Robin')
-                      : matches;
+                      ? (matches || []).filter(m => m.round !== 'Round Robin')
+                      : (matches || []);
                     
                     const playoffRounds = tournament.format === 'round_robin_split'
                       ? rounds.filter(r => r !== 'Round Robin')
@@ -1745,12 +1745,12 @@ export default function TournamentDetail() {
                     <CardHeader>
                       <CardTitle>Round Robin Schedule</CardTitle>
                       <CardDescription>
-                        {matches.length} match{matches.length !== 1 ? 'es' : ''}
+                        {(matches || []).length} match{(matches || []).length !== 1 ? 'es' : ''}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
-                        {matches.map((match) => (
+                        {(matches || []).map((match) => (
                           <Card key={match.id} data-testid={`card-match-${match.matchNumber}`}>
                             <CardContent className="p-4">
                               <div className="flex flex-col md:flex-row md:items-center gap-4">
