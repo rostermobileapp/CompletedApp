@@ -145,11 +145,20 @@ export default function TournamentCreate() {
       // Sort teams by their standings ranking (if we have standings data)
       let sortedTeamIds = [...data.teamIds];
       
+      console.log('🏆 Seeding Debug:', {
+        seasonId: data.seasonId,
+        standingsAvailable: !!standings,
+        standingsLength: standings?.length || 0,
+        standings: standings?.map(s => ({ teamId: s.teamId, teamName: s.teamName, points: s.points, wins: s.wins })),
+        selectedTeamIds: data.teamIds
+      });
+      
       if (standings && standings.length > 0) {
         // Create a map of teamId -> standings rank (0-indexed position in standings)
         const standingsRankMap = new Map<string, number>();
         standings.forEach((s, index) => {
           standingsRankMap.set(s.teamId, index);
+          console.log(`🏆 Standings rank: ${s.teamName} (${s.teamId}) = position ${index}, points=${s.points}`);
         });
         
         // Sort selected teams by their standings position
@@ -158,6 +167,10 @@ export default function TournamentCreate() {
           const rankB = standingsRankMap.get(b) ?? 999;
           return rankA - rankB;
         });
+        
+        console.log('🏆 Sorted team IDs:', sortedTeamIds);
+      } else {
+        console.log('🏆 No standings available, using selection order');
       }
       
       const teamData = sortedTeamIds.map((teamId, index) => {
@@ -175,6 +188,8 @@ export default function TournamentCreate() {
           losses: teamStanding?.losses || 0
         };
       });
+      
+      console.log('🏆 Final team seeding:', teamData.map(t => `#${t.seed} ${t.teamName}`));
 
       try {
         await apiRequest('POST', `/api/tournaments/${tournament.id}/generate-bracket`, {
