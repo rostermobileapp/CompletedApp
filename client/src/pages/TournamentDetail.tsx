@@ -1757,7 +1757,7 @@ export default function TournamentDetail() {
                               )}
                             </CardDescription>
                           </div>
-                          {canManageTournament() && (
+                          {tournament.status === 'draft' && (
                             <Button
                               onClick={() => setShowAddMatchDialog(true)}
                               variant="outline"
