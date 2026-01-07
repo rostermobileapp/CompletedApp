@@ -645,6 +645,11 @@ export function CustomBracketBuilder({
                         Winner of {m.gameNumber}
                       </SelectItem>
                     ))}
+                    {matchups.filter(m => m.id !== matchup.id).map(m => (
+                      <SelectItem key={`loser-${m.id}`} value={`loser:${m.gameNumber}`}>
+                        Loser of {m.gameNumber}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <div className="text-center text-xs text-muted-foreground">vs</div>
@@ -666,6 +671,11 @@ export function CustomBracketBuilder({
                     {matchups.filter(m => m.id !== matchup.id).map(m => (
                       <SelectItem key={`winner-${m.id}`} value={`winner:${m.gameNumber}`}>
                         Winner of {m.gameNumber}
+                      </SelectItem>
+                    ))}
+                    {matchups.filter(m => m.id !== matchup.id).map(m => (
+                      <SelectItem key={`loser-${m.id}`} value={`loser:${m.gameNumber}`}>
+                        Loser of {m.gameNumber}
                       </SelectItem>
                     ))}
                   </SelectContent>
