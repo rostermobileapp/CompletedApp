@@ -2092,11 +2092,8 @@ export default function Messages() {
           
           {/* Messages */}
           <div 
-            className="flex-1 overflow-y-auto relative" 
+            className={`flex-1 overflow-y-auto relative ${conversationTeam?.logoUrl ? 'bg-white dark:bg-black' : ''}`}
             data-testid="messages-container"
-            style={conversationTeam?.logoUrl ? {
-              backgroundColor: '#000',
-            } : undefined}
           >
             {/* Team logo background for team group chats */}
             {conversationTeam?.logoUrl && (
