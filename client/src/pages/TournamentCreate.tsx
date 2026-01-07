@@ -142,17 +142,28 @@ export default function TournamentCreate() {
       const tournament = await response.json();
 
       // Step 2: Add teams and generate bracket
-      // Fetch fresh standings data for the selected season
+      // Fetch standings data for seeding (try season-specific first, fallback to league-wide)
       let seasonStandings: StandingsEntry[] = [];
-      if (data.seasonId) {
-        try {
+      try {
+        // First try season-specific standings if a season is selected
+        if (data.seasonId) {
           const standingsResponse = await fetch(`/api/leagues/${leagueId}/standings?seasonId=${data.seasonId}`);
           if (standingsResponse.ok) {
             seasonStandings = await standingsResponse.json();
           }
-        } catch (err) {
-          console.warn('Failed to fetch standings for seeding:', err);
         }
+        
+        // If season standings are empty or all zeros, fallback to overall league standings
+        const hasRealData = seasonStandings.some(s => s.wins > 0 || s.losses > 0 || s.points > 0);
+        if (!hasRealData) {
+          console.log('🏆 Season standings empty, falling back to overall league standings');
+          const overallResponse = await fetch(`/api/leagues/${leagueId}/standings`);
+          if (overallResponse.ok) {
+            seasonStandings = await overallResponse.json();
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch standings for seeding:', err);
       }
       
       // Sort teams by their standings ranking (if we have standings data)
