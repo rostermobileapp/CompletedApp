@@ -72,7 +72,7 @@ interface TournamentMatch {
   team2Id: string | null;
   team1Score: number | null;
   team2Score: number | null;
-  status: string;
+  status: string | null;
   advancesToMatchId?: string | null;
 }
 
