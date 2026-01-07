@@ -521,6 +521,47 @@ export default function Messages() {
   const [paymentRequestDescription, setPaymentRequestDescription] = useState('');
   const [paymentRequestAmount, setPaymentRequestAmount] = useState('');
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard detection for mobile devices (including Android)
+  useEffect(() => {
+    const handleViewportResize = () => {
+      if (window.visualViewport) {
+        const viewportHeight = window.visualViewport.height;
+        const windowHeight = window.innerHeight;
+        const calculatedKeyboardHeight = windowHeight - viewportHeight;
+        setKeyboardHeight(calculatedKeyboardHeight > 50 ? calculatedKeyboardHeight : 0);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+      window.visualViewport.addEventListener('scroll', handleViewportResize);
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportResize);
+        window.visualViewport.removeEventListener('scroll', handleViewportResize);
+      }
+    };
+  }, []);
+
+  // Auto-resize textarea as content changes
+  const autoResizeTextarea = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      const maxHeight = 120; // Max 5-6 lines
+      textareaRef.current.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+    }
+  };
+
+  useEffect(() => {
+    autoResizeTextarea();
+  }, [newMessage]);
 
   // Fetch user's leagues for contact discovery
   const { data: userLeagues = [], isLoading: userLeaguesLoading } = useQuery<League[]>({
@@ -1192,7 +1233,7 @@ export default function Messages() {
     }
   };
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setNewMessage(e.target.value);
     
     // Start typing indicator when user starts typing
@@ -2286,7 +2327,12 @@ export default function Messages() {
         </FeatureLockOverlay>
       {/* Message Input - only show when conversation is selected */}
       {selectedConversation && canAccessPremiumFeatures() && (
-        <div className="bg-background border-t border-border p-4 mb-16" data-testid="message-input-container">
+        <div 
+          ref={inputContainerRef}
+          className="bg-background border-t border-border p-4"
+          style={{ paddingBottom: keyboardHeight > 0 ? `${keyboardHeight + 16}px` : '16px' }}
+          data-testid="message-input-container"
+        >
           {/* File previews */}
           {selectedFiles.length > 0 && (
             <div className="mb-3 space-y-2" data-testid="selected-files">
@@ -2499,10 +2545,10 @@ export default function Messages() {
             </div>
           )}
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2">
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="p-2 hover:bg-accent rounded transition-colors"
+              className="p-2 hover:bg-accent rounded transition-colors mb-1"
               data-testid="button-attach-file-basic"
               title="Attach file"
             >
@@ -2510,7 +2556,7 @@ export default function Messages() {
             </button>
             <button 
               onClick={() => setGifModalOpen(true)}
-              className="p-2 hover:bg-accent rounded transition-colors"
+              className="p-2 hover:bg-accent rounded transition-colors mb-1"
               data-testid="button-gif-search"
               title="Send GIF"
             >
@@ -2518,7 +2564,7 @@ export default function Messages() {
             </button>
             <button 
               onClick={() => setShowPollCreator(!showPollCreator)}
-              className="p-2 hover:bg-accent rounded transition-colors"
+              className="p-2 hover:bg-accent rounded transition-colors mb-1"
               data-testid="button-create-poll"
               title="Create Poll"
             >
@@ -2526,13 +2572,14 @@ export default function Messages() {
             </button>
             <button 
               onClick={() => setShowPaymentRequestCreator(!showPaymentRequestCreator)}
-              className="p-2 hover:bg-accent rounded transition-colors"
+              className="p-2 hover:bg-accent rounded transition-colors mb-1"
               data-testid="button-request-payment"
               title="Request Payment"
             >
               <DollarSign className="w-4 h-4" />
             </button>
-            <Input
+            <textarea
+              ref={textareaRef}
               placeholder="Type a message..."
               value={newMessage}
               onChange={handleInputChange}
@@ -2543,12 +2590,14 @@ export default function Messages() {
                 }
               }}
               onBlur={handleTypingStop}
-              className="flex-1"
+              className="flex-1 resize-none overflow-y-auto min-h-[40px] max-h-[120px] py-2 px-3 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              rows={1}
               data-testid="input-message"
             />
             <Button 
               onClick={handleSendMessage}
               disabled={(!newMessage.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending || isUploadingFiles}
+              className="mb-1"
               data-testid="button-send-message"
             >
               {isUploadingFiles ? (
