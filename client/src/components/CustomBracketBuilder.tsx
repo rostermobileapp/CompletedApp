@@ -819,7 +819,13 @@ export function CustomBracketBuilder({
                     onValueChange={(value) => setWinnerDestination(matchup.id, value === 'unassigned' ? null : value)}
                   >
                     <SelectTrigger className="h-6 text-xs flex-1 bg-[#32CD32]" style={{ color: '#000000' }} data-testid={`select-winner-dest-${matchup.id}`}>
-                      <SelectValue />
+                      <span className="text-black">
+                        {matchup.winnerDestination === 'final' 
+                          ? 'Championship' 
+                          : matchup.winnerDestination 
+                            ? (matchups.find(m => m.id === matchup.winnerDestination)?.gameNumber || matchup.winnerDestination.substring(0, 6))
+                            : 'Moves to'}
+                      </span>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Moves to</SelectItem>
@@ -837,7 +843,13 @@ export function CustomBracketBuilder({
                     onValueChange={(value) => setLoserDestination(matchup.id, value === 'unassigned' ? null : value)}
                   >
                     <SelectTrigger className="h-6 text-xs flex-1 bg-[#c92e2f]" style={{ color: '#ffffff' }} data-testid={`select-loser-dest-${matchup.id}`}>
-                      <SelectValue />
+                      <span className="text-white">
+                        {matchup.loserDestination === 'eliminated' 
+                          ? 'Eliminated' 
+                          : matchup.loserDestination 
+                            ? (matchups.find(m => m.id === matchup.loserDestination)?.gameNumber || matchup.loserDestination.substring(0, 6))
+                            : 'Moves to'}
+                      </span>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Moves to</SelectItem>
