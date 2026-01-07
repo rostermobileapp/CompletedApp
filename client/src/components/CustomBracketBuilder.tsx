@@ -64,6 +64,18 @@ function calculateConnectionPath(
   return `M ${sourceX} ${sourceY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${destX} ${destY}`;
 }
 
+interface TournamentMatch {
+  id: string;
+  matchNumber: number;
+  round: string;
+  team1Id: string | null;
+  team2Id: string | null;
+  team1Score: number | null;
+  team2Score: number | null;
+  status: string;
+  advancesToMatchId?: string | null;
+}
+
 interface CustomBracketBuilderProps {
   teams?: TournamentTeam[];
   tournamentId?: string;
@@ -73,6 +85,77 @@ interface CustomBracketBuilderProps {
   locked?: boolean;
   onSave?: (data: any) => void;
   onLock?: () => void;
+  initialMatches?: TournamentMatch[];
+}
+
+// Convert existing tournament matches to matchup format for editing
+function convertMatchesToMatchups(matches: TournamentMatch[], teams: TournamentTeam[]): { matchups: Matchup[], connections: Connection[] } {
+  const teamMap = new Map(teams.map(t => [t.id, t.teamName]));
+  const matchMap = new Map(matches.map(m => [m.id, m]));
+  
+  // Group matches by round for positioning
+  const roundGroups = new Map<string, TournamentMatch[]>();
+  matches.forEach(m => {
+    const existing = roundGroups.get(m.round) || [];
+    existing.push(m);
+    roundGroups.set(m.round, existing);
+  });
+  
+  const rounds = Array.from(roundGroups.keys());
+  const matchups: Matchup[] = [];
+  const connections: Connection[] = [];
+  
+  let roundX = 100;
+  rounds.forEach((round, roundIndex) => {
+    const roundMatches = roundGroups.get(round) || [];
+    roundMatches.forEach((match, matchIndex) => {
+      const isLosers = round.toLowerCase().includes('loser');
+      
+      // Determine team values - use team name or "Winner of Game X" / "Loser of Game X"
+      let team1Value = '';
+      let team2Value = '';
+      
+      if (match.team1Id) {
+        team1Value = teamMap.get(match.team1Id) || match.team1Id;
+      }
+      if (match.team2Id) {
+        team2Value = teamMap.get(match.team2Id) || match.team2Id;
+      }
+      
+      const matchup: Matchup = {
+        id: match.id,
+        type: isLosers ? 'losers' : 'standard',
+        position: { 
+          x: roundX + (roundIndex * 350), 
+          y: 100 + (matchIndex * 180) 
+        },
+        gameNumber: `Game ${match.matchNumber}`,
+        team1: team1Value,
+        team2: team2Value,
+        score1: match.team1Score,
+        score2: match.team2Score,
+        winner: match.team1Score !== null && match.team2Score !== null 
+          ? (match.team1Score > match.team2Score ? 'team1' : 'team2') 
+          : null,
+        winnerDestination: match.advancesToMatchId || null,
+        loserDestination: 'eliminated'
+      };
+      
+      matchups.push(matchup);
+      
+      // Create connections for advancement
+      if (match.advancesToMatchId) {
+        connections.push({
+          id: nanoid(),
+          source: match.id,
+          destination: match.advancesToMatchId,
+          type: 'winner'
+        });
+      }
+    });
+  });
+  
+  return { matchups, connections };
 }
 
 export function CustomBracketBuilder({ 
@@ -83,7 +166,8 @@ export function CustomBracketBuilder({
   embeddable = false,
   locked = false,
   onSave,
-  onLock
+  onLock,
+  initialMatches
 }: CustomBracketBuilderProps) {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -361,7 +445,15 @@ export function CustomBracketBuilder({
   };
 
   useEffect(() => {
-    // Load bracket from tournament settings first (source of truth), then fall back to localStorage
+    // Priority 1: Load from initialMatches prop (for editing existing auto-generated brackets)
+    if (initialMatches && initialMatches.length > 0) {
+      const { matchups: converted, connections: convertedConnections } = convertMatchesToMatchups(initialMatches, teams);
+      setMatchups(converted);
+      setConnections(convertedConnections);
+      return;
+    }
+    
+    // Priority 2: Load bracket from tournament settings (for custom bracket format)
     if (tournament?.settings?.customBracket) {
       const data = tournament.settings.customBracket;
       if (data.matchups && data.matchups.length > 0) {
@@ -375,7 +467,7 @@ export function CustomBracketBuilder({
       }
     }
 
-    // Fall back to localStorage if no tournament settings
+    // Priority 3: Fall back to localStorage if no tournament settings
     const saved = localStorage.getItem('customBracket');
     if (saved) {
       const data = JSON.parse(saved);
@@ -386,7 +478,7 @@ export function CustomBracketBuilder({
         setPan(data.pan || { x: 0, y: 0 });
       }
     }
-  }, [tournament]);
+  }, [tournament, initialMatches, teams]);
 
   const containerClass = embeddable ? "flex flex-col bg-background" : "h-screen flex flex-col bg-background";
 
