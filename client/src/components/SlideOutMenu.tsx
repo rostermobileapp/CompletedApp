@@ -199,7 +199,6 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
           </button>
         </div>
       )}
-      
       {/* Sheet is always rendered to ensure proper overlay cleanup */}
       <Sheet open={open} onOpenChange={setOpen}>
         <AnimatedSheetContent 
@@ -246,12 +245,10 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
           </div>
         </AnimatedSheetContent>
       </Sheet>
-      
       <PremiumFeatureAlert 
         open={showPremiumAlert} 
         onOpenChange={setShowPremiumAlert} 
       />
-
       {/* Tournament Warning Modal */}
       <AlertDialog open={showTournamentWarning} onOpenChange={setShowTournamentWarning}>
         <AlertDialogContent className="max-w-md">
@@ -269,9 +266,7 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
               onClick={handleTournamentProceed}
               className="w-full"
               data-testid="button-tournament-proceed"
-            >
-              Proceed Anyways
-            </AlertDialogAction>
+            >Continue</AlertDialogAction>
             <AlertDialogCancel 
               onClick={handleTournamentBack}
               className="w-full"
