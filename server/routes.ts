@@ -15105,9 +15105,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tournamentType: tournament.type  // Pass tournament type to bracket generator
       };
       
+      // SERVER-SIDE SEEDING: For season playoff tournaments, sort teams by standings
+      let seededTeamData = [...teamData];
+      if (tournament.type === 'season_playoff' && tournament.leagueId) {
+        try {
+          console.log('🏆 [SERVER] Season playoff detected, fetching standings for seeding...');
+          
+          // First try season-specific standings
+          let standingsData = await storage.getLeagueStandings(tournament.leagueId, tournament.seasonId || undefined);
+          
+          // Check if standings have real data (not all zeros)
+          const hasRealData = standingsData.some((s: any) => s.wins > 0 || s.losses > 0 || s.points > 0);
+          
+          if (!hasRealData && tournament.seasonId) {
+            console.log('🏆 [SERVER] Season standings empty, falling back to overall league standings');
+            standingsData = await storage.getLeagueStandings(tournament.leagueId, undefined);
+          }
+          
+          console.log('🏆 [SERVER] Standings data:', standingsData.map((s: any) => `${s.teamName}: ${s.points} pts`));
+          
+          if (standingsData.length > 0) {
+            // Create a map of teamId -> standings rank (0-indexed)
+            const standingsRankMap = new Map<string, number>();
+            standingsData.forEach((s: any, index: number) => {
+              standingsRankMap.set(s.teamId, index);
+            });
+            
+            // Sort teams by their standings position
+            seededTeamData.sort((a: any, b: any) => {
+              const rankA = standingsRankMap.get(a.teamId) ?? 999;
+              const rankB = standingsRankMap.get(b.teamId) ?? 999;
+              return rankA - rankB;
+            });
+            
+            // Re-assign seeds based on sorted order
+            seededTeamData = seededTeamData.map((team: any, index: number) => ({
+              ...team,
+              seed: index + 1
+            }));
+            
+            console.log('🏆 [SERVER] Final seeding:', seededTeamData.map((t: any) => `#${t.seed} ${t.teamName}`));
+          }
+        } catch (standingsError) {
+          console.warn('🏆 [SERVER] Failed to fetch standings for seeding, using client order:', standingsError);
+        }
+      }
+      
       // Apply bracket type (seeded or blind_draw) to determine team order and seeds
       const bracketType = settings.bracketType || 'seeded';
-      const orderedTeamData = applyBracketType(teamData, bracketType);
+      const orderedTeamData = applyBracketType(seededTeamData, bracketType);
 
       // Insert teams with updated seeds
       const insertedTeams = await db
