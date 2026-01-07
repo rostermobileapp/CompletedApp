@@ -818,8 +818,8 @@ export function CustomBracketBuilder({
                     value={matchup.winnerDestination || 'unassigned'}
                     onValueChange={(value) => setWinnerDestination(matchup.id, value === 'unassigned' ? null : value)}
                   >
-                    <SelectTrigger className="h-6 text-xs flex-1" style={{ backgroundColor: '#32CD32', color: '#000000' }} data-testid={`select-winner-dest-${matchup.id}`}>
-                      <SelectValue placeholder="Moves to" className="text-black" />
+                    <SelectTrigger className="h-6 text-xs flex-1 bg-[#32CD32]" style={{ color: '#000000' }} data-testid={`select-winner-dest-${matchup.id}`}>
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Moves to</SelectItem>
@@ -836,8 +836,8 @@ export function CustomBracketBuilder({
                     value={matchup.loserDestination || 'unassigned'}
                     onValueChange={(value) => setLoserDestination(matchup.id, value === 'unassigned' ? null : value)}
                   >
-                    <SelectTrigger className="h-6 text-xs flex-1 bg-[#c92e2f] text-white [&>span]:text-white data-[placeholder]:!text-white" data-testid={`select-loser-dest-${matchup.id}`}>
-                      <SelectValue placeholder="Moves to" />
+                    <SelectTrigger className="h-6 text-xs flex-1 bg-[#c92e2f]" style={{ color: '#ffffff' }} data-testid={`select-loser-dest-${matchup.id}`}>
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Moves to</SelectItem>
