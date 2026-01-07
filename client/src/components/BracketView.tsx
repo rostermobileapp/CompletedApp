@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, Maximize2, Edit } from "lucide-react";
 import type { TournamentMatch, TournamentTeam, TournamentSettings } from "@shared/schema";
@@ -589,197 +588,151 @@ export default function BracketView({ matches, teams, format, settings, tourname
     const isGrandFinal = match.round === 'Grand Finals' || match.round === 'True Finals';
     const bracketType = bracketColorType || match.bracketType || 'main';
     
-    // Visual hierarchy with 4px borders
-    // Blue for winners/championship/main, Red for losers/consolation, 
-    // Purple for losers1, Orange for losers2, Gold for grand finals,
-    // Green/Teal/Indigo/Pink for compass directions
-    let borderClass: string;
-    let cardBgClass: string;
-    let headerClass: string;
-    let titleClass: string;
-    let badgeClass: string;
+    // Clean card styling matching CustomBracketBuilder design
+    // Green (#32CD32) for winners/main brackets, Red for losers brackets, Yellow for grand finals
+    let borderColor: string;
     let winnerBgClass: string;
     
     if (isGrandFinal) {
-      borderClass = 'border-[4px] border-yellow-500 dark:border-yellow-400';
-      cardBgClass = 'bg-yellow-500/50 dark:bg-yellow-400/50';
-      headerClass = 'bg-yellow-500/10';
-      titleClass = 'text-yellow-600 dark:text-yellow-400';
-      badgeClass = isCompleted ? 'bg-yellow-500' : 'border-yellow-500 text-yellow-600 dark:text-yellow-400';
-      winnerBgClass = 'bg-yellow-500 text-white';
-    } else if (bracketType === 'losers' || bracketType === 'consolation') {
-      borderClass = 'border-[4px] border-red-500 dark:border-red-400';
-      cardBgClass = 'bg-red-500/50 dark:bg-red-400/50';
-      headerClass = 'bg-red-500/10';
-      titleClass = 'text-red-600 dark:text-red-400';
-      badgeClass = isCompleted ? 'bg-red-500' : 'border-red-500 text-red-600 dark:text-red-400';
-      winnerBgClass = 'bg-red-500 text-white';
-    } else if (bracketType === 'losers1') {
-      borderClass = 'border-[4px] border-purple-500 dark:border-purple-400';
-      cardBgClass = 'bg-purple-500/50 dark:bg-purple-400/50';
-      headerClass = 'bg-purple-500/10';
-      titleClass = 'text-purple-600 dark:text-purple-400';
-      badgeClass = isCompleted ? 'bg-purple-500' : 'border-purple-500 text-purple-600 dark:text-purple-400';
-      winnerBgClass = 'bg-purple-500 text-white';
-    } else if (bracketType === 'losers2') {
-      borderClass = 'border-[4px] border-orange-500 dark:border-orange-400';
-      cardBgClass = 'bg-orange-500/50 dark:bg-orange-400/50';
-      headerClass = 'bg-orange-500/10';
-      titleClass = 'text-orange-600 dark:text-orange-400';
-      badgeClass = isCompleted ? 'bg-orange-500' : 'border-orange-500 text-orange-600 dark:text-orange-400';
-      winnerBgClass = 'bg-orange-500 text-white';
-    } else if (bracketType === 'guarantee') {
-      // Cyan/aqua for guarantee bracket
-      borderClass = 'border-[4px] border-cyan-500 dark:border-cyan-400';
-      cardBgClass = 'bg-cyan-500/50 dark:bg-cyan-400/50';
-      headerClass = 'bg-cyan-500/10';
-      titleClass = 'text-cyan-600 dark:text-cyan-400';
-      badgeClass = isCompleted ? 'bg-cyan-500' : 'border-cyan-500 text-cyan-600 dark:text-cyan-400';
-      winnerBgClass = 'bg-cyan-500 text-white';
-    } else if (bracketType.includes('east') || bracketType.includes('west')) {
-      borderClass = 'border-[4px] border-green-500 dark:border-green-400';
-      cardBgClass = 'bg-green-500/50 dark:bg-green-400/50';
-      headerClass = 'bg-green-500/10';
-      titleClass = 'text-green-600 dark:text-green-400';
-      badgeClass = isCompleted ? 'bg-green-500' : 'border-green-500 text-green-600 dark:text-green-400';
-      winnerBgClass = 'bg-green-500 text-white';
-    } else if (bracketType.includes('north') || bracketType.includes('south')) {
-      borderClass = 'border-[4px] border-teal-500 dark:border-teal-400';
-      cardBgClass = 'bg-teal-500/50 dark:bg-teal-400/50';
-      headerClass = 'bg-teal-500/10';
-      titleClass = 'text-teal-600 dark:text-teal-400';
-      badgeClass = isCompleted ? 'bg-teal-500' : 'border-teal-500 text-teal-600 dark:text-teal-400';
-      winnerBgClass = 'bg-teal-500 text-white';
+      borderColor = 'border-[#FFD700]'; // Gold for grand finals
+      winnerBgClass = 'bg-[#FFD700] text-black';
+    } else if (bracketType === 'losers' || bracketType === 'consolation' || bracketType === 'losers1' || bracketType === 'losers2') {
+      borderColor = 'border-destructive'; // Red for losers brackets
+      winnerBgClass = 'bg-destructive text-white';
     } else {
-      // Default: winners/championship/main
-      borderClass = 'border-[4px] border-blue-500 dark:border-blue-400';
-      cardBgClass = 'bg-blue-500/50 dark:bg-blue-400/50';
-      headerClass = 'bg-blue-500/10';
-      titleClass = 'text-blue-600 dark:text-blue-400';
-      badgeClass = isCompleted ? 'bg-blue-500' : 'border-blue-500 text-blue-600 dark:text-blue-400';
-      winnerBgClass = 'bg-blue-500 text-white';
+      // Default: winners/championship/main - use green like CustomBracketBuilder
+      borderColor = 'border-[#32CD32]';
+      winnerBgClass = 'bg-[#32CD32] text-black';
     }
 
     return (
       <g key={match.id} transform={`translate(${x}, ${y})`}>
         <foreignObject width={MATCH_WIDTH} height={MATCH_HEIGHT}>
           <Card 
-            className={`h-full shadow-lg ${cardBgClass} ${borderClass} cursor-pointer hover:opacity-90 transition-opacity relative group`} 
+            className={`h-full bg-card ${borderColor} border-[4px] cursor-pointer hover:opacity-90 transition-opacity relative group`} 
             data-testid={`card-match-${match.matchNumber}`}
             onClick={() => setSelectedMatchId(match.id)}
           >
             {/* Edit Icon - Always visible for commissioners */}
             {isCommissioner && (
               <div className="absolute top-1 right-1 z-10 bg-white dark:bg-gray-800 rounded-full p-1.5 shadow-md opacity-80 group-hover:opacity-100 transition-opacity">
-                <Edit className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" data-testid={`icon-edit-${match.matchNumber}`} />
+                <Edit className="h-3.5 w-3.5 text-muted-foreground" data-testid={`icon-edit-${match.matchNumber}`} />
               </div>
             )}
-            <CardHeader className={`p-2 ${headerClass}`}>
-              <div className="space-y-1">
-                <CardTitle className={`text-xs font-semibold text-white`}>
-                  {match.round}
-                </CardTitle>
-                <div className={`text-[10px] font-medium text-white opacity-80 flex items-center gap-1.5`}>
-                  <span data-testid={`label-match-${match.matchNumber}`}>Match #{match.matchNumber}</span>
-                  {match.scheduledTime && (
-                    <span className="text-[9px] opacity-70">
-                      • {formatDate(new Date(match.scheduledTime), "MMM d, h:mm a")}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-2 pt-0 space-y-1">
-              {/* Team 1 */}
-              <div
-                className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors ${
-                  team1Wins
-                    ? `${winnerBgClass} font-bold shadow-sm`
-                    : 'bg-muted'
-                }`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {tournamentType === 'standalone' && !hasUpstreamMatch(match, 'team1') ? (
-                  <Select
-                    value={match.team1Id || ""}
-                    onValueChange={(value) => handleTeamSelect(match.id, 'team1', value, match)}
-                    disabled={updateMatchTeamMutation.isPending}
-                  >
-                    <SelectTrigger className="h-7 text-xs bg-white dark:bg-gray-800" data-testid={`select-team1-${match.matchNumber}`}>
-                      <SelectValue placeholder="Select Team">
-                        {match.team1Id ? getTeamName(match.team1Id) : "Select Team"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {match.team1Id && (
-                        <SelectItem value="__clear__" className="text-red-600 dark:text-red-400 font-medium">
-                          ✕ Clear Selection
-                        </SelectItem>
-                      )}
-                      {getAvailableTeams(match, 'team1').map((team) => (
-                        <SelectItem key={team.id} value={team.id}>
-                          {team.teamName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <span className="truncate text-xs text-white" data-testid={`text-team1-${match.matchNumber}`}>
-                    {getTeamDisplay(match.team1Id, match, 'team1')}
+            <div className="h-full p-3 flex flex-col gap-1">
+              {/* Header - clean but with round context */}
+              <div className="flex items-center justify-between gap-1">
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-bold text-foreground truncate" data-testid={`label-match-${match.matchNumber}`}>
+                    Game {match.matchNumber}
                   </span>
-                )}
-                {match.team1Score !== null && (
-                  <span className="font-bold ml-2 text-lg text-white" data-testid={`text-score1-${match.matchNumber}`}>
-                    {match.team1Score}
+                  <span className="text-[10px] text-muted-foreground truncate">
+                    {match.round}
+                  </span>
+                </div>
+                {match.scheduledTime && (
+                  <span className="text-[9px] text-muted-foreground whitespace-nowrap">
+                    {formatDate(new Date(match.scheduledTime), "MMM d")}
                   </span>
                 )}
               </div>
 
-              {/* Team 2 */}
-              <div
-                className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors ${
-                  team2Wins
-                    ? `${winnerBgClass} font-bold shadow-sm`
-                    : 'bg-muted'
-                }`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {tournamentType === 'standalone' && !hasUpstreamMatch(match, 'team2') ? (
-                  <Select
-                    value={match.team2Id || ""}
-                    onValueChange={(value) => handleTeamSelect(match.id, 'team2', value, match)}
-                    disabled={updateMatchTeamMutation.isPending}
-                  >
-                    <SelectTrigger className="h-7 text-xs bg-white dark:bg-gray-800" data-testid={`select-team2-${match.matchNumber}`}>
-                      <SelectValue placeholder="Select Team">
-                        {match.team2Id ? getTeamName(match.team2Id) : "Select Team"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {match.team2Id && (
-                        <SelectItem value="__clear__" className="text-red-600 dark:text-red-400 font-medium">
-                          ✕ Clear Selection
-                        </SelectItem>
-                      )}
-                      {getAvailableTeams(match, 'team2').map((team) => (
-                        <SelectItem key={team.id} value={team.id}>
-                          {team.teamName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <span className="truncate text-xs text-white" data-testid={`text-team2-${match.matchNumber}`}>
-                    {getTeamDisplay(match.team2Id, match, 'team2')}
-                  </span>
-                )}
-                {match.team2Score !== null && (
-                  <span className="font-bold ml-2 text-lg text-white" data-testid={`text-score2-${match.matchNumber}`}>
-                    {match.team2Score}
-                  </span>
-                )}
+              {/* Teams section */}
+              <div className="flex-1 flex flex-col gap-1">
+                {/* Team 1 */}
+                <div
+                  className={`flex items-center justify-between px-2 py-1.5 rounded text-sm ${
+                    team1Wins
+                      ? `${winnerBgClass} font-bold`
+                      : 'bg-muted'
+                  }`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {tournamentType === 'standalone' && !hasUpstreamMatch(match, 'team1') ? (
+                    <Select
+                      value={match.team1Id || ""}
+                      onValueChange={(value) => handleTeamSelect(match.id, 'team1', value, match)}
+                      disabled={updateMatchTeamMutation.isPending}
+                    >
+                      <SelectTrigger className="h-6 text-xs bg-background border-0" data-testid={`select-team1-${match.matchNumber}`}>
+                        <SelectValue placeholder="Select Team">
+                          {match.team1Id ? getTeamName(match.team1Id) : "Select Team"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {match.team1Id && (
+                          <SelectItem value="__clear__" className="text-destructive font-medium">
+                            ✕ Clear Selection
+                          </SelectItem>
+                        )}
+                        {getAvailableTeams(match, 'team1').map((team) => (
+                          <SelectItem key={team.id} value={team.id}>
+                            {team.teamName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className={`truncate text-xs ${team1Wins ? '' : 'text-foreground'}`} data-testid={`text-team1-${match.matchNumber}`}>
+                      {getTeamDisplay(match.team1Id, match, 'team1')}
+                    </span>
+                  )}
+                  {match.team1Score !== null && (
+                    <span className={`font-bold ml-2 ${team1Wins ? '' : 'text-foreground'}`} data-testid={`text-score1-${match.matchNumber}`}>
+                      {match.team1Score}
+                    </span>
+                  )}
+                </div>
+
+                {/* VS divider like CustomBracketBuilder */}
+                <div className="text-center text-xs text-muted-foreground">vs</div>
+
+                {/* Team 2 */}
+                <div
+                  className={`flex items-center justify-between px-2 py-1.5 rounded text-sm ${
+                    team2Wins
+                      ? `${winnerBgClass} font-bold`
+                      : 'bg-muted'
+                  }`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {tournamentType === 'standalone' && !hasUpstreamMatch(match, 'team2') ? (
+                    <Select
+                      value={match.team2Id || ""}
+                      onValueChange={(value) => handleTeamSelect(match.id, 'team2', value, match)}
+                      disabled={updateMatchTeamMutation.isPending}
+                    >
+                      <SelectTrigger className="h-6 text-xs bg-background border-0" data-testid={`select-team2-${match.matchNumber}`}>
+                        <SelectValue placeholder="Select Team">
+                          {match.team2Id ? getTeamName(match.team2Id) : "Select Team"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {match.team2Id && (
+                          <SelectItem value="__clear__" className="text-destructive font-medium">
+                            ✕ Clear Selection
+                          </SelectItem>
+                        )}
+                        {getAvailableTeams(match, 'team2').map((team) => (
+                          <SelectItem key={team.id} value={team.id}>
+                            {team.teamName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className={`truncate text-xs ${team2Wins ? '' : 'text-foreground'}`} data-testid={`text-team2-${match.matchNumber}`}>
+                      {getTeamDisplay(match.team2Id, match, 'team2')}
+                    </span>
+                  )}
+                  {match.team2Score !== null && (
+                    <span className={`font-bold ml-2 ${team2Wins ? '' : 'text-foreground'}`} data-testid={`text-score2-${match.matchNumber}`}>
+                      {match.team2Score}
+                    </span>
+                  )}
+                </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </foreignObject>
       </g>
