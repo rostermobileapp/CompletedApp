@@ -15,7 +15,7 @@ import {
   roleHierarchy
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
@@ -14508,14 +14508,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } else if (scheduledTime === null && match.gameId) {
           console.log('🗑️ Clearing schedule - attempting to delete game');
-          // Schedule cleared - try to delete the linked game
+          // Schedule cleared - delete related records then the game
           try {
+            // Delete related duty exclusions first
+            await db
+              .delete(dutyExclusions)
+              .where(eq(dutyExclusions.gameId, match.gameId));
+            
+            // Delete related score submissions
+            await db
+              .delete(gameScoreSubmissions)
+              .where(eq(gameScoreSubmissions.gameId, match.gameId));
+            
+            // Now delete the game
             await db
               .delete(games)
               .where(eq(games.id, match.gameId));
-            console.log('✅ Game deleted successfully');
+            console.log('✅ Game and related records deleted successfully');
           } catch (deleteError) {
-            console.log('⚠️ Could not delete game (may have references), game remains orphaned:', deleteError);
+            console.log('⚠️ Could not delete game (may have other references):', deleteError);
           }
           // Always unlink the game from the tournament match
           updateData.gameId = null;
