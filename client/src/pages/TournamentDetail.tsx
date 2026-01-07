@@ -863,9 +863,8 @@ export default function TournamentDetail() {
   });
   
   // Derive locked state from tournament data - default to unlocked if no bracket exists yet
-  const isBracketLocked = tournament?.format === 'custom_bracket' 
-    ? ((tournament.settings as any)?.customBracket?.locked ?? false)
-    : false;
+  // This now applies to all tournament formats, not just custom_bracket
+  const isBracketLocked = (tournament?.settings as any)?.customBracket?.locked ?? false;
 
   const { data: teams, isLoading: teamsLoading } = useQuery<TournamentTeam[]>({
     queryKey: ['/api/tournaments', tournamentId, 'teams'],
@@ -1575,7 +1574,9 @@ export default function TournamentDetail() {
 
           {/* Bracket Tab */}
           <TabsContent value="bracket" className="space-y-4">
-            {(matches && matches.length > 0) || tournament.format === 'custom_bracket' ? (
+            {(matches && matches.length > 0) || 
+             tournament.format === 'custom_bracket' ||
+             (tournament.status === 'draft' && ['single_elimination', 'double_elimination', 'three_game_guarantee', 'round_robin_split'].includes(tournament.format)) ? (
               <div className="space-y-6">
                 {/* Round Robin + Playoffs Seeding Button */}
                 {tournament.format === 'round_robin_split' && (() => {
@@ -1710,33 +1711,106 @@ export default function TournamentDetail() {
                       : rounds;
 
                     return (
-                      <Card>
-                        <CardHeader className="pt-[2px] pb-[2px]">
-                          <CardTitle>
-                            {tournament.format === 'round_robin_split' ? 'Playoff Bracket' : 'Tournament Bracket'}
-                          </CardTitle>
-                          <CardDescription>
-                            {playoffRounds.length} round{playoffRounds.length !== 1 ? 's' : ''} • {bracketMatches.length} match{bracketMatches.length !== 1 ? 'es' : ''}
-                            {tournament.format === 'round_robin_split' && (
-                              <span className="block mt-1 text-xs">
-                                Playoff seeding based on Round Robin record (wins/losses) with goals scored as tiebreaker
-                              </span>
+                      <>
+                        {/* Custom Bracket Builder for editing */}
+                        {tournament.status === 'draft' && canManageTournament() && (
+                          <Card className="mb-4">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                              <div>
+                                <CardTitle>Bracket Editor</CardTitle>
+                                <CardDescription>
+                                  {isBracketLocked && !isEditingBracket ? 'Your custom bracket structure is saved' : 'Customize your tournament bracket structure'}
+                                </CardDescription>
+                              </div>
+                              {isBracketLocked && !isEditingBracket && (
+                                <Button
+                                  onClick={() => setIsEditingBracket(true)}
+                                  data-testid="button-unlock-bracket"
+                                  variant="outline"
+                                  className="gap-2"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                  Edit Bracket
+                                </Button>
+                              )}
+                            </CardHeader>
+                            {(!isBracketLocked || isEditingBracket) && (
+                              <CardContent>
+                                <CustomBracketBuilder
+                                  teams={teams || []}
+                                  tournamentId={tournamentId}
+                                  tournament={tournament}
+                                  embeddable={true}
+                                  locked={tournament.status !== 'draft' || (isBracketLocked && !isEditingBracket)}
+                                  onSave={async (bracketData) => {
+                                    try {
+                                      const bracketWithLock = {
+                                        ...bracketData,
+                                        locked: true
+                                      };
+                                      
+                                      const updatedSettings = {
+                                        ...(tournament.settings as any || {}),
+                                        customBracket: bracketWithLock
+                                      };
+                                      
+                                      await apiRequest('PATCH', `/api/tournaments/${tournamentId}`, {
+                                        settings: updatedSettings
+                                      });
+                                      
+                                      await queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+                                      
+                                      setIsEditingBracket(false);
+                                      
+                                      toast({
+                                        title: "Bracket saved",
+                                        description: "Your bracket has been saved"
+                                      });
+                                    } catch (error) {
+                                      toast({
+                                        title: "Error",
+                                        description: "Failed to save bracket",
+                                        variant: "destructive"
+                                      });
+                                      throw error;
+                                    }
+                                  }}
+                                  onLock={() => setIsEditingBracket(false)}
+                                />
+                              </CardContent>
                             )}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <BracketView 
-                            matches={bracketMatches} 
-                            teams={teams || []} 
-                            format={tournament.format}
-                            settings={tournament.settings as TournamentSettings | undefined}
-                            tournamentName={tournament.name}
-                            tournamentId={tournamentId || ''}
-                            isCommissioner={tournament.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
-                            tournamentType={tournament.type}
-                          />
-                        </CardContent>
-                      </Card>
+                          </Card>
+                        )}
+                        
+                        {/* Bracket View */}
+                        <Card>
+                          <CardHeader className="pt-[2px] pb-[2px]">
+                            <CardTitle>
+                              {tournament.format === 'round_robin_split' ? 'Playoff Bracket' : 'Tournament Bracket'}
+                            </CardTitle>
+                            <CardDescription>
+                              {playoffRounds.length} round{playoffRounds.length !== 1 ? 's' : ''} • {bracketMatches.length} match{bracketMatches.length !== 1 ? 'es' : ''}
+                              {tournament.format === 'round_robin_split' && (
+                                <span className="block mt-1 text-xs">
+                                  Playoff seeding based on Round Robin record (wins/losses) with goals scored as tiebreaker
+                                </span>
+                              )}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <BracketView 
+                              matches={bracketMatches} 
+                              teams={teams || []} 
+                              format={tournament.format}
+                              settings={tournament.settings as TournamentSettings | undefined}
+                              tournamentName={tournament.name}
+                              tournamentId={tournamentId || ''}
+                              isCommissioner={tournament.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
+                              tournamentType={tournament.type}
+                            />
+                          </CardContent>
+                        </Card>
+                      </>
                     );
                   })())
                 ) : (
