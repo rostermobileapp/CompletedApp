@@ -70,6 +70,7 @@ export default function TournamentCreate() {
 
   const watchedTeamIds = form.watch("teamIds");
   const watchedFormat = form.watch("format");
+  const watchedSeasonId = form.watch("seasonId");
 
   // Fetch league teams
   const { data: teams, isLoading: teamsLoading } = useQuery<Team[]>({
@@ -81,6 +82,28 @@ export default function TournamentCreate() {
   const { data: seasons } = useQuery<any[]>({
     queryKey: ['/api/leagues', leagueId, 'seasons'],
     enabled: !!leagueId
+  });
+
+  // Fetch season standings to determine team seeding
+  type StandingsEntry = {
+    teamId: string;
+    teamName: string;
+    points: number;
+    wins: number;
+    losses: number;
+    ties: number;
+    goalsFor: number;
+    goalsAgainst: number;
+  };
+  
+  const { data: standings } = useQuery<StandingsEntry[]>({
+    queryKey: ['/api/leagues', leagueId, 'standings', watchedSeasonId],
+    queryFn: async () => {
+      const response = await fetch(`/api/leagues/${leagueId}/standings?seasonId=${watchedSeasonId}`);
+      if (!response.ok) throw new Error('Failed to fetch standings');
+      return response.json();
+    },
+    enabled: !!leagueId && !!watchedSeasonId
   });
 
   // Fetch format recommendations
@@ -119,16 +142,37 @@ export default function TournamentCreate() {
       const tournament = await response.json();
 
       // Step 2: Add teams and generate bracket
-      const teamData = data.teamIds.map((teamId, index) => {
+      // Sort teams by their standings ranking (if we have standings data)
+      let sortedTeamIds = [...data.teamIds];
+      
+      if (standings && standings.length > 0) {
+        // Create a map of teamId -> standings rank (0-indexed position in standings)
+        const standingsRankMap = new Map<string, number>();
+        standings.forEach((s, index) => {
+          standingsRankMap.set(s.teamId, index);
+        });
+        
+        // Sort selected teams by their standings position
+        sortedTeamIds.sort((a, b) => {
+          const rankA = standingsRankMap.get(a) ?? 999; // Teams not in standings go to the end
+          const rankB = standingsRankMap.get(b) ?? 999;
+          return rankA - rankB;
+        });
+      }
+      
+      const teamData = sortedTeamIds.map((teamId, index) => {
         const team = teams.find(t => t.id === teamId);
         if (!team) throw new Error(`Team ${teamId} not found`);
+        
+        // Get standings data for wins/losses if available
+        const teamStanding = standings?.find(s => s.teamId === teamId);
         
         return {
           teamId: team.id,
           teamName: team.name,
           seed: index + 1,
-          wins: 0,
-          losses: 0
+          wins: teamStanding?.wins || 0,
+          losses: teamStanding?.losses || 0
         };
       });
 
