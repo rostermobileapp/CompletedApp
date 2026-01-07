@@ -698,10 +698,10 @@ export function CustomBracketBuilder({
                     onValueChange={(value) => setLoserDestination(matchup.id, value === 'unassigned' ? null : value)}
                   >
                     <SelectTrigger className="h-6 text-xs flex-1" data-testid={`select-loser-dest-${matchup.id}`}>
-                      <SelectValue placeholder="Loser →" />
+                      <SelectValue placeholder="Moves to" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Moves to</SelectItem>
                       <SelectItem value="eliminated">Eliminated</SelectItem>
                       {matchups.filter(m => m.id !== matchup.id).map(m => (
                         <SelectItem key={m.id} value={m.id}>
