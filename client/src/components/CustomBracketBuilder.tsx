@@ -570,7 +570,7 @@ export function CustomBracketBuilder({
         {matchups.map(matchup => (
           <Card
             key={matchup.id}
-            className={`absolute ${matchup.type === 'losers' ? 'border-destructive' : 'border-primary'} ${draggingMatchup === matchup.id ? 'opacity-50' : ''}`}
+            className={`absolute ${matchup.type === 'losers' ? 'border-destructive' : 'border-[#32CD32]'} ${draggingMatchup === matchup.id ? 'opacity-50' : ''}`}
             style={{
               width: CARD_WIDTH,
               height: CARD_HEIGHT,
