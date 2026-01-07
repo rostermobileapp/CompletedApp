@@ -818,8 +818,8 @@ export function CustomBracketBuilder({
                     value={matchup.winnerDestination || 'unassigned'}
                     onValueChange={(value) => setWinnerDestination(matchup.id, value === 'unassigned' ? null : value)}
                   >
-                    <SelectTrigger className="h-6 text-xs flex-1 bg-[#32CD32] text-black [&>span]:text-black data-[placeholder]:!text-black" data-testid={`select-winner-dest-${matchup.id}`}>
-                      <SelectValue placeholder="Moves to" />
+                    <SelectTrigger className="h-6 text-xs flex-1" style={{ backgroundColor: '#32CD32', color: '#000000' }} data-testid={`select-winner-dest-${matchup.id}`}>
+                      <SelectValue placeholder="Moves to" className="text-black" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Moves to</SelectItem>
