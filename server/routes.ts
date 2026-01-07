@@ -3721,7 +3721,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leagues/:id/standings", async (req, res) => {
     try {
       const leagueId = req.params.id;
-      const standings = await storage.getLeagueStandings(leagueId);
+      const seasonId = typeof req.query.seasonId === 'string' ? req.query.seasonId : undefined;
+      const standings = await storage.getLeagueStandings(leagueId, seasonId);
       res.json(standings);
     } catch (error) {
       console.error("Error fetching league standings:", error);

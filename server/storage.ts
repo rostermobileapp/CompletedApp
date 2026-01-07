@@ -3206,7 +3206,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getLeagueStandings(leagueId: string): Promise<Array<{
+  async getLeagueStandings(leagueId: string, seasonId?: string): Promise<Array<{
     teamId: string;
     teamName: string;
     gamesPlayed: number;
@@ -3222,27 +3222,48 @@ export class DatabaseStorage implements IStorage {
     const teams = await this.getTeamsByLeague(leagueId);
     const teamIdSet = new Set(teams.map(t => t.id));
     
-    // Get all completed games for this league
+    // Get all completed games for this league, optionally filtered by season
     // Query all games that either have this league_id OR involve teams from this league
-    const result = await db.execute(sql`
-      SELECT 
-        g.id,
-        g.league_id,
-        g.home_team_id,
-        g.away_team_id,
-        g.home_score,
-        g.away_score,
-        g.is_completed,
-        g.result_type
-      FROM games g
-      LEFT JOIN teams ht ON g.home_team_id = ht.id
-      LEFT JOIN teams at ON g.away_team_id = at.id
-      WHERE (g.is_completed = true OR (g.home_score IS NOT NULL AND g.away_score IS NOT NULL))
-        AND (
-          g.league_id = ${leagueId}
-          OR (ht.league_id = ${leagueId} AND at.league_id = ${leagueId})
-        )
-    `);
+    const result = seasonId 
+      ? await db.execute(sql`
+          SELECT 
+            g.id,
+            g.league_id,
+            g.home_team_id,
+            g.away_team_id,
+            g.home_score,
+            g.away_score,
+            g.is_completed,
+            g.result_type
+          FROM games g
+          LEFT JOIN teams ht ON g.home_team_id = ht.id
+          LEFT JOIN teams at ON g.away_team_id = at.id
+          WHERE (g.is_completed = true OR (g.home_score IS NOT NULL AND g.away_score IS NOT NULL))
+            AND g.season_id = ${seasonId}
+            AND (
+              g.league_id = ${leagueId}
+              OR (ht.league_id = ${leagueId} AND at.league_id = ${leagueId})
+            )
+        `)
+      : await db.execute(sql`
+          SELECT 
+            g.id,
+            g.league_id,
+            g.home_team_id,
+            g.away_team_id,
+            g.home_score,
+            g.away_score,
+            g.is_completed,
+            g.result_type
+          FROM games g
+          LEFT JOIN teams ht ON g.home_team_id = ht.id
+          LEFT JOIN teams at ON g.away_team_id = at.id
+          WHERE (g.is_completed = true OR (g.home_score IS NOT NULL AND g.away_score IS NOT NULL))
+            AND (
+              g.league_id = ${leagueId}
+              OR (ht.league_id = ${leagueId} AND at.league_id = ${leagueId})
+            )
+        `);
     
     const completedGames = result.rows.map((row: any) => ({
       id: row.id as string,
