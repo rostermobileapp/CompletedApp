@@ -683,7 +683,7 @@ export function CustomBracketBuilder({
                       <SelectValue placeholder="Moves to" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Moves to</SelectItem>
                       <SelectItem value="final">Championship</SelectItem>
                       {matchups.filter(m => m.id !== matchup.id).map(m => (
                         <SelectItem key={m.id} value={m.id}>
