@@ -93,6 +93,22 @@ function convertMatchesToMatchups(matches: TournamentMatch[], teams: TournamentT
   const teamMap = new Map(teams.map(t => [t.id, t.teamName]));
   const matchMap = new Map(matches.map(m => [m.id, m]));
   
+  // Build reverse lookup: which matches feed into which match slots
+  // Key: destinationMatchId, Value: { sourceMatchId, type: 'winner' | 'loser', slot: 'team1' | 'team2' }
+  const feedsInto = new Map<string, { sourceMatchId: string; type: 'winner' | 'loser'; slot: 'team1' | 'team2' }[]>();
+  
+  // For each match, if it has advancesToMatchId, the winner feeds into that match
+  matches.forEach(m => {
+    if (m.advancesToMatchId) {
+      const existing = feedsInto.get(m.advancesToMatchId) || [];
+      // Determine which slot (team1 or team2) this feeds into
+      // We'll assign slots based on order of feeding matches
+      const slot = existing.length === 0 ? 'team1' : 'team2';
+      existing.push({ sourceMatchId: m.id, type: 'winner', slot });
+      feedsInto.set(m.advancesToMatchId, existing);
+    }
+  });
+  
   // Group matches by round for positioning
   const roundGroups = new Map<string, TournamentMatch[]>();
   matches.forEach(m => {
@@ -111,15 +127,36 @@ function convertMatchesToMatchups(matches: TournamentMatch[], teams: TournamentT
     roundMatches.forEach((match, matchIndex) => {
       const isLosers = round.toLowerCase().includes('loser');
       
-      // Determine team values - use team name or "Winner of Game X" / "Loser of Game X"
+      // Get feeding matches for this match
+      const feedingMatches = feedsInto.get(match.id) || [];
+      const team1Feed = feedingMatches.find(f => f.slot === 'team1');
+      const team2Feed = feedingMatches.find(f => f.slot === 'team2');
+      
+      // Determine team values
+      // Priority: 1) Assigned team, 2) Winner/Loser reference, 3) Empty
       let team1Value = '';
       let team2Value = '';
       
       if (match.team1Id) {
+        // Actual team assigned
         team1Value = teamMap.get(match.team1Id) || match.team1Id;
+      } else if (team1Feed) {
+        // Routing from another match - use game number format that CustomBracketBuilder expects
+        const sourceMatch = matchMap.get(team1Feed.sourceMatchId);
+        if (sourceMatch) {
+          team1Value = `${team1Feed.type}:Game ${sourceMatch.matchNumber}`;
+        }
       }
+      
       if (match.team2Id) {
+        // Actual team assigned
         team2Value = teamMap.get(match.team2Id) || match.team2Id;
+      } else if (team2Feed) {
+        // Routing from another match - use game number format that CustomBracketBuilder expects
+        const sourceMatch = matchMap.get(team2Feed.sourceMatchId);
+        if (sourceMatch) {
+          team2Value = `${team2Feed.type}:Game ${sourceMatch.matchNumber}`;
+        }
       }
       
       const matchup: Matchup = {
