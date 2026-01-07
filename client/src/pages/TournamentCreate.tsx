@@ -142,21 +142,34 @@ export default function TournamentCreate() {
       const tournament = await response.json();
 
       // Step 2: Add teams and generate bracket
+      // Fetch fresh standings data for the selected season
+      let seasonStandings: StandingsEntry[] = [];
+      if (data.seasonId) {
+        try {
+          const standingsResponse = await fetch(`/api/leagues/${leagueId}/standings?seasonId=${data.seasonId}`);
+          if (standingsResponse.ok) {
+            seasonStandings = await standingsResponse.json();
+          }
+        } catch (err) {
+          console.warn('Failed to fetch standings for seeding:', err);
+        }
+      }
+      
       // Sort teams by their standings ranking (if we have standings data)
       let sortedTeamIds = [...data.teamIds];
       
       console.log('🏆 Seeding Debug:', {
         seasonId: data.seasonId,
-        standingsAvailable: !!standings,
-        standingsLength: standings?.length || 0,
-        standings: standings?.map(s => ({ teamId: s.teamId, teamName: s.teamName, points: s.points, wins: s.wins })),
+        standingsAvailable: seasonStandings.length > 0,
+        standingsLength: seasonStandings.length,
+        standings: seasonStandings.map(s => ({ teamId: s.teamId, teamName: s.teamName, points: s.points, wins: s.wins })),
         selectedTeamIds: data.teamIds
       });
       
-      if (standings && standings.length > 0) {
+      if (seasonStandings.length > 0) {
         // Create a map of teamId -> standings rank (0-indexed position in standings)
         const standingsRankMap = new Map<string, number>();
-        standings.forEach((s, index) => {
+        seasonStandings.forEach((s, index) => {
           standingsRankMap.set(s.teamId, index);
           console.log(`🏆 Standings rank: ${s.teamName} (${s.teamId}) = position ${index}, points=${s.points}`);
         });
@@ -178,7 +191,7 @@ export default function TournamentCreate() {
         if (!team) throw new Error(`Team ${teamId} not found`);
         
         // Get standings data for wins/losses if available
-        const teamStanding = standings?.find(s => s.teamId === teamId);
+        const teamStanding = seasonStandings.find(s => s.teamId === teamId);
         
         return {
           teamId: team.id,
