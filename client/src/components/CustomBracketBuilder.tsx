@@ -175,7 +175,7 @@ function convertMatchesToMatchups(matches: TournamentMatch[], teams: TournamentT
           ? (match.team1Score > match.team2Score ? 'team1' : 'team2') 
           : null,
         winnerDestination: match.advancesToMatchId || null,
-        loserDestination: 'eliminated'
+        loserDestination: null
       };
       
       matchups.push(matchup);
