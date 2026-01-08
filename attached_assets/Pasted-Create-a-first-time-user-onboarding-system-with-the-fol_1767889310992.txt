@@ -1,0 +1,50 @@
+Create a first-time user onboarding system with the following requirements:
+Modal Specifications:
+
+Display a modal/popup on first login that blocks access to the main application
+Modal should be non-dismissible until required fields are completed
+Clean, professional UI with clear labels and validation messages
+
+Required Fields (must be completed before proceeding):
+
+First Name (text input, required)
+Last Name (text input, required)
+Phone Number (formatted input with validation, required)
+Email (text input, pre-filled from authentication/login, read-only or disabled, required)
+City (text input, required)
+Player Type (dropdown or radio buttons: "Skater" or "Goalie", required)
+
+Optional Fields:
+7. Date of Birth (date picker, optional)
+8. Venmo Username (text input, optional)
+9. CashApp Username (text input, optional)
+10. Profile Photo (image upload with preview, optional - accept common image formats: jpg, png, webp)
+Functionality Requirements:
+
+Add validation for all required fields before allowing form submission
+Phone number should be formatted (e.g., (123) 456-7890)
+Email should be validated for proper format
+Date of Birth should have age restrictions if needed (e.g., 13+ years old)
+Profile photo should have file size limits (suggest max 5MB)
+Show clear error messages for invalid inputs
+Include a "Save and Continue" button that remains disabled until all required fields are valid
+
+Database/State Management:
+
+Create or update user profile record with all submitted information
+Set a flag (e.g., hasCompletedOnboarding: true) to prevent modal from showing again
+Store all field data in the user's profile table/collection
+Profile photo should be uploaded to storage and URL saved to user profile
+
+Post-Submission Behavior:
+
+After successful save, close the modal and redirect user to the home screen
+All entered data should appear in the user's profile page
+User should be able to edit this information later from their profile settings
+
+Additional Considerations:
+
+Modal should be responsive and work on mobile devices
+Add loading state during form submission
+Include error handling for failed submissions with user-friendly messages
+Consider adding a progress indicator if form is long
