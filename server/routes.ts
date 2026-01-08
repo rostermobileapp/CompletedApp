@@ -1002,35 +1002,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
         console.log('[Stripe] Created customer:', customerId);
       } else {
-        // Update existing customer's email to match current profile
-        console.log('[Stripe] Updating customer email for checkout:', customerId);
-        await stripe.customers.update(customerId, {
-          email: user.email || undefined,
-          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
-        });
+        // Verify customer exists in Stripe and update their info
+        console.log('[Stripe] Verifying and updating customer for checkout:', customerId);
+        try {
+          await stripe.customers.update(customerId, {
+            email: user.email || undefined,
+            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+          });
+        } catch (customerError: any) {
+          // If customer doesn't exist in Stripe, create a new one
+          if (customerError.code === 'resource_missing' || customerError.statusCode === 404) {
+            console.log('[Stripe] Customer not found in Stripe, creating new one:', userId);
+            const customer = await stripe.customers.create({
+              email: user.email || undefined,
+              name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+              metadata: {
+                userId: userId,
+              },
+            });
+            customerId = customer.id;
+            await storage.updateUserStripeInfo(userId, customerId, '');
+            console.log('[Stripe] Created new customer:', customerId);
+          } else {
+            throw customerError;
+          }
+        }
 
         // Check if customer has any active subscriptions
         // If they do, they should use billing portal to upgrade instead
-        const subscriptions = await stripe.subscriptions.list({
-          customer: customerId,
-          status: 'active',
-          limit: 1,
-        });
-
-        if (subscriptions.data.length > 0) {
-          console.log('[Stripe] Customer has active subscription, redirecting to billing portal for upgrade');
-          // Create a billing portal session for upgrade/management
-          const protocol = req.protocol || 'https';
-          const host = req.get('host') || (process.env.REPLIT_DOMAINS 
-            ? `${process.env.REPLIT_DOMAINS}` 
-            : 'localhost:5000');
-          const appUrl = `${protocol}://${host}`;
-
-          const portalSession = await stripe.billingPortal.sessions.create({
+        try {
+          const subscriptions = await stripe.subscriptions.list({
             customer: customerId,
-            return_url: `${appUrl}/subscription`,
+            status: 'active',
+            limit: 1,
           });
-          return res.json({ url: portalSession.url });
+
+          if (subscriptions.data.length > 0) {
+            console.log('[Stripe] Customer has active subscription, redirecting to billing portal for upgrade');
+            // Create a billing portal session for upgrade/management
+            const protocol = req.protocol || 'https';
+            const host = req.get('host') || (process.env.REPLIT_DOMAINS 
+              ? `${process.env.REPLIT_DOMAINS}` 
+              : 'localhost:5000');
+            const appUrl = `${protocol}://${host}`;
+
+            const portalSession = await stripe.billingPortal.sessions.create({
+              customer: customerId,
+              return_url: `${appUrl}/subscription`,
+            });
+            return res.json({ url: portalSession.url });
+          }
+        } catch (subError: any) {
+          console.log('[Stripe] Error checking subscriptions, proceeding with checkout:', subError.message);
         }
       }
 
