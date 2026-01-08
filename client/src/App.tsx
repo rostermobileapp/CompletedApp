@@ -119,24 +119,37 @@ function Router() {
   const [location] = useLocation();
   const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
   
-  // Minimum 1-second display time for the loading screen (reduced for faster UX)
+  // Minimum 1-second display time for the loading screen
   const [minDelayElapsed, setMinDelayElapsed] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // Maximum 5-second timeout - bypass loading screen even if data is still loading
+  const [maxTimeoutReached, setMaxTimeoutReached] = useState(false);
+  const minTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const maxTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
-    // Start timer when authenticated and auth loading is complete
-    if (isAuthenticated && !authLoading && !minDelayElapsed) {
-      timerRef.current = setTimeout(() => {
-        setMinDelayElapsed(true);
-      }, 1000);
+    // Start timers when authenticated and auth loading is complete
+    if (isAuthenticated && !authLoading) {
+      if (!minDelayElapsed) {
+        minTimerRef.current = setTimeout(() => {
+          setMinDelayElapsed(true);
+        }, 1000);
+      }
+      if (!maxTimeoutReached) {
+        maxTimerRef.current = setTimeout(() => {
+          setMaxTimeoutReached(true);
+        }, 5000);
+      }
     }
     
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
+      if (minTimerRef.current) {
+        clearTimeout(minTimerRef.current);
+      }
+      if (maxTimerRef.current) {
+        clearTimeout(maxTimerRef.current);
       }
     };
-  }, [isAuthenticated, authLoading, minDelayElapsed]);
+  }, [isAuthenticated, authLoading, minDelayElapsed, maxTimeoutReached]);
 
   // Always render password reset pages standalone, regardless of auth state
   if (location === '/reset-password') {
@@ -166,8 +179,11 @@ function Router() {
     );
   }
 
-  // Wait for BOTH: minimum 3 seconds AND data to be loaded before showing the app
-  if (!minDelayElapsed || dataLoading) {
+  // Show loading screen until:
+  // 1. Minimum delay has passed AND data is loaded, OR
+  // 2. Maximum timeout is reached (bypass even if data still loading)
+  const shouldShowLoading = !maxTimeoutReached && (!minDelayElapsed || dataLoading);
+  if (shouldShowLoading) {
     return <LoadingScreen />;
   }
 
