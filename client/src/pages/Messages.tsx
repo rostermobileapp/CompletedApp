@@ -596,22 +596,30 @@ export default function Messages() {
     if (selectedTournamentId) {
       filtered = filtered.filter(conv => conv.tournamentId === selectedTournamentId);
     }
-    // Filter by league if one is selected
-    else if (selectedLeagueId) {
-      filtered = filtered.filter(conv => conv.leagueId === selectedLeagueId);
-    }
-    
-    // Further filter by team if one is selected
-    if (selectedTeamId) {
-      // When a team is selected, show team chat AND league-wide chats (direct, captain)
+    // Filter by team if one is selected - get the team's league and filter by that
+    else if (selectedTeamId) {
+      // Find the selected team to get its league ID
+      const selectedTeamData = userTeams.find((t: any) => t.id === selectedTeamId);
+      const teamLeagueId = selectedTeamData?.leagueId;
+      
+      // Filter by the team's league first
+      if (teamLeagueId) {
+        filtered = filtered.filter(conv => conv.leagueId === teamLeagueId);
+      }
+      
+      // Then filter to show team chat AND league-wide chats (direct, captain)
       // This includes conversations with matching teamId OR conversations with no teamId (direct/captain chats)
       filtered = filtered.filter(conv => 
         conv.teamId === selectedTeamId || conv.teamId === null
       );
     }
+    // Filter by league if one is selected
+    else if (selectedLeagueId) {
+      filtered = filtered.filter(conv => conv.leagueId === selectedLeagueId);
+    }
     
     return filtered;
-  }, [allConversations, selectedLeagueId, selectedTeamId, selectedTournamentId]);
+  }, [allConversations, selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams]);
 
   // Fetch unread message counts per conversation
   const { data: unreadCountsData } = useQuery<{ unreadCounts: Array<{ conversationId: string; unreadCount: number }> }>({
