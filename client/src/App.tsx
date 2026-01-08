@@ -119,7 +119,7 @@ function Router() {
   const [location] = useLocation();
   const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
   
-  // Minimum 3-second display time for the loading screen
+  // Minimum 1-second display time for the loading screen (reduced for faster UX)
   const [minDelayElapsed, setMinDelayElapsed] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -128,7 +128,7 @@ function Router() {
     if (isAuthenticated && !authLoading && !minDelayElapsed) {
       timerRef.current = setTimeout(() => {
         setMinDelayElapsed(true);
-      }, 3000);
+      }, 1000);
     }
     
     return () => {

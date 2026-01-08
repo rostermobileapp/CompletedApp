@@ -172,9 +172,12 @@ export function useAppDataPrefetch(enabled: boolean = true) {
 
   const allQueries = [...baseQueries, ...dependentQueries];
 
-  // Consider loading complete if query has finished (success or error)
-  // This prevents the app from being stuck on loading screen if an API fails
-  const isLoading = allQueries.some(q => q.isLoading && !q.isError);
+  // In TanStack Query v5:
+  // - status 'pending' means no data yet (initial load or retrying after error)
+  // - status 'error' means query failed after all retries
+  // - status 'success' means query succeeded
+  // We consider loading complete once all queries have either succeeded or failed (after retries)
+  const isLoading = allQueries.some(q => q.status === 'pending' && !q.isError);
   const hasError = allQueries.some(q => q.isError);
 
   return {
