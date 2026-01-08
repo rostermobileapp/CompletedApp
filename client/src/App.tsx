@@ -92,10 +92,13 @@ function Router() {
   const [maxTimeoutReached, setMaxTimeoutReached] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const maxTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const timersStartedRef = useRef(false);
   
   useEffect(() => {
-    // Start timer when authenticated and auth loading is complete
-    if (isAuthenticated && !authLoading && !minDelayElapsed) {
+    // Start timers only ONCE when authenticated and auth loading is complete
+    if (isAuthenticated && !authLoading && !timersStartedRef.current) {
+      timersStartedRef.current = true;
+      
       timerRef.current = setTimeout(() => {
         setMinDelayElapsed(true);
       }, 3000);
@@ -106,6 +109,7 @@ function Router() {
       }, 10000);
     }
     
+    // Cleanup only on unmount
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
@@ -114,7 +118,7 @@ function Router() {
         clearTimeout(maxTimerRef.current);
       }
     };
-  }, [isAuthenticated, authLoading, minDelayElapsed]);
+  }, [isAuthenticated, authLoading]);
 
   // Always render password reset pages standalone, regardless of auth state
   if (location === '/reset-password') {
