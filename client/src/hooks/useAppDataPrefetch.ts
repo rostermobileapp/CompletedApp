@@ -172,12 +172,7 @@ export function useAppDataPrefetch(enabled: boolean = true) {
 
   const allQueries = [...baseQueries, ...dependentQueries];
 
-  // In TanStack Query v5:
-  // - status 'pending' means no data yet (initial load or retrying after error)
-  // - status 'error' means query failed after all retries
-  // - status 'success' means query succeeded
-  // We consider loading complete once all queries have either succeeded or failed (after retries)
-  const isLoading = allQueries.some(q => q.status === 'pending' && !q.isError);
+  const isLoading = allQueries.some(q => q.isLoading);
   const hasError = allQueries.some(q => q.isError);
 
   return {

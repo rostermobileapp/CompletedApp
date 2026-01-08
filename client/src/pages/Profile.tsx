@@ -274,14 +274,13 @@ export default function Profile() {
       const response = await apiRequest('DELETE', '/api/auth/user');
       return response.json();
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       toast({ 
         title: 'Profile deleted',
         description: 'Your account has been permanently deleted' 
       });
-      // Sign out from Supabase and redirect to login
-      await supabase.auth.signOut();
-      navigate('/login');
+      // Redirect to home page
+      window.location.href = '/';
     },
     onError: (error: any) => {
       toast({ 
@@ -427,7 +426,7 @@ export default function Profile() {
       </div>
       
       {/* Scrollable Content Section */}
-      <div className="flex-1 overflow-y-auto pb-48">
+      <div className="flex-1 overflow-y-auto pb-24">
         {/* Profile Details */}
         <div className="px-6 mb-6 pt-2">
         <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
