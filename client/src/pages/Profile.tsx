@@ -274,13 +274,14 @@ export default function Profile() {
       const response = await apiRequest('DELETE', '/api/auth/user');
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ 
         title: 'Profile deleted',
         description: 'Your account has been permanently deleted' 
       });
-      // Redirect to home page
-      window.location.href = '/';
+      // Sign out from Supabase and redirect to login
+      await supabase.auth.signOut();
+      navigate('/login');
     },
     onError: (error: any) => {
       toast({ 
