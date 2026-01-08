@@ -294,8 +294,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      
+      // First delete user data from our database
       await storage.deleteUser(userId);
-      // User deletion successful - Supabase handles auth state
+      
+      // Then delete the user from Supabase authentication
+      const { error: supabaseError } = await supabase.auth.admin.deleteUser(userId);
+      if (supabaseError) {
+        console.error("Error deleting user from Supabase auth:", supabaseError);
+        // Continue anyway since database deletion succeeded
+      }
+      
       res.json({ message: "Profile deleted successfully" });
     } catch (error: any) {
       console.error("Error deleting user:", error);

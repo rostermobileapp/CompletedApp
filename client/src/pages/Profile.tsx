@@ -274,13 +274,31 @@ export default function Profile() {
       const response = await apiRequest('DELETE', '/api/auth/user');
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ 
         title: 'Profile deleted',
         description: 'Your account has been permanently deleted' 
       });
-      // Redirect to home page
-      window.location.href = '/';
+      
+      // Remove OneSignal external ID
+      try {
+        await removeExternalId();
+      } catch (e) {
+        console.log('Failed to remove external ID during profile deletion');
+      }
+      
+      // Sign out from Supabase
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.error('Error signing out:', e);
+      }
+      
+      // Clear all cached data
+      queryClient.clear();
+      
+      // Redirect to login page
+      window.location.href = '/login';
     },
     onError: (error: any) => {
       toast({ 
