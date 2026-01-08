@@ -1,7 +1,7 @@
 import { Switch, Route, useLocation } from "wouter";
 import { useState, useEffect, useRef } from "react";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PermissionProvider } from "@/context/SubscriptionContext";
@@ -15,6 +15,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppDataPrefetch } from "@/hooks/useAppDataPrefetch";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
+import { OnboardingModal } from "@/components/OnboardingModal";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Waitlist from "@/pages/Waitlist";
@@ -142,6 +143,7 @@ function Router() {
     <PermissionProvider>
       <ScrollToTop />
       <NativelyNotificationsInitializer />
+      <OnboardingChecker />
       <div className="relative min-h-screen w-full">
         <SlideOutMenu />
         <SwipeableMainScreens>
