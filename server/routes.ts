@@ -1008,6 +1008,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: user.email || undefined,
           name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
         });
+
+        // Check if customer has any active subscriptions
+        // If they do, they should use billing portal to upgrade instead
+        const subscriptions = await stripe.subscriptions.list({
+          customer: customerId,
+          status: 'active',
+          limit: 1,
+        });
+
+        if (subscriptions.data.length > 0) {
+          console.log('[Stripe] Customer has active subscription, redirecting to billing portal for upgrade');
+          // Create a billing portal session for upgrade/management
+          const protocol = req.protocol || 'https';
+          const host = req.get('host') || (process.env.REPLIT_DOMAINS 
+            ? `${process.env.REPLIT_DOMAINS}` 
+            : 'localhost:5000');
+          const appUrl = `${protocol}://${host}`;
+
+          const portalSession = await stripe.billingPortal.sessions.create({
+            customer: customerId,
+            return_url: `${appUrl}/subscription`,
+          });
+          return res.json({ url: portalSession.url });
+        }
       }
 
       // Build URL from request for reliability
@@ -1038,7 +1062,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ url: session.url });
     } catch (error: any) {
-      console.error('[Stripe] Error creating checkout session:', error);
+      console.error('[Stripe] Error creating checkout session:', error.message || error);
+      console.error('[Stripe] Full error details:', JSON.stringify(error, null, 2));
       res.status(500).json({ message: 'Failed to create checkout session' });
     }
   });
