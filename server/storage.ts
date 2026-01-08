@@ -252,7 +252,7 @@ export interface IStorage {
   updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User>;
   deleteUser(id: string): Promise<void>;
   updateUserNavigationPreferences(id: string, preferences: any): Promise<User>;
-  updateUserOnboarding(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'phoneNumber' | 'playerType' | 'profileImageUrl' | 'selectedFacilityId' | 'onboardingProgress' | 'onboardingCompleted' | 'role'>>): Promise<User>;
+  updateUserOnboarding(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'phoneNumber' | 'city' | 'dateOfBirth' | 'playerType' | 'profileImageUrl' | 'venmoUsername' | 'cashappUsername' | 'selectedFacilityId' | 'onboardingProgress' | 'onboardingCompleted' | 'role'>>): Promise<User>;
   
   // User notification operations
   createNotification(notification: InsertUserNotification): Promise<UserNotification>;
@@ -868,7 +868,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserOnboarding(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'phoneNumber' | 'playerType' | 'profileImageUrl' | 'selectedFacilityId' | 'onboardingProgress' | 'onboardingCompleted' | 'role'>>): Promise<User> {
+  async updateUserOnboarding(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'phoneNumber' | 'city' | 'dateOfBirth' | 'playerType' | 'profileImageUrl' | 'venmoUsername' | 'cashappUsername' | 'selectedFacilityId' | 'onboardingProgress' | 'onboardingCompleted' | 'role'>>): Promise<User> {
     const [user] = await db
       .update(users)
       .set({

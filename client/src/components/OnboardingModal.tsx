@@ -234,7 +234,7 @@ export function OnboardingModal({ isOpen, userEmail }: OnboardingModalProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/onboarding"] });
       toast({
         title: "Welcome!",

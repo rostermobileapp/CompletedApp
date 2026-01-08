@@ -82,6 +82,38 @@ function LoadingScreen() {
   );
 }
 
+interface UserData {
+  id: string;
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  phoneNumber?: string | null;
+  city?: string | null;
+  playerType?: string | null;
+  onboardingCompleted?: boolean;
+}
+
+function OnboardingChecker() {
+  const { data: user } = useQuery<UserData>({
+    queryKey: ['/api/user'],
+  });
+
+  const needsOnboarding = user && !user.onboardingCompleted && (
+    !user.firstName || 
+    !user.lastName || 
+    !user.phoneNumber || 
+    !user.city || 
+    !user.playerType
+  );
+
+  return (
+    <OnboardingModal 
+      isOpen={!!needsOnboarding} 
+      userEmail={user?.email}
+    />
+  );
+}
+
 function Router() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
