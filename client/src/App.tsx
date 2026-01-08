@@ -88,7 +88,10 @@ function Router() {
   
   // Minimum 3-second display time for the loading screen
   const [minDelayElapsed, setMinDelayElapsed] = useState(false);
+  // Maximum 10-second timeout to prevent infinite loading
+  const [maxTimeoutReached, setMaxTimeoutReached] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const maxTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
     // Start timer when authenticated and auth loading is complete
@@ -96,11 +99,19 @@ function Router() {
       timerRef.current = setTimeout(() => {
         setMinDelayElapsed(true);
       }, 3000);
+      
+      // Safety timeout - don't let loading screen stay forever
+      maxTimerRef.current = setTimeout(() => {
+        setMaxTimeoutReached(true);
+      }, 10000);
     }
     
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
+      }
+      if (maxTimerRef.current) {
+        clearTimeout(maxTimerRef.current);
       }
     };
   }, [isAuthenticated, authLoading, minDelayElapsed]);
@@ -134,7 +145,8 @@ function Router() {
   }
 
   // Wait for BOTH: minimum 3 seconds AND data to be loaded before showing the app
-  if (!minDelayElapsed || dataLoading) {
+  // OR if max timeout is reached, proceed anyway to prevent infinite loading
+  if ((!minDelayElapsed || dataLoading) && !maxTimeoutReached) {
     return <LoadingScreen />;
   }
 

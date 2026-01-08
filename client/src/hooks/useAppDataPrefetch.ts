@@ -172,7 +172,9 @@ export function useAppDataPrefetch(enabled: boolean = true) {
 
   const allQueries = [...baseQueries, ...dependentQueries];
 
-  const isLoading = allQueries.some(q => q.isLoading);
+  // Consider loading complete if queries are still loading OR if they errored out
+  // Don't block the app forever if an API call fails for new users
+  const isLoading = allQueries.some(q => q.isLoading && !q.isError);
   const hasError = allQueries.some(q => q.isError);
 
   return {
