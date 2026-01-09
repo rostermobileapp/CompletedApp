@@ -33,13 +33,13 @@ function calculateTriggerTime(eventTime: Date, trigger: ReminderTrigger, timezon
     return subHours(eventTime, 2);
   }
   
-  // 2 days before at 3PM in the league's local timezone
+  // 2 days before at 3:30PM in the league's local timezone
   const twoDaysBefore = subDays(eventTime, 2);
   
-  // Convert to local timezone, set to 3PM, then convert back to UTC
+  // Convert to local timezone, set to 3:30PM, then convert back to UTC
   const localTime = toZonedTime(twoDaysBefore, timezone);
-  const localAt3PM = setMinutes(setHours(localTime, 15), 0); // 3:00 PM local
-  return fromZonedTime(localAt3PM, timezone);
+  const localAt330PM = setMinutes(setHours(localTime, 15), 30); // 3:30 PM local
+  return fromZonedTime(localAt330PM, timezone);
 }
 
 function shouldSendReminder(now: Date, triggerTime: Date): boolean {
