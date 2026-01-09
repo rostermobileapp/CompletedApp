@@ -1826,6 +1826,19 @@ export class DatabaseStorage implements IStorage {
       .where(eq(teams.id, teamId))
       .returning();
     
+    // Also update isCaptain on teamMemberships for the new approach
+    // This keeps both systems in sync during the transition
+    if (captainId) {
+      // Set the new captain's isCaptain = true (without clearing others for multi-captain support)
+      await db
+        .update(teamMemberships)
+        .set({ isCaptain: true })
+        .where(and(
+          eq(teamMemberships.teamId, teamId),
+          eq(teamMemberships.userId, captainId)
+        ));
+    }
+    
     // Update captain chat membership for this league
     if (team.leagueId) {
       const { MessagingService } = await import('./messagingService');
@@ -1834,6 +1847,115 @@ export class DatabaseStorage implements IStorage {
     }
     
     return team;
+  }
+
+  // Add a captain to a team (multi-captain support)
+  async addTeamCaptain(teamId: string, userId: string): Promise<boolean> {
+    try {
+      // Check if user already has a membership
+      const [membership] = await db
+        .select()
+        .from(teamMemberships)
+        .where(and(
+          eq(teamMemberships.teamId, teamId),
+          eq(teamMemberships.userId, userId)
+        ));
+      
+      if (membership) {
+        // Update existing membership
+        await db
+          .update(teamMemberships)
+          .set({ isCaptain: true })
+          .where(and(
+            eq(teamMemberships.teamId, teamId),
+            eq(teamMemberships.userId, userId)
+          ));
+      } else {
+        // Create a new membership with captain status
+        // This handles the case where user has a league assignment but no direct team membership
+        // All other fields have defaults: id (gen_random_uuid), joinedAt (now), position/jerseyNumber/skillLevel/approvedBy (nullable)
+        await db.insert(teamMemberships).values({
+          teamId,
+          userId,
+          isCaptain: true,
+          status: 'approved',
+        });
+      }
+      
+      // Maintain backwards compatibility: if teams.captainId is null, set it
+      const team = await this.getTeam(teamId);
+      if (team && !team.captainId) {
+        await db.update(teams).set({ captainId: userId }).where(eq(teams.id, teamId));
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error adding team captain:', error);
+      return false;
+    }
+  }
+
+  // Remove a captain from a team (multi-captain support)
+  async removeTeamCaptain(teamId: string, userId: string): Promise<void> {
+    await db
+      .update(teamMemberships)
+      .set({ isCaptain: false })
+      .where(and(
+        eq(teamMemberships.teamId, teamId),
+        eq(teamMemberships.userId, userId)
+      ));
+      
+    // Only clear teams.captainId if this specific user was the primary captain
+    const team = await this.getTeam(teamId);
+    if (team && team.captainId === userId) {
+      // Check if there are other captains to promote, otherwise leave null
+      const remainingCaptains = await this.getTeamCaptains(teamId);
+      const otherCaptains = remainingCaptains.filter(c => c !== userId);
+      if (otherCaptains.length > 0) {
+        // Promote another captain to be the primary
+        await db.update(teams).set({ captainId: otherCaptains[0] }).where(eq(teams.id, teamId));
+      } else {
+        await db.update(teams).set({ captainId: null }).where(eq(teams.id, teamId));
+      }
+    }
+  }
+
+  // Check if a user is a captain of a team
+  async isTeamCaptain(teamId: string, userId: string): Promise<boolean> {
+    const [membership] = await db
+      .select()
+      .from(teamMemberships)
+      .where(and(
+        eq(teamMemberships.teamId, teamId),
+        eq(teamMemberships.userId, userId),
+        eq(teamMemberships.isCaptain, true)
+      ));
+    
+    if (membership) return true;
+    
+    // Fall back to checking teams.captainId for backwards compatibility
+    const team = await this.getTeam(teamId);
+    return team?.captainId === userId;
+  }
+
+  // Get all captains of a team
+  async getTeamCaptains(teamId: string): Promise<string[]> {
+    const captains = await db
+      .select({ userId: teamMemberships.userId })
+      .from(teamMemberships)
+      .where(and(
+        eq(teamMemberships.teamId, teamId),
+        eq(teamMemberships.isCaptain, true)
+      ));
+    
+    // Also include teams.captainId for backwards compatibility
+    const team = await this.getTeam(teamId);
+    const captainIds = captains.map(c => c.userId);
+    if (team?.captainId && !captainIds.includes(team.captainId)) {
+      captainIds.push(team.captainId);
+    }
+    
+    return captainIds;
   }
 
   async getTeam(id: string): Promise<Team | undefined> {

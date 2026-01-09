@@ -478,6 +478,7 @@ export default function LeagueManagement() {
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [teamCaptains, setTeamCaptains] = useState<string[]>([]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [showScheduleGame, setShowScheduleGame] = useState(false);
   const [showEditGame, setShowEditGame] = useState(false);
@@ -567,6 +568,33 @@ export default function LeagueManagement() {
   
   // Member search state
   const [memberSearch, setMemberSearch] = useState('');
+  
+  // Fetch team captains when a team is selected
+  React.useEffect(() => {
+    const fetchCaptains = async () => {
+      if (selectedTeam && !selectedTeam.isFreeAgents) {
+        try {
+          const response = await apiRequest('GET', `/api/teams/${selectedTeam.id}/captains`);
+          if (response.ok) {
+            const data = await response.json();
+            // Handle both { captains: [] } format and raw array format for backwards compatibility
+            const captains = Array.isArray(data) ? data : (data.captains || []);
+            setTeamCaptains(captains);
+          } else {
+            // Fall back to just captainId on error
+            setTeamCaptains(selectedTeam.captainId ? [selectedTeam.captainId] : []);
+          }
+        } catch (error) {
+          console.error('Error fetching team captains:', error);
+          // Fall back to just captainId
+          setTeamCaptains(selectedTeam.captainId ? [selectedTeam.captainId] : []);
+        }
+      } else {
+        setTeamCaptains([]);
+      }
+    };
+    fetchCaptains();
+  }, [selectedTeam?.id]);
   
   // Close date picker when clicking outside
   React.useEffect(() => {
@@ -1075,6 +1103,110 @@ export default function LeagueManagement() {
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
       refetchMembers();
+    },
+  });
+
+  // Add captain mutation (for multi-captain support)
+  const addCaptainMutation = useMutation({
+    mutationFn: async ({ teamId, captainUserId }: { teamId: string; captainUserId: string }) => {
+      const response = await apiRequest('POST', `/api/teams/${teamId}/captains`, { captainUserId });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to add captain');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Captain Added',
+        description: 'Player has been made a team captain.',
+      });
+      // Update local captains state from response
+      if (data.captains) {
+        setTeamCaptains(data.captains);
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
+      refetchMembers();
+    },
+    onError: async (error: Error) => {
+      toast({
+        title: 'Failed to add captain',
+        description: error.message,
+        variant: 'destructive',
+      });
+      // Refetch captains to ensure UI is in sync
+      const teamIdAtError = selectedTeam?.id;
+      if (teamIdAtError) {
+        try {
+          const res = await apiRequest('GET', `/api/teams/${teamIdAtError}/captains`);
+          if (res.ok) {
+            const data = await res.json();
+            // Only update if we're still on the same team
+            if (selectedTeam?.id === teamIdAtError) {
+              const captains = Array.isArray(data) ? data : (data.captains || []);
+              setTeamCaptains(captains);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to refetch captains:', e);
+        }
+      }
+      // Invalidate related queries after refetch attempt
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
+    },
+  });
+
+  // Remove captain mutation (for multi-captain support)
+  const removeCaptainMutation = useMutation({
+    mutationFn: async ({ teamId, captainUserId }: { teamId: string; captainUserId: string }) => {
+      const response = await apiRequest('DELETE', `/api/teams/${teamId}/captains/${captainUserId}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to remove captain');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Captain Removed',
+        description: 'Player is no longer a team captain.',
+      });
+      // Update local captains state from response
+      if (data.captains) {
+        setTeamCaptains(data.captains);
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
+      refetchMembers();
+    },
+    onError: async (error: Error) => {
+      toast({
+        title: 'Failed to remove captain',
+        description: error.message,
+        variant: 'destructive',
+      });
+      // Refetch captains to ensure UI is in sync
+      const teamIdAtError = selectedTeam?.id;
+      if (teamIdAtError) {
+        try {
+          const res = await apiRequest('GET', `/api/teams/${teamIdAtError}/captains`);
+          if (res.ok) {
+            const data = await res.json();
+            // Only update if we're still on the same team
+            if (selectedTeam?.id === teamIdAtError) {
+              const captains = Array.isArray(data) ? data : (data.captains || []);
+              setTeamCaptains(captains);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to refetch captains:', e);
+        }
+      }
+      // Invalidate related queries after refetch attempt
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
     },
   });
 
@@ -2709,7 +2841,7 @@ export default function LeagueManagement() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className="font-medium">{formatUserName(member.user, member)}</p>
-                                {!selectedTeam.isFreeAgents && member.userId === selectedTeam.captainId && (
+                                {!selectedTeam.isFreeAgents && teamCaptains.includes(member.userId) && (
                                   <span className="px-1.5 py-0.5 bg-warning/20 text-warning rounded text-xs font-bold">C</span>
                                 )}
                                 {member.isGoalie && (
@@ -2729,23 +2861,41 @@ export default function LeagueManagement() {
                               <p>Jersey: {member.jerseyNumber ? `#${member.jerseyNumber}` : 'null'}</p>
                             </div>
                             
-                            {/* Captain Assignment Controls */}
-                            {!selectedTeam.isFreeAgents && !selectedTeam.captainId && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setTeamCaptainMutation.mutate({
-                                    teamId: selectedTeam.id,
-                                    captainId: member.userId
-                                  });
-                                }}
-                                disabled={setTeamCaptainMutation.isPending}
-                                className="px-2 py-1 bg-primary/20 text-primary rounded text-xs font-medium hover:bg-primary/30 disabled:opacity-50"
-                                data-testid={`button-set-captain-${member.user.id}`}
-                              >
-                                Set Captain
-                              </button>
-                            )}
+                            {/* Captain Assignment Controls - Allow multiple captains */}
+                            {!selectedTeam.isFreeAgents && (() => {
+                              const isCaptain = teamCaptains.includes(member.userId);
+                              return isCaptain ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeCaptainMutation.mutate({
+                                      teamId: selectedTeam.id,
+                                      captainUserId: member.userId
+                                    });
+                                  }}
+                                  disabled={removeCaptainMutation.isPending}
+                                  className="px-2 py-1 bg-destructive/20 text-destructive rounded text-xs font-medium hover:bg-destructive/30 disabled:opacity-50"
+                                  data-testid={`button-remove-captain-${member.user.id}`}
+                                >
+                                  Remove Captain
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    addCaptainMutation.mutate({
+                                      teamId: selectedTeam.id,
+                                      captainUserId: member.userId
+                                    });
+                                  }}
+                                  disabled={addCaptainMutation.isPending}
+                                  className="px-2 py-1 bg-primary/20 text-primary rounded text-xs font-medium hover:bg-primary/30 disabled:opacity-50"
+                                  data-testid={`button-set-captain-${member.user.id}`}
+                                >
+                                  Make Captain
+                                </button>
+                              );
+                            })()}
                           </div>
                         </div>
                       ))}

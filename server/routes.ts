@@ -4100,6 +4100,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add a captain to a team (multi-captain support)
+  app.post("/api/teams/:id/captains", isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const teamId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { captainUserId } = req.body;
+
+      if (!captainUserId) {
+        return res.status(400).json({ message: "Captain user ID is required" });
+      }
+
+      const team = await storage.getTeam(teamId);
+      if (!team) {
+        return res.status(404).json({ message: "Team not found" });
+      }
+
+      // Check authorization - commissioner or existing captain
+      let isAuthorized = false;
+      if (team.leagueId) {
+        const league = await storage.getLeague(team.leagueId);
+        isAuthorized = league?.commissionerId === userId;
+      }
+      if (!isAuthorized) {
+        isAuthorized = await storage.isTeamCaptain(teamId, userId);
+      }
+      if (!isAuthorized && team.creatorId === userId) {
+        isAuthorized = true;
+      }
+
+      if (!isAuthorized) {
+        return res.status(403).json({ message: "Only commissioners or existing captains can add new captains" });
+      }
+
+      // Verify user is a team member
+      const teamMembers = await storage.getTeamMembers(teamId);
+      const hasDirectMembership = teamMembers.some(member => member.userId === captainUserId);
+      
+      let hasLeagueAssignment = false;
+      if (team.leagueId) {
+        const leagueMembership = await storage.getUserLeagueMembership(captainUserId, team.leagueId);
+        hasLeagueAssignment = leagueMembership !== undefined && leagueMembership.assignedTeamId === teamId;
+      }
+
+      if (!hasDirectMembership && !hasLeagueAssignment) {
+        return res.status(400).json({ message: "User must be a member of this team to be assigned as captain" });
+      }
+
+      const success = await storage.addTeamCaptain(teamId, captainUserId);
+      
+      if (!success) {
+        return res.status(500).json({ message: "Failed to add captain - database error" });
+      }
+      
+      // Return updated list of captains
+      const captains = await storage.getTeamCaptains(teamId);
+      res.json({ message: "Captain added successfully", captains });
+    } catch (error) {
+      console.error("Error adding team captain:", error);
+      res.status(500).json({ message: "Failed to add team captain" });
+    }
+  });
+
+  // Remove a captain from a team (multi-captain support)
+  app.delete("/api/teams/:id/captains/:captainUserId", isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const { id: teamId, captainUserId } = req.params;
+      const userId = req.user.claims.sub;
+
+      const team = await storage.getTeam(teamId);
+      if (!team) {
+        return res.status(404).json({ message: "Team not found" });
+      }
+
+      // Check authorization - commissioner or the captain themselves
+      let isAuthorized = false;
+      if (team.leagueId) {
+        const league = await storage.getLeague(team.leagueId);
+        isAuthorized = league?.commissionerId === userId;
+      }
+      if (!isAuthorized && userId === captainUserId) {
+        // Captains can remove themselves
+        isAuthorized = true;
+      }
+      if (!isAuthorized && team.creatorId === userId) {
+        isAuthorized = true;
+      }
+
+      if (!isAuthorized) {
+        return res.status(403).json({ message: "Only commissioners can remove captains" });
+      }
+
+      await storage.removeTeamCaptain(teamId, captainUserId);
+      
+      // Return updated list of captains
+      const captains = await storage.getTeamCaptains(teamId);
+      res.json({ message: "Captain removed successfully", captains });
+    } catch (error) {
+      console.error("Error removing team captain:", error);
+      res.status(500).json({ message: "Failed to remove team captain" });
+    }
+  });
+
+  // Get all captains for a team
+  app.get("/api/teams/:id/captains", isAuthenticated, async (req: any, res) => {
+    try {
+      const teamId = req.params.id;
+      const captains = await storage.getTeamCaptains(teamId);
+      res.json({ captains });
+    } catch (error) {
+      console.error("Error fetching team captains:", error);
+      res.status(500).json({ message: "Failed to fetch team captains" });
+    }
+  });
+
   // Game routes
   app.get("/api/user/games/upcoming", isAuthenticated, async (req: any, res) => {
     try {
