@@ -436,7 +436,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                           data-testid={`pending-member-${member.id}`}
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                            <div className="w-8 h-8 dark:bg-blue-900 rounded-full flex items-center justify-center bg-[#ffffff]">
                               <span className="text-blue-600 text-sm font-medium">
                                 {member.user?.firstName?.charAt(0) || '?'}
                               </span>
