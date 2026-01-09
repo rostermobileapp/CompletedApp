@@ -5936,7 +5936,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const team = await storage.getTeam(teamId);
-      if (!team || team.captainId !== userId) {
+      const isCaptain = await storage.isTeamCaptain(teamId, userId);
+      if (!team || !isCaptain) {
         return res.status(403).json({ message: 'Only team captains can create duties' });
       }
 
@@ -5963,9 +5964,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { teamId, dutyTemplateId } = req.params;
       const { name, icon, scope } = req.body;
       
-      // Verify team captain
+      // Verify team captain (supports multiple captains)
       const team = await storage.getTeam(teamId);
-      if (!team || team.captainId !== userId) {
+      const isCaptain = await storage.isTeamCaptain(teamId, userId);
+      if (!team || !isCaptain) {
         return res.status(403).json({ message: 'Only team captains can edit duties' });
       }
 
@@ -6001,13 +6003,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Duty template not found' });
       }
 
-      // Verify user is team captain or league commissioner
+      // Verify user is team captain or league commissioner (supports multiple captains)
       const team = await storage.getTeam(template.teamId);
       if (!team) {
         return res.status(404).json({ message: 'Team not found' });
       }
       
-      const isCaptain = team.captainId === userId;
+      const isCaptain = await storage.isTeamCaptain(template.teamId, userId);
       let isCommissioner = false;
       if (team.leagueId) {
         const league = await storage.getLeague(team.leagueId);
@@ -6053,7 +6055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Team not found' });
       }
       
-      const isCaptain = team.captainId === userId;
+      const isCaptain = await storage.isTeamCaptain(template.teamId, userId);
       let isCommissioner = false;
       if (team.leagueId) {
         const league = await storage.getLeague(team.leagueId);
