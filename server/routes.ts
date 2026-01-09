@@ -4012,8 +4012,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/teams/:id/members", async (req, res) => {
     try {
-      const members = await storage.getTeamMembers(req.params.id);
-      res.json(members);
+      const teamId = req.params.id;
+      const members = await storage.getTeamMembers(teamId);
+      
+      // Get all captains for this team to properly set isCaptain flag
+      const captainIds = await storage.getTeamCaptains(teamId);
+      
+      // Add isCaptain flag to each member based on captains list
+      const membersWithCaptainStatus = members.map(member => ({
+        ...member,
+        isCaptain: captainIds.includes(member.userId)
+      }));
+      
+      res.json(membersWithCaptainStatus);
     } catch (error) {
       console.error("Error fetching team members:", error);
       res.status(500).json({ message: "Failed to fetch team members" });
