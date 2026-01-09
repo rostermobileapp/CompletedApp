@@ -3614,7 +3614,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League or user not found" });
       }
       
+      // Verify user is commissioner or secondary commissioner
+      const isCommissioner = league.commissionerId === userId;
+      const isSecondaryCommissioner = league.secondaryCommissionerId === userId;
+      if (!isCommissioner && !isSecondaryCommissioner) {
+        return res.status(403).json({ message: "Only commissioners can update player details" });
+      }
+      
       const updates = req.body;
+      
+      // Get the membership to verify it belongs to this league
+      const membership = await storage.getLeagueMembership(memberId);
+      if (!membership || membership.leagueId !== leagueId) {
+        return res.status(404).json({ message: "Member not found in this league" });
+      }
+      
+      // If firstName or lastName is being updated, also update the actual user profile
+      if (updates.displayFirstName !== undefined || updates.displayLastName !== undefined) {
+        const profileUpdates: { firstName?: string; lastName?: string } = {};
+        if (updates.displayFirstName !== undefined) {
+          profileUpdates.firstName = updates.displayFirstName;
+        }
+        if (updates.displayLastName !== undefined) {
+          profileUpdates.lastName = updates.displayLastName;
+        }
+        // Update the actual user profile
+        await storage.updateUserProfile(membership.userId, profileUpdates);
+      }
+      
       const updatedMember = await storage.updateLeagueMember(memberId, updates);
       res.json(updatedMember);
     } catch (error) {

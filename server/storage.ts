@@ -2674,6 +2674,15 @@ export class DatabaseStorage implements IStorage {
     return membership;
   }
 
+  async getLeagueMembership(membershipId: string): Promise<LeagueMembership | undefined> {
+    const [membership] = await db
+      .select()
+      .from(leagueMemberships)
+      .where(eq(leagueMemberships.id, membershipId))
+      .limit(1);
+    return membership;
+  }
+
   async requestTeamMembership(membership: InsertTeamMembership): Promise<TeamMembership> {
     const [newMembership] = await db.insert(teamMemberships).values(membership).returning();
     return newMembership;
