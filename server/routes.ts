@@ -8543,7 +8543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/leagues/:leagueId/replace-player', isAuthenticated, async (req: any, res) => {
     try {
       const { leagueId } = req.params;
-      const { placeholderUserId, newUserId, preserveDisplayName = true } = req.body;
+      const { placeholderUserId, newUserId, preserveDisplayName = true, pendingMembershipIdToDelete } = req.body;
       const userId = req.user.claims.sub;
 
       // Validate request body
@@ -8551,9 +8551,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         placeholderUserId: z.string().min(1, 'Placeholder user ID is required'),
         newUserId: z.string().min(1, 'New user ID is required'),
         preserveDisplayName: z.boolean().optional().default(true),
+        pendingMembershipIdToDelete: z.string().optional(),
       });
 
-      const validatedData = replaceRequestSchema.parse({ placeholderUserId, newUserId, preserveDisplayName });
+      const validatedData = replaceRequestSchema.parse({ placeholderUserId, newUserId, preserveDisplayName, pendingMembershipIdToDelete });
 
       if (validatedData.placeholderUserId === validatedData.newUserId) {
         return res.status(400).json({ message: 'Cannot replace user with themselves' });
@@ -8571,10 +8572,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Target user not found' });
       }
 
-      // Check if new user is already in the league
+      // Check if new user is already in the league (but allow if we're deleting their pending membership)
       const existingMembership = await storage.getUserLeagueMembership(validatedData.newUserId, leagueId);
-      if (existingMembership) {
+      if (existingMembership && !validatedData.pendingMembershipIdToDelete) {
         return res.status(400).json({ message: 'Target user is already a member of this league' });
+      }
+      // If pending membership to delete is specified, verify it matches the existing membership
+      if (existingMembership && validatedData.pendingMembershipIdToDelete && existingMembership.id !== validatedData.pendingMembershipIdToDelete) {
+        return res.status(400).json({ message: 'Pending membership ID does not match existing membership' });
       }
 
       // Get the placeholder's membership
@@ -8594,6 +8599,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Perform the replace operation atomically in a transaction
       const newMembership = await db.transaction(async (tx) => {
+        // 0. If we have a pending membership to delete, delete it first
+        if (validatedData.pendingMembershipIdToDelete) {
+          await tx
+            .delete(leagueMemberships)
+            .where(eq(leagueMemberships.id, validatedData.pendingMembershipIdToDelete));
+        }
+
         // 1. Delete placeholder's team membership if they had one
         if (teamId) {
           await tx

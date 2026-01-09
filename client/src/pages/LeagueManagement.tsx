@@ -508,11 +508,16 @@ export default function LeagueManagement() {
   const [scheduleImportFile, setScheduleImportFile] = useState<File | null>(null);
   const scheduleFileInputRef = React.useRef<HTMLInputElement>(null);
   
-  // Merge modal state
+  // Approval modal state
   const [selectedMember, setSelectedMember] = useState<LeagueMember | null>(null);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<any[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
+  const [approvalMode, setApprovalMode] = useState<'initial' | 'replace'>('initial');
+  const [placeholderSearchQuery, setPlaceholderSearchQuery] = useState('');
+  const [placeholderSearchResults, setPlaceholderSearchResults] = useState<LeagueMember[]>([]);
+  const [selectedPlaceholder, setSelectedPlaceholder] = useState<LeagueMember | null>(null);
+  const [isReplacingInApproval, setIsReplacingInApproval] = useState(false);
   
   // Replace player modal state (for replacing placeholder players with real users)
   const [showReplacePlayerModal, setShowReplacePlayerModal] = useState(false);
@@ -5095,16 +5100,22 @@ export default function LeagueManagement() {
       )}
       {/* Player Approval Modal */}
       {showMergeModal && selectedMember && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-border">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+          <div className="bg-card rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md border border-border">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Approve Player</h3>
+              <h3 className="text-lg font-semibold">
+                {approvalMode === 'initial' ? 'Approve Player' : 'Replace Placeholder'}
+              </h3>
               <button
                 onClick={() => {
                   setShowMergeModal(false);
                   setSelectedMember(null);
                   setPotentialMatches([]);
                   setSelectedMatch(null);
+                  setApprovalMode('initial');
+                  setPlaceholderSearchQuery('');
+                  setPlaceholderSearchResults([]);
+                  setSelectedPlaceholder(null);
                 }}
                 className="text-muted-foreground hover:text-foreground"
               >
@@ -5118,78 +5129,163 @@ export default function LeagueManagement() {
                 <p className="text-sm text-muted-foreground">{formatUserName(selectedMember.user, selectedMember)}</p>
               </div>
               
-              {potentialMatches.length > 0 && (
-                <div className="border-t border-border pt-4">
-                  <p className="font-medium mb-2">Potential Matches Found:</p>
-                  <div className="space-y-2 mb-4">
-                    {potentialMatches.map((match: any) => (
-                      <div 
-                        key={match.id} 
-                        className={`p-2 border rounded-lg cursor-pointer ${
-                          selectedMatch === match.id ? 'border-blue-500 bg-blue-500/10' : 'border-border'
-                        }`}
-                        onClick={() => setSelectedMatch(selectedMatch === match.id ? null : match.id)}
-                      >
-                        <p className="text-sm font-medium">{match.firstName} {match.lastName}</p>
-                        <p className="text-xs text-muted-foreground">Team: {match.teamName}</p>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {selectedMatch && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          // Link the selected imported player with the real user
-                          await apiRequest('POST', `/api/leagues/${leagueId}/players/merge`, {
-                            membershipId: selectedMember.id,
-                            importedPlayerId: selectedMatch
-                          });
-                          
-                          // Refresh the member lists
-                          queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'pending-members'] });
-                          queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
-                          
-                          toast({
-                            title: "Success",
-                            description: "Player linked successfully!",
-                          });
-                          
-                          setShowMergeModal(false);
-                          setSelectedMember(null);
-                          setPotentialMatches([]);
-                          setSelectedMatch(null);
-                        } catch (error) {
-                          toast({
-                            title: "Error",
-                            description: "Failed to link player.",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      className="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 font-medium"
-                    >
-                      Approve and Link to Selected
-                    </button>
-                  )}
-                </div>
-              )}
-              
-              <div className="pt-4 border-t border-border">
-                <div className="flex gap-2">
+              {approvalMode === 'initial' && (
+                <div className="space-y-3">
                   <button
                     onClick={() => {
                       approveMutation.mutate(selectedMember.id);
                       setShowMergeModal(false);
                       setSelectedMember(null);
+                      setApprovalMode('initial');
                     }}
                     disabled={approveMutation.isPending}
-                    className="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-medium disabled:opacity-50"
+                    className="w-full bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 font-medium disabled:opacity-50"
                   >
-                    {approveMutation.isPending ? 'Approving...' : 'Approve as New Player'}
+                    {approveMutation.isPending ? 'Approving...' : 'Accept as New Player'}
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setApprovalMode('replace');
+                      const placeholders = commissionerDisplayMembers.filter((m: LeagueMember) => 
+                        m.user?.email?.includes('@placeholder.roster') || 
+                        m.user?.id?.startsWith('placeholder-')
+                      );
+                      setPlaceholderSearchResults(placeholders);
+                    }}
+                    className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 font-medium"
+                  >
+                    Replace a Placeholder
                   </button>
                 </div>
-              </div>
+              )}
+              
+              {approvalMode === 'replace' && (
+                <div className="space-y-4">
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Search placeholder players..."
+                      value={placeholderSearchQuery}
+                      onChange={(e) => {
+                        const query = e.target.value.toLowerCase();
+                        setPlaceholderSearchQuery(e.target.value);
+                        const placeholders = commissionerDisplayMembers.filter((m: LeagueMember) => {
+                          const isPlaceholder = m.user?.email?.includes('@placeholder.roster') || 
+                            m.user?.id?.startsWith('placeholder-');
+                          if (!isPlaceholder) return false;
+                          if (!query) return true;
+                          const name = formatUserName(m.user, m).toLowerCase();
+                          return name.includes(query);
+                        });
+                        setPlaceholderSearchResults(placeholders);
+                      }}
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                    />
+                  </div>
+                  
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {placeholderSearchResults.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No placeholder players found
+                      </p>
+                    ) : (
+                      placeholderSearchResults.map((placeholder: LeagueMember) => {
+                        const team = teams?.find((t: any) => t.id === placeholder.assignedTeamId);
+                        return (
+                          <div
+                            key={placeholder.id}
+                            onClick={() => setSelectedPlaceholder(
+                              selectedPlaceholder?.id === placeholder.id ? null : placeholder
+                            )}
+                            className={`p-3 border rounded-lg cursor-pointer ${
+                              selectedPlaceholder?.id === placeholder.id 
+                                ? 'border-blue-500 bg-blue-500/10' 
+                                : 'border-border hover:border-muted-foreground'
+                            }`}
+                          >
+                            <p className="font-medium text-sm">{formatUserName(placeholder.user, placeholder)}</p>
+                            {team && (
+                              <p className="text-xs text-muted-foreground">Team: {team.name}</p>
+                            )}
+                            {placeholder.jerseyNumber && (
+                              <p className="text-xs text-muted-foreground">#{placeholder.jerseyNumber}</p>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                    <button
+                      onClick={() => {
+                        setApprovalMode('initial');
+                        setPlaceholderSearchQuery('');
+                        setPlaceholderSearchResults([]);
+                        setSelectedPlaceholder(null);
+                      }}
+                      className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!selectedPlaceholder) return;
+                        
+                        setIsReplacingInApproval(true);
+                        try {
+                          // Replace the placeholder with the new user, and delete the pending membership atomically
+                          const response = await apiRequest('POST', `/api/leagues/${leagueId}/replace-player`, {
+                            placeholderUserId: selectedPlaceholder.userId,
+                            newUserId: selectedMember.userId,
+                            preserveDisplayName: false,
+                            pendingMembershipIdToDelete: selectedMember.id
+                          });
+                          
+                          if (response.ok) {
+                            await queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'pending-members'] });
+                            await queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
+                            await queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+                            
+                            toast({
+                              title: "Success",
+                              description: "Placeholder replaced successfully!",
+                            });
+                            
+                            setShowMergeModal(false);
+                            setSelectedMember(null);
+                            setApprovalMode('initial');
+                            setPlaceholderSearchQuery('');
+                            setPlaceholderSearchResults([]);
+                            setSelectedPlaceholder(null);
+                          } else {
+                            const error = await response.json();
+                            toast({
+                              title: "Error",
+                              description: error.message || "Failed to replace placeholder.",
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error) {
+                          console.error('Replace error:', error);
+                          toast({
+                            title: "Error",
+                            description: "Failed to replace placeholder. Please try again.",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setIsReplacingInApproval(false);
+                        }
+                      }}
+                      disabled={!selectedPlaceholder || isReplacingInApproval}
+                      className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50"
+                    >
+                      {isReplacingInApproval ? 'Replacing...' : 'Confirm Replace'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
