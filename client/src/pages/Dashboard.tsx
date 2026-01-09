@@ -423,7 +423,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                 <div>
                   <div className="flex items-center gap-2 mb-4">
                     <UserCheck className="w-5 h-5 text-blue-600" />
-                    <h3 className="text-lg font-semibold text-blue-600">
+                    <h3 className="text-lg font-semibold text-[#3c83f6]">
                       Pending Player Approvals ({pendingMembers.length})
                     </h3>
                   </div>
@@ -462,7 +462,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                           </div>
                           <Button 
                             size="sm" 
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            className="hover:bg-blue-700 text-white bg-[#3c83f6]"
                             onClick={() => onNavigate(`/league-management?leagueId=${leagueId}`)}
                             data-testid={`button-review-member-${member.id}`}
                           >
