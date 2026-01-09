@@ -6,7 +6,8 @@ import {
   teamMemberships, 
   users, 
   eventRemindersSent,
-  leagues
+  leagues,
+  gameRsvps
 } from "@shared/schema";
 import { and, eq, gt, lt, gte, lte, inArray, sql, or, not } from "drizzle-orm";
 import { storage } from "./storage";
@@ -49,25 +50,50 @@ async function getGameParticipants(gameId: string): Promise<{ id: string; firstN
   if (!game.length) return [];
   
   const teamIds = [game[0].homeTeamId, game[0].awayTeamId].filter(Boolean) as string[];
-  if (teamIds.length === 0) return [];
   
-  const members = await db
+  // Get users from team_memberships (approved team members)
+  let teamMembers: { id: string; firstName: string | null; lastName: string | null }[] = [];
+  if (teamIds.length > 0) {
+    teamMembers = await db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+      })
+      .from(teamMemberships)
+      .innerJoin(users, eq(teamMemberships.userId, users.id))
+      .where(
+        and(
+          inArray(teamMemberships.teamId, teamIds),
+          eq(teamMemberships.status, 'approved')
+        )
+      );
+  }
+  
+  // Get users from game_rsvps (game roster) - include ALL users regardless of RSVP status
+  const rosterMembers = await db
     .select({
       id: users.id,
       firstName: users.firstName,
       lastName: users.lastName,
     })
-    .from(teamMemberships)
-    .innerJoin(users, eq(teamMemberships.userId, users.id))
-    .where(
-      and(
-        inArray(teamMemberships.teamId, teamIds),
-        eq(teamMemberships.status, 'approved')
-      )
-    );
+    .from(gameRsvps)
+    .innerJoin(users, eq(gameRsvps.userId, users.id))
+    .where(eq(gameRsvps.gameId, gameId));
   
-  // Deduplicate in case a user is on both teams
-  const uniqueMembers = new Map(members.map(m => [m.id, m]));
+  // Combine and deduplicate
+  const uniqueMembers = new Map<string, { id: string; firstName: string | null; lastName: string | null }>();
+  
+  for (const member of teamMembers) {
+    uniqueMembers.set(member.id, member);
+  }
+  
+  for (const member of rosterMembers) {
+    uniqueMembers.set(member.id, member);
+  }
+  
+  console.log(`📋 Game ${gameId} participants: ${teamMembers.length} from team memberships, ${rosterMembers.length} from game roster, ${uniqueMembers.size} total unique`);
+  
   return Array.from(uniqueMembers.values());
 }
 
