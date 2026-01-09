@@ -8663,10 +8663,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Delete pending membership first if specified (before merge creates issues)
+      // Important: Only delete a membership that belongs to the NEW user, never the placeholder
       if (validatedData.pendingMembershipIdToDelete) {
-        await db
-          .delete(leagueMemberships)
-          .where(eq(leagueMemberships.id, validatedData.pendingMembershipIdToDelete));
+        // Verify the membership to delete belongs to the new user (not the placeholder)
+        const membershipToDelete = await storage.getLeagueMembership(validatedData.pendingMembershipIdToDelete);
+        if (membershipToDelete && 
+            membershipToDelete.userId === validatedData.newUserId &&
+            membershipToDelete.id !== placeholderMembership.id) {
+          await db
+            .delete(leagueMemberships)
+            .where(eq(leagueMemberships.id, validatedData.pendingMembershipIdToDelete));
+        }
       }
 
       // Use mergeUsersInLeague to properly transfer all stats, goals, assists, etc.
@@ -8688,15 +8695,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         statsTransferred: hasStats
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to replace player:', error);
+      console.error('Replace player error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        code: error?.code
+      });
       if (error instanceof z.ZodError) {
         return res.status(400).json({ 
           message: 'Invalid request data', 
           errors: error.errors 
         });
       }
-      res.status(500).json({ message: 'Failed to replace player' });
+      // Return more specific error message
+      const errorMessage = error?.message || 'Failed to replace player';
+      res.status(500).json({ message: errorMessage });
     }
   });
 
