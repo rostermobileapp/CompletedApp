@@ -437,7 +437,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 dark:bg-blue-900 rounded-full flex items-center justify-center bg-[#ffffff]">
-                              <span className="text-blue-600 text-sm font-medium">
+                              <span className="text-sm font-medium text-[#000000]">
                                 {member.user?.firstName?.charAt(0) || '?'}
                               </span>
                             </div>
