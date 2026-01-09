@@ -77,6 +77,20 @@ import { startEventReminderJob } from "./eventReminderJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
 import { getUncachableResendClient } from "./resend";
 
+// Module-level map to store active WebSocket connections by user ID
+// This allows broadcasting from anywhere in routes.ts
+const activeConnections = new Map<string, WebSocket>();
+
+// Helper function to broadcast a message to a specific user via WebSocket
+export function broadcastToUser(userId: string, message: any) {
+  const connection = activeConnections.get(userId);
+  if (connection && connection.readyState === WebSocket.OPEN) {
+    connection.send(JSON.stringify(message));
+    return true;
+  }
+  return false;
+}
+
 
 // Helper function to format date as local time string without timezone suffix
 // Returns format: "YYYY-MM-DDTHH:MM:SS" which prevents timezone adjustments on frontend
@@ -3429,6 +3443,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // If user was rejected or inactive, allow them to re-request by updating status to pending
         if (existingMembership.status === 'rejected' || existingMembership.status === 'inactive') {
           const updatedMembership = await storage.updateLeagueMembershipStatus(existingMembership.id, 'pending');
+          
+          // Send WebSocket notification to commissioner for re-request
+          storage.getLeague(leagueId).then(async (league) => {
+            if (league && league.commissionerId) {
+              const requestingUser = await storage.getUser(userId);
+              const requesterName = requestingUser 
+                ? `${requestingUser.firstName} ${requestingUser.lastName}`.trim() || requestingUser.email 
+                : 'Someone';
+              
+              broadcastToUser(league.commissionerId, {
+                type: 'pending_member_added',
+                leagueId,
+                membershipId: updatedMembership.id,
+                requesterName
+              });
+            }
+          }).catch(err => console.error('[Notifications] Failed to send re-request notification:', err));
+          
           return res.json(updatedMembership);
         }
       }
@@ -3440,13 +3472,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: req.body.message,
       });
       
-      // Send push notification to league commissioner (fire and forget)
+      // Send push notification and WebSocket broadcast to league commissioner (fire and forget)
       storage.getLeague(leagueId).then(async (league) => {
         if (league && league.commissionerId) {
           const requestingUser = await storage.getUser(userId);
           const requesterName = requestingUser 
             ? `${requestingUser.firstName} ${requestingUser.lastName}`.trim() || requestingUser.email 
             : 'Someone';
+          
+          // Send WebSocket message to commissioner for immediate UI update
+          broadcastToUser(league.commissionerId, {
+            type: 'pending_member_added',
+            leagueId,
+            membershipId: membership.id,
+            requesterName
+          });
           
           const { sendJoinRequestPushNotification } = await import('./oneSignalNotifications');
           sendJoinRequestPushNotification(
@@ -12777,9 +12817,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // WebSocket server for real-time messaging
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-
-  // Store active connections by user ID
-  const activeConnections = new Map<string, WebSocket>();
 
   wss.on('connection', async (ws: WebSocket, req) => {
     let userId: string | null = null;

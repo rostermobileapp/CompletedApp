@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
@@ -683,6 +683,56 @@ export default function LeagueManagement() {
     },
     enabled: !!leagueId,
   });
+
+  // WebSocket connection for real-time pending member updates
+  const wsRef = useRef<WebSocket | null>(null);
+  
+  useEffect(() => {
+    if (!user?.id || !leagueId) return;
+    
+    // Construct WebSocket URL
+    let wsUrl;
+    try {
+      const origin = window.location.origin;
+      wsUrl = origin.replace('https:', 'wss:').replace('http:', 'ws:') + '/ws';
+    } catch (error) {
+      console.warn('Failed to get origin, using fallback:', error);
+      wsUrl = 'ws://localhost:5000/ws';
+    }
+    
+    const websocket = new WebSocket(wsUrl);
+    
+    websocket.onopen = () => {
+      wsRef.current = websocket;
+      // Authenticate with the server
+      websocket.send(JSON.stringify({
+        type: 'authenticate',
+        userId: user.id
+      }));
+    };
+    
+    websocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        // Handle pending member added event
+        if (data.type === 'pending_member_added' && data.leagueId === leagueId) {
+          // Refetch pending members to show the new request immediately
+          refetchPending();
+        }
+      } catch (error) {
+        console.error('WebSocket message parse error:', error);
+      }
+    };
+    
+    websocket.onclose = () => {
+      wsRef.current = null;
+    };
+    
+    return () => {
+      websocket.close();
+    };
+  }, [user?.id, leagueId, refetchPending]);
 
   // Fetch pending team join requests
   const { data: teamJoinRequests = [], refetch: refetchTeamJoinRequests } = useQuery({
