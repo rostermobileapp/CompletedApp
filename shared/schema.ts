@@ -371,6 +371,7 @@ export const teamMemberships = pgTable("team_memberships", {
   status: membershipStatusEnum("status").default("pending").notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   approvedBy: varchar("approved_by").references(() => users.id),
+  isCaptain: boolean("is_captain").default(false).notNull(), // Allows multiple captains per team
 });
 
 // Placeholder players table - for players added before they have accounts
