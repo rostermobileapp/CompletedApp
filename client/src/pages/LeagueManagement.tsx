@@ -42,7 +42,8 @@ import {
   Target,
   Shield,
   AlertCircle as AlertIcon,
-  User
+  User,
+  Search
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
 import { format } from 'date-fns';
@@ -541,6 +542,9 @@ export default function LeagueManagement() {
   const [showCreateFacility, setShowCreateFacility] = useState(false);
   const [facilitySearch, setFacilitySearch] = useState('');
   const [selectedFacility, setSelectedFacility] = useState<any>(null);
+  
+  // Member search state
+  const [memberSearch, setMemberSearch] = useState('');
   
   // Close date picker when clicking outside
   React.useEffect(() => {
@@ -2274,9 +2278,20 @@ export default function LeagueManagement() {
             {/* Approved Members */}
             <div className="bg-card rounded-xl border border-border p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <UserCheck className="w-5 h-5 text-green-500/50" />
                   <h3 className="text-lg font-semibold">League Members ({members.length})</h3>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search players..."
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      className="pl-9 w-48 h-8 text-sm"
+                      data-testid="input-member-search"
+                    />
+                  </div>
                 </div>
                 {members.length > 0 && (
                   <button
@@ -2293,7 +2308,14 @@ export default function LeagueManagement() {
                 <p className="text-muted-foreground text-center py-8">No approved members yet.</p>
               ) : (
                 <div className="space-y-3">
-                  {members.map((member: LeagueMember) => (
+                  {members.filter((member: LeagueMember) => {
+                    if (!memberSearch.trim()) return true;
+                    const searchLower = memberSearch.toLowerCase().trim();
+                    const displayName = formatUserName(member.user, member).toLowerCase();
+                    const email = member.user.email?.toLowerCase() || '';
+                    const jerseyNum = member.jerseyNumber?.toString() || '';
+                    return displayName.includes(searchLower) || email.includes(searchLower) || jerseyNum.includes(searchLower);
+                  }).map((member: LeagueMember) => (
                     <div 
                       key={member.id} 
                       className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-card cursor-pointer transition-colors"
