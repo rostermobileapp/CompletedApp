@@ -32,9 +32,9 @@ function calculateTriggerTime(eventTime: Date, trigger: ReminderTrigger): Date {
     return subHours(eventTime, 2);
   }
   
-  // 2 days before at 6PM
+  // 2 days before at 3PM
   const twoDaysBefore = subDays(eventTime, 2);
-  return setMinutes(setHours(twoDaysBefore, 18), 0); // 6:00 PM
+  return setMinutes(setHours(twoDaysBefore, 15), 0); // 3:00 PM
 }
 
 function shouldSendReminder(now: Date, triggerTime: Date): boolean {
