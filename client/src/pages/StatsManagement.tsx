@@ -409,13 +409,21 @@ export default function StatsManagement() {
       return;
     }
 
+    // Get set of current league member IDs to filter out deleted/removed players
+    const currentMemberIds = new Set(
+      Array.isArray(nonGoaliePlayers) ? nonGoaliePlayers.map((p: any) => p.id) : []
+    );
+
     const updates = Object.entries(bulkPlayerStats)
-      .filter(([_, stats]) => 
-        // Include any player with entered values (not empty strings)
-        stats.goals !== '' || 
-        stats.assists !== '' || 
-        stats.penaltyMinutes !== '' || 
-        stats.gamesPlayed !== ''
+      .filter(([userId, stats]) => 
+        // Only include players who are still active league members
+        currentMemberIds.has(userId) && (
+          // Include any player with entered values (not empty strings)
+          stats.goals !== '' || 
+          stats.assists !== '' || 
+          stats.penaltyMinutes !== '' || 
+          stats.gamesPlayed !== ''
+        )
       )
       .map(([userId, stats]) => ({
         userId,
