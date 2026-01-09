@@ -2100,13 +2100,13 @@ export default function Messages() {
           
           {/* Messages */}
           <div 
-            className={`flex-1 overflow-y-auto relative ${conversationTeam?.logoUrl ? 'bg-white dark:bg-black' : ''}`}
+            className={`flex-1 relative ${conversationTeam?.logoUrl ? 'bg-white dark:bg-black' : ''}`}
             data-testid="messages-container"
           >
-            {/* Team logo background for team group chats */}
+            {/* Team logo background for team group chats - fixed in place */}
             {conversationTeam?.logoUrl && (
               <div 
-                className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden"
+                className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-0"
               >
                 <img 
                   src={getImageUrl(conversationTeam.logoUrl) || ''} 
@@ -2116,7 +2116,8 @@ export default function Messages() {
                 />
               </div>
             )}
-            <div className="relative z-10 p-4 space-y-4 pb-4">
+            <div className="absolute inset-0 overflow-y-auto z-10">
+            <div className="relative p-4 space-y-4 pb-4">
             {messagesLoading ? (
               <div className="space-y-4" data-testid="messages-loading">
                 {[1, 2, 3].map(i => (
@@ -2325,6 +2326,7 @@ export default function Messages() {
               </div>
             )}
             <div ref={messagesEndRef} />
+            </div>
             </div>
           </div>
         </>
