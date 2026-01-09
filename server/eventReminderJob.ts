@@ -7,9 +7,10 @@ import {
   users, 
   eventRemindersSent,
   leagues,
-  gameRsvps
+  gameRsvps,
+  leagueMemberships
 } from "@shared/schema";
-import { and, eq, gt, lt, gte, lte, inArray, sql, or, not } from "drizzle-orm";
+import { and, eq, gt, lt, gte, lte, inArray, sql, or, not, isNull } from "drizzle-orm";
 import { storage } from "./storage";
 import { format, subDays, setHours, setMinutes, subHours, addDays } from "date-fns";
 import { sendScheduleReminderPushNotification } from "./oneSignalNotifications";
@@ -50,28 +51,43 @@ async function getGameParticipants(gameId: string): Promise<{ id: string; firstN
   if (!game.length) return [];
   
   const teamIds = [game[0].homeTeamId, game[0].awayTeamId].filter(Boolean) as string[];
+  if (teamIds.length === 0) return [];
   
-  // Get users from team_memberships (approved team members)
-  let teamMembers: { id: string; firstName: string | null; lastName: string | null }[] = [];
-  if (teamIds.length > 0) {
-    teamMembers = await db
-      .select({
-        id: users.id,
-        firstName: users.firstName,
-        lastName: users.lastName,
-      })
-      .from(teamMemberships)
-      .innerJoin(users, eq(teamMemberships.userId, users.id))
-      .where(
-        and(
-          inArray(teamMemberships.teamId, teamIds),
-          eq(teamMemberships.status, 'approved')
-        )
-      );
-  }
+  // 1. Get users from direct team_memberships (approved team members)
+  const directMembers = await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    })
+    .from(teamMemberships)
+    .innerJoin(users, eq(teamMemberships.userId, users.id))
+    .where(
+      and(
+        inArray(teamMemberships.teamId, teamIds),
+        eq(teamMemberships.status, 'approved')
+      )
+    );
   
-  // Get users from game_rsvps (game roster) - include ALL users regardless of RSVP status
-  const rosterMembers = await db
+  // 2. Get users from league_memberships who are assigned to these teams
+  const leagueMembers = await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    })
+    .from(leagueMemberships)
+    .innerJoin(users, eq(leagueMemberships.userId, users.id))
+    .where(
+      and(
+        inArray(leagueMemberships.assignedTeamId, teamIds),
+        eq(leagueMemberships.status, 'approved'),
+        not(isNull(leagueMemberships.assignedTeamId))
+      )
+    );
+  
+  // 3. Get users from game_rsvps (in case someone RSVPed but isn't on team roster)
+  const rsvpMembers = await db
     .select({
       id: users.id,
       firstName: users.firstName,
@@ -81,18 +97,22 @@ async function getGameParticipants(gameId: string): Promise<{ id: string; firstN
     .innerJoin(users, eq(gameRsvps.userId, users.id))
     .where(eq(gameRsvps.gameId, gameId));
   
-  // Combine and deduplicate
+  // Combine and deduplicate all sources
   const uniqueMembers = new Map<string, { id: string; firstName: string | null; lastName: string | null }>();
   
-  for (const member of teamMembers) {
+  for (const member of directMembers) {
     uniqueMembers.set(member.id, member);
   }
   
-  for (const member of rosterMembers) {
+  for (const member of leagueMembers) {
     uniqueMembers.set(member.id, member);
   }
   
-  console.log(`📋 Game ${gameId} participants: ${teamMembers.length} from team memberships, ${rosterMembers.length} from game roster, ${uniqueMembers.size} total unique`);
+  for (const member of rsvpMembers) {
+    uniqueMembers.set(member.id, member);
+  }
+  
+  console.log(`📋 Game ${gameId} participants: ${directMembers.length} direct team members, ${leagueMembers.length} league-assigned members, ${rsvpMembers.length} from RSVPs, ${uniqueMembers.size} total unique`);
   
   return Array.from(uniqueMembers.values());
 }
