@@ -536,6 +536,20 @@ export default function LeagueManagement() {
   const [showEditTeam, setShowEditTeam] = useState(false);
   const [selectedTeamForEdit, setSelectedTeamForEdit] = useState<Team | null>(null);
   
+  // Post-merge placeholder deletion state
+  const [showPostMergeDeleteDialog, setShowPostMergeDeleteDialog] = useState(false);
+  const [postMergePlaceholderInfo, setPostMergePlaceholderInfo] = useState<{
+    userId: string;
+    name: string;
+    hadStats: boolean;
+  } | null>(null);
+  const [isDeletingPostMergePlaceholder, setIsDeletingPostMergePlaceholder] = useState(false);
+  
+  // Delete placeholder with stats dialog state
+  const [showDeletePlaceholderWithStatsDialog, setShowDeletePlaceholderWithStatsDialog] = useState(false);
+  const [playerToDeleteWithStats, setPlayerToDeleteWithStats] = useState<LeagueMember | null>(null);
+  const [isCheckingPlayerStats, setIsCheckingPlayerStats] = useState(false);
+  
   // Bulk delete confirmation states
   const [showDeleteAllPlayersDialog, setShowDeleteAllPlayersDialog] = useState(false);
   const [showDeleteAllTeamsDialog, setShowDeleteAllTeamsDialog] = useState(false);
@@ -3480,14 +3494,54 @@ export default function LeagueManagement() {
                     Remove from Team
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm('Are you sure you want to remove this player from the league entirely? This cannot be undone.')) {
-                        removeFromLeagueMutation.mutate(selectedPlayer.id);
+                    onClick={async () => {
+                      const isPlaceholder = selectedPlayer.user?.email?.includes('@placeholder.roster') || 
+                        selectedPlayer.user?.id?.startsWith('placeholder-');
+                      
+                      if (isPlaceholder) {
+                        // Check if placeholder has stats before deleting
+                        setIsCheckingPlayerStats(true);
+                        try {
+                          const response = await apiRequest('GET', `/api/leagues/${leagueId}/stats/players/${selectedPlayer.userId}`);
+                          const stats = await response.json();
+                          
+                          const hasStats = stats && (
+                            (stats.gamesPlayed || 0) > 0 || 
+                            (stats.goals || 0) > 0 || 
+                            (stats.assists || 0) > 0
+                          );
+                          
+                          if (hasStats) {
+                            // Show special dialog for placeholder with stats
+                            setPlayerToDeleteWithStats(selectedPlayer);
+                            setShowDeletePlaceholderWithStatsDialog(true);
+                            setSelectedPlayer(null);
+                          } else {
+                            // No stats, normal deletion
+                            if (confirm('Are you sure you want to remove this placeholder player from the league? This cannot be undone.')) {
+                              removeFromLeagueMutation.mutate(selectedPlayer.id);
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Error checking stats:', error);
+                          // Fallback to normal confirmation
+                          if (confirm('Are you sure you want to remove this player from the league entirely? This cannot be undone.')) {
+                            removeFromLeagueMutation.mutate(selectedPlayer.id);
+                          }
+                        } finally {
+                          setIsCheckingPlayerStats(false);
+                        }
+                      } else {
+                        // Regular user, just confirm
+                        if (confirm('Are you sure you want to remove this player from the league entirely? This cannot be undone.')) {
+                          removeFromLeagueMutation.mutate(selectedPlayer.id);
+                        }
                       }
                     }}
-                    className="w-full px-4 py-2 bg-red-500/50 text-white rounded-lg hover:bg-red-600/50 text-sm font-medium"
+                    disabled={isCheckingPlayerStats}
+                    className="w-full px-4 py-2 bg-red-500/50 text-white rounded-lg hover:bg-red-600/50 text-sm font-medium disabled:opacity-50"
                   >
-                    Remove from League
+                    {isCheckingPlayerStats ? 'Checking...' : 'Remove from League'}
                   </button>
                 </div>
 
@@ -5294,21 +5348,38 @@ export default function LeagueManagement() {
                           });
                           
                           if (response.ok) {
+                            const result = await response.json();
+                            
                             await queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'pending-members'] });
                             await queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
                             await queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
                             
-                            toast({
-                              title: "Success",
-                              description: "Placeholder replaced successfully!",
-                            });
-                            
+                            // Close the merge modal
                             setShowMergeModal(false);
                             setSelectedMember(null);
                             setApprovalMode('initial');
                             setPlaceholderSearchQuery('');
                             setPlaceholderSearchResults([]);
                             setSelectedPlaceholder(null);
+                            
+                            // Show success message
+                            const statsMessage = result.statsTransferred 
+                              ? " All stats have been transferred."
+                              : "";
+                            toast({
+                              title: "Success",
+                              description: `Placeholder replaced successfully!${statsMessage}`,
+                            });
+                            
+                            // If this was a placeholder user, ask if they want to delete it
+                            if (result.isPlaceholder && result.placeholderUserId) {
+                              setPostMergePlaceholderInfo({
+                                userId: result.placeholderUserId,
+                                name: result.placeholderName || 'Unknown',
+                                hadStats: result.hadStats || false,
+                              });
+                              setShowPostMergeDeleteDialog(true);
+                            }
                           } else {
                             const error = await response.json();
                             toast({
@@ -5336,6 +5407,165 @@ export default function LeagueManagement() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Post-Merge Placeholder Delete Dialog */}
+      {showPostMergeDeleteDialog && postMergePlaceholderInfo && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+          <div className="bg-card rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Delete Placeholder User?</h3>
+              <button
+                onClick={() => {
+                  setShowPostMergeDeleteDialog(false);
+                  setPostMergePlaceholderInfo(null);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                The placeholder user <span className="font-medium text-foreground">{postMergePlaceholderInfo.name}</span> has been replaced and all data has been transferred to the new user.
+              </p>
+              
+              {postMergePlaceholderInfo.hadStats && (
+                <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    All stats have been successfully transferred to the new player.
+                  </p>
+                </div>
+              )}
+              
+              <p className="text-sm text-muted-foreground">
+                Would you like to delete the placeholder user from the system? This is optional - the placeholder is no longer in this league.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setShowPostMergeDeleteDialog(false);
+                    setPostMergePlaceholderInfo(null);
+                  }}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                >
+                  Keep Placeholder
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!postMergePlaceholderInfo) return;
+                    
+                    setIsDeletingPostMergePlaceholder(true);
+                    try {
+                      const response = await apiRequest('DELETE', `/api/users/${postMergePlaceholderInfo.userId}`);
+                      
+                      if (response.ok) {
+                        toast({
+                          title: "Success",
+                          description: "Placeholder user deleted successfully.",
+                        });
+                      } else {
+                        const error = await response.json();
+                        toast({
+                          title: "Note",
+                          description: error.message || "Could not delete placeholder user. They may be in other leagues.",
+                        });
+                      }
+                    } catch (error) {
+                      console.error('Delete placeholder error:', error);
+                      toast({
+                        title: "Note",
+                        description: "Could not delete placeholder user.",
+                      });
+                    } finally {
+                      setIsDeletingPostMergePlaceholder(false);
+                      setShowPostMergeDeleteDialog(false);
+                      setPostMergePlaceholderInfo(null);
+                    }
+                  }}
+                  disabled={isDeletingPostMergePlaceholder}
+                  className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 font-medium disabled:opacity-50"
+                >
+                  {isDeletingPostMergePlaceholder ? 'Deleting...' : 'Delete Placeholder'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Placeholder With Stats Dialog */}
+      {showDeletePlaceholderWithStatsDialog && playerToDeleteWithStats && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+          <div className="bg-card rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-amber-500">Placeholder Has Stats</h3>
+              <button
+                onClick={() => {
+                  setShowDeletePlaceholderWithStatsDialog(false);
+                  setPlayerToDeleteWithStats(null);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="w-4 h-4 inline mr-2" />
+                  This placeholder player has recorded stats. If you delete them, the stats will be lost.
+                </p>
+              </div>
+              
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{formatUserName(playerToDeleteWithStats.user, playerToDeleteWithStats)}</span> has game statistics that will be permanently deleted.
+              </p>
+              
+              <p className="text-sm text-muted-foreground">
+                Would you like to transfer these stats to another player first, or delete them anyway?
+              </p>
+              
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={() => {
+                    // Open the replace modal with this placeholder pre-selected
+                    setSelectedPlayerToReplace(playerToDeleteWithStats);
+                    setShowReplacePlayerModal(true);
+                    setShowDeletePlaceholderWithStatsDialog(false);
+                    setPlayerToDeleteWithStats(null);
+                  }}
+                  className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 font-medium flex items-center justify-center gap-2"
+                >
+                  <Merge className="w-4 h-4" />
+                  Merge Stats First
+                </button>
+                
+                <button
+                  onClick={() => {
+                    removeFromLeagueMutation.mutate(playerToDeleteWithStats.id);
+                    setShowDeletePlaceholderWithStatsDialog(false);
+                    setPlayerToDeleteWithStats(null);
+                  }}
+                  className="w-full bg-red-500/50 text-white px-4 py-2 rounded-lg hover:bg-red-600/50 font-medium"
+                >
+                  Delete Anyway (Stats Will Be Lost)
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setShowDeletePlaceholderWithStatsDialog(false);
+                    setPlayerToDeleteWithStats(null);
+                  }}
+                  className="w-full px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>

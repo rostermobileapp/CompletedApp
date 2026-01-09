@@ -8579,7 +8579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Replace a placeholder player with a registered user (keeps team assignment)
+  // Replace a placeholder player with a registered user (keeps team assignment and transfers stats)
   app.post('/api/leagues/:leagueId/replace-player', isAuthenticated, async (req: any, res) => {
     try {
       const { leagueId } = req.params;
@@ -8612,93 +8612,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Target user not found' });
       }
 
-      // Check if new user is already in the league (but allow if we're deleting their pending membership)
-      const existingMembership = await storage.getUserLeagueMembership(validatedData.newUserId, leagueId);
-      if (existingMembership && !validatedData.pendingMembershipIdToDelete) {
-        return res.status(400).json({ message: 'Target user is already a member of this league' });
-      }
-      // If pending membership to delete is specified, verify it matches the existing membership
-      if (existingMembership && validatedData.pendingMembershipIdToDelete && existingMembership.id !== validatedData.pendingMembershipIdToDelete) {
-        return res.status(400).json({ message: 'Pending membership ID does not match existing membership' });
-      }
-
       // Get the placeholder's membership
       const placeholderMembership = await storage.getUserLeagueMembership(validatedData.placeholderUserId, leagueId);
       if (!placeholderMembership) {
         return res.status(404).json({ message: 'Placeholder user is not a member of this league' });
       }
 
-      // Get the placeholder user's display names for potential preservation
+      // Get the placeholder user's info for response
       const placeholderUser = await storage.getUser(validatedData.placeholderUserId);
+      const isPlaceholder = placeholderUser?.email?.includes('@placeholder.roster') || false;
+
+      // Check placeholder stats for response
+      const placeholderStats = await db
+        .select()
+        .from(playerStats)
+        .where(and(
+          eq(playerStats.userId, validatedData.placeholderUserId),
+          eq(playerStats.leagueId, leagueId)
+        ));
       
-      // Store team assignment and jersey number from placeholder
-      const teamId = placeholderMembership.assignedTeamId;
-      const jerseyNumber = placeholderMembership.jerseyNumber;
-      const displayFirstName = placeholderMembership.displayFirstName || placeholderUser?.firstName;
-      const displayLastName = placeholderMembership.displayLastName || placeholderUser?.lastName;
+      const hasStats = placeholderStats.length > 0 && placeholderStats.some(s => 
+        (s.gamesPlayed || 0) > 0 || (s.goals || 0) > 0 || (s.assists || 0) > 0
+      );
 
-      // Perform the replace operation atomically in a transaction
-      const newMembership = await db.transaction(async (tx) => {
-        // 0. If we have a pending membership to delete, delete it first
-        if (validatedData.pendingMembershipIdToDelete) {
-          await tx
-            .delete(leagueMemberships)
-            .where(eq(leagueMemberships.id, validatedData.pendingMembershipIdToDelete));
-        }
-
-        // 1. Delete placeholder's team membership if they had one
-        if (teamId) {
-          await tx
-            .delete(teamMemberships)
-            .where(
-              and(
-                eq(teamMemberships.userId, validatedData.placeholderUserId),
-                eq(teamMemberships.teamId, teamId)
-              )
-            );
-        }
-
-        // 2. Delete the placeholder's league membership
-        await tx
+      // Delete pending membership first if specified (before merge creates issues)
+      if (validatedData.pendingMembershipIdToDelete) {
+        await db
           .delete(leagueMemberships)
-          .where(eq(leagueMemberships.id, placeholderMembership.id));
+          .where(eq(leagueMemberships.id, validatedData.pendingMembershipIdToDelete));
+      }
 
-        // 3. Create new league membership for the real user with the same team assignment
-        const [createdMembership] = await tx
-          .insert(leagueMemberships)
-          .values({
-            userId: validatedData.newUserId,
-            leagueId: leagueId,
-            status: 'approved',
-            assignedTeamId: teamId,
-            jerseyNumber: jerseyNumber,
-            displayFirstName: validatedData.preserveDisplayName ? displayFirstName : undefined,
-            displayLastName: validatedData.preserveDisplayName ? displayLastName : undefined,
-            approvedAt: new Date(),
-            approvedBy: userId,
-          })
-          .returning();
-
-        // 4. Create team membership for the new user if there was a team assignment
-        if (teamId) {
-          await tx
-            .insert(teamMemberships)
-            .values({
-              userId: validatedData.newUserId,
-              teamId: teamId,
-              status: 'approved',
-              jerseyNumber: jerseyNumber,
-              approvedBy: userId,
-            });
-        }
-
-        return createdMembership;
-      });
+      // Use mergeUsersInLeague to properly transfer all stats, goals, assists, etc.
+      const mergedMembership = await storage.mergeUsersInLeague(
+        leagueId,
+        validatedData.placeholderUserId, // from (placeholder)
+        validatedData.newUserId, // to (real user)
+        validatedData.preserveDisplayName
+      );
 
       res.json({
         message: 'Player replaced successfully',
-        membership: newMembership,
-        preservedDisplayName: validatedData.preserveDisplayName
+        membership: mergedMembership,
+        preservedDisplayName: validatedData.preserveDisplayName,
+        placeholderUserId: validatedData.placeholderUserId,
+        placeholderName: placeholderUser ? `${placeholderUser.firstName || ''} ${placeholderUser.lastName || ''}`.trim() : null,
+        isPlaceholder: isPlaceholder,
+        hadStats: hasStats,
+        statsTransferred: hasStats
       });
 
     } catch (error) {
