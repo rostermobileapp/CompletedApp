@@ -978,6 +978,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete a placeholder user (commissioner only, for cleanup after merging)
+  app.delete('/api/users/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId: targetUserId } = req.params;
+      const requestingUserId = req.user.claims.sub;
+
+      // Get the target user
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only allow deletion of placeholder users (check both email pattern and isPlaceholder flag)
+      const isPlaceholder = targetUser.email?.includes('@placeholder.roster') || 
+                            (targetUser as any).isPlaceholder === true;
+      if (!isPlaceholder) {
+        return res.status(403).json({ message: "Only placeholder users can be deleted" });
+      }
+
+      // Verify the requesting user is a commissioner of at least one league
+      // This is a relaxed check since after merging, the placeholder may have no memberships left
+      const requestingUserLeagues = await db
+        .select({ id: leagues.id })
+        .from(leagues)
+        .where(eq(leagues.commissionerId, requestingUserId));
+
+      if (requestingUserLeagues.length === 0) {
+        return res.status(403).json({ message: "You must be a commissioner to delete placeholder users" });
+      }
+
+      // Soft delete approach: Mark user as deleted instead of hard delete
+      // This preserves historical data integrity while hiding the user from active use
+      await db
+        .update(users)
+        .set({ 
+          email: `deleted_${Date.now()}_${targetUser.email || targetUserId}`,
+          firstName: '[Deleted]',
+          lastName: 'User'
+        })
+        .where(eq(users.id, targetUserId));
+
+      // Clean up any remaining memberships
+      await db.delete(leagueMemberships).where(eq(leagueMemberships.userId, targetUserId));
+
+      res.json({ message: "Placeholder user deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting placeholder user:", error);
+      res.status(500).json({ message: "Failed to delete placeholder user" });
+    }
+  });
+
   // Stripe webhook routes only - subscription management handled via Stripe billing portal
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
