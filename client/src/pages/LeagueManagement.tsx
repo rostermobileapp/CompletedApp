@@ -5093,7 +5093,7 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-      {/* Merge Approval Modal */}
+      {/* Player Approval Modal */}
       {showMergeModal && selectedMember && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-card rounded-lg p-6 max-w-md w-full border border-border">
@@ -5140,7 +5140,7 @@ export default function LeagueManagement() {
                     <button
                       onClick={async () => {
                         try {
-                          // Merge the selected imported player with the real user
+                          // Link the selected imported player with the real user
                           await apiRequest('POST', `/api/leagues/${leagueId}/players/merge`, {
                             membershipId: selectedMember.id,
                             importedPlayerId: selectedMatch
@@ -5152,7 +5152,7 @@ export default function LeagueManagement() {
                           
                           toast({
                             title: "Success",
-                            description: "Player merged successfully!",
+                            description: "Player linked successfully!",
                           });
                           
                           setShowMergeModal(false);
@@ -5162,14 +5162,14 @@ export default function LeagueManagement() {
                         } catch (error) {
                           toast({
                             title: "Error",
-                            description: "Failed to merge player.",
+                            description: "Failed to link player.",
                             variant: "destructive",
                           });
                         }
                       }}
                       className="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 font-medium"
                     >
-                      Approve and Merge with Selected
+                      Approve and Link to Selected
                     </button>
                   )}
                 </div>
@@ -5186,7 +5186,7 @@ export default function LeagueManagement() {
                     disabled={approveMutation.isPending}
                     className="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-medium disabled:opacity-50"
                   >
-                    {approveMutation.isPending ? 'Approving...' : 'Approve Without Merge'}
+                    {approveMutation.isPending ? 'Approving...' : 'Approve as New Player'}
                   </button>
                 </div>
               </div>
