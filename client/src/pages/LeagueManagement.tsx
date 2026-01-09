@@ -514,11 +514,14 @@ export default function LeagueManagement() {
   const [potentialMatches, setPotentialMatches] = useState<any[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
   
-  // User merge modal state (for merging existing users)
-  const [showUserMergeModal, setShowUserMergeModal] = useState(false);
-  const [selectedPlayerToMerge, setSelectedPlayerToMerge] = useState<LeagueMember | null>(null);
-  const [targetUserId, setTargetUserId] = useState('');
-  const [targetUserEmail, setTargetUserEmail] = useState('');
+  // Replace player modal state (for replacing placeholder players with real users)
+  const [showReplacePlayerModal, setShowReplacePlayerModal] = useState(false);
+  const [selectedPlayerToReplace, setSelectedPlayerToReplace] = useState<LeagueMember | null>(null);
+  const [replaceTargetUserId, setReplaceTargetUserId] = useState('');
+  const [replaceSearchQuery, setReplaceSearchQuery] = useState('');
+  const [replaceSearchResults, setReplaceSearchResults] = useState<any[]>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const [isReplacingPlayer, setIsReplacingPlayer] = useState(false);
   const [preserveDisplayName, setPreserveDisplayName] = useState(true);
   
   // Delete confirmation state
@@ -3384,24 +3387,24 @@ export default function LeagueManagement() {
                   </button>
                 </div>
 
-                {/* Merge Player (Commissioner Only) */}
+                {/* Replace Player (Commissioner Only) */}
                 {league?.commissionerId === user?.id && (
                   <div className="space-y-2">
-                    <h4 className="font-medium text-sm">Merge Player</h4>
+                    <h4 className="font-medium text-sm">Replace Player</h4>
                     <p className="text-xs text-muted-foreground">
-                      Merge this player with another user account (useful for linking placeholder players to real users)
+                      Replace this placeholder player with a registered user (keeps team assignment)
                     </p>
                     <button
                       onClick={() => {
-                        setSelectedPlayerToMerge(selectedPlayer);
-                        setShowUserMergeModal(true);
+                        setSelectedPlayerToReplace(selectedPlayer);
+                        setShowReplacePlayerModal(true);
                         setSelectedPlayer(null); // Close player modal
                       }}
                       className="w-full px-4 py-2 bg-blue-500/50 text-white rounded-lg hover:bg-blue-600/50 text-sm font-medium"
-                      data-testid={`button-merge-${selectedPlayer.user.id}`}
+                      data-testid={`button-replace-${selectedPlayer.user.id}`}
                     >
                       <Users className="w-4 h-4 inline mr-2" />
-                      Merge with Another User
+                      Replace with User
                     </button>
                   </div>
                 )}
@@ -5309,22 +5312,23 @@ export default function LeagueManagement() {
           </div>
         </div>
       )}
-      {/* User Merge Modal */}
-      {showUserMergeModal && selectedPlayerToMerge && (
+      {/* Replace Player Modal */}
+      {showReplacePlayerModal && selectedPlayerToReplace && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-card rounded-lg p-6 max-w-lg w-full border border-border max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Merge Player</h3>
+              <h3 className="text-lg font-semibold">Replace Player</h3>
               <button
                 onClick={() => {
-                  setShowUserMergeModal(false);
-                  setSelectedPlayerToMerge(null);
-                  setTargetUserId('');
-                  setTargetUserEmail('');
+                  setShowReplacePlayerModal(false);
+                  setSelectedPlayerToReplace(null);
+                  setReplaceTargetUserId('');
+                  setReplaceSearchQuery('');
+                  setReplaceSearchResults([]);
                   setPreserveDisplayName(true);
                 }}
                 className="text-muted-foreground hover:text-foreground"
-                data-testid="button-close-merge-modal"
+                data-testid="button-close-replace-modal"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -5332,66 +5336,103 @@ export default function LeagueManagement() {
             
             <div className="space-y-4 overflow-y-auto flex-1">
               <div className="bg-muted/50 p-3 rounded-lg">
-                <p className="text-xs text-muted-foreground uppercase mb-1">Merge From (Source)</p>
+                <p className="text-xs text-muted-foreground uppercase mb-1">Player to Replace</p>
                 <p className="font-medium">
-                  {formatUserName(selectedPlayerToMerge.user, selectedPlayerToMerge)}
+                  {formatUserName(selectedPlayerToReplace.user, selectedPlayerToReplace)}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {selectedPlayerToMerge.user.email || 'No email'}
+                  {selectedPlayerToReplace.user.email || 'No email'}
+                  {selectedPlayerToReplace.assignedTeamId && teams.find(t => t.id === selectedPlayerToReplace.assignedTeamId) && (
+                    <> • Team: {teams.find(t => t.id === selectedPlayerToReplace.assignedTeamId)?.name}</>
+                  )}
                 </p>
               </div>
               
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Search for Target Player</label>
-                <input
-                  type="text"
-                  value={targetUserEmail}
-                  onChange={(e) => setTargetUserEmail(e.target.value)}
-                  placeholder="Type a name to search..."
-                  className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  data-testid="input-merge-search"
-                />
+                <label className="block text-sm font-medium">Search for Registered User</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={replaceSearchQuery}
+                    onChange={(e) => setReplaceSearchQuery(e.target.value)}
+                    placeholder="Search by name or email..."
+                    className="flex-1 p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="input-replace-search"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && replaceSearchQuery.trim().length >= 2) {
+                        e.preventDefault();
+                        setIsSearchingUsers(true);
+                        apiRequest('GET', `/api/users/search?q=${encodeURIComponent(replaceSearchQuery.trim())}`)
+                          .then(res => res.json())
+                          .then(data => {
+                            setReplaceSearchResults(data);
+                            setIsSearchingUsers(false);
+                          })
+                          .catch(() => {
+                            setIsSearchingUsers(false);
+                            toast({
+                              title: "Error",
+                              description: "Failed to search users.",
+                              variant: "destructive",
+                            });
+                          });
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (replaceSearchQuery.trim().length >= 2) {
+                        setIsSearchingUsers(true);
+                        apiRequest('GET', `/api/users/search?q=${encodeURIComponent(replaceSearchQuery.trim())}`)
+                          .then(res => res.json())
+                          .then(data => {
+                            setReplaceSearchResults(data);
+                            setIsSearchingUsers(false);
+                          })
+                          .catch(() => {
+                            setIsSearchingUsers(false);
+                            toast({
+                              title: "Error",
+                              description: "Failed to search users.",
+                              variant: "destructive",
+                            });
+                          });
+                      }
+                    }}
+                    disabled={replaceSearchQuery.trim().length < 2 || isSearchingUsers}
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50"
+                  >
+                    {isSearchingUsers ? 'Searching...' : 'Search'}
+                  </button>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Search by name or email to find the player to merge with
+                  Search all registered users by name or email (minimum 2 characters)
                 </p>
               </div>
               
-              {/* Player Search Results */}
-              <div className="border border-border rounded-lg overflow-hidden">
-                <div className="max-h-48 overflow-y-auto">
-                  {members
-                    .filter(m => m.userId !== selectedPlayerToMerge.userId)
-                    .filter(m => {
-                      if (!targetUserEmail.trim()) return true;
-                      const searchQuery = targetUserEmail.toLowerCase().trim();
-                      const firstName = (m.displayFirstName || m.user.firstName || '').toLowerCase();
-                      const lastName = (m.displayLastName || m.user.lastName || '').toLowerCase();
-                      const email = (m.user.email || '').toLowerCase();
-                      const fullName = `${firstName} ${lastName}`;
-                      return fullName.includes(searchQuery) || 
-                             firstName.includes(searchQuery) || 
-                             lastName.includes(searchQuery) ||
-                             email.includes(searchQuery);
-                    })
-                    .slice(0, 20)
-                    .map(member => {
-                      const isSelected = targetUserId === member.userId;
-                      const memberTeam = teams.find(t => t.id === member.assignedTeamId);
+              {/* User Search Results */}
+              {replaceSearchResults.length > 0 && (
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="max-h-48 overflow-y-auto">
+                    {replaceSearchResults.map((user: any) => {
+                      const isSelected = replaceTargetUserId === user.id;
+                      const isAlreadyInLeague = members.some(m => m.userId === user.id);
                       return (
                         <button
-                          key={member.id}
-                          onClick={() => setTargetUserId(isSelected ? '' : member.userId)}
-                          className={`w-full p-3 text-left border-b border-border last:border-b-0 hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/10 border-l-4 border-l-primary' : ''}`}
-                          data-testid={`button-select-merge-target-${member.userId}`}
+                          key={user.id}
+                          onClick={() => setReplaceTargetUserId(isSelected ? '' : user.id)}
+                          disabled={isAlreadyInLeague}
+                          className={`w-full p-3 text-left border-b border-border last:border-b-0 hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/10 border-l-4 border-l-primary' : ''} ${isAlreadyInLeague ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          data-testid={`button-select-replace-target-${user.id}`}
                         >
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="font-medium">
-                                {formatUserName(member.user, member)}
+                                {user.lastName && user.firstName ? `${user.lastName}, ${user.firstName}` : user.email}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {member.user.email || 'No email'}
-                                {memberTeam && ` • ${memberTeam.name}`}
+                                {user.email}
+                                {isAlreadyInLeague && <span className="ml-2 text-yellow-500">(Already in league)</span>}
                               </p>
                             </div>
                             {isSelected && (
@@ -5403,27 +5444,29 @@ export default function LeagueManagement() {
                         </button>
                       );
                     })}
-                  {members.filter(m => m.userId !== selectedPlayerToMerge.userId).length === 0 && (
-                    <div className="p-4 text-center text-muted-foreground">
-                      No other players in this league
-                    </div>
-                  )}
+                  </div>
                 </div>
-              </div>
+              )}
               
-              {targetUserId && (
+              {replaceSearchQuery.trim().length >= 2 && replaceSearchResults.length === 0 && !isSearchingUsers && (
+                <div className="p-4 text-center text-muted-foreground border border-border rounded-lg">
+                  No users found matching "{replaceSearchQuery}"
+                </div>
+              )}
+              
+              {replaceTargetUserId && (
                 <div className="bg-primary/10 p-3 rounded-lg border border-primary/20">
-                  <p className="text-xs text-muted-foreground uppercase mb-1">Merge Into (Target)</p>
+                  <p className="text-xs text-muted-foreground uppercase mb-1">Replace With</p>
                   {(() => {
-                    const targetMember = members.find(m => m.userId === targetUserId);
-                    if (!targetMember) return null;
+                    const targetUser = replaceSearchResults.find((u: any) => u.id === replaceTargetUserId);
+                    if (!targetUser) return null;
                     return (
                       <>
                         <p className="font-medium">
-                          {formatUserName(targetMember.user, targetMember)}
+                          {targetUser.lastName && targetUser.firstName ? `${targetUser.lastName}, ${targetUser.firstName}` : targetUser.email}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {targetMember.user.email || 'No email'}
+                          {targetUser.email}
                         </p>
                       </>
                     );
@@ -5440,7 +5483,7 @@ export default function LeagueManagement() {
                     className="rounded"
                     data-testid="checkbox-preserve-name"
                   />
-                  <span className="text-sm">Keep source player's display name on roster</span>
+                  <span className="text-sm">Keep original player's display name on roster</span>
                 </label>
               </div>
               
@@ -5448,72 +5491,77 @@ export default function LeagueManagement() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
-                      setShowUserMergeModal(false);
-                      setSelectedPlayerToMerge(null);
-                      setTargetUserId('');
-                      setTargetUserEmail('');
+                      setShowReplacePlayerModal(false);
+                      setSelectedPlayerToReplace(null);
+                      setReplaceTargetUserId('');
+                      setReplaceSearchQuery('');
+                      setReplaceSearchResults([]);
                       setPreserveDisplayName(true);
                     }}
                     className="flex-1 bg-muted text-muted-foreground px-4 py-2 rounded-lg hover:bg-muted/80 font-medium"
-                    data-testid="button-cancel-merge"
+                    data-testid="button-cancel-replace"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={async () => {
-                      if (!targetUserId) {
+                      if (!replaceTargetUserId) {
                         toast({
                           title: "Error",
-                          description: "Please select a target player.",
+                          description: "Please select a user to replace with.",
                           variant: "destructive",
                         });
                         return;
                       }
                       
+                      setIsReplacingPlayer(true);
                       try {
-                        const response = await apiRequest('POST', `/api/leagues/${leagueId}/merge-player`, {
-                          fromUserId: selectedPlayerToMerge.userId,
-                          toUserId: targetUserId,
-                          preserveName: preserveDisplayName
+                        const response = await apiRequest('POST', `/api/leagues/${leagueId}/replace-player`, {
+                          placeholderUserId: selectedPlayerToReplace.userId,
+                          newUserId: replaceTargetUserId,
+                          preserveDisplayName: preserveDisplayName
                         });
                         
                         if (response.ok) {
                           toast({
                             title: "Success",
-                            description: `Player merged successfully! ${preserveDisplayName ? 'Display name preserved.' : ''}`,
+                            description: "Player replaced successfully! Team assignment preserved.",
                           });
                           
                           // Invalidate queries to refresh the data
                           await queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
                           await queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
                           
-                          setShowUserMergeModal(false);
-                          setSelectedPlayerToMerge(null);
-                          setTargetUserId('');
-                          setTargetUserEmail('');
+                          setShowReplacePlayerModal(false);
+                          setSelectedPlayerToReplace(null);
+                          setReplaceTargetUserId('');
+                          setReplaceSearchQuery('');
+                          setReplaceSearchResults([]);
                           setPreserveDisplayName(true);
                         } else {
                           const error = await response.json();
                           toast({
                             title: "Error",
-                            description: error.message || "Failed to merge players.",
+                            description: error.message || "Failed to replace player.",
                             variant: "destructive",
                           });
                         }
                       } catch (error) {
-                        console.error('Merge error:', error);
+                        console.error('Replace error:', error);
                         toast({
                           title: "Error",
-                          description: "Failed to merge players. Please try again.",
+                          description: "Failed to replace player. Please try again.",
                           variant: "destructive",
                         });
+                      } finally {
+                        setIsReplacingPlayer(false);
                       }
                     }}
-                    disabled={!targetUserId}
+                    disabled={!replaceTargetUserId || isReplacingPlayer}
                     className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50"
-                    data-testid="button-confirm-merge"
+                    data-testid="button-confirm-replace"
                   >
-                    Merge Players
+                    {isReplacingPlayer ? 'Replacing...' : 'Replace Player'}
                   </button>
                 </div>
               </div>

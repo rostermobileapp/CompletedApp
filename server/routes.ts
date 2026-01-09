@@ -876,6 +876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: users.id,
             firstName: users.firstName,
             lastName: users.lastName,
+            email: users.email,
             profileImageUrl: users.profileImageUrl,
           })
           .from(users)
@@ -887,6 +888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               or(
                 sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
                 sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.email}) LIKE LOWER(${`%${q}%`})`,
                 sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
               )
             )
@@ -898,6 +900,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: users.id,
             firstName: users.firstName,
             lastName: users.lastName,
+            email: users.email,
             profileImageUrl: users.profileImageUrl,
           })
           .from(users)
@@ -909,6 +912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               or(
                 sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
                 sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.email}) LIKE LOWER(${`%${q}%`})`,
                 sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
               )
             )
@@ -920,6 +924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: users.id,
             firstName: users.firstName,
             lastName: users.lastName,
+            email: users.email,
             profileImageUrl: users.profileImageUrl,
           })
           .from(users)
@@ -927,6 +932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             or(
               sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
               sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+              sql`LOWER(${users.email}) LIKE LOWER(${`%${q}%`})`,
               sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
             )
           )
@@ -8530,6 +8536,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       res.status(500).json({ message: 'Failed to merge users' });
+    }
+  });
+
+  // Replace a placeholder player with a registered user (keeps team assignment)
+  app.post('/api/leagues/:leagueId/replace-player', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const { placeholderUserId, newUserId, preserveDisplayName = true } = req.body;
+      const userId = req.user.claims.sub;
+
+      // Validate request body
+      const replaceRequestSchema = z.object({
+        placeholderUserId: z.string().min(1, 'Placeholder user ID is required'),
+        newUserId: z.string().min(1, 'New user ID is required'),
+        preserveDisplayName: z.boolean().optional().default(true),
+      });
+
+      const validatedData = replaceRequestSchema.parse({ placeholderUserId, newUserId, preserveDisplayName });
+
+      if (validatedData.placeholderUserId === validatedData.newUserId) {
+        return res.status(400).json({ message: 'Cannot replace user with themselves' });
+      }
+
+      // Check commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Commissioner access required' });
+      }
+
+      // Verify new user exists
+      const newUser = await storage.getUser(validatedData.newUserId);
+      if (!newUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      // Check if new user is already in the league
+      const existingMembership = await storage.getUserLeagueMembership(validatedData.newUserId, leagueId);
+      if (existingMembership) {
+        return res.status(400).json({ message: 'Target user is already a member of this league' });
+      }
+
+      // Get the placeholder's membership
+      const placeholderMembership = await storage.getUserLeagueMembership(validatedData.placeholderUserId, leagueId);
+      if (!placeholderMembership) {
+        return res.status(404).json({ message: 'Placeholder user is not a member of this league' });
+      }
+
+      // Get the placeholder user's display names for potential preservation
+      const placeholderUser = await storage.getUser(validatedData.placeholderUserId);
+      
+      // Store team assignment and jersey number from placeholder
+      const teamId = placeholderMembership.assignedTeamId;
+      const jerseyNumber = placeholderMembership.jerseyNumber;
+      const displayFirstName = placeholderMembership.displayFirstName || placeholderUser?.firstName;
+      const displayLastName = placeholderMembership.displayLastName || placeholderUser?.lastName;
+
+      // Perform the replace operation atomically in a transaction
+      const newMembership = await db.transaction(async (tx) => {
+        // 1. Delete placeholder's team membership if they had one
+        if (teamId) {
+          await tx
+            .delete(teamMemberships)
+            .where(
+              and(
+                eq(teamMemberships.userId, validatedData.placeholderUserId),
+                eq(teamMemberships.teamId, teamId)
+              )
+            );
+        }
+
+        // 2. Delete the placeholder's league membership
+        await tx
+          .delete(leagueMemberships)
+          .where(eq(leagueMemberships.id, placeholderMembership.id));
+
+        // 3. Create new league membership for the real user with the same team assignment
+        const [createdMembership] = await tx
+          .insert(leagueMemberships)
+          .values({
+            userId: validatedData.newUserId,
+            leagueId: leagueId,
+            status: 'approved',
+            assignedTeamId: teamId,
+            jerseyNumber: jerseyNumber,
+            displayFirstName: validatedData.preserveDisplayName ? displayFirstName : undefined,
+            displayLastName: validatedData.preserveDisplayName ? displayLastName : undefined,
+            approvedAt: new Date(),
+            approvedBy: userId,
+          })
+          .returning();
+
+        // 4. Create team membership for the new user if there was a team assignment
+        if (teamId) {
+          await tx
+            .insert(teamMemberships)
+            .values({
+              userId: validatedData.newUserId,
+              teamId: teamId,
+              status: 'approved',
+              jerseyNumber: jerseyNumber,
+              approvedBy: userId,
+            });
+        }
+
+        return createdMembership;
+      });
+
+      res.json({
+        message: 'Player replaced successfully',
+        membership: newMembership,
+        preservedDisplayName: validatedData.preserveDisplayName
+      });
+
+    } catch (error) {
+      console.error('Failed to replace player:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Invalid request data', 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: 'Failed to replace player' });
     }
   });
 
