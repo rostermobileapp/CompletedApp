@@ -13,6 +13,7 @@ import {
 import { and, eq, gt, lt, gte, lte, inArray, sql, or, not, isNull } from "drizzle-orm";
 import { storage } from "./storage";
 import { format, subDays, setHours, setMinutes, subHours, addDays } from "date-fns";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { sendScheduleReminderPushNotification } from "./oneSignalNotifications";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
@@ -27,14 +28,18 @@ interface EventInfo {
   eventType: "game" | "scrimmage";
 }
 
-function calculateTriggerTime(eventTime: Date, trigger: ReminderTrigger): Date {
+function calculateTriggerTime(eventTime: Date, trigger: ReminderTrigger, timezone: string = "America/New_York"): Date {
   if (trigger === "2_hours") {
     return subHours(eventTime, 2);
   }
   
-  // 2 days before at 3PM
+  // 2 days before at 3PM in the league's local timezone
   const twoDaysBefore = subDays(eventTime, 2);
-  return setMinutes(setHours(twoDaysBefore, 15), 0); // 3:00 PM
+  
+  // Convert to local timezone, set to 3PM, then convert back to UTC
+  const localTime = toZonedTime(twoDaysBefore, timezone);
+  const localAt3PM = setMinutes(setHours(localTime, 15), 0); // 3:00 PM local
+  return fromZonedTime(localAt3PM, timezone);
 }
 
 function shouldSendReminder(now: Date, triggerTime: Date): boolean {
@@ -255,6 +260,17 @@ export async function checkAndSendEventReminders(): Promise<void> {
     for (const game of upcomingGames) {
       const eventTime = new Date(game.scheduledAt);
       
+      // Get league timezone
+      let timezone = "America/New_York"; // Default fallback
+      try {
+        const league = await storage.getLeague(game.leagueId);
+        if (league?.timezone) {
+          timezone = league.timezone;
+        }
+      } catch (e) {
+        // Keep default timezone
+      }
+      
       // Build event title from teams
       let title = "Game";
       try {
@@ -278,7 +294,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
       };
       
       for (const trigger of triggers) {
-        const triggerTime = calculateTriggerTime(eventTime, trigger);
+        const triggerTime = calculateTriggerTime(eventTime, trigger, timezone);
         
         if (shouldSendReminder(now, triggerTime)) {
           const participants = await getGameParticipants(game.id);
@@ -331,7 +347,7 @@ export function startEventReminderJob(): void {
   }
   
   console.log('🔔 Starting unified event reminder job (checking every 5 minutes)');
-  console.log('   - Reminders: 2 days before at 6PM, 2 hours before');
+  console.log('   - Reminders: 2 days before at 3PM (league timezone), 2 hours before');
   console.log('   - Covers: Games and Scrimmages');
   
   // Run immediately on startup
