@@ -5809,13 +5809,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getUserTeams(userId)
       ]);
       
+      // Get captain status for user's teams in this game
+      const gameTeamIds = [game.homeTeamId, game.awayTeamId].filter((id): id is string => !!id);
+      const userTeamMemberships = await storage.getUserTeamMemberships(userId, gameTeamIds);
+      
       res.json({
         game: formattedGame,
         league,
         homeTeamMembers,
         awayTeamMembers,
         scoreSubmissions,
-        userTeams
+        userTeams,
+        userTeamMemberships
       });
     } catch (error) {
       console.error('Error fetching full game details:', error);

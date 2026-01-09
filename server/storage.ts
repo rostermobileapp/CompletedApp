@@ -309,6 +309,7 @@ export interface IStorage {
   getTeamByUniqueId(uniqueTeamId: string): Promise<Team | undefined>;
   searchTeams(search?: string): Promise<(Team & { league?: League | null })[]>;
   getUserTeams(userId: string): Promise<Team[]>;
+  getUserTeamMemberships(userId: string, teamIds: string[]): Promise<{ teamId: string; isCaptain: boolean }[]>;
   getTeamsWhereCaptain(userId: string): Promise<{ id: string; name: string }[]>;
   updateTeam(id: string, data: Partial<Pick<Team, 'name'>>): Promise<Team>;
   updateTeamLogo(id: string, logoUrl: string): Promise<Team>;
@@ -1998,6 +1999,47 @@ export class DatabaseStorage implements IStorage {
     const uniqueTeams = Array.from(new Map(allTeams.map(team => [team.id, team])).values());
     
     return uniqueTeams;
+  }
+
+  async getUserTeamMemberships(userId: string, teamIds: string[]): Promise<{ teamId: string; isCaptain: boolean }[]> {
+    if (teamIds.length === 0) return [];
+    
+    const memberships = await db
+      .select({
+        teamId: teamMemberships.teamId,
+        isCaptain: teamMemberships.isCaptain,
+      })
+      .from(teamMemberships)
+      .where(
+        and(
+          eq(teamMemberships.userId, userId),
+          eq(teamMemberships.status, "approved"),
+          inArray(teamMemberships.teamId, teamIds)
+        )
+      );
+    
+    // Also check teams.captainId for backwards compatibility
+    const teamsResult = await db
+      .select({ id: teams.id, captainId: teams.captainId })
+      .from(teams)
+      .where(inArray(teams.id, teamIds));
+    
+    // Merge: if user is in teams.captainId but not in memberships.isCaptain, include them
+    const result = new Map<string, boolean>();
+    
+    // First add from memberships
+    for (const m of memberships) {
+      result.set(m.teamId, m.isCaptain);
+    }
+    
+    // Then check captainId for backwards compatibility
+    for (const t of teamsResult) {
+      if (t.captainId === userId) {
+        result.set(t.id, true);
+      }
+    }
+    
+    return Array.from(result.entries()).map(([teamId, isCaptain]) => ({ teamId, isCaptain }));
   }
 
   async getTeamsWhereCaptain(userId: string): Promise<{ id: string; name: string }[]> {

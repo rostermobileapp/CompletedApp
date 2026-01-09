@@ -51,6 +51,7 @@ export default function GameDetails() {
     awayTeamMembers: TeamMemberWithUser[];
     scoreSubmissions: GameScoreSubmission[];
     userTeams: UserTeam[];
+    userTeamMemberships: { teamId: string; isCaptain: boolean }[];
   }
 
   const { data: fullGameData, isLoading: gameLoading } = useQuery<FullGameData>({
@@ -65,6 +66,7 @@ export default function GameDetails() {
   const awayTeamMembers = fullGameData?.awayTeamMembers;
   const scoreSubmissions = fullGameData?.scoreSubmissions;
   const userTeams = fullGameData?.userTeams;
+  const userTeamMemberships = fullGameData?.userTeamMemberships || [];
 
   // Get primary team (first team for now)
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
@@ -76,9 +78,11 @@ export default function GameDetails() {
   });
 
   // Compute captain team ID early for the RSVP summary query
-  // This requires knowing which team the user is captain of
-  const isEarlyCaptainOfHome = game?.homeTeam?.captainId === (user as any)?.id;
-  const isEarlyCaptainOfAway = game?.awayTeam?.captainId === (user as any)?.id;
+  // Check membership isCaptain flag for multi-captain support, with fallback to legacy captainId
+  const isEarlyCaptainOfHome = userTeamMemberships.find(m => m.teamId === game?.homeTeam?.id)?.isCaptain || 
+                                game?.homeTeam?.captainId === (user as any)?.id;
+  const isEarlyCaptainOfAway = userTeamMemberships.find(m => m.teamId === game?.awayTeam?.id)?.isCaptain ||
+                                game?.awayTeam?.captainId === (user as any)?.id;
   const earlyCaptainTeamId = isEarlyCaptainOfHome ? game?.homeTeam?.id : 
                               isEarlyCaptainOfAway ? game?.awayTeam?.id : null;
 
@@ -504,9 +508,11 @@ export default function GameDetails() {
   const now = Date.now();
   const isScoreSubmissionAvailable = now >= oneHourAfterStart;
 
-  // Check if user is a captain or commissioner using team.captainId
-  const isHomeCaptain = game.homeTeam?.captainId === (user as User)?.id;
-  const isAwayCaptain = game.awayTeam?.captainId === (user as User)?.id;
+  // Check if user is a captain or commissioner - use membership isCaptain flag for multi-captain support
+  const isHomeCaptain = userTeamMemberships.find(m => m.teamId === game.homeTeam?.id)?.isCaptain || 
+                        game.homeTeam?.captainId === (user as User)?.id;
+  const isAwayCaptain = userTeamMemberships.find(m => m.teamId === game.awayTeam?.id)?.isCaptain ||
+                        game.awayTeam?.captainId === (user as User)?.id;
   const isCaptain = isHomeCaptain || isAwayCaptain;
   
   // Derive captain team ID directly from captain status for RSVPSummary
@@ -716,7 +722,7 @@ export default function GameDetails() {
             gameId={game.id}
             teamId={game.homeTeam.id}
             userId={(user as User).id}
-            isCaptain={game.homeTeam.captainId === (user as User).id}
+            isCaptain={isHomeCaptain}
             isTeamMember={isUserOnHomeTeam}
           />
         )}
@@ -727,7 +733,7 @@ export default function GameDetails() {
             gameId={game.id}
             teamId={game.awayTeam.id}
             userId={(user as User).id}
-            isCaptain={game.awayTeam.captainId === (user as User).id}
+            isCaptain={isAwayCaptain}
             isTeamMember={isUserOnAwayTeam}
           />
         )}
