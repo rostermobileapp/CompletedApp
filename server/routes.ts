@@ -8613,6 +8613,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { placeholderUserId, newUserId, preserveDisplayName = true, pendingMembershipIdToDelete } = req.body;
       const userId = req.user.claims.sub;
 
+      console.log('=== REPLACE PLAYER REQUEST ===');
+      console.log('leagueId:', leagueId);
+      console.log('placeholderUserId:', placeholderUserId);
+      console.log('newUserId:', newUserId);
+      console.log('pendingMembershipIdToDelete:', pendingMembershipIdToDelete);
+      console.log('preserveDisplayName:', preserveDisplayName);
+
       // Validate request body
       const replaceRequestSchema = z.object({
         placeholderUserId: z.string().min(1, 'Placeholder user ID is required'),
@@ -8641,6 +8648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get the placeholder's membership
       const placeholderMembership = await storage.getUserLeagueMembership(validatedData.placeholderUserId, leagueId);
+      console.log('placeholderMembership found:', placeholderMembership?.id);
       if (!placeholderMembership) {
         return res.status(404).json({ message: 'Placeholder user is not a member of this league' });
       }
@@ -8667,12 +8675,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedData.pendingMembershipIdToDelete) {
         // Verify the membership to delete belongs to the new user (not the placeholder)
         const membershipToDelete = await storage.getLeagueMembership(validatedData.pendingMembershipIdToDelete);
+        console.log('membershipToDelete lookup:', {
+          id: validatedData.pendingMembershipIdToDelete,
+          found: !!membershipToDelete,
+          membershipUserId: membershipToDelete?.userId,
+          expectedNewUserId: validatedData.newUserId,
+          placeholderMembershipId: placeholderMembership.id
+        });
         if (membershipToDelete && 
             membershipToDelete.userId === validatedData.newUserId &&
             membershipToDelete.id !== placeholderMembership.id) {
+          console.log('Deleting new user pending membership:', validatedData.pendingMembershipIdToDelete);
           await db
             .delete(leagueMemberships)
             .where(eq(leagueMemberships.id, validatedData.pendingMembershipIdToDelete));
+        } else {
+          console.log('NOT deleting membership - safety check prevented deletion');
         }
       }
 
