@@ -23,20 +23,24 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
     }
 
     return (
-      <a
-        href="https://hockeyplayersinbusiness.org/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed left-0 right-0 flex items-center justify-center bg-transparent cursor-pointer"
+      <div
+        className="fixed left-0 right-0 flex items-center justify-center bg-transparent"
         style={{ bottom: '82px', height: '50px', zIndex: 40 }}
-        data-testid="hpib-banner-bottom"
       >
-        <img
-          src={hpibBannerImage}
-          alt="Hockey Players in Business - Join for only $50/yr"
-          className="w-full h-full object-cover"
-        />
-      </a>
+        <a
+          href="https://hockeyplayersinbusiness.org/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center cursor-pointer h-full w-full max-w-lg"
+          data-testid="hpib-banner-bottom"
+        >
+          <img
+            src={hpibBannerImage}
+            alt="Hockey Players in Business - Join for only $50/yr"
+            className="w-full h-full object-contain"
+          />
+        </a>
+      </div>
     );
   }
 
