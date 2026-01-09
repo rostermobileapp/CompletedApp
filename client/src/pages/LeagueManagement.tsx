@@ -2335,21 +2335,10 @@ export default function LeagueManagement() {
 
             {/* Approved Members */}
             <div className="bg-card rounded-xl border border-border p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <UserCheck className="w-5 h-5 text-green-500/50" />
                   <h3 className="text-lg font-semibold">League Members ({members.length})</h3>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search players..."
-                      value={memberSearch}
-                      onChange={(e) => setMemberSearch(e.target.value)}
-                      className="pl-9 w-48 h-8 text-sm"
-                      data-testid="input-member-search"
-                    />
-                  </div>
                 </div>
                 {members.length > 0 && (
                   <button
@@ -2361,6 +2350,17 @@ export default function LeagueManagement() {
                     Delete All Players
                   </button>
                 )}
+              </div>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search players..."
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                  className="pl-9 w-full h-9 text-sm"
+                  data-testid="input-member-search"
+                />
               </div>
               {members.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No approved members yet.</p>
