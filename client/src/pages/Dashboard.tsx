@@ -427,7 +427,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                       Pending Player Approvals ({pendingMembers.length})
                     </h3>
                   </div>
-                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-[#212121]">
                     <div className="space-y-3">
                       {pendingMembers.map((member: any) => (
                         <div 
