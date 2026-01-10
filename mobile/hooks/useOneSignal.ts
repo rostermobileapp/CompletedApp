@@ -11,6 +11,7 @@ interface UseOneSignalResult {
   logout: () => Promise<void>;
   requestPermission: () => Promise<boolean>;
   getPlayerId: () => Promise<string | null>;
+  setFirstNameTag: (firstName: string) => void;
 }
 
 export function useOneSignal(): UseOneSignalResult {
@@ -142,6 +143,21 @@ export function useOneSignal(): UseOneSignalResult {
     }
   }, [isInitialized]);
 
+  const setFirstNameTag = useCallback((firstName: string) => {
+    if (!isInitialized) {
+      console.warn('[OneSignal] Cannot set tag - SDK not initialized');
+      return;
+    }
+
+    try {
+      console.log('[OneSignal] Setting first_name tag:', firstName);
+      OneSignal.User.addTag('first_name', firstName);
+      console.log('[OneSignal] first_name tag set successfully');
+    } catch (error) {
+      console.error('[OneSignal] Error setting first_name tag:', error);
+    }
+  }, [isInitialized]);
+
   return {
     isInitialized,
     playerId,
@@ -151,5 +167,6 @@ export function useOneSignal(): UseOneSignalResult {
     logout,
     requestPermission,
     getPlayerId,
+    setFirstNameTag,
   };
 }

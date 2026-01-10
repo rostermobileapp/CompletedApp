@@ -19,6 +19,8 @@ interface OneSignalSDK {
       optOut: () => Promise<void>;
     };
     addAlias: (label: string, id: string) => void;
+    addTag: (key: string, value: string) => void;
+    addTags: (tags: Record<string, string>) => void;
   };
   Notifications: {
     permission: boolean;
@@ -38,6 +40,8 @@ interface NativelyNotificationsSDK {
   getExternalId: (callback: (resp: Array<{ externalId?: string; error?: string; message?: string }> | { externalId?: string; error?: string; message?: string }) => void) => void;
   setExternalId: (data: { externalId: string }, callback: (resp: { externalId?: string; error?: string; message?: string }) => void) => void;
   removeExternalId: (callback: (resp: { error?: string; message?: string } | null) => void) => void;
+  sendTag: (data: { key: string; value: string }, callback: (resp: { success?: boolean; error?: string }) => void) => void;
+  sendTags: (data: { tags: Record<string, string> }, callback: (resp: { success?: boolean; error?: string }) => void) => void;
 }
 
 declare global {
@@ -61,6 +65,7 @@ export function useNativelyNotifications() {
   const [isNativeSDK, setIsNativeSDK] = useState(false);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [displayId, setDisplayId] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState<string | null>(null);
   const [externalIdSet, setExternalIdSet] = useState(false);
   const [permissionState, setPermissionState] = useState<'default' | 'granted' | 'denied'>('default');
   const hasInitialized = useRef(false);
@@ -250,8 +255,15 @@ export function useNativelyNotifications() {
         console.log('[OneSignal] User data received:', { 
           id: data.id, 
           displayId: data.displayId,
+          firstName: data.firstName,
           hasDisplayId: !!data.displayId 
         });
+        
+        // Store firstName for OneSignal tag personalization
+        if (data.firstName) {
+          setFirstName(data.firstName);
+          console.log('[OneSignal] Using firstName:', data.firstName);
+        }
         
         // IMPORTANT: Only use displayId if it exists - do NOT fall back to UUID
         // The displayId should be a short string like "LFB3Kf"
@@ -302,14 +314,14 @@ export function useNativelyNotifications() {
   }, [isAuthenticated]);
 
   // Initialize with Natively native SDK
-  const initNativelySDK = useCallback(async (userDisplayId: string) => {
+  const initNativelySDK = useCallback(async (userDisplayId: string, userFirstName: string | null) => {
     const notifications = getNativelyInstance();
     if (!notifications) {
       console.error('[OneSignal] NativelyNotifications instance not available');
       return;
     }
 
-    console.log('[OneSignal] Initializing Natively native SDK for displayId:', userDisplayId);
+    console.log('[OneSignal] Initializing Natively native SDK for displayId:', userDisplayId, 'firstName:', userFirstName);
 
     // Get permission status
     notifications.getPermissionStatus((resp) => {
@@ -326,6 +338,18 @@ export function useNativelyNotifications() {
         registerPlayerId(resp.playerId);
       }
     });
+
+    // Set first_name tag for personalization (used in Liquid syntax: {{ first_name | default: "there" }})
+    if (userFirstName && notifications.sendTag) {
+      console.log('[OneSignal] Setting first_name tag via Natively:', userFirstName);
+      notifications.sendTag({ key: 'first_name', value: userFirstName }, (resp) => {
+        if (resp && resp.success) {
+          console.log('[OneSignal] ✅ first_name tag set successfully:', userFirstName);
+        } else {
+          console.log('[OneSignal] first_name tag response:', resp);
+        }
+      });
+    }
 
     // Set External ID with displayId
     console.log('[OneSignal] Calling Natively setExternalId with:', userDisplayId);
@@ -362,7 +386,7 @@ export function useNativelyNotifications() {
   }, [getNativelyInstance, registerPlayerId, playerId, updateInAppTrigger]);
 
   // Initialize with OneSignal web SDK
-  const initWebSDK = useCallback(async (userDisplayId: string) => {
+  const initWebSDK = useCallback(async (userDisplayId: string, userFirstName: string | null) => {
     if (!window.OneSignalDeferred) {
       console.error('[OneSignal] Web SDK not available');
       return;
@@ -370,7 +394,7 @@ export function useNativelyNotifications() {
 
     window.OneSignalDeferred.push(async (OneSignal) => {
       try {
-        console.log('[OneSignal] Initializing web SDK for displayId:', userDisplayId);
+        console.log('[OneSignal] Initializing web SDK for displayId:', userDisplayId, 'firstName:', userFirstName);
         hasInitialized.current = true;
         setIsInitialized(true);
 
@@ -387,6 +411,13 @@ export function useNativelyNotifications() {
         if (subscriptionId) {
           setPlayerId(subscriptionId);
           await registerPlayerId(subscriptionId);
+        }
+
+        // Set first_name tag for personalization (used in Liquid syntax: {{ first_name | default: "there" }})
+        if (userFirstName) {
+          console.log('[OneSignal] Setting first_name tag via web SDK:', userFirstName);
+          OneSignal.User.addTag('first_name', userFirstName);
+          console.log('[OneSignal] ✅ first_name tag set successfully:', userFirstName);
         }
 
         // Login with external ID to link user
@@ -447,14 +478,14 @@ export function useNativelyNotifications() {
     // Use Natively native SDK if available (check both state and current window object)
     if (hasNativelySDK || isNativeSDK) {
       console.log('[OneSignal] Detected Natively app, using native SDK');
-      initNativelySDK(displayId);
+      initNativelySDK(displayId, firstName);
     } else if (window.OneSignalDeferred) {
       console.log('[OneSignal] Using web SDK');
-      initWebSDK(displayId);
+      initWebSDK(displayId, firstName);
     } else {
       console.log('[OneSignal] No SDK available');
     }
-  }, [isAuthenticated, user?.id, displayId, isNativeSDK, initNativelySDK, initWebSDK]);
+  }, [isAuthenticated, user?.id, displayId, firstName, isNativeSDK, initNativelySDK, initWebSDK]);
 
   // Request permission
   const requestPermission = useCallback(async (): Promise<boolean> => {
