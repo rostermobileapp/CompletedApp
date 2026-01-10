@@ -143,6 +143,33 @@ export function useNativelyNotifications() {
     return null;
   }, []);
 
+  // Set or remove the In-App trigger based on permission status
+  // This triggers OneSignal In-App messages when permission is NOT enabled
+  const updateInAppTrigger = useCallback((hasPermission: boolean) => {
+    if (isNativeSDK) {
+      const notifications = getNativelyInstance();
+      if (notifications && 'addTrigger' in notifications) {
+        if (!hasPermission) {
+          (notifications as any).addTrigger?.("permission_not_enabled", "true");
+          console.log('[OneSignal] Set in-app trigger: permission_not_enabled = true');
+        } else {
+          (notifications as any).removeTrigger?.("permission_not_enabled");
+          console.log('[OneSignal] Removed in-app trigger: permission_not_enabled');
+        }
+      }
+    } else if (window.OneSignalDeferred) {
+      window.OneSignalDeferred.push((OneSignal) => {
+        if (!hasPermission) {
+          (OneSignal as any).InAppMessages?.addTrigger("permission_not_enabled", "true");
+          console.log('[OneSignal] Set in-app trigger: permission_not_enabled = true');
+        } else {
+          (OneSignal as any).InAppMessages?.removeTrigger("permission_not_enabled");
+          console.log('[OneSignal] Removed in-app trigger: permission_not_enabled');
+        }
+      });
+    }
+  }, [isNativeSDK, getNativelyInstance]);
+
   // Check for SDK on mount and when ready event fires
   useEffect(() => {
     // Initial check
@@ -288,6 +315,7 @@ export function useNativelyNotifications() {
     notifications.getPermissionStatus((resp) => {
       console.log('[OneSignal] Natively permission status:', resp);
       setPermissionState(resp.status ? 'granted' : 'default');
+      updateInAppTrigger(resp.status);
     });
 
     // Get OneSignal Player ID
@@ -331,7 +359,7 @@ export function useNativelyNotifications() {
 
     setIsInitialized(true);
     hasInitialized.current = true;
-  }, [getNativelyInstance, registerPlayerId, playerId]);
+  }, [getNativelyInstance, registerPlayerId, playerId, updateInAppTrigger]);
 
   // Initialize with OneSignal web SDK
   const initWebSDK = useCallback(async (userDisplayId: string) => {
@@ -350,6 +378,7 @@ export function useNativelyNotifications() {
         const permission = OneSignal.Notifications.permission;
         console.log('[OneSignal] Permission:', permission);
         setPermissionState(permission ? 'granted' : 'default');
+        updateInAppTrigger(permission);
 
         // Get the subscription ID (Player ID)
         const subscriptionId = OneSignal.User.PushSubscription.id;
@@ -386,13 +415,14 @@ export function useNativelyNotifications() {
         OneSignal.Notifications.addEventListener('permissionChange', (granted: boolean) => {
           console.log('[OneSignal] Permission changed:', granted);
           setPermissionState(granted ? 'granted' : 'denied');
+          updateInAppTrigger(granted);
         });
 
       } catch (error) {
         console.error('[OneSignal] Initialization error:', error);
       }
     });
-  }, [registerPlayerId]);
+  }, [registerPlayerId, updateInAppTrigger]);
 
   // Initialize and sync with OneSignal when user is authenticated
   useEffect(() => {
