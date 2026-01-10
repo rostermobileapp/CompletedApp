@@ -3243,13 +3243,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      // Verify that the user owns the league
-      const league = await storage.getLeague(leagueId);
+      // Verify that the user owns the league - try by primary key first, then by uniqueLeagueId
+      let league = await storage.getLeague(leagueId);
+      if (!league) {
+        league = await storage.getLeagueByUniqueId(leagueId);
+      }
       if (!league || league.commissionerId !== userId) {
         return res.status(403).json({ message: "You can only edit your own leagues" });
       }
       
-      const result = await storage.updateLeague(leagueId, req.body);
+      const result = await storage.updateLeague(league.id, req.body);
       res.json(result);
     } catch (error) {
       console.error("Error updating league:", error);
@@ -3259,7 +3262,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/leagues/:id", async (req, res) => {
     try {
-      const league = await storage.getLeague(req.params.id);
+      // Try by primary key first, then by uniqueLeagueId
+      let league = await storage.getLeague(req.params.id);
+      if (!league) {
+        league = await storage.getLeagueByUniqueId(req.params.id);
+      }
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -3280,13 +3287,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      // Verify that the user owns the league
-      const league = await storage.getLeague(leagueId);
+      // Verify that the user owns the league - try by primary key first, then by uniqueLeagueId
+      let league = await storage.getLeague(leagueId);
+      if (!league) {
+        league = await storage.getLeagueByUniqueId(leagueId);
+      }
       if (!league || league.commissionerId !== userId) {
         return res.status(403).json({ message: "You can only delete your own leagues" });
       }
       
-      await storage.deleteLeague(leagueId);
+      await storage.deleteLeague(league.id);
       res.json({ message: "League deleted successfully" });
     } catch (error) {
       console.error("Error deleting league:", error);
