@@ -264,7 +264,7 @@ export default function Subscription() {
             <button
               onClick={handleManageSubscription}
               disabled={isLoading}
-              className="w-full mt-4 bg-primary text-primary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mt-4 bg-primary text-primary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="button-manage-subscription"
             >
               {isLoading ? (
@@ -361,7 +361,7 @@ export default function Subscription() {
                 className={`w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${
                   plan.current
                     ? 'bg-secondary text-secondary-foreground cursor-not-allowed'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
+                    : 'bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50'
                 }`}
                 data-testid={`button-${plan.tier}`}
               >

@@ -131,7 +131,7 @@ export default function Roster() {
                     maxFileSize={5 * 1024 * 1024} // 5MB
                     onGetUploadParameters={handleGetTeamLogoUploadParameters}
                     onComplete={handleTeamLogoUploadComplete}
-                    buttonClassName="w-8 h-8 rounded-full bg-primary text-primary-foreground p-0 flex items-center justify-center hover:bg-primary/90"
+                    buttonClassName="w-8 h-8 rounded-full bg-primary text-primary-foreground p-0 flex items-center justify-center hover:bg-primary"
                   >
                     <Upload className="w-4 h-4" />
                   </ObjectUploader>

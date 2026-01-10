@@ -261,7 +261,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
                     : 'cursor-default border-border bg-background'
                 } ${
                   isUserChoice
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 border-primary'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary border-primary'
                     : ''
                 }`}
                 data-testid={`poll-option-${index}`}

@@ -395,7 +395,7 @@ export default function Profile() {
                   maxFileSize={15728640} // 15MB
                   onGetUploadParameters={handleGetUploadParameters}
                   onComplete={handleUploadComplete}
-                  buttonClassName="w-8 h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full flex items-center justify-center border-2 border-background"
+                  buttonClassName="w-8 h-8 bg-primary hover:bg-primary text-primary-foreground rounded-full flex items-center justify-center border-2 border-background"
                 >
                   <Camera className="w-4 h-4" />
                 </ObjectUploader>
@@ -837,7 +837,7 @@ export default function Profile() {
                         setSelectedTeamForLeagueRequest(team.id);
                         setShowLeagueRequestDialog(true);
                       }}
-                      className="w-full mt-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                      className="w-full mt-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary"
                       data-testid={`button-request-join-league-${team.id}`}
                     >
                       Request to Join League

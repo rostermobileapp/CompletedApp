@@ -2632,19 +2632,19 @@ export default function Dashboard() {
       <div className="px-6 flex gap-2">
         <button
           onClick={() => navigate('/league-tournament-search')}
-          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
+          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary font-medium text-sm"
           data-testid="button-find-league"
         >Find a League / Tournament</button>
         <button
           onClick={() => navigate('/team-search')}
-          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
+          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary font-medium text-sm"
           data-testid="button-find-team"
         >
           Find a Team
         </button>
         <button
           onClick={() => setShowFeedbackModal(true)}
-          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 font-medium text-sm"
+          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary font-medium text-sm"
           data-testid="button-send-feedback"
         >
           Send Feedback

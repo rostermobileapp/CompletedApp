@@ -497,7 +497,7 @@ function TournamentPollCard({
                 variant={userVoted ? "default" : "outline"}
                 className={`w-full justify-between h-auto py-3.5 px-4 relative overflow-hidden transition-all duration-300 rounded-xl ${
                   userVoted 
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 border-primary' 
+                    ? 'bg-primary text-primary-foreground hover:bg-primary border-primary' 
                     : 'hover:bg-accent/50 border-border'
                 }`}
                 onClick={() => onVote(poll.id, index, poll.allowMultiple)}
@@ -2485,7 +2485,7 @@ export default function TournamentDetail() {
                       }
                     }}
                     disabled={!targetUserId.trim()}
-                    className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50"
+                    className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary font-medium disabled:opacity-50"
                     data-testid="button-confirm-merge"
                   >
                     Merge Participants

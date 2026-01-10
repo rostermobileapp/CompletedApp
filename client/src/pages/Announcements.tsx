@@ -534,7 +534,7 @@ function PollCard({
                 variant={userVoted ? "default" : "outline"}
                 className={`w-full justify-between h-auto py-3.5 px-4 relative overflow-hidden transition-all duration-300 rounded-xl ${
                   userVoted 
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 border-primary' 
+                    ? 'bg-primary text-primary-foreground hover:bg-primary border-primary' 
                     : 'hover:bg-accent/50 border-border'
                 }`}
                 onClick={() => onVote(poll.id, index, poll.allowMultiple)}

@@ -424,7 +424,7 @@ export function SubstituteRequestModal({
             <Button
               onClick={handleSubmit}
               disabled={!selectedPlayer || createRequestMutation.isPending}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary"
               data-testid="button-send-request"
             >
               {createRequestMutation.isPending ? "Sending..." : "Send Request"}

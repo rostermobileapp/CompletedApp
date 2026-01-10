@@ -396,7 +396,7 @@ function GamesCalendar({ games, teams, onGameClick }: {
           </button>
           <button
             onClick={() => setCurrentDate(new Date())}
-            className="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            className="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary transition-colors"
             data-testid="button-today"
           >
             Today
@@ -2184,7 +2184,7 @@ export default function LeagueManagement() {
             </div>
             <button
               onClick={() => setShowCreateSeason(true)}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium"
               data-testid="button-create-season"
             >
               <Plus className="w-4 h-4 mr-2 inline" />
@@ -2203,7 +2203,7 @@ export default function LeagueManagement() {
               </div>
               <button
                 onClick={() => setShowCreateSeason(true)}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium"
                 data-testid="button-create-first-season"
               >
                 <Plus className="w-4 h-4 mr-2 inline" />
@@ -3600,7 +3600,7 @@ export default function LeagueManagement() {
                       });
                     }}
                     disabled={updatePlayerMutation.isPending}
-                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
                   >
                     {updatePlayerMutation.isPending ? 'Saving...' : 'Save Changes'}
                   </button>
@@ -3832,7 +3832,7 @@ export default function LeagueManagement() {
                     <button
                       type="button"
                       onClick={() => setShowCreateFacility(true)}
-                      className="w-full sm:w-auto px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium whitespace-nowrap"
+                      className="w-full sm:w-auto px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium whitespace-nowrap"
                       data-testid="button-add-facility"
                     >
                       <Plus className="w-4 h-4 inline mr-1" />
@@ -3927,7 +3927,7 @@ export default function LeagueManagement() {
                         addCoCommissionerMutation.mutate(coCommissionerEmail);
                       }}
                       disabled={addCoCommissionerMutation.isPending || !coCommissionerEmail}
-                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
                       data-testid="button-add-cocommissioner"
                     >
                       {addCoCommissionerMutation.isPending ? 'Adding...' : 'Add'}
@@ -3996,7 +3996,7 @@ export default function LeagueManagement() {
                         addAdminMutation.mutate(adminEmail);
                       }}
                       disabled={addAdminMutation.isPending || !adminEmail}
-                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
                       data-testid="button-add-admin"
                     >
                       {addAdminMutation.isPending ? 'Adding...' : 'Add'}
@@ -4065,7 +4065,7 @@ export default function LeagueManagement() {
                         addStatManagerMutation.mutate(statManagerEmail);
                       }}
                       disabled={addStatManagerMutation.isPending || !statManagerEmail}
-                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
                       data-testid="button-add-stat-manager"
                     >
                       {addStatManagerMutation.isPending ? 'Adding...' : 'Add'}
@@ -4137,7 +4137,7 @@ export default function LeagueManagement() {
                   <button
                     type="submit"
                     disabled={updateLeagueMutation.isPending}
-                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
                     data-testid="button-save-league-changes"
                   >
                     {updateLeagueMutation.isPending ? 'Saving...' : 'Save Changes'}
@@ -4235,7 +4235,7 @@ export default function LeagueManagement() {
                   <button
                     type="submit"
                     disabled={createSeasonMutation.isPending}
-                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
                     data-testid="button-create-season-submit"
                   >
                     {createSeasonMutation.isPending ? 'Creating...' : 'Create Season'}
@@ -4391,7 +4391,7 @@ export default function LeagueManagement() {
                   <button
                     type="submit"
                     disabled={createFacilityMutation.isPending}
-                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
                     data-testid="button-submit-create-facility"
                   >
                     {createFacilityMutation.isPending ? 'Creating...' : 'Create Facility'}
@@ -4653,7 +4653,7 @@ export default function LeagueManagement() {
                                     <button
                                       type="button"
                                       onClick={() => setShowTimePicker(false)}
-                                      className="px-4 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium transition-colors"
+                                      className="px-4 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary font-medium transition-colors"
                                     >
                                       Done
                                     </button>
@@ -5199,7 +5199,7 @@ export default function LeagueManagement() {
                     <button
                       type="submit"
                       disabled={updateGameMutation.isPending}
-                      className="flex-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50"
+                      className="flex-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
                       data-testid="button-save-game-changes"
                     >
                       {updateGameMutation.isPending ? 'Saving...' : 'Save Changes'}
@@ -5550,7 +5550,7 @@ export default function LeagueManagement() {
                         }
                       }}
                       disabled={!selectedPlaceholder || isReplacingInApproval}
-                      className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50"
+                      className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary font-medium disabled:opacity-50"
                     >
                       {isReplacingInApproval ? 'Replacing...' : 'Confirm Replace'}
                     </button>
@@ -5926,7 +5926,7 @@ export default function LeagueManagement() {
                       }
                     }}
                     disabled={replaceSearchQuery.trim().length < 2 || isSearchingUsers}
-                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50"
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary font-medium disabled:opacity-50"
                   >
                     {isSearchingUsers ? 'Searching...' : 'Search'}
                   </button>
@@ -6084,7 +6084,7 @@ export default function LeagueManagement() {
                       }
                     }}
                     disabled={!replaceTargetUserId || isReplacingPlayer}
-                    className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50"
+                    className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary font-medium disabled:opacity-50"
                     data-testid="button-confirm-replace"
                   >
                     {isReplacingPlayer ? 'Replacing...' : 'Replace Player'}

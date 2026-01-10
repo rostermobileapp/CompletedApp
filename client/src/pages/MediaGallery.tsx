@@ -355,7 +355,7 @@ export default function MediaGalleryPage() {
               </p>
               <Button 
                 onClick={() => navigate('/payments')}
-                className="bg-primary hover:bg-primary/90"
+                className="bg-primary hover:bg-primary"
                 data-testid="button-upgrade-now"
               >
                 Upgrade Now
