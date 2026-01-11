@@ -279,7 +279,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (dateOfBirth !== undefined) profileData.dateOfBirth = dateOfBirth;
       if (playerType !== undefined) profileData.playerType = playerType;
       if (email !== undefined) profileData.email = email;
-      if (timezone !== undefined) profileData.timezone = timezone;
+      if (timezone !== undefined) {
+        profileData.timezone = timezone;
+        profileData.timezoneManuallySet = true; // Mark as manually set when user changes it
+      }
 
       const user = await storage.updateUserProfile(userId, profileData);
       res.json(user);

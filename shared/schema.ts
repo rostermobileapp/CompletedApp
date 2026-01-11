@@ -222,6 +222,7 @@ export const users = pgTable("users", {
   cashappUsername: varchar("cashapp_username"),
   // Timezone preference for displaying dates/times
   timezone: varchar("timezone").default("America/New_York"),
+  timezoneManuallySet: boolean("timezone_manually_set").default(false),
   // Navigation preferences
   navigationPreferences: jsonb("navigation_preferences"),
   // Onboarding tracking

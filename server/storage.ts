@@ -246,7 +246,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'playerType' | 'email' | 'timezone'>>): Promise<User>;
+  updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'playerType' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User>;
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
   updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
   updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User>;
@@ -782,7 +782,7 @@ export class DatabaseStorage implements IStorage {
 
 
 
-  async updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'playerType' | 'email' | 'timezone'>>): Promise<User> {
+  async updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'playerType' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User> {
     const [user] = await db
       .update(users)
       .set({
@@ -2438,6 +2438,35 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(leagueMemberships.id, membershipId))
         .returning();
+
+      // Update the user's timezone to match the league's timezone (if they haven't manually set one)
+      try {
+        const [league] = await tx
+          .select({ timezone: leagues.timezone })
+          .from(leagues)
+          .where(eq(leagues.id, membership.leagueId))
+          .limit(1);
+        
+        if (league?.timezone) {
+          const [user] = await tx
+            .select({ timezoneManuallySet: users.timezoneManuallySet })
+            .from(users)
+            .where(eq(users.id, membership.userId))
+            .limit(1);
+          
+          // Only update if user hasn't manually set their timezone
+          if (!user?.timezoneManuallySet) {
+            await tx
+              .update(users)
+              .set({ timezone: league.timezone })
+              .where(eq(users.id, membership.userId));
+            console.log(`📍 Updated timezone for user ${membership.userId} to ${league.timezone} (matched to league)`);
+          }
+        }
+      } catch (error) {
+        console.error('Error updating user timezone on league join:', error);
+        // Don't fail the approval if timezone update fails
+      }
 
       // Check if this user was previously merged with an imported player in this league
       const [importedPlayer] = await tx
