@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch } from "lucide-react";
 import { RSVPButtons } from "@/components/RSVPButtons";
@@ -635,7 +636,11 @@ export default function GameDetails() {
               <div className="flex items-center gap-2 text-muted-foreground mt-1">
                 <Clock className="w-4 h-4" />
                 <span data-testid="text-game-time">
-                  {format(new Date(game.scheduledAt), 'EEEE, MMM d • h:mm a')}
+                  {formatInTimeZone(
+                    new Date(game.scheduledAt), 
+                    (league as any)?.timezone || 'America/New_York',
+                    'EEEE, MMM d • h:mm a'
+                  )}
                 </span>
               </div>
               {game.venue && (

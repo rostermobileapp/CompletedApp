@@ -303,12 +303,36 @@ const editGameSchema = z.object({
 
 type EditGameForm = z.infer<typeof editGameSchema>;
 
+const TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
+  { value: 'America/Phoenix', label: 'Arizona (No DST)' },
+  { value: 'America/Toronto', label: 'Eastern Time - Toronto' },
+  { value: 'America/Vancouver', label: 'Pacific Time - Vancouver' },
+  { value: 'America/Edmonton', label: 'Mountain Time - Edmonton' },
+  { value: 'America/Winnipeg', label: 'Central Time - Winnipeg' },
+  { value: 'America/Halifax', label: 'Atlantic Time (AT)' },
+  { value: 'America/St_Johns', label: 'Newfoundland Time (NT)' },
+  { value: 'Europe/London', label: 'London (GMT/BST)' },
+  { value: 'Europe/Paris', label: 'Central European Time' },
+  { value: 'Europe/Berlin', label: 'Berlin (CET)' },
+  { value: 'Australia/Sydney', label: 'Sydney (AEST)' },
+  { value: 'Australia/Melbourne', label: 'Melbourne (AEST)' },
+  { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+  { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
+];
+
 const editLeagueSchema = z.object({
   name: z.string().min(1, 'League name is required'),
   description: z.string().optional(),
   location: z.string().optional(),
   season: z.string().optional(),
   facilityId: z.string().optional(),
+  timezone: z.string().optional(),
   isActive: z.boolean(),
 });
 
@@ -877,6 +901,7 @@ export default function LeagueManagement() {
       location: league?.location || '',
       season: league?.season || '',
       facilityId: league?.facilityId || '',
+      timezone: (league as any)?.timezone || 'America/New_York',
       isActive: league?.isActive ?? true,
     },
   });
@@ -952,6 +977,7 @@ export default function LeagueManagement() {
         season: league.season || '',
         isActive: league.isActive ?? true,
         facilityId: league.facilityId || '',
+        timezone: (league as any)?.timezone || 'America/New_York',
       });
     }
   }, [league]);
@@ -3854,6 +3880,35 @@ export default function LeagueManagement() {
                     placeholder="e.g., Spring 2024"
                     data-testid="input-league-season"
                   />
+                </div>
+
+                {/* Timezone */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Timezone</label>
+                  <Controller
+                    name="timezone"
+                    control={editLeagueForm.control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value || 'America/New_York'}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger className="w-full" data-testid="select-league-timezone">
+                          <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIMEZONES.map((tz) => (
+                            <SelectItem key={tz.value} value={tz.value}>
+                              {tz.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This timezone will be used for all game schedules and notifications
+                  </p>
                 </div>
 
                 {/* Active Status */}
