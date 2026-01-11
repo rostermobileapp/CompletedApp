@@ -20,6 +20,7 @@ interface UserProfileData {
   playerType?: string | null;
   venmoUsername?: string | null;
   cashappUsername?: string | null;
+  timezone?: string | null;
 }
 
 export default function UserProfile() {
@@ -41,6 +42,20 @@ export default function UserProfile() {
       case 'commissioner': return { label: 'COMMISSIONER', class: 'bg-warning text-black' };
       default: return { label: 'FREE', class: 'bg-muted text-muted-foreground' };
     }
+  };
+
+  const formatTimezone = (tz: string | null | undefined): string => {
+    if (!tz) return 'Not specified';
+    const timezoneLabels: Record<string, string> = {
+      'America/New_York': 'Eastern (ET)',
+      'America/Chicago': 'Central (CT)',
+      'America/Denver': 'Mountain (MT)',
+      'America/Los_Angeles': 'Pacific (PT)',
+      'America/Anchorage': 'Alaska (AKT)',
+      'Pacific/Honolulu': 'Hawaii (HT)',
+      'America/Phoenix': 'Arizona (MST)',
+    };
+    return timezoneLabels[tz] || tz;
   };
 
   const downloadVCF = () => {
@@ -207,6 +222,10 @@ export default function UserProfile() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Player Type:</span>
               <span data-testid="text-player-type">{user.playerType || 'Not specified'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Timezone:</span>
+              <span data-testid="text-profile-timezone">{formatTimezone(user.timezone)}</span>
             </div>
           </div>
         </div>
