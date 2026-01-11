@@ -180,7 +180,8 @@ async function markReminderSent(
 async function sendEventReminder(
   event: EventInfo,
   player: { id: string; firstName: string | null; lastName: string | null },
-  trigger: ReminderTrigger
+  trigger: ReminderTrigger,
+  dutyMessage?: string
 ): Promise<void> {
   const triggerAlreadySent = await hasReminderBeenSent(event.eventType, event.id, player.id, trigger);
   if (triggerAlreadySent) {
@@ -199,13 +200,15 @@ async function sendEventReminder(
       timeLabel,
       event.location || 'TBD',
       event.id,
-      event.eventType
+      event.eventType,
+      dutyMessage
     );
     
     // Record that we sent this reminder
     await markReminderSent(event.eventType, event.id, player.id, trigger);
     
-    console.log(`✅ Sent ${trigger} reminder for ${event.eventType} ${event.id} to ${player.firstName || player.id}`);
+    const dutyLog = dutyMessage ? ` (with duty: ${dutyMessage})` : '';
+    console.log(`✅ Sent ${trigger} reminder for ${event.eventType} ${event.id} to ${player.firstName || player.id}${dutyLog}`);
   } catch (error) {
     console.error(`❌ Failed to send ${trigger} reminder for ${event.eventType} ${event.id} to ${player.id}:`, error);
   }
@@ -227,6 +230,8 @@ export async function checkAndSendEventReminders(): Promise<void> {
         homeTeamId: games.homeTeamId,
         awayTeamId: games.awayTeamId,
         leagueId: games.leagueId,
+        homeBeverageDutyUserId: games.homeBeverageDutyUserId,
+        awayBeverageDutyUserId: games.awayBeverageDutyUserId,
       })
       .from(games)
       .where(
@@ -301,7 +306,13 @@ export async function checkAndSendEventReminders(): Promise<void> {
           console.log(`📧 Sending ${trigger} reminders for game ${game.id} to ${participants.length} players`);
           
           for (const player of participants) {
-            await sendEventReminder(eventInfo, player, trigger);
+            // Check if player has a duty for this game
+            let dutyMessage: string | undefined;
+            if (player.id === game.homeBeverageDutyUserId || player.id === game.awayBeverageDutyUserId) {
+              dutyMessage = "🍺 You have beverage duty!";
+            }
+            
+            await sendEventReminder(eventInfo, player, trigger, dutyMessage);
           }
         }
       }

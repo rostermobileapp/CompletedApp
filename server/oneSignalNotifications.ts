@@ -173,7 +173,8 @@ export async function sendScheduleReminderPushNotification(
   timeLabel: string,
   location: string,
   eventId: string,
-  eventType: 'scrimmage' | 'game'
+  eventType: 'scrimmage' | 'game',
+  dutyMessage?: string
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
   const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
@@ -182,10 +183,15 @@ export async function sendScheduleReminderPushNotification(
     return false;
   }
   
+  let message = `Starting in ${timeLabel} at ${location}`;
+  if (dutyMessage) {
+    message += ` - ${dutyMessage}`;
+  }
+  
   return sendPushNotificationToUser({
     userId: recipientId,
     title: `⏰ Reminder: ${eventTitle}`,
-    message: `Starting in ${timeLabel} at ${location}`,
+    message,
     data: {
       type: 'schedule_reminder',
       eventType,
