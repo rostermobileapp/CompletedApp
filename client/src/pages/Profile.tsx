@@ -20,6 +20,28 @@ import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HPIBBanner } from '@/components/HPIBBanner';
 
+const TIMEZONE_OPTIONS = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
+  { value: 'America/Phoenix', label: 'Arizona (No DST)' },
+  { value: 'America/Toronto', label: 'Eastern Time - Toronto' },
+  { value: 'America/Vancouver', label: 'Pacific Time - Vancouver' },
+  { value: 'America/Edmonton', label: 'Mountain Time - Edmonton' },
+  { value: 'America/Winnipeg', label: 'Central Time - Winnipeg' },
+  { value: 'America/Halifax', label: 'Atlantic Time (AT)' },
+  { value: 'America/St_Johns', label: 'Newfoundland Time (NT)' },
+  { value: 'Europe/London', label: 'GMT/BST - London' },
+  { value: 'Europe/Paris', label: 'CET - Paris' },
+  { value: 'Europe/Berlin', label: 'CET - Berlin' },
+  { value: 'Australia/Sydney', label: 'AEST - Sydney' },
+  { value: 'Australia/Melbourne', label: 'AEST - Melbourne' },
+  { value: 'Asia/Tokyo', label: 'JST - Tokyo' },
+];
+
 const profileSchema = z.object({
   email: z.string().email('Invalid email address').optional(),
   firstName: z.string().optional(),
@@ -28,6 +50,7 @@ const profileSchema = z.object({
   phoneNumber: z.string().optional(),
   city: z.string().optional(),
   playerType: z.enum(['Skater', 'Goalie']).optional(),
+  timezone: z.string().optional(),
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
@@ -70,6 +93,7 @@ export default function Profile() {
       phoneNumber: (user as any)?.phoneNumber || '',
       city: (user as any)?.city || '',
       playerType: (user as any)?.playerType || undefined,
+      timezone: (user as any)?.timezone || 'America/New_York',
     },
   });
 
@@ -548,6 +572,32 @@ export default function Profile() {
                 />
               </div>
               
+              <div>
+                <label className="block text-sm font-medium mb-1">Timezone</label>
+                <Controller
+                  name="timezone"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger className="w-full" data-testid="select-timezone">
+                        <SelectValue placeholder="Select timezone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIMEZONE_OPTIONS.map((tz) => (
+                          <SelectItem key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Used for displaying game times and schedules</p>
+              </div>
+              
               <button
                 type="submit"
                 disabled={updateProfileMutation.isPending}
@@ -593,6 +643,14 @@ export default function Profile() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Player Type:</span>
                 <span data-testid="text-player-type">{(user as any)?.playerType || 'Not specified'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Timezone:</span>
+                <span data-testid="text-timezone">
+                  {TIMEZONE_OPTIONS.find(tz => tz.value === (user as any)?.timezone)?.label || 
+                   (user as any)?.timezone || 
+                   'Eastern Time (ET)'}
+                </span>
               </div>
             </div>
           )}

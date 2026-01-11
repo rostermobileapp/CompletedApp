@@ -1,16 +1,39 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, MapPin, Calendar } from 'lucide-react';
+import { ArrowLeft, Crown, MapPin, Calendar, Globe } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
 import { insertLeagueSchema } from '@shared/schema';
 import type { z } from 'zod';
 import { usePermissions } from '@/context/SubscriptionContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const TIMEZONE_OPTIONS = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
+  { value: 'America/Phoenix', label: 'Arizona (No DST)' },
+  { value: 'America/Toronto', label: 'Eastern Time - Toronto' },
+  { value: 'America/Vancouver', label: 'Pacific Time - Vancouver' },
+  { value: 'America/Edmonton', label: 'Mountain Time - Edmonton' },
+  { value: 'America/Winnipeg', label: 'Central Time - Winnipeg' },
+  { value: 'America/Halifax', label: 'Atlantic Time (AT)' },
+  { value: 'America/St_Johns', label: 'Newfoundland Time (NT)' },
+  { value: 'Europe/London', label: 'GMT/BST - London' },
+  { value: 'Europe/Paris', label: 'CET - Paris' },
+  { value: 'Europe/Berlin', label: 'CET - Berlin' },
+  { value: 'Australia/Sydney', label: 'AEST - Sydney' },
+  { value: 'Australia/Melbourne', label: 'AEST - Melbourne' },
+  { value: 'Asia/Tokyo', label: 'JST - Tokyo' },
+];
 
 // Create a form schema that includes the new fields, making most fields optional
 const createLeagueSchema = insertLeagueSchema.extend({
@@ -45,6 +68,7 @@ export default function CreateLeague() {
       rinkAddress: '',
       season: '',
       maxTeams: 16,
+      timezone: 'America/New_York',
     },
   });
 
@@ -272,6 +296,39 @@ export default function CreateLeague() {
                 {form.formState.errors.maxTeams && (
                   <p className="text-destructive text-sm mt-1">{form.formState.errors.maxTeams.message}</p>
                 )}
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Globe className="w-4 h-4 text-primary" />
+                  <label className="block text-sm font-medium" data-testid="label-timezone">
+                    League Timezone
+                  </label>
+                </div>
+                <Controller
+                  name="timezone"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value || 'America/New_York'}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger className="w-full" data-testid="select-timezone">
+                        <SelectValue placeholder="Select timezone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIMEZONE_OPTIONS.map((tz) => (
+                          <SelectItem key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <p className="text-muted-foreground text-xs mt-1">
+                  All games and schedules will use this timezone by default
+                </p>
               </div>
             </div>
           </div>

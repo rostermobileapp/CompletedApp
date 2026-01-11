@@ -220,6 +220,8 @@ export const users = pgTable("users", {
   // Payment method fields for receiving payments
   venmoUsername: varchar("venmo_username"),
   cashappUsername: varchar("cashapp_username"),
+  // Timezone preference for displaying dates/times
+  timezone: varchar("timezone").default("America/New_York"),
   // Navigation preferences
   navigationPreferences: jsonb("navigation_preferences"),
   // Onboarding tracking
