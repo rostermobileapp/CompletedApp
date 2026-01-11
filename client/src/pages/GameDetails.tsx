@@ -639,7 +639,7 @@ export default function GameDetails() {
                   {formatInTimeZone(
                     new Date(game.scheduledAt), 
                     (league as any)?.timezone || 'America/New_York',
-                    'EEEE, MMM d • h:mm a'
+                    'EEEE, MMM d • h:mm a zzz'
                   )}
                 </span>
               </div>
