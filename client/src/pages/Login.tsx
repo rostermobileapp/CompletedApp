@@ -37,9 +37,10 @@ export default function Login() {
         
         if (data.user && !data.session) {
           toast({
-            title: 'Almost there!',
-            description: 'Check your email to verify your account before signing in.',
+            title: 'Check Your Email',
+            description: 'We sent you a confirmation link. Please click it to activate your account, then come back and sign in.',
           });
+          setIsSignUp(false);
         } else if (data.session) {
           toast({
             title: 'Welcome!',
@@ -51,6 +52,7 @@ export default function Login() {
             title: 'Success!',
             description: 'Your account has been created. You can now sign in.',
           });
+          setIsSignUp(false);
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
