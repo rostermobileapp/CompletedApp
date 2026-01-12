@@ -1435,6 +1435,30 @@ export default function Dashboard() {
     queryKey: ['/api/user/leagues'],
   });
   
+  // Fetch visible tournaments for all user leagues
+  const { data: visibleTournaments = [], isLoading: visibleTournamentsLoading } = useQuery<any[]>({
+    queryKey: ['/api/user/visible-tournaments', userLeagues],
+    queryFn: async () => {
+      if (!Array.isArray(userLeagues) || userLeagues.length === 0) return [];
+      
+      // Fetch visible tournaments for each league
+      const tournamentPromises = userLeagues.map(async (league: any) => {
+        try {
+          const response = await apiRequest('GET', `/api/leagues/${league.id}/visible-tournaments`);
+          const tournaments = await response.json();
+          return tournaments.map((t: any) => ({ ...t, leagueName: league.name }));
+        } catch (error) {
+          console.error(`Failed to fetch visible tournaments for league ${league.id}:`, error);
+          return [];
+        }
+      });
+      
+      const results = await Promise.all(tournamentPromises);
+      return results.flat();
+    },
+    enabled: Array.isArray(userLeagues) && userLeagues.length > 0,
+  });
+  
   // Fetch user's paid tournaments
   const { data: userPaidTournaments } = useQuery({
     queryKey: ['/api/user/paid-tournaments'],
@@ -2328,7 +2352,7 @@ export default function Dashboard() {
           </button>
         </div>
         
-        {gamesLoading || invitesLoading || requestsLoading || remindersLoading ? (
+        {gamesLoading || invitesLoading || requestsLoading || remindersLoading || visibleTournamentsLoading ? (
           <div className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid="loading-upcoming-games">
             <div className="h-16 bg-muted rounded"></div>
           </div>
@@ -2343,7 +2367,7 @@ export default function Dashboard() {
             const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
             return eventDateOnly >= yesterday;
           };
-          return (Array.isArray(upcomingGames) && upcomingGames.filter((g: any) => isYesterdayOrLater(g.scheduledAt)).length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => isYesterdayOrLater(i.dateTime)).length > 0) || (Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved' && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0) || (Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && isYesterdayOrLater(r.scheduledAt)).length > 0);
+          return (Array.isArray(upcomingGames) && upcomingGames.filter((g: any) => isYesterdayOrLater(g.scheduledAt)).length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => isYesterdayOrLater(i.dateTime)).length > 0) || (Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved' && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0) || (Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && isYesterdayOrLater(r.scheduledAt)).length > 0) || (Array.isArray(visibleTournaments) && visibleTournaments.length > 0);
         })() ? (
           <div className="space-y-3">
             {/* First show scrimmage invites (yesterday and future - visible until day after) */}
@@ -2491,6 +2515,36 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+            
+            {/* Show visible tournament brackets */}
+            {Array.isArray(visibleTournaments) && visibleTournaments.map((tournament: any) => (
+              <div 
+                key={`bracket-${tournament.id}`}
+                className="rounded-xl border border-purple-500/50 p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
+                onClick={() => navigate(`/tournaments/${tournament.id}?tab=bracket&readonly=true`)}
+                data-testid={`card-bracket-${tournament.id}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
+                    <Trophy className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold" data-testid={`text-bracket-name-${tournament.id}`}>
+                        {tournament.name}
+                      </h3>
+                      <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Bracket</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground" data-testid={`text-bracket-league-${tournament.id}`}>
+                      {tournament.leagueName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      View Bracket
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
             
             {/* Then show regular games (yesterday and future - visible until day after) */}
             {(upcomingGames as any[])

@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX, User, ArrowRight, Megaphone, Plus, Heart, ThumbsUp, Laugh, Frown, Angry, Meh, MessageCircle, BarChart3, Pin, MoreHorizontal, Edit2, FileText, AlertCircle } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX, User, ArrowRight, Megaphone, Plus, Heart, ThumbsUp, Laugh, Frown, Angry, Meh, MessageCircle, BarChart3, Pin, MoreHorizontal, Edit2, FileText, AlertCircle, Eye, EyeOff } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -829,10 +829,13 @@ export default function TournamentDetail() {
   const { toast } = useToast();
   const { canManageLeagueSpecific } = usePermissions();
   
-  // Read tab from URL query parameter
+  // Read tab and readonly mode from URL query parameters
   const urlParams = new URLSearchParams(window.location.search);
   const tabFromUrl = urlParams.get('tab');
-  const defaultTab = (tabFromUrl && ['bracket', 'teams', 'schedule'].includes(tabFromUrl)) ? tabFromUrl : 'bracket';
+  const isReadOnlyMode = urlParams.get('readonly') === 'true';
+  // In read-only mode, only allow bracket and schedule tabs
+  const allowedTabs = isReadOnlyMode ? ['bracket', 'schedule'] : ['bracket', 'teams', 'schedule'];
+  const defaultTab = (tabFromUrl && allowedTabs.includes(tabFromUrl)) ? tabFromUrl : 'bracket';
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingMatch, setEditingMatch] = useState<TournamentMatch | null>(null);
   const [scoringMatchId, setScoringMatchId] = useState<string | null>(null);
@@ -1059,6 +1062,33 @@ export default function TournamentDetail() {
     }
   });
 
+  const toggleVisibilityMutation = useMutation({
+    mutationFn: async (isVisibleToLeague: boolean) => {
+      const response = await apiRequest('PATCH', `/api/tournaments/${tournamentId}/visibility`, { isVisibleToLeague });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+      // Invalidate visible tournaments queries so the dashboard updates
+      if (data.leagueId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/leagues', data.leagueId, 'visible-tournaments'] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/user/visible-tournaments'] });
+      toast({
+        title: data.isVisibleToLeague ? "Bracket visible to league" : "Bracket hidden from league",
+        description: data.isVisibleToLeague 
+          ? "All league members can now view the tournament bracket on their home page." 
+          : "The bracket is no longer visible to league members."
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update bracket visibility",
+        variant: "destructive"
+      });
+    }
+  });
 
   const isLoading = tournamentLoading || teamsLoading || matchesLoading;
 
@@ -1568,9 +1598,11 @@ export default function TournamentDetail() {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 pt-[2px] pb-[2px] pl-[8px] pr-[8px]">
         <Tabs defaultValue={defaultTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 md:w-auto">
+          <TabsList className={`grid w-full ${isReadOnlyMode ? 'grid-cols-2' : 'grid-cols-3'} md:w-auto`}>
             <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
-            <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
+            {!isReadOnlyMode && (
+              <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
+            )}
             <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
           </TabsList>
 
@@ -1795,19 +1827,50 @@ export default function TournamentDetail() {
                                   Playoff seeding based on Round Robin record (wins/losses) with goals scored as tiebreaker
                                 </span>
                               )}
+                              {tournament.isVisibleToLeague && (
+                                <span className="block mt-1 text-xs text-green-600 dark:text-green-400">
+                                  Visible to all league members
+                                </span>
+                              )}
                             </CardDescription>
                           </div>
-                          {tournament.status === 'draft' && (
-                            <Button
-                              onClick={() => setIsEditingBracket(true)}
-                              variant="outline"
-                              size="sm"
-                              className="gap-2"
-                              data-testid="button-edit-bracket"
-                            >
-                              <Edit className="h-4 w-4" />
-                              Edit Bracket
-                            </Button>
+                          {!isReadOnlyMode && (
+                            <div className="flex gap-2">
+                              {tournament.status === 'draft' && (
+                                <Button
+                                  onClick={() => setIsEditingBracket(true)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-2"
+                                  data-testid="button-edit-bracket"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                  Edit Bracket
+                                </Button>
+                              )}
+                              {tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
+                                <Button
+                                  onClick={() => toggleVisibilityMutation.mutate(!tournament.isVisibleToLeague)}
+                                  variant={tournament.isVisibleToLeague ? "default" : "outline"}
+                                  size="sm"
+                                  className="gap-2"
+                                  disabled={toggleVisibilityMutation.isPending}
+                                  data-testid="button-toggle-visibility"
+                                >
+                                  {tournament.isVisibleToLeague ? (
+                                    <>
+                                      <EyeOff className="h-4 w-4" />
+                                      Hide from League
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye className="h-4 w-4" />
+                                      Make Visible to League
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                            </div>
                           )}
                         </CardHeader>
                         <CardContent>
@@ -1818,7 +1881,7 @@ export default function TournamentDetail() {
                             settings={tournament.settings as TournamentSettings | undefined}
                             tournamentName={tournament.name}
                             tournamentId={tournamentId || ''}
-                            isCommissioner={tournament.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
+                            isCommissioner={!isReadOnlyMode && tournament.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
                             tournamentType={tournament.type}
                           />
                         </CardContent>
