@@ -7009,12 +7009,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const isCreator = tournament.createdBy === userId;
         const hasGlobalStatManager = user?.specialPermissions?.includes('stat_manager') || false;
         
-        // Check if commissioner of the league or has league-specific stat_manager
+        // Check if commissioner/co-commissioner of the league or has league-specific stat_manager
         let isLeagueCommissioner = false;
         let hasLeagueStatManager = false;
-        if (tournament.leagueId) {
-          const league = await storage.getLeague(tournament.leagueId);
-          isLeagueCommissioner = league?.commissionerId === userId;
+        if (tournament.leagueId && user) {
+          const { canManageLeagueSpecific } = await import('./permissionMiddleware');
+          isLeagueCommissioner = await canManageLeagueSpecific(user as any, tournament.leagueId);
           const leaguePermissions = await storage.getUserLeaguePermissions(userId, tournament.leagueId);
           hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager') || false;
         }
@@ -9929,7 +9929,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Tournament not found' });
       }
 
-      const isCommissioner = tournament.createdBy === userId;
+      // Check if user has commissioner access - either tournament creator or league commissioner/co-commissioner
+      let isCommissioner = tournament.createdBy === userId;
+      
+      if (!isCommissioner && tournament.leagueId) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          const { canManageLeagueSpecific } = await import('./permissionMiddleware');
+          isCommissioner = await canManageLeagueSpecific(user as any, tournament.leagueId);
+        }
+      }
 
       if (!isCommissioner) {
         return res.status(403).json({ message: 'Only tournament commissioners can create announcements' });
@@ -14441,7 +14450,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
 
-      // Get all tournaments created by the user (both standalone and league)
+      // Get leagues where user is commissioner or co-commissioner
+      const commissionerLeagues = await storage.getLeaguesByCommissioner(userId);
+      const commissionerLeagueIds = commissionerLeagues.map(l => l.id);
+
+      // Build conditions: user created the tournament OR user is commissioner/co-commissioner of the league
+      const conditions: any[] = [eq(tournaments.createdBy, userId)];
+      if (commissionerLeagueIds.length > 0) {
+        conditions.push(inArray(tournaments.leagueId, commissionerLeagueIds));
+      }
+
+      // Get all tournaments the user has access to
       const allTournamentsList = await db
         .select({
           id: tournaments.id,
@@ -14455,7 +14474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .from(tournaments)
         .leftJoin(leagues, eq(tournaments.leagueId, leagues.id))
-        .where(eq(tournaments.createdBy, userId))
+        .where(or(...conditions))
         .orderBy(sql`${tournaments.createdAt} DESC`);
 
       res.json(allTournamentsList);
@@ -16076,20 +16095,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "This endpoint is only for custom bracket tournaments" });
       }
 
-      // Check if user has permissions for this tournament's league
-      const [league] = await db
-        .select()
-        .from(leagues)
-        .where(eq(leagues.id, tournament.leagueId));
-
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
+      // Check if user has commissioner/co-commissioner permissions for this tournament
+      let hasPermission = tournament.createdBy === userId;
+      
+      if (!hasPermission && tournament.leagueId) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          const { canManageLeagueSpecific } = await import('./permissionMiddleware');
+          hasPermission = await canManageLeagueSpecific(user as any, tournament.leagueId);
+        }
       }
 
-      // Check if user is league commissioner
-      const isCommissioner = league.commissionerId === userId;
-
-      if (!isCommissioner) {
+      if (!hasPermission) {
         return res.status(403).json({ message: "Access denied. Only league commissioners can generate tournament matches" });
       }
 
@@ -17045,21 +17062,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Tournament not found" });
       }
 
-      // Check commissioner access - via league commissioner OR tournament creator
-      let isCommissioner = false;
+      // Check commissioner access - via league commissioner/co-commissioner OR tournament creator
+      let isCommissioner = tournament.createdBy === userId;
       
-      // For league-based tournaments, check league commissioner
-      if (tournament.leagueId) {
-        const [league] = await db
-          .select()
-          .from(leagues)
-          .where(eq(leagues.id, tournament.leagueId));
-        isCommissioner = league?.commissionerId === userId;
-      }
-      
-      // For standalone tournaments, check tournament creator
-      if (!isCommissioner && tournament.createdBy === userId) {
-        isCommissioner = true;
+      // For league-based tournaments, check if user can manage the league (commissioner or co-commissioner)
+      if (!isCommissioner && tournament.leagueId) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          const { canManageLeagueSpecific } = await import('./permissionMiddleware');
+          isCommissioner = await canManageLeagueSpecific(user as any, tournament.leagueId);
+        }
       }
       
       // Check captain access - either via linked league team OR tournament participant captain

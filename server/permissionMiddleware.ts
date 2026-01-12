@@ -573,9 +573,9 @@ export const requireTournamentParticipant: RequestHandler = async (req, res, nex
       return res.status(400).json({ message: "Tournament ID required" });
     }
 
-    // Check if user is a league commissioner (they always have access)
+    // Check if user is a tournament creator or league commissioner/co-commissioner
     const { db } = await import("./db");
-    const { tournaments, leagues } = await import("@shared/schema");
+    const { tournaments } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
 
     const [tournament] = await db
@@ -584,13 +584,20 @@ export const requireTournamentParticipant: RequestHandler = async (req, res, nex
       .where(eq(tournaments.id, tournamentId));
 
     if (tournament) {
-      const [league] = await db
-        .select()
-        .from(leagues)
-        .where(eq(leagues.id, tournament.leagueId));
-
-      if (league && league.commissionerId === userId) {
-        return next(); // Commissioner always has access
+      // Tournament creator always has access
+      if (tournament.createdBy === userId) {
+        return next();
+      }
+      
+      // For league tournaments, check commissioner/co-commissioner access
+      if (tournament.leagueId) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          const hasLeagueAccess = await canManageLeagueSpecific(user as UserWithPermissions, tournament.leagueId);
+          if (hasLeagueAccess) {
+            return next();
+          }
+        }
       }
     }
 
