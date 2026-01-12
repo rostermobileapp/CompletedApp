@@ -304,8 +304,9 @@ export default function TeamView() {
                   return (
                     <div 
                       key={member.id} 
-                      className="flex items-center justify-between p-3 rounded-lg bg-card border"
+                      className="flex items-center justify-between p-3 rounded-lg bg-card border cursor-pointer hover:bg-accent transition-colors"
                       data-testid={`roster-member-${member.id}`}
+                      onClick={() => member.user?.id && navigate(`/user/${member.user.id}`)}
                     >
                       <div className="flex items-center gap-3">
                         <Avatar className="w-10 h-10">
