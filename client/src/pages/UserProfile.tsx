@@ -61,8 +61,8 @@ export default function UserProfile() {
   const downloadVCF = () => {
     if (!user) return;
 
-    // Generate vCard content
-    const vCardContent = [
+    // Generate vCard content with proper line endings (CRLF as per RFC 6350)
+    const vCardLines = [
       'BEGIN:VCARD',
       'VERSION:3.0',
       `FN:${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -72,18 +72,25 @@ export default function UserProfile() {
       user.city ? `ADR:;;${user.city};;;;` : '',
       user.dateOfBirth ? `BDAY:${user.dateOfBirth}` : '',
       'END:VCARD'
-    ].filter(line => line && !line.endsWith(':')).join('\n');
+    ].filter(line => line && !line.endsWith(':'));
+    
+    const vCardContent = vCardLines.join('\r\n');
+    const fileName = `${user.firstName || 'contact'}_${user.lastName || 'info'}.vcf`;
 
-    // Create blob and download
-    const blob = new Blob([vCardContent], { type: 'text/vcard' });
-    const url = window.URL.createObjectURL(blob);
+    // Use data URL approach which works better on mobile devices
+    const dataUrl = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vCardContent);
+    
     const link = document.createElement('a');
-    link.href = url;
-    link.download = `${user.firstName || 'contact'}_${user.lastName || 'info'}.vcf`;
+    link.href = dataUrl;
+    link.download = fileName;
+    link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    
+    // Small delay before cleanup to ensure download starts
+    setTimeout(() => {
+      document.body.removeChild(link);
+    }, 100);
 
     toast({
       title: "Contact Downloaded",
