@@ -40,6 +40,12 @@ export default function Login() {
             title: 'Almost there!',
             description: 'Check your email to verify your account before signing in.',
           });
+        } else if (data.session) {
+          toast({
+            title: 'Welcome!',
+            description: 'Your account has been created.',
+          });
+          setLocation('/');
         } else {
           toast({
             title: 'Success!',

@@ -31,7 +31,13 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     
-    if (error || !user) {
+    if (error) {
+      console.error('[Auth] Supabase getUser error:', error.message);
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    
+    if (!user) {
+      console.error('[Auth] No user returned from Supabase');
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
