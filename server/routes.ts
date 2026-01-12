@@ -15565,6 +15565,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(tournaments.id, id))
         .returning();
 
+      // If custom bracket with matchups is being saved, create/update tournament_matches
+      if (settings?.customBracket?.matchups && Array.isArray(settings.customBracket.matchups)) {
+        const matchups = settings.customBracket.matchups;
+        
+        // Clear existing matches for this tournament
+        await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
+        
+        // Get existing teams for the tournament to map team names to IDs
+        const existingTeams = await db
+          .select()
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.tournamentId, id));
+        
+        const teamNameToId = new Map(existingTeams.map(t => [t.name, t.id]));
+        
+        // Create tournament_matches from matchups
+        const matchesToInsert = matchups.map((matchup: any, index: number) => {
+          // Extract game number from string like "Game 1" -> 1
+          const matchNumber = parseInt(matchup.gameNumber?.replace(/\D/g, '') || String(index + 1));
+          
+          return {
+            id: matchup.id,
+            tournamentId: id,
+            round: matchup.type === 'losers' ? 'Losers Bracket' : 'Winners Bracket',
+            matchNumber,
+            team1Id: teamNameToId.get(matchup.team1) || null,
+            team2Id: teamNameToId.get(matchup.team2) || null,
+            team1Score: matchup.score1,
+            team2Score: matchup.score2,
+            winnerId: matchup.winner ? teamNameToId.get(matchup.winner) : null,
+            status: matchup.winner ? 'completed' : 'pending',
+            scheduledTime: null,
+            location: null,
+            notes: null
+          };
+        });
+        
+        if (matchesToInsert.length > 0) {
+          await db.insert(tournamentMatches).values(matchesToInsert);
+        }
+      }
+
       // If teams provided, regenerate bracket
       if (teams && teams.length > 0) {
         // Clear existing teams and matches

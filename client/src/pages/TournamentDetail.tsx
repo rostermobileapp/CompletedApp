@@ -1731,8 +1731,9 @@ export default function TournamentDetail() {
                               settings: updatedSettings
                             });
                             
-                            // Refresh tournament data
+                            // Refresh tournament data and matches
                             await queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+                            await queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'matches'] });
                             
                             setIsEditingBracket(false);
                             
