@@ -507,7 +507,7 @@ export class MessagingService {
     return undefined;
   }
 
-  async createDirectConversation(user1Id: string, user2Id: string, leagueId: string): Promise<Conversation> {
+  async createDirectConversation(user1Id: string, user2Id: string, leagueId: string | null): Promise<Conversation> {
     return await db.transaction(async (tx) => {
       // Create conversation
       const [conversation] = await tx
