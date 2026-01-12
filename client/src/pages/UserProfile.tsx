@@ -31,7 +31,7 @@ export default function UserProfile() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
-  const { selectedLeague } = useDashboardSelection();
+  const { selectedLeagueId } = useDashboardSelection();
 
   const { data: user, isLoading } = useQuery<UserProfileData>({
     queryKey: ['/api/users', userId],
@@ -42,7 +42,7 @@ export default function UserProfile() {
     mutationFn: async (otherUserId: string) => {
       const response = await apiRequest('POST', '/api/conversations/direct', {
         otherUserId,
-        leagueId: selectedLeague?.id,
+        leagueId: selectedLeagueId,
       });
       return response.json();
     },
