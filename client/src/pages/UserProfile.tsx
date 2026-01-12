@@ -59,43 +59,10 @@ export default function UserProfile() {
   };
 
   const downloadVCF = () => {
-    if (!user) return;
-
-    // Generate vCard content with proper line endings (CRLF as per RFC 6350)
-    const vCardLines = [
-      'BEGIN:VCARD',
-      'VERSION:3.0',
-      `FN:${user.firstName || ''} ${user.lastName || ''}`.trim(),
-      `N:${user.lastName || ''};${user.firstName || ''};;;`,
-      user.email ? `EMAIL:${user.email}` : '',
-      user.phoneNumber ? `TEL:${user.phoneNumber}` : '',
-      user.city ? `ADR:;;${user.city};;;;` : '',
-      user.dateOfBirth ? `BDAY:${user.dateOfBirth}` : '',
-      'END:VCARD'
-    ].filter(line => line && !line.endsWith(':'));
+    if (!userId) return;
     
-    const vCardContent = vCardLines.join('\r\n');
-    const fileName = `${user.firstName || 'contact'}_${user.lastName || 'info'}.vcf`;
-
-    // Use data URL approach which works better on mobile devices
-    const dataUrl = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vCardContent);
-    
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = fileName;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    
-    // Small delay before cleanup to ensure download starts
-    setTimeout(() => {
-      document.body.removeChild(link);
-    }, 100);
-
-    toast({
-      title: "Contact Downloaded",
-      description: `Contact information for ${user.firstName} ${user.lastName} has been downloaded.`,
-    });
+    // Navigate directly to server endpoint - this works on mobile WebViews
+    window.location.href = `/api/users/${userId}/contact.vcf`;
   };
 
   if (isLoading) {
