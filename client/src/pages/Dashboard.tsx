@@ -27,6 +27,7 @@ import { z } from 'zod';
 import logoUrl from '@assets/Roster Logo White_1757083079896.png';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
+import clickDetailsIconUrl from '@assets/image_1768228477604.png';
 import FeedbackModal from '@/components/FeedbackModal';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { SlideOutMenu } from '@/components/SlideOutMenu';
@@ -2628,6 +2629,13 @@ export default function Dashboard() {
                         </div>
                       );
                     })()}
+                    <img 
+                      src={clickDetailsIconUrl}
+                      alt="View details"
+                      className="w-5 h-5"
+                      style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
+                      data-testid={`icon-view-details-${game.id}`}
+                    />
                   </div>
                 </div>
               </div>

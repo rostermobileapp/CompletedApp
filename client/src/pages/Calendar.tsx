@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
+import clickDetailsIconUrl from '@assets/image_1768228477604.png';
 import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
 import { useDashboardSelection } from "@/hooks/useDashboardSelection";
 
@@ -260,6 +261,13 @@ export default function Calendar() {
                           </p>
                         )}
                       </div>
+                      <img 
+                        src={clickDetailsIconUrl}
+                        alt="View details"
+                        className="w-5 h-5"
+                        style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
+                        data-testid={`icon-view-details-scrimmage-${event.id}`}
+                      />
                     </div>
                   </div>
                 );
@@ -341,6 +349,13 @@ export default function Calendar() {
                           </p>
                         )}
                       </div>
+                      <img 
+                        src={clickDetailsIconUrl}
+                        alt="View details"
+                        className="w-5 h-5"
+                        style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
+                        data-testid={`icon-view-details-substitute-${game.id}`}
+                      />
                     </div>
                   </div>
                 );
@@ -412,6 +427,13 @@ export default function Calendar() {
                       </div>
                     )}
                   </div>
+                  <img 
+                    src={clickDetailsIconUrl}
+                    alt="View details"
+                    className="w-5 h-5"
+                    style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
+                    data-testid={`icon-view-details-${game.id}`}
+                  />
                 </div>
               </div>
               );
