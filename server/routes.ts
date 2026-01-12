@@ -11782,13 +11782,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const requestSchema = z.object({
         otherUserId: z.string().min(1),
-        leagueId: z.string().min(1)
+        leagueId: z.string().min(1).optional()
       });
       
       const { otherUserId, leagueId } = requestSchema.parse(req.body);
       
       // Check if conversation already exists
-      const existingConversation = await messagingService.findDirectConversation(userId, otherUserId, leagueId);
+      const existingConversation = await messagingService.findDirectConversation(userId, otherUserId, leagueId || null);
       if (existingConversation) {
         const participants = await messagingService.getConversationParticipants(existingConversation.id);
         return res.json({
@@ -11798,7 +11798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Create new conversation
-      const conversation = await messagingService.createDirectConversation(userId, otherUserId, leagueId);
+      const conversation = await messagingService.createDirectConversation(userId, otherUserId, leagueId || null);
       const participants = await messagingService.getConversationParticipants(conversation.id);
       
       res.status(201).json({
