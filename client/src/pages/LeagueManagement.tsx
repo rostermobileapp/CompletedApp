@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { apiRequest, getImageUrl } from '@/lib/queryClient';
+import { apiRequest, getImageUrl, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
@@ -1045,6 +1045,7 @@ export default function LeagueManagement() {
       return response.json();
     },
     onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
       const conversationId = conversation.id || conversation.conversationId;
       if (conversationId) {
         setPageTransitionDirection('up');
