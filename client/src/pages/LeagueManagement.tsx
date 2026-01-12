@@ -1035,6 +1035,31 @@ export default function LeagueManagement() {
     }
   }, [editMemberId, members, teams, selectedPlayer]);
 
+  // Mutation for messaging a player
+  const createDirectMessageMutation = useMutation({
+    mutationFn: async (otherUserId: string) => {
+      const response = await apiRequest('POST', '/api/conversations/direct', {
+        otherUserId,
+        leagueId: leagueId,
+      });
+      return response.json();
+    },
+    onSuccess: (conversation) => {
+      const conversationId = conversation.id || conversation.conversationId;
+      if (conversationId) {
+        setPageTransitionDirection('up');
+        navigate(`/messages/${conversationId}`);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start conversation",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Mutations for member management
   const approveMutation = useMutation({
     mutationFn: async (membershipId: string) => {
@@ -3602,12 +3627,28 @@ export default function LeagueManagement() {
                 <div className="flex justify-between items-center">
                   <button
                     onClick={() => {
-                      // TODO: Implement messaging functionality
-                      toast({ title: 'Messaging feature coming soon!' });
+                      if (!user) {
+                        toast({
+                          title: "Sign in required",
+                          description: "Please sign in to send messages",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (selectedPlayer.userId === user.id) {
+                        toast({
+                          title: "Cannot message yourself",
+                          description: "You cannot start a conversation with yourself",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      createDirectMessageMutation.mutate(selectedPlayer.userId);
                     }}
-                    className="px-4 py-2 bg-blue-500/50 text-white rounded-lg hover:bg-blue-600/50 text-sm font-medium"
+                    disabled={createDirectMessageMutation.isPending}
+                    className="px-4 py-2 bg-blue-500/50 text-white rounded-lg hover:bg-blue-600/50 text-sm font-medium disabled:opacity-50"
                   >
-                    Message Player
+                    {createDirectMessageMutation.isPending ? 'Opening...' : 'Message Player'}
                   </button>
                   <button
                     onClick={() => {
