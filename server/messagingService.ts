@@ -956,16 +956,39 @@ export class MessagingService {
       p => !currentMemberIds.has(p.userId) || p.firstName === '[Deleted]'
     );
 
-    // Add new members
+    // Add new members (or re-add previously removed members by clearing leftAt)
     if (membersToAdd.length > 0) {
-      await db.insert(conversationParticipants)
-        .values(membersToAdd.map(userId => ({
-          conversationId: existingChat.id,
-          userId,
-        })))
-        .onConflictDoNothing({
-          target: [conversationParticipants.conversationId, conversationParticipants.userId]
-        });
+      for (const userId of membersToAdd) {
+        // Check if this user was previously in the chat but left
+        const [existingParticipant] = await db
+          .select()
+          .from(conversationParticipants)
+          .where(
+            and(
+              eq(conversationParticipants.conversationId, existingChat.id),
+              eq(conversationParticipants.userId, userId)
+            )
+          )
+          .limit(1);
+
+        if (existingParticipant && existingParticipant.leftAt) {
+          // Re-add by clearing leftAt
+          await db
+            .update(conversationParticipants)
+            .set({ leftAt: null, joinedAt: new Date() })
+            .where(eq(conversationParticipants.id, existingParticipant.id));
+        } else if (!existingParticipant) {
+          // Add as new participant
+          await db.insert(conversationParticipants)
+            .values({
+              conversationId: existingChat.id,
+              userId,
+            })
+            .onConflictDoNothing({
+              target: [conversationParticipants.conversationId, conversationParticipants.userId]
+            });
+        }
+      }
     }
 
     // Remove members who are no longer on the team or are deleted
