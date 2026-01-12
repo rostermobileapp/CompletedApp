@@ -1,5 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { supabase } from "./supabase";
+import { supabase, clearStaleSession } from "./supabase";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -34,6 +34,11 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   
   if (error) {
     console.error('[Auth] getSession error:', error.message);
+    // If there's an error getting the session, it might be stale
+    if (error.message.includes('session') || error.message.includes('token')) {
+      console.log('[Auth] Session error detected, clearing stale session...');
+      await clearStaleSession();
+    }
   }
   
   if (session?.access_token) {
