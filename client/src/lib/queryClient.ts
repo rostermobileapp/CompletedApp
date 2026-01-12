@@ -29,11 +29,17 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function getAuthHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session }, error } = await supabase.auth.getSession();
   const headers: Record<string, string> = {};
+  
+  if (error) {
+    console.error('[Auth] getSession error:', error.message);
+  }
   
   if (session?.access_token) {
     headers['Authorization'] = `Bearer ${session.access_token}`;
+  } else {
+    console.log('[Auth] No session available - user not authenticated');
   }
   
   return headers;

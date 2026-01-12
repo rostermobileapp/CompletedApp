@@ -22,11 +22,22 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader) {
+    console.log('[Auth] No authorization header present');
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  
+  if (!authHeader.startsWith('Bearer ')) {
+    console.log('[Auth] Authorization header does not start with Bearer');
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
   const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  
+  if (!token || token.length < 10) {
+    console.log('[Auth] Token is empty or too short');
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token);
