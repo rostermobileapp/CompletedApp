@@ -15528,7 +15528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { name, type, seasonId, format, description, teams } = req.body;
+      const { name, type, seasonId, format, description, teams, settings } = req.body;
 
       // Check tournament exists and is draft
       const [tournament] = await db
@@ -15544,6 +15544,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot edit tournament after it has started" });
       }
 
+      // Merge settings if provided
+      const mergedSettings = settings 
+        ? { ...(tournament.settings as any || {}), ...settings }
+        : tournament.settings;
+
       // Update tournament metadata
       const [updated] = await db
         .update(tournaments)
@@ -15554,6 +15559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           format: format || tournament.format,
           description: description !== undefined ? description : tournament.description,
           numTeams: teams ? teams.length : tournament.numTeams,
+          settings: mergedSettings,
           updatedAt: new Date()
         })
         .where(eq(tournaments.id, id))
