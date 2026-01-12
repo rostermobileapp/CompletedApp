@@ -2525,7 +2525,7 @@ export default function Dashboard() {
                 data-testid={`card-bracket-${tournament.id}`}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-[#e3d340]">
                     <Trophy className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
