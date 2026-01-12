@@ -4328,17 +4328,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create a set of existing game IDs for deduplication
       const existingGameIds = new Set(games.map(g => g.id));
       
+      // Use centralized visibility helper
+      const { shouldShowEventBasedOnLeagueNoon } = await import('./dateUtils');
+      
       // Fetch and add substitute games that aren't already in the list
-      // Games drop off by noon the following day
-      const now = new Date();
-      const currentHourUTC = now.getUTCHours();
-      const gameCutoffUTC = new Date();
-      if (currentHourUTC >= 12) {
-        gameCutoffUTC.setUTCHours(0, 0, 0, 0); // Today at midnight
-      } else {
-        gameCutoffUTC.setUTCDate(gameCutoffUTC.getUTCDate() - 1);
-        gameCutoffUTC.setUTCHours(0, 0, 0, 0); // Yesterday at midnight
-      }
+      // Games drop off by noon the following day according to league timezone
+      const leagueCache = new Map<string, any>();
       
       const substituteGames: typeof games = [];
       for (const gameId of substituteGameIds) {
@@ -4348,11 +4343,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const game = await storage.getGameById(gameId);
           
           if (game) {
-            // Include games from the cutoff onwards (drop off by noon the next day)
-            const gameDate = new Date(game.scheduledAt);
-            const isTodayOrFuture = gameDate >= gameCutoffUTC;
+            // Get league timezone (cache for performance)
+            let league = leagueCache.get(game.leagueId);
+            if (league === undefined && !leagueCache.has(game.leagueId)) {
+              league = await storage.getLeague(game.leagueId);
+              leagueCache.set(game.leagueId, league);
+            }
             
-            if (isTodayOrFuture) {
+            const leagueTimezone = league?.timezone || 'America/New_York';
+            
+            if (shouldShowEventBasedOnLeagueNoon(game.scheduledAt, leagueTimezone)) {
               substituteGames.push(game);
             }
           }
@@ -4373,23 +4373,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
       
-      // Add approved scrimmages as schedule items (same cutoff as games for consistency)
-      const formattedScrimmages = approvedScrimmageRequests
-        .filter(req => new Date(req.scrimmage.dateTime) >= gameCutoffUTC)
-        .map(req => ({
-          id: req.scrimmage.id,
-          scheduledAt: req.scrimmage.dateTime,
-          location: req.scrimmage.location,
-          isScrimmage: true,
-          scrimmageTitle: req.scrimmage.title,
-          scrimmageCreator: req.scrimmage.creator,
-          isSubstitute: false,
-          homeTeam: null,
-          awayTeam: null,
-          homeScore: null,
-          awayScore: null,
-          status: req.scrimmage.status,
-        }));
+      // Add approved scrimmages as schedule items (filter by league timezone)
+      const formattedScrimmages = [];
+      for (const req of approvedScrimmageRequests) {
+        // Get league timezone (use cache)
+        let league = leagueCache.get(req.scrimmage.leagueId);
+        if (league === undefined && !leagueCache.has(req.scrimmage.leagueId)) {
+          league = await storage.getLeague(req.scrimmage.leagueId);
+          leagueCache.set(req.scrimmage.leagueId, league);
+        }
+        
+        const leagueTimezone = league?.timezone || 'America/New_York';
+        
+        if (shouldShowEventBasedOnLeagueNoon(req.scrimmage.dateTime, leagueTimezone)) {
+          formattedScrimmages.push({
+            id: req.scrimmage.id,
+            scheduledAt: req.scrimmage.dateTime,
+            location: req.scrimmage.location,
+            isScrimmage: true,
+            scrimmageTitle: req.scrimmage.title,
+            scrimmageCreator: req.scrimmage.creator,
+            isSubstitute: false,
+            homeTeam: null,
+            awayTeam: null,
+            homeScore: null,
+            awayScore: null,
+            status: req.scrimmage.status,
+          });
+        }
+      }
       
       // Combine games and scrimmages
       const allItems = [...formattedGames, ...formattedScrimmages];

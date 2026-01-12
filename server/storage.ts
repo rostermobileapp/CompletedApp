@@ -3153,20 +3153,11 @@ export class DatabaseStorage implements IStorage {
     const userLeagues = await this.getUserLeagues(userId);
     const leagueIds = userLeagues.map(l => l.id);
     
-    // Games drop off by noon the following day
-    // If it's before noon today, yesterday's games still show (cutoff = yesterday at 00:00)
-    // If it's noon or later today, yesterday's games drop off (cutoff = today at 00:00)
-    const now = new Date();
-    const currentHourUTC = now.getUTCHours();
-    const gameCutoffUTC = new Date();
-    if (currentHourUTC >= 12) {
-      // Past noon - yesterday's games should drop off
-      gameCutoffUTC.setUTCHours(0, 0, 0, 0); // Today at midnight
-    } else {
-      // Before noon - yesterday's games still visible
-      gameCutoffUTC.setUTCDate(gameCutoffUTC.getUTCDate() - 1);
-      gameCutoffUTC.setUTCHours(0, 0, 0, 0); // Yesterday at midnight
-    }
+    // Games drop off by noon the following day according to the league's timezone
+    // First, use a generous 3-day lookback to fetch candidates, then filter per-game based on league timezone
+    const generousCutoff = new Date();
+    generousCutoff.setUTCDate(generousCutoff.getUTCDate() - 3);
+    generousCutoff.setUTCHours(0, 0, 0, 0);
     
     // Get games where user has an attending RSVP (for substitute players)
     const rsvpGames = await db
@@ -3177,7 +3168,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(gameRsvps.userId, userId),
           eq(gameRsvps.status, 'attending'),
-          gte(games.scheduledAt, gameCutoffUTC)
+          gte(games.scheduledAt, generousCutoff)
         )
       );
     const rsvpGameIds = rsvpGames.map(r => r.gameId);
@@ -3191,7 +3182,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(substituteRequests.substitutePlayerId, userId),
           eq(substituteRequests.status, 'approved'),
-          gte(games.scheduledAt, gameCutoffUTC)
+          gte(games.scheduledAt, generousCutoff)
         )
       );
     const substituteGameIds = substituteGames.map(r => r.gameId);
@@ -3218,21 +3209,40 @@ export class DatabaseStorage implements IStorage {
       conditions.push(inArray(games.id, substituteGameIds));
     }
 
-    // Get all games first, then join with teams
+    // Get all games first (with generous cutoff), then filter per-game based on league timezone
     const gamesResult = await db
       .select()
       .from(games)
       .where(
         and(
-          gte(games.scheduledAt, gameCutoffUTC),
+          gte(games.scheduledAt, generousCutoff),
           or(...conditions)
         )
       )
       .orderBy(asc(games.scheduledAt));
 
-    // Get team data for each game
+    // Import the centralized visibility helper
+    const { shouldShowEventBasedOnLeagueNoon } = await import('./dateUtils');
+
+    // Get team data and filter games based on league timezone
     const gamesWithTeams = [];
+    const leagueCache = new Map<string, League | undefined>();
+    
     for (const game of gamesResult) {
+      // Get league timezone (cache for performance)
+      let league = leagueCache.get(game.leagueId);
+      if (league === undefined && !leagueCache.has(game.leagueId)) {
+        league = await this.getLeague(game.leagueId);
+        leagueCache.set(game.leagueId, league);
+      }
+      
+      const leagueTimezone = league?.timezone || 'America/New_York';
+      
+      // Check if game should still be visible (noon the day after in league timezone)
+      if (!shouldShowEventBasedOnLeagueNoon(game.scheduledAt, leagueTimezone)) {
+        continue; // Skip games past their visibility window
+      }
+      
       const [homeTeam] = await db.select().from(teams).where(eq(teams.id, game.homeTeamId));
       const [awayTeam] = await db.select().from(teams).where(eq(teams.id, game.awayTeamId));
       
@@ -3243,7 +3253,7 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Get approved scrimmages for the user (same cutoff as games for consistency)
+    // Get approved scrimmages for the user (with generous cutoff, filter later)
     const approvedScrimmages = await db
       .select({
         scrimmage: scrimmages,
@@ -3256,15 +3266,32 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(scrimmageRequests.playerId, userId),
           eq(scrimmageRequests.status, 'approved'),
-          gte(scrimmages.dateTime, gameCutoffUTC),
+          gte(scrimmages.dateTime, generousCutoff),
           // Only roster_confirmed scrimmages should show on schedule
           eq(scrimmages.status, 'roster_confirmed')
         )
       )
       .orderBy(asc(scrimmages.dateTime));
 
+    // Filter scrimmages based on their league's timezone
+    const filteredScrimmages = [];
+    for (const { scrimmage, creator } of approvedScrimmages) {
+      // Use cached league if available, otherwise fetch
+      let league = leagueCache.get(scrimmage.leagueId);
+      if (league === undefined && !leagueCache.has(scrimmage.leagueId)) {
+        league = await this.getLeague(scrimmage.leagueId);
+        leagueCache.set(scrimmage.leagueId, league);
+      }
+      
+      const leagueTimezone = league?.timezone || 'America/New_York';
+      
+      if (shouldShowEventBasedOnLeagueNoon(scrimmage.dateTime, leagueTimezone)) {
+        filteredScrimmages.push({ scrimmage, creator });
+      }
+    }
+
     // Convert approved scrimmages to game-like format
-    const scrimmagesAsGames = approvedScrimmages.map(({ scrimmage, creator }) => ({
+    const scrimmagesAsGames = filteredScrimmages.map(({ scrimmage, creator }) => ({
       id: scrimmage.id,
       createdAt: scrimmage.createdAt,
       leagueId: scrimmage.leagueId,
