@@ -1505,7 +1505,16 @@ export default function Messages() {
   // Get the current conversation to display proper chat title
   // Look in allConversations first to handle cases where conversation has null leagueId 
   // but user has a league filter active (e.g., direct message from user profile)
-  const currentConversation = allConversations.find(c => c.id === selectedConversation);
+  const cachedConversation = allConversations.find(c => c.id === selectedConversation);
+  
+  // Fetch conversation details when navigating directly to a conversation not in cache
+  const { data: fetchedConversation } = useQuery<Conversation>({
+    queryKey: ['/api/conversations', selectedConversation],
+    enabled: !!selectedConversation && !cachedConversation,
+  });
+  
+  // Use cached conversation if available, otherwise use fetched data
+  const currentConversation = cachedConversation || fetchedConversation;
 
   // Fetch team data for team group chats (to get logo)
   const { data: conversationTeam } = useQuery<Team>({
