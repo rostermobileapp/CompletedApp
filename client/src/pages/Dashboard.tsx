@@ -2533,7 +2533,7 @@ export default function Dashboard() {
                       <h3 className="font-semibold" data-testid={`text-bracket-name-${tournament.id}`}>
                         {tournament.name}
                       </h3>
-                      <span className="text-xs bg-purple-500 px-2 py-0.5 rounded text-[#000000]">Bracket</span>
+                      <span className="text-xs px-2 py-0.5 rounded text-[#000000] bg-[#ffd700]">Bracket</span>
                     </div>
                     <p className="text-sm text-muted-foreground" data-testid={`text-bracket-league-${tournament.id}`}>
                       {tournament.leagueName}
