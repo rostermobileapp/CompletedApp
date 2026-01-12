@@ -11782,7 +11782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const requestSchema = z.object({
         otherUserId: z.string().min(1),
-        leagueId: z.string().min(1).optional()
+        leagueId: z.string().min(1).nullish()
       });
       
       const { otherUserId, leagueId } = requestSchema.parse(req.body);
