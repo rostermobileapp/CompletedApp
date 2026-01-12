@@ -3707,6 +3707,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUserProfile(membership.userId, profileUpdates);
       }
       
+      // If timezone is being updated, update the user's timezone
+      if (updates.timezone !== undefined) {
+        await storage.updateUserProfile(membership.userId, { 
+          timezone: updates.timezone,
+          timezoneManuallySet: true 
+        });
+      }
+      
       const updatedMember = await storage.updateLeagueMember(memberId, updates);
       res.json(updatedMember);
     } catch (error) {

@@ -93,6 +93,7 @@ type LeagueMember = {
     displayName?: string;
     email: string;
     profileImageUrl?: string;
+    timezone?: string;
   };
 };
 
@@ -666,7 +667,8 @@ export default function LeagueManagement() {
     isGoalie: false,
     isSkater: true, // Default to skater
     displayFirstName: '',
-    displayLastName: ''
+    displayLastName: '',
+    timezone: 'America/New_York'
   });
 
   // Get league ID and edit mode from URL params
@@ -1022,7 +1024,8 @@ export default function LeagueManagement() {
           isGoalie: memberToEdit.isGoalie || false,
           isSkater: memberToEdit.isSkater ?? true, // Default to true if not set
           displayFirstName: memberToEdit.displayFirstName || memberToEdit.user.firstName || '',
-          displayLastName: memberToEdit.displayLastName || memberToEdit.user.lastName || ''
+          displayLastName: memberToEdit.displayLastName || memberToEdit.user.lastName || '',
+          timezone: memberToEdit.user.timezone || 'America/New_York'
         });
         // Clear the editMember parameter from URL after opening modal
         const newUrl = new URL(window.location.href);
@@ -2562,7 +2565,8 @@ export default function LeagueManagement() {
                           isGoalie: member.isGoalie || false,
                           isSkater: member.isSkater ?? true, // Default to true if not set
                           displayFirstName: member.displayFirstName || member.user.firstName || '',
-                          displayLastName: member.displayLastName || member.user.lastName || ''
+                          displayLastName: member.displayLastName || member.user.lastName || '',
+                          timezone: member.user.timezone || 'America/New_York'
                         });
                       }}
                       data-testid={`member-${member.user.id}`}
@@ -2847,7 +2851,8 @@ export default function LeagueManagement() {
                                 isGoalie: member.isGoalie || false,
                                 isSkater: member.isSkater ?? true, // Default to true if not set
                                 displayFirstName: member.displayFirstName || member.user.firstName || '',
-                                displayLastName: member.displayLastName || member.user.lastName || ''
+                                displayLastName: member.displayLastName || member.user.lastName || '',
+                                timezone: member.user.timezone || 'America/New_York'
                               });
                             }}
                           >
@@ -3575,6 +3580,21 @@ export default function LeagueManagement() {
                     placeholder="Add notes about this player..."
                   />
                 </div>
+
+                {/* Timezone */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Timezone</label>
+                  <select
+                    value={playerEditForm.timezone}
+                    onChange={(e) => setPlayerEditForm(prev => ({ ...prev, timezone: e.target.value }))}
+                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    data-testid="select-player-timezone"
+                  >
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-3 mt-6">
@@ -3600,7 +3620,8 @@ export default function LeagueManagement() {
                         isGoalie: playerEditForm.isGoalie,
                         isSkater: playerEditForm.isSkater,
                         displayFirstName: playerEditForm.displayFirstName?.trim() || null,
-                        displayLastName: playerEditForm.displayLastName?.trim() || null
+                        displayLastName: playerEditForm.displayLastName?.trim() || null,
+                        timezone: playerEditForm.timezone
                       };
                       
                       // Handle captain assignment separately (this affects the team's captainId)
