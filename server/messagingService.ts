@@ -66,32 +66,24 @@ export class MessagingService {
     
     const leagueId = conversation?.leagueId;
     
+    // Query participants with user data
     const result = await db
       .select({
-        // Get participant fields
         id: conversationParticipants.id,
         conversationId: conversationParticipants.conversationId, 
         userId: conversationParticipants.userId,
         joinedAt: conversationParticipants.joinedAt,
-        // Get user fields and create user object
-        // Use league membership display names if available, otherwise fall back to user names
-        user: {
-          id: users.id,
-          email: users.email,
-          firstName: leagueId 
-            ? sql<string>`COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName})`.as('firstName')
-            : users.firstName,
-          lastName: leagueId
-            ? sql<string>`COALESCE(${leagueMemberships.displayLastName}, ${users.lastName})`.as('lastName')
-            : users.lastName,
-          profileImageUrl: users.profileImageUrl,
-          displayName: leagueId
-            ? sql<string>`COALESCE(
-                COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName}) || ' ' || COALESCE(${leagueMemberships.displayLastName}, ${users.lastName}),
-                ${users.email}
-              )`.as('displayName')
-            : sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
-        }
+        leftAt: conversationParticipants.leftAt,
+        lastReadAt: conversationParticipants.lastReadAt,
+        hiddenAt: conversationParticipants.hiddenAt,
+        historyClearedAt: conversationParticipants.historyClearedAt,
+        userId2: users.id,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+        userProfileImageUrl: users.profileImageUrl,
+        displayFirstName: leagueMemberships.displayFirstName,
+        displayLastName: leagueMemberships.displayLastName,
       })
       .from(conversationParticipants)
       .innerJoin(users, eq(conversationParticipants.userId, users.id))
@@ -107,11 +99,29 @@ export class MessagingService {
       .where(
         and(
           eq(conversationParticipants.conversationId, conversationId),
-          isNull(conversationParticipants.leftAt)  // Only return active participants
+          isNull(conversationParticipants.leftAt)
         )
       );
     
-    return result as any[] as ConversationParticipant[];
+    // Transform to expected format with nested user object
+    return result.map(row => ({
+      id: row.id,
+      conversationId: row.conversationId,
+      userId: row.userId,
+      joinedAt: row.joinedAt,
+      leftAt: row.leftAt,
+      lastReadAt: row.lastReadAt,
+      hiddenAt: row.hiddenAt,
+      historyClearedAt: row.historyClearedAt,
+      user: {
+        id: row.userId2,
+        email: row.userEmail,
+        firstName: row.displayFirstName || row.userFirstName,
+        lastName: row.displayLastName || row.userLastName,
+        profileImageUrl: row.userProfileImageUrl,
+        displayName: `${row.displayFirstName || row.userFirstName || ''} ${row.displayLastName || row.userLastName || ''}`.trim() || row.userEmail
+      }
+    })) as any[] as ConversationParticipant[];
   }
 
   async isUserInConversation(userId: string, conversationId: string): Promise<boolean> {
