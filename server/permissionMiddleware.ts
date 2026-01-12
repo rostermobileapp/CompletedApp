@@ -406,11 +406,14 @@ export async function hasLeagueSpecialPermission(user: UserWithPermissions, leag
 export async function canManageLeagueSpecific(user: UserWithPermissions, leagueId: string): Promise<boolean> {
   // Primary commissioner can manage any league
   if (user.isPrimaryCommissioner) return true;
+  // Global commissioner role can manage any league
+  if (user.role === 'commissioner') return true;
   // Global admin can manage any league
   if (hasSpecialPermission(user, 'admin')) return true;
   // Check league-specific admin permission
   if (await hasLeagueSpecialPermission(user, leagueId, 'admin')) return true;
-  // Check league-specific commissioner role
+  // Check league-specific commissioner or secondary_commissioner role
+  if (await hasLeagueRole(user, leagueId, 'commissioner')) return true;
   return await hasLeagueRole(user, leagueId, 'secondary_commissioner');
 }
 
