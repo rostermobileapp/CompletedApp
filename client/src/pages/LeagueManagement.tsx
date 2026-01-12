@@ -3643,6 +3643,16 @@ export default function LeagueManagement() {
                         });
                         return;
                       }
+                      const isPlaceholder = selectedPlayer.user?.email?.includes('@placeholder.roster') || 
+                        selectedPlayer.user?.id?.startsWith('placeholder-');
+                      if (isPlaceholder) {
+                        toast({
+                          title: "Cannot message this player",
+                          description: "This is a placeholder player without a real account. Replace them with a registered user first to enable messaging.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
                       createDirectMessageMutation.mutate(selectedPlayer.userId);
                     }}
                     disabled={createDirectMessageMutation.isPending}
