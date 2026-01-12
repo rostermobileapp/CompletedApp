@@ -1503,7 +1503,9 @@ export default function Messages() {
   };
 
   // Get the current conversation to display proper chat title
-  const currentConversation = conversations.find(c => c.id === selectedConversation);
+  // Look in allConversations first to handle cases where conversation has null leagueId 
+  // but user has a league filter active (e.g., direct message from user profile)
+  const currentConversation = allConversations.find(c => c.id === selectedConversation);
 
   // Fetch team data for team group chats (to get logo)
   const { data: conversationTeam } = useQuery<Team>({
