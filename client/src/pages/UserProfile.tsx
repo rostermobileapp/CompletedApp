@@ -61,8 +61,8 @@ export default function UserProfile() {
   const downloadVCF = () => {
     if (!userId) return;
     
-    // Navigate directly to server endpoint - this works on mobile WebViews
-    window.location.href = `/api/users/${userId}/contact.vcf`;
+    // Open in new window to trigger download without navigating away from app
+    window.open(`/api/users/${userId}/contact.vcf`, '_blank');
   };
 
   if (isLoading) {
