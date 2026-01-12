@@ -630,9 +630,22 @@ export default function GameDetails() {
               )}
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-bold" data-testid="text-game-matchup">
-                vs {opponentTeam?.name}
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold" data-testid="text-game-matchup">
+                  vs {opponentTeam?.name}
+                </h2>
+                {opponentTeam && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/team/${opponentTeam.id}`)}
+                    className="ml-2"
+                    data-testid="button-view-team"
+                  >
+                    View Team
+                  </Button>
+                )}
+              </div>
               <div className="flex items-center gap-2 text-muted-foreground mt-1">
                 <Clock className="w-4 h-4" />
                 <span data-testid="text-game-time">
