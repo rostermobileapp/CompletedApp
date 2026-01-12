@@ -264,7 +264,7 @@ export default function Calendar() {
                       <img 
                         src={clickDetailsIconUrl}
                         alt="View details"
-                        className="w-5 h-5"
+                        className="w-12 h-12"
                         style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
                         data-testid={`icon-view-details-scrimmage-${event.id}`}
                       />
@@ -352,7 +352,7 @@ export default function Calendar() {
                       <img 
                         src={clickDetailsIconUrl}
                         alt="View details"
-                        className="w-5 h-5"
+                        className="w-12 h-12"
                         style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
                         data-testid={`icon-view-details-substitute-${game.id}`}
                       />
@@ -430,7 +430,7 @@ export default function Calendar() {
                   <img 
                     src={clickDetailsIconUrl}
                     alt="View details"
-                    className="w-5 h-5"
+                    className="w-12 h-12"
                     style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
                     data-testid={`icon-view-details-${game.id}`}
                   />
