@@ -694,6 +694,8 @@ export class DatabaseStorage implements IStorage {
         stripe_subscription_id as "stripeSubscriptionId",
         venmo_username as "venmoUsername", 
         cashapp_username as "cashappUsername", 
+        timezone,
+        timezone_manually_set as "timezoneManuallySet",
         navigation_preferences as "navigationPreferences",
         last_updated as "lastUpdated", 
         created_at as "createdAt", 
