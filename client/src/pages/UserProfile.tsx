@@ -1,10 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useLocation, useParams } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, DollarSign, Download } from 'lucide-react';
+import { ArrowLeft, DollarSign, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { getImageUrl } from '@/lib/queryClient';
+import { getImageUrl, apiRequest } from '@/lib/queryClient';
+import { useAuth } from '@/hooks/useAuth';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
 interface UserProfileData {
   id: string;
@@ -28,11 +30,57 @@ export default function UserProfile() {
   const userId = params.userId;
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
+  const { selectedLeague } = useDashboardSelection();
 
   const { data: user, isLoading } = useQuery<UserProfileData>({
     queryKey: ['/api/users', userId],
     enabled: !!userId,
   });
+
+  const createDirectMessageMutation = useMutation({
+    mutationFn: async (otherUserId: string) => {
+      const response = await apiRequest('POST', '/api/conversations/direct', {
+        otherUserId,
+        leagueId: selectedLeague?.id,
+      });
+      return response.json();
+    },
+    onSuccess: (conversation) => {
+      setPageTransitionDirection('up');
+      const conversationId = conversation.id || conversation.conversationId;
+      if (conversationId) {
+        navigate(`/messages/${conversationId}`);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start conversation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleMessageUser = () => {
+    if (!userId || !currentUser) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to send messages",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (userId === currentUser.id) {
+      toast({
+        title: "Cannot message yourself",
+        description: "You cannot start a conversation with yourself",
+        variant: "destructive",
+      });
+      return;
+    }
+    createDirectMessageMutation.mutate(userId);
+  };
 
   const getTierDisplay = (role: string) => {
     switch (role) {
@@ -56,13 +104,6 @@ export default function UserProfile() {
       'America/Phoenix': 'Arizona (MST)',
     };
     return timezoneLabels[tz] || tz;
-  };
-
-  const downloadVCF = () => {
-    if (!userId) return;
-    
-    // Open in new window to trigger download without navigating away from app
-    window.open(`/api/users/${userId}/contact.vcf`, '_blank');
   };
 
   if (isLoading) {
@@ -113,12 +154,13 @@ export default function UserProfile() {
           <Button
             variant="outline"
             size="sm"
-            onClick={downloadVCF}
+            onClick={handleMessageUser}
+            disabled={createDirectMessageMutation.isPending}
             className="flex items-center gap-2 text-[16px] bg-[#3a7eec] text-white hover:bg-[#3a7eec]/90"
-            data-testid="button-download-vcf"
+            data-testid="button-message-user"
           >
-            <Download className="w-4 h-4" />
-            Contact
+            <MessageCircle className="w-4 h-4" />
+            {createDirectMessageMutation.isPending ? 'Opening...' : 'Message'}
           </Button>
         </div>
       </div>

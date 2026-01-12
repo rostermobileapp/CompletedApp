@@ -964,41 +964,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Download user contact as VCF - MUST be before /api/users/:userId
-  app.get('/api/users/:userId/contact.vcf', isAuthenticated, async (req: any, res) => {
-    try {
-      const { userId } = req.params;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Generate vCard content with proper line endings (CRLF as per RFC 6350)
-      const vCardLines = [
-        'BEGIN:VCARD',
-        'VERSION:3.0',
-        `FN:${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        `N:${user.lastName || ''};${user.firstName || ''};;;`,
-        user.email ? `EMAIL:${user.email}` : '',
-        user.phoneNumber ? `TEL:${user.phoneNumber}` : '',
-        user.city ? `ADR:;;${user.city};;;;` : '',
-        user.dateOfBirth ? `BDAY:${user.dateOfBirth}` : '',
-        'END:VCARD'
-      ].filter(line => line && !line.endsWith(':'));
-      
-      const vCardContent = vCardLines.join('\r\n');
-      const fileName = `${user.firstName || 'contact'}_${user.lastName || 'info'}.vcf`;
-      
-      res.setHeader('Content-Type', 'text/vcard; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-      res.send(vCardContent);
-    } catch (error) {
-      console.error("Error generating VCF:", error);
-      res.status(500).json({ message: "Failed to generate contact file" });
-    }
-  });
-
   // Get any user's public profile by ID
   app.get('/api/users/:userId', isAuthenticated, async (req: any, res) => {
     try {
