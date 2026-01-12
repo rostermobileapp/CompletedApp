@@ -571,7 +571,14 @@ export function useNativelyNotifications() {
           return;
         }
 
+        // Add timeout for native SDK
+        const timeout = setTimeout(() => {
+          console.log('[OneSignal] removeExternalId timed out, continuing with logout');
+          resolve();
+        }, 3000);
+
         notifications.removeExternalId((resp) => {
+          clearTimeout(timeout);
           if (resp && (resp.error || resp.message)) {
             console.error('[OneSignal] Natively removeExternalId failed:', resp.error || resp.message);
           } else {
@@ -590,6 +597,13 @@ export function useNativelyNotifications() {
         return;
       }
 
+      // Add timeout to ensure logout proceeds even if OneSignal doesn't respond
+      // This can happen when OneSignal init fails (e.g., on non-production domains)
+      const timeout = setTimeout(() => {
+        console.log('[OneSignal] removeExternalId timed out, continuing with logout');
+        resolve();
+      }, 3000);
+
       window.OneSignalDeferred.push(async (OneSignal) => {
         try {
           await OneSignal.logout();
@@ -598,6 +612,7 @@ export function useNativelyNotifications() {
         } catch (error) {
           console.error('[OneSignal] Logout error:', error);
         }
+        clearTimeout(timeout);
         resolve();
       });
     });
