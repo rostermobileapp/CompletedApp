@@ -2557,6 +2557,18 @@ export default function Dashboard() {
                         {game.venue}
                       </p>
                     )}
+                    {/* Score display for completed games */}
+                    {(game.isCompleted || (game.homeScore !== null && game.awayScore !== null)) && !game.isScrimmage && (
+                      <div className="text-sm font-medium" data-testid={`text-game-score-${game.id}`}>
+                        <span className={game.homeTeam?.id === primaryTeam?.id ? "text-primary" : "text-muted-foreground"}>
+                          {game.homeTeam?.name}: {game.homeScore ?? 0}
+                        </span>
+                        <span className="text-muted-foreground mx-2">•</span>
+                        <span className={game.awayTeam?.id === primaryTeam?.id ? "text-primary" : "text-muted-foreground"}>
+                          {game.awayTeam?.name}: {game.awayScore ?? 0}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {/* Duty Icons */}

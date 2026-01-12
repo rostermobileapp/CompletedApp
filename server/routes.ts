@@ -4329,10 +4329,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingGameIds = new Set(games.map(g => g.id));
       
       // Fetch and add substitute games that aren't already in the list
-      // Use start of yesterday in UTC to ensure games remain visible regardless of timezone
-      const startOfYesterdayUTC = new Date();
-      startOfYesterdayUTC.setUTCDate(startOfYesterdayUTC.getUTCDate() - 1);
-      startOfYesterdayUTC.setUTCHours(0, 0, 0, 0);
+      // Games drop off by noon the following day
+      const now = new Date();
+      const currentHourUTC = now.getUTCHours();
+      const gameCutoffUTC = new Date();
+      if (currentHourUTC >= 12) {
+        gameCutoffUTC.setUTCHours(0, 0, 0, 0); // Today at midnight
+      } else {
+        gameCutoffUTC.setUTCDate(gameCutoffUTC.getUTCDate() - 1);
+        gameCutoffUTC.setUTCHours(0, 0, 0, 0); // Yesterday at midnight
+      }
       
       const substituteGames: typeof games = [];
       for (const gameId of substituteGameIds) {
@@ -4342,9 +4348,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const game = await storage.getGameById(gameId);
           
           if (game) {
-            // Include games from today onwards (not just future by exact time)
+            // Include games from the cutoff onwards (drop off by noon the next day)
             const gameDate = new Date(game.scheduledAt);
-            const isTodayOrFuture = gameDate >= startOfYesterdayUTC;
+            const isTodayOrFuture = gameDate >= gameCutoffUTC;
             
             if (isTodayOrFuture) {
               substituteGames.push(game);
@@ -4367,13 +4373,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
       
-      // Add approved scrimmages as schedule items
-      // Use start of yesterday in UTC to ensure scrimmages remain visible regardless of timezone
-      const scrimmageStartOfYesterdayUTC = new Date();
-      scrimmageStartOfYesterdayUTC.setUTCDate(scrimmageStartOfYesterdayUTC.getUTCDate() - 1);
-      scrimmageStartOfYesterdayUTC.setUTCHours(0, 0, 0, 0);
+      // Add approved scrimmages as schedule items (same cutoff as games for consistency)
       const formattedScrimmages = approvedScrimmageRequests
-        .filter(req => new Date(req.scrimmage.dateTime) >= scrimmageStartOfYesterdayUTC)
+        .filter(req => new Date(req.scrimmage.dateTime) >= gameCutoffUTC)
         .map(req => ({
           id: req.scrimmage.id,
           scheduledAt: req.scrimmage.dateTime,

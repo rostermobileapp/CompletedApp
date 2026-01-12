@@ -3153,11 +3153,20 @@ export class DatabaseStorage implements IStorage {
     const userLeagues = await this.getUserLeagues(userId);
     const leagueIds = userLeagues.map(l => l.id);
     
-    // Use start of yesterday in UTC as cutoff to ensure games remain visible
-    // for all users regardless of timezone (gives 24+ hour buffer)
-    const startOfYesterdayUTC = new Date();
-    startOfYesterdayUTC.setUTCDate(startOfYesterdayUTC.getUTCDate() - 1);
-    startOfYesterdayUTC.setUTCHours(0, 0, 0, 0);
+    // Games drop off by noon the following day
+    // If it's before noon today, yesterday's games still show (cutoff = yesterday at 00:00)
+    // If it's noon or later today, yesterday's games drop off (cutoff = today at 00:00)
+    const now = new Date();
+    const currentHourUTC = now.getUTCHours();
+    const gameCutoffUTC = new Date();
+    if (currentHourUTC >= 12) {
+      // Past noon - yesterday's games should drop off
+      gameCutoffUTC.setUTCHours(0, 0, 0, 0); // Today at midnight
+    } else {
+      // Before noon - yesterday's games still visible
+      gameCutoffUTC.setUTCDate(gameCutoffUTC.getUTCDate() - 1);
+      gameCutoffUTC.setUTCHours(0, 0, 0, 0); // Yesterday at midnight
+    }
     
     // Get games where user has an attending RSVP (for substitute players)
     const rsvpGames = await db
@@ -3168,7 +3177,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(gameRsvps.userId, userId),
           eq(gameRsvps.status, 'attending'),
-          gte(games.scheduledAt, startOfYesterdayUTC)
+          gte(games.scheduledAt, gameCutoffUTC)
         )
       );
     const rsvpGameIds = rsvpGames.map(r => r.gameId);
@@ -3182,7 +3191,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(substituteRequests.substitutePlayerId, userId),
           eq(substituteRequests.status, 'approved'),
-          gte(games.scheduledAt, startOfYesterdayUTC)
+          gte(games.scheduledAt, gameCutoffUTC)
         )
       );
     const substituteGameIds = substituteGames.map(r => r.gameId);
@@ -3215,7 +3224,7 @@ export class DatabaseStorage implements IStorage {
       .from(games)
       .where(
         and(
-          gte(games.scheduledAt, startOfYesterdayUTC),
+          gte(games.scheduledAt, gameCutoffUTC),
           or(...conditions)
         )
       )
@@ -3234,11 +3243,7 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Get approved scrimmages for the user (use start of yesterday in UTC for timezone safety)
-    const scrimmageStartOfYesterdayUTC = new Date();
-    scrimmageStartOfYesterdayUTC.setUTCDate(scrimmageStartOfYesterdayUTC.getUTCDate() - 1);
-    scrimmageStartOfYesterdayUTC.setUTCHours(0, 0, 0, 0);
-    
+    // Get approved scrimmages for the user (same cutoff as games for consistency)
     const approvedScrimmages = await db
       .select({
         scrimmage: scrimmages,
@@ -3251,7 +3256,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(scrimmageRequests.playerId, userId),
           eq(scrimmageRequests.status, 'approved'),
-          gte(scrimmages.dateTime, scrimmageStartOfYesterdayUTC),
+          gte(scrimmages.dateTime, gameCutoffUTC),
           // Only roster_confirmed scrimmages should show on schedule
           eq(scrimmages.status, 'roster_confirmed')
         )
