@@ -104,7 +104,12 @@ export class MessagingService {
             )
           : sql`false`
       )
-      .where(eq(conversationParticipants.conversationId, conversationId));
+      .where(
+        and(
+          eq(conversationParticipants.conversationId, conversationId),
+          isNull(conversationParticipants.leftAt)  // Only return active participants
+        )
+      );
     
     return result as any[] as ConversationParticipant[];
   }
@@ -116,7 +121,8 @@ export class MessagingService {
       .where(
         and(
           eq(conversationParticipants.userId, userId),
-          eq(conversationParticipants.conversationId, conversationId)
+          eq(conversationParticipants.conversationId, conversationId),
+          isNull(conversationParticipants.leftAt)  // Only check active participants
         )
       )
       .limit(1);
