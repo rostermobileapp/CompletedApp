@@ -1670,43 +1670,41 @@ export default function TournamentDetail() {
                           {isBracketLocked && !isEditingBracket ? 'Your custom tournament structure is locked' : 'Design your own tournament bracket structure'}
                         </CardDescription>
                       </div>
-                      {!isReadOnlyMode && isBracketLocked && !isEditingBracket && (
-                        <div className="flex gap-2 flex-wrap">
-                          {tournament.status === 'draft' && (
-                            <Button
-                              onClick={() => setIsEditingBracket(true)}
-                              data-testid="button-unlock-bracket"
-                              variant="outline"
-                              className="gap-2"
-                            >
-                              <Edit className="h-4 w-4" />
-                              Edit Bracket
-                            </Button>
-                          )}
-                          {tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
-                            <Button
-                              onClick={() => toggleVisibilityMutation.mutate(!tournament.isVisibleToLeague)}
-                              variant={tournament.isVisibleToLeague ? "default" : "outline"}
-                              size="sm"
-                              className="gap-2"
-                              disabled={toggleVisibilityMutation.isPending}
-                              data-testid="button-toggle-visibility-custom"
-                            >
-                              {tournament.isVisibleToLeague ? (
-                                <>
-                                  <EyeOff className="h-4 w-4" />
-                                  Hide from League
-                                </>
-                              ) : (
-                                <>
-                                  <Eye className="h-4 w-4" />
-                                  Make Visible to League
-                                </>
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex gap-2 flex-wrap">
+                        {!isReadOnlyMode && tournament.status === 'draft' && isBracketLocked && !isEditingBracket && (
+                          <Button
+                            onClick={() => setIsEditingBracket(true)}
+                            data-testid="button-unlock-bracket"
+                            variant="outline"
+                            className="gap-2"
+                          >
+                            <Edit className="h-4 w-4" />
+                            Edit Bracket
+                          </Button>
+                        )}
+                        {tournament.leagueId && (
+                          <Button
+                            onClick={() => toggleVisibilityMutation.mutate(!tournament.isVisibleToLeague)}
+                            variant={tournament.isVisibleToLeague ? "default" : "outline"}
+                            size="sm"
+                            className="gap-2"
+                            disabled={toggleVisibilityMutation.isPending}
+                            data-testid="button-toggle-visibility-custom"
+                          >
+                            {tournament.isVisibleToLeague ? (
+                              <>
+                                <EyeOff className="h-4 w-4" />
+                                Hide from League
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="h-4 w-4" />
+                                Make Visible to League
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     </CardHeader>
                     <CardContent>
                       <CustomBracketBuilder
