@@ -15632,6 +15632,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Toggle tournament visibility to league members
+  app.patch('/api/tournaments/:id/visibility', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { isVisibleToLeague } = req.body;
+      const userId = req.user.claims.sub;
+
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, id));
+
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      // Check commissioner access
+      let isCommissioner = tournament.createdBy === userId;
+      
+      if (!isCommissioner && tournament.leagueId) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          const { canManageLeagueSpecific } = await import('./permissionMiddleware');
+          isCommissioner = await canManageLeagueSpecific(user as any, tournament.leagueId);
+        }
+      }
+
+      if (!isCommissioner) {
+        return res.status(403).json({ message: 'Only commissioners can toggle tournament visibility' });
+      }
+
+      // Update visibility
+      const [updated] = await db
+        .update(tournaments)
+        .set({
+          isVisibleToLeague: isVisibleToLeague,
+          visibleToLeagueAt: isVisibleToLeague ? new Date() : null,
+          updatedAt: new Date()
+        })
+        .where(eq(tournaments.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating tournament visibility:", error);
+      res.status(500).json({ message: "Failed to update tournament visibility" });
+    }
+  });
+
+  // Get visible tournaments for a league (for league members to see on schedule)
+  app.get('/api/leagues/:leagueId/visible-tournaments', isAuthenticated, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Check if user is a member of this league
+      const [membership] = await db
+        .select()
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, leagueId),
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.status, 'approved')
+          )
+        );
+
+      if (!membership) {
+        return res.status(403).json({ message: 'You must be a league member to view tournaments' });
+      }
+
+      // Get visible tournaments that haven't expired (30 days after final match)
+      const visibleTournaments = await db
+        .select()
+        .from(tournaments)
+        .where(
+          and(
+            eq(tournaments.leagueId, leagueId),
+            eq(tournaments.isVisibleToLeague, true)
+          )
+        );
+
+      // Filter out tournaments where the final match was more than 30 days ago
+      const now = new Date();
+      const validTournaments = [];
+      
+      for (const tournament of visibleTournaments) {
+        // Get the latest match date for this tournament
+        const latestMatch = await db
+          .select({ scheduledTime: tournamentMatches.scheduledTime })
+          .from(tournamentMatches)
+          .where(eq(tournamentMatches.tournamentId, tournament.id))
+          .orderBy(sql`scheduled_time DESC NULLS LAST`)
+          .limit(1);
+
+        let isExpired = false;
+        if (latestMatch.length > 0 && latestMatch[0].scheduledTime) {
+          const expiryDate = new Date(latestMatch[0].scheduledTime);
+          expiryDate.setDate(expiryDate.getDate() + 30);
+          isExpired = now > expiryDate;
+        }
+
+        if (!isExpired) {
+          validTournaments.push(tournament);
+        }
+      }
+
+      res.json(validTournaments);
+    } catch (error) {
+      console.error("Error fetching visible tournaments:", error);
+      res.status(500).json({ message: "Failed to fetch visible tournaments" });
+    }
+  });
+
   // Add teams to tournament and generate bracket
   app.post('/api/tournaments/:id/generate-bracket', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
