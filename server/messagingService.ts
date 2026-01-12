@@ -540,6 +540,7 @@ export class MessagingService {
       .where(
         and(
           eq(conversationParticipants.userId, userId),
+          isNull(conversationParticipants.leftAt),  // Only show active conversations
           leagueId ? eq(conversations.leagueId, leagueId) : sql`true`,
           // Only show conversations that are not hidden OR have new messages after hiddenAt
           sql`(${conversationParticipants.hiddenAt} IS NULL OR ${conversations.lastMessageAt} > ${conversationParticipants.hiddenAt})`
@@ -551,7 +552,7 @@ export class MessagingService {
   }
 
   async getUnreadMessageCount(userId: string): Promise<number> {
-    // Get all conversations the user is part of
+    // Get all active conversations the user is part of
     const userConversations = await db
       .select({ id: conversations.id })
       .from(conversations)
@@ -559,7 +560,12 @@ export class MessagingService {
         conversationParticipants,
         eq(conversations.id, conversationParticipants.conversationId)
       )
-      .where(eq(conversationParticipants.userId, userId));
+      .where(
+        and(
+          eq(conversationParticipants.userId, userId),
+          isNull(conversationParticipants.leftAt)  // Only active conversations
+        )
+      );
 
     if (userConversations.length === 0) {
       return 0;
@@ -592,7 +598,7 @@ export class MessagingService {
   }
 
   async getUnreadMessageCountPerConversation(userId: string): Promise<Array<{ conversationId: string; unreadCount: number }>> {
-    // Get all conversations the user is part of
+    // Get all active conversations the user is part of
     const userConversations = await db
       .select({ id: conversations.id })
       .from(conversations)
@@ -600,7 +606,12 @@ export class MessagingService {
         conversationParticipants,
         eq(conversations.id, conversationParticipants.conversationId)
       )
-      .where(eq(conversationParticipants.userId, userId));
+      .where(
+        and(
+          eq(conversationParticipants.userId, userId),
+          isNull(conversationParticipants.leftAt)  // Only active conversations
+        )
+      );
 
     if (userConversations.length === 0) {
       return [];
