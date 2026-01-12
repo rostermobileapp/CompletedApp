@@ -4,7 +4,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, DollarSign, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { getImageUrl, apiRequest } from '@/lib/queryClient';
+import { getImageUrl, apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
@@ -47,6 +47,7 @@ export default function UserProfile() {
       return response.json();
     },
     onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
       setPageTransitionDirection('up');
       const conversationId = conversation.id || conversation.conversationId;
       if (conversationId) {
