@@ -1663,16 +1663,16 @@ export default function TournamentDetail() {
                 {tournament.format === 'custom_bracket' ? (
                   // Custom bracket builder embedded
                   (<Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
+                    <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
                       <div>
                         <CardTitle>Custom Bracket</CardTitle>
                         <CardDescription>
                           {isBracketLocked && !isEditingBracket ? 'Your custom tournament structure is locked' : 'Design your own tournament bracket structure'}
                         </CardDescription>
                       </div>
-                      {!isReadOnlyMode && (
-                        <div className="flex gap-2">
-                          {tournament.status === 'draft' && isBracketLocked && !isEditingBracket && (
+                      {!isReadOnlyMode && isBracketLocked && !isEditingBracket && (
+                        <div className="flex gap-2 flex-wrap">
+                          {tournament.status === 'draft' && (
                             <Button
                               onClick={() => setIsEditingBracket(true)}
                               data-testid="button-unlock-bracket"
@@ -1683,7 +1683,7 @@ export default function TournamentDetail() {
                               Edit Bracket
                             </Button>
                           )}
-                          {isBracketLocked && tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
+                          {tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
                             <Button
                               onClick={() => toggleVisibilityMutation.mutate(!tournament.isVisibleToLeague)}
                               variant={tournament.isVisibleToLeague ? "default" : "outline"}
