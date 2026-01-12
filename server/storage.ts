@@ -714,6 +714,39 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     try {
+      // First, check if a user with this email already exists (handles re-signup with new Supabase ID)
+      if (userData.email) {
+        const existingByEmail = await this.getUserByEmail(userData.email);
+        if (existingByEmail && existingByEmail.id !== userData.id) {
+          // User signed up again with same email but got a new Supabase ID
+          // We need to migrate the user to the new Supabase ID
+          console.log(`[Storage] Found existing user by email, migrating from ID ${existingByEmail.id} to ${userData.id}`);
+          
+          try {
+            // Clean up foreign key references that prevent ID update
+            // Delete online status records (they can be recreated)
+            await db.execute(sql`DELETE FROM user_online_status WHERE user_id = ${existingByEmail.id}`);
+            
+            // Now update the user ID
+            const [user] = await db
+              .update(users)
+              .set({
+                id: userData.id,
+                updatedAt: new Date(),
+              })
+              .where(eq(users.email, userData.email))
+              .returning();
+            console.log(`[Storage] Successfully migrated user to new ID: ${userData.id}`);
+            return user;
+          } catch (migrationError: any) {
+            console.error(`[Storage] Migration failed, returning existing user:`, migrationError.message);
+            // If migration fails, just return the existing user - authentication will still work
+            // because we'll look up by email in the auth middleware
+            return existingByEmail;
+          }
+        }
+      }
+      
       // Generate display ID upfront for both insert and update scenarios
       const displayId = await this.generateUniqueDisplayId();
       
@@ -749,6 +782,33 @@ export class DatabaseStorage implements IStorage {
     } catch (error: any) {
       // If there's still a conflict issue, fall back to explicit check and update
       console.error('[Storage] Error in upsertUser, trying fallback:', error.message);
+      
+      // First try to find by email (in case of email conflict)
+      if (userData.email) {
+        const existingByEmail = await this.getUserByEmail(userData.email);
+        if (existingByEmail) {
+          console.log(`[Storage] Fallback: Found user by email, attempting migration to ${userData.id}`);
+          try {
+            // Clean up foreign key references
+            await db.execute(sql`DELETE FROM user_online_status WHERE user_id = ${existingByEmail.id}`);
+            
+            const [user] = await db
+              .update(users)
+              .set({
+                id: userData.id,
+                updatedAt: new Date(),
+              })
+              .where(eq(users.email, userData.email))
+              .returning();
+            console.log(`[Storage] Fallback migration successful`);
+            return user;
+          } catch (migrationError: any) {
+            console.error(`[Storage] Fallback migration failed:`, migrationError.message);
+            // Return existing user if migration fails
+            return existingByEmail;
+          }
+        }
+      }
       
       const existingUser = userData.id ? await this.getUser(userData.id) : undefined;
       

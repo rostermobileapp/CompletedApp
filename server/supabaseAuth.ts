@@ -54,7 +54,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
     // Sync user with our database
     // NOTE: Do NOT set role here - it's managed by Stripe subscription sync
-    await storage.upsertUser({
+    const dbUser = await storage.upsertUser({
       id: user.id,
       email: user.email || '',
       firstName: user.user_metadata?.first_name || user.email?.split('@')[0] || '',
@@ -63,13 +63,14 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     });
 
     // Attach user to request object with Replit-compatible format
+    // Use the database user ID (which may differ from Supabase ID in migration scenarios)
     (req as any).user = {
       claims: {
-        sub: user.id,
-        email: user.email,
-        first_name: user.user_metadata?.first_name,
-        last_name: user.user_metadata?.last_name,
-        profile_image_url: user.user_metadata?.profile_image_url || user.user_metadata?.avatar_url,
+        sub: dbUser.id, // Use database user ID
+        email: dbUser.email || user.email,
+        first_name: dbUser.firstName || user.user_metadata?.first_name,
+        last_name: dbUser.lastName || user.user_metadata?.last_name,
+        profile_image_url: dbUser.profileImageUrl || user.user_metadata?.profile_image_url || user.user_metadata?.avatar_url,
       }
     } as any;
 
