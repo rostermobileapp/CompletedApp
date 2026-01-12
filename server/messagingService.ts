@@ -716,47 +716,67 @@ export class MessagingService {
     let participantIds: Set<string>;
     
     if (tournamentTeam && !tournamentTeam.teamId) {
-      // Standalone tournament team - get participants from tournamentParticipants table
+      // Standalone tournament team - get participants from tournamentParticipants table (joined with users to filter deleted)
       const tournamentParticipantsData = await db
-        .select({ userId: tournamentParticipants.userId })
+        .select({ userId: tournamentParticipants.userId, firstName: users.firstName })
         .from(tournamentParticipants)
+        .innerJoin(users, eq(tournamentParticipants.userId, users.id))
         .where(and(
           eq(tournamentParticipants.tournamentTeamId, teamId),
           eq(tournamentParticipants.status, 'approved')
         ));
       
-      participantIds = new Set(tournamentParticipantsData.map(p => p.userId));
+      // Filter out soft-deleted users
+      participantIds = new Set(
+        tournamentParticipantsData
+          .filter(p => p.firstName !== '[Deleted]')
+          .map(p => p.userId)
+      );
     } else {
       // Regular team or tournament team with linked regular team
       const actualTeamId = team?.id || teamId;
       
-      // Get all approved team members from team_memberships
+      // Get all approved team members from team_memberships (joined with users to filter deleted)
       const teamMembershipsData = await db
-        .select({ userId: teamMemberships.userId })
+        .select({ userId: teamMemberships.userId, firstName: users.firstName })
         .from(teamMemberships)
+        .innerJoin(users, eq(teamMemberships.userId, users.id))
         .where(and(
           eq(teamMemberships.teamId, actualTeamId),
           eq(teamMemberships.status, 'approved')
         ));
 
-      // Also get league members who are assigned to this team
+      // Also get league members who are assigned to this team (joined with users to filter deleted)
       const leagueMembershipsData = await db
-        .select({ userId: leagueMemberships.userId })
+        .select({ userId: leagueMemberships.userId, firstName: users.firstName })
         .from(leagueMemberships)
+        .innerJoin(users, eq(leagueMemberships.userId, users.id))
         .where(and(
           eq(leagueMemberships.assignedTeamId, actualTeamId),
           eq(leagueMemberships.status, 'approved')
         ));
 
       // Create a set of all unique team participants (members + captain + league-assigned members)
+      // Exclude soft-deleted users (firstName = '[Deleted]')
       participantIds = new Set<string>([
-        ...teamMembershipsData.map(m => m.userId),
-        ...leagueMembershipsData.map(m => m.userId)
+        ...teamMembershipsData
+          .filter(m => m.firstName !== '[Deleted]')
+          .map(m => m.userId),
+        ...leagueMembershipsData
+          .filter(m => m.firstName !== '[Deleted]')
+          .map(m => m.userId)
       ]);
       
-      // Always add the captain if they exist
+      // Always add the captain if they exist and are not deleted
       if (team?.captainId) {
-        participantIds.add(team.captainId);
+        const [captain] = await db
+          .select({ firstName: users.firstName })
+          .from(users)
+          .where(eq(users.id, team.captainId))
+          .limit(1);
+        if (captain && captain.firstName !== '[Deleted]') {
+          participantIds.add(team.captainId);
+        }
       }
     }
 
@@ -845,33 +865,47 @@ export class MessagingService {
       throw new Error(`Team ${teamId} not found`);
     }
 
-    // Get all approved team members from team_memberships
+    // Get all approved team members from team_memberships (joined with users to check for deleted)
     const teamMembershipsData = await db
-      .select({ userId: teamMemberships.userId })
+      .select({ userId: teamMemberships.userId, firstName: users.firstName })
       .from(teamMemberships)
+      .innerJoin(users, eq(teamMemberships.userId, users.id))
       .where(and(
         eq(teamMemberships.teamId, teamId),
         eq(teamMemberships.status, 'approved')
       ));
 
-    // Also get league members who are assigned to this team
+    // Also get league members who are assigned to this team (joined with users to check for deleted)
     const leagueMembershipsData = await db
-      .select({ userId: leagueMemberships.userId })
+      .select({ userId: leagueMemberships.userId, firstName: users.firstName })
       .from(leagueMemberships)
+      .innerJoin(users, eq(leagueMemberships.userId, users.id))
       .where(and(
         eq(leagueMemberships.assignedTeamId, teamId),
         eq(leagueMemberships.status, 'approved')
       ));
 
     // Create a set of all unique team participants (members + captain + league-assigned members)
+    // Exclude soft-deleted users (firstName = '[Deleted]')
     const currentMemberIds = new Set<string>([
-      ...teamMembershipsData.map(m => m.userId),
-      ...leagueMembershipsData.map(m => m.userId)
+      ...teamMembershipsData
+        .filter(m => m.firstName !== '[Deleted]')
+        .map(m => m.userId),
+      ...leagueMembershipsData
+        .filter(m => m.firstName !== '[Deleted]')
+        .map(m => m.userId)
     ]);
     
-    // Always add the captain if they exist
+    // Always add the captain if they exist and are not deleted
     if (team.captainId) {
-      currentMemberIds.add(team.captainId);
+      const [captain] = await db
+        .select({ firstName: users.firstName })
+        .from(users)
+        .where(eq(users.id, team.captainId))
+        .limit(1);
+      if (captain && captain.firstName !== '[Deleted]') {
+        currentMemberIds.add(team.captainId);
+      }
     }
 
     // Find existing team group chat
@@ -892,10 +926,15 @@ export class MessagingService {
       return;
     }
 
-    // Get current active participants (those who haven't left)
-    const currentParticipants = await db
-      .select()
+    // Get current active participants (those who haven't left) along with user info
+    const currentParticipantsWithUsers = await db
+      .select({
+        id: conversationParticipants.id,
+        userId: conversationParticipants.userId,
+        firstName: users.firstName
+      })
       .from(conversationParticipants)
+      .innerJoin(users, eq(conversationParticipants.userId, users.id))
       .where(
         and(
           eq(conversationParticipants.conversationId, existingChat.id),
@@ -903,16 +942,18 @@ export class MessagingService {
         )
       );
 
-    const currentParticipantIds = new Set(currentParticipants.map(p => p.userId));
+    const currentParticipantIds = new Set(currentParticipantsWithUsers.map(p => p.userId));
 
-    // Find members who need to be added
+    // Find members who need to be added (are on roster but not in chat)
     const membersToAdd = Array.from(currentMemberIds).filter(
       userId => !currentParticipantIds.has(userId)
     );
 
-    // Find participants who need to be removed (no longer team members)
-    const participantsToRemove = currentParticipants.filter(
-      p => !currentMemberIds.has(p.userId)
+    // Find participants who need to be removed:
+    // 1. No longer on team roster
+    // 2. OR are soft-deleted users ([Deleted] User)
+    const participantsToRemove = currentParticipantsWithUsers.filter(
+      p => !currentMemberIds.has(p.userId) || p.firstName === '[Deleted]'
     );
 
     // Add new members
@@ -927,7 +968,7 @@ export class MessagingService {
         });
     }
 
-    // Remove members who are no longer on the team
+    // Remove members who are no longer on the team or are deleted
     if (participantsToRemove.length > 0) {
       await db
         .update(conversationParticipants)

@@ -15,7 +15,7 @@ import {
   roleHierarchy
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, playerStats } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, playerStats, teamMemberships, conversationParticipants } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
@@ -1012,6 +1012,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You must be a commissioner to delete placeholder users" });
       }
 
+      // Get user's team assignments before deletion so we can sync team chats
+      const userLeagueMemberships = await db
+        .select({ assignedTeamId: leagueMemberships.assignedTeamId, leagueId: leagueMemberships.leagueId })
+        .from(leagueMemberships)
+        .where(eq(leagueMemberships.userId, targetUserId));
+      
+      const userTeamMemberships = await db
+        .select({ teamId: teamMemberships.teamId })
+        .from(teamMemberships)
+        .where(eq(teamMemberships.userId, targetUserId));
+
+      // Collect all teams the user was on
+      const teamsToSync = new Map<string, string>(); // teamId -> leagueId
+      for (const membership of userLeagueMemberships) {
+        if (membership.assignedTeamId && membership.leagueId) {
+          teamsToSync.set(membership.assignedTeamId, membership.leagueId);
+        }
+      }
+      for (const membership of userTeamMemberships) {
+        // Get team to find leagueId
+        const [team] = await db.select().from(teams).where(eq(teams.id, membership.teamId));
+        if (team && team.leagueId) {
+          teamsToSync.set(membership.teamId, team.leagueId);
+        }
+      }
+
       // Soft delete approach: Mark user as deleted instead of hard delete
       // This preserves historical data integrity while hiding the user from active use
       await db
@@ -1025,6 +1051,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Clean up any remaining memberships
       await db.delete(leagueMemberships).where(eq(leagueMemberships.userId, targetUserId));
+      await db.delete(teamMemberships).where(eq(teamMemberships.userId, targetUserId));
+
+      // Remove user from all conversation participants
+      await db
+        .update(conversationParticipants)
+        .set({ leftAt: new Date() })
+        .where(eq(conversationParticipants.userId, targetUserId));
+
+      // Sync team chats to remove the deleted user
+      for (const [teamId, leagueId] of teamsToSync) {
+        try {
+          await messagingService.syncTeamChatParticipants(teamId, leagueId);
+        } catch (syncError) {
+          console.error(`Failed to sync team chat for team ${teamId}:`, syncError);
+        }
+      }
 
       res.json({ message: "Placeholder user deleted successfully" });
     } catch (error) {
@@ -3715,7 +3757,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Track if team assignment is changing to sync chats
+      const oldTeamId = membership.assignedTeamId;
+      const newTeamId = updates.assignedTeamId;
+      
       const updatedMember = await storage.updateLeagueMember(memberId, updates);
+      
+      // If team assignment changed, sync team chats
+      if (oldTeamId !== newTeamId) {
+        try {
+          // Sync old team (if existed) to remove user
+          if (oldTeamId) {
+            await messagingService.syncTeamChatParticipants(oldTeamId, leagueId);
+          }
+          // Sync new team (if assigned) to add user
+          if (newTeamId) {
+            await messagingService.syncTeamChatParticipants(newTeamId, leagueId);
+          }
+        } catch (error) {
+          console.error('Error syncing team chat after member update:', error);
+        }
+      }
+      
       res.json(updatedMember);
     } catch (error) {
       console.error("Error updating league member:", error);
@@ -7977,6 +8040,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
 
+        // Track teams that need chat syncing (both old and new assignments)
+        const teamsToSyncAfterImport = new Set<string>();
+
         // Create placeholder user accounts and league memberships for imported players
         for (const player of validPlayers) {
           try {
@@ -7997,6 +8063,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (player.jerseyNumber !== null) updateData.jerseyNumber = player.jerseyNumber;
               if (player.notes) updateData.notes = player.notes;
               updateData.isGoalie = player.isGoalie;
+
+              // Track team assignment changes for chat syncing
+              const oldTeamId = existingMember.assignedTeamId;
+              const newTeamId = player.teamId;
+              
+              // Always sync existing member's current team (catches stale participants)
+              if (oldTeamId) teamsToSyncAfterImport.add(oldTeamId);
+              // If changing teams, also sync the new team
+              if (newTeamId && newTeamId !== oldTeamId) {
+                teamsToSyncAfterImport.add(newTeamId);
+              }
 
               if (Object.keys(updateData).length > 0) {
                 await db.update(leagueMemberships)
@@ -8028,6 +8105,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 isGoalie: player.isGoalie,
                 approvedAt: new Date(),
               });
+
+              // Track new player's team for chat syncing
+              if (player.teamId) {
+                teamsToSyncAfterImport.add(player.teamId);
+              }
               
               actualSuccessCount++;
               createdPlayerIds.push(placeholderUser.id);
@@ -8045,6 +8127,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           successfulRecords: actualSuccessCount,
           failedRecords: parseResults.data.length - actualSuccessCount
         });
+
+        // Sync team chat participants for all teams that had players added or changed
+        for (const teamId of teamsToSyncAfterImport) {
+          try {
+            await messagingService.syncTeamChatParticipants(teamId, leagueId);
+          } catch (error) {
+            console.error(`Error syncing team chat for team ${teamId} after import:`, error);
+          }
+        }
 
         // Clean up uploaded file
         fs.unlinkSync(file.path);
@@ -9005,6 +9096,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.update(leagueMemberships)
           .set({ assignedTeamId: team[0].id })
           .where(eq(leagueMemberships.id, membershipId));
+
+        // Sync team chat participants after team assignment
+        try {
+          await messagingService.syncTeamChatParticipants(team[0].id, leagueId);
+        } catch (error) {
+          console.error('Error syncing team chat after merge team assignment:', error);
+        }
       }
 
       // Find and delete the placeholder user's league membership

@@ -2429,7 +2429,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async approveLeagueMembership(membershipId: string, approverId: string): Promise<LeagueMembership> {
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       // First approve the membership
       const [membership] = await tx
         .update(leagueMemberships)
@@ -2518,19 +2518,33 @@ export class DatabaseStorage implements IStorage {
             .set({ assignedTeamId: team.id })
             .where(eq(leagueMemberships.id, membershipId));
           
-          // Return the updated membership
+          // Return the updated membership with team info for post-transaction sync
           const [updatedMembership] = await tx
             .select()
             .from(leagueMemberships)
             .where(eq(leagueMemberships.id, membershipId))
             .limit(1);
           
-          return updatedMembership;
+          return { membership: updatedMembership, teamToSync: { teamId: team.id, leagueId: membership.leagueId } };
         }
       }
 
-      return membership;
+      return { membership, teamToSync: null };
     });
+
+    // Sync team chat participants AFTER transaction commits
+    if (result.teamToSync) {
+      try {
+        const { MessagingService } = await import('./messagingService');
+        const messagingService = new MessagingService();
+        await messagingService.syncTeamChatParticipants(result.teamToSync.teamId, result.teamToSync.leagueId);
+      } catch (error) {
+        console.error('Error syncing team chat after team assignment:', error);
+        // Don't fail the approval if chat sync fails
+      }
+    }
+
+    return result.membership;
   }
 
   async getUserLeagueMembership(userId: string, leagueId: string): Promise<LeagueMembership | undefined> {
