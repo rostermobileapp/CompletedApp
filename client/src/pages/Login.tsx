@@ -25,6 +25,7 @@ export default function Login() {
 
     try {
       if (isSignUp) {
+        console.log('[Signup] Attempting signup for:', email);
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -33,21 +34,32 @@ export default function Login() {
           }
         });
         
+        console.log('[Signup] Response:', { 
+          hasUser: !!data.user, 
+          hasSession: !!data.session,
+          userId: data.user?.id,
+          sessionAccessToken: data.session?.access_token ? 'present' : 'missing',
+          error: error?.message 
+        });
+        
         if (error) throw error;
         
         if (data.user && !data.session) {
+          console.log('[Signup] User created but no session - email confirmation may be required');
           toast({
             title: 'Check Your Email',
             description: 'We sent you a confirmation link. Please click it to activate your account, then come back and sign in.',
           });
           setIsSignUp(false);
         } else if (data.session) {
+          console.log('[Signup] Session established, redirecting to home');
           toast({
             title: 'Welcome!',
             description: 'Your account has been created.',
           });
           setLocation('/');
         } else {
+          console.log('[Signup] No user or session returned');
           toast({
             title: 'Success!',
             description: 'Your account has been created. You can now sign in.',
