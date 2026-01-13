@@ -3453,20 +3453,49 @@ export class DatabaseStorage implements IStorage {
           let userTeamInMatch = false;
           
           // First try to get team names from team IDs if they exist
+          let team1Logo: string | null = null;
+          let team2Logo: string | null = null;
+          
           if (match.team1Id) {
             const [team1Data] = await db
-              .select({ teamName: tournamentTeams.teamName })
+              .select({ 
+                teamName: tournamentTeams.teamName,
+                teamId: tournamentTeams.teamId
+              })
               .from(tournamentTeams)
               .where(eq(tournamentTeams.id, match.team1Id));
-            if (team1Data) team1Name = team1Data.teamName;
+            if (team1Data) {
+              team1Name = team1Data.teamName;
+              // Get logo from the linked team if it exists
+              if (team1Data.teamId) {
+                const [linkedTeam] = await db
+                  .select({ logoUrl: teams.logoUrl })
+                  .from(teams)
+                  .where(eq(teams.id, team1Data.teamId));
+                if (linkedTeam) team1Logo = linkedTeam.logoUrl;
+              }
+            }
             if (tournamentTeamIds.includes(match.team1Id)) userTeamInMatch = true;
           }
           if (match.team2Id) {
             const [team2Data] = await db
-              .select({ teamName: tournamentTeams.teamName })
+              .select({ 
+                teamName: tournamentTeams.teamName,
+                teamId: tournamentTeams.teamId
+              })
               .from(tournamentTeams)
               .where(eq(tournamentTeams.id, match.team2Id));
-            if (team2Data) team2Name = team2Data.teamName;
+            if (team2Data) {
+              team2Name = team2Data.teamName;
+              // Get logo from the linked team if it exists
+              if (team2Data.teamId) {
+                const [linkedTeam] = await db
+                  .select({ logoUrl: teams.logoUrl })
+                  .from(teams)
+                  .where(eq(teams.id, team2Data.teamId));
+                if (linkedTeam) team2Logo = linkedTeam.logoUrl;
+              }
+            }
             if (tournamentTeamIds.includes(match.team2Id)) userTeamInMatch = true;
           }
           
@@ -3513,6 +3542,22 @@ export class DatabaseStorage implements IStorage {
             }
           }
           
+          // Fallback: try to find logos by team name if not found by ID
+          if (!team1Logo && team1Name !== 'TBD' && tournament.leagueId) {
+            const [teamByName] = await db
+              .select({ logoUrl: teams.logoUrl })
+              .from(teams)
+              .where(and(eq(teams.leagueId, tournament.leagueId), eq(teams.name, team1Name)));
+            if (teamByName) team1Logo = teamByName.logoUrl;
+          }
+          if (!team2Logo && team2Name !== 'TBD' && tournament.leagueId) {
+            const [teamByName] = await db
+              .select({ logoUrl: teams.logoUrl })
+              .from(teams)
+              .where(and(eq(teams.leagueId, tournament.leagueId), eq(teams.name, team2Name)));
+            if (teamByName) team2Logo = teamByName.logoUrl;
+          }
+          
           tournamentMatchesAsGames.push({
             id: match.id,
             createdAt: match.createdAt,
@@ -3539,7 +3584,7 @@ export class DatabaseStorage implements IStorage {
               leagueId: tournament.leagueId || '',
               seasonId: null,
               captainId: null,
-              logoUrl: null,
+              logoUrl: team1Logo,
               wins: 0,
               losses: 0,
               ties: 0,
@@ -3554,7 +3599,7 @@ export class DatabaseStorage implements IStorage {
               leagueId: tournament.leagueId || '',
               seasonId: null,
               captainId: null,
-              logoUrl: null,
+              logoUrl: team2Logo,
               wins: 0,
               losses: 0,
               ties: 0,
@@ -3944,6 +3989,182 @@ export class DatabaseStorage implements IStorage {
         updatedAt: row.home_team_updated_at as Date,
       },
       awayTeam,
+    };
+  }
+
+  // Get a tournament match formatted as a game-like object (for GameDetails compatibility)
+  async getTournamentMatchAsGame(matchId: string): Promise<any | undefined> {
+    // Fetch tournament match with tournament data
+    const result = await db
+      .select({
+        match: tournamentMatches,
+        tournament: tournaments,
+      })
+      .from(tournamentMatches)
+      .innerJoin(tournaments, eq(tournamentMatches.tournamentId, tournaments.id))
+      .where(eq(tournamentMatches.id, matchId));
+    
+    if (!result.length) {
+      return undefined;
+    }
+    
+    const { match, tournament } = result[0];
+    
+    // Get team names and logos
+    let team1Name = 'TBD';
+    let team2Name = 'TBD';
+    let team1Logo: string | null = null;
+    let team2Logo: string | null = null;
+    let team1LinkedId: string | null = null;
+    let team2LinkedId: string | null = null;
+    
+    // Fetch team1 data if exists
+    if (match.team1Id) {
+      const [team1Data] = await db
+        .select({ 
+          teamName: tournamentTeams.teamName,
+          teamId: tournamentTeams.teamId
+        })
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.id, match.team1Id));
+      if (team1Data) {
+        team1Name = team1Data.teamName;
+        team1LinkedId = team1Data.teamId;
+        if (team1Data.teamId) {
+          const [linkedTeam] = await db
+            .select({ logoUrl: teams.logoUrl })
+            .from(teams)
+            .where(eq(teams.id, team1Data.teamId));
+          if (linkedTeam) team1Logo = linkedTeam.logoUrl;
+        }
+      }
+    }
+    
+    // Fetch team2 data if exists
+    if (match.team2Id) {
+      const [team2Data] = await db
+        .select({ 
+          teamName: tournamentTeams.teamName,
+          teamId: tournamentTeams.teamId
+        })
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.id, match.team2Id));
+      if (team2Data) {
+        team2Name = team2Data.teamName;
+        team2LinkedId = team2Data.teamId;
+        if (team2Data.teamId) {
+          const [linkedTeam] = await db
+            .select({ logoUrl: teams.logoUrl })
+            .from(teams)
+            .where(eq(teams.id, team2Data.teamId));
+          if (linkedTeam) team2Logo = linkedTeam.logoUrl;
+        }
+      }
+    }
+    
+    // For custom brackets, get team names from settings if not found
+    const settings = tournament.settings as any;
+    if (settings?.customBracket?.matchups) {
+      const matchup = settings.customBracket.matchups.find((m: any) => m.id === match.id);
+      if (matchup) {
+        if (team1Name === 'TBD' && matchup.team1 && !matchup.team1.startsWith('winner:') && !matchup.team1.startsWith('loser:')) {
+          team1Name = matchup.team1;
+        }
+        if (team2Name === 'TBD' && matchup.team2 && !matchup.team2.startsWith('winner:') && !matchup.team2.startsWith('loser:')) {
+          team2Name = matchup.team2;
+        }
+      }
+    }
+    
+    // Fallback: try to find logos by team name if not found by ID
+    if (!team1Logo && team1Name !== 'TBD' && tournament.leagueId) {
+      const [teamByName] = await db
+        .select({ logoUrl: teams.logoUrl, id: teams.id })
+        .from(teams)
+        .where(and(eq(teams.leagueId, tournament.leagueId), eq(teams.name, team1Name)));
+      if (teamByName) {
+        team1Logo = teamByName.logoUrl;
+        if (!team1LinkedId) team1LinkedId = teamByName.id;
+      }
+    }
+    if (!team2Logo && team2Name !== 'TBD' && tournament.leagueId) {
+      const [teamByName] = await db
+        .select({ logoUrl: teams.logoUrl, id: teams.id })
+        .from(teams)
+        .where(and(eq(teams.leagueId, tournament.leagueId), eq(teams.name, team2Name)));
+      if (teamByName) {
+        team2Logo = teamByName.logoUrl;
+        if (!team2LinkedId) team2LinkedId = teamByName.id;
+      }
+    }
+    
+    // Get game name from custom bracket if available
+    let gameName = match.round;
+    if (settings?.customBracket?.matchups) {
+      const matchup = settings.customBracket.matchups.find((m: any) => m.id === match.id);
+      if (matchup?.gameNumber) {
+        gameName = matchup.gameNumber;
+      }
+    }
+    
+    // Build game-like object
+    return {
+      id: match.id,
+      createdAt: match.createdAt,
+      leagueId: tournament.leagueId || '',
+      seasonId: null,
+      homeTeamId: team1LinkedId || match.team1Id || '',
+      awayTeamId: team2LinkedId || match.team2Id || '',
+      scheduledAt: match.scheduledTime,
+      venue: match.location || null,
+      lockerRoom: null,
+      homeTeamLockerRoom: null,
+      awayTeamLockerRoom: null,
+      homeScore: match.team1Score,
+      awayScore: match.team2Score,
+      isCompleted: match.status === 'completed',
+      homeBeverageDutyUserId: null,
+      homeBeverageDutyClaimedAt: null,
+      awayBeverageDutyUserId: null,
+      awayBeverageDutyClaimedAt: null,
+      updatedAt: match.updatedAt,
+      resultType: null,
+      homeTeam: {
+        id: team1LinkedId || match.team1Id || 'tbd',
+        name: team1Name,
+        leagueId: tournament.leagueId || '',
+        seasonId: null,
+        captainId: null,
+        logoUrl: team1Logo,
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      awayTeam: {
+        id: team2LinkedId || match.team2Id || 'tbd',
+        name: team2Name,
+        leagueId: tournament.leagueId || '',
+        seasonId: null,
+        captainId: null,
+        logoUrl: team2Logo,
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      opponentName: null,
+      isTournamentMatch: true,
+      tournamentId: tournament.id,
+      tournamentName: tournament.name,
+      matchRound: gameName,
+      matchNumber: match.matchNumber
     };
   }
 

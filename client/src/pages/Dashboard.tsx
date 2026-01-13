@@ -2594,7 +2594,7 @@ export default function Dashboard() {
               <div 
                 key={game.id} 
                 className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
-                onClick={() => navigate(game.isScrimmage ? `/scrimmage/${game.id}` : game.isTournamentMatch ? `/tournaments/${game.tournamentId}?tab=bracket` : `/game/${game.id}`)}
+                onClick={() => navigate(game.isScrimmage ? `/scrimmage/${game.id}` : `/game/${game.id}`)}
                 data-testid={`card-game-${game.id}`}
               >
                 <div className="flex items-center gap-4 bg-[212121]">

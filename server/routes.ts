@@ -5879,10 +5879,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/games/:gameId', isAuthenticated, async (req: any, res) => {
     try {
       const gameId = req.params.gameId;
-      const game = await storage.getGameById(gameId);
+      
+      // First try to get from regular games
+      let game = await storage.getGameById(gameId);
+      
+      // If not found, check if it's a tournament match
       if (!game) {
+        const tournamentMatch = await storage.getTournamentMatchAsGame(gameId);
+        if (tournamentMatch) {
+          const formattedGame = formatGameForResponse(tournamentMatch);
+          return res.json(formattedGame);
+        }
         return res.status(404).json({ message: 'Game not found' });
       }
+      
       const formattedGame = formatGameForResponse(game);
       res.json(formattedGame);
     } catch (error) {
@@ -5897,25 +5907,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const gameId = req.params.gameId;
       const userId = req.user.claims.sub;
       
-      const game = await storage.getGameById(gameId);
+      // First try regular games
+      let game = await storage.getGameById(gameId);
+      let isTournamentMatch = false;
+      
+      // If not found, check if it's a tournament match
       if (!game) {
-        return res.status(404).json({ message: 'Game not found' });
+        const tournamentMatch = await storage.getTournamentMatchAsGame(gameId);
+        if (!tournamentMatch) {
+          return res.status(404).json({ message: 'Game not found' });
+        }
+        game = tournamentMatch;
+        isTournamentMatch = true;
       }
       
       const formattedGame = formatGameForResponse(game);
       
-      // Fetch all related data in parallel for maximum speed
+      // Fetch all related data in parallel
+      // For tournament matches, use linked team IDs if available, otherwise empty arrays
+      const homeTeamId = game.homeTeamId;
+      const awayTeamId = game.awayTeamId;
+      
       const [league, homeTeamMembers, awayTeamMembers, scoreSubmissions, userTeams] = await Promise.all([
         game.leagueId ? storage.getLeague(game.leagueId) : null,
-        storage.getTeamMembers(game.homeTeamId),
-        game.awayTeamId ? storage.getTeamMembers(game.awayTeamId) : [],
-        storage.getGameScoreSubmissions(gameId),
+        // Only fetch team members if we have a valid team ID (not 'tbd' or tournament team ID)
+        homeTeamId && homeTeamId !== 'tbd' ? storage.getTeamMembers(homeTeamId).catch(() => []) : Promise.resolve([]),
+        awayTeamId && awayTeamId !== 'tbd' ? storage.getTeamMembers(awayTeamId).catch(() => []) : Promise.resolve([]),
+        isTournamentMatch ? Promise.resolve([]) : storage.getGameScoreSubmissions(gameId),
         storage.getUserTeams(userId)
       ]);
       
       // Get captain status for user's teams in this game
-      const gameTeamIds = [game.homeTeamId, game.awayTeamId].filter((id): id is string => !!id);
-      const userTeamMemberships = await storage.getUserTeamMemberships(userId, gameTeamIds);
+      const gameTeamIds = [homeTeamId, awayTeamId].filter((id): id is string => !!id && id !== 'tbd');
+      const userTeamMemberships = gameTeamIds.length > 0 
+        ? await storage.getUserTeamMemberships(userId, gameTeamIds).catch(() => [])
+        : [];
       
       res.json({
         game: formattedGame,
@@ -5924,7 +5950,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         awayTeamMembers,
         scoreSubmissions,
         userTeams,
-        userTeamMemberships
+        userTeamMemberships,
+        isTournamentMatch
       });
     } catch (error) {
       console.error('Error fetching full game details:', error);
