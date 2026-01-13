@@ -1132,10 +1132,36 @@ export default function TournamentDetail() {
   const rounds = Object.keys(matchesByRound).sort();
 
   // Get team name by ID (teamId here is actually tournamentTeams.id)
-  const getTeamName = (teamId: string | null) => {
-    if (!teamId) return "TBD";
-    const team = teams?.find(t => t.id === teamId);
-    return team?.teamName || "TBD";
+  // If teamId is null, look up team reference from tournament.settings.customBracket
+  const getTeamName = (teamId: string | null, match?: TournamentMatch, position?: 'team1' | 'team2') => {
+    if (teamId) {
+      const team = teams?.find(t => t.id === teamId);
+      return team?.teamName || "TBD";
+    }
+    
+    // If teamId is null, check for team reference in customBracket settings (for custom brackets)
+    if (match && position && tournament?.format === 'custom_bracket' && tournament?.settings) {
+      const settings = tournament.settings as TournamentSettings & { customBracket?: { matchups?: any[] } };
+      const customBracket = settings?.customBracket;
+      if (customBracket?.matchups) {
+        // Find the matchup that corresponds to this match by game number (stored in round)
+        const matchup = customBracket.matchups.find((m: any) => m.gameNumber === match.round);
+        if (matchup) {
+          const teamValue = position === 'team1' ? matchup.team1 : matchup.team2;
+          if (teamValue) {
+            // Check if it's a winner/loser reference like "winner:Game 1"
+            if (teamValue.startsWith('winner:') || teamValue.startsWith('loser:')) {
+              const [type, gameRef] = teamValue.split(':');
+              return `${type.charAt(0).toUpperCase() + type.slice(1)} of ${gameRef}`;
+            }
+            // It's a team name - return it directly
+            return teamValue;
+          }
+        }
+      }
+    }
+    
+    return "TBD";
   };
 
   // Export schedule to PDF
@@ -1214,8 +1240,8 @@ export default function TournamentDetail() {
           addNewPage();
         }
 
-        const team1Name = getTeamName(match.team1Id);
-        const team2Name = getTeamName(match.team2Id);
+        const team1Name = getTeamName(match.team1Id, match, 'team1');
+        const team2Name = getTeamName(match.team2Id, match, 'team2');
 
         // Match card background
         doc.setFillColor(255, 255, 255);
@@ -1227,11 +1253,11 @@ export default function TournamentDetail() {
         doc.setFillColor(59, 130, 246);
         doc.rect(margin, currentY, availableWidth, 3, 'F');
 
-        // Match number and round
+        // Match round/game name
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(0, 0, 0);
-        doc.text(`Match ${match.matchNumber} - ${match.round}`, margin + 10, currentY + 20);
+        doc.text(match.round, margin + 10, currentY + 20);
 
         // Teams
         doc.setFontSize(10);
@@ -1932,7 +1958,7 @@ export default function TournamentDetail() {
                               <div className="flex flex-col md:flex-row md:items-center gap-4">
                                 <div className="flex-1 grid grid-cols-3 gap-4 items-center">
                                   <div className="text-right font-medium" data-testid={`text-team1-${match.matchNumber}`}>
-                                    {getTeamName(match.team1Id)}
+                                    {getTeamName(match.team1Id, match, 'team1')}
                                   </div>
                                   <div className="text-center">
                                     {match.team1Score !== null && match.team2Score !== null ? (
@@ -1944,7 +1970,7 @@ export default function TournamentDetail() {
                                     )}
                                   </div>
                                   <div className="font-medium" data-testid={`text-team2-${match.matchNumber}`}>
-                                    {getTeamName(match.team2Id)}
+                                    {getTeamName(match.team2Id, match, 'team2')}
                                   </div>
                                 </div>
                                 <Badge variant={match.status === 'completed' ? 'default' : 'outline'}>
@@ -2281,8 +2307,8 @@ export default function TournamentDetail() {
                     matches
                       .sort((a, b) => a.matchNumber - b.matchNumber)
                       .map((match) => {
-                        const team1Name = getTeamName(match.team1Id);
-                        const team2Name = getTeamName(match.team2Id);
+                        const team1Name = getTeamName(match.team1Id, match, 'team1');
+                        const team2Name = getTeamName(match.team2Id, match, 'team2');
                         
                         return (
                           <Card key={match.id} data-testid={`card-schedule-${match.matchNumber}`}>
@@ -2292,7 +2318,7 @@ export default function TournamentDetail() {
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                   <div className="space-y-1">
                                     <div className="font-semibold">
-                                      Match {match.matchNumber} - {match.round}
+                                      {match.round}
                                     </div>
                                     <div className="text-sm font-medium">
                                       {team1Name} vs {team2Name}
@@ -2436,8 +2462,8 @@ export default function TournamentDetail() {
           match={editingMatch}
           open={!!editingMatch}
           onOpenChange={(open) => !open && setEditingMatch(null)}
-          team1Name={getTeamName(editingMatch.team1Id)}
-          team2Name={getTeamName(editingMatch.team2Id)}
+          team1Name={getTeamName(editingMatch.team1Id, editingMatch, 'team1')}
+          team2Name={getTeamName(editingMatch.team2Id, editingMatch, 'team2')}
         />
       )}
 

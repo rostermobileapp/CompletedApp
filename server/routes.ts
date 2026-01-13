@@ -16329,9 +16329,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (let i = 0; i < matchups.length; i++) {
           const matchup = matchups[i];
           
-          // Handle team1 - could be actual team or winner reference
+          // Handle team1 - could be actual team or winner/loser reference
           let team1Id = null;
-          if (matchup.team1.startsWith('winner:')) {
+          if (matchup.team1.startsWith('winner:') || matchup.team1.startsWith('loser:')) {
             // Leave as null - will be filled when the referenced match completes
             team1Id = null;
           } else {
@@ -16339,9 +16339,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             team1Id = team1 ? team1.id : null;
           }
 
-          // Handle team2 - could be actual team or winner reference
+          // Handle team2 - could be actual team or winner/loser reference
           let team2Id = null;
-          if (matchup.team2.startsWith('winner:')) {
+          if (matchup.team2.startsWith('winner:') || matchup.team2.startsWith('loser:')) {
             // Leave as null - will be filled when the referenced match completes
             team2Id = null;
           } else {
@@ -16364,7 +16364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             location: null,
             gameId: null, // Will be linked when match is scheduled with date/time
             advancesToMatchId: null, // Custom brackets don't use automatic advancement
-            notes: `Custom bracket: ${matchup.gameNumber || `Game ${i + 1}`}`
+            notes: null
           });
         }
 
