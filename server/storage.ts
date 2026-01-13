@@ -44,6 +44,7 @@ import {
   lineCombinationAssignments,
   drafts,
   draftPicks,
+  tournaments,
   tournamentTeams,
   tournamentMatches,
   tournamentPhotos,
@@ -3409,8 +3410,176 @@ export class DatabaseStorage implements IStorage {
       resultType: null
     }));
 
-    // Combine regular games and scrimmages, then sort by scheduled time
-    const allEvents = [...gamesWithTeams, ...scrimmagesAsGames];
+    // Get tournament matches for user's teams
+    const tournamentMatchesAsGames: any[] = [];
+    if (teamIds.length > 0) {
+      // Find tournament_teams that link to the user's teams
+      const userTournamentTeams = await db
+        .select({
+          id: tournamentTeams.id,
+          tournamentId: tournamentTeams.tournamentId,
+          teamId: tournamentTeams.teamId,
+          teamName: tournamentTeams.teamName
+        })
+        .from(tournamentTeams)
+        .where(inArray(tournamentTeams.teamId, teamIds));
+      
+      if (userTournamentTeams.length > 0) {
+        const tournamentTeamIds = userTournamentTeams.map(tt => tt.id);
+        const userTeamNames = userTournamentTeams.map(tt => tt.teamName);
+        const userTournamentIds = [...new Set(userTournamentTeams.map(tt => tt.tournamentId))];
+        
+        // Get ALL scheduled tournament matches for tournaments where user has teams
+        // This handles custom brackets where team1Id/team2Id may be null but team names are in settings
+        const upcomingTournamentMatches = await db
+          .select({
+            match: tournamentMatches,
+            tournament: tournaments,
+          })
+          .from(tournamentMatches)
+          .innerJoin(tournaments, eq(tournamentMatches.tournamentId, tournaments.id))
+          .where(
+            and(
+              isNotNull(tournamentMatches.scheduledTime),
+              gte(tournamentMatches.scheduledTime, generousCutoff),
+              inArray(tournamentMatches.tournamentId, userTournamentIds)
+            )
+          );
+        
+        // Filter and build game-like objects
+        for (const { match, tournament } of upcomingTournamentMatches) {
+          let team1Name = 'TBD';
+          let team2Name = 'TBD';
+          let userTeamInMatch = false;
+          
+          // First try to get team names from team IDs if they exist
+          if (match.team1Id) {
+            const [team1Data] = await db
+              .select({ teamName: tournamentTeams.teamName })
+              .from(tournamentTeams)
+              .where(eq(tournamentTeams.id, match.team1Id));
+            if (team1Data) team1Name = team1Data.teamName;
+            if (tournamentTeamIds.includes(match.team1Id)) userTeamInMatch = true;
+          }
+          if (match.team2Id) {
+            const [team2Data] = await db
+              .select({ teamName: tournamentTeams.teamName })
+              .from(tournamentTeams)
+              .where(eq(tournamentTeams.id, match.team2Id));
+            if (team2Data) team2Name = team2Data.teamName;
+            if (tournamentTeamIds.includes(match.team2Id)) userTeamInMatch = true;
+          }
+          
+          // For custom brackets, team names are stored in settings.customBracket.matchups
+          const settings = tournament.settings as any;
+          if (settings?.customBracket?.matchups) {
+            const matchup = settings.customBracket.matchups.find(
+              (m: any) => m.id === match.id
+            );
+            if (matchup) {
+              // Get team1 from matchup if not already set
+              if (team1Name === 'TBD' && matchup.team1 && !matchup.team1.startsWith('winner:') && !matchup.team1.startsWith('loser:')) {
+                team1Name = matchup.team1;
+              }
+              // Get team2 from matchup if not already set
+              if (team2Name === 'TBD' && matchup.team2 && !matchup.team2.startsWith('winner:') && !matchup.team2.startsWith('loser:')) {
+                team2Name = matchup.team2;
+              }
+              // Check if user's team is in this matchup by name
+              if (userTeamNames.some(name => name === matchup.team1 || name === matchup.team2)) {
+                userTeamInMatch = true;
+              }
+            }
+          }
+          
+          // Skip this match if user's team is not involved
+          if (!userTeamInMatch) continue;
+          
+          // Check visibility based on league timezone
+          const leagueTimezone = tournament.leagueId 
+            ? (leagueCache.get(tournament.leagueId)?.timezone || 'America/New_York')
+            : 'America/New_York';
+          
+          if (!shouldShowEventBasedOnLeagueNoon(match.scheduledTime!, leagueTimezone)) {
+            continue;
+          }
+          
+          // Get the game name from custom bracket if available
+          let gameName = match.round;
+          if (settings?.customBracket?.matchups) {
+            const matchup = settings.customBracket.matchups.find((m: any) => m.id === match.id);
+            if (matchup?.gameNumber) {
+              gameName = matchup.gameNumber;
+            }
+          }
+          
+          tournamentMatchesAsGames.push({
+            id: match.id,
+            createdAt: match.createdAt,
+            leagueId: tournament.leagueId || '',
+            seasonId: null,
+            homeTeamId: match.team1Id || '',
+            awayTeamId: match.team2Id || '',
+            scheduledAt: match.scheduledTime,
+            venue: match.location || null,
+            lockerRoom: null,
+            homeTeamLockerRoom: null,
+            awayTeamLockerRoom: null,
+            homeScore: match.team1Score,
+            awayScore: match.team2Score,
+            isCompleted: match.status === 'completed',
+            homeBeverageDutyUserId: null,
+            homeBeverageDutyClaimedAt: null,
+            awayBeverageDutyUserId: null,
+            awayBeverageDutyClaimedAt: null,
+            updatedAt: match.updatedAt,
+            homeTeam: {
+              id: match.team1Id || 'tbd',
+              name: team1Name,
+              leagueId: tournament.leagueId || '',
+              seasonId: null,
+              captainId: null,
+              logoUrl: null,
+              wins: 0,
+              losses: 0,
+              ties: 0,
+              goalsFor: 0,
+              goalsAgainst: 0,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            },
+            awayTeam: {
+              id: match.team2Id || 'tbd',
+              name: team2Name,
+              leagueId: tournament.leagueId || '',
+              seasonId: null,
+              captainId: null,
+              logoUrl: null,
+              wins: 0,
+              losses: 0,
+              ties: 0,
+              goalsFor: 0,
+              goalsAgainst: 0,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            },
+            opponentName: null,
+            isTournamentMatch: true,
+            tournamentId: tournament.id,
+            tournamentName: tournament.name,
+            matchRound: gameName,
+            matchNumber: match.matchNumber,
+            resultType: null
+          });
+        }
+      }
+    }
+
+    console.log(`📅 getUpcomingGames for user ${userId}: returned ${gamesWithTeams.length} roster games, ${substituteGameIds.length} substitute game IDs, ${filteredScrimmages.length} approved scrimmages, ${tournamentMatchesAsGames.length} tournament matches`);
+    
+    // Combine regular games, scrimmages, and tournament matches, then sort by scheduled time
+    const allEvents = [...gamesWithTeams, ...scrimmagesAsGames, ...tournamentMatchesAsGames];
+    console.log(`📅 Final response: ${gamesWithTeams.length} games + ${scrimmagesAsGames.length} scrimmages + ${tournamentMatchesAsGames.length} tournament matches = ${allEvents.length} total items`);
     return allEvents.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
   }
 
