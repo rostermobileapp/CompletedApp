@@ -1,5 +1,6 @@
-import { Users, MessageCircle, User, DollarSign, Home } from 'lucide-react';
+import { Users, MessageCircle, User, DollarSign } from 'lucide-react';
 import { useLocation } from 'wouter';
+import homeLogo from '@assets/Home_Logo_1768323157245.png';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
@@ -101,7 +102,7 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
               data-testid={`nav-${shortcut.id}`}
             >
               {shortcut.id === 'home' ? (
-                <Home className="w-6 h-6 mb-1" />
+                <img src={homeLogo} alt="Home" className="w-6 h-6 mb-1" />
               ) : Icon && (
                 <div className="relative">
                   <Icon className="w-5 h-5 mb-1" />
