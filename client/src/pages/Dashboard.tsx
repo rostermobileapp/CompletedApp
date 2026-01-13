@@ -2534,7 +2534,7 @@ export default function Dashboard() {
             {Array.isArray(visibleTournaments) && visibleTournaments.map((tournament: any) => (
               <div 
                 key={`bracket-${tournament.id}`}
-                className="rounded-xl border border-purple-500/50 p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
+                className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] bracket-glow"
                 onClick={() => navigate(`/tournaments/${tournament.id}?tab=bracket&readonly=true`)}
                 data-testid={`card-bracket-${tournament.id}`}
               >

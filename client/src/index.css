@@ -122,6 +122,20 @@
     text-transform: uppercase;
   }
 
+  /* Pulsing blue glow animation for bracket cards */
+  @keyframes bluePulse {
+    0%, 100% {
+      box-shadow: 0 0 8px 2px rgba(59, 130, 246, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 16px 4px rgba(59, 130, 246, 0.7);
+    }
+  }
+  
+  .bracket-glow {
+    animation: bluePulse 3s ease-in-out infinite;
+  }
+
   /* Feature locked state */
   .feature-locked {
     opacity: 0.5;
