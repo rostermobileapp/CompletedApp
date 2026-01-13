@@ -1910,7 +1910,7 @@ export default function Dashboard() {
             <img 
               src={theme === 'dark' ? darkModeLogo : lightModeLogo}
               alt="Roster"
-              className="h-10 pl-[12px] pr-[12px]"
+              className="h-[50px] pl-[12px] pr-[12px]"
               data-testid="img-roster-logo"
             />
           </div>
