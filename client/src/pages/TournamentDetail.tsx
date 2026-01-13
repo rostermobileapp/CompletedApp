@@ -35,6 +35,7 @@ import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } 
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
+import { resolveTeamDisplay } from "@/utils/tournamentMatchDisplay";
 
 // Announcement types
 type AnnouncementReaction = {
@@ -1131,37 +1132,25 @@ export default function TournamentDetail() {
 
   const rounds = Object.keys(matchesByRound).sort();
 
-  // Get team name by ID (teamId here is actually tournamentTeams.id)
-  // If teamId is null, look up team reference from tournament.settings.customBracket
+  // Get team name by ID - uses shared utility for consistency with BracketView
   const getTeamName = (teamId: string | null, match?: TournamentMatch, position?: 'team1' | 'team2') => {
-    if (teamId) {
-      const team = teams?.find(t => t.id === teamId);
-      return team?.teamName || "TBD";
-    }
-    
-    // If teamId is null, check for team reference in customBracket settings (for custom brackets)
-    if (match && position && tournament?.format === 'custom_bracket' && tournament?.settings) {
-      const settings = tournament.settings as TournamentSettings & { customBracket?: { matchups?: any[] } };
-      const customBracket = settings?.customBracket;
-      if (customBracket?.matchups) {
-        // Find the matchup that corresponds to this match by game number (stored in round)
-        const matchup = customBracket.matchups.find((m: any) => m.gameNumber === match.round);
-        if (matchup) {
-          const teamValue = position === 'team1' ? matchup.team1 : matchup.team2;
-          if (teamValue) {
-            // Check if it's a winner/loser reference like "winner:Game 1"
-            if (teamValue.startsWith('winner:') || teamValue.startsWith('loser:')) {
-              const [type, gameRef] = teamValue.split(':');
-              return `${type.charAt(0).toUpperCase() + type.slice(1)} of ${gameRef}`;
-            }
-            // It's a team name - return it directly
-            return teamValue;
-          }
-        }
+    if (!match || !position) {
+      if (teamId) {
+        const team = teams?.find(t => t.id === teamId);
+        return team?.teamName || "TBD";
       }
+      return "TBD";
     }
     
-    return "TBD";
+    return resolveTeamDisplay({
+      teamId,
+      match,
+      position,
+      teams: teams || [],
+      matches: matches || [],
+      format: tournament?.format || '',
+      settings: tournament?.settings as TournamentSettings & { customBracket?: { matchups?: any[] } }
+    });
   };
 
   // Export schedule to PDF

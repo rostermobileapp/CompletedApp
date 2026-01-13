@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { resolveTeamDisplay } from "@/utils/tournamentMatchDisplay";
 
 interface BracketViewProps {
   matches: TournamentMatch[];
@@ -173,135 +174,17 @@ export default function BracketView({ matches, teams, format, settings, tourname
     return false;
   };
 
-  // Helper to get descriptive text for TBD teams
+  // Helper to get descriptive text for TBD teams - uses shared utility
   const getTeamDisplay = (teamId: string | null, match: TournamentMatch, position: 'team1' | 'team2') => {
-    if (teamId) {
-      const team = teams.find(t => t.id === teamId);
-      const teamName = team?.teamName || "TBD";
-      
-      // Show seed numbers if enabled in settings
-      if (settings?.showSeedNumbers && team?.seed) {
-        return `#${team.seed} ${teamName}`;
-      }
-      
-      return teamName;
-    }
-    
-    // For TBD teams, check notes for source match info
-    if (match.notes) {
-      // Check for Round Robin + Playoffs seeding pattern (e.g., "Seed #1 vs Seed #2 (based on Round Robin record)")
-      const seedPattern = /Seed #(\d+) vs Seed #(\d+)/;
-      const seedMatch = match.notes.match(seedPattern);
-      if (seedMatch) {
-        const seed1 = seedMatch[1];
-        const seed2 = seedMatch[2];
-        if (position === 'team1') {
-          return `Seed #${seed1}`;
-        } else {
-          return `Seed #${seed2}`;
-        }
-      }
-      
-      // Try to extract explicit inbound match references from notes
-      // Only extract references to OTHER matches (not current match)
-      const matchRefPattern = /(winner|loser)\s+(?:of|from)\s+match[_\s]?(\d+)/gi;
-      const matchRefs = Array.from(match.notes.matchAll(matchRefPattern));
-      // Filter to only include references to different matches
-      const inboundMatchRefs = matchRefs.filter(ref => parseInt(ref[2]) !== match.matchNumber);
-      
-      if (inboundMatchRefs.length >= 1) {
-        if (position === 'team1' && inboundMatchRefs[0]) {
-          const prefix = inboundMatchRefs[0][1];
-          const matchNum = inboundMatchRefs[0][2];
-          return `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} of Match ${matchNum}`;
-        } else if (position === 'team2' && inboundMatchRefs[1]) {
-          const prefix = inboundMatchRefs[1][1];
-          const matchNum = inboundMatchRefs[1][2];
-          return `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} of Match ${matchNum}`;
-        } else if (position === 'team2' && inboundMatchRefs.length === 1) {
-          // Only one inbound reference - derive second from first
-          const prefix = inboundMatchRefs[0][1];
-          const matchNum = parseInt(inboundMatchRefs[0][2]) + 1;
-          return `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} of Match ${matchNum}`;
-        }
-      }
-      
-      // Check for losers bracket patterns
-      const losersRoundMatch = match.notes.match(/receives\s+losers\s+from\s+winners\s+round\s+(\d+)/i);
-      if (losersRoundMatch) {
-        return position === 'team1' ? `Loser from WR ${losersRoundMatch[1]}` : `Loser from WR ${losersRoundMatch[1]}`;
-      }
-      
-      if (/merger\s+round|previous\s+losers/i.test(match.notes)) {
-        return 'TBD';
-      }
-    }
-    
-    // For TBD teams, find matches that advance to this match
-    // Support both UUID format and match_X format for backwards compatibility
-    const sourceMatches = matches.filter(m => 
-      m.advancesToMatchId === match.id || 
-      m.advancesToMatchId === `match_${match.matchNumber}`
-    );
-    
-    if (sourceMatches.length === 1) {
-      const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
-      return `${prefix} Match ${sourceMatches[0].matchNumber}`;
-    } else if (sourceMatches.length === 2) {
-      // Two matches feed into this one (common in brackets)
-      // Distinguish based on position or match numbers
-      const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
-      if (position === 'team1') {
-        return `${prefix} Match ${sourceMatches[0].matchNumber}`;
-      } else {
-        return `${prefix} Match ${sourceMatches[1].matchNumber}`;
-      }
-    } else if (sourceMatches.length > 0) {
-      // Multiple sources - just show first for now
-      const prefix = match.bracketType === 'losers' ? 'Loser of' : 'Winner of';
-      return `${prefix} Match ${sourceMatches[0].matchNumber}`;
-    }
-    
-    // Fallback to notes-based description
-    if (match.notes) {
-      if (match.notes.toLowerCase().includes('play-in')) {
-        return "Winner of Play-In";
-      }
-      if (match.notes.toLowerCase().includes('winners round') && match.bracketType === 'losers') {
-        // Extract which winners round by looking at match notes
-        const winnersRoundMatch = match.notes.match(/Winners Round (\d+)/);
-        if (winnersRoundMatch) {
-          const winnersRound = parseInt(winnersRoundMatch[1]);
-          // Find all Winners Round matches of that round
-          const winnersRoundMatches = matches.filter(m => m.bracketType === 'winners' && m.round.includes(`Winners Round ${winnersRound}`));
-          
-          // Determine which position this losers match is in its round
-          const losersRoundMatches = matches.filter(m => m.bracketType === 'losers' && m.round === match.round);
-          const matchIndex = losersRoundMatches.findIndex(m => m.id === match.id);
-          
-          if (matchIndex >= 0) {
-            // This losers match pairs winners matches: [matchIndex*2, matchIndex*2+1]
-            const parent1Index = matchIndex * 2;
-            const parent2Index = matchIndex * 2 + 1;
-            
-            if (position === 'team1' && winnersRoundMatches[parent1Index]) {
-              return `Loser of Match ${winnersRoundMatches[parent1Index].matchNumber}`;
-            } else if (position === 'team2' && winnersRoundMatches[parent2Index]) {
-              return `Loser of Match ${winnersRoundMatches[parent2Index].matchNumber}`;
-            }
-          }
-        }
-        return "Loser from Winners";
-      }
-      if (match.notes.toLowerCase().includes('winners round')) {
-        return "Winner from Winners";
-      }
-      if (match.notes.toLowerCase().includes('losers round')) {
-        return "Winner from Losers";
-      }
-    }
-    
-    return "TBD";
+    return resolveTeamDisplay({
+      teamId,
+      match,
+      position,
+      teams,
+      matches,
+      format,
+      settings: settings as any
+    });
   };
 
   // Organize matches by round and bracket type with stable ordering
