@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format, isBefore, isAfter, addHours } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, ArrowLeft, Clock, Users } from "lucide-react";
+import { Trophy, ArrowLeft, Clock, Users, ChevronRight } from "lucide-react";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
-import clickDetailsIconUrl from '@assets/image_1768228477604.png';
 import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
 import { useDashboardSelection } from "@/hooks/useDashboardSelection";
 
@@ -261,11 +260,8 @@ export default function Calendar() {
                           </p>
                         )}
                       </div>
-                      <img 
-                        src={clickDetailsIconUrl}
-                        alt="View details"
-                        className="w-12 h-12"
-                        style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
+                      <ChevronRight 
+                        className="w-8 h-8 text-primary"
                         data-testid={`icon-view-details-scrimmage-${event.id}`}
                       />
                     </div>
@@ -349,11 +345,8 @@ export default function Calendar() {
                           </p>
                         )}
                       </div>
-                      <img 
-                        src={clickDetailsIconUrl}
-                        alt="View details"
-                        className="w-12 h-12"
-                        style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
+                      <ChevronRight 
+                        className="w-8 h-8 text-primary"
                         data-testid={`icon-view-details-substitute-${game.id}`}
                       />
                     </div>
@@ -427,11 +420,8 @@ export default function Calendar() {
                       </div>
                     )}
                   </div>
-                  <img 
-                    src={clickDetailsIconUrl}
-                    alt="View details"
-                    className="w-12 h-12"
-                    style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
+                  <ChevronRight 
+                    className="w-8 h-8 text-primary"
                     data-testid={`icon-view-details-${game.id}`}
                   />
                 </div>
