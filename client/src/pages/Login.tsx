@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import logoWhite from '@assets/ROSTER_LOGO_WHITE_1765849625877.png';
 
 export default function Login() {
   const [showForm, setShowForm] = useState(false);
@@ -133,12 +132,12 @@ export default function Login() {
             ease: [0.4, 0, 0.2, 1],
           }}
         >
-          <motion.img
-            src={logoWhite}
-            alt="Roster Logo"
-            className="w-64 max-w-[80vw]"
+          <motion.span
+            className="text-6xl font-bold text-white"
             data-testid="logo-image"
-          />
+          >
+            Roster
+          </motion.span>
 
           <AnimatePresence>
             {!showForm && (
@@ -183,12 +182,12 @@ export default function Login() {
                 }}
               >
                 <div className="text-center pt-[0px] pb-[0px] mt-[12px] mb-[12px]">
-                  <img 
-                    src={logoWhite} 
-                    alt="Roster" 
-                    className="h-8 mx-auto mb-2"
+                  <span 
+                    className="text-2xl font-bold text-white"
                     data-testid="modal-logo"
-                  />
+                  >
+                    Roster
+                  </span>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-3 pl-[8px] pr-[8px] pt-[0px] pb-[0px] mt-[0px] mb-[0px] ml-[8px] mr-[8px]">

@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { notifyDashboardSelectionChange } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon, UserPlus, Target, ArrowRight, Bell, XCircle, CheckCircle2 } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, Megaphone, BarChart3, Award, ChevronDown, ChevronRight, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon, UserPlus, Target, ArrowRight, Bell, XCircle, CheckCircle2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -1903,12 +1903,12 @@ export default function Dashboard() {
       <div className="sticky top-0 z-50 bg-background p-3 flex items-center mb-[12px] pl-[16px] pr-[16px] pt-[4px] pb-[4px]">
         <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
           <div className="flex items-center gap-2">
-            <img 
-              src={logoUrl}
-              alt="Roster Logo" 
-              className="h-[30px] w-auto pt-[0px] pb-[0px] pl-[12px] pr-[12px] invert dark:invert-0"
+            <span 
+              className="text-2xl font-bold text-foreground pl-[12px] pr-[12px]"
               data-testid="img-roster-logo"
-            />
+            >
+              Roster
+            </span>
           </div>
           <div className="flex items-center gap-3">
             <button 
@@ -2680,11 +2680,8 @@ export default function Dashboard() {
                         </div>
                       );
                     })()}
-                    <img 
-                      src={clickDetailsIconUrl}
-                      alt="View details"
-                      className="w-12 h-12"
-                      style={{ filter: 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(97%) contrast(101%)' }}
+                    <ChevronRight 
+                      className="w-8 h-8 text-primary"
                       data-testid={`icon-view-details-${game.id}`}
                     />
                   </div>

@@ -1,11 +1,10 @@
-import { Users, MessageCircle, User, DollarSign } from 'lucide-react';
+import { Users, MessageCircle, User, DollarSign, Home } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useKeyboard } from '@/hooks/use-keyboard';
 import { useSwipeableNav, SCREEN_ORDER, ScreenId } from '@/context/SwipeableNavContext';
-import rostersLogoUrl from '@assets/Roster R White_1757096715093.png';
 
 interface BottomNavigationProps {
   useSwipeNav?: boolean;
@@ -102,12 +101,7 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
               data-testid={`nav-${shortcut.id}`}
             >
               {shortcut.id === 'home' ? (
-                <img 
-                  src={rostersLogoUrl}
-                  alt="Home"
-                  className="mb-1 object-contain invert dark:invert-0"
-                  style={{ width: '30px', height: '30px' }}
-                />
+                <Home className="w-6 h-6 mb-1" />
               ) : Icon && (
                 <div className="relative">
                   <Icon className="w-5 h-5 mb-1" />

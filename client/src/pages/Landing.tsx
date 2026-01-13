@@ -1,8 +1,6 @@
 import { Users, Calendar, Trophy, MessageCircle, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import logoWhite from '@assets/Roster Logo White_1759233840726.png';
-import heroImage from '@assets/previewed_1761963923150.png';
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
@@ -20,12 +18,12 @@ export default function Landing() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="w-24"></div>
-          <img 
-            src={logoWhite} 
-            alt="Roster Logo" 
-            className="h-8"
+          <span 
+            className="text-2xl font-bold text-white"
             data-testid="logo-image"
-          />
+          >
+            Roster
+          </span>
           <div className="w-24"></div>
         </div>
       </header>
@@ -52,12 +50,12 @@ export default function Landing() {
             <span className="text-[#3c82f4]">Organized</span>
           </h1>
           <div className="flex flex-col md:flex-row gap-8 items-start justify-center mb-12">
-            <img 
-              src={heroImage}
-              alt="Roster app interface"
-              className="w-full md:w-1/2 max-w-[336px] rounded-lg shadow-2xl"
+            <div 
+              className="w-full md:w-1/2 max-w-[336px] rounded-lg shadow-2xl bg-gradient-to-br from-[#3c82f4] to-[#1a56db] p-8 flex items-center justify-center"
               data-testid="image-hero"
-            />
+            >
+              <Trophy className="w-32 h-32 text-white/80" />
+            </div>
             <div 
               className="text-base md:text-lg leading-relaxed text-[#ffffff] md:w-1/2 max-w-md md:mt-16"
               data-testid="text-hero-body"

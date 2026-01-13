@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import logoWhite from '@assets/Roster Logo White_1759233840726.png';
 import { useState } from "react";
 
 const waitlistFormSchema = z.object({
@@ -76,12 +75,12 @@ export default function Waitlist() {
         <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
           <div className="max-w-7xl mx-auto px-6 py-4 flex justify-center items-center">
             <Link href="/">
-              <img 
-                src={logoWhite} 
-                alt="Roster Logo" 
-                className="h-8 cursor-pointer"
+              <span 
+                className="text-2xl font-bold text-white cursor-pointer"
                 data-testid="logo-image"
-              />
+              >
+                Roster
+              </span>
             </Link>
           </div>
         </header>
@@ -130,12 +129,12 @@ export default function Waitlist() {
             Back
           </Button>
           <Link href="/">
-            <img 
-              src={logoWhite} 
-              alt="Roster Logo" 
-              className="h-8 cursor-pointer"
+            <span 
+              className="text-2xl font-bold text-white cursor-pointer"
               data-testid="logo-image"
-            />
+            >
+              Roster
+            </span>
           </Link>
           <div className="w-24"></div>
         </div>
