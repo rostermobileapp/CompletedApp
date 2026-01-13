@@ -6323,8 +6323,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Team ID is required' });
       }
 
-      // Verify the game exists
-      const game = await storage.getGameById(gameId);
+      // Verify the game exists - check regular games first, then tournament matches
+      let game = await storage.getGameById(gameId);
+      let isTournamentMatch = false;
+      if (!game) {
+        const tournamentMatch = await storage.getTournamentMatchAsGame(gameId);
+        if (tournamentMatch) {
+          game = tournamentMatch;
+          isTournamentMatch = true;
+        }
+      }
       if (!game) {
         return res.status(404).json({ message: 'Game not found' });
       }
@@ -6336,7 +6344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Verify user is on the specified team
       // Check both direct team membership AND league membership with assigned team
-      const teamMembers = await storage.getTeamMembers(teamId);
+      const teamMembers = await storage.getTeamMembers(teamId).catch(() => []);
       const hasDirectTeamMembership = teamMembers.some(member => member.userId === userId);
       
       // Also check if user has league membership with this team assigned (only for league games)
@@ -6420,8 +6428,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'User ID not found' });
       }
 
-      // Verify the game exists
-      const game = await storage.getGameById(gameId);
+      // Verify the game exists - check regular games first, then tournament matches
+      let game = await storage.getGameById(gameId);
+      let isTournamentMatch = false;
+      if (!game) {
+        const tournamentMatch = await storage.getTournamentMatchAsGame(gameId);
+        if (tournamentMatch) {
+          game = tournamentMatch;
+          isTournamentMatch = true;
+        }
+      }
       if (!game) {
         return res.status(404).json({ message: 'Game not found' });
       }
@@ -6435,19 +6451,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check if user is captain of either team
-      const homeTeam = await storage.getTeam(game.homeTeamId);
-      const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId) : null;
+      const homeTeam = game.homeTeamId ? await storage.getTeam(game.homeTeamId).catch(() => null) : null;
+      const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId).catch(() => null) : null;
       const isHomeCaptain = homeTeam && homeTeam.captainId === userId;
       const isAwayCaptain = awayTeam && awayTeam.captainId === userId;
       
       // For team-specific access
       if (teamId) {
         // Verify user is on the requested team, captain, or commissioner
-        const requestedTeam = await storage.getTeam(teamId as string);
+        const requestedTeam = await storage.getTeam(teamId as string).catch(() => null);
         const isCaptainOfRequestedTeam = requestedTeam && requestedTeam.captainId === userId;
         
         // Check if user is a member of this team
-        const teamMembers = await storage.getTeamMembers(teamId as string);
+        const teamMembers = await storage.getTeamMembers(teamId as string).catch(() => []);
         const isMemberOfTeam = teamMembers.some(member => member.userId === userId);
         
         // Also check league membership assignment (only for league games)
@@ -6470,8 +6486,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(summary);
       } else {
         // General access - require being on either team, captain, or commissioner
-        const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
-        const awayTeamMembers = game.awayTeamId ? await storage.getTeamMembers(game.awayTeamId) : [];
+        const homeTeamMembers = game.homeTeamId ? await storage.getTeamMembers(game.homeTeamId).catch(() => []) : [];
+        const awayTeamMembers = game.awayTeamId ? await storage.getTeamMembers(game.awayTeamId).catch(() => []) : [];
         const isOnHomeTeam = homeTeamMembers.some(member => member.userId === userId);
         const isOnAwayTeam = awayTeamMembers.some(member => member.userId === userId);
         
