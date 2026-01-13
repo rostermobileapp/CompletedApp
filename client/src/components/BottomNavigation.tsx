@@ -102,7 +102,7 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
               data-testid={`nav-${shortcut.id}`}
             >
               {shortcut.id === 'home' ? (
-                <img src={homeLogo} alt="Home" className="w-[29px] h-[29px] mb-1" />
+                <img src={homeLogo} alt="Home" className="w-[35px] h-[35px] mb-1" />
               ) : Icon && (
                 <div className="relative">
                   <Icon className="w-5 h-5 mb-1" />
