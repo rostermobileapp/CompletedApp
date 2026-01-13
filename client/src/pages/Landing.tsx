@@ -127,6 +127,14 @@ export default function Landing() {
                   <td className="text-center p-4 text-white">$995 / Year</td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
+                  <td className="p-4 text-white">Annoying Ads</td>
+                  <td className="text-center p-4 bg-[#3c82f4]/10 font-bold text-white">NEVER</td>
+                  <td className="text-center p-4 text-white">MULTIPLE</td>
+                  <td className="text-center p-4 text-white">TONS</td>
+                  <td className="text-center p-4 text-white">ALWAYS</td>
+                  <td className="text-center p-4 text-white">No</td>
+                </tr>
+                <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Team Scheduling</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
                   <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
