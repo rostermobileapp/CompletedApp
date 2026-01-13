@@ -25,7 +25,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
+import lightModeLogo from '@assets/Light_Mode_Logo_1768322748282.png';
+import darkModeLogo from '@assets/Dark_Mode_Logo_1768322748283.png';
 import FeedbackModal from '@/components/FeedbackModal';
+import { useTheme } from '@/context/ThemeContext';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { SlideOutMenu } from '@/components/SlideOutMenu';
 
@@ -1125,6 +1128,7 @@ export default function Dashboard() {
   const { canAccessPremiumFeatures, hasStatManagerAccess } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { theme } = useTheme();
 
   // Fetch full user profile (includes profileImageUrl, firstName, etc.)
   const { data: userProfile } = useQuery({
@@ -1903,12 +1907,12 @@ export default function Dashboard() {
       <div className="sticky top-0 z-50 bg-background p-3 flex items-center mb-[12px] pl-[16px] pr-[16px] pt-[4px] pb-[4px]">
         <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
           <div className="flex items-center gap-2">
-            <span 
-              className="text-2xl font-bold text-foreground pl-[12px] pr-[12px]"
+            <img 
+              src={theme === 'dark' ? darkModeLogo : lightModeLogo}
+              alt="Roster"
+              className="h-8 pl-[12px] pr-[12px]"
               data-testid="img-roster-logo"
-            >
-              Roster
-            </span>
+            />
           </div>
           <div className="flex items-center gap-3">
             <button 
