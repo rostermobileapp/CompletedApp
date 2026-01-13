@@ -35,7 +35,7 @@ import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } 
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
-import { resolveTeamDisplay } from "@/utils/tournamentMatchDisplay";
+import { resolveTeamDisplay, resolveGameName } from "@/utils/tournamentMatchDisplay";
 
 // Announcement types
 type AnnouncementReaction = {
@@ -2298,6 +2298,11 @@ export default function TournamentDetail() {
                       .map((match) => {
                         const team1Name = getTeamName(match.team1Id, match, 'team1');
                         const team2Name = getTeamName(match.team2Id, match, 'team2');
+                        const gameName = resolveGameName({
+                          match,
+                          format: tournament?.format || '',
+                          settings: tournament?.settings as TournamentSettings & { customBracket?: { matchups?: any[] } }
+                        });
                         
                         return (
                           <Card key={match.id} data-testid={`card-schedule-${match.matchNumber}`}>
@@ -2307,7 +2312,7 @@ export default function TournamentDetail() {
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                   <div className="space-y-1">
                                     <div className="font-semibold">
-                                      {match.round}
+                                      {gameName}
                                     </div>
                                     <div className="text-sm font-medium">
                                       {team1Name} vs {team2Name}

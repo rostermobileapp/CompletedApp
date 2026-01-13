@@ -8,6 +8,28 @@ interface CustomBracketMatchup {
   type?: string;
 }
 
+interface ResolveGameNameParams {
+  match: TournamentMatch;
+  format: string;
+  settings?: TournamentSettings & { customBracket?: { matchups?: CustomBracketMatchup[] } };
+}
+
+export function resolveGameName({
+  match,
+  format,
+  settings
+}: ResolveGameNameParams): string {
+  if (format === 'custom_bracket' && settings?.customBracket?.matchups) {
+    const matchup = settings.customBracket.matchups.find(
+      (m: CustomBracketMatchup) => m.id === match.id
+    );
+    if (matchup?.gameNumber) {
+      return matchup.gameNumber;
+    }
+  }
+  return match.round;
+}
+
 interface ResolveTeamDisplayParams {
   teamId: string | null;
   match: TournamentMatch;
@@ -40,7 +62,7 @@ export function resolveTeamDisplay({
   
   if (format === 'custom_bracket' && settings?.customBracket?.matchups) {
     const matchup = settings.customBracket.matchups.find(
-      (m: CustomBracketMatchup) => m.gameNumber === match.round
+      (m: CustomBracketMatchup) => m.id === match.id
     );
     if (matchup) {
       const teamValue = position === 'team1' ? matchup.team1 : matchup.team2;
