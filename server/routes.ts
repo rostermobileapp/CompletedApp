@@ -4409,6 +4409,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Sort by date
       allItems.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
       
+      // Log any tournament matches for debugging
+      const tournamentMatches = formattedGames.filter((g: any) => g.isTournamentMatch);
+      if (tournamentMatches.length > 0) {
+        console.log(`🏆 Tournament matches in response:`, tournamentMatches.map((g: any) => ({ id: g.id, isTournamentMatch: g.isTournamentMatch, tournamentId: g.tournamentId, homeTeam: g.homeTeam?.name, awayTeam: g.awayTeam?.name })));
+      }
       console.log(`📅 Final response: ${formattedGames.length} games + ${formattedScrimmages.length} scrimmages = ${allItems.length} total items`);
       
       // Disable caching to force fresh response

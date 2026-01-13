@@ -1290,63 +1290,9 @@ export default function Dashboard() {
     },
   });
   
-  const { data: upcomingGames, isLoading: gamesLoading } = useQuery({
+  const { data: rawUpcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
     staleTime: 30000,
-    select: (games) => {
-      if (!Array.isArray(games)) return games;
-      
-      // Filter by team if team is selected
-      if (selectedType === 'team' && selectedId) {
-        return games.filter(game => 
-          game.homeTeamId === selectedId || 
-          game.awayTeamId === selectedId ||
-          game.isSubstitute === true // Always show substitute games regardless of selected team
-        );
-      }
-      
-      // Filter by league if league is selected
-      if (selectedType === 'league' && selectedLeagueId) {
-        return games.filter(game => 
-          game.homeTeam?.leagueId === selectedLeagueId || 
-          game.awayTeam?.leagueId === selectedLeagueId ||
-          game.isSubstitute === true // Always show substitute games regardless of selected league
-        );
-      }
-      
-      // Filter by tournament if tournament is selected
-      if (selectedType === 'tournament' && selectedId) {
-        return games.filter(game => 
-          game.tournamentId === selectedId
-        );
-      }
-      
-      return games;
-    }
-  });
-
-  // Fetch duty assignments for upcoming games
-  const { data: dutyAssignments = [] } = useQuery({
-    queryKey: ['/api/duty-assignments', upcomingGames],
-    queryFn: async () => {
-      if (!Array.isArray(upcomingGames) || upcomingGames.length === 0) return [];
-      
-      // Fetch duty assignments for each game
-      const assignmentPromises = upcomingGames.map(async (game: any) => {
-        try {
-          const response = await apiRequest('GET', `/api/games/${game.id}/duties`);
-          const assignments = await response.json();
-          return { gameId: game.id, assignments: assignments || [] };
-        } catch (error) {
-          console.error(`Failed to fetch duties for game ${game.id}:`, error);
-          return { gameId: game.id, assignments: [] };
-        }
-      });
-      
-      const results = await Promise.all(assignmentPromises);
-      return results;
-    },
-    enabled: !!upcomingGames && Array.isArray(upcomingGames) && upcomingGames.length > 0,
   });
 
   const { data: scrimmageInvites, isLoading: invitesLoading } = useQuery({
@@ -1426,6 +1372,73 @@ export default function Dashboard() {
   // Get all user teams (unfiltered) for captain checks across all leagues
   const { data: userTeamsAll } = useQuery({
     queryKey: ['/api/user/teams']
+  });
+  
+  // Filter upcoming games based on selection and handle tournament matches with null team IDs
+  const upcomingGames = React.useMemo(() => {
+    if (!Array.isArray(rawUpcomingGames)) return rawUpcomingGames;
+    
+    const games = rawUpcomingGames as any[];
+    
+    // Filter by team if team is selected
+    if (selectedType === 'team' && selectedId) {
+      // Find the selected team name to match tournament matches which have null team IDs
+      const selectedTeam = userTeamsAll?.find((t: any) => t.id === selectedId);
+      const selectedTeamName = selectedTeam?.name?.toLowerCase();
+      
+      return games.filter(game => 
+        game.homeTeamId === selectedId || 
+        game.awayTeamId === selectedId ||
+        game.isSubstitute === true || // Always show substitute games regardless of selected team
+        // For tournament matches with null team IDs, match by team name
+        (game.isTournamentMatch && selectedTeamName && (
+          game.homeTeam?.name?.toLowerCase() === selectedTeamName ||
+          game.awayTeam?.name?.toLowerCase() === selectedTeamName
+        ))
+      );
+    }
+    
+    // Filter by league if league is selected
+    if (selectedType === 'league' && selectedLeagueId) {
+      return games.filter(game => 
+        game.homeTeam?.leagueId === selectedLeagueId || 
+        game.awayTeam?.leagueId === selectedLeagueId ||
+        game.isSubstitute === true // Always show substitute games regardless of selected league
+      );
+    }
+    
+    // Filter by tournament if tournament is selected
+    if (selectedType === 'tournament' && selectedId) {
+      return games.filter(game => 
+        game.tournamentId === selectedId
+      );
+    }
+    
+    return games;
+  }, [rawUpcomingGames, selectedType, selectedId, selectedLeagueId, userTeamsAll]);
+  
+  // Fetch duty assignments for upcoming games
+  const { data: dutyAssignments = [] } = useQuery({
+    queryKey: ['/api/duty-assignments', upcomingGames],
+    queryFn: async () => {
+      if (!Array.isArray(upcomingGames) || upcomingGames.length === 0) return [];
+      
+      // Fetch duty assignments for each game
+      const assignmentPromises = upcomingGames.map(async (game: any) => {
+        try {
+          const response = await apiRequest('GET', `/api/games/${game.id}/duties`);
+          const assignments = await response.json();
+          return { gameId: game.id, assignments: assignments || [] };
+        } catch (error) {
+          console.error(`Failed to fetch duties for game ${game.id}:`, error);
+          return { gameId: game.id, assignments: [] };
+        }
+      });
+      
+      const results = await Promise.all(assignmentPromises);
+      return results;
+    },
+    enabled: !!upcomingGames && Array.isArray(upcomingGames) && upcomingGames.length > 0,
   });
 
   const { data: userLeagueMemberships } = useQuery({
@@ -2549,12 +2562,7 @@ export default function Dashboard() {
             
             {/* Then show regular games (yesterday and future - visible until day after) */}
             {(upcomingGames as any[])
-              .filter((game: any, idx: number) => {
-                // Debug: log tournament matches
-                if (idx === 0 && game.isTournamentMatch) {
-                  console.log('[Dashboard] Tournament match detected:', game.id, 'homeTeam:', game.homeTeam?.name, 'awayTeam:', game.awayTeam?.name);
-                  console.log('[Dashboard] User teams:', userTeams?.map((t: any) => t.name));
-                }
+              .filter((game: any) => {
                 // Games remain visible until the day AFTER they are scheduled
                 // Compare local dates only (not timestamps) to handle timezone differences correctly
                 const eventDate = new Date(game.scheduledAt);
@@ -2578,9 +2586,6 @@ export default function Dashboard() {
                   userTeamNames.includes(game.homeTeam?.name?.toLowerCase()) || 
                   userTeamNames.includes(game.awayTeam?.name?.toLowerCase())
                 );
-                if (game.isTournamentMatch) {
-                  console.log('[Dashboard] isTournamentMatchForUser:', isTournamentMatchForUser, 'userTeamNames:', userTeamNames, 'homeTeam:', game.homeTeam?.name?.toLowerCase(), 'awayTeam:', game.awayTeam?.name?.toLowerCase());
-                }
                 // Also show games where user is an approved substitute (marked by backend)
                 const isSubstitute = game.isSubstitute === true;
                 return isOnTeam || isSubstitute || isTournamentMatchForUser;
