@@ -1,4 +1,5 @@
-import { Users, Calendar, Trophy, MessageCircle, Check } from 'lucide-react';
+import { Users, Calendar, MessageCircle, Check } from 'lucide-react';
+import appPreviewImage from "@assets/previewed_1768341988878.png";
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 
@@ -51,10 +52,14 @@ export default function Landing() {
           </h1>
           <div className="flex flex-col md:flex-row gap-8 items-start justify-center mb-12">
             <div 
-              className="w-full md:w-1/2 max-w-[336px] rounded-lg shadow-2xl bg-gradient-to-br from-[#3c82f4] to-[#1a56db] p-8 flex items-center justify-center"
+              className="w-full md:w-1/2 max-w-[336px] flex items-center justify-center"
               data-testid="image-hero"
             >
-              <Trophy className="w-32 h-32 text-white/80" />
+              <img 
+                src={appPreviewImage} 
+                alt="Roster app preview" 
+                className="w-full h-auto rounded-3xl shadow-2xl"
+              />
             </div>
             <div 
               className="text-base md:text-lg leading-relaxed text-[#ffffff] md:w-1/2 max-w-md md:mt-16"
