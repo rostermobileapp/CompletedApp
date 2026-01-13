@@ -1596,18 +1596,20 @@ export default function TournamentDetail() {
         </div>
       )}
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 pt-[2px] pb-[2px] pl-[8px] pr-[8px]">
+      <div className="w-full">
         <Tabs defaultValue={defaultTab} className="space-y-6">
-          <TabsList className={`grid w-full ${isReadOnlyMode ? 'grid-cols-2' : 'grid-cols-3'} md:w-auto`}>
-            <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
-            {!isReadOnlyMode && (
-              <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
-            )}
-            <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
-          </TabsList>
+          <div className="max-w-7xl mx-auto px-4 md:px-8 pt-[2px]">
+            <TabsList className={`grid w-full ${isReadOnlyMode ? 'grid-cols-2' : 'grid-cols-3'} md:w-auto`}>
+              <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
+              {!isReadOnlyMode && (
+                <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
+              )}
+              <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
+            </TabsList>
+          </div>
 
-          {/* Bracket Tab */}
-          <TabsContent value="bracket" className="space-y-4">
+          {/* Bracket Tab - Full width */}
+          <TabsContent value="bracket" className="space-y-4 px-2">
             {(matches && matches.length > 0) || 
              tournament.format === 'custom_bracket' ||
              (tournament.status === 'draft' && ['single_elimination', 'double_elimination', 'three_game_guarantee', 'round_robin_split'].includes(tournament.format)) ? (
@@ -1661,9 +1663,9 @@ export default function TournamentDetail() {
                 })()}
                 
                 {tournament.format === 'custom_bracket' ? (
-                  // Custom bracket builder embedded
-                  (<Card>
-                    <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
+                  // Custom bracket builder embedded - full width
+                  (<Card className="border-0 shadow-none bg-transparent">
+                    <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2 px-0">
                       <div>
                         <CardTitle>Custom Bracket</CardTitle>
                         <CardDescription>
@@ -1706,7 +1708,7 @@ export default function TournamentDetail() {
                         )}
                       </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-0">
                       <CustomBracketBuilder
                         teams={teams || []}
                         tournamentId={tournamentId}
@@ -1772,8 +1774,8 @@ export default function TournamentDetail() {
                     // Show CustomBracketBuilder when editing, BracketView when viewing
                     if (isEditingBracket && tournament.status === 'draft') {
                       return (
-                        <Card>
-                          <CardHeader className="flex flex-row items-center justify-between">
+                        <Card className="border-0 shadow-none bg-transparent">
+                          <CardHeader className="flex flex-row items-center justify-between px-0">
                             <div>
                               <CardTitle>Edit Bracket</CardTitle>
                               <CardDescription>
@@ -1789,7 +1791,7 @@ export default function TournamentDetail() {
                               Cancel
                             </Button>
                           </CardHeader>
-                          <CardContent>
+                          <CardContent className="p-0">
                             <CustomBracketBuilder
                               teams={teams || []}
                               tournamentId={tournamentId}
@@ -1839,8 +1841,8 @@ export default function TournamentDetail() {
                     }
 
                     return (
-                      <Card>
-                        <CardHeader className="pt-[2px] pb-[2px] flex flex-row items-center justify-between">
+                      <Card className="border-0 shadow-none bg-transparent">
+                        <CardHeader className="pt-[2px] pb-[2px] flex flex-row items-center justify-between px-0">
                           <div>
                             <CardTitle>
                               {tournament.format === 'round_robin_split' ? 'Playoff Bracket' : 'Tournament Bracket'}
@@ -1898,7 +1900,7 @@ export default function TournamentDetail() {
                             </div>
                           )}
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="p-0">
                           <BracketView 
                             matches={bracketMatches} 
                             teams={teams || []} 
@@ -1971,7 +1973,7 @@ export default function TournamentDetail() {
           </TabsContent>
 
           {/* Teams Tab */}
-          <TabsContent value="teams" className="space-y-6">
+          <TabsContent value="teams" className="space-y-6 max-w-7xl mx-auto px-4 md:px-8">
             {/* CSV Upload Section - Tournament Manager Only */}
             {tournament && canManageTournament() && (
               <Card>
@@ -2248,7 +2250,7 @@ export default function TournamentDetail() {
           </TabsContent>
 
           {/* Schedule Tab */}
-          <TabsContent value="schedule">
+          <TabsContent value="schedule" className="max-w-7xl mx-auto px-4 md:px-8">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">

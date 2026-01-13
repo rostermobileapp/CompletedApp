@@ -517,7 +517,7 @@ export function CustomBracketBuilder({
     }
   }, [tournament, initialMatches, teams]);
 
-  const containerClass = embeddable ? "flex flex-col bg-background" : "h-screen flex flex-col bg-background";
+  const containerClass = embeddable ? "flex flex-col bg-background w-full" : "h-screen flex flex-col bg-background";
 
   return (
     <div className={containerClass}>
@@ -621,7 +621,7 @@ export function CustomBracketBuilder({
         onMouseUp={locked ? undefined : handleMouseUp}
         onMouseLeave={locked ? undefined : handleMouseUp}
         data-testid="canvas"
-        style={embeddable ? { minHeight: '500px' } : undefined}
+        style={embeddable ? { minHeight: '70vh' } : undefined}
       >
         {/* Grid Background */}
         {showGrid && (
