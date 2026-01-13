@@ -2549,7 +2549,12 @@ export default function Dashboard() {
             
             {/* Then show regular games (yesterday and future - visible until day after) */}
             {(upcomingGames as any[])
-              .filter((game: any) => {
+              .filter((game: any, idx: number) => {
+                // Debug: log tournament matches
+                if (idx === 0 && game.isTournamentMatch) {
+                  console.log('[Dashboard] Tournament match detected:', game.id, 'homeTeam:', game.homeTeam?.name, 'awayTeam:', game.awayTeam?.name);
+                  console.log('[Dashboard] User teams:', userTeams?.map((t: any) => t.name));
+                }
                 // Games remain visible until the day AFTER they are scheduled
                 // Compare local dates only (not timestamps) to handle timezone differences correctly
                 const eventDate = new Date(game.scheduledAt);
@@ -2573,6 +2578,9 @@ export default function Dashboard() {
                   userTeamNames.includes(game.homeTeam?.name?.toLowerCase()) || 
                   userTeamNames.includes(game.awayTeam?.name?.toLowerCase())
                 );
+                if (game.isTournamentMatch) {
+                  console.log('[Dashboard] isTournamentMatchForUser:', isTournamentMatchForUser, 'userTeamNames:', userTeamNames, 'homeTeam:', game.homeTeam?.name?.toLowerCase(), 'awayTeam:', game.awayTeam?.name?.toLowerCase());
+                }
                 // Also show games where user is an approved substitute (marked by backend)
                 const isSubstitute = game.isSubstitute === true;
                 return isOnTeam || isSubstitute || isTournamentMatchForUser;
