@@ -2566,22 +2566,32 @@ export default function Dashboard() {
                 }
                 // For regular games, ensure we only show games for teams the user is currently on
                 const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+                const userTeamNames = Array.isArray(userTeams) ? userTeams.map((team: any) => team.name?.toLowerCase()) : [];
                 const isOnTeam = userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
+                // For tournament matches with null team IDs, check by team name
+                const isTournamentMatchForUser = game.isTournamentMatch && (
+                  userTeamNames.includes(game.homeTeam?.name?.toLowerCase()) || 
+                  userTeamNames.includes(game.awayTeam?.name?.toLowerCase())
+                );
                 // Also show games where user is an approved substitute (marked by backend)
                 const isSubstitute = game.isSubstitute === true;
-                return isOnTeam || isSubstitute;
+                return isOnTeam || isSubstitute || isTournamentMatchForUser;
               })
               .slice(0, 5).map((game: any) => (
               <div 
                 key={game.id} 
                 className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
-                onClick={() => navigate(game.isScrimmage ? `/scrimmage/${game.id}` : `/game/${game.id}`)}
+                onClick={() => navigate(game.isScrimmage ? `/scrimmage/${game.id}` : game.isTournamentMatch ? `/tournaments/${game.tournamentId}?tab=bracket` : `/game/${game.id}`)}
                 data-testid={`card-game-${game.id}`}
               >
                 <div className="flex items-center gap-4 bg-[212121]">
                   <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
                     {(() => {
-                      const opponentTeam = game.homeTeam?.id === primaryTeam?.id ? game.awayTeam : game.homeTeam;
+                      // For tournament matches, compare by name since IDs may be null
+                      const isHomeTeamUser = game.isTournamentMatch 
+                        ? game.homeTeam?.name?.toLowerCase() === primaryTeam?.name?.toLowerCase()
+                        : game.homeTeam?.id === primaryTeam?.id;
+                      const opponentTeam = isHomeTeamUser ? game.awayTeam : game.homeTeam;
                       return opponentTeam?.logoUrl ? (
                         <img 
                           src={getImageUrl(opponentTeam.logoUrl) || ''} 
@@ -2597,11 +2607,20 @@ export default function Dashboard() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
-                        {game.isScrimmage ? game.scrimmageTitle : `vs ${game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}`}
+                        {game.isScrimmage ? game.scrimmageTitle : game.isTournamentMatch ? (
+                          `vs ${game.homeTeam?.name?.toLowerCase() === primaryTeam?.name?.toLowerCase() ? game.awayTeam?.name : game.homeTeam?.name}`
+                        ) : (
+                          `vs ${game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}`
+                        )}
                       </h3>
                       {game.isSubstitute === true && (
                         <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-sub-${game.id}`}>
                           SUB
+                        </span>
+                      )}
+                      {game.isTournamentMatch && (
+                        <span className="text-xs bg-[#ffd700] text-black px-2 py-0.5 rounded font-medium" data-testid={`badge-tournament-${game.id}`}>
+                          {game.matchRound || 'Tournament'}
                         </span>
                       )}
                     </div>
