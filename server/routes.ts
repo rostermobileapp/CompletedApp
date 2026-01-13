@@ -4838,16 +4838,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Permission check: Only team captains, team creators, or league commissioners can schedule games
       let hasPermission = false;
       
-      // Check if user is captain or creator of home team
+      // Check if user is captain or creator of home team (uses isTeamCaptain which checks both teams.captainId and team_memberships.is_captain)
       const homeTeam = await storage.getTeam(gameData.homeTeamId);
-      if (homeTeam?.captainId === userId || homeTeam?.creatorId === userId) {
+      if (homeTeam?.creatorId === userId || await storage.isTeamCaptain(gameData.homeTeamId, userId)) {
         hasPermission = true;
       }
       
       // Check if user is captain or creator of away team (if present)
       if (!hasPermission && gameData.awayTeamId) {
         const awayTeam = await storage.getTeam(gameData.awayTeamId);
-        if (awayTeam?.captainId === userId || awayTeam?.creatorId === userId) {
+        if (awayTeam?.creatorId === userId || await storage.isTeamCaptain(gameData.awayTeamId, userId)) {
           hasPermission = true;
         }
       }
@@ -4892,16 +4892,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Permission check: Only team captains, team creators, or league commissioners can update games
       let hasPermission = false;
       
-      // Check if user is captain or creator of home team
+      // Check if user is captain or creator of home team (uses isTeamCaptain which checks both teams.captainId and team_memberships.is_captain)
       const homeTeam = await storage.getTeam(existingGame.homeTeamId);
-      if (homeTeam?.captainId === userId || homeTeam?.creatorId === userId) {
+      if (homeTeam?.creatorId === userId || await storage.isTeamCaptain(existingGame.homeTeamId, userId)) {
         hasPermission = true;
       }
       
       // Check if user is captain or creator of away team (if present)
       if (!hasPermission && existingGame.awayTeamId) {
         const awayTeam = await storage.getTeam(existingGame.awayTeamId);
-        if (awayTeam?.captainId === userId || awayTeam?.creatorId === userId) {
+        if (awayTeam?.creatorId === userId || await storage.isTeamCaptain(existingGame.awayTeamId, userId)) {
           hasPermission = true;
         }
       }
@@ -4954,16 +4954,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Permission check: Only team captains, team creators, or league commissioners can delete games
       let hasPermission = false;
       
-      // Check if user is captain or creator of home team
+      // Check if user is captain or creator of home team (uses isTeamCaptain which checks both teams.captainId and team_memberships.is_captain)
       const homeTeam = await storage.getTeam(game.homeTeamId);
-      if (homeTeam?.captainId === userId || homeTeam?.creatorId === userId) {
+      if (homeTeam?.creatorId === userId || await storage.isTeamCaptain(game.homeTeamId, userId)) {
         hasPermission = true;
       }
       
       // Check if user is captain or creator of away team (if present)
       if (!hasPermission && game.awayTeamId) {
         const awayTeam = await storage.getTeam(game.awayTeamId);
-        if (awayTeam?.captainId === userId || awayTeam?.creatorId === userId) {
+        if (awayTeam?.creatorId === userId || await storage.isTeamCaptain(game.awayTeamId, userId)) {
           hasPermission = true;
         }
       }
