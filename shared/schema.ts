@@ -729,6 +729,19 @@ export const gameRsvps = pgTable("game_rsvps", {
   unique("unique_game_user_team_rsvp").on(table.gameId, table.userId, table.teamId),
 ]);
 
+// Tournament Match RSVPs table - separate from game_rsvps due to different foreign key
+export const tournamentMatchRsvps = pgTable("tournament_match_rsvps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  matchId: varchar("match_id").references(() => tournamentMatches.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  teamId: varchar("team_id").notNull(),
+  status: rsvpStatusEnum("status").default("no_response").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_tournament_match_user_team_rsvp").on(table.matchId, table.userId, table.teamId),
+]);
+
 // Substitute requests table
 export const substituteRequests = pgTable("substitute_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -15,6 +15,7 @@ import {
   personalReminders,
   gameScoreSubmissions,
   gameRsvps,
+  tournamentMatchRsvps,
   gameGoalies,
   gameStars,
   substituteRequests,
@@ -375,6 +376,9 @@ export interface IStorage {
   
   // RSVP operations
   createOrUpdateRsvp(rsvp: InsertGameRsvp): Promise<GameRsvp>;
+  createOrUpdateTournamentMatchRsvp(rsvp: { matchId: string; userId: string; teamId: string; status: string }): Promise<any>;
+  getTournamentMatchRsvp(matchId: string, userId: string, teamId: string): Promise<any>;
+  getTournamentMatchRsvpSummary(matchId: string, teamId: string): Promise<{ attending: any[]; notAttending: any[]; noResponse: any[] }>;
   getGameRsvp(gameId: string, userId: string): Promise<GameRsvp | undefined>;
   getUserTeamRsvp(gameId: string, userId: string, teamId: string): Promise<GameRsvp | undefined>;
   getUserGameRsvps(gameId: string, userId: string): Promise<GameRsvp[]>;
@@ -5502,6 +5506,88 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return newRsvp;
     }
+  }
+
+  async createOrUpdateTournamentMatchRsvp(rsvp: { matchId: string; userId: string; teamId: string; status: string }): Promise<any> {
+    const [existingRsvp] = await db
+      .select()
+      .from(tournamentMatchRsvps)
+      .where(and(
+        eq(tournamentMatchRsvps.matchId, rsvp.matchId), 
+        eq(tournamentMatchRsvps.userId, rsvp.userId),
+        eq(tournamentMatchRsvps.teamId, rsvp.teamId)
+      ))
+      .limit(1);
+
+    if (existingRsvp) {
+      const [updatedRsvp] = await db
+        .update(tournamentMatchRsvps)
+        .set({ status: rsvp.status as any, updatedAt: new Date() })
+        .where(and(
+          eq(tournamentMatchRsvps.matchId, rsvp.matchId), 
+          eq(tournamentMatchRsvps.userId, rsvp.userId),
+          eq(tournamentMatchRsvps.teamId, rsvp.teamId)
+        ))
+        .returning();
+      return updatedRsvp;
+    } else {
+      const [newRsvp] = await db
+        .insert(tournamentMatchRsvps)
+        .values({
+          matchId: rsvp.matchId,
+          userId: rsvp.userId,
+          teamId: rsvp.teamId,
+          status: rsvp.status as any,
+        })
+        .returning();
+      return newRsvp;
+    }
+  }
+
+  async getTournamentMatchRsvp(matchId: string, userId: string, teamId: string): Promise<any> {
+    const [rsvp] = await db
+      .select()
+      .from(tournamentMatchRsvps)
+      .where(and(
+        eq(tournamentMatchRsvps.matchId, matchId),
+        eq(tournamentMatchRsvps.userId, userId),
+        eq(tournamentMatchRsvps.teamId, teamId)
+      ))
+      .limit(1);
+    return rsvp;
+  }
+
+  async getTournamentMatchRsvpSummary(matchId: string, teamId: string): Promise<{ attending: any[]; notAttending: any[]; noResponse: any[] }> {
+    const rsvps = await db
+      .select()
+      .from(tournamentMatchRsvps)
+      .leftJoin(users, eq(tournamentMatchRsvps.userId, users.id))
+      .where(and(
+        eq(tournamentMatchRsvps.matchId, matchId),
+        eq(tournamentMatchRsvps.teamId, teamId)
+      ));
+
+    const attending = rsvps
+      .filter(r => r.tournament_match_rsvps.status === 'attending')
+      .map(r => ({ ...r.tournament_match_rsvps, user: r.users! }));
+
+    const notAttending = rsvps
+      .filter(r => r.tournament_match_rsvps.status === 'not_attending')
+      .map(r => ({ ...r.tournament_match_rsvps, user: r.users! }));
+
+    // For tournament matches, we can try to get team members if the team exists
+    let noResponse: any[] = [];
+    try {
+      const teamMembers = await this.getTeamMembers(teamId);
+      const rsvpUserIds = rsvps.map(r => r.tournament_match_rsvps.userId);
+      noResponse = teamMembers
+        .filter(member => !rsvpUserIds.includes(member.userId))
+        .map(member => member.user);
+    } catch {
+      // Team might not exist in teams table for custom bracket teams
+    }
+
+    return { attending, notAttending, noResponse };
   }
 
   async getGameRsvp(gameId: string, userId: string): Promise<GameRsvp | undefined> {

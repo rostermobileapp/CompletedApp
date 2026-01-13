@@ -6358,14 +6358,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'You must be on this team to RSVP' });
       }
 
-      const rsvpData = insertGameRsvpSchema.parse({
-        gameId,
-        userId,
-        teamId,
-        status,
-      });
-
-      const rsvp = await storage.createOrUpdateRsvp(rsvpData);
+      let rsvp;
+      if (isTournamentMatch) {
+        // Use tournament match RSVP storage
+        rsvp = await storage.createOrUpdateTournamentMatchRsvp({
+          matchId: gameId,
+          userId,
+          teamId,
+          status,
+        });
+      } else {
+        const rsvpData = insertGameRsvpSchema.parse({
+          gameId,
+          userId,
+          teamId,
+          status,
+        });
+        rsvp = await storage.createOrUpdateRsvp(rsvpData);
+      }
       
       // Send push notification to team captain (if user is not the captain themselves)
       try {
@@ -6482,8 +6492,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: 'You must be on this team, a captain, or commissioner to view attendance' });
         }
         
-        const summary = await storage.getTeamRsvpSummary(gameId, teamId as string);
-        res.json(summary);
+        // Use tournament match RSVP summary if this is a tournament match
+        if (isTournamentMatch) {
+          const summary = await storage.getTournamentMatchRsvpSummary(gameId, teamId as string);
+          res.json(summary);
+        } else {
+          const summary = await storage.getTeamRsvpSummary(gameId, teamId as string);
+          res.json(summary);
+        }
+        return;
       } else {
         // General access - require being on either team, captain, or commissioner
         const homeTeamMembers = game.homeTeamId ? await storage.getTeamMembers(game.homeTeamId).catch(() => []) : [];
