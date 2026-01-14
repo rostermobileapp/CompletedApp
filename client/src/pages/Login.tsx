@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import rosterVideo from '@assets/Roster_white_text_Transparent_Rev1_1768410071707.mov';
 
 export default function Login() {
   const [showForm, setShowForm] = useState(false);
@@ -133,16 +132,12 @@ export default function Login() {
             ease: [0.4, 0, 0.2, 1],
           }}
         >
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="w-64 h-auto"
+          <motion.span
+            className="text-6xl font-bold text-white"
             data-testid="logo-image"
           >
-            <source src={rosterVideo} type="video/mp4" />
-          </video>
+            Roster
+          </motion.span>
 
           <AnimatePresence>
             {!showForm && (
