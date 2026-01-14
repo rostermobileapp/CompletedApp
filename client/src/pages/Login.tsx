@@ -136,7 +136,6 @@ export default function Login() {
           <video
             autoPlay
             muted
-            loop
             playsInline
             className="w-full h-auto"
             data-testid="logo-image"
