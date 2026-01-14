@@ -105,7 +105,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1161f4] flex flex-col overflow-hidden" data-testid="login-page">
+    <div className="min-h-screen bg-black flex flex-col overflow-hidden" data-testid="login-page">
       <motion.div
         className="absolute top-4 left-4 z-50"
         initial={{ opacity: 0 }}
@@ -167,7 +167,7 @@ export default function Login() {
           {showForm && (
             <>
               <motion.div
-                className="fixed inset-0 z-40 bg-[#1161f4]"
+                className="fixed inset-0 z-40 bg-black"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -176,7 +176,7 @@ export default function Login() {
               />
 
               <motion.div
-                className="fixed left-6 right-6 z-50 rounded-2xl px-5 py-6 pl-[4px] pr-[4px] pt-[4px] pb-[4px] bg-[#1161f4]"
+                className="fixed left-6 right-6 z-50 rounded-2xl px-5 py-6 pl-[4px] pr-[4px] pt-[4px] pb-[4px] bg-black"
                 initial={{ opacity: 0, scale: 0.95, top: '33%' }}
                 animate={{ opacity: 1, scale: 1, top: '8%' }}
                 exit={{ opacity: 0, scale: 0.95, top: '33%' }}
