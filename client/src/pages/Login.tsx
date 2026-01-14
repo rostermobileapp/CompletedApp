@@ -50,9 +50,11 @@ export default function Login() {
         if (error) throw error;
         
         if (data.user && !data.session) {
-          console.log('[Signup] User created but no session - showing verification modal');
+          console.log('[Signup] User created but no session - showing verification modal for:', email);
+          console.log('[Signup] Setting showVerification to true');
           setPendingEmail(email);
           setShowVerification(true);
+          console.log('[Signup] Verification modal should now be visible');
         } else if (data.session) {
           console.log('[Signup] Session established, redirecting to home');
           toast({
