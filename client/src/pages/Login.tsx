@@ -138,7 +138,7 @@ export default function Login() {
             muted
             loop
             playsInline
-            className="w-64 h-auto"
+            className="w-full max-w-md h-auto px-4"
             data-testid="logo-image"
             src={rosterVideo}
           />
