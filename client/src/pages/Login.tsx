@@ -8,6 +8,7 @@ import { useLocation } from 'wouter';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import rosterVideo from '@assets/Roster_white_text_Transparent_Rev1_1768410673997.mp4';
+import rosterLogo from '@assets/Dark_Mode_Logo_1768422401788.png';
 
 export default function Login() {
   const [showForm, setShowForm] = useState(false);
@@ -185,12 +186,12 @@ export default function Login() {
                 }}
               >
                 <div className="text-center pt-[0px] pb-[0px] mt-[12px] mb-[12px]">
-                  <span 
-                    className="text-2xl font-bold text-white"
+                  <img 
+                    src={rosterLogo}
+                    alt="Roster"
+                    className="h-8 mx-auto"
                     data-testid="modal-logo"
-                  >
-                    Roster
-                  </span>
+                  />
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-3 pl-[8px] pr-[8px] pt-[0px] pb-[0px] mt-[0px] mb-[0px] ml-[8px] mr-[8px]">
