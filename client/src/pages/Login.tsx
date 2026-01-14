@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +98,10 @@ export default function Login() {
     setEmail('');
     setPassword('');
     setIsSignUp(false);
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play();
+    }
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -135,6 +140,7 @@ export default function Login() {
           }}
         >
           <video
+            ref={videoRef}
             autoPlay
             muted
             playsInline
