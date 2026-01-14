@@ -9,6 +9,7 @@ import { X, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import rosterVideo from '@assets/Roster_white_text_Transparent_Rev1_1768410673997.mp4';
 import rosterLogo from '@assets/Dark_Mode_Logo_1768422401788.png';
+import { EmailVerificationModal } from '@/components/EmailVerificationModal';
 
 export default function Login() {
   const [showForm, setShowForm] = useState(false);
@@ -17,6 +18,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -47,12 +50,9 @@ export default function Login() {
         if (error) throw error;
         
         if (data.user && !data.session) {
-          console.log('[Signup] User created but no session - email confirmation may be required');
-          toast({
-            title: 'Check Your Email',
-            description: 'We sent you a confirmation link. Please click it to activate your account, then come back and sign in.',
-          });
-          setIsSignUp(false);
+          console.log('[Signup] User created but no session - showing verification modal');
+          setPendingEmail(email);
+          setShowVerification(true);
         } else if (data.session) {
           console.log('[Signup] Session established, redirecting to home');
           toast({
@@ -102,6 +102,18 @@ export default function Login() {
       videoRef.current.currentTime = 0;
       videoRef.current.play();
     }
+  };
+
+  const handleVerificationSuccess = () => {
+    setShowVerification(false);
+    setPendingEmail('');
+    setEmail('');
+    setPassword('');
+    toast({
+      title: 'Welcome!',
+      description: 'Your account is now active. You are signed in.',
+    });
+    setLocation('/');
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -283,6 +295,18 @@ export default function Login() {
           )}
         </AnimatePresence>
       </div>
+
+      <EmailVerificationModal
+        open={showVerification}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setShowVerification(false);
+            setPendingEmail('');
+          }
+        }}
+        email={pendingEmail}
+        onVerificationSuccess={handleVerificationSuccess}
+      />
     </div>
   );
 }
