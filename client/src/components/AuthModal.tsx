@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
+import { EmailVerificationModal } from './EmailVerificationModal';
 
 interface AuthModalProps {
   open: boolean;
@@ -23,6 +24,8 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -42,19 +45,16 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         
         if (error) throw error;
         
-        // Check if email confirmation is required
         if (data.user && !data.session) {
-          toast({
-            title: 'Almost there!',
-            description: 'Check your email to verify your account before signing in.',
-          });
-        } else {
+          setPendingEmail(email);
+          setShowVerification(true);
+        } else if (data.session) {
           toast({
             title: 'Success!',
-            description: 'Your account has been created. You can now sign in.',
+            description: 'Your account has been created and you are now signed in.',
           });
+          onOpenChange(false);
         }
-        onOpenChange(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -80,87 +80,119 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
     }
   };
 
+  const handleVerificationSuccess = () => {
+    setShowVerification(false);
+    setEmail('');
+    setPassword('');
+    setPendingEmail('');
+    toast({
+      title: 'Welcome!',
+      description: 'Your account is now active. You are signed in.',
+    });
+    onOpenChange(false);
+  };
+
+  const handleMainModalClose = (isOpen: boolean) => {
+    if (!isOpen && !showVerification) {
+      onOpenChange(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md top-4 translate-y-0" data-testid="modal-auth">
-        <DialogHeader>
-          <DialogTitle data-testid="text-auth-title">
-            {isSignUp ? 'Create Account' : 'Sign In'}
-          </DialogTitle>
-          <DialogDescription data-testid="text-auth-description">
-            {isSignUp
-              ? 'Enter your email and password to create an account'
-              : 'Enter your email and password to sign in'}
-          </DialogDescription>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              data-testid="input-email"
-            />
-          </div>
+    <>
+      <Dialog open={open && !showVerification} onOpenChange={handleMainModalClose}>
+        <DialogContent className="sm:max-w-md top-4 translate-y-0" data-testid="modal-auth">
+          <DialogHeader>
+            <DialogTitle data-testid="text-auth-title">
+              {isSignUp ? 'Create Account' : 'Sign In'}
+            </DialogTitle>
+            <DialogDescription data-testid="text-auth-description">
+              {isSignUp
+                ? 'Enter your email and password to create an account'
+                : 'Enter your email and password to sign in'}
+            </DialogDescription>
+          </DialogHeader>
           
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              data-testid="input-password"
-            />
-          </div>
-          
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading}
-            data-testid="button-submit"
-          >
-            {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
-          </Button>
-          
-          {!isSignUp && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                data-testid="input-email"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                data-testid="input-password"
+              />
+            </div>
+            
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading}
+              data-testid="button-submit"
+            >
+              {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
+            </Button>
+            
+            {!isSignUp && (
+              <div className="text-center text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenChange(false);
+                    setLocation('/forgot-password');
+                  }}
+                  className="text-primary hover:underline"
+                  data-testid="link-forgot-password"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+            
             <div className="text-center text-sm">
               <button
                 type="button"
-                onClick={() => {
-                  onOpenChange(false);
-                  setLocation('/forgot-password');
-                }}
+                onClick={() => setIsSignUp(!isSignUp)}
                 className="text-primary hover:underline"
-                data-testid="link-forgot-password"
+                data-testid="button-toggle-mode"
               >
-                Forgot password?
+                {isSignUp
+                  ? 'Already have an account? Sign in'
+                  : "Don't have an account? Sign up"}
               </button>
             </div>
-          )}
-          
-          <div className="text-center text-sm">
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-primary hover:underline"
-              data-testid="button-toggle-mode"
-            >
-              {isSignUp
-                ? 'Already have an account? Sign in'
-                : "Don't have an account? Sign up"}
-            </button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <EmailVerificationModal
+        open={showVerification}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setShowVerification(false);
+            setPendingEmail('');
+          }
+        }}
+        email={pendingEmail}
+        onVerificationSuccess={handleVerificationSuccess}
+      />
+    </>
   );
 }
