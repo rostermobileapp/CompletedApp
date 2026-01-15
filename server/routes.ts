@@ -4844,6 +4844,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const gameData = insertGameSchema.parse(req.body);
       
+      // Convert empty string awayTeamId to null for single-team scrimmages
+      if (gameData.awayTeamId === '') {
+        gameData.awayTeamId = null;
+      }
+      
       // Permission check: Only team captains, team creators, or league commissioners can schedule games
       let hasPermission = false;
       
