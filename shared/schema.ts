@@ -449,10 +449,11 @@ export const dutyTemplates = pgTable("duty_templates", {
 ]);
 
 // Duty assignments table - tracks who claimed which duty for which game
+// Note: gameId can be a regular game ID OR a tournament match ID (no foreign key constraint)
 export const dutyAssignments = pgTable("duty_assignments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   dutyTemplateId: varchar("duty_template_id").references(() => dutyTemplates.id).notNull(),
-  gameId: varchar("game_id").references(() => games.id).notNull(),
+  gameId: varchar("game_id").notNull(), // Can be game ID or tournament match ID
   userId: varchar("user_id").references(() => users.id).notNull(), // Who claimed it
   teamId: varchar("team_id").references(() => teams.id).notNull(), // Which team they're representing
   claimedAt: timestamp("claimed_at").defaultNow().notNull(),
@@ -464,10 +465,11 @@ export const dutyAssignments = pgTable("duty_assignments", {
 ]);
 
 // Duty exclusions table - tracks which duties are excluded from specific games
+// Note: gameId can be a regular game ID OR a tournament match ID (no foreign key constraint)
 export const dutyExclusions = pgTable("duty_exclusions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   dutyTemplateId: varchar("duty_template_id").references(() => dutyTemplates.id).notNull(),
-  gameId: varchar("game_id").references(() => games.id).notNull(),
+  gameId: varchar("game_id").notNull(), // Can be game ID or tournament match ID
   teamId: varchar("team_id").references(() => teams.id).notNull(),
   excludedAt: timestamp("excluded_at").defaultNow().notNull(),
   excludedBy: varchar("excluded_by").references(() => users.id).notNull(),
