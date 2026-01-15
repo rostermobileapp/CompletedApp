@@ -6220,6 +6220,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { gameId, dutyTemplateId } = req.params;
       const { teamId } = req.body;
       
+      console.log(`[DUTY CLAIM] gameId=${gameId}, dutyTemplateId=${dutyTemplateId}, teamId=${teamId}, userId=${userId}`);
+      
       if (!teamId) {
         return res.status(400).json({ message: 'Team ID is required' });
       }
@@ -6231,14 +6233,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // First check regular team membership
       const teamMembers = await storage.getTeamMembers(teamId);
       isMember = teamMembers.some(member => member.userId === userId);
+      console.log(`[DUTY CLAIM] Regular team members found: ${teamMembers.length}, isMember: ${isMember}`);
       
       // If not found in regular teams, check if this is a tournament team
       if (!isMember) {
+        console.log(`[DUTY CLAIM] Not a regular team member, checking if tournament team...`);
         const [tournamentTeam] = await db
           .select()
           .from(tournamentTeams)
           .where(eq(tournamentTeams.id, teamId));
         
+        console.log(`[DUTY CLAIM] Tournament team found: ${!!tournamentTeam}, linked teamId: ${tournamentTeam?.teamId}`);
         if (tournamentTeam) {
           // Check if user is a participant of this tournament team
           const [participant] = await db
@@ -6269,6 +6274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Attempt to claim the duty using the effective team ID (linked regular team for tournament teams)
       try {
+        console.log(`[DUTY CLAIM] Attempting to claim with effectiveTeamId=${effectiveTeamId}`);
         const assignment = await storage.claimDuty({
           dutyTemplateId,
           gameId,
@@ -6276,8 +6282,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           teamId: effectiveTeamId,
         });
         
+        console.log(`[DUTY CLAIM] Success! Assignment created:`, assignment.id);
         res.json(assignment);
       } catch (error: any) {
+        console.log(`[DUTY CLAIM] Error during claim:`, error.message);
         // Handle unique constraint violations (duty already claimed)
         if (error.code === '23505' || error.message?.includes('unique')) {
           return res.status(409).json({ message: 'This duty has already been claimed' });
