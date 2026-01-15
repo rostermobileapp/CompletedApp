@@ -41,75 +41,43 @@ export default function BracketView({ matches, teams, format, settings, tourname
     panRef.current = pan;
   }, [pan]);
   
-  // Native pointer event handlers on SVG with capture mode
-  // This intercepts events from foreignObject children before they bubble
-  useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  // Standard React mouse event handlers (same pattern as working CustomBracketBuilder)
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    // Only start panning if clicking on the canvas background or SVG (not on match cards)
+    const target = e.target as HTMLElement;
+    if (target.closest('.match-card') || target.closest('button') || target.closest('select')) {
+      return; // Don't start drag if clicking on a match card or interactive element
+    }
     
-    const handlePointerDown = (e: PointerEvent) => {
-      // Only initiate drag if clicking on empty space (not on interactive elements)
-      const target = e.target as HTMLElement;
-      if (target.closest('button') || target.closest('[role="button"]') || target.closest('select')) {
-        return; // Don't start drag if clicking on a button or select
-      }
-      
-      if (e.pointerType === 'touch' && !(e as any).isPrimary) return;
-      
-      // Set pointer capture on SVG for move/up events
-      svg.setPointerCapture(e.pointerId);
-      isDraggingRef.current = true;
+    setIsDragging(true);
+    hasDraggedRef.current = false;
+    setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    
+    const dx = Math.abs(e.clientX - (panStart.x + pan.x));
+    const dy = Math.abs(e.clientY - (panStart.y + pan.y));
+    
+    if (dx > 5 || dy > 5) {
+      hasDraggedRef.current = true;
+    }
+    
+    setPan({
+      x: e.clientX - panStart.x,
+      y: e.clientY - panStart.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setTimeout(() => {
       hasDraggedRef.current = false;
-      setIsDragging(true);
-      dragStartRef.current = { 
-        x: e.clientX - panRef.current.x, 
-        y: e.clientY - panRef.current.y 
-      };
-    };
-    
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!isDraggingRef.current) return;
-      
-      const dx = Math.abs(e.clientX - (dragStartRef.current.x + panRef.current.x));
-      const dy = Math.abs(e.clientY - (dragStartRef.current.y + panRef.current.y));
-      
-      if (dx > 5 || dy > 5) {
-        hasDraggedRef.current = true;
-      }
-      
-      const newPan = {
-        x: e.clientX - dragStartRef.current.x,
-        y: e.clientY - dragStartRef.current.y
-      };
-      setPan(newPan);
-    };
-    
-    const handlePointerUp = (e: PointerEvent) => {
-      if (svg.hasPointerCapture(e.pointerId)) {
-        svg.releasePointerCapture(e.pointerId);
-      }
-      isDraggingRef.current = false;
-      setIsDragging(false);
-      
-      // Reset hasDragged after a short delay to allow click handlers to check it
-      setTimeout(() => {
-        hasDraggedRef.current = false;
-      }, 50);
-    };
-    
-    // Use capture: true to intercept events before they reach foreignObject children
-    svg.addEventListener('pointerdown', handlePointerDown, { capture: true });
-    svg.addEventListener('pointermove', handlePointerMove, { capture: true });
-    svg.addEventListener('pointerup', handlePointerUp, { capture: true });
-    svg.addEventListener('pointercancel', handlePointerUp, { capture: true });
-    
-    return () => {
-      svg.removeEventListener('pointerdown', handlePointerDown, { capture: true });
-      svg.removeEventListener('pointermove', handlePointerMove, { capture: true });
-      svg.removeEventListener('pointerup', handlePointerUp, { capture: true });
-      svg.removeEventListener('pointercancel', handlePointerUp, { capture: true });
-    };
-  }, []);
+    }, 50);
+  };
   const { toast } = useToast();
 
   // Mutation to update match team assignments
@@ -570,7 +538,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
       <g key={match.id} transform={`translate(${x}, ${y})`}>
         <foreignObject width={MATCH_WIDTH} height={MATCH_HEIGHT}>
           <Card 
-            className={`h-full bg-card ${borderColor} border-[4px] cursor-pointer hover:opacity-90 transition-opacity relative group`} 
+            className={`match-card h-full bg-card ${borderColor} border-[4px] cursor-pointer hover:opacity-90 transition-opacity relative group`} 
             data-testid={`card-match-${match.matchNumber}`}
             onClick={() => {
               if (!hasDraggedRef.current) {
@@ -876,6 +844,10 @@ export default function BracketView({ matches, teams, format, settings, tourname
           cursor: isDragging ? 'grabbing' : 'grab'
         }}
         onWheel={handleWheel}
+        onMouseDown={handleCanvasMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
       >
         <svg
           ref={svgRef}
