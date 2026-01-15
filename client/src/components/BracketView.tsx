@@ -507,7 +507,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
 
   calculateAllPositions();
 
-  const renderMatch = (match: TournamentMatch, x: number, y: number, bracketColorType?: string) => {
+  // Render match card as absolutely positioned div (NOT inside SVG foreignObject)
+  const renderMatchCard = (match: TournamentMatch, x: number, y: number, bracketColorType?: string) => {
     const isCompleted = match.status === 'completed';
     // Only highlight if there's an actual winner (avoid null === null bug)
     const team1Wins = match.winnerId != null && match.winnerId === match.team1Id;
@@ -534,18 +535,29 @@ export default function BracketView({ matches, teams, format, settings, tourname
       winnerBgClass = 'bg-[#32CD32] text-black';
     }
 
+    // Calculate position with zoom and pan (add 50, 80 offset like the SVG g transform)
+    const cardX = (x + 50) * zoom + pan.x;
+    const cardY = (y + 80) * zoom + pan.y;
+
     return (
-      <g key={match.id} transform={`translate(${x}, ${y})`}>
-        <foreignObject width={MATCH_WIDTH} height={MATCH_HEIGHT}>
-          <Card 
-            className={`match-card h-full bg-card ${borderColor} border-[4px] cursor-pointer hover:opacity-90 transition-opacity relative group`} 
-            data-testid={`card-match-${match.matchNumber}`}
-            onClick={() => {
-              if (!hasDraggedRef.current) {
-                setSelectedMatchId(match.id);
-              }
-            }}
-          >
+      <Card 
+        key={match.id}
+        className={`match-card absolute bg-card ${borderColor} border-[4px] cursor-pointer hover:opacity-90 transition-opacity group`} 
+        style={{
+          width: MATCH_WIDTH,
+          height: MATCH_HEIGHT,
+          left: cardX,
+          top: cardY,
+          transform: `scale(${zoom})`,
+          transformOrigin: 'top left'
+        }}
+        data-testid={`card-match-${match.matchNumber}`}
+        onClick={() => {
+          if (!hasDraggedRef.current) {
+            setSelectedMatchId(match.id);
+          }
+        }}
+      >
             {/* Edit Icon - Always visible for commissioners */}
             {isCommissioner && (
               <div className="absolute top-1 right-1 z-10 bg-white dark:bg-gray-800 rounded-full p-1.5 shadow-md opacity-80 group-hover:opacity-100 transition-opacity">
@@ -666,9 +678,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                 </div>
               </div>
             </div>
-          </Card>
-        </foreignObject>
-      </g>
+      </Card>
     );
   };
 
@@ -706,37 +716,9 @@ export default function BracketView({ matches, teams, format, settings, tourname
     );
   };
 
-  const renderBracket = () => {
+  // Render only SVG connectors (match cards are rendered separately as HTML divs)
+  const renderConnectors = () => {
     const elements: JSX.Element[] = [];
-
-    // Get bracket label mappings
-    const bracketLabels: { [key: string]: string } = {
-      'winners': 'Winners Bracket',
-      'losers': 'Losers Bracket',
-      'guarantee': '3-Game Guarantee Round',
-      'losers1': 'Losers 1 Bracket',
-      'losers2': 'Losers 2 Bracket',
-      'championship': 'Championship Bracket',
-      'consolation': 'Consolation Bracket',
-      'east': 'East Division',
-      'northeast': 'Northeast Division',
-      'north': 'North Division',
-      'northwest': 'Northwest Division',
-      'west': 'West Division',
-      'southwest': 'Southwest Division',
-      'south': 'South Division',
-      'southeast': 'Southeast Division'
-    };
-
-    // Render all matches (they've been positioned by calculateAllPositions)
-    matches.forEach((match) => {
-      const pos = matchPositions.get(match.id);
-      if (pos) {
-        elements.push(renderMatch(match, pos.x, pos.y, match.bracketType || undefined));
-      }
-    });
-
-    
 
     // Draw connectors based on advancesToMatchId
     matches.forEach(match => {
@@ -756,6 +738,17 @@ export default function BracketView({ matches, teams, format, settings, tourname
     });
 
     return elements;
+  };
+
+  // Render match cards as HTML divs (outside SVG)
+  const renderMatchCards = () => {
+    return matches.map((match) => {
+      const pos = matchPositions.get(match.id);
+      if (pos) {
+        return renderMatchCard(match, pos.x, pos.y, match.bracketType || undefined);
+      }
+      return null;
+    });
   };
 
   // Calculate SVG dimensions based on actual match positions
@@ -837,7 +830,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
       {/* Bracket Container */}
       <div
         ref={containerRef}
-        className="overflow-hidden border rounded-lg bg-muted/20"
+        className="overflow-hidden border rounded-lg bg-muted/20 relative"
         style={{ 
           height: '70vh',
           touchAction: 'none',
@@ -849,16 +842,13 @@ export default function BracketView({ matches, teams, format, settings, tourname
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
+        {/* SVG for connections only - pointer-events: none so clicks go through */}
         <svg
           ref={svgRef}
-          width={svgWidth * zoom}
-          height={svgHeight * zoom}
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          preserveAspectRatio="xMidYMid meet"
+          className="absolute inset-0 pointer-events-none"
           style={{
-            transform: `translate(${pan.x}px, ${pan.y}px)`,
-            transition: isDragging ? 'none' : 'transform 0.1s',
-            userSelect: 'none'
+            width: '100%',
+            height: '100%'
           }}
         >
           {/* Arrow marker definitions */}
@@ -887,10 +877,14 @@ export default function BracketView({ matches, teams, format, settings, tourname
             </marker>
           </defs>
           
-          <g transform="translate(50, 80)">
-            {renderBracket()}
+          {/* Connectors with pan/zoom transform */}
+          <g transform={`translate(${pan.x + 50 * zoom}, ${pan.y + 80 * zoom}) scale(${zoom})`}>
+            {renderConnectors()}
           </g>
         </svg>
+
+        {/* Match cards as HTML divs (positioned absolutely) */}
+        {renderMatchCards()}
       </div>
 
       {/* Score Modal */}
