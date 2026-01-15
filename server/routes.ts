@@ -6225,8 +6225,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify user is a member of the team
+      let isMember = false;
+      
+      // First check regular team membership
       const teamMembers = await storage.getTeamMembers(teamId);
-      const isMember = teamMembers.some(member => member.userId === userId);
+      isMember = teamMembers.some(member => member.userId === userId);
+      
+      // If not found in regular teams, check if this is a tournament team
+      if (!isMember) {
+        const [tournamentTeam] = await db
+          .select()
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.id, teamId));
+        
+        if (tournamentTeam) {
+          // Check if user is a participant of this tournament team
+          const [participant] = await db
+            .select()
+            .from(tournamentParticipants)
+            .where(and(
+              eq(tournamentParticipants.tournamentTeamId, teamId),
+              eq(tournamentParticipants.userId, userId),
+              eq(tournamentParticipants.status, 'approved')
+            ));
+          isMember = !!participant;
+          
+          // Also check if the tournament team is linked to a regular team the user is on
+          if (!isMember && tournamentTeam.teamId) {
+            const linkedTeamMembers = await storage.getTeamMembers(tournamentTeam.teamId);
+            isMember = linkedTeamMembers.some(member => member.userId === userId);
+          }
+        }
+      }
+      
       if (!isMember) {
         return res.status(403).json({ message: 'You are not a member of this team' });
       }
@@ -6265,8 +6296,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify user is a member of the team
+      let isMember = false;
+      
+      // First check regular team membership
       const teamMembers = await storage.getTeamMembers(teamId);
-      const isMember = teamMembers.some(member => member.userId === userId);
+      isMember = teamMembers.some(member => member.userId === userId);
+      
+      // If not found in regular teams, check if this is a tournament team
+      if (!isMember) {
+        const [tournamentTeam] = await db
+          .select()
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.id, teamId));
+        
+        if (tournamentTeam) {
+          // Check if user is a participant of this tournament team
+          const [participant] = await db
+            .select()
+            .from(tournamentParticipants)
+            .where(and(
+              eq(tournamentParticipants.tournamentTeamId, teamId),
+              eq(tournamentParticipants.userId, userId),
+              eq(tournamentParticipants.status, 'approved')
+            ));
+          isMember = !!participant;
+          
+          // Also check if the tournament team is linked to a regular team the user is on
+          if (!isMember && tournamentTeam.teamId) {
+            const linkedTeamMembers = await storage.getTeamMembers(tournamentTeam.teamId);
+            isMember = linkedTeamMembers.some(member => member.userId === userId);
+          }
+        }
+      }
+      
       if (!isMember) {
         return res.status(403).json({ message: 'You are not a member of this team' });
       }
