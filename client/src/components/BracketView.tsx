@@ -41,15 +41,26 @@ export default function BracketView({ matches, teams, format, settings, tourname
     panRef.current = pan;
   }, [pan]);
   
+  const overlayRef = useRef<HTMLDivElement>(null);
+  
   // Native pointer event handlers using useEffect for reliable event capture
+  // Listen on container for pointerdown, but use overlay for capture during drag
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    const overlay = overlayRef.current;
+    if (!container || !overlay) return;
     
     const handlePointerDown = (e: PointerEvent) => {
+      // Only initiate drag if clicking on empty space (not on interactive elements)
+      const target = e.target as HTMLElement;
+      if (target.closest('button') || target.closest('[role="button"]') || target.closest('select')) {
+        return; // Don't start drag if clicking on a button or select
+      }
+      
       if (e.pointerType === 'touch' && !(e as any).isPrimary) return;
       
-      container.setPointerCapture(e.pointerId);
+      // Set pointer capture on overlay for move/up events
+      overlay.setPointerCapture(e.pointerId);
       isDraggingRef.current = true;
       hasDraggedRef.current = false;
       setIsDragging(true);
@@ -77,8 +88,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
     };
     
     const handlePointerUp = (e: PointerEvent) => {
-      if (container.hasPointerCapture(e.pointerId)) {
-        container.releasePointerCapture(e.pointerId);
+      if (overlay.hasPointerCapture(e.pointerId)) {
+        overlay.releasePointerCapture(e.pointerId);
       }
       isDraggingRef.current = false;
       setIsDragging(false);
@@ -89,18 +100,18 @@ export default function BracketView({ matches, teams, format, settings, tourname
       }, 50);
     };
     
+    // Listen for pointerdown on container (includes SVG and its children)
     container.addEventListener('pointerdown', handlePointerDown);
-    container.addEventListener('pointermove', handlePointerMove);
-    container.addEventListener('pointerup', handlePointerUp);
-    container.addEventListener('pointercancel', handlePointerUp);
-    container.addEventListener('pointerleave', handlePointerUp);
+    // Listen for move/up on overlay (which gets pointer capture during drag)
+    overlay.addEventListener('pointermove', handlePointerMove);
+    overlay.addEventListener('pointerup', handlePointerUp);
+    overlay.addEventListener('pointercancel', handlePointerUp);
     
     return () => {
       container.removeEventListener('pointerdown', handlePointerDown);
-      container.removeEventListener('pointermove', handlePointerMove);
-      container.removeEventListener('pointerup', handlePointerUp);
-      container.removeEventListener('pointercancel', handlePointerUp);
-      container.removeEventListener('pointerleave', handlePointerUp);
+      overlay.removeEventListener('pointermove', handlePointerMove);
+      overlay.removeEventListener('pointerup', handlePointerUp);
+      overlay.removeEventListener('pointercancel', handlePointerUp);
     };
   }, []);
   const { toast } = useToast();
@@ -862,14 +873,28 @@ export default function BracketView({ matches, teams, format, settings, tourname
       {/* Bracket Container */}
       <div
         ref={containerRef}
-        className="overflow-hidden border rounded-lg bg-muted/20"
+        className="overflow-hidden border rounded-lg bg-muted/20 relative"
         style={{ 
           height: '70vh',
-          cursor: isDragging ? 'grabbing' : 'grab',
-          touchAction: 'none'
+          touchAction: 'none',
+          cursor: isDragging ? 'grabbing' : 'grab'
         }}
         onWheel={handleWheel}
       >
+        {/* Invisible overlay for pointer capture during drag */}
+        <div
+          ref={overlayRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: isDragging ? 100 : -1,
+            background: 'transparent',
+            pointerEvents: isDragging ? 'auto' : 'none'
+          }}
+        />
         <svg
           ref={svgRef}
           width={svgWidth * zoom}
@@ -879,7 +904,6 @@ export default function BracketView({ matches, teams, format, settings, tourname
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px)`,
             transition: isDragging ? 'none' : 'transform 0.1s',
-            pointerEvents: isDragging ? 'none' : 'auto',
             userSelect: 'none'
           }}
         >
