@@ -484,21 +484,22 @@ export default function BracketView({ matches, teams, format, settings, tourname
       winnerBgClass = 'bg-[#32CD32] text-black';
     }
 
-    // Calculate position with zoom (add 50, 80 offset like the SVG g transform)
+    // Calculate position and size with zoom (add 50, 80 offset like the SVG g transform)
     const cardX = (x + 50) * zoom;
     const cardY = (y + 80) * zoom;
+    const cardWidth = MATCH_WIDTH * zoom;
+    const cardHeight = MATCH_HEIGHT * zoom;
 
     return (
       <Card 
         key={match.id}
         className={`match-card absolute bg-card ${borderColor} border-[4px] cursor-pointer hover:opacity-90 transition-opacity group`} 
         style={{
-          width: MATCH_WIDTH,
-          height: MATCH_HEIGHT,
+          width: cardWidth,
+          height: cardHeight,
           left: cardX,
           top: cardY,
-          transform: `scale(${zoom})`,
-          transformOrigin: 'top left'
+          fontSize: `${zoom * 100}%`
         }}
         data-testid={`card-match-${match.matchNumber}`}
         onClick={() => setSelectedMatchId(match.id)}
