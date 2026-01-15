@@ -2885,9 +2885,7 @@ export default function Dashboard() {
                         </span>
                       )}
                       {game.isTournamentMatch && (
-                        <span className="text-xs bg-[#ffd700] text-black px-2 py-0.5 rounded font-medium" data-testid={`badge-tournament-${game.id}`}>
-                          {game.matchRound || 'Tournament'}
-                        </span>
+                        <Trophy className="w-4 h-4 text-[#ffd700]" data-testid={`badge-tournament-${game.id}`} />
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
