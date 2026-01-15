@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, Maximize2, Edit } from "lucide-react";
@@ -24,60 +24,9 @@ interface BracketViewProps {
 
 export default function BracketView({ matches, teams, format, settings, tournamentName, tournamentId, isCommissioner = false, tournamentType }: BracketViewProps) {
   const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
-  const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
-  const [initialZoom, setInitialZoom] = useState<number>(0.5);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const hasDraggedRef = useRef(false);
-  const isDraggingRef = useRef(false);
-  const dragStartRef = useRef({ x: 0, y: 0 });
-  const panRef = useRef({ x: 0, y: 0 });
-  
-  // Keep panRef in sync with state
-  useEffect(() => {
-    panRef.current = pan;
-  }, [pan]);
-  
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-
-  // Standard React mouse event handlers (same pattern as working CustomBracketBuilder)
-  const handleCanvasMouseDown = (e: React.MouseEvent) => {
-    // Only start panning if clicking on the canvas background or SVG (not on match cards)
-    const target = e.target as HTMLElement;
-    if (target.closest('.match-card') || target.closest('button') || target.closest('select')) {
-      return; // Don't start drag if clicking on a match card or interactive element
-    }
-    
-    setIsDragging(true);
-    hasDraggedRef.current = false;
-    setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    
-    const dx = Math.abs(e.clientX - (panStart.x + pan.x));
-    const dy = Math.abs(e.clientY - (panStart.y + pan.y));
-    
-    if (dx > 5 || dy > 5) {
-      hasDraggedRef.current = true;
-    }
-    
-    setPan({
-      x: e.clientX - panStart.x,
-      y: e.clientY - panStart.y
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setTimeout(() => {
-      hasDraggedRef.current = false;
-    }, 50);
-  };
   const { toast } = useToast();
 
   // Mutation to update match team assignments
@@ -535,9 +484,9 @@ export default function BracketView({ matches, teams, format, settings, tourname
       winnerBgClass = 'bg-[#32CD32] text-black';
     }
 
-    // Calculate position with zoom and pan (add 50, 80 offset like the SVG g transform)
-    const cardX = (x + 50) * zoom + pan.x;
-    const cardY = (y + 80) * zoom + pan.y;
+    // Calculate position with zoom (add 50, 80 offset like the SVG g transform)
+    const cardX = (x + 50) * zoom;
+    const cardY = (y + 80) * zoom;
 
     return (
       <Card 
@@ -552,11 +501,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
           transformOrigin: 'top left'
         }}
         data-testid={`card-match-${match.matchNumber}`}
-        onClick={() => {
-          if (!hasDraggedRef.current) {
-            setSelectedMatchId(match.id);
-          }
-        }}
+        onClick={() => setSelectedMatchId(match.id)}
       >
             {/* Edit Icon - Always visible for commissioners */}
             {isCommissioner && (
@@ -777,24 +722,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
   
   console.log('🔍 SVG Dimensions:', { width: svgWidth, height: svgHeight, hasLosers, losersRounds: losersRounds.length });
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    if (e.ctrlKey || e.metaKey) {
-      // Zoom
-      const delta = -e.deltaY * 0.001;
-      setZoom(prev => Math.min(Math.max(0.3, prev + delta), 3));
-    } else {
-      // Pan
-      setPan(prev => ({
-        x: prev.x - e.deltaX,
-        y: prev.y - e.deltaY
-      }));
-    }
-  };
-
-  const resetView = () => {
+  const resetZoom = () => {
     setZoom(0.5);
-    setPan({ x: 0, y: 0 });
   };
 
   return (
@@ -820,71 +749,75 @@ export default function BracketView({ matches, teams, format, settings, tourname
         <Button
           size="sm"
           variant="outline"
-          onClick={resetView}
+          onClick={resetZoom}
           data-testid="button-reset-view"
         >
           <Maximize2 className="h-4 w-4" />
         </Button>
       </div>
 
-      {/* Bracket Container */}
+      {/* Bracket Container - scrollable with standard scrollbars */}
       <div
         ref={containerRef}
-        className="overflow-hidden border rounded-lg bg-muted/20 relative"
+        className="overflow-auto border rounded-lg bg-muted/20"
         style={{ 
-          height: '70vh',
-          touchAction: 'none',
-          cursor: isDragging ? 'grabbing' : 'grab'
+          height: '70vh'
         }}
-        onWheel={handleWheel}
-        onMouseDown={handleCanvasMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
       >
-        {/* SVG for connections only - pointer-events: none so clicks go through */}
-        <svg
-          ref={svgRef}
-          className="absolute inset-0 pointer-events-none"
+        {/* Inner container with actual bracket size */}
+        <div 
+          className="relative"
           style={{
-            width: '100%',
-            height: '100%'
+            width: svgWidth * zoom + 100,
+            height: svgHeight * zoom + 100,
+            minWidth: '100%',
+            minHeight: '100%'
           }}
         >
-          {/* Arrow marker definitions */}
-          <defs>
-            <marker
-              id="arrowhead-winner"
-              markerWidth="10"
-              markerHeight="10"
-              refX="9"
-              refY="3"
-              orient="auto"
-              markerUnits="strokeWidth"
-            >
-              <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--primary))" />
-            </marker>
-            <marker
-              id="arrowhead-loser"
-              markerWidth="10"
-              markerHeight="10"
-              refX="9"
-              refY="3"
-              orient="auto"
-              markerUnits="strokeWidth"
-            >
-              <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--destructive))" />
-            </marker>
-          </defs>
-          
-          {/* Connectors with pan/zoom transform */}
-          <g transform={`translate(${pan.x + 50 * zoom}, ${pan.y + 80 * zoom}) scale(${zoom})`}>
-            {renderConnectors()}
-          </g>
-        </svg>
+          {/* SVG for connections only - pointer-events: none so clicks go through */}
+          <svg
+            ref={svgRef}
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              width: svgWidth * zoom + 100,
+              height: svgHeight * zoom + 100
+            }}
+          >
+            {/* Arrow marker definitions */}
+            <defs>
+              <marker
+                id="arrowhead-winner"
+                markerWidth="10"
+                markerHeight="10"
+                refX="9"
+                refY="3"
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--primary))" />
+              </marker>
+              <marker
+                id="arrowhead-loser"
+                markerWidth="10"
+                markerHeight="10"
+                refX="9"
+                refY="3"
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--destructive))" />
+              </marker>
+            </defs>
+            
+            {/* Connectors with zoom transform */}
+            <g transform={`translate(50, 80) scale(${zoom})`}>
+              {renderConnectors()}
+            </g>
+          </svg>
 
-        {/* Match cards as HTML divs (positioned absolutely) */}
-        {renderMatchCards()}
+          {/* Match cards as HTML divs (positioned absolutely) */}
+          {renderMatchCards()}
+        </div>
       </div>
 
       {/* Score Modal */}
