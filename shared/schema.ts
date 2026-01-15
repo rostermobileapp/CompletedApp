@@ -1249,6 +1249,55 @@ export const eventParticipants = pgTable("event_participants", {
   index("idx_event_participants_membership").on(table.facilityMembershipId),
 ]);
 
+// Team event type enum
+export const teamEventTypeEnum = pgEnum("team_event_type", [
+  "general",      // General events like parties, meetings
+  "practice",     // Team practice
+  "scrimmage",    // Internal scrimmage (just your team) or vs another team
+  "social"        // Team social events
+]);
+
+// Team events table - for general team events, scrimmages, etc.
+export const teamEvents = pgTable("team_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  eventType: teamEventTypeEnum("event_type").notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  endTime: timestamp("end_time"), // Optional end time
+  location: varchar("location"),
+  // For scrimmages against another team
+  opponentTeamId: varchar("opponent_team_id").references(() => teams.id),
+  opponentName: varchar("opponent_name"), // If opponent is not in the system
+  isInternalScrimmage: boolean("is_internal_scrimmage").default(true), // True if just your team, false if vs opponent
+  // Additional details
+  notes: text("notes"),
+  maxParticipants: integer("max_participants"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_team_events_team").on(table.teamId),
+  index("idx_team_events_scheduled").on(table.scheduledAt),
+  index("idx_team_events_type").on(table.eventType),
+  index("idx_team_events_creator").on(table.creatorId),
+]);
+
+// Team event RSVPs table
+export const teamEventRsvps = pgTable("team_event_rsvps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamEventId: varchar("team_event_id").references(() => teamEvents.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  status: rsvpStatusEnum("status").default("no_response").notNull(),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_team_event_user_rsvp").on(table.teamEventId, table.userId),
+  index("idx_team_event_rsvps_event").on(table.teamEventId),
+  index("idx_team_event_rsvps_user").on(table.userId),
+]);
+
 // Payment requests table
 export const paymentRequests = pgTable("payment_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2005,6 +2054,34 @@ export const eventParticipantsRelations = relations(eventParticipants, ({ one })
   }),
 }));
 
+// Team events relations
+export const teamEventsRelations = relations(teamEvents, ({ one, many }) => ({
+  team: one(teams, {
+    fields: [teamEvents.teamId],
+    references: [teams.id],
+  }),
+  creator: one(users, {
+    fields: [teamEvents.creatorId],
+    references: [users.id],
+  }),
+  opponentTeam: one(teams, {
+    fields: [teamEvents.opponentTeamId],
+    references: [teams.id],
+  }),
+  rsvps: many(teamEventRsvps),
+}));
+
+export const teamEventRsvpsRelations = relations(teamEventRsvps, ({ one }) => ({
+  teamEvent: one(teamEvents, {
+    fields: [teamEventRsvps.teamEventId],
+    references: [teamEvents.id],
+  }),
+  user: one(users, {
+    fields: [teamEventRsvps.userId],
+    references: [users.id],
+  }),
+}));
+
 // Payment request relations
 export const paymentRequestsRelations = relations(paymentRequests, ({ one, many }) => ({
   creator: one(users, {
@@ -2520,6 +2597,39 @@ export const insertScrimmageReminderSentSchema = createInsertSchema(scrimmageRem
   sentAt: true,
 });
 
+// Team event schemas
+export const insertTeamEventSchema = createInsertSchema(teamEvents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createTeamEventRequestSchema = createInsertSchema(teamEvents).omit({
+  id: true,
+  creatorId: true, // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  scheduledAt: z.string().transform((val) => new Date(val)),
+  endTime: z.string().optional().nullable().transform((val) => val ? new Date(val) : null),
+});
+
+export const updateTeamEventRequestSchema = createInsertSchema(teamEvents).omit({
+  id: true,
+  teamId: true,      // Cannot change team
+  creatorId: true,   // Server-controlled
+  createdAt: true,
+  updatedAt: true,
+}).partial().extend({
+  scheduledAt: z.string().transform((val) => new Date(val)).optional(),
+  endTime: z.string().optional().nullable().transform((val) => val ? new Date(val) : null),
+});
+
+export const insertTeamEventRsvpSchema = createInsertSchema(teamEventRsvps).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Payment request schemas
 export const insertPaymentRequestSchema = createInsertSchema(paymentRequests).omit({
   id: true,
@@ -2984,6 +3094,21 @@ export type PaymentRequestRecipient = typeof paymentRequestRecipients.$inferSele
 export type InsertPaymentRequestRecipient = z.infer<typeof insertPaymentRequestRecipientSchema>;
 export type UpdatePaymentRequestRecipient = z.infer<typeof updatePaymentRequestRecipientSchema>;
 export type CreateScrimmageJoinRequest = z.infer<typeof createScrimmageJoinRequestSchema>;
+// Team event types
+export type TeamEvent = typeof teamEvents.$inferSelect;
+export type InsertTeamEvent = z.infer<typeof insertTeamEventSchema>;
+export type CreateTeamEventRequest = z.infer<typeof createTeamEventRequestSchema>;
+export type UpdateTeamEventRequest = z.infer<typeof updateTeamEventRequestSchema>;
+export type TeamEventRsvp = typeof teamEventRsvps.$inferSelect;
+export type InsertTeamEventRsvp = z.infer<typeof insertTeamEventRsvpSchema>;
+
+// Extended team event types
+export type TeamEventWithDetails = TeamEvent & {
+  team: Team;
+  creator: User;
+  opponentTeam?: Team | null;
+  rsvps: (TeamEventRsvp & { user: User })[];
+};
 
 // Line combinations types
 export type LineCombination = typeof lineCombinations.$inferSelect;

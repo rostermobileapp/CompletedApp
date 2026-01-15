@@ -64,6 +64,10 @@ import {
   createCalendarEventRequestSchema,
   updateCalendarEventRequestSchema,
   createEventParticipantRequestSchema,
+  createTeamEventRequestSchema,
+  updateTeamEventRequestSchema,
+  teamEvents,
+  teamEventRsvps,
 } from "@shared/schema";
 import { z, ZodError } from "zod";
 import multer from "multer";
@@ -14488,6 +14492,348 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error checking in participant:", error);
       res.status(500).json({ message: "Failed to check in participant" });
+    }
+  });
+
+  // ==================== TEAM EVENTS ROUTES ====================
+
+  // Get team events for a specific team
+  app.get('/api/teams/:teamId/events', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Check if user is a member of this team
+      const membership = await storage.getTeamMembership(userId, teamId);
+      if (!membership) {
+        return res.status(403).json({ message: "You must be a team member to view events" });
+      }
+      
+      const events = await db
+        .select()
+        .from(teamEvents)
+        .where(eq(teamEvents.teamId, teamId))
+        .orderBy(teamEvents.scheduledAt);
+      
+      // Format dates for frontend
+      const formattedEvents = events.map(event => ({
+        ...event,
+        scheduledAt: formatDateAsLocalString(event.scheduledAt),
+        endTime: event.endTime ? formatDateAsLocalString(event.endTime) : null,
+      }));
+      
+      res.json(formattedEvents);
+    } catch (error) {
+      console.error("Error fetching team events:", error);
+      res.status(500).json({ message: "Failed to fetch team events" });
+    }
+  });
+
+  // Get a single team event
+  app.get('/api/team-events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const event = await db
+        .select()
+        .from(teamEvents)
+        .where(eq(teamEvents.id, id))
+        .limit(1);
+      
+      if (!event.length) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      const teamEvent = event[0];
+      
+      // Check if user is a member of this team
+      const membership = await storage.getTeamMembership(userId, teamEvent.teamId);
+      if (!membership) {
+        return res.status(403).json({ message: "You must be a team member to view this event" });
+      }
+      
+      // Get RSVPs for this event
+      const rsvps = await db
+        .select({
+          id: teamEventRsvps.id,
+          userId: teamEventRsvps.userId,
+          status: teamEventRsvps.status,
+          respondedAt: teamEventRsvps.respondedAt,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        })
+        .from(teamEventRsvps)
+        .innerJoin(users, eq(teamEventRsvps.userId, users.id))
+        .where(eq(teamEventRsvps.teamEventId, id));
+      
+      res.json({
+        ...teamEvent,
+        scheduledAt: formatDateAsLocalString(teamEvent.scheduledAt),
+        endTime: teamEvent.endTime ? formatDateAsLocalString(teamEvent.endTime) : null,
+        rsvps,
+      });
+    } catch (error) {
+      console.error("Error fetching team event:", error);
+      res.status(500).json({ message: "Failed to fetch team event" });
+    }
+  });
+
+  // Create a team event
+  app.post('/api/team-events', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = createTeamEventRequestSchema.parse(req.body);
+      
+      // Check if user is a member of this team (and preferably captain)
+      const membership = await storage.getTeamMembership(userId, validatedData.teamId);
+      if (!membership) {
+        return res.status(403).json({ message: "You must be a team member to create events" });
+      }
+      
+      const [newEvent] = await db
+        .insert(teamEvents)
+        .values({
+          ...validatedData,
+          creatorId: userId,
+        })
+        .returning();
+      
+      res.status(201).json({
+        ...newEvent,
+        scheduledAt: formatDateAsLocalString(newEvent.scheduledAt),
+        endTime: newEvent.endTime ? formatDateAsLocalString(newEvent.endTime) : null,
+      });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid event data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error creating team event:", error);
+      res.status(500).json({ message: "Failed to create team event" });
+    }
+  });
+
+  // Update a team event
+  app.patch('/api/team-events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Get the event first
+      const [existingEvent] = await db
+        .select()
+        .from(teamEvents)
+        .where(eq(teamEvents.id, id))
+        .limit(1);
+      
+      if (!existingEvent) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Check if user is the creator or a team captain
+      const membership = await storage.getTeamMembership(userId, existingEvent.teamId);
+      if (!membership) {
+        return res.status(403).json({ message: "You must be a team member to edit events" });
+      }
+      
+      if (existingEvent.creatorId !== userId && !membership.isCaptain) {
+        return res.status(403).json({ message: "Only the event creator or a team captain can edit events" });
+      }
+      
+      const validatedData = updateTeamEventRequestSchema.parse(req.body);
+      
+      const [updatedEvent] = await db
+        .update(teamEvents)
+        .set({
+          ...validatedData,
+          updatedAt: new Date(),
+        })
+        .where(eq(teamEvents.id, id))
+        .returning();
+      
+      res.json({
+        ...updatedEvent,
+        scheduledAt: formatDateAsLocalString(updatedEvent.scheduledAt),
+        endTime: updatedEvent.endTime ? formatDateAsLocalString(updatedEvent.endTime) : null,
+      });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid event data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error updating team event:", error);
+      res.status(500).json({ message: "Failed to update team event" });
+    }
+  });
+
+  // Delete a team event
+  app.delete('/api/team-events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Get the event first
+      const [existingEvent] = await db
+        .select()
+        .from(teamEvents)
+        .where(eq(teamEvents.id, id))
+        .limit(1);
+      
+      if (!existingEvent) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Check if user is the creator or a team captain
+      const membership = await storage.getTeamMembership(userId, existingEvent.teamId);
+      if (!membership) {
+        return res.status(403).json({ message: "You must be a team member to delete events" });
+      }
+      
+      if (existingEvent.creatorId !== userId && !membership.isCaptain) {
+        return res.status(403).json({ message: "Only the event creator or a team captain can delete events" });
+      }
+      
+      // Delete RSVPs first
+      await db
+        .delete(teamEventRsvps)
+        .where(eq(teamEventRsvps.teamEventId, id));
+      
+      // Then delete the event
+      await db
+        .delete(teamEvents)
+        .where(eq(teamEvents.id, id));
+      
+      res.json({ success: true, message: "Event deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting team event:", error);
+      res.status(500).json({ message: "Failed to delete team event" });
+    }
+  });
+
+  // Update RSVP for a team event
+  app.post('/api/team-events/:id/rsvp', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const { status } = req.body;
+      
+      if (!['attending', 'not_attending', 'no_response'].includes(status)) {
+        return res.status(400).json({ message: "Invalid RSVP status" });
+      }
+      
+      // Get the event first
+      const [event] = await db
+        .select()
+        .from(teamEvents)
+        .where(eq(teamEvents.id, id))
+        .limit(1);
+      
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Check if user is a member of this team
+      const membership = await storage.getTeamMembership(userId, event.teamId);
+      if (!membership) {
+        return res.status(403).json({ message: "You must be a team member to RSVP" });
+      }
+      
+      // Check if RSVP exists
+      const [existingRsvp] = await db
+        .select()
+        .from(teamEventRsvps)
+        .where(and(
+          eq(teamEventRsvps.teamEventId, id),
+          eq(teamEventRsvps.userId, userId)
+        ))
+        .limit(1);
+      
+      let rsvp;
+      if (existingRsvp) {
+        // Update existing RSVP
+        [rsvp] = await db
+          .update(teamEventRsvps)
+          .set({
+            status,
+            respondedAt: new Date(),
+          })
+          .where(eq(teamEventRsvps.id, existingRsvp.id))
+          .returning();
+      } else {
+        // Create new RSVP
+        [rsvp] = await db
+          .insert(teamEventRsvps)
+          .values({
+            teamEventId: id,
+            userId,
+            status,
+            respondedAt: new Date(),
+          })
+          .returning();
+      }
+      
+      res.json(rsvp);
+    } catch (error) {
+      console.error("Error updating RSVP:", error);
+      res.status(500).json({ message: "Failed to update RSVP" });
+    }
+  });
+
+  // Get team events for the user's calendar (all teams)
+  app.get('/api/user/team-events', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get all teams the user is a member of
+      const userMemberships = await db
+        .select({ teamId: teamMemberships.teamId })
+        .from(teamMemberships)
+        .where(and(
+          eq(teamMemberships.userId, userId),
+          eq(teamMemberships.status, 'approved')
+        ));
+      
+      const teamIds = userMemberships.map(m => m.teamId);
+      
+      if (teamIds.length === 0) {
+        return res.json([]);
+      }
+      
+      const events = await db
+        .select({
+          id: teamEvents.id,
+          teamId: teamEvents.teamId,
+          eventType: teamEvents.eventType,
+          title: teamEvents.title,
+          description: teamEvents.description,
+          scheduledAt: teamEvents.scheduledAt,
+          endTime: teamEvents.endTime,
+          location: teamEvents.location,
+          opponentName: teamEvents.opponentName,
+          isInternalScrimmage: teamEvents.isInternalScrimmage,
+          teamName: teams.name,
+        })
+        .from(teamEvents)
+        .innerJoin(teams, eq(teamEvents.teamId, teams.id))
+        .where(inArray(teamEvents.teamId, teamIds))
+        .orderBy(teamEvents.scheduledAt);
+      
+      const formattedEvents = events.map(event => ({
+        ...event,
+        scheduledAt: formatDateAsLocalString(event.scheduledAt),
+        endTime: event.endTime ? formatDateAsLocalString(event.endTime) : null,
+      }));
+      
+      res.json(formattedEvents);
+    } catch (error) {
+      console.error("Error fetching user team events:", error);
+      res.status(500).json({ message: "Failed to fetch team events" });
     }
   });
 
