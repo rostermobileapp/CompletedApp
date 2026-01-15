@@ -14634,14 +14634,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Event not found" });
       }
       
-      // Check if user is the creator or a team captain
+      // Check if user is the creator, team captain, or commissioner
       const membership = await storage.getTeamMembership(userId, existingEvent.teamId);
       if (!membership) {
         return res.status(403).json({ message: "You must be a team member to edit events" });
       }
       
-      if (existingEvent.creatorId !== userId && !membership.isCaptain) {
-        return res.status(403).json({ message: "Only the event creator or a team captain can edit events" });
+      // Check if user is commissioner of the team's league
+      const team = await storage.getTeam(existingEvent.teamId);
+      const isCommissioner = team?.leagueId 
+        ? await storage.isLeagueCommissioner(userId, team.leagueId)
+        : false;
+      
+      if (existingEvent.creatorId !== userId && !membership.isCaptain && !isCommissioner) {
+        return res.status(403).json({ message: "Only the event creator, team captain, or commissioner can edit events" });
       }
       
       const validatedData = updateTeamEventRequestSchema.parse(req.body);
@@ -14689,14 +14695,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Event not found" });
       }
       
-      // Check if user is the creator or a team captain
+      // Check if user is the creator, team captain, or commissioner
       const membership = await storage.getTeamMembership(userId, existingEvent.teamId);
       if (!membership) {
         return res.status(403).json({ message: "You must be a team member to delete events" });
       }
       
-      if (existingEvent.creatorId !== userId && !membership.isCaptain) {
-        return res.status(403).json({ message: "Only the event creator or a team captain can delete events" });
+      // Check if user is commissioner of the team's league
+      const team = await storage.getTeam(existingEvent.teamId);
+      const isCommissioner = team?.leagueId 
+        ? await storage.isLeagueCommissioner(userId, team.leagueId)
+        : false;
+      
+      if (existingEvent.creatorId !== userId && !membership.isCaptain && !isCommissioner) {
+        return res.status(403).json({ message: "Only the event creator, team captain, or commissioner can delete events" });
       }
       
       // Delete RSVPs first
@@ -14805,10 +14817,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
       
+      // Get full membership info including captain status
+      const userMembershipsWithRole = await db
+        .select({ 
+          teamId: teamMemberships.teamId, 
+          isCaptain: teamMemberships.isCaptain 
+        })
+        .from(teamMemberships)
+        .where(and(
+          eq(teamMemberships.userId, userId),
+          eq(teamMemberships.status, 'approved')
+        ));
+      
+      const membershipMap = new Map(userMembershipsWithRole.map(m => [m.teamId, m.isCaptain]));
+      
+      // Get leagues where user is commissioner or co-commissioner
+      const commissionerLeagues = await storage.getLeaguesByCommissioner(userId);
+      const commissionerLeagueIds = new Set(commissionerLeagues.map(l => l.id));
+      
+      // Get teams and their league IDs
+      const teamsWithLeagues = await db
+        .select({ id: teams.id, leagueId: teams.leagueId })
+        .from(teams)
+        .where(inArray(teams.id, teamIds));
+      
+      const teamLeagueMap = new Map(teamsWithLeagues.map(t => [t.id, t.leagueId]));
+      
       const events = await db
         .select({
           id: teamEvents.id,
           teamId: teamEvents.teamId,
+          creatorId: teamEvents.creatorId,
           eventType: teamEvents.eventType,
           title: teamEvents.title,
           description: teamEvents.description,
@@ -14824,11 +14863,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(inArray(teamEvents.teamId, teamIds))
         .orderBy(teamEvents.scheduledAt);
       
-      const formattedEvents = events.map(event => ({
-        ...event,
-        scheduledAt: formatDateAsLocalString(event.scheduledAt),
-        endTime: event.endTime ? formatDateAsLocalString(event.endTime) : null,
-      }));
+      const formattedEvents = events.map(event => {
+        const isCaptain = membershipMap.get(event.teamId) || false;
+        const leagueId = teamLeagueMap.get(event.teamId);
+        const isCommissioner = leagueId ? commissionerLeagueIds.has(leagueId) : false;
+        const isCreator = event.creatorId === userId;
+        const canEdit = isCreator || isCaptain || isCommissioner;
+        
+        return {
+          ...event,
+          scheduledAt: formatDateAsLocalString(event.scheduledAt),
+          endTime: event.endTime ? formatDateAsLocalString(event.endTime) : null,
+          canEdit,
+        };
+      });
       
       res.json(formattedEvents);
     } catch (error) {

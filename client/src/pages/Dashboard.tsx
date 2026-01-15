@@ -2767,16 +2767,18 @@ export default function Dashboard() {
                         </p>
                       )}
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingTeamEvent(event);
-                      }}
-                      className="px-3 py-1 text-sm hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-                      data-testid={`button-edit-team-event-${event.id}`}
-                    >
-                      Edit
-                    </button>
+                    {event.canEdit && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTeamEvent(event);
+                        }}
+                        className="px-3 py-1 text-sm hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                        data-testid={`button-edit-team-event-${event.id}`}
+                      >
+                        Edit
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
