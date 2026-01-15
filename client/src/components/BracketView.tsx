@@ -26,6 +26,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
   const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [hasDragged, setHasDragged] = useState(false); // Track if actual drag movement occurred
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
@@ -494,7 +495,11 @@ export default function BracketView({ matches, teams, format, settings, tourname
           <Card 
             className={`h-full bg-card ${borderColor} border-[4px] cursor-pointer hover:opacity-90 transition-opacity relative group`} 
             data-testid={`card-match-${match.matchNumber}`}
-            onClick={() => setSelectedMatchId(match.id)}
+            onClick={() => {
+              if (!hasDragged) {
+                setSelectedMatchId(match.id);
+              }
+            }}
           >
             {/* Edit Icon - Always visible for commissioners */}
             {isCommissioner && (
@@ -751,11 +756,17 @@ export default function BracketView({ matches, teams, format, settings, tourname
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
+    setHasDragged(false);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isDragging) {
+      const dx = Math.abs(e.clientX - (dragStart.x + pan.x));
+      const dy = Math.abs(e.clientY - (dragStart.y + pan.y));
+      if (dx > 5 || dy > 5) {
+        setHasDragged(true);
+      }
       setPan({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y
@@ -782,6 +793,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
       // Single touch for panning
       const touch = e.touches[0];
       setIsDragging(true);
+      setHasDragged(false);
       setDragStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y });
       // Reset pinch state
       setInitialPinchDistance(null);
@@ -800,6 +812,11 @@ export default function BracketView({ matches, teams, format, settings, tourname
     if (e.touches.length === 1 && isDragging) {
       // Single touch for panning
       const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - (dragStart.x + pan.x));
+      const dy = Math.abs(touch.clientY - (dragStart.y + pan.y));
+      if (dx > 5 || dy > 5) {
+        setHasDragged(true);
+      }
       setPan({
         x: touch.clientX - dragStart.x,
         y: touch.clientY - dragStart.y
