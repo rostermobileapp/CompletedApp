@@ -2970,7 +2970,7 @@ export default function Dashboard() {
                       );
                     })()}
                     <ChevronRight 
-                      className="w-8 h-8 text-primary"
+                      className="w-8 h-8 text-primary ml-auto"
                       data-testid={`icon-view-details-${game.id}`}
                     />
                   </div>
