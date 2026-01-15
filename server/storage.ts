@@ -344,7 +344,7 @@ export interface IStorage {
   findExistingGame(leagueId: string, homeTeamId: string, awayTeamId: string, scheduledAt: Date): Promise<Game | null>;
   getUpcomingGames(userId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
   getTeamGames(teamId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
-  getGamesByLeague(leagueId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]>;
+  getGamesByLeague(leagueId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team | null })[]>;
   getGameById(gameId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team }) | undefined>;
   claimBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game>;
   releaseBeverageDuty(gameId: string, userId: string, teamId: string): Promise<Game>;
@@ -4562,7 +4562,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getGamesByLeague(leagueId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team })[]> {
+  async getGamesByLeague(leagueId: string): Promise<(Game & { homeTeam: Team; awayTeam: Team | null })[]> {
     const result = await db.execute(sql`
       SELECT 
         g.*,
@@ -4578,7 +4578,7 @@ export class DatabaseStorage implements IStorage {
         at.created_at as away_team_created_at, at.updated_at as away_team_updated_at
       FROM games g
       INNER JOIN teams ht ON g.home_team_id = ht.id
-      INNER JOIN teams at ON g.away_team_id = at.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE g.league_id = ${leagueId}
       ORDER BY g.scheduled_at ASC
     `);
@@ -4621,7 +4621,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: row.home_team_created_at as Date,
         updatedAt: row.home_team_updated_at as Date,
       },
-      awayTeam: {
+      awayTeam: row.away_team_id ? {
         id: row.away_team_id as string,
         name: row.away_team_name as string,
         logoUrl: row.away_team_logo_url as string | null,
@@ -4638,7 +4638,7 @@ export class DatabaseStorage implements IStorage {
         goalsAgainst: row.away_team_goals_against as number,
         createdAt: row.away_team_created_at as Date,
         updatedAt: row.away_team_updated_at as Date,
-      },
+      } : null,
     }));
   }
 

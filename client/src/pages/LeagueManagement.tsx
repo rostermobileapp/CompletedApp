@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
 import { format } from 'date-fns';
+import { fromZonedTime } from 'date-fns-tz';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1851,10 +1852,18 @@ export default function LeagueManagement() {
   // Game scheduling mutation
   const createGameMutation = useMutation({
     mutationFn: async (data: CreateGameForm) => {
+      // Get league timezone, default to Eastern Time
+      const leagueTimezone = (league as any)?.timezone || 'America/New_York';
+      
+      // Convert the datetime-local value to UTC using the league's timezone
+      // datetime-local gives us "2025-01-15T18:00" which should be interpreted as league local time
+      // fromZonedTime converts a date that represents local time in a timezone to UTC
+      const utcDateTime = fromZonedTime(data.scheduledAt, leagueTimezone);
+      
       const gameData = {
         ...data,
         leagueId: leagueId,
-        scheduledAt: data.scheduledAt,
+        scheduledAt: utcDateTime.toISOString(),
       };
       const response = await apiRequest('POST', '/api/games', gameData);
       return response.json();
@@ -1910,9 +1919,12 @@ export default function LeagueManagement() {
       };
       
       if (shouldUpdateScheduledAt) {
-        // Format as YYYY-MM-DDTHH:MM to preserve local time without timezone conversion
+        // Get league timezone, default to Eastern Time
+        const leagueTimezone = (league as any)?.timezone || 'America/New_York';
+        // Format as YYYY-MM-DDTHH:MM and convert to UTC using league timezone
         const formattedDateTime = `${data.gameDate}T${data.gameTime}`;
-        updatePayload.scheduledAt = formattedDateTime;
+        const utcDateTime = fromZonedTime(formattedDateTime, leagueTimezone);
+        updatePayload.scheduledAt = utcDateTime.toISOString();
       }
       
       const response = await apiRequest('PATCH', `/api/games/${gameId}`, updatePayload);
@@ -3155,7 +3167,12 @@ export default function LeagueManagement() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-2">Game Date & Time</label>
+                      <label className="block text-sm font-medium mb-2">
+                        Game Date & Time
+                        <span className="text-muted-foreground font-normal ml-2">
+                          ({TIMEZONES.find(tz => tz.value === ((league as any)?.timezone || 'America/New_York'))?.label || 'Eastern Time (ET)'})
+                        </span>
+                      </label>
                       <input
                         {...gameForm.register('scheduledAt')}
                         type="datetime-local"
