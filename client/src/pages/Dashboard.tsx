@@ -76,6 +76,26 @@ const teamGameSchema = z.object({
   notes: z.string().optional(),
 });
 
+const generalEventSchema = z.object({
+  teamId: z.string().min(1, "Team is required"),
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  scheduledAt: z.string().min(1, "Date and time are required"),
+  endTime: z.string().optional(),
+  location: z.string().optional(),
+});
+
+const scrimmageEventSchema = z.object({
+  teamId: z.string().min(1, "Team is required"),
+  title: z.string().min(1, "Title is required"),
+  scheduledAt: z.string().min(1, "Date and time are required"),
+  endTime: z.string().optional(),
+  location: z.string().optional(),
+  isInternalScrimmage: z.boolean().default(false),
+  opponentName: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 // Notification Badge Component
 function AnnouncementBadge({ leagueId, tournamentId }: { leagueId?: string | null; tournamentId?: string | null }) {
   const { data: unreadCount } = useQuery({
@@ -1186,7 +1206,7 @@ export default function Dashboard() {
   
   // Add event dialog state
   const [showAddEventDialog, setShowAddEventDialog] = useState(false);
-  const [eventType, setEventType] = useState<'reminder' | 'game' | null>(null);
+  const [eventType, setEventType] = useState<'reminder' | 'game' | 'generalEvent' | 'scrimmage' | null>(null);
   
   // Reminder form
   const reminderForm = useForm<z.infer<typeof personalReminderSchema>>({
@@ -1206,6 +1226,34 @@ export default function Dashboard() {
       opponentName: "",
       scheduledAt: "",
       venue: "",
+      notes: "",
+    },
+  });
+
+  // General Event form
+  const generalEventForm = useForm<z.infer<typeof generalEventSchema>>({
+    resolver: zodResolver(generalEventSchema),
+    defaultValues: {
+      teamId: "",
+      title: "",
+      description: "",
+      scheduledAt: "",
+      endTime: "",
+      location: "",
+    },
+  });
+
+  // Scrimmage Event form
+  const scrimmageEventForm = useForm<z.infer<typeof scrimmageEventSchema>>({
+    resolver: zodResolver(scrimmageEventSchema),
+    defaultValues: {
+      teamId: "",
+      title: "",
+      scheduledAt: "",
+      endTime: "",
+      location: "",
+      isInternalScrimmage: false,
+      opponentName: "",
       notes: "",
     },
   });
@@ -1285,6 +1333,70 @@ export default function Dashboard() {
       toast({
         title: "Error",
         description: "Failed to create game. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create general event mutation
+  const createGeneralEventMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof generalEventSchema>) => {
+      await apiRequest("POST", "/api/team-events", {
+        teamId: data.teamId,
+        eventType: "general",
+        title: data.title,
+        description: data.description || null,
+        scheduledAt: data.scheduledAt,
+        endTime: data.endTime || null,
+        location: data.location || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/team-events"] });
+      toast({
+        title: "Event Created",
+        description: "Your team event has been added to the calendar.",
+      });
+      setEventType(null);
+      generalEventForm.reset();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create event. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create scrimmage event mutation
+  const createScrimmageEventMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof scrimmageEventSchema>) => {
+      await apiRequest("POST", "/api/team-events", {
+        teamId: data.teamId,
+        eventType: "scrimmage",
+        title: data.title,
+        scheduledAt: data.scheduledAt,
+        endTime: data.endTime || null,
+        location: data.location || null,
+        isInternalScrimmage: data.isInternalScrimmage,
+        opponentName: data.isInternalScrimmage ? null : data.opponentName,
+        notes: data.notes || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/team-events"] });
+      toast({
+        title: "Scrimmage Created",
+        description: "Your scrimmage has been added to the calendar.",
+      });
+      setEventType(null);
+      scrimmageEventForm.reset();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create scrimmage. Please try again.",
         variant: "destructive",
       });
     },
@@ -2879,6 +2991,38 @@ export default function Dashboard() {
                 </div>
               </Button>
             )}
+            {canScheduleGames && (
+              <Button
+                onClick={() => {
+                  setEventType('generalEvent');
+                  setShowAddEventDialog(false);
+                }}
+                variant="outline"
+                className="w-full h-auto py-4 px-6 justify-start text-left"
+                data-testid="button-select-general-event"
+              >
+                <div>
+                  <div className="font-semibold">General Event</div>
+                  <div className="text-sm text-muted-foreground">Schedule a team party, meeting, or other event</div>
+                </div>
+              </Button>
+            )}
+            {canScheduleGames && (
+              <Button
+                onClick={() => {
+                  setEventType('scrimmage');
+                  setShowAddEventDialog(false);
+                }}
+                variant="outline"
+                className="w-full h-auto py-4 px-6 justify-start text-left"
+                data-testid="button-select-scrimmage"
+              >
+                <div>
+                  <div className="font-semibold">Scrimmage</div>
+                  <div className="text-sm text-muted-foreground">Schedule a practice scrimmage (internal or vs another team)</div>
+                </div>
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -3049,6 +3193,275 @@ export default function Dashboard() {
                   data-testid="button-submit-game"
                 >
                   {createGameMutation.isPending ? "Creating..." : "Create Game"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      {/* General Event Form Dialog */}
+      <Dialog open={eventType === 'generalEvent'} onOpenChange={(open) => !open && setEventType(null)}>
+        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-general-event">
+          <DialogHeader>
+            <DialogTitle data-testid="text-create-general-event-title">Create Team Event</DialogTitle>
+          </DialogHeader>
+          <Form {...generalEventForm}>
+            <form onSubmit={generalEventForm.handleSubmit((data) => createGeneralEventMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={generalEventForm.control}
+                name="teamId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Team</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-general-event-team">
+                          <SelectValue placeholder="Select your team" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Array.isArray(userTeams) && userTeams.map((team: any) => (
+                          <SelectItem key={team.id} value={team.id} data-testid={`option-general-event-team-${team.id}`}>
+                            {team.leagueId && team.league ? `${team.league.name}: ${team.name}` : team.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={generalEventForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Team Pizza Party, Team Meeting" {...field} data-testid="input-general-event-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={generalEventForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Add event details..." {...field} data-testid="input-general-event-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={generalEventForm.control}
+                name="scheduledAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Date & Time</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} data-testid="input-general-event-datetime" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={generalEventForm.control}
+                name="endTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Time (Optional)</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} data-testid="input-general-event-endtime" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={generalEventForm.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Event location" {...field} data-testid="input-general-event-location" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEventType(null)}
+                  data-testid="button-cancel-general-event"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createGeneralEventMutation.isPending}
+                  data-testid="button-submit-general-event"
+                >
+                  {createGeneralEventMutation.isPending ? "Creating..." : "Create Event"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      {/* Scrimmage Form Dialog */}
+      <Dialog open={eventType === 'scrimmage'} onOpenChange={(open) => !open && setEventType(null)}>
+        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-scrimmage">
+          <DialogHeader>
+            <DialogTitle data-testid="text-create-scrimmage-title">Create Scrimmage</DialogTitle>
+          </DialogHeader>
+          <Form {...scrimmageEventForm}>
+            <form onSubmit={scrimmageEventForm.handleSubmit((data) => createScrimmageEventMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={scrimmageEventForm.control}
+                name="teamId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Team</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-scrimmage-team">
+                          <SelectValue placeholder="Select your team" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Array.isArray(userTeams) && userTeams.map((team: any) => (
+                          <SelectItem key={team.id} value={team.id} data-testid={`option-scrimmage-team-${team.id}`}>
+                            {team.leagueId && team.league ? `${team.league.name}: ${team.name}` : team.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={scrimmageEventForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Scrimmage Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Practice Game, Friendly Match" {...field} data-testid="input-scrimmage-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={scrimmageEventForm.control}
+                name="isInternalScrimmage"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={field.onChange}
+                        className="h-4 w-4 rounded border-gray-300"
+                        data-testid="checkbox-scrimmage-internal"
+                      />
+                    </FormControl>
+                    <FormLabel className="font-normal">Internal Scrimmage (within your team)</FormLabel>
+                  </FormItem>
+                )}
+              />
+              {!scrimmageEventForm.watch('isInternalScrimmage') && (
+                <FormField
+                  control={scrimmageEventForm.control}
+                  name="opponentName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Opponent Team</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Opponent team name" {...field} data-testid="input-scrimmage-opponent" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              <FormField
+                control={scrimmageEventForm.control}
+                name="scheduledAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Date & Time</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} data-testid="input-scrimmage-datetime" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={scrimmageEventForm.control}
+                name="endTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Time (Optional)</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} data-testid="input-scrimmage-endtime" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={scrimmageEventForm.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Scrimmage location" {...field} data-testid="input-scrimmage-location" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={scrimmageEventForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Additional information..." {...field} data-testid="input-scrimmage-notes" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEventType(null)}
+                  data-testid="button-cancel-scrimmage"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createScrimmageEventMutation.isPending}
+                  data-testid="button-submit-scrimmage"
+                >
+                  {createScrimmageEventMutation.isPending ? "Creating..." : "Create Scrimmage"}
                 </Button>
               </div>
             </form>
