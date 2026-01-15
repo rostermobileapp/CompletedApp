@@ -6876,8 +6876,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const goals = await storage.getGameGoals(gameId);
       const penalties = await storage.getGamePenalties(gameId);
 
-      // Update player stats if this is a league game
-      if (game.leagueId) {
+      // Update player stats if this is a league game (not a scrimmage)
+      // Scrimmages don't count towards player stats
+      if (game.leagueId && !game.isScrimmage) {
         // Build stats updates from goals
         const statsMap = new Map<string, { goals: number; assists: number; penaltyMinutes: number }>();
 

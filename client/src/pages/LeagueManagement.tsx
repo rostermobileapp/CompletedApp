@@ -3356,9 +3356,20 @@ export default function LeagueManagement() {
                                       {game.venue || '-'}
                                     </td>
                                     <td className="p-3 text-center">
-                                      <span className="text-xs bg-blue-100/50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-full">
-                                        {game.status || 'SCHEDULED'}
-                                      </span>
+                                      <div className="flex flex-col items-center gap-1">
+                                        {game.isScrimmage && (
+                                          <span className="text-xs bg-orange-100/50 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 px-2 py-0.5 rounded-full font-medium">
+                                            SCRIMMAGE
+                                          </span>
+                                        )}
+                                        <span className={`text-xs px-2 py-1 rounded-full ${
+                                          game.isScrimmage 
+                                            ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400'
+                                            : 'bg-blue-100/50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                                        }`}>
+                                          {game.status || 'SCHEDULED'}
+                                        </span>
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -3390,13 +3401,23 @@ export default function LeagueManagement() {
                           return (
                             <div 
                               key={game.id} 
-                              className="p-3 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
+                              className={`p-3 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors ${
+                                game.isScrimmage ? 'border-orange-300 dark:border-orange-700' : ''
+                              }`}
                               onClick={() => {
                                 setSelectedGame(game);
                                 setShowEditGame(true);
                               }}
                               data-testid={`game-${game.id}`}
                             >
+                              {/* Scrimmage Badge */}
+                              {game.isScrimmage && (
+                                <div className="flex justify-center mb-2">
+                                  <span className="text-xs bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300 px-3 py-1 rounded-full font-medium">
+                                    SCRIMMAGE
+                                  </span>
+                                </div>
+                              )}
                               {/* Team Matchup */}
                               <div className="flex items-center justify-between">
                                 {/* Home Team */}

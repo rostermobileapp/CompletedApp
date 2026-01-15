@@ -3752,6 +3752,7 @@ export class DatabaseStorage implements IStorage {
     
     // Get all completed games for this league, optionally filtered by season
     // Query all games that either have this league_id OR involve teams from this league
+    // Exclude scrimmages from standings calculations
     const result = seasonId 
       ? await db.execute(sql`
           SELECT 
@@ -3768,6 +3769,7 @@ export class DatabaseStorage implements IStorage {
           LEFT JOIN teams at ON g.away_team_id = at.id
           WHERE (g.is_completed = true OR (g.home_score IS NOT NULL AND g.away_score IS NOT NULL))
             AND g.season_id = ${seasonId}
+            AND (g.is_scrimmage = false OR g.is_scrimmage IS NULL)
             AND (
               g.league_id = ${leagueId}
               OR (ht.league_id = ${leagueId} AND at.league_id = ${leagueId})
@@ -3787,6 +3789,7 @@ export class DatabaseStorage implements IStorage {
           LEFT JOIN teams ht ON g.home_team_id = ht.id
           LEFT JOIN teams at ON g.away_team_id = at.id
           WHERE (g.is_completed = true OR (g.home_score IS NOT NULL AND g.away_score IS NOT NULL))
+            AND (g.is_scrimmage = false OR g.is_scrimmage IS NULL)
             AND (
               g.league_id = ${leagueId}
               OR (ht.league_id = ${leagueId} AND at.league_id = ${leagueId})
