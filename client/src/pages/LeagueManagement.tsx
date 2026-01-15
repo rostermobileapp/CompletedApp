@@ -285,10 +285,19 @@ type CreateTeamForm = z.infer<typeof createTeamSchema>;
 
 const createGameSchema = z.object({
   homeTeamId: z.string().min(1, 'Home team is required'),
-  awayTeamId: z.string().min(1, 'Away team is required'),
+  awayTeamId: z.string().optional(), // Optional for single-team scrimmages
   scheduledAt: z.string().min(1, 'Game date and time is required'),
   venue: z.string().optional(),
   isScrimmage: z.boolean().default(false),
+}).refine((data) => {
+  // Away team is required for regular games, optional for scrimmages
+  if (!data.isScrimmage && (!data.awayTeamId || data.awayTeamId === '')) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Away team is required for regular games',
+  path: ['awayTeamId'],
 });
 
 type CreateGameForm = z.infer<typeof createGameSchema>;
@@ -477,7 +486,7 @@ function GamesCalendar({ games, teams, onGameClick }: {
                       data-testid={`calendar-game-${game.id}`}
                     >
                       <div className="font-medium truncate">
-                        {homeTeam?.name || 'Team'} vs {awayTeam?.name || 'Team'}
+                        {awayTeam ? `${homeTeam?.name || 'Team'} vs ${awayTeam.name}` : `${homeTeam?.name || 'Team'} Practice`}
                       </div>
                       <div className="text-blue-600">
                         {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -3123,13 +3132,22 @@ export default function LeagueManagement() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-2">Away Team</label>
+                        <label className="block text-sm font-medium mb-2">
+                          Away Team
+                          {gameForm.watch('isScrimmage') && (
+                            <span className="text-muted-foreground font-normal ml-1">(optional)</span>
+                          )}
+                        </label>
                         <select
                           {...gameForm.register('awayTeamId')}
                           className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           data-testid="select-away-team"
                         >
-                          <option value="">Select away team</option>
+                          {gameForm.watch('isScrimmage') ? (
+                            <option value="">No opponent (single team)</option>
+                          ) : (
+                            <option value="">Select away team</option>
+                          )}
                           {teams.map((team: Team) => (
                             <option key={team.id} value={team.id}>{team.name}</option>
                           ))}
@@ -3336,21 +3354,25 @@ export default function LeagueManagement() {
                                       )}
                                     </td>
                                     <td className="p-3">
-                                      <div className="flex items-center gap-2">
-                                        {awayTeam?.logoUrl ? (
-                                          <img 
-                                            src={getImageUrl(awayTeam.logoUrl) || ''} 
-                                            alt={`${awayTeam.name} logo`}
-                                            className="w-8 h-8 rounded object-cover"
-                                            data-testid={`img-away-team-logo-${game.id}`}
-                                          />
-                                        ) : (
-                                          <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
-                                            <Trophy className="w-4 h-4 text-primary-foreground" />
-                                          </div>
-                                        )}
-                                        <span className="font-medium text-sm">{awayTeam?.name || 'Unknown'}</span>
-                                      </div>
+                                      {awayTeam ? (
+                                        <div className="flex items-center gap-2">
+                                          {awayTeam.logoUrl ? (
+                                            <img 
+                                              src={getImageUrl(awayTeam.logoUrl) || ''} 
+                                              alt={`${awayTeam.name} logo`}
+                                              className="w-8 h-8 rounded object-cover"
+                                              data-testid={`img-away-team-logo-${game.id}`}
+                                            />
+                                          ) : (
+                                            <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
+                                              <Trophy className="w-4 h-4 text-primary-foreground" />
+                                            </div>
+                                          )}
+                                          <span className="font-medium text-sm">{awayTeam.name}</span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground italic">Practice</span>
+                                      )}
                                     </td>
                                     <td className="p-3 text-sm text-muted-foreground">
                                       {game.venue || '-'}
@@ -3452,22 +3474,33 @@ export default function LeagueManagement() {
 
                                 {/* Away Team */}
                                 <div className="flex flex-col items-center flex-1">
-                                  <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
-                                    {awayTeam?.logoUrl ? (
-                                      <img 
-                                        src={getImageUrl(awayTeam.logoUrl) || ''} 
-                                        alt={`${awayTeam.name} logo`}
-                                        className="w-full h-full rounded-lg object-cover"
-                                        data-testid={`img-away-team-logo-${game.id}`}
-                                      />
-                                    ) : (
-                                      <Trophy className="w-7 h-7 text-primary-foreground" />
-                                    )}
-                                  </div>
-                                  <p className="font-semibold text-center text-xs">{awayTeam?.name || 'Unknown'}</p>
-                                  <p className="text-xs text-muted-foreground">AWAY</p>
-                                  {hasScore && (
-                                    <p className="text-sm font-bold mt-1">{game.awayScore}</p>
+                                  {awayTeam ? (
+                                    <>
+                                      <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
+                                        {awayTeam.logoUrl ? (
+                                          <img 
+                                            src={getImageUrl(awayTeam.logoUrl) || ''} 
+                                            alt={`${awayTeam.name} logo`}
+                                            className="w-full h-full rounded-lg object-cover"
+                                            data-testid={`img-away-team-logo-${game.id}`}
+                                          />
+                                        ) : (
+                                          <Trophy className="w-7 h-7 text-primary-foreground" />
+                                        )}
+                                      </div>
+                                      <p className="font-semibold text-center text-xs">{awayTeam.name}</p>
+                                      <p className="text-xs text-muted-foreground">AWAY</p>
+                                      {hasScore && (
+                                        <p className="text-sm font-bold mt-1">{game.awayScore}</p>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="w-14 h-14 bg-muted rounded-lg flex items-center justify-center mb-1.5">
+                                        <span className="text-2xl">🏃</span>
+                                      </div>
+                                      <p className="text-center text-xs text-muted-foreground italic">Practice</p>
+                                    </>
                                   )}
                                 </div>
                               </div>
@@ -5420,7 +5453,7 @@ export default function LeagueManagement() {
                   {(() => {
                     const homeTeam = teams.find((t: Team) => t.id === selectedGame.homeTeamId);
                     const awayTeam = teams.find((t: Team) => t.id === selectedGame.awayTeamId);
-                    return `${homeTeam?.name || 'Unknown'} vs ${awayTeam?.name || 'Unknown'}`;
+                    return awayTeam ? `${homeTeam?.name || 'Unknown'} vs ${awayTeam.name}` : `${homeTeam?.name || 'Unknown'} Practice`;
                   })()}
                 </p>
                 <p className="text-xs text-muted-foreground">
