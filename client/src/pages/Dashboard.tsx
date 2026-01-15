@@ -1208,6 +1208,9 @@ export default function Dashboard() {
   const [showAddEventDialog, setShowAddEventDialog] = useState(false);
   const [eventType, setEventType] = useState<'reminder' | 'game' | 'generalEvent' | 'scrimmage' | null>(null);
   
+  // Edit team event state
+  const [editingTeamEvent, setEditingTeamEvent] = useState<any>(null);
+  
   // Reminder form
   const reminderForm = useForm<z.infer<typeof personalReminderSchema>>({
     resolver: zodResolver(personalReminderSchema),
@@ -1401,6 +1404,50 @@ export default function Dashboard() {
       });
     },
   });
+
+  // Update team event mutation
+  const updateTeamEventMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      await apiRequest("PATCH", `/api/team-events/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/team-events"] });
+      toast({
+        title: "Event Updated",
+        description: "Your team event has been updated.",
+      });
+      setEditingTeamEvent(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update event. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete team event mutation
+  const deleteTeamEventMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/team-events/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/team-events"] });
+      toast({
+        title: "Event Deleted",
+        description: "Your team event has been deleted.",
+      });
+      setEditingTeamEvent(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete event. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
   
   const { data: rawUpcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
@@ -1455,6 +1502,27 @@ export default function Dashboard() {
   const { data: personalReminders = [], isLoading: remindersLoading } = useQuery({
     queryKey: ['/api/user/personal-reminders'],
     staleTime: 30000,
+  });
+
+  // Fetch user's team events (general events and scrimmages)
+  const { data: teamEvents = [], isLoading: teamEventsLoading } = useQuery({
+    queryKey: ['/api/user/team-events'],
+    staleTime: 30000,
+    select: (events) => {
+      if (!Array.isArray(events)) return [];
+      
+      // Tournaments don't have team events, return empty
+      if (selectedType === 'tournament') {
+        return [];
+      }
+      
+      // Filter by team if team is selected
+      if (selectedType === 'team' && selectedId) {
+        return events.filter((event: any) => event.teamId === selectedId);
+      }
+      
+      return events;
+    }
   });
 
   const { data: userTeams } = useQuery({
@@ -2642,6 +2710,77 @@ export default function Dashboard() {
                 </div>
               ))}
             
+            {/* Show team events (general events and scrimmages) */}
+            {Array.isArray(teamEvents) && teamEvents
+              .filter((event: any) => {
+                const eventDate = new Date(event.scheduledAt);
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                yesterday.setHours(0, 0, 0, 0);
+                const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                return eventDateOnly >= yesterday;
+              })
+              .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+              .slice(0, 5)
+              .map((event: any) => (
+                <div 
+                  key={`team-event-${event.id}`}
+                  className={`rounded-xl border p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${
+                    event.eventType === 'scrimmage' 
+                      ? 'border-orange-200 dark:border-orange-800' 
+                      : 'border-blue-200 dark:border-blue-800'
+                  }`}
+                  data-testid={`card-team-event-${event.id}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                      event.eventType === 'scrimmage' ? 'bg-orange-500' : 'bg-blue-500'
+                    }`}>
+                      {event.eventType === 'scrimmage' ? (
+                        <Trophy className="w-6 h-6 text-white" />
+                      ) : (
+                        <Calendar className="w-6 h-6 text-white" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold" data-testid={`text-team-event-title-${event.id}`}>
+                          {event.title}
+                        </h3>
+                        <span className={`text-xs text-white px-2 py-0.5 rounded ${
+                          event.eventType === 'scrimmage' ? 'bg-orange-500' : 'bg-blue-500'
+                        }`}>
+                          {event.eventType === 'scrimmage' ? 'Scrimmage' : 'Event'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground" data-testid={`text-team-event-time-${event.id}`}>
+                        {format(new Date(event.scheduledAt), 'MMM d • h:mm a')}
+                      </p>
+                      {event.teamName && (
+                        <p className="text-xs text-muted-foreground" data-testid={`text-team-event-team-${event.id}`}>
+                          {event.teamName}
+                        </p>
+                      )}
+                      {event.location && (
+                        <p className="text-xs text-muted-foreground" data-testid={`text-team-event-location-${event.id}`}>
+                          {event.location}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingTeamEvent(event);
+                      }}
+                      className="px-3 py-1 text-sm hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                      data-testid={`button-edit-team-event-${event.id}`}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              ))}
+            
             {/* Show visible tournament brackets */}
             {Array.isArray(visibleTournaments) && visibleTournaments.map((tournament: any) => (
               <div 
@@ -3466,6 +3605,163 @@ export default function Dashboard() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+      {/* Edit Team Event Dialog */}
+      <Dialog open={!!editingTeamEvent} onOpenChange={(open) => !open && setEditingTeamEvent(null)}>
+        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-edit-team-event">
+          <DialogHeader>
+            <DialogTitle data-testid="text-edit-team-event-title">
+              Edit {editingTeamEvent?.eventType === 'scrimmage' ? 'Scrimmage' : 'Team Event'}
+            </DialogTitle>
+          </DialogHeader>
+          {editingTeamEvent && (
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target as HTMLFormElement);
+                const title = formData.get('title') as string;
+                const scheduledAt = formData.get('scheduledAt') as string;
+                const endTimeVal = formData.get('endTime') as string;
+                const locationVal = formData.get('location') as string;
+                
+                const data: any = {
+                  eventType: editingTeamEvent.eventType,
+                  title: title,
+                  scheduledAt: scheduledAt,
+                };
+                
+                // Only include optional fields if they have values
+                if (editingTeamEvent.eventType !== 'scrimmage') {
+                  const descriptionVal = formData.get('description') as string;
+                  if (descriptionVal) data.description = descriptionVal;
+                }
+                if (endTimeVal) data.endTime = endTimeVal;
+                if (locationVal) data.location = locationVal;
+                
+                if (editingTeamEvent.eventType === 'scrimmage') {
+                  const opponentVal = formData.get('opponentName') as string;
+                  const notesVal = formData.get('notes') as string;
+                  if (opponentVal) data.opponentName = opponentVal;
+                  if (notesVal) data.notes = notesVal;
+                  data.isInternalScrimmage = editingTeamEvent.isInternalScrimmage;
+                }
+                updateTeamEventMutation.mutate({ id: editingTeamEvent.id, data });
+              }} 
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">Title</Label>
+                <Input 
+                  id="edit-title" 
+                  name="title" 
+                  defaultValue={editingTeamEvent.title}
+                  placeholder="Event title"
+                  required
+                  data-testid="input-edit-team-event-title"
+                />
+              </div>
+              {editingTeamEvent.eventType !== 'scrimmage' && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-description">Description (Optional)</Label>
+                  <Textarea 
+                    id="edit-description" 
+                    name="description" 
+                    defaultValue={editingTeamEvent.description || ''}
+                    placeholder="Add event details..."
+                    data-testid="input-edit-team-event-description"
+                  />
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="edit-scheduledAt">Start Date & Time</Label>
+                <Input 
+                  id="edit-scheduledAt" 
+                  name="scheduledAt" 
+                  type="datetime-local"
+                  defaultValue={editingTeamEvent.scheduledAt?.slice(0, 16)}
+                  required
+                  data-testid="input-edit-team-event-datetime"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-endTime">End Time (Optional)</Label>
+                <Input 
+                  id="edit-endTime" 
+                  name="endTime" 
+                  type="datetime-local"
+                  defaultValue={editingTeamEvent.endTime?.slice(0, 16) || ''}
+                  data-testid="input-edit-team-event-endtime"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-location">Location (Optional)</Label>
+                <Input 
+                  id="edit-location" 
+                  name="location" 
+                  defaultValue={editingTeamEvent.location || ''}
+                  placeholder="Event location"
+                  data-testid="input-edit-team-event-location"
+                />
+              </div>
+              {editingTeamEvent.eventType === 'scrimmage' && !editingTeamEvent.isInternalScrimmage && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-opponentName">Opponent Team</Label>
+                  <Input 
+                    id="edit-opponentName" 
+                    name="opponentName" 
+                    defaultValue={editingTeamEvent.opponentName || ''}
+                    placeholder="Opponent team name"
+                    data-testid="input-edit-scrimmage-opponent"
+                  />
+                </div>
+              )}
+              {editingTeamEvent.eventType === 'scrimmage' && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-notes">Notes (Optional)</Label>
+                  <Textarea 
+                    id="edit-notes" 
+                    name="notes" 
+                    defaultValue={editingTeamEvent.notes || ''}
+                    placeholder="Additional information..."
+                    data-testid="input-edit-scrimmage-notes"
+                  />
+                </div>
+              )}
+              <div className="flex gap-2 justify-between">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    if (confirm('Are you sure you want to delete this event?')) {
+                      deleteTeamEventMutation.mutate(editingTeamEvent.id);
+                    }
+                  }}
+                  disabled={deleteTeamEventMutation.isPending}
+                  data-testid="button-delete-team-event"
+                >
+                  {deleteTeamEventMutation.isPending ? "Deleting..." : "Delete"}
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditingTeamEvent(null)}
+                    data-testid="button-cancel-edit-team-event"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updateTeamEventMutation.isPending}
+                    data-testid="button-submit-edit-team-event"
+                  >
+                    {updateTeamEventMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
