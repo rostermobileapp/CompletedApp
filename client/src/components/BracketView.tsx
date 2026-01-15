@@ -26,13 +26,83 @@ export default function BracketView({ matches, teams, format, settings, tourname
   const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
   const [initialZoom, setInitialZoom] = useState<number>(0.5);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const hasDraggedRef = useRef(false); // Use ref to track drag movement for immediate access
+  const hasDraggedRef = useRef(false);
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const panRef = useRef({ x: 0, y: 0 });
+  
+  // Keep panRef in sync with state
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
+  
+  // Native pointer event handlers using useEffect for reliable event capture
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.pointerType === 'touch' && !(e as any).isPrimary) return;
+      
+      container.setPointerCapture(e.pointerId);
+      isDraggingRef.current = true;
+      hasDraggedRef.current = false;
+      setIsDragging(true);
+      dragStartRef.current = { 
+        x: e.clientX - panRef.current.x, 
+        y: e.clientY - panRef.current.y 
+      };
+    };
+    
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      
+      const dx = Math.abs(e.clientX - (dragStartRef.current.x + panRef.current.x));
+      const dy = Math.abs(e.clientY - (dragStartRef.current.y + panRef.current.y));
+      
+      if (dx > 5 || dy > 5) {
+        hasDraggedRef.current = true;
+      }
+      
+      const newPan = {
+        x: e.clientX - dragStartRef.current.x,
+        y: e.clientY - dragStartRef.current.y
+      };
+      setPan(newPan);
+    };
+    
+    const handlePointerUp = (e: PointerEvent) => {
+      if (container.hasPointerCapture(e.pointerId)) {
+        container.releasePointerCapture(e.pointerId);
+      }
+      isDraggingRef.current = false;
+      setIsDragging(false);
+      
+      // Reset hasDragged after a short delay to allow click handlers to check it
+      setTimeout(() => {
+        hasDraggedRef.current = false;
+      }, 50);
+    };
+    
+    container.addEventListener('pointerdown', handlePointerDown);
+    container.addEventListener('pointermove', handlePointerMove);
+    container.addEventListener('pointerup', handlePointerUp);
+    container.addEventListener('pointercancel', handlePointerUp);
+    container.addEventListener('pointerleave', handlePointerUp);
+    
+    return () => {
+      container.removeEventListener('pointerdown', handlePointerDown);
+      container.removeEventListener('pointermove', handlePointerMove);
+      container.removeEventListener('pointerup', handlePointerUp);
+      container.removeEventListener('pointercancel', handlePointerUp);
+      container.removeEventListener('pointerleave', handlePointerUp);
+    };
+  }, []);
   const { toast } = useToast();
 
   // Mutation to update match team assignments
@@ -754,98 +824,6 @@ export default function BracketView({ matches, teams, format, settings, tourname
     }
   };
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType === 'touch' && e.isPrimary === false) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setIsDragging(true);
-    hasDraggedRef.current = false;
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (isDragging) {
-      const dx = Math.abs(e.clientX - (dragStart.x + pan.x));
-      const dy = Math.abs(e.clientY - (dragStart.y + pan.y));
-      if (dx > 5 || dy > 5) {
-        hasDraggedRef.current = true;
-      }
-      setPan({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      });
-    }
-  };
-
-  const handlePointerUp = (e: React.PointerEvent) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    setIsDragging(false);
-    // Reset after a short delay to allow click handler to check
-    setTimeout(() => {
-      hasDraggedRef.current = false;
-    }, 100);
-  };
-
-  // Helper function to calculate distance between two touch points
-  const getTouchDistance = (touch1: React.Touch, touch2: React.Touch) => {
-    const dx = touch1.clientX - touch2.clientX;
-    const dy = touch1.clientY - touch2.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  };
-
-  // Touch event handlers for mobile support
-  const handleTouchStart = (e: React.TouchEvent) => {
-    // Prevent default to stop page scrolling on mobile
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      // Single touch for panning
-      const touch = e.touches[0];
-      setIsDragging(true);
-      hasDraggedRef.current = false;
-      setDragStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y });
-      // Reset pinch state
-      setInitialPinchDistance(null);
-    } else if (e.touches.length === 2) {
-      // Two fingers for pinch-to-zoom
-      setIsDragging(false);
-      const distance = getTouchDistance(e.touches[0], e.touches[1]);
-      setInitialPinchDistance(distance);
-      setInitialZoom(zoom);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    // Prevent default to stop page scrolling on mobile
-    e.preventDefault();
-    if (e.touches.length === 1 && isDragging) {
-      // Single touch for panning
-      const touch = e.touches[0];
-      const dx = Math.abs(touch.clientX - (dragStart.x + pan.x));
-      const dy = Math.abs(touch.clientY - (dragStart.y + pan.y));
-      if (dx > 5 || dy > 5) {
-        hasDraggedRef.current = true;
-      }
-      setPan({
-        x: touch.clientX - dragStart.x,
-        y: touch.clientY - dragStart.y
-      });
-    } else if (e.touches.length === 2 && initialPinchDistance !== null) {
-      // Two fingers for pinch-to-zoom
-      const currentDistance = getTouchDistance(e.touches[0], e.touches[1]);
-      const scale = currentDistance / initialPinchDistance;
-      const newZoom = Math.min(Math.max(0.3, initialZoom * scale), 3);
-      setZoom(newZoom);
-    }
-  };
-
-  const handleTouchEnd = () => {
-    setIsDragging(false);
-    setInitialPinchDistance(null);
-    // Reset after a short delay to allow click handler to check
-    setTimeout(() => {
-      hasDraggedRef.current = false;
-    }, 100);
-  };
-
   const resetView = () => {
     setZoom(0.5);
     setPan({ x: 0, y: 0 });
@@ -891,15 +869,6 @@ export default function BracketView({ matches, teams, format, settings, tourname
           touchAction: 'none'
         }}
         onWheel={handleWheel}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
       >
         <svg
           ref={svgRef}
