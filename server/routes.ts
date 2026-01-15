@@ -6224,8 +6224,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Team ID is required' });
       }
 
-      // Verify user is a member of the team
+      // Verify user is a member of the team and resolve tournament team to linked regular team
       let isMember = false;
+      let effectiveTeamId = teamId; // The team ID to use for the duty (may be different for tournament teams)
       
       // First check regular team membership
       const teamMembers = await storage.getTeamMembers(teamId);
@@ -6251,9 +6252,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isMember = !!participant;
           
           // Also check if the tournament team is linked to a regular team the user is on
-          if (!isMember && tournamentTeam.teamId) {
+          if (tournamentTeam.teamId) {
             const linkedTeamMembers = await storage.getTeamMembers(tournamentTeam.teamId);
-            isMember = linkedTeamMembers.some(member => member.userId === userId);
+            if (linkedTeamMembers.some(member => member.userId === userId)) {
+              isMember = true;
+            }
+            // Use the linked regular team ID for duty operations
+            effectiveTeamId = tournamentTeam.teamId;
           }
         }
       }
@@ -6262,13 +6267,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'You are not a member of this team' });
       }
 
-      // Attempt to claim the duty
+      // Attempt to claim the duty using the effective team ID (linked regular team for tournament teams)
       try {
         const assignment = await storage.claimDuty({
           dutyTemplateId,
           gameId,
           userId,
-          teamId,
+          teamId: effectiveTeamId,
         });
         
         res.json(assignment);
@@ -6295,8 +6300,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Team ID is required' });
       }
 
-      // Verify user is a member of the team
+      // Verify user is a member of the team and resolve tournament team to linked regular team
       let isMember = false;
+      let effectiveTeamId = teamId; // The team ID to use for the duty (may be different for tournament teams)
       
       // First check regular team membership
       const teamMembers = await storage.getTeamMembers(teamId);
@@ -6322,9 +6328,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isMember = !!participant;
           
           // Also check if the tournament team is linked to a regular team the user is on
-          if (!isMember && tournamentTeam.teamId) {
+          if (tournamentTeam.teamId) {
             const linkedTeamMembers = await storage.getTeamMembers(tournamentTeam.teamId);
-            isMember = linkedTeamMembers.some(member => member.userId === userId);
+            if (linkedTeamMembers.some(member => member.userId === userId)) {
+              isMember = true;
+            }
+            // Use the linked regular team ID for duty operations
+            effectiveTeamId = tournamentTeam.teamId;
           }
         }
       }
@@ -6333,7 +6343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'You are not a member of this team' });
       }
 
-      await storage.releaseDuty(dutyTemplateId, gameId, teamId);
+      await storage.releaseDuty(dutyTemplateId, gameId, effectiveTeamId);
       res.json({ success: true });
     } catch (error) {
       console.error('Error releasing duty:', error);
