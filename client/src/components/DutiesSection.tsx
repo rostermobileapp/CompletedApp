@@ -202,8 +202,10 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
     },
   });
 
-  const getAssignment = (dutyTemplateId: string) => {
-    return dutyAssignments.find((a: any) => a.dutyTemplateId === dutyTemplateId && a.teamId === teamId);
+  const getAssignment = (dutyTemplateId: string, template: any) => {
+    // Match by duty template ID and the template's actual team ID (handles tournament team -> regular team mapping)
+    // The template.teamId is always the regular team ID since the backend resolves tournament teams
+    return dutyAssignments.find((a: any) => a.dutyTemplateId === dutyTemplateId && a.teamId === template.teamId);
   };
 
   const handleEdit = (template: any) => {
@@ -257,7 +259,7 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
 
       <div className="space-y-2">
         {dutyTemplates.map((template: any) => {
-          const assignment = getAssignment(template.id);
+          const assignment = getAssignment(template.id, template);
           const isClaimed = !!assignment;
           const isClaimedByMe = assignment?.userId === userId;
 

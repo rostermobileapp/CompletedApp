@@ -6172,7 +6172,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/games/:gameId/teams/:teamId/duties', async (req: any, res) => {
     try {
       const { gameId, teamId } = req.params;
-      const templates = await storage.getDutyTemplatesForGame(teamId, gameId);
+      
+      // Resolve tournament team ID to linked regular team ID if applicable
+      let effectiveTeamId = teamId;
+      const [tournamentTeam] = await db
+        .select()
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.id, teamId));
+      
+      if (tournamentTeam && tournamentTeam.teamId) {
+        effectiveTeamId = tournamentTeam.teamId;
+      }
+      
+      const templates = await storage.getDutyTemplatesForGame(effectiveTeamId, gameId);
       res.json(templates);
     } catch (error) {
       console.error('Error fetching duty templates for game:', error);
