@@ -26,13 +26,13 @@ export default function BracketView({ matches, teams, format, settings, tourname
   const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [hasDragged, setHasDragged] = useState(false); // Track if actual drag movement occurred
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
   const [initialZoom, setInitialZoom] = useState<number>(0.5);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const hasDraggedRef = useRef(false); // Use ref to track drag movement for immediate access
   const { toast } = useToast();
 
   // Mutation to update match team assignments
@@ -496,7 +496,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
             className={`h-full bg-card ${borderColor} border-[4px] cursor-pointer hover:opacity-90 transition-opacity relative group`} 
             data-testid={`card-match-${match.matchNumber}`}
             onClick={() => {
-              if (!hasDragged) {
+              if (!hasDraggedRef.current) {
                 setSelectedMatchId(match.id);
               }
             }}
@@ -754,18 +754,20 @@ export default function BracketView({ matches, teams, format, settings, tourname
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch' && e.isPrimary === false) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
-    setHasDragged(false);
+    hasDraggedRef.current = false;
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (isDragging) {
       const dx = Math.abs(e.clientX - (dragStart.x + pan.x));
       const dy = Math.abs(e.clientY - (dragStart.y + pan.y));
       if (dx > 5 || dy > 5) {
-        setHasDragged(true);
+        hasDraggedRef.current = true;
       }
       setPan({
         x: e.clientX - dragStart.x,
@@ -774,8 +776,13 @@ export default function BracketView({ matches, teams, format, settings, tourname
     }
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = (e: React.PointerEvent) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
     setIsDragging(false);
+    // Reset after a short delay to allow click handler to check
+    setTimeout(() => {
+      hasDraggedRef.current = false;
+    }, 100);
   };
 
   // Helper function to calculate distance between two touch points
@@ -793,7 +800,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
       // Single touch for panning
       const touch = e.touches[0];
       setIsDragging(true);
-      setHasDragged(false);
+      hasDraggedRef.current = false;
       setDragStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y });
       // Reset pinch state
       setInitialPinchDistance(null);
@@ -815,7 +822,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
       const dx = Math.abs(touch.clientX - (dragStart.x + pan.x));
       const dy = Math.abs(touch.clientY - (dragStart.y + pan.y));
       if (dx > 5 || dy > 5) {
-        setHasDragged(true);
+        hasDraggedRef.current = true;
       }
       setPan({
         x: touch.clientX - dragStart.x,
@@ -833,6 +840,10 @@ export default function BracketView({ matches, teams, format, settings, tourname
   const handleTouchEnd = () => {
     setIsDragging(false);
     setInitialPinchDistance(null);
+    // Reset after a short delay to allow click handler to check
+    setTimeout(() => {
+      hasDraggedRef.current = false;
+    }, 100);
   };
 
   const resetView = () => {
@@ -880,10 +891,11 @@ export default function BracketView({ matches, teams, format, settings, tourname
           touchAction: 'none'
         }}
         onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -897,7 +909,9 @@ export default function BracketView({ matches, teams, format, settings, tourname
           preserveAspectRatio="xMidYMid meet"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px)`,
-            transition: isDragging ? 'none' : 'transform 0.1s'
+            transition: isDragging ? 'none' : 'transform 0.1s',
+            pointerEvents: isDragging ? 'none' : 'auto',
+            userSelect: 'none'
           }}
         >
           {/* Arrow marker definitions */}
