@@ -98,7 +98,11 @@ export default function TeamView() {
               size="sm"
               onClick={() => {
                 setPageTransitionDirection('down');
-                window.history.back();
+                if (window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  navigate('/');
+                }
               }}
               className="p-2"
               data-testid="button-back"
@@ -127,7 +131,11 @@ export default function TeamView() {
               size="sm"
               onClick={() => {
                 setPageTransitionDirection('down');
-                window.history.back();
+                if (window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  navigate('/');
+                }
               }}
               className="p-2"
               data-testid="button-back"
