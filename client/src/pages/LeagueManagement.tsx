@@ -288,6 +288,7 @@ const createGameSchema = z.object({
   awayTeamId: z.string().min(1, 'Away team is required'),
   scheduledAt: z.string().min(1, 'Game date and time is required'),
   venue: z.string().optional(),
+  isScrimmage: z.boolean().default(false),
 });
 
 type CreateGameForm = z.infer<typeof createGameSchema>;
@@ -891,6 +892,7 @@ export default function LeagueManagement() {
       awayTeamId: '',
       scheduledAt: '',
       venue: '',
+      isScrimmage: false,
     },
   });
 
@@ -3077,6 +3079,35 @@ export default function LeagueManagement() {
               {showScheduleGame && teams.length >= 2 && (
                 <div className="mb-6 p-4 bg-background rounded-lg border">
                   <form onSubmit={gameForm.handleSubmit((data) => createGameMutation.mutate(data))} className="space-y-4">
+                    {/* Game/Scrimmage Toggle */}
+                    <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => gameForm.setValue('isScrimmage', false)}
+                        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                          !gameForm.watch('isScrimmage')
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                        data-testid="button-game-type"
+                      >
+                        Game
+                        <span className="block text-xs font-normal opacity-70">Counts for standings</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => gameForm.setValue('isScrimmage', true)}
+                        className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                          gameForm.watch('isScrimmage')
+                            ? 'bg-orange-500 text-white shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                        data-testid="button-scrimmage-type"
+                      >
+                        Scrimmage
+                        <span className="block text-xs font-normal opacity-70">No stats/standings</span>
+                      </button>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium mb-2">Home Team</label>
@@ -3130,7 +3161,7 @@ export default function LeagueManagement() {
                         className="px-4 py-2 bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
                         data-testid="button-submit-game"
                       >
-                        {createGameMutation.isPending ? 'Scheduling...' : 'Schedule Game'}
+                        {createGameMutation.isPending ? 'Scheduling...' : (gameForm.watch('isScrimmage') ? 'Schedule Scrimmage' : 'Schedule Game')}
                       </button>
                       <button
                         type="button"

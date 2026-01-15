@@ -425,6 +425,7 @@ export const games = pgTable("games", {
   homeScore: integer("home_score"),
   awayScore: integer("away_score"),
   isCompleted: boolean("is_completed").default(false).notNull(),
+  isScrimmage: boolean("is_scrimmage").default(false).notNull(), // True if scrimmage (doesn't count for standings/stats)
   homeBeverageDutyUserId: varchar("home_beverage_duty_user_id").references(() => users.id),
   homeBeverageDutyClaimedAt: timestamp("home_beverage_duty_claimed_at"),
   awayBeverageDutyUserId: varchar("away_beverage_duty_user_id").references(() => users.id),
