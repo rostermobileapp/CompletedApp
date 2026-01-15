@@ -1483,29 +1483,31 @@ export default function TournamentDetail() {
                 </div>
               </div>
               
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {tournament.status === 'draft' && (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
-                      data-testid="button-edit"
-                    >
-                      Edit Settings
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => setShowDeleteDialog(true)}
-                      data-testid="button-delete"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  </>
-                )}
-              </div>
+              {!isReadOnlyMode && (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {tournament.status === 'draft' && (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
+                        data-testid="button-edit"
+                      >
+                        Edit Settings
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => setShowDeleteDialog(true)}
+                        data-testid="button-delete"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Description - Optional Second Line */}
@@ -1517,8 +1519,8 @@ export default function TournamentDetail() {
           </div>
         </div>
       </div>
-      {/* Payment Status Section - Commissioner Only */}
-      {tournament && canManageTournament() && (
+      {/* Payment Status Section - Commissioner Only (not in readonly mode) */}
+      {tournament && canManageTournament() && !isReadOnlyMode && (
         <div className="max-w-7xl mx-auto px-4 md:px-8 pb-4 md:pb-6">
           <Card className={tournament.paymentStatus === 'paid' ? 'border-green-500/50' : 'border-amber-500/50'}>
             <CardContent className="p-4 md:p-6 pt-[4px] pb-[4px]">
@@ -1630,7 +1632,7 @@ export default function TournamentDetail() {
              (tournament.status === 'draft' && ['single_elimination', 'double_elimination', 'three_game_guarantee', 'round_robin_split'].includes(tournament.format)) ? (
               <div className="space-y-6">
                 {/* Round Robin + Playoffs Seeding Button */}
-                {tournament.format === 'round_robin_split' && (() => {
+                {!isReadOnlyMode && tournament.format === 'round_robin_split' && (() => {
                   const roundRobinMatches = (matches || []).filter(m => m.round === 'Round Robin');
                   const playoffMatches = (matches || []).filter(m => m.round !== 'Round Robin');
                   const playoffsSeeded = playoffMatches.some(m => m.team1Id !== null && m.team2Id !== null);
@@ -1687,41 +1689,43 @@ export default function TournamentDetail() {
                           {isBracketLocked && !isEditingBracket ? 'Your custom tournament structure is locked' : 'Design your own tournament bracket structure'}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2 flex-wrap">
-                        {!isReadOnlyMode && tournament.status === 'draft' && isBracketLocked && !isEditingBracket && (
-                          <Button
-                            onClick={() => setIsEditingBracket(true)}
-                            data-testid="button-unlock-bracket"
-                            variant="outline"
-                            className="gap-2"
-                          >
-                            <Edit className="h-4 w-4" />
-                            Edit Bracket
-                          </Button>
-                        )}
-                        {tournament.leagueId && (
-                          <Button
-                            onClick={() => toggleVisibilityMutation.mutate(!tournament.isVisibleToLeague)}
-                            variant={tournament.isVisibleToLeague ? "default" : "outline"}
-                            size="sm"
-                            className="gap-2"
-                            disabled={toggleVisibilityMutation.isPending}
-                            data-testid="button-toggle-visibility-custom"
-                          >
-                            {tournament.isVisibleToLeague ? (
-                              <>
-                                <EyeOff className="h-4 w-4" />
-                                Hide from League
-                              </>
-                            ) : (
-                              <>
-                                <Eye className="h-4 w-4" />
-                                Make Visible to League
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </div>
+                      {!isReadOnlyMode && (
+                        <div className="flex gap-2 flex-wrap">
+                          {tournament.status === 'draft' && isBracketLocked && !isEditingBracket && (
+                            <Button
+                              onClick={() => setIsEditingBracket(true)}
+                              data-testid="button-unlock-bracket"
+                              variant="outline"
+                              className="gap-2"
+                            >
+                              <Edit className="h-4 w-4" />
+                              Edit Bracket
+                            </Button>
+                          )}
+                          {tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
+                            <Button
+                              onClick={() => toggleVisibilityMutation.mutate(!tournament.isVisibleToLeague)}
+                              variant={tournament.isVisibleToLeague ? "default" : "outline"}
+                              size="sm"
+                              className="gap-2"
+                              disabled={toggleVisibilityMutation.isPending}
+                              data-testid="button-toggle-visibility-custom"
+                            >
+                              {tournament.isVisibleToLeague ? (
+                                <>
+                                  <EyeOff className="h-4 w-4" />
+                                  Hide from League
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="h-4 w-4" />
+                                  Make Visible to League
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </CardHeader>
                     <CardContent className="p-0">
                       <CustomBracketBuilder
@@ -1876,7 +1880,7 @@ export default function TournamentDetail() {
                               )}
                             </CardDescription>
                           </div>
-                          {!isReadOnlyMode && (
+                          {!isReadOnlyMode && canManageTournament() && (
                             <div className="flex gap-2">
                               {tournament.status === 'draft' && (
                                 <Button
@@ -1923,7 +1927,7 @@ export default function TournamentDetail() {
                             settings={tournament.settings as TournamentSettings | undefined}
                             tournamentName={tournament.name}
                             tournamentId={tournamentId || ''}
-                            isCommissioner={!isReadOnlyMode && tournament.leagueId ? canManageLeagueSpecific(tournament.leagueId) : false}
+                            isCommissioner={!isReadOnlyMode && canManageTournament()}
                             tournamentType={tournament.type}
                           />
                         </CardContent>

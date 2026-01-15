@@ -776,6 +776,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
 
   // Touch event handlers for mobile support
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Prevent default to stop page scrolling on mobile
+    e.preventDefault();
     if (e.touches.length === 1) {
       // Single touch for panning
       const touch = e.touches[0];
@@ -793,6 +795,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    // Prevent default to stop page scrolling on mobile
+    e.preventDefault();
     if (e.touches.length === 1 && isDragging) {
       // Single touch for panning
       const touch = e.touches[0];
