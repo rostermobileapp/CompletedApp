@@ -41,14 +41,11 @@ export default function BracketView({ matches, teams, format, settings, tourname
     panRef.current = pan;
   }, [pan]);
   
-  const overlayRef = useRef<HTMLDivElement>(null);
-  
-  // Native pointer event handlers using useEffect for reliable event capture
-  // Listen on container for pointerdown, but use overlay for capture during drag
+  // Native pointer event handlers on SVG with capture mode
+  // This intercepts events from foreignObject children before they bubble
   useEffect(() => {
-    const container = containerRef.current;
-    const overlay = overlayRef.current;
-    if (!container || !overlay) return;
+    const svg = svgRef.current;
+    if (!svg) return;
     
     const handlePointerDown = (e: PointerEvent) => {
       // Only initiate drag if clicking on empty space (not on interactive elements)
@@ -59,8 +56,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
       
       if (e.pointerType === 'touch' && !(e as any).isPrimary) return;
       
-      // Set pointer capture on overlay for move/up events
-      overlay.setPointerCapture(e.pointerId);
+      // Set pointer capture on SVG for move/up events
+      svg.setPointerCapture(e.pointerId);
       isDraggingRef.current = true;
       hasDraggedRef.current = false;
       setIsDragging(true);
@@ -88,8 +85,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
     };
     
     const handlePointerUp = (e: PointerEvent) => {
-      if (overlay.hasPointerCapture(e.pointerId)) {
-        overlay.releasePointerCapture(e.pointerId);
+      if (svg.hasPointerCapture(e.pointerId)) {
+        svg.releasePointerCapture(e.pointerId);
       }
       isDraggingRef.current = false;
       setIsDragging(false);
@@ -100,18 +97,17 @@ export default function BracketView({ matches, teams, format, settings, tourname
       }, 50);
     };
     
-    // Listen for pointerdown on container (includes SVG and its children)
-    container.addEventListener('pointerdown', handlePointerDown);
-    // Listen for move/up on overlay (which gets pointer capture during drag)
-    overlay.addEventListener('pointermove', handlePointerMove);
-    overlay.addEventListener('pointerup', handlePointerUp);
-    overlay.addEventListener('pointercancel', handlePointerUp);
+    // Use capture: true to intercept events before they reach foreignObject children
+    svg.addEventListener('pointerdown', handlePointerDown, { capture: true });
+    svg.addEventListener('pointermove', handlePointerMove, { capture: true });
+    svg.addEventListener('pointerup', handlePointerUp, { capture: true });
+    svg.addEventListener('pointercancel', handlePointerUp, { capture: true });
     
     return () => {
-      container.removeEventListener('pointerdown', handlePointerDown);
-      overlay.removeEventListener('pointermove', handlePointerMove);
-      overlay.removeEventListener('pointerup', handlePointerUp);
-      overlay.removeEventListener('pointercancel', handlePointerUp);
+      svg.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+      svg.removeEventListener('pointermove', handlePointerMove, { capture: true });
+      svg.removeEventListener('pointerup', handlePointerUp, { capture: true });
+      svg.removeEventListener('pointercancel', handlePointerUp, { capture: true });
     };
   }, []);
   const { toast } = useToast();
@@ -873,7 +869,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
       {/* Bracket Container */}
       <div
         ref={containerRef}
-        className="overflow-hidden border rounded-lg bg-muted/20 relative"
+        className="overflow-hidden border rounded-lg bg-muted/20"
         style={{ 
           height: '70vh',
           touchAction: 'none',
@@ -881,20 +877,6 @@ export default function BracketView({ matches, teams, format, settings, tourname
         }}
         onWheel={handleWheel}
       >
-        {/* Invisible overlay for pointer capture during drag */}
-        <div
-          ref={overlayRef}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: isDragging ? 100 : -1,
-            background: 'transparent',
-            pointerEvents: isDragging ? 'auto' : 'none'
-          }}
-        />
         <svg
           ref={svgRef}
           width={svgWidth * zoom}
