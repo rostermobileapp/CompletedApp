@@ -745,7 +745,7 @@ export default function GameDetails() {
         )}
 
         {/* Custom Duties Section - Away Team */}
-        {!isGameCompleted && isUserOnAwayTeam && (
+        {!isGameCompleted && isUserOnAwayTeam && game.awayTeam && (
           <DutiesSection 
             gameId={game.id}
             teamId={game.awayTeam.id}
