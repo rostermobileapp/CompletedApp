@@ -14716,11 +14716,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(users, eq(teamEventRsvps.userId, users.id))
         .where(eq(teamEventRsvps.teamEventId, id));
       
+      // Get team info
+      const [team] = await db
+        .select({
+          id: teams.id,
+          name: teams.name,
+          captainId: teams.captainId,
+        })
+        .from(teams)
+        .where(eq(teams.id, teamEvent.teamId));
+      
+      // Get all team members for the roster view
+      const teamMembers = await db
+        .select({
+          userId: teamMemberships.userId,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+          isCaptain: teamMemberships.isCaptain,
+        })
+        .from(teamMemberships)
+        .innerJoin(users, eq(teamMemberships.userId, users.id))
+        .where(and(
+          eq(teamMemberships.teamId, teamEvent.teamId),
+          eq(teamMemberships.status, 'approved')
+        ));
+      
+      // Check if current user is captain
+      const isCaptain = membership.isCaptain || team?.captainId === userId;
+      
       res.json({
         ...teamEvent,
         scheduledAt: formatDateAsLocalString(teamEvent.scheduledAt),
         endTime: teamEvent.endTime ? formatDateAsLocalString(teamEvent.endTime) : null,
         rsvps,
+        team,
+        teamMembers,
+        isCaptain,
+        userRsvp: rsvps.find(r => r.userId === userId) || null,
       });
     } catch (error) {
       console.error("Error fetching team event:", error);

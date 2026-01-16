@@ -66,6 +66,7 @@ import LeagueTournamentSearch from "@/pages/LeagueTournamentSearch";
 import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 import MediaGalleryPage from "@/pages/MediaGallery";
 import TeamView from "@/pages/TeamView";
+import TeamEventDetails from "@/pages/TeamEventDetails";
 
 function LoadingScreen() {
   return (
@@ -185,6 +186,7 @@ function Router() {
               <Route path="/calendar" component={Calendar} />
               <Route path="/game/:id" component={GameDetails} />
               <Route path="/scrimmage/:id" component={GameDetails} />
+              <Route path="/team-event/:id" component={TeamEventDetails} />
               <Route path="/team/:id" component={TeamView} />
               <Route path="/announcements" component={Announcements} />
               <Route path="/substitute-confirmations" component={SubstituteConfirmations} />

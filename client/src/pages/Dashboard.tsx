@@ -2725,11 +2725,12 @@ export default function Dashboard() {
               .map((event: any) => (
                 <div 
                   key={`team-event-${event.id}`}
-                  className={`rounded-xl border p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${
+                  className={`rounded-xl border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${
                     event.eventType === 'scrimmage' 
                       ? 'border-orange-200 dark:border-orange-800' 
                       : 'border-blue-200 dark:border-blue-800'
                   }`}
+                  onClick={() => navigate(`/team-event/${event.id}`)}
                   data-testid={`card-team-event-${event.id}`}
                 >
                   <div className="flex items-center gap-4">
@@ -2847,7 +2848,7 @@ export default function Dashboard() {
               <div 
                 key={game.id} 
                 className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
-                onClick={() => navigate(game.isScrimmage ? `/scrimmage/${game.id}` : `/game/${game.id}`)}
+                onClick={() => navigate(`/game/${game.id}`)}
                 data-testid={`card-game-${game.id}`}
               >
                 <div className="flex items-center gap-4 bg-[212121]">
@@ -2879,13 +2880,25 @@ export default function Dashboard() {
                           `vs ${game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}`
                         )}
                       </h3>
+                      {game.isScrimmage && (
+                        <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-scrimmage-${game.id}`}>
+                          Scrimmage
+                        </span>
+                      )}
+                      {!game.isScrimmage && !game.isTournamentMatch && (
+                        <span className="text-xs bg-primary text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-game-${game.id}`}>
+                          Game
+                        </span>
+                      )}
                       {game.isSubstitute === true && (
-                        <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-sub-${game.id}`}>
+                        <span className="text-xs bg-yellow-500 text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-sub-${game.id}`}>
                           SUB
                         </span>
                       )}
                       {game.isTournamentMatch && (
-                        <Trophy className="w-4 h-4 text-[#ffd700]" data-testid={`badge-tournament-${game.id}`} />
+                        <span className="text-xs bg-[#ffd700] text-black px-2 py-0.5 rounded font-medium" data-testid={`badge-tournament-${game.id}`}>
+                          Playoff
+                        </span>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
