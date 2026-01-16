@@ -2953,13 +2953,13 @@ export default function Dashboard() {
                 setEventType('reminder');
                 setShowAddEventDialog(false);
               }}
-              variant="outline"
-              className="w-full h-auto py-4 px-6 justify-start text-left"
+              className="w-full max-w-full h-auto py-4 px-6 justify-start text-left text-white hover:opacity-90"
+              style={{ backgroundColor: '#212121' }}
               data-testid="button-select-reminder"
             >
               <div>
                 <div className="font-semibold">Personal Reminder</div>
-                <div className="text-sm text-muted-foreground">Add a personal note or reminder to your calendar</div>
+                <div className="text-sm text-gray-300">Add a personal note or reminder to your calendar</div>
               </div>
             </Button>
             {canScheduleGames && (
@@ -2968,13 +2968,13 @@ export default function Dashboard() {
                   setEventType('game');
                   setShowAddEventDialog(false);
                 }}
-                variant="outline"
-                className="w-full h-auto py-4 px-6 justify-start text-left"
+                className="w-full max-w-full h-auto py-4 px-6 justify-start text-left text-white hover:opacity-90"
+                style={{ backgroundColor: '#212121' }}
                 data-testid="button-select-game"
               >
                 <div>
                   <div className="font-semibold">Team Game</div>
-                  <div className="text-sm text-muted-foreground">Schedule a game for your team</div>
+                  <div className="text-sm text-gray-300">Schedule a game for your team</div>
                 </div>
               </Button>
             )}
@@ -2984,13 +2984,13 @@ export default function Dashboard() {
                   setEventType('generalEvent');
                   setShowAddEventDialog(false);
                 }}
-                variant="outline"
-                className="w-full h-auto py-4 px-6 justify-start text-left"
+                className="w-full max-w-full h-auto py-4 px-6 justify-start text-left text-white hover:opacity-90"
+                style={{ backgroundColor: '#212121' }}
                 data-testid="button-select-general-event"
               >
                 <div>
                   <div className="font-semibold">General Event</div>
-                  <div className="text-sm text-muted-foreground">Schedule a team party, meeting, or other event</div>
+                  <div className="text-sm text-gray-300">Schedule a team party, meeting, or other event</div>
                 </div>
               </Button>
             )}
@@ -3000,13 +3000,13 @@ export default function Dashboard() {
                   setEventType('scrimmage');
                   setShowAddEventDialog(false);
                 }}
-                variant="outline"
-                className="w-full h-auto py-4 px-6 justify-start text-left"
+                className="w-full max-w-full h-auto py-4 px-6 justify-start text-left text-white hover:opacity-90"
+                style={{ backgroundColor: '#212121' }}
                 data-testid="button-select-scrimmage"
               >
                 <div>
                   <div className="font-semibold">Scrimmage</div>
-                  <div className="text-sm text-muted-foreground">Schedule a practice scrimmage (internal or vs another team)</div>
+                  <div className="text-sm text-gray-300">Schedule a practice scrimmage (internal or vs another team)</div>
                 </div>
               </Button>
             )}
