@@ -2953,7 +2953,7 @@ export default function Dashboard() {
                 setEventType('reminder');
                 setShowAddEventDialog(false);
               }}
-              className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
+              className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-blue-600 bg-blue-500"
               data-testid="button-select-reminder"
             >
               <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
@@ -2967,7 +2967,7 @@ export default function Dashboard() {
                   setEventType('game');
                   setShowAddEventDialog(false);
                 }}
-                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
+                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-blue-600 bg-blue-500"
                 data-testid="button-select-game"
               >
                 <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
@@ -2982,7 +2982,7 @@ export default function Dashboard() {
                   setEventType('generalEvent');
                   setShowAddEventDialog(false);
                 }}
-                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
+                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-blue-600 bg-blue-500"
                 data-testid="button-select-general-event"
               >
                 <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
@@ -2997,7 +2997,7 @@ export default function Dashboard() {
                   setEventType('scrimmage');
                   setShowAddEventDialog(false);
                 }}
-                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
+                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-blue-600 bg-blue-500"
                 data-testid="button-select-scrimmage"
               >
                 <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
