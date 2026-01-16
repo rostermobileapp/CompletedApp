@@ -4373,7 +4373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return {
           ...formatted,
           isSubstitute,
-          isScrimmage: false
+          isScrimmage: game.isScrimmage || false
         };
       });
       
