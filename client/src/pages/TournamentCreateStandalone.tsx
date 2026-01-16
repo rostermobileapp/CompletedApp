@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, ArrowRight, CheckCircle, Trophy, Users, Info, Upload, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, Trophy, Users, Info, Upload, Plus, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -449,6 +449,26 @@ export default function TournamentCreateStandalone() {
     form.setValue('teams', updatedTeams);
   };
 
+  const downloadCsvTemplate = () => {
+    const headers = ['Team Name*', 'Player Full Name', 'Email', 'Phone Number', 'Jersey #', 'Position', 'Skill Level', 'Player Type'];
+    const exampleRows = [
+      ['Team Alpha', 'John Smith', 'john@example.com', '555-123-4567', '10', 'Forward', 'Intermediate', 'Skater'],
+      ['Team Alpha', 'Jane Doe', 'jane@example.com', '555-234-5678', '1', 'Goalie', 'Advanced', 'Goalie'],
+      ['Team Beta', 'Mike Johnson', 'mike@example.com', '555-345-6789', '22', 'Defense', 'Beginner', 'Skater'],
+    ];
+    
+    const csvContent = [headers, ...exampleRows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tournament-teams-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
@@ -797,17 +817,28 @@ export default function TournamentCreateStandalone() {
                             id="csv-upload"
                             data-testid="input-csv-upload"
                           />
-                          <label htmlFor="csv-upload">
+                          <div className="flex flex-wrap gap-2">
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() => document.getElementById('csv-upload')?.click()}
-                              data-testid="button-csv-upload"
+                              onClick={downloadCsvTemplate}
+                              data-testid="button-download-template"
                             >
-                              <Upload className="h-4 w-4 mr-2" />
-                              Upload CSV
+                              <Download className="h-4 w-4 mr-2" />
+                              Download Template
                             </Button>
-                          </label>
+                            <label htmlFor="csv-upload">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => document.getElementById('csv-upload')?.click()}
+                                data-testid="button-csv-upload"
+                              >
+                                <Upload className="h-4 w-4 mr-2" />
+                                Upload CSV
+                              </Button>
+                            </label>
+                          </div>
                         </div>
 
                         {/* Manual Team Entry */}
