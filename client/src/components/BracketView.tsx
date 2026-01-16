@@ -727,25 +727,40 @@ export default function BracketView({ matches, teams, format, settings, tourname
     setZoom(0.5);
   };
 
+  // Calculate effective dimensions - ensure minimum size for scrolling
+  const effectiveWidth = Math.max(svgWidth * zoom + 100, 1200);
+  const effectiveHeight = Math.max(svgHeight * zoom + 100, 800);
+  
+  console.log('🔍 BracketView Dimensions:', { 
+    svgWidth, 
+    svgHeight, 
+    zoom, 
+    effectiveWidth, 
+    effectiveHeight,
+    matchCount: matches.length 
+  });
+
   return (
-    <div className="relative">
-      {/* Controls */}
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
+    <div className="relative" style={{ overflow: 'visible' }}>
+      {/* Controls - positioned at top with better visibility */}
+      <div className="flex gap-2 mb-3 justify-end">
         <Button
           size="sm"
-          variant="outline"
+          variant="default"
           onClick={() => setZoom(prev => Math.min(prev + 0.2, 3))}
           data-testid="button-zoom-in"
         >
-          <ZoomIn className="h-4 w-4" />
+          <ZoomIn className="h-4 w-4 mr-1" />
+          Zoom In
         </Button>
         <Button
           size="sm"
-          variant="outline"
+          variant="default"
           onClick={() => setZoom(prev => Math.max(prev - 0.2, 0.3))}
           data-testid="button-zoom-out"
         >
-          <ZoomOut className="h-4 w-4" />
+          <ZoomOut className="h-4 w-4 mr-1" />
+          Zoom Out
         </Button>
         <Button
           size="sm"
@@ -753,26 +768,30 @@ export default function BracketView({ matches, teams, format, settings, tourname
           onClick={resetZoom}
           data-testid="button-reset-view"
         >
-          <Maximize2 className="h-4 w-4" />
+          <Maximize2 className="h-4 w-4 mr-1" />
+          Reset
         </Button>
       </div>
 
       {/* Bracket Container - scrollable with standard scrollbars */}
       <div
         ref={containerRef}
-        className="overflow-auto border rounded-lg bg-muted/20"
+        className="border rounded-lg bg-muted/20"
         style={{ 
-          height: '70vh'
+          height: '70vh',
+          overflowX: 'auto',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
         }}
       >
         {/* Inner container with actual bracket size */}
         <div 
           className="relative"
           style={{
-            width: svgWidth * zoom + 100,
-            height: svgHeight * zoom + 100,
-            minWidth: '100%',
-            minHeight: '100%'
+            width: effectiveWidth,
+            height: effectiveHeight,
+            minWidth: effectiveWidth,
+            minHeight: effectiveHeight
           }}
         >
           {/* SVG for connections only - pointer-events: none so clicks go through */}
@@ -780,8 +799,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
             ref={svgRef}
             className="absolute inset-0 pointer-events-none"
             style={{
-              width: svgWidth * zoom + 100,
-              height: svgHeight * zoom + 100
+              width: effectiveWidth,
+              height: effectiveHeight
             }}
           >
             {/* Arrow marker definitions */}
