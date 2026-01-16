@@ -521,101 +521,109 @@ export function CustomBracketBuilder({
 
   return (
     <div className={containerClass}>
-      {/* Toolbar - hidden when locked in embeddable mode */}
-      {!locked && (
-        <div className="border-b bg-card p-4 flex items-center gap-4 flex-wrap">
-          <Button
-            onClick={() => addMatchup('standard')}
-            variant="default"
-            className="gap-2"
-            data-testid="button-add-matchup"
-          >
-            <Plus className="h-4 w-4" />
-            Matchup
-          </Button>
-          <Button
-            onClick={() => addMatchup('losers')}
-            variant="destructive"
-            className="gap-2"
-            data-testid="button-add-losers-matchup"
-          >
-            <Plus className="h-4 w-4" />
-            Losers Matchup
-          </Button>
-          <div className="h-6 w-px bg-border" />
-          <Button
-            onClick={handleZoomIn}
-            variant="outline"
-            size="icon"
-            data-testid="button-zoom-in"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button
-            onClick={handleZoomOut}
-            variant="outline"
-            size="icon"
-            data-testid="button-zoom-out"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <span className="text-sm text-muted-foreground">{Math.round(zoom * 100)}%</span>
-          <div className="h-6 w-px bg-border" />
-          <Button
-            onClick={() => setShowGrid(!showGrid)}
-            variant={showGrid ? "default" : "outline"}
-            size="icon"
-            data-testid="button-toggle-grid"
-          >
-            <Grid3x3 className="h-4 w-4" />
-          </Button>
-          {!embeddable && (
-            <>
-              <div className="h-6 w-px bg-border" />
-              <Button
-                onClick={saveBracket}
-                variant="outline"
-                className="gap-2"
-                data-testid="button-save"
-              >
-                <Save className="h-4 w-4" />
-                Save
-              </Button>
-              <Button
-                onClick={loadBracket}
-                variant="outline"
-                className="gap-2"
-                data-testid="button-load"
-              >
-                <Download className="h-4 w-4" />
-                Load
-              </Button>
-            </>
-          )}
-          <div className="h-6 w-px bg-border" />
-          <Button
-            onClick={embeddable ? saveBracket : handleGenerateMatches}
-            variant="default"
-            className="gap-2"
-            data-testid={embeddable ? "button-save-lock" : "button-generate-matches"}
-            disabled={matchups.length === 0 || isGenerating || isSaving}
-          >
-            <Check className="h-4 w-4" />
-            {embeddable 
-              ? (isSaving ? "Saving..." : "Save & Lock Bracket")
-              : (isGenerating ? "Generating..." : "Generate Matches")
-            }
-          </Button>
-          <div className="ml-auto text-sm text-muted-foreground">
-            {matchups.length} matchup{matchups.length !== 1 ? 's' : ''}
-          </div>
-        </div>
-      )}
+      {/* Zoom controls - always visible (even when locked) */}
+      <div className="border-b bg-card p-3 flex items-center gap-3">
+        <Button
+          onClick={handleZoomIn}
+          variant="default"
+          size="sm"
+          className="gap-2"
+          data-testid="button-zoom-in"
+        >
+          <ZoomIn className="h-4 w-4" />
+          Zoom In
+        </Button>
+        <Button
+          onClick={handleZoomOut}
+          variant="default"
+          size="sm"
+          className="gap-2"
+          data-testid="button-zoom-out"
+        >
+          <ZoomOut className="h-4 w-4" />
+          Zoom Out
+        </Button>
+        <span className="text-sm text-muted-foreground">{Math.round(zoom * 100)}%</span>
+        
+        {/* Additional editing controls - only when not locked */}
+        {!locked && (
+          <>
+            <div className="h-6 w-px bg-border" />
+            <Button
+              onClick={() => addMatchup('standard')}
+              variant="default"
+              className="gap-2"
+              data-testid="button-add-matchup"
+            >
+              <Plus className="h-4 w-4" />
+              Matchup
+            </Button>
+            <Button
+              onClick={() => addMatchup('losers')}
+              variant="destructive"
+              className="gap-2"
+              data-testid="button-add-losers-matchup"
+            >
+              <Plus className="h-4 w-4" />
+              Losers Matchup
+            </Button>
+            <div className="h-6 w-px bg-border" />
+            <Button
+              onClick={() => setShowGrid(!showGrid)}
+              variant={showGrid ? "default" : "outline"}
+              size="icon"
+              data-testid="button-toggle-grid"
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </Button>
+            {!embeddable && (
+              <>
+                <div className="h-6 w-px bg-border" />
+                <Button
+                  onClick={saveBracket}
+                  variant="outline"
+                  className="gap-2"
+                  data-testid="button-save"
+                >
+                  <Save className="h-4 w-4" />
+                  Save
+                </Button>
+                <Button
+                  onClick={loadBracket}
+                  variant="outline"
+                  className="gap-2"
+                  data-testid="button-load"
+                >
+                  <Download className="h-4 w-4" />
+                  Load
+                </Button>
+              </>
+            )}
+            <div className="h-6 w-px bg-border" />
+            <Button
+              onClick={embeddable ? saveBracket : handleGenerateMatches}
+              variant="default"
+              className="gap-2"
+              data-testid={embeddable ? "button-save-lock" : "button-generate-matches"}
+              disabled={matchups.length === 0 || isGenerating || isSaving}
+            >
+              <Check className="h-4 w-4" />
+              {embeddable 
+                ? (isSaving ? "Saving..." : "Save & Lock Bracket")
+                : (isGenerating ? "Generating..." : "Generate Matches")
+              }
+            </Button>
+            <div className="ml-auto text-sm text-muted-foreground">
+              {matchups.length} matchup{matchups.length !== 1 ? 's' : ''}
+            </div>
+          </>
+        )}
+      </div>
 
-      {/* Canvas */}
+      {/* Canvas - use scrollbars when locked, drag-to-pan when editing */}
       <div
         ref={canvasRef}
-        className={`flex-1 overflow-hidden relative ${locked ? 'cursor-default' : 'cursor-move'}`}
+        className={`flex-1 relative ${locked ? 'overflow-auto cursor-default' : 'overflow-hidden cursor-move'}`}
         onMouseDown={locked ? undefined : handleCanvasMouseDown}
         onMouseMove={locked ? undefined : handleMouseMove}
         onMouseUp={locked ? undefined : handleMouseUp}
@@ -623,6 +631,20 @@ export function CustomBracketBuilder({
         data-testid="canvas"
         style={embeddable ? { minHeight: '70vh' } : undefined}
       >
+        {/* Inner content wrapper - needs explicit dimensions for scrolling when locked */}
+        <div
+          className="relative"
+          style={{
+            width: locked 
+              ? Math.max(1200, ...matchups.map(m => (m.position.x + CARD_WIDTH) * zoom + 100))
+              : '100%',
+            height: locked
+              ? Math.max(800, ...matchups.map(m => (m.position.y + CARD_HEIGHT) * zoom + 100))
+              : '100%',
+            minWidth: locked ? '100%' : undefined,
+            minHeight: locked ? '100%' : undefined
+          }}
+        >
         {/* Grid Background */}
         {showGrid && (
           <div
@@ -866,6 +888,7 @@ export function CustomBracketBuilder({
             </div>
           </Card>
         ))}
+        </div>
       </div>
     </div>
   );
