@@ -53,6 +53,9 @@ export default function GameDetails() {
     scoreSubmissions: GameScoreSubmission[];
     userTeams: UserTeam[];
     userTeamMemberships: { teamId: string; isCaptain: boolean }[];
+    isTournamentMatch?: boolean;
+    linkedHomeTeamId?: string | null;
+    linkedAwayTeamId?: string | null;
   }
 
   const { data: fullGameData, isLoading: gameLoading } = useQuery<FullGameData>({
@@ -68,6 +71,9 @@ export default function GameDetails() {
   const scoreSubmissions = fullGameData?.scoreSubmissions;
   const userTeams = fullGameData?.userTeams;
   const userTeamMemberships = fullGameData?.userTeamMemberships || [];
+  const isTournamentMatch = fullGameData?.isTournamentMatch || false;
+  const linkedHomeTeamId = fullGameData?.linkedHomeTeamId;
+  const linkedAwayTeamId = fullGameData?.linkedAwayTeamId;
 
   // Get primary team (first team for now)
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
@@ -737,7 +743,7 @@ export default function GameDetails() {
         {!isGameCompleted && isUserOnHomeTeam && (
           <DutiesSection 
             gameId={game.id}
-            teamId={game.homeTeam.id}
+            teamId={linkedHomeTeamId || game.homeTeam.id}
             userId={(user as User).id}
             isCaptain={isHomeCaptain}
             isTeamMember={isUserOnHomeTeam}
@@ -748,7 +754,7 @@ export default function GameDetails() {
         {!isGameCompleted && isUserOnAwayTeam && game.awayTeam && (
           <DutiesSection 
             gameId={game.id}
-            teamId={game.awayTeam.id}
+            teamId={linkedAwayTeamId || game.awayTeam.id}
             userId={(user as User).id}
             isCaptain={isAwayCaptain}
             isTeamMember={isUserOnAwayTeam}

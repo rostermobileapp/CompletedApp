@@ -5934,23 +5934,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Fetch all related data in parallel
       // For tournament matches, use linked team IDs if available, otherwise empty arrays
-      const homeTeamId = game.homeTeamId;
-      const awayTeamId = game.awayTeamId;
+      let homeTeamId = game.homeTeamId;
+      let awayTeamId = game.awayTeamId;
+      
+      // For tournament matches, resolve tournament team IDs to linked regular team IDs
+      let linkedHomeTeamId: string | null = null;
+      let linkedAwayTeamId: string | null = null;
+      if (isTournamentMatch) {
+        // Check if homeTeamId is a tournament team and get linked regular team
+        const [homeTournamentTeam] = await db
+          .select()
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.id, homeTeamId));
+        if (homeTournamentTeam?.teamId) {
+          linkedHomeTeamId = homeTournamentTeam.teamId;
+        }
+        
+        // Check if awayTeamId is a tournament team and get linked regular team
+        if (awayTeamId) {
+          const [awayTournamentTeam] = await db
+            .select()
+            .from(tournamentTeams)
+            .where(eq(tournamentTeams.id, awayTeamId));
+          if (awayTournamentTeam?.teamId) {
+            linkedAwayTeamId = awayTournamentTeam.teamId;
+          }
+        }
+      }
+      
+      // Use linked team IDs for fetching team members if available
+      const effectiveHomeTeamId = linkedHomeTeamId || homeTeamId;
+      const effectiveAwayTeamId = linkedAwayTeamId || awayTeamId;
       
       const [league, homeTeamMembers, awayTeamMembers, scoreSubmissions, userTeams] = await Promise.all([
         game.leagueId ? storage.getLeague(game.leagueId) : null,
         // Only fetch team members if we have a valid team ID (not 'tbd' or tournament team ID)
-        homeTeamId && homeTeamId !== 'tbd' ? storage.getTeamMembers(homeTeamId).catch(() => []) : Promise.resolve([]),
-        awayTeamId && awayTeamId !== 'tbd' ? storage.getTeamMembers(awayTeamId).catch(() => []) : Promise.resolve([]),
+        effectiveHomeTeamId && effectiveHomeTeamId !== 'tbd' ? storage.getTeamMembers(effectiveHomeTeamId).catch(() => []) : Promise.resolve([]),
+        effectiveAwayTeamId && effectiveAwayTeamId !== 'tbd' ? storage.getTeamMembers(effectiveAwayTeamId).catch(() => []) : Promise.resolve([]),
         isTournamentMatch ? Promise.resolve([]) : storage.getGameScoreSubmissions(gameId),
         storage.getUserTeams(userId)
       ]);
       
       // Get captain status for user's teams in this game
-      const gameTeamIds = [homeTeamId, awayTeamId].filter((id): id is string => !!id && id !== 'tbd');
-      const userTeamMemberships = gameTeamIds.length > 0 
-        ? await storage.getUserTeamMemberships(userId, gameTeamIds).catch(() => [])
+      // For tournament matches, include both the tournament team IDs and linked regular team IDs
+      const allTeamIds = [homeTeamId, awayTeamId, linkedHomeTeamId, linkedAwayTeamId]
+        .filter((id): id is string => !!id && id !== 'tbd');
+      const uniqueTeamIds = [...new Set(allTeamIds)];
+      const userTeamMemberships = uniqueTeamIds.length > 0 
+        ? await storage.getUserTeamMemberships(userId, uniqueTeamIds).catch(() => [])
         : [];
+      
+      // For tournament matches, if user is captain of linked regular team, also mark them as captain for tournament team
+      if (isTournamentMatch) {
+        if (linkedHomeTeamId) {
+          const isLinkedHomeCaptain = userTeamMemberships.some(m => m.teamId === linkedHomeTeamId && m.isCaptain);
+          if (isLinkedHomeCaptain && !userTeamMemberships.some(m => m.teamId === homeTeamId)) {
+            userTeamMemberships.push({ teamId: homeTeamId, isCaptain: true });
+          }
+        }
+        if (linkedAwayTeamId && awayTeamId) {
+          const isLinkedAwayCaptain = userTeamMemberships.some(m => m.teamId === linkedAwayTeamId && m.isCaptain);
+          if (isLinkedAwayCaptain && !userTeamMemberships.some(m => m.teamId === awayTeamId)) {
+            userTeamMemberships.push({ teamId: awayTeamId, isCaptain: true });
+          }
+        }
+      }
       
       res.json({
         game: formattedGame,
@@ -5960,7 +6008,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scoreSubmissions,
         userTeams,
         userTeamMemberships,
-        isTournamentMatch
+        isTournamentMatch,
+        linkedHomeTeamId,
+        linkedAwayTeamId
       });
     } catch (error) {
       console.error('Error fetching full game details:', error);

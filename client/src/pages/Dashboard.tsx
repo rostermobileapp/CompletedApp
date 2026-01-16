@@ -91,7 +91,7 @@ const scrimmageEventSchema = z.object({
   scheduledAt: z.string().min(1, "Date and time are required"),
   endTime: z.string().optional(),
   location: z.string().optional(),
-  isInternalScrimmage: z.boolean().default(false),
+  isInternalScrimmage: z.boolean().default(true),
   opponentName: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -1255,7 +1255,7 @@ export default function Dashboard() {
       scheduledAt: "",
       endTime: "",
       location: "",
-      isInternalScrimmage: false,
+      isInternalScrimmage: true,
       opponentName: "",
       notes: "",
     },
@@ -3095,7 +3095,7 @@ export default function Dashboard() {
       />
       {/* Add Event Dialog */}
       <Dialog open={showAddEventDialog} onOpenChange={setShowAddEventDialog}>
-        <DialogContent className="sm:max-w-[425px]" data-testid="dialog-add-event">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-[425px]" data-testid="dialog-add-event">
           <DialogHeader>
             <DialogTitle data-testid="text-add-event-title">Add Event</DialogTitle>
           </DialogHeader>
@@ -3167,7 +3167,7 @@ export default function Dashboard() {
       </Dialog>
       {/* Personal Reminder Form Dialog */}
       <Dialog open={eventType === 'reminder'} onOpenChange={(open) => !open && setEventType(null)}>
-        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-reminder">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="dialog-create-reminder">
           <DialogHeader>
             <DialogTitle data-testid="text-create-reminder-title">Create Personal Reminder</DialogTitle>
           </DialogHeader>
@@ -3235,7 +3235,7 @@ export default function Dashboard() {
       </Dialog>
       {/* Team Game Form Dialog */}
       <Dialog open={eventType === 'game'} onOpenChange={(open) => !open && setEventType(null)}>
-        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-game">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="dialog-create-game">
           <DialogHeader>
             <DialogTitle data-testid="text-create-game-title">Create Team Game</DialogTitle>
           </DialogHeader>
@@ -3340,7 +3340,7 @@ export default function Dashboard() {
       </Dialog>
       {/* General Event Form Dialog */}
       <Dialog open={eventType === 'generalEvent'} onOpenChange={(open) => !open && setEventType(null)}>
-        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-general-event">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="dialog-create-general-event">
           <DialogHeader>
             <DialogTitle data-testid="text-create-general-event-title">Create Team Event</DialogTitle>
           </DialogHeader>
@@ -3458,7 +3458,7 @@ export default function Dashboard() {
       </Dialog>
       {/* Scrimmage Form Dialog */}
       <Dialog open={eventType === 'scrimmage'} onOpenChange={(open) => !open && setEventType(null)}>
-        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-create-scrimmage">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="dialog-create-scrimmage">
           <DialogHeader>
             <DialogTitle data-testid="text-create-scrimmage-title">Create Scrimmage</DialogTitle>
           </DialogHeader>
@@ -3505,17 +3505,22 @@ export default function Dashboard() {
                 control={scrimmageEventForm.control}
                 name="isInternalScrimmage"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                     <FormControl>
                       <input
                         type="checkbox"
                         checked={field.value}
                         onChange={field.onChange}
-                        className="h-4 w-4 rounded border-gray-300"
+                        className="h-5 w-5 rounded border-gray-300 accent-primary mt-0.5"
                         data-testid="checkbox-scrimmage-internal"
                       />
                     </FormControl>
-                    <FormLabel className="font-normal">Internal Scrimmage (within your team)</FormLabel>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className="font-medium">Just my team</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        {field.value ? "This is a team practice or internal scrimmage" : "Uncheck to add an opponent team"}
+                      </p>
+                    </div>
                   </FormItem>
                 )}
               />
@@ -3609,7 +3614,7 @@ export default function Dashboard() {
       </Dialog>
       {/* Edit Team Event Dialog */}
       <Dialog open={!!editingTeamEvent} onOpenChange={(open) => !open && setEditingTeamEvent(null)}>
-        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-edit-team-event">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-team-event">
           <DialogHeader>
             <DialogTitle data-testid="text-edit-team-event-title">
               Edit {editingTeamEvent?.eventType === 'scrimmage' ? 'Scrimmage' : 'Team Event'}
