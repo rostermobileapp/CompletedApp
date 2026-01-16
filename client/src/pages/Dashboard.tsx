@@ -189,75 +189,14 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
     enabled: !!leagueId && isOpen,
   });
 
-  // Fetch games that need score verification - parallelized for performance
+  // Fetch games that need score verification - using dedicated endpoint
   const { data: gamesNeedingVerification = [], isLoading: gamesLoading } = useQuery({
-    queryKey: ['/api/leagues', leagueId, 'games-needing-verification-modal'],
+    queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
     queryFn: async () => {
       if (!leagueId) return [];
-      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
-      const allGames = await response.json();
-      
-      if (!Array.isArray(allGames)) return [];
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      // Filter past games first
-      const pastGames = allGames.filter((game: any) => {
-        const gameDate = new Date(game.scheduledAt);
-        gameDate.setHours(0, 0, 0, 0);
-        return gameDate < today;
-      });
-      
-      // Fetch all score submissions in parallel
-      const submissionResults = await Promise.all(
-        pastGames.map(async (game: any) => {
-          try {
-            const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
-            if (!submissionsResponse.ok) return { game, submissions: null };
-            const submissions = await submissionsResponse.json();
-            return { game, submissions: Array.isArray(submissions) ? submissions : null };
-          } catch {
-            return { game, submissions: null };
-          }
-        })
-      );
-      
-      // Process results
-      const gamesNeedingVerification = [];
-      for (const { game, submissions } of submissionResults) {
-        if (!submissions) continue;
-        
-        const submissionCount = submissions.length;
-        let needsVerification = false;
-        let reason = '';
-        
-        const hasCommissionerSubmission = submissions.some((sub: any) => 
-          sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
-        );
-        
-        if (hasCommissionerSubmission) {
-          needsVerification = false;
-        } else if (submissionCount === 0) {
-          needsVerification = true;
-          reason = 'No score submissions';
-        } else if (submissionCount === 1) {
-          needsVerification = true;
-          reason = 'Missing one team submission';
-        } else if (submissionCount === 2) {
-          const [sub1, sub2] = submissions;
-          if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
-            needsVerification = true;
-            reason = `Mismatched scores: ${sub1.homeScore}-${sub1.awayScore} vs ${sub2.homeScore}-${sub2.awayScore}`;
-          }
-        }
-        
-        if (needsVerification) {
-          gamesNeedingVerification.push({ ...game, reason });
-        }
-      }
-      
-      return gamesNeedingVerification;
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games-needing-verification`);
+      if (!response.ok) return [];
+      return response.json();
     },
     staleTime: 0,
     enabled: !!leagueId && isOpen,
@@ -1075,64 +1014,13 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
   leagueId: string; 
   onNavigate: (path: string) => void; 
 }) {
-  // Fetch games that need score verification - parallelized for performance
+  // Fetch games that need score verification - using dedicated endpoint
   const { data: gamesNeedingVerification = [] } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
-      const allGames = await response.json();
-      
-      if (!Array.isArray(allGames)) return [];
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      // Filter past games first
-      const pastGames = allGames.filter((game: any) => {
-        const gameDate = new Date(game.scheduledAt);
-        gameDate.setHours(0, 0, 0, 0);
-        return gameDate < today;
-      });
-      
-      // Fetch all score submissions in parallel
-      const submissionResults = await Promise.all(
-        pastGames.map(async (game: any) => {
-          try {
-            const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
-            if (!submissionsResponse.ok) return { game, submissions: null };
-            const submissions = await submissionsResponse.json();
-            return { game, submissions: Array.isArray(submissions) ? submissions : null };
-          } catch {
-            return { game, submissions: null };
-          }
-        })
-      );
-      
-      // Process results
-      const gamesNeedingVerification = [];
-      for (const { game, submissions } of submissionResults) {
-        if (!submissions) continue;
-        
-        const submissionCount = submissions.length;
-        let needsVerification = false;
-        
-        if (submissionCount === 0) {
-          needsVerification = true;
-        } else if (submissionCount === 1) {
-          needsVerification = true;
-        } else if (submissionCount === 2) {
-          const [sub1, sub2] = submissions;
-          if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
-            needsVerification = true;
-          }
-        }
-        
-        if (needsVerification) {
-          gamesNeedingVerification.push(game);
-        }
-      }
-      
-      return gamesNeedingVerification;
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games-needing-verification`);
+      if (!response.ok) return [];
+      return response.json();
     },
     enabled: !!leagueId,
   });
@@ -1995,7 +1883,7 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch needs attention data for the permanent bar - parallelized for performance
+  // Fetch needs attention data for the permanent bar - using dedicated endpoints
   const { data: needsAttentionData, isLoading: isLoadingNeedsAttention } = useQuery({
     queryKey: ['/api/needs-attention-summary', effectiveLeagueId],
     staleTime: 30000,
@@ -2003,76 +1891,23 @@ export default function Dashboard() {
       if (!effectiveLeagueId) return { pendingMembers: 0, gamesNeedingVerification: 0, notifications: 0, total: 0 };
       
       try {
-        // Fetch all top-level data in parallel (including notifications)
-        const [pendingMembersResponse, gamesResponse, substituteApprovalsResponse, starsResponse, notificationsResponse] = await Promise.all([
+        // Fetch all top-level data in parallel (including notifications and games needing verification)
+        const [pendingMembersResponse, gamesVerificationResponse, substituteApprovalsResponse, starsResponse, notificationsResponse] = await Promise.all([
           apiRequest('GET', `/api/leagues/${effectiveLeagueId}/pending-members`),
-          apiRequest('GET', `/api/leagues/${effectiveLeagueId}/games`),
+          apiRequest('GET', `/api/leagues/${effectiveLeagueId}/games-needing-verification`),
           apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${effectiveLeagueId}`).catch(() => null),
           apiRequest('GET', `/api/user/games-needing-stars?leagueId=${effectiveLeagueId}`).catch(() => null),
           apiRequest('GET', `/api/notifications`).catch(() => null)
         ]);
         
         const pendingMembers = await pendingMembersResponse.json();
-        const allGames = await gamesResponse.json();
+        const gamesNeedingVerificationData = gamesVerificationResponse.ok ? await gamesVerificationResponse.json() : [];
         const substituteData = substituteApprovalsResponse ? await substituteApprovalsResponse.json().catch(() => ({ total: 0 })) : { total: 0 };
         const starsData = starsResponse ? await starsResponse.json().catch(() => []) : [];
         const notificationsData = notificationsResponse ? await notificationsResponse.json().catch(() => []) : [];
         
-        let gamesNeedingVerification = 0;
-        if (Array.isArray(allGames)) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          // Filter past games first
-          const pastGames = allGames.filter((game: any) => {
-            const gameDate = new Date(game.scheduledAt);
-            gameDate.setHours(0, 0, 0, 0);
-            return gameDate < today;
-          });
-          
-          // Fetch all score submissions in parallel
-          const submissionResults = await Promise.all(
-            pastGames.map(async (game: any) => {
-              try {
-                const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
-                if (!submissionsResponse.ok) return null;
-                const submissions = await submissionsResponse.json();
-                return Array.isArray(submissions) ? submissions : null;
-              } catch {
-                return null;
-              }
-            })
-          );
-          
-          // Count games needing verification
-          for (const submissions of submissionResults) {
-            if (!submissions) continue;
-            
-            const submissionCount = submissions.length;
-            let needsVerification = false;
-            
-            const hasCommissionerSubmission = submissions.some((sub: any) => 
-              sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
-            );
-            
-            if (hasCommissionerSubmission) {
-              needsVerification = false;
-            } else if (submissionCount === 0 || submissionCount === 1) {
-              needsVerification = true;
-            } else if (submissionCount === 2) {
-              const [sub1, sub2] = submissions;
-              if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
-                needsVerification = true;
-              }
-            }
-            
-            if (needsVerification) {
-              gamesNeedingVerification++;
-            }
-          }
-        }
-        
         const pendingMembersCount = Array.isArray(pendingMembers) ? pendingMembers.length : 0;
+        const gamesNeedingVerification = Array.isArray(gamesNeedingVerificationData) ? gamesNeedingVerificationData.length : 0;
         const pendingSubstituteApprovals = substituteData.total || 0;
         const gamesNeedingStars = Array.isArray(starsData) ? starsData.length : 0;
         const notificationsCount = Array.isArray(notificationsData) ? notificationsData.length : 0;

@@ -3988,6 +3988,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get games that need score verification (for commissioners only)
+  app.get("/api/leagues/:id/games-needing-verification", isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      // Check if user is commissioner of this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      const isCommissioner = league.commissionerId === userId;
+      
+      // Also check if user has stat_manager permission
+      const user = await storage.getUser(userId);
+      const hasStatManager = user?.specialPermissions?.includes('stat_manager');
+      
+      // Check league-specific permissions
+      const leaguePermissions = await storage.getUserLeaguePermissions(userId, leagueId);
+      const hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager');
+      
+      if (!isCommissioner && !hasStatManager && !hasLeagueStatManager) {
+        // Return empty array for non-commissioners instead of 403
+        return res.json([]);
+      }
+      
+      const games = await storage.getGamesByLeague(leagueId);
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Filter past games
+      const pastGames = games.filter((game: any) => {
+        const gameDate = new Date(game.scheduledAt);
+        gameDate.setHours(0, 0, 0, 0);
+        return gameDate < today;
+      });
+      
+      // Check each past game for verification needs
+      const gamesNeedingVerification = [];
+      
+      for (const game of pastGames) {
+        const submissions = await storage.getGameScoreSubmissions(game.id);
+        const submissionCount = submissions.length;
+        let needsVerification = false;
+        let reason = '';
+        
+        // Check for commissioner override
+        const hasCommissionerSubmission = submissions.some((sub: any) => 
+          sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
+        );
+        
+        if (hasCommissionerSubmission) {
+          needsVerification = false;
+        } else if (submissionCount === 0) {
+          needsVerification = true;
+          reason = 'No score submissions';
+        } else if (submissionCount === 1) {
+          needsVerification = true;
+          reason = 'Missing one team submission';
+        } else if (submissionCount === 2) {
+          const [sub1, sub2] = submissions;
+          if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
+            needsVerification = true;
+            reason = `Mismatched scores: ${sub1.homeScore}-${sub1.awayScore} vs ${sub2.homeScore}-${sub2.awayScore}`;
+          }
+        }
+        
+        if (needsVerification) {
+          gamesNeedingVerification.push({
+            ...formatGameForResponse(game),
+            reason,
+            submissionCount
+          });
+        }
+      }
+      
+      res.json(gamesNeedingVerification);
+    } catch (error) {
+      console.error("Error fetching games needing verification:", error);
+      res.status(500).json({ message: "Failed to fetch games needing verification" });
+    }
+  });
+
   app.get("/api/leagues/:id/standings", async (req, res) => {
     try {
       const leagueId = req.params.id;
