@@ -2953,10 +2953,10 @@ export default function Dashboard() {
                 setEventType('reminder');
                 setShowAddEventDialog(false);
               }}
-              className="inline-flex h-auto py-3 px-4 justify-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
+              className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
               data-testid="button-select-reminder"
             >
-              <div className="max-w-[min(100vw-6rem,280px)]">
+              <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
                 <div className="font-semibold">Personal Reminder</div>
                 <div className="text-sm text-gray-300">Add a personal note or reminder to your calendar</div>
               </div>
@@ -2967,10 +2967,10 @@ export default function Dashboard() {
                   setEventType('game');
                   setShowAddEventDialog(false);
                 }}
-                className="inline-flex h-auto py-3 px-4 justify-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
+                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
                 data-testid="button-select-game"
               >
-                <div className="max-w-[min(100vw-6rem,280px)]">
+                <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
                   <div className="font-semibold">Team Game</div>
                   <div className="text-sm text-gray-300">Schedule a game for your team</div>
                 </div>
@@ -2982,10 +2982,10 @@ export default function Dashboard() {
                   setEventType('generalEvent');
                   setShowAddEventDialog(false);
                 }}
-                className="inline-flex h-auto py-3 px-4 justify-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
+                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
                 data-testid="button-select-general-event"
               >
-                <div className="max-w-[min(100vw-6rem,280px)]">
+                <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
                   <div className="font-semibold">General Event</div>
                   <div className="text-sm text-gray-300">Schedule a team party, meeting, or other event</div>
                 </div>
@@ -2997,10 +2997,10 @@ export default function Dashboard() {
                   setEventType('scrimmage');
                   setShowAddEventDialog(false);
                 }}
-                className="inline-flex h-auto py-3 px-4 justify-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
+                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-[#2c2c2c] bg-[#212121]"
                 data-testid="button-select-scrimmage"
               >
-                <div className="max-w-[min(100vw-6rem,280px)]">
+                <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
                   <div className="font-semibold">Scrimmage</div>
                   <div className="text-sm text-gray-300">Schedule a practice scrimmage (internal or vs another team)</div>
                 </div>
