@@ -2619,8 +2619,30 @@ export default function Dashboard() {
                 </div>
               ))}
             
-            {/* Show visible tournament brackets */}
-            {Array.isArray(visibleTournaments) && visibleTournaments.map((tournament: any) => (
+            {/* Show visible tournament brackets - only for the selected team's league or selected league */}
+            {Array.isArray(visibleTournaments) && visibleTournaments
+              .filter((tournament: any) => {
+                // If a team is selected, only show brackets from that team's league
+                if (selectedType === 'team' && selectedId) {
+                  // Ensure userTeamsAll is an array before using find
+                  const teamsArray = Array.isArray(userTeamsAll) ? userTeamsAll : [];
+                  const team = teamsArray.find((t: any) => t.id === selectedId);
+                  // If team has no league (independent), don't show any brackets
+                  if (!team?.leagueId) return false;
+                  // Only show brackets from the team's league
+                  return tournament.leagueId === team.leagueId;
+                }
+                // If a league is selected, only show brackets from that league
+                if (selectedType === 'league' && selectedId) {
+                  return tournament.leagueId === selectedId;
+                }
+                // If a tournament is selected, show its bracket
+                if (selectedType === 'tournament') {
+                  return tournament.id === selectedId;
+                }
+                return true;
+              })
+              .map((tournament: any) => (
               <div 
                 key={`bracket-${tournament.id}`}
                 className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] bracket-glow"

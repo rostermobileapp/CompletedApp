@@ -494,6 +494,25 @@ export default function CreateTeam() {
       
       {!createdTeam ? (
         <>
+          {/* Independent Team Info Card */}
+          <Card className="mb-6 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
+                  <Users className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">This team will be independent</h3>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    You're creating a team that is not part of any league or tournament. This is perfect for pickup games, 
+                    practice sessions, or organizing your own events. If you want to join a league later, you can request 
+                    to join from your team's page.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Team Details</CardTitle>
