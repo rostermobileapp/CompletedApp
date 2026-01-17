@@ -2089,8 +2089,15 @@ export default function LeagueManagement() {
   const deleteLeagueMutation = useMutation({
     mutationFn: async () => {
       console.log('[DeleteLeague] Attempting to delete league:', leagueId);
-      const response = await apiRequest('DELETE', `/api/leagues/${leagueId}`);
-      return response.json();
+      alert('[DeleteLeague] Inside mutationFn, leagueId=' + leagueId);
+      try {
+        const response = await apiRequest('DELETE', `/api/leagues/${leagueId}`);
+        alert('[DeleteLeague] apiRequest returned successfully');
+        return response.json();
+      } catch (err: any) {
+        alert('[DeleteLeague] apiRequest threw error: ' + err?.message);
+        throw err;
+      }
     },
     onSuccess: () => {
       console.log('[DeleteLeague] League deleted successfully');
