@@ -3328,28 +3328,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/leagues/:id", isAuthenticated, async (req: any, res) => {
+    console.log("[DELETE /api/leagues/:id] Request received for id:", req.params.id);
     try {
       const userId = req.user.claims.sub;
+      console.log("[DELETE /api/leagues/:id] User ID:", userId);
       const user = await storage.getUser(userId);
       const leagueId = req.params.id;
       
       if (!user) {
+        console.log("[DELETE /api/leagues/:id] User not found");
         return res.status(404).json({ message: "User not found" });
       }
       
       // Verify that the user owns the league - try by primary key first, then by uniqueLeagueId
       let league = await storage.getLeague(leagueId);
+      console.log("[DELETE /api/leagues/:id] League by primary key:", league?.id, league?.name);
       if (!league) {
         league = await storage.getLeagueByUniqueId(leagueId);
+        console.log("[DELETE /api/leagues/:id] League by uniqueId:", league?.id, league?.name);
       }
       if (!league || league.commissionerId !== userId) {
+        console.log("[DELETE /api/leagues/:id] Access denied - commissionerId:", league?.commissionerId, "userId:", userId);
         return res.status(403).json({ message: "You can only delete your own leagues" });
       }
       
+      console.log("[DELETE /api/leagues/:id] Starting deletion for league:", league.id, league.name);
       await storage.deleteLeague(league.id);
+      console.log("[DELETE /api/leagues/:id] League deleted successfully");
       res.json({ message: "League deleted successfully" });
     } catch (error) {
-      console.error("Error deleting league:", error);
+      console.error("[DELETE /api/leagues/:id] Error deleting league:", error);
       res.status(500).json({ message: "Failed to delete league" });
     }
   });
