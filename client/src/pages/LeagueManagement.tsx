@@ -4352,8 +4352,14 @@ export default function LeagueManagement() {
                       const confirmed = confirm(`Are you sure you want to delete the league "${league?.name}"? This action cannot be undone and will remove all associated teams, games, and data.`);
                       console.log('[DeleteLeague] Confirm result:', confirmed);
                       if (confirmed) {
+                        alert('About to call mutation.mutate()!');
                         console.log('[DeleteLeague] User confirmed, calling mutation...');
-                        deleteLeagueMutation.mutate();
+                        try {
+                          deleteLeagueMutation.mutate();
+                          alert('Mutation called successfully!');
+                        } catch (err: any) {
+                          alert('Mutation threw error: ' + err?.message);
+                        }
                       }
                     }}
                     disabled={deleteLeagueMutation.isPending}
