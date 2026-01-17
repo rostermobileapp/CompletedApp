@@ -4344,7 +4344,10 @@ export default function LeagueManagement() {
                 <div className="border-t pt-4">
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      alert(`Deleting league: ${league?.name} (ID: ${leagueId})`);
                       console.log('[DeleteLeague] Button clicked, leagueId:', leagueId, 'league:', league?.name);
                       const confirmed = confirm(`Are you sure you want to delete the league "${league?.name}"? This action cannot be undone and will remove all associated teams, games, and data.`);
                       console.log('[DeleteLeague] Confirm result:', confirmed);
