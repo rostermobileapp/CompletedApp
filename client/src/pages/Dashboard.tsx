@@ -3343,7 +3343,7 @@ export default function Dashboard() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {Array.isArray(userTeams) && userTeams.map((team: any) => (
+                        {Array.isArray(userTeamsAll) && userTeamsAll.map((team: any) => (
                           <SelectItem key={team.id} value={team.id} data-testid={`option-scrimmage-team-${team.id}`}>
                             {team.leagueId && team.league ? `${team.league.name}: ${team.name}` : team.name}
                           </SelectItem>
