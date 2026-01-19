@@ -867,9 +867,22 @@ export default function LeagueManagement() {
     });
   }, [gamesData]);
 
-  // Auto-scroll to next upcoming game when list view is shown
+  // Reset scroll state when switching to list view
   useEffect(() => {
-    if (gamesViewMode !== 'list' || hasScrolledToNextGame || games.length === 0) return;
+    if (gamesViewMode === 'list') {
+      setHasScrolledToNextGame(false);
+    }
+  }, [gamesViewMode]);
+
+  // Auto-scroll to next upcoming game when list view is shown or on mobile
+  useEffect(() => {
+    if (games.length === 0) return;
+    
+    // For desktop, only scroll when in list mode
+    // For mobile, always scroll (mobile always shows list)
+    const isMobile = window.innerWidth < 768;
+    if (!isMobile && gamesViewMode !== 'list') return;
+    if (hasScrolledToNextGame) return;
     
     const now = new Date();
     const sortedGames = [...games].sort((a, b) => 
@@ -887,26 +900,27 @@ export default function LeagueManagement() {
       
       // Small delay to ensure DOM is rendered
       setTimeout(() => {
-        // Try desktop container first
+        // Try desktop container first (only visible on desktop in list view)
         const desktopContainer = gamesListDesktopRef.current;
-        if (desktopContainer) {
+        if (desktopContainer && desktopContainer.offsetParent !== null) {
           const gameRow = desktopContainer.querySelector(`[data-game-id="${nextGame.id}"]`);
           if (gameRow) {
             gameRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setHasScrolledToNextGame(true);
+            return;
           }
         }
         
-        // Try mobile container
+        // Try mobile container (always visible on mobile)
         const mobileContainer = gamesListMobileRef.current;
-        if (mobileContainer) {
+        if (mobileContainer && mobileContainer.offsetParent !== null) {
           const gameCard = mobileContainer.querySelector(`[data-game-id="${nextGame.id}"]`);
           if (gameCard) {
             gameCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setHasScrolledToNextGame(true);
           }
         }
-        
-        setHasScrolledToNextGame(true);
-      }, 100);
+      }, 300);
     }
   }, [gamesViewMode, games, hasScrolledToNextGame]);
   
