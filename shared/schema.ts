@@ -417,7 +417,7 @@ export const games = pgTable("games", {
   homeTeamId: varchar("home_team_id").references(() => teams.id).notNull(),
   awayTeamId: varchar("away_team_id").references(() => teams.id), // Made nullable for standalone team games
   opponentName: varchar("opponent_name"), // Name of opponent when awayTeamId is null
-  scheduledAt: timestamp("scheduled_at").notNull(),
+  scheduledAt: timestamp("scheduled_at", { mode: 'string' }).notNull(),
   venue: varchar("venue"),
   lockerRoom: varchar("locker_room"),
   homeTeamLockerRoom: varchar("home_team_locker_room"),
@@ -545,7 +545,7 @@ export const tournamentMatches = pgTable("tournament_matches", {
   team1Score: integer("team1_score"),
   team2Score: integer("team2_score"),
   advancesToMatchId: varchar("advances_to_match_id"), // Self-reference - ID of next match winner advances to
-  scheduledTime: timestamp("scheduled_time"),
+  scheduledTime: timestamp("scheduled_time", { mode: 'string' }),
   location: varchar("location"),
   status: varchar("status").default("scheduled"), // scheduled, in_progress, completed
   notes: text("notes"),
@@ -664,7 +664,7 @@ export const personalReminders = pgTable("personal_reminders", {
   userId: varchar("user_id").references(() => users.id).notNull(),
   title: varchar("title").notNull(),
   description: text("description"),
-  scheduledAt: timestamp("scheduled_at").notNull(),
+  scheduledAt: timestamp("scheduled_at", { mode: 'string' }).notNull(),
   isCompleted: boolean("is_completed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1040,7 +1040,7 @@ export const scrimmages = pgTable("scrimmages", {
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
   creatorId: varchar("creator_id").references(() => users.id).notNull(),
   title: varchar("title").notNull(),
-  dateTime: timestamp("date_time").notNull(),
+  dateTime: timestamp("date_time", { mode: 'string' }).notNull(),
   location: varchar("location").notNull(),
   maxPlayers: integer("max_players").notNull(),
   skillLevel: varchar("skill_level"), // Optional skill level requirement
@@ -1268,8 +1268,8 @@ export const teamEvents = pgTable("team_events", {
   eventType: teamEventTypeEnum("event_type").notNull(),
   title: varchar("title").notNull(),
   description: text("description"),
-  scheduledAt: timestamp("scheduled_at").notNull(),
-  endTime: timestamp("end_time"), // Optional end time
+  scheduledAt: timestamp("scheduled_at", { mode: 'string' }).notNull(),
+  endTime: timestamp("end_time", { mode: 'string' }), // Optional end time
   location: varchar("location"),
   // For scrimmages against another team
   opponentTeamId: varchar("opponent_team_id").references(() => teams.id),
