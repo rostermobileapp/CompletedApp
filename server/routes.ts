@@ -14850,14 +14850,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/team-events', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log("[Team Events POST] User:", userId, "Body:", JSON.stringify(req.body));
+      
       const validatedData = createTeamEventRequestSchema.parse(req.body);
+      console.log("[Team Events POST] Validated data:", JSON.stringify(validatedData));
       
       // Check if user is a member of this team (and preferably captain)
       const membership = await storage.getTeamMembership(userId, validatedData.teamId);
+      console.log("[Team Events POST] Membership:", membership);
       if (!membership) {
         return res.status(403).json({ message: "You must be a team member to create events" });
       }
       
+      console.log("[Team Events POST] Inserting event...");
       const [newEvent] = await db
         .insert(teamEvents)
         .values({
@@ -14865,6 +14870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           creatorId: userId,
         })
         .returning();
+      console.log("[Team Events POST] Created event:", newEvent?.id);
       
       res.status(201).json({
         ...newEvent,
@@ -14873,12 +14879,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       if (error instanceof ZodError) {
+        console.error("[Team Events POST] Zod validation error:", error.errors);
         return res.status(400).json({ 
           message: "Invalid event data", 
           errors: error.errors 
         });
       }
-      console.error("Error creating team event:", error);
+      console.error("[Team Events POST] Error creating team event:", error);
       res.status(500).json({ message: "Failed to create team event" });
     }
   });
