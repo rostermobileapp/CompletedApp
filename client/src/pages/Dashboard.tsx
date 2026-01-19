@@ -1263,7 +1263,8 @@ export default function Dashboard() {
   // Create scrimmage event mutation
   const createScrimmageEventMutation = useMutation({
     mutationFn: async (data: z.infer<typeof scrimmageEventSchema>) => {
-      await apiRequest("POST", "/api/team-events", {
+      console.log("[Scrimmage] Creating scrimmage with data:", data);
+      const response = await apiRequest("POST", "/api/team-events", {
         teamId: data.teamId,
         eventType: "scrimmage",
         title: data.title,
@@ -1274,8 +1275,11 @@ export default function Dashboard() {
         opponentName: data.isInternalScrimmage ? null : data.opponentName,
         notes: data.notes || null,
       });
+      console.log("[Scrimmage] Response:", response);
+      return response;
     },
     onSuccess: () => {
+      console.log("[Scrimmage] Success!");
       queryClient.invalidateQueries({ queryKey: ["/api/user/team-events"] });
       toast({
         title: "Scrimmage Created",
@@ -1284,7 +1288,8 @@ export default function Dashboard() {
       setEventType(null);
       scrimmageEventForm.reset();
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("[Scrimmage] Error:", error);
       toast({
         title: "Error",
         description: "Failed to create scrimmage. Please try again.",
