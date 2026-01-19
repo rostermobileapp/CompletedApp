@@ -3509,8 +3509,10 @@ export default function LeagueManagement() {
                           return (
                             <div 
                               key={game.id} 
-                              className={`p-3 bg-background rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors ${
-                                game.isScrimmage ? 'border-orange-300 dark:border-orange-700' : ''
+                              className={`p-3 bg-background rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${
+                                game.isScrimmage 
+                                  ? 'border-2 border-orange-500 dark:border-orange-400' 
+                                  : 'border border-border'
                               }`}
                               onClick={() => {
                                 setSelectedGame(game);
