@@ -1808,6 +1808,21 @@ export class DatabaseStorage implements IStorage {
       await db.delete(teamMemberships).where(inArray(teamMemberships.teamId, teamIds));
     }
     
+    // 20.5. Delete duty templates and related data (depends on teams)
+    if (teamIds.length > 0) {
+      // Get duty templates for these teams
+      const teamDutyTemplates = await db.select({ id: dutyTemplates.id }).from(dutyTemplates).where(inArray(dutyTemplates.teamId, teamIds));
+      if (teamDutyTemplates.length > 0) {
+        const dutyTemplateIds = teamDutyTemplates.map(dt => dt.id);
+        // Delete duty exclusions first (references duty templates)
+        await db.delete(dutyExclusions).where(inArray(dutyExclusions.dutyTemplateId, dutyTemplateIds));
+        // Delete duty assignments (references duty templates)
+        await db.delete(dutyAssignments).where(inArray(dutyAssignments.dutyTemplateId, dutyTemplateIds));
+      }
+      // Delete duty templates (references teams)
+      await db.delete(dutyTemplates).where(inArray(dutyTemplates.teamId, teamIds));
+    }
+    
     // 21. Clear assignedTeamId references in league memberships before deleting teams
     if (teamIds.length > 0) {
       await db.update(leagueMemberships)
