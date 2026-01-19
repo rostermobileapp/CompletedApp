@@ -482,13 +482,18 @@ function GamesCalendar({ games, teams, onGameClick }: {
                     <div
                       key={game.id}
                       onClick={() => onGameClick(game)}
-                      className="bg-blue-100 text-blue-800 p-1 rounded text-xs cursor-pointer hover:bg-blue-200 transition-colors"
+                      className={`p-1 rounded text-xs cursor-pointer transition-colors ${
+                        game.isScrimmage 
+                          ? 'bg-orange-100 text-orange-800 hover:bg-orange-200 dark:bg-orange-900/50 dark:text-orange-300 dark:hover:bg-orange-900/70' 
+                          : 'bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:hover:bg-blue-900/70'
+                      }`}
                       data-testid={`calendar-game-${game.id}`}
                     >
                       <div className="font-medium truncate">
+                        {game.isScrimmage && <span className="mr-1">⚡</span>}
                         {awayTeam ? `${homeTeam?.name || 'Team'} vs ${awayTeam.name}` : `${homeTeam?.name || 'Team'} Practice`}
                       </div>
-                      <div className="text-blue-600">
+                      <div className={game.isScrimmage ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}>
                         {gameTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
