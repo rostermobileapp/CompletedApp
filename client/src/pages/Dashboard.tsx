@@ -165,32 +165,34 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
   const [comments, setComments] = useState("");
   const { toast } = useToast();
   
-  // Fetch pending league member approvals
-  const { data: pendingMembers = [], isLoading: pendingMembersLoading } = useQuery({
+  // Fetch pending league member approvals - use stale-while-revalidate for instant modal
+  const { data: pendingMembers = [], isFetching: pendingMembersFetching } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'pending-members'],
     queryFn: async () => {
       if (!leagueId) return [];
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/pending-members`);
       return response.json();
     },
-    staleTime: 0,
-    enabled: !!leagueId && isOpen,
+    staleTime: 5 * 60 * 1000, // 5 minutes - show cached data instantly
+    enabled: !!leagueId, // Always enabled when leagueId exists (prefetch)
+    refetchOnMount: true, // Refetch in background when modal opens
   });
 
   // Fetch pending substitute approvals
-  const { data: pendingSubstituteApprovals, isLoading: substituteApprovalsLoading } = useQuery({
+  const { data: pendingSubstituteApprovals, isFetching: substituteApprovalsFetching } = useQuery({
     queryKey: ['/api/substitute-requests/pending-approvals', leagueId],
     queryFn: async () => {
       if (!leagueId) return { captain: [], commissioner: [], total: 0 };
       const response = await apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${leagueId}`);
       return response.json();
     },
-    staleTime: 0,
-    enabled: !!leagueId && isOpen,
+    staleTime: 5 * 60 * 1000,
+    enabled: !!leagueId,
+    refetchOnMount: true,
   });
 
   // Fetch games that need score verification - using dedicated endpoint
-  const { data: gamesNeedingVerification = [], isLoading: gamesLoading } = useQuery({
+  const { data: gamesNeedingVerification = [], isFetching: gamesFetching } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
     queryFn: async () => {
       if (!leagueId) return [];
@@ -198,33 +200,35 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
       if (!response.ok) return [];
       return response.json();
     },
-    staleTime: 0,
-    enabled: !!leagueId && isOpen,
+    staleTime: 5 * 60 * 1000,
+    enabled: !!leagueId,
+    refetchOnMount: true,
   });
 
   // Fetch games needing star awards
-  const { data: gamesNeedingStars = [], isLoading: starsLoading } = useQuery({
+  const { data: gamesNeedingStars = [], isFetching: starsFetching } = useQuery({
     queryKey: ['/api/user/games-needing-stars', leagueId],
     queryFn: async () => {
       if (!leagueId) return [];
       const response = await apiRequest('GET', `/api/user/games-needing-stars?leagueId=${leagueId}`);
       return response.json();
     },
-    staleTime: 0,
-    enabled: !!leagueId && isOpen,
+    staleTime: 5 * 60 * 1000,
+    enabled: !!leagueId,
+    refetchOnMount: true,
   });
 
   // Fetch notifications (previously in header NotificationCenter)
-  const { data: notifications = [], isLoading: notificationsLoading } = useQuery<Notification[]>({
+  const { data: notifications = [], isFetching: notificationsFetching } = useQuery<Notification[]>({
     queryKey: ['/api/notifications'],
-    staleTime: 0,
-    enabled: isOpen,
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: true,
   });
 
   const { data: unreadNotifications = [] } = useQuery<Notification[]>({
     queryKey: ['/api/notifications/unread'],
-    staleTime: 0,
-    enabled: isOpen,
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: true,
   });
 
   // Mark notification as read mutation
@@ -360,16 +364,9 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
           <h2 className="text-2xl font-semibold text-center">Needs Attention</h2>
         </div>
 
-        {/* Content */}
+        {/* Content - Show cached data immediately, refresh in background */}
         <div className="flex-1 overflow-auto p-6 pl-[4px] pr-[4px]">
-          {(pendingMembersLoading || gamesLoading || substituteApprovalsLoading || starsLoading || notificationsLoading) ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-                <p className="text-muted-foreground">Loading tasks...</p>
-              </div>
-            </div>
-          ) : totalTasks === 0 ? (
+          {totalTasks === 0 ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <Check className="w-16 h-16 text-green-500 mx-auto mb-4" />
