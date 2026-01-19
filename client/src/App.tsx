@@ -70,13 +70,26 @@ import TeamEventDetails from "@/pages/TeamEventDetails";
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-6" data-testid="loading-app">
-      <div className="animate-pulse text-center max-w-md">
-        <div className="text-xl md:text-2xl font-bold text-primary italic leading-relaxed">
-          "Hockey is a game of fun. If you're not having fun, you're not doing it right."
-        </div>
-        <div className="text-lg md:text-xl font-bold text-primary mt-4">
-          - Mark Messier
+    <div className="min-h-screen flex items-center justify-center bg-black" data-testid="loading-app">
+      <div className="relative w-32 h-32 flex items-center justify-center">
+        <img 
+          src="/assets/Home_Logo_1768857215157.png" 
+          alt="Roster Logo" 
+          className="w-20 h-20 object-contain z-10"
+        />
+        <div className="absolute inset-0 animate-spin" style={{ animationDuration: '2s' }}>
+          <svg className="w-full h-full" viewBox="0 0 100 100">
+            <circle
+              cx="50"
+              cy="50"
+              r="45"
+              fill="none"
+              stroke="white"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray="70 200"
+            />
+          </svg>
         </div>
       </div>
     </div>
