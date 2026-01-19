@@ -1890,7 +1890,6 @@ export default function Dashboard() {
   // Fetch needs attention data for the permanent bar - using dedicated endpoints
   const { data: needsAttentionData, isLoading: isLoadingNeedsAttention } = useQuery({
     queryKey: ['/api/needs-attention-summary', effectiveLeagueId],
-    staleTime: 30000,
     queryFn: async () => {
       if (!effectiveLeagueId) return { pendingMembers: 0, gamesNeedingVerification: 0, notifications: 0, total: 0 };
       

@@ -15,6 +15,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppDataPrefetch } from "@/hooks/useAppDataPrefetch";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
+import { useNotificationWebSocket } from "@/hooks/useNotificationWebSocket";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Waitlist from "@/pages/Waitlist";
@@ -101,6 +102,7 @@ function Router() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
   const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
+  useNotificationWebSocket();
   
   // Minimum 3-second display time for the loading screen
   const [minDelayElapsed, setMinDelayElapsed] = useState(false);
