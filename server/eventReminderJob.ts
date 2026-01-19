@@ -15,6 +15,7 @@ import { storage } from "./storage";
 import { format, subDays, setHours, setMinutes, subHours, addDays } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { sendScheduleReminderPushNotification } from "./oneSignalNotifications";
+import { parseLeagueLocalDateTime } from "./dateUtils";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -219,9 +220,14 @@ export async function checkAndSendEventReminders(): Promise<void> {
     const now = new Date();
     const maxLookAhead = addDays(now, 3); // Look 3 days ahead for upcoming events
     
-    console.log(`🔍 Checking for event reminders at ${now.toISOString()}`);
+    // Convert to ISO strings for comparison with string timestamp columns
+    const nowStr = now.toISOString();
+    const maxLookAheadStr = maxLookAhead.toISOString();
+    
+    console.log(`🔍 Checking for event reminders at ${nowStr}`);
     
     // Get upcoming games (within next 3 days, not completed)
+    // Use SQL template for string-based timestamp comparison
     const upcomingGames = await db
       .select({
         id: games.id,
@@ -236,8 +242,8 @@ export async function checkAndSendEventReminders(): Promise<void> {
       .from(games)
       .where(
         and(
-          gt(games.scheduledAt, now),
-          lte(games.scheduledAt, maxLookAhead),
+          sql`${games.scheduledAt} > ${nowStr}`,
+          sql`${games.scheduledAt} <= ${maxLookAheadStr}`,
           eq(games.isCompleted, false)
         )
       );
@@ -249,12 +255,13 @@ export async function checkAndSendEventReminders(): Promise<void> {
         title: scrimmages.title,
         dateTime: scrimmages.dateTime,
         location: scrimmages.location,
+        leagueId: scrimmages.leagueId,
       })
       .from(scrimmages)
       .where(
         and(
-          gt(scrimmages.dateTime, now),
-          lte(scrimmages.dateTime, maxLookAhead),
+          sql`${scrimmages.dateTime} > ${nowStr}`,
+          sql`${scrimmages.dateTime} <= ${maxLookAheadStr}`,
           eq(scrimmages.status, 'open')
         )
       );
@@ -263,18 +270,21 @@ export async function checkAndSendEventReminders(): Promise<void> {
     
     // Process games
     for (const game of upcomingGames) {
-      const eventTime = new Date(game.scheduledAt);
-      
-      // Get league timezone
+      // Get league timezone first for proper date conversion
       let timezone = "America/New_York"; // Default fallback
       try {
-        const league = await storage.getLeague(game.leagueId);
-        if (league?.timezone) {
-          timezone = league.timezone;
+        if (game.leagueId) {
+          const league = await storage.getLeague(game.leagueId);
+          if (league?.timezone) {
+            timezone = league.timezone;
+          }
         }
       } catch (e) {
         // Keep default timezone
       }
+      
+      // Parse the league-local datetime string with proper timezone context
+      const eventTime = parseLeagueLocalDateTime(game.scheduledAt, timezone);
       
       // Build event title from teams
       let title = "Game";
@@ -320,7 +330,19 @@ export async function checkAndSendEventReminders(): Promise<void> {
     
     // Process scrimmages
     for (const scrimmage of upcomingScrimmages) {
-      const eventTime = new Date(scrimmage.dateTime);
+      // Get league timezone for proper date conversion
+      let scrimmageTimezone = "America/New_York";
+      try {
+        const scrimmageLeague = await storage.getLeague(scrimmage.leagueId);
+        if (scrimmageLeague?.timezone) {
+          scrimmageTimezone = scrimmageLeague.timezone;
+        }
+      } catch (e) {
+        // Keep default timezone
+      }
+      
+      // Parse the league-local datetime string with proper timezone context
+      const eventTime = parseLeagueLocalDateTime(scrimmage.dateTime, scrimmageTimezone);
       
       const eventInfo: EventInfo = {
         id: scrimmage.id,

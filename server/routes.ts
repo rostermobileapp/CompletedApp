@@ -20,7 +20,7 @@ import { generateSingleElimination, generateDoubleElimination, generateRoundRobi
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
-import { formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime } from "./dateUtils";
+import { formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, parseLeagueLocalDateTime } from "./dateUtils";
 import {
   insertLeagueSchema,
   insertTeamSchema,
@@ -5019,17 +5019,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updates = req.body;
       
-      // Convert scheduledAt string to Date object if present
-      // Frontend sends format: "2025-10-27T22:30" (local time in league timezone)
-      // Append 'Z' to preserve the exact time value without local-to-UTC conversion
-      if (updates.scheduledAt && typeof updates.scheduledAt === 'string') {
-        const val = updates.scheduledAt;
-        if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-          updates.scheduledAt = new Date(val);
-        } else {
-          updates.scheduledAt = new Date(val + 'Z');
-        }
-      }
+      // scheduledAt is kept as string - Drizzle uses { mode: 'string' } for league-local times
+      // No conversion needed - string is passed through directly to storage
       
       const updatedGame = await storage.updateGame(gameId, updates);
       const formattedGame = formatGameForResponse(updatedGame);
@@ -10400,29 +10391,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ========== SCRIMMAGE ROUTES ==========
 
-  // Custom schema for API request that handles string-to-Date conversion
-  // Preserves time values without UTC conversion by appending 'Z' to local time strings
+  // Custom schema for API request - keeps datetime as strings
+  // Drizzle uses { mode: 'string' } for league-local times
   const createScrimmageApiSchema = insertScrimmageSchema.extend({
-    dateTime: z.preprocess((val) => {
-      if (typeof val === 'string') {
-        // Append 'Z' to preserve the exact time value without local-to-UTC conversion
-        if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-          return new Date(val);
-        }
-        return new Date(val + 'Z');
-      }
-      return val;
-    }, z.date()),
-    recurrenceEndDate: z.preprocess((val) => {
-      if (typeof val === 'string' && val !== '') {
-        // Append 'Z' to preserve the exact time value without local-to-UTC conversion
-        if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-          return new Date(val);
-        }
-        return new Date(val + 'Z');
-      }
-      return null;
-    }, z.date().nullable().optional()),
+    dateTime: z.string(),
+    recurrenceEndDate: z.string().nullable().optional(),
   });
 
   // Create scrimmage (available to all users)
@@ -10455,16 +10428,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Maximum players cannot exceed 50" });
       }
       
-      // Ensure scrimmage is scheduled in the future
-      const now = new Date();
-      if (scrimmageData.dateTime <= now) {
-        return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
-      }
-      
       // Verify league exists and user is a member
       const league = await storage.getLeague(scrimmageData.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
+      }
+      
+      // Ensure scrimmage is scheduled in the future
+      // Use parseLeagueLocalDateTime to convert string to Date for comparison
+      const now = new Date();
+      const scrimmageDateTime = parseLeagueLocalDateTime(scrimmageData.dateTime, league.timezone);
+      if (scrimmageDateTime <= now) {
+        return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
       }
       
       const membership = await storage.getUserLeagueMembership(userId, scrimmageData.leagueId);
@@ -10503,10 +10478,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Handle recurring events
       if (scrimmageData.isRecurring && scrimmageData.recurrenceType !== 'none') {
         // Generate all recurring dates
+        // Use parseLeagueLocalDateTime to convert string to Date for date arithmetic
         const dates: Date[] = [];
-        const startDate = new Date(scrimmageData.dateTime);
+        const startDate = parseLeagueLocalDateTime(scrimmageData.dateTime, league.timezone);
         const maxOccurrences = scrimmageData.recurrenceCount || 52; // Default max to prevent infinite loops
-        const endDate = scrimmageData.recurrenceEndDate ? new Date(scrimmageData.recurrenceEndDate) : null;
+        const endDate = scrimmageData.recurrenceEndDate ? parseLeagueLocalDateTime(scrimmageData.recurrenceEndDate, league.timezone) : null;
         
         if (scrimmageData.recurrenceType === 'daily') {
           // Daily recurrence: simple iteration

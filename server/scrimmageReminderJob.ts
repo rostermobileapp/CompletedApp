@@ -4,12 +4,15 @@ import { and, eq, gt, lt, inArray, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { format } from "date-fns";
 import { sendScheduleReminderPushNotification } from "./oneSignalNotifications";
+import { parseLeagueLocalDateTime } from "./dateUtils";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
 export async function checkAndSendScrimmageReminders(): Promise<void> {
   try {
     const now = new Date();
+    // Convert to ISO string for comparison with string timestamp column
+    const nowStr = now.toISOString();
     
     // Find scrimmages that:
     // 1. Have reminder settings
@@ -20,7 +23,7 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
       .from(scrimmages)
       .where(
         and(
-          gt(scrimmages.dateTime, now),
+          sql`${scrimmages.dateTime} > ${nowStr}`,
           eq(scrimmages.status, 'open'),
           sql`${scrimmages.reminderHoursBefore} IS NOT NULL AND array_length(${scrimmages.reminderHoursBefore}, 1) > 0`
         )
@@ -31,7 +34,10 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
         continue;
       }
       
-      const scrimmageTime = new Date(scrimmage.dateTime);
+      // Get league timezone for proper date conversion
+      const league = await storage.getLeague(scrimmage.leagueId);
+      const timezone = league?.timezone || 'America/New_York';
+      const scrimmageTime = parseLeagueLocalDateTime(scrimmage.dateTime, timezone);
       const hoursUntil = (scrimmageTime.getTime() - now.getTime()) / (1000 * 60 * 60);
       
       // Find which reminders should be sent now

@@ -1,7 +1,7 @@
 import { storage } from './storage';
-import { addDays, subDays, isBefore, isAfter, startOfDay, setHours, setMinutes } from 'date-fns';
+import { addDays, subDays, isBefore, isAfter, startOfDay, setHours, setMinutes, format } from 'date-fns';
 import { sendScrimmageInvitePushNotification } from './oneSignalNotifications';
-import { formatScrimmageDateTime, formatDayAndTime } from './dateUtils';
+import { formatScrimmageDateTime, formatDayAndTime, parseLeagueLocalDateTime } from './dateUtils';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -54,7 +54,11 @@ async function checkAndSendInvitations() {
       }
 
       // Calculate when the invite should be sent
-      const inviteSendDate = subDays(new Date(scrimmage.dateTime), scrimmage.inviteDaysBefore);
+      // Get league timezone for proper date conversion
+      const league = await storage.getLeague(scrimmage.leagueId);
+      const timezone = league?.timezone || 'America/New_York';
+      const scrimmageDate = parseLeagueLocalDateTime(scrimmage.dateTime, timezone);
+      const inviteSendDate = subDays(scrimmageDate, scrimmage.inviteDaysBefore);
       
       // If inviteTimeOfDay is specified, use that time
       let inviteSendDateTime = startOfDay(inviteSendDate);
@@ -145,12 +149,16 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
   const createdOccurrences: any[] = [];
   const now = new Date();
   const horizonDate = addDays(now, horizonWeeks * 7);
-  const startDate = new Date(parentScrimmage.dateTime);
+  
+  // Get league timezone for proper date conversion
+  const league = await storage.getLeague(parentScrimmage.leagueId);
+  const timezone = league?.timezone || 'America/New_York';
+  const startDate = parseLeagueLocalDateTime(parentScrimmage.dateTime, timezone);
   
   // Determine recurrence end date
   let endDate = horizonDate;
   if (parentScrimmage.recurrenceEndDate) {
-    endDate = new Date(parentScrimmage.recurrenceEndDate);
+    endDate = parseLeagueLocalDateTime(parentScrimmage.recurrenceEndDate, timezone);
     if (isAfter(endDate, horizonDate)) {
       endDate = horizonDate;
     }

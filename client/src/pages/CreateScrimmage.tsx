@@ -229,9 +229,16 @@ export default function CreateScrimmage() {
   // Pre-populate form when editing an existing scrimmage
   useEffect(() => {
     if (isEditMode && existingScrimmage && !formInitialized) {
-      const dateTime = new Date(existingScrimmage.dateTime);
-      const dateStr = format(dateTime, 'yyyy-MM-dd');
-      const timeStr = format(dateTime, 'HH:mm');
+      // Parse league-local datetime string directly without Date conversion
+      // dateTime is stored as "2025-01-15T18:00" (league-local time)
+      const dateTimeStr = existingScrimmage.dateTime || '';
+      const [datePart, timePart] = dateTimeStr.split('T');
+      const dateStr = datePart || '';
+      const timeStr = timePart ? timePart.slice(0, 5) : ''; // Get HH:mm
+      
+      // Parse recurrence end date directly from string
+      const recurrenceEndDateStr = existingScrimmage.recurrenceEndDate || '';
+      const recurrenceEndDatePart = recurrenceEndDateStr ? recurrenceEndDateStr.split('T')[0] : '';
       
       form.reset({
         title: existingScrimmage.title || '',
@@ -246,7 +253,7 @@ export default function CreateScrimmage() {
         recurrenceType: existingScrimmage.recurrenceType || 'none',
         recurrenceDays: existingScrimmage.recurrenceDays || [],
         recurrenceEndType: existingScrimmage.recurrenceEndDate ? 'date' : existingScrimmage.recurrenceCount ? 'count' : 'never',
-        recurrenceEndDate: existingScrimmage.recurrenceEndDate ? format(new Date(existingScrimmage.recurrenceEndDate), 'yyyy-MM-dd') : '',
+        recurrenceEndDate: recurrenceEndDatePart,
         recurrenceCount: existingScrimmage.recurrenceCount || 1,
         enableInviteScheduling: !!existingScrimmage.inviteDaysBefore,
         sendInviteNow: false, // Don't send invites again on edit

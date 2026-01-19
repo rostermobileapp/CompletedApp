@@ -4,27 +4,61 @@ import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 const DEFAULT_TIMEZONE = 'America/New_York';
 
 /**
- * Parse a datetime string and create a Date object that preserves the wall-clock time.
- * This prevents unwanted timezone conversions when storing times in the league's local timezone.
+ * Parse a league-local datetime string into a proper UTC Date object.
+ * This should be used when you need to do date arithmetic or comparisons.
  * 
- * @param dateTimeString - A datetime string like "2025-01-15T18:00" or "2025-01-15T18:00:00"
- * @returns A Date object where the UTC time equals the input wall-clock time
+ * @param localDateTimeString - A datetime string like "2025-01-15T18:00" representing league local time
+ * @param leagueTimezone - The IANA timezone of the league (e.g., 'America/New_York')
+ * @returns A Date object representing the correct UTC instant
+ * 
+ * @example
+ * // If league is EST (UTC-5), "2025-01-15T18:00" (6 PM EST) becomes:
+ * // Date representing 2025-01-15T23:00:00Z (11 PM UTC)
+ * parseLeagueLocalDateTime("2025-01-15T18:00", "America/New_York")
  */
-export function parseLocalDateTime(dateTimeString: string): Date {
-  if (!dateTimeString) {
+export function parseLeagueLocalDateTime(localDateTimeString: string, leagueTimezone: string | null | undefined): Date {
+  if (!localDateTimeString) {
     return new Date();
   }
   
+  const tz = leagueTimezone || DEFAULT_TIMEZONE;
+  
   // If already has timezone designator (Z, +, or -), parse directly
-  if (dateTimeString.endsWith('Z') || 
-      dateTimeString.includes('+') || 
-      (dateTimeString.length > 10 && dateTimeString.includes('-', 10))) {
-    return new Date(dateTimeString);
+  if (localDateTimeString.endsWith('Z') || 
+      localDateTimeString.includes('+') || 
+      (localDateTimeString.length > 10 && localDateTimeString.includes('-', 10))) {
+    return new Date(localDateTimeString);
   }
   
-  // Append 'Z' to treat the local time as UTC, preventing timezone offset
-  // This ensures "18:00" is stored as 18:00, not converted based on server timezone
-  return new Date(dateTimeString + 'Z');
+  // Convert from league local time to UTC using the league timezone
+  // This creates a proper UTC instant from a league-local time string
+  return fromZonedTime(localDateTimeString, tz);
+}
+
+/**
+ * Format a league-local datetime string for storage.
+ * Normalizes the format to ensure consistent storage.
+ * 
+ * @param dateTimeString - A datetime string like "2025-01-15T18:00"
+ * @returns A normalized datetime string
+ */
+export function normalizeLocalDateTimeString(dateTimeString: string): string {
+  if (!dateTimeString) {
+    return new Date().toISOString().slice(0, 19);
+  }
+  
+  // Remove timezone designator if present - we want to store league-local time
+  if (dateTimeString.endsWith('Z')) {
+    return dateTimeString.slice(0, -1);
+  }
+  
+  // Remove timezone offset if present (e.g., +05:00 or -05:00)
+  const tzOffsetMatch = dateTimeString.match(/[+-]\d{2}:\d{2}$/);
+  if (tzOffsetMatch) {
+    return dateTimeString.slice(0, -6);
+  }
+  
+  return dateTimeString;
 }
 
 /**
@@ -39,8 +73,13 @@ export function shouldShowEventBasedOnLeagueNoon(
   leagueTimezone: string
 ): boolean {
   const now = new Date();
-  const eventDateObj = typeof eventDate === 'string' ? new Date(eventDate) : eventDate;
   const tz = leagueTimezone || DEFAULT_TIMEZONE;
+  
+  // If eventDate is a string (league-local datetime), use parseLeagueLocalDateTime to correctly
+  // interpret it in the league's timezone context
+  const eventDateObj = typeof eventDate === 'string' 
+    ? parseLeagueLocalDateTime(eventDate, tz) 
+    : eventDate;
   
   try {
     // Step 1: Convert the event time (UTC) to the league's local timezone
@@ -71,7 +110,13 @@ export function formatDateInTimezone(
   timezone?: string | null
 ): string {
   const tz = timezone || DEFAULT_TIMEZONE;
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  // If date is a string (league-local datetime), use parseLeagueLocalDateTime to correctly
+  // interpret it in the league's timezone context before formatting
+  // If date is already a Date object, use it directly (assumed to be UTC)
+  const dateObj = typeof date === 'string' 
+    ? parseLeagueLocalDateTime(date, tz) 
+    : date;
   
   try {
     return formatInTimeZone(dateObj, tz, formatStr);

@@ -2376,7 +2376,7 @@ export const insertGameSchema = createInsertSchema(games).omit({
   id: true,
   createdAt: true,
 }).extend({
-  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  // Keep datetime as string - stored as league-local time
   scheduledAt: z.string(),
 });
 
@@ -2395,7 +2395,7 @@ export const insertPersonalReminderSchema = createInsertSchema(personalReminders
   createdAt: true,
   updatedAt: true,
 }).extend({
-  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  // Keep datetime as string - stored as league-local time
   scheduledAt: z.string(),
 });
 
@@ -2615,7 +2615,7 @@ export const createTeamEventRequestSchema = createInsertSchema(teamEvents).omit(
   createdAt: true,
   updatedAt: true,
 }).extend({
-  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  // Keep datetime as string - stored as league-local time
   scheduledAt: z.string(),
   endTime: z.string().optional().nullable(),
 });
@@ -2627,7 +2627,7 @@ export const updateTeamEventRequestSchema = createInsertSchema(teamEvents).omit(
   createdAt: true,
   updatedAt: true,
 }).partial().extend({
-  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  // Keep datetime as string - stored as league-local time
   scheduledAt: z.string().optional(),
   endTime: z.string().optional().nullable(),
 });
@@ -2656,7 +2656,7 @@ export const createPaymentRequestSchema = createInsertSchema(paymentRequests).om
   createdAt: true,
   updatedAt: true,
 }).extend({
-  // Keep datetime as string - preserves the deadline in local time
+  // Keep datetime as string - stored as league-local time
   deadline: z.string().optional().nullable(),
   recipientUserIds: z.array(z.string()).min(1, "At least one recipient is required"),
 });
@@ -2765,7 +2765,7 @@ export const updateScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   createdAt: true,
   updatedAt: true,
 }).partial().extend({
-  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  // Keep datetime as string - stored as league-local time
   dateTime: z.string().optional(),
 });
 
@@ -3215,7 +3215,7 @@ export const insertLeaguePhotoTagSchema = createInsertSchema(leaguePhotoTags).om
 
 // Update tournament match schema for PATCH operations
 export const updateTournamentMatchSchema = z.object({
-  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  // Keep datetime as string - stored as league-local time
   scheduledTime: z.string().nullable().optional(),
   location: z.string().nullable().optional(),
   team1Score: z.number().int().nullable().optional(),

@@ -22,6 +22,19 @@ The backend is a modular REST API developed with Express.js and TypeScript. Auth
 
 PostgreSQL is the primary database, managed with Drizzle ORM for type-safe operations and Drizzle Kit for migration management.
 
+## Timezone Management
+
+The platform uses a **league-local string storage** approach for datetime handling to prevent incorrect UTC conversions:
+
+- **Storage**: Timestamp columns (games.scheduledAt, scrimmages.dateTime, teamEvents.scheduledAt/endTime, tournamentMatches.scheduledTime, personalReminders.scheduledAt) use Drizzle's `{ mode: 'string' }` to store datetimes as league-local strings (e.g., "2025-01-15T18:00")
+- **API Schemas**: Zod schemas accept datetime strings without Date transformation
+- **Date Arithmetic**: The `parseLeagueLocalDateTime(localString, leagueTimezone)` helper in `server/dateUtils.ts` converts league-local strings to UTC Date objects when comparisons or arithmetic are needed
+- **Formatting**: `formatDateInTimezone()` and related helpers use `parseLeagueLocalDateTime` to properly interpret league-local strings before formatting for display
+- **Background Jobs**: Event reminder and scrimmage invite jobs fetch league timezone before parsing datetime strings
+- **Frontend**: Forms send datetime strings directly without Date conversion; edit forms parse strings directly (e.g., `dateTimeStr.split('T')`) to extract date/time parts
+
+This approach ensures times remain consistent across storage, display, and calculations regardless of server timezone.
+
 ## Authentication and Authorization
 
 Supabase Authentication manages user authentication via email/password and JWT tokens. The backend validates these tokens using a Supabase service role key. A role-based access control system (`free_tier`, `player_pro`, `commissioner`, `secondary_commissioner`) is enforced at both API and UI levels, with real-time subscription enforcement via Stripe webhooks.
