@@ -67,13 +67,14 @@ import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 import MediaGalleryPage from "@/pages/MediaGallery";
 import TeamView from "@/pages/TeamView";
 import TeamEventDetails from "@/pages/TeamEventDetails";
+import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
 function LoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-black" data-testid="loading-app">
       <div className="relative w-32 h-32 flex items-center justify-center">
         <img 
-          src="/assets/Home_Logo_1768857215157.png" 
+          src={rosterLogo} 
           alt="Roster Logo" 
           className="w-20 h-20 object-contain z-10"
         />
