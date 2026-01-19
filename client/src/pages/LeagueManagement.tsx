@@ -549,6 +549,11 @@ export default function LeagueManagement() {
   const [scheduleImportFile, setScheduleImportFile] = useState<File | null>(null);
   const scheduleFileInputRef = React.useRef<HTMLInputElement>(null);
   
+  // Games list scroll refs
+  const gamesListDesktopRef = React.useRef<HTMLDivElement>(null);
+  const gamesListMobileRef = React.useRef<HTMLDivElement>(null);
+  const [hasScrolledToNextGame, setHasScrolledToNextGame] = useState(false);
+  
   // Approval modal state
   const [selectedMember, setSelectedMember] = useState<LeagueMember | null>(null);
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -861,6 +866,49 @@ export default function LeagueManagement() {
       return dateA.getTime() - dateB.getTime();
     });
   }, [gamesData]);
+
+  // Auto-scroll to next upcoming game when list view is shown
+  useEffect(() => {
+    if (gamesViewMode !== 'list' || hasScrolledToNextGame || games.length === 0) return;
+    
+    const now = new Date();
+    const sortedGames = [...games].sort((a, b) => 
+      new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+    );
+    
+    // Find the first game that is today or in the future
+    const nextGameIndex = sortedGames.findIndex(game => {
+      const gameDate = new Date(game.scheduledAt);
+      return gameDate >= now;
+    });
+    
+    if (nextGameIndex >= 0) {
+      const nextGame = sortedGames[nextGameIndex];
+      
+      // Small delay to ensure DOM is rendered
+      setTimeout(() => {
+        // Try desktop container first
+        const desktopContainer = gamesListDesktopRef.current;
+        if (desktopContainer) {
+          const gameRow = desktopContainer.querySelector(`[data-game-id="${nextGame.id}"]`);
+          if (gameRow) {
+            gameRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+        
+        // Try mobile container
+        const mobileContainer = gamesListMobileRef.current;
+        if (mobileContainer) {
+          const gameCard = mobileContainer.querySelector(`[data-game-id="${nextGame.id}"]`);
+          if (gameCard) {
+            gameCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+        
+        setHasScrolledToNextGame(true);
+      }, 100);
+    }
+  }, [gamesViewMode, games, hasScrolledToNextGame]);
   
   // Centralized commissioner check (after league query)
   const isCommissioner = React.useMemo(() => {
@@ -3309,7 +3357,7 @@ export default function LeagueManagement() {
                         setShowEditGame(true);
                       }} />
                     ) : (
-                      <div className="max-h-[600px] overflow-y-auto border rounded-lg">
+                      <div ref={gamesListDesktopRef} className="max-h-[600px] overflow-y-auto border rounded-lg">
                         <table className="w-full">
                           <thead className="bg-muted/50 sticky top-0 z-10">
                             <tr>
@@ -3345,6 +3393,7 @@ export default function LeagueManagement() {
                                       setShowEditGame(true);
                                     }}
                                     data-testid={`game-${game.id}`}
+                                    data-game-id={game.id}
                                   >
                                     <td className="p-3 text-sm">
                                       <div>{gameDate.toLocaleDateString()}</div>
@@ -3428,7 +3477,7 @@ export default function LeagueManagement() {
 
                   {/* Mobile: Always show list view with scrolling and sorting */}
                   <div className="md:hidden">
-                    <div className="max-h-[600px] overflow-y-auto space-y-3 border rounded-lg p-2">
+                    <div ref={gamesListMobileRef} className="max-h-[600px] overflow-y-auto space-y-3 border rounded-lg p-2">
                       {(() => {
                         // Sort games by date (chronological order)
                         const sortedGames = [...games].sort((a, b) => {
@@ -3454,6 +3503,7 @@ export default function LeagueManagement() {
                                 setShowEditGame(true);
                               }}
                               data-testid={`game-${game.id}`}
+                              data-game-id={game.id}
                             >
                               {/* Scrimmage Badge */}
                               {game.isScrimmage && (
