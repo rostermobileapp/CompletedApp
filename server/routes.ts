@@ -5020,9 +5020,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = req.body;
       
       // Convert scheduledAt string to Date object if present
-      // Frontend sends format: "2025-10-27T22:30" (local time)
+      // Frontend sends format: "2025-10-27T22:30" (local time in league timezone)
+      // Append 'Z' to preserve the exact time value without local-to-UTC conversion
       if (updates.scheduledAt && typeof updates.scheduledAt === 'string') {
-        updates.scheduledAt = new Date(updates.scheduledAt);
+        const val = updates.scheduledAt;
+        if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+          updates.scheduledAt = new Date(val);
+        } else {
+          updates.scheduledAt = new Date(val + 'Z');
+        }
       }
       
       const updatedGame = await storage.updateGame(gameId, updates);
@@ -10395,16 +10401,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========== SCRIMMAGE ROUTES ==========
 
   // Custom schema for API request that handles string-to-Date conversion
+  // Preserves time values without UTC conversion by appending 'Z' to local time strings
   const createScrimmageApiSchema = insertScrimmageSchema.extend({
     dateTime: z.preprocess((val) => {
       if (typeof val === 'string') {
-        return new Date(val);
+        // Append 'Z' to preserve the exact time value without local-to-UTC conversion
+        if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+          return new Date(val);
+        }
+        return new Date(val + 'Z');
       }
       return val;
     }, z.date()),
     recurrenceEndDate: z.preprocess((val) => {
       if (typeof val === 'string' && val !== '') {
-        return new Date(val);
+        // Append 'Z' to preserve the exact time value without local-to-UTC conversion
+        if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+          return new Date(val);
+        }
+        return new Date(val + 'Z');
       }
       return null;
     }, z.date().nullable().optional()),

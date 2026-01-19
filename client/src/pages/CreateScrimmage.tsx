@@ -321,20 +321,22 @@ export default function CreateScrimmage() {
       }
       
       // Map form fields to database schema
+      // Send datetime strings directly without timezone conversion
+      // The datetime is in the league's timezone and should be stored as-is
       const scrimmageData = {
         title: data.title,
         notes: data.notes,
         skillLevel: data.skillLevel,
         location: data.venue, // Map venue to location
         maxPlayers: data.maxParticipants, // Map maxParticipants to maxPlayers
-        dateTime: new Date(`${data.date}T${data.time}`), // Combine date and time
+        dateTime: `${data.date}T${data.time}`, // Send as string without UTC conversion
         costPerPlayer: data.costPerPlayer ? data.costPerPlayer : null, // Optional cost
         // Recurring event data
         isRecurring: data.isRecurring,
         recurrenceType: data.isRecurring ? data.recurrenceType : 'none',
         recurrenceDays: data.isRecurring && data.recurrenceType === 'weekly' ? data.recurrenceDays : null,
         recurrenceEndDate: data.isRecurring && data.recurrenceEndType === 'date' && data.recurrenceEndDate 
-          ? new Date(data.recurrenceEndDate) 
+          ? data.recurrenceEndDate // Send as string without UTC conversion
           : null,
         recurrenceCount: data.isRecurring && data.recurrenceEndType === 'count' ? data.recurrenceCount : null,
         // Invitation scheduling for recurring scrimmages

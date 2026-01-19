@@ -4,6 +4,30 @@ import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 const DEFAULT_TIMEZONE = 'America/New_York';
 
 /**
+ * Parse a datetime string and create a Date object that preserves the wall-clock time.
+ * This prevents unwanted timezone conversions when storing times in the league's local timezone.
+ * 
+ * @param dateTimeString - A datetime string like "2025-01-15T18:00" or "2025-01-15T18:00:00"
+ * @returns A Date object where the UTC time equals the input wall-clock time
+ */
+export function parseLocalDateTime(dateTimeString: string): Date {
+  if (!dateTimeString) {
+    return new Date();
+  }
+  
+  // If already has timezone designator (Z, +, or -), parse directly
+  if (dateTimeString.endsWith('Z') || 
+      dateTimeString.includes('+') || 
+      (dateTimeString.length > 10 && dateTimeString.includes('-', 10))) {
+    return new Date(dateTimeString);
+  }
+  
+  // Append 'Z' to treat the local time as UTC, preventing timezone offset
+  // This ensures "18:00" is stored as 18:00, not converted based on server timezone
+  return new Date(dateTimeString + 'Z');
+}
+
+/**
  * Check if an event should still be visible based on league timezone.
  * Events remain visible until noon the day after they're scheduled.
  * @param eventDate - The date/time of the event (in UTC)

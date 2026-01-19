@@ -2376,7 +2376,15 @@ export const insertGameSchema = createInsertSchema(games).omit({
   id: true,
   createdAt: true,
 }).extend({
-  scheduledAt: z.string().transform((val) => new Date(val)),
+  // Parse datetime string without timezone conversion - treat as-is (league local time)
+  // Append 'Z' to prevent local-to-UTC conversion, preserving the exact time value
+  scheduledAt: z.string().transform((val) => {
+    // If already has timezone designator, use as-is; otherwise append Z to preserve time value
+    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+      return new Date(val);
+    }
+    return new Date(val + 'Z');
+  }),
 });
 
 export const insertDutyTemplateSchema = createInsertSchema(dutyTemplates).omit({
@@ -2394,7 +2402,13 @@ export const insertPersonalReminderSchema = createInsertSchema(personalReminders
   createdAt: true,
   updatedAt: true,
 }).extend({
-  scheduledAt: z.string().transform((val) => new Date(val)),
+  // Parse datetime string without timezone conversion - treat as-is (league local time)
+  scheduledAt: z.string().transform((val) => {
+    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+      return new Date(val);
+    }
+    return new Date(val + 'Z');
+  }),
 });
 
 export const insertGameScoreSubmissionSchema = createInsertSchema(gameScoreSubmissions).omit({
@@ -2613,8 +2627,20 @@ export const createTeamEventRequestSchema = createInsertSchema(teamEvents).omit(
   createdAt: true,
   updatedAt: true,
 }).extend({
-  scheduledAt: z.string().transform((val) => new Date(val)),
-  endTime: z.string().optional().nullable().transform((val) => val ? new Date(val) : null),
+  // Parse datetime string without timezone conversion - preserve league local time
+  scheduledAt: z.string().transform((val) => {
+    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+      return new Date(val);
+    }
+    return new Date(val + 'Z');
+  }),
+  endTime: z.string().optional().nullable().transform((val) => {
+    if (!val) return null;
+    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+      return new Date(val);
+    }
+    return new Date(val + 'Z');
+  }),
 });
 
 export const updateTeamEventRequestSchema = createInsertSchema(teamEvents).omit({
@@ -2624,8 +2650,20 @@ export const updateTeamEventRequestSchema = createInsertSchema(teamEvents).omit(
   createdAt: true,
   updatedAt: true,
 }).partial().extend({
-  scheduledAt: z.string().transform((val) => new Date(val)).optional(),
-  endTime: z.string().optional().nullable().transform((val) => val ? new Date(val) : null),
+  // Parse datetime string without timezone conversion - preserve league local time
+  scheduledAt: z.string().transform((val) => {
+    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+      return new Date(val);
+    }
+    return new Date(val + 'Z');
+  }).optional(),
+  endTime: z.string().optional().nullable().transform((val) => {
+    if (!val) return null;
+    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+      return new Date(val);
+    }
+    return new Date(val + 'Z');
+  }),
 });
 
 export const insertTeamEventRsvpSchema = createInsertSchema(teamEventRsvps).omit({
@@ -2652,7 +2690,14 @@ export const createPaymentRequestSchema = createInsertSchema(paymentRequests).om
   createdAt: true,
   updatedAt: true,
 }).extend({
-  deadline: z.string().optional().nullable().transform((val) => val ? new Date(val) : null),
+  // Parse datetime string without timezone conversion - preserve league local time
+  deadline: z.string().optional().nullable().transform((val) => {
+    if (!val) return null;
+    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+      return new Date(val);
+    }
+    return new Date(val + 'Z');
+  }),
   recipientUserIds: z.array(z.string()).min(1, "At least one recipient is required"),
 });
 
@@ -2760,7 +2805,13 @@ export const updateScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   createdAt: true,
   updatedAt: true,
 }).partial().extend({
-  dateTime: z.string().transform((val) => new Date(val)).optional(),
+  // Parse datetime string without timezone conversion - preserve league local time
+  dateTime: z.string().transform((val) => {
+    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+      return new Date(val);
+    }
+    return new Date(val + 'Z');
+  }).optional(),
 });
 
 // Substitute request API validation schemas
@@ -3209,8 +3260,15 @@ export const insertLeaguePhotoTagSchema = createInsertSchema(leaguePhotoTags).om
 
 // Update tournament match schema for PATCH operations
 export const updateTournamentMatchSchema = z.object({
+  // Parse datetime string without timezone conversion - preserve league local time
   scheduledTime: z.union([
-    z.string().transform(val => val ? new Date(val) : null),
+    z.string().transform(val => {
+      if (!val) return null;
+      if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
+        return new Date(val);
+      }
+      return new Date(val + 'Z');
+    }),
     z.null()
   ]).optional(),
   location: z.string().nullable().optional(),
