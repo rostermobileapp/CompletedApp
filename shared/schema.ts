@@ -2376,15 +2376,8 @@ export const insertGameSchema = createInsertSchema(games).omit({
   id: true,
   createdAt: true,
 }).extend({
-  // Parse datetime string without timezone conversion - treat as-is (league local time)
-  // Append 'Z' to prevent local-to-UTC conversion, preserving the exact time value
-  scheduledAt: z.string().transform((val) => {
-    // If already has timezone designator, use as-is; otherwise append Z to preserve time value
-    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-      return new Date(val);
-    }
-    return new Date(val + 'Z');
-  }),
+  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  scheduledAt: z.string(),
 });
 
 export const insertDutyTemplateSchema = createInsertSchema(dutyTemplates).omit({
@@ -2402,13 +2395,8 @@ export const insertPersonalReminderSchema = createInsertSchema(personalReminders
   createdAt: true,
   updatedAt: true,
 }).extend({
-  // Parse datetime string without timezone conversion - treat as-is (league local time)
-  scheduledAt: z.string().transform((val) => {
-    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-      return new Date(val);
-    }
-    return new Date(val + 'Z');
-  }),
+  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  scheduledAt: z.string(),
 });
 
 export const insertGameScoreSubmissionSchema = createInsertSchema(gameScoreSubmissions).omit({
@@ -2627,20 +2615,9 @@ export const createTeamEventRequestSchema = createInsertSchema(teamEvents).omit(
   createdAt: true,
   updatedAt: true,
 }).extend({
-  // Parse datetime string without timezone conversion - preserve league local time
-  scheduledAt: z.string().transform((val) => {
-    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-      return new Date(val);
-    }
-    return new Date(val + 'Z');
-  }),
-  endTime: z.string().optional().nullable().transform((val) => {
-    if (!val) return null;
-    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-      return new Date(val);
-    }
-    return new Date(val + 'Z');
-  }),
+  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  scheduledAt: z.string(),
+  endTime: z.string().optional().nullable(),
 });
 
 export const updateTeamEventRequestSchema = createInsertSchema(teamEvents).omit({
@@ -2650,20 +2627,9 @@ export const updateTeamEventRequestSchema = createInsertSchema(teamEvents).omit(
   createdAt: true,
   updatedAt: true,
 }).partial().extend({
-  // Parse datetime string without timezone conversion - preserve league local time
-  scheduledAt: z.string().transform((val) => {
-    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-      return new Date(val);
-    }
-    return new Date(val + 'Z');
-  }).optional(),
-  endTime: z.string().optional().nullable().transform((val) => {
-    if (!val) return null;
-    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-      return new Date(val);
-    }
-    return new Date(val + 'Z');
-  }),
+  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  scheduledAt: z.string().optional(),
+  endTime: z.string().optional().nullable(),
 });
 
 export const insertTeamEventRsvpSchema = createInsertSchema(teamEventRsvps).omit({
@@ -2690,14 +2656,8 @@ export const createPaymentRequestSchema = createInsertSchema(paymentRequests).om
   createdAt: true,
   updatedAt: true,
 }).extend({
-  // Parse datetime string without timezone conversion - preserve league local time
-  deadline: z.string().optional().nullable().transform((val) => {
-    if (!val) return null;
-    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-      return new Date(val);
-    }
-    return new Date(val + 'Z');
-  }),
+  // Keep datetime as string - preserves the deadline in local time
+  deadline: z.string().optional().nullable(),
   recipientUserIds: z.array(z.string()).min(1, "At least one recipient is required"),
 });
 
@@ -2805,13 +2765,8 @@ export const updateScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   createdAt: true,
   updatedAt: true,
 }).partial().extend({
-  // Parse datetime string without timezone conversion - preserve league local time
-  dateTime: z.string().transform((val) => {
-    if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-      return new Date(val);
-    }
-    return new Date(val + 'Z');
-  }).optional(),
+  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  dateTime: z.string().optional(),
 });
 
 // Substitute request API validation schemas
@@ -3260,17 +3215,8 @@ export const insertLeaguePhotoTagSchema = createInsertSchema(leaguePhotoTags).om
 
 // Update tournament match schema for PATCH operations
 export const updateTournamentMatchSchema = z.object({
-  // Parse datetime string without timezone conversion - preserve league local time
-  scheduledTime: z.union([
-    z.string().transform(val => {
-      if (!val) return null;
-      if (val.endsWith('Z') || val.includes('+') || val.includes('-', 10)) {
-        return new Date(val);
-      }
-      return new Date(val + 'Z');
-    }),
-    z.null()
-  ]).optional(),
+  // Keep datetime as string - Drizzle column uses { mode: 'string' } to preserve league local time
+  scheduledTime: z.string().nullable().optional(),
   location: z.string().nullable().optional(),
   team1Score: z.number().int().nullable().optional(),
   team2Score: z.number().int().nullable().optional(),
