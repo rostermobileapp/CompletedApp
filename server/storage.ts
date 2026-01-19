@@ -4669,6 +4669,7 @@ export class DatabaseStorage implements IStorage {
       homeScore: row.home_score as number | null,
       awayScore: row.away_score as number | null,
       isCompleted: row.is_completed as boolean,
+      isScrimmage: row.is_scrimmage as boolean,
       homeBeverageDutyUserId: row.home_beverage_duty_user_id as string | null,
       homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at as Date | null,
       awayBeverageDutyUserId: row.away_beverage_duty_user_id as string | null,
