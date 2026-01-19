@@ -337,6 +337,7 @@ export interface IStorage {
   requestTeamMembership(membership: InsertTeamMembership): Promise<TeamMembership>;
   approveTeamMembership(membershipId: string, approverId: string): Promise<TeamMembership>;
   getTeamMembers(teamId: string): Promise<(TeamMembership & { user: User })[]>;
+  getTeamMembership(userId: string, teamId: string): Promise<TeamMembership | undefined>;
   leaveTeam(userId: string, teamId: string): Promise<void>;
   
   // Game operations
@@ -3065,6 +3066,62 @@ export class DatabaseStorage implements IStorage {
     );
 
     return uniqueMembers;
+  }
+
+  async getTeamMembership(userId: string, teamId: string): Promise<TeamMembership | undefined> {
+    // Check direct team membership first
+    const [directMembership] = await db
+      .select()
+      .from(teamMemberships)
+      .where(
+        and(
+          eq(teamMemberships.userId, userId),
+          eq(teamMemberships.teamId, teamId),
+          eq(teamMemberships.status, 'approved')
+        )
+      );
+
+    if (directMembership) {
+      return directMembership;
+    }
+
+    // Check if user is assigned to this team via league membership
+    const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
+    if (!team?.leagueId) {
+      return undefined;
+    }
+
+    // Check if user has league membership assigned to this team
+    const [leagueMembershipAssignment] = await db
+      .select()
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.leagueId, team.leagueId),
+          eq(leagueMemberships.assignedTeamId, teamId),
+          eq(leagueMemberships.status, 'approved')
+        )
+      );
+
+    if (leagueMembershipAssignment) {
+      // User is assigned to this team via league membership - return a minimal membership
+      // indicating they are a valid member (used for authorization checks)
+      return {
+        id: leagueMembershipAssignment.id,
+        userId,
+        teamId,
+        status: 'approved',
+        approvedBy: null,
+        position: null,
+        jerseyNumber: null,
+        skillLevel: null,
+        joinedAt: leagueMembershipAssignment.joinedAt,
+        isCaptain: false,
+      };
+    }
+
+    return undefined;
   }
 
   async leaveTeam(userId: string, teamId: string): Promise<void> {
