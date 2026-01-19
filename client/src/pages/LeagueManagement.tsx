@@ -266,6 +266,7 @@ type Game = {
   homeScore?: number; // Added missing property
   awayScore?: number; // Added missing property
   isCompleted: boolean; // Added missing property
+  isScrimmage?: boolean; // Scrimmage indicator
   resultType?: 'regulation' | 'overtime' | 'shootout'; // Added for OTL tracking
   homeBeverageDutyUserId?: string;
   homeBeverageDutyClaimedAt?: string;
@@ -304,12 +305,13 @@ type CreateGameForm = z.infer<typeof createGameSchema>;
 
 const editGameSchema = z.object({
   homeTeamId: z.string().min(1, 'Home team is required'),
-  awayTeamId: z.string().min(1, 'Away team is required'),
+  awayTeamId: z.string().optional(),
   gameDate: z.string().min(1, 'Game date is required'),
   gameTime: z.string().min(1, 'Game time is required'),
   venue: z.string().optional(),
   homeTeamLockerRoom: z.string().optional(),
   awayTeamLockerRoom: z.string().optional(),
+  isScrimmage: z.boolean().default(false),
 });
 
 type EditGameForm = z.infer<typeof editGameSchema>;
@@ -1021,6 +1023,7 @@ export default function LeagueManagement() {
       venue: '',
       homeTeamLockerRoom: '',
       awayTeamLockerRoom: '',
+      isScrimmage: false,
     },
   });
 
@@ -1037,12 +1040,13 @@ export default function LeagueManagement() {
       
       editGameForm.reset({
         homeTeamId: selectedGame.homeTeamId,
-        awayTeamId: selectedGame.awayTeamId,
+        awayTeamId: selectedGame.awayTeamId || '',
         gameDate: `${year}-${month}-${day}`,
         gameTime: `${hours}:${minutes}`,
         venue: selectedGame.venue || '',
         homeTeamLockerRoom: selectedGame.homeTeamLockerRoom || '',
         awayTeamLockerRoom: selectedGame.awayTeamLockerRoom || '',
+        isScrimmage: selectedGame.isScrimmage || false,
       });
     }
   }, [selectedGame]);
@@ -1972,10 +1976,11 @@ export default function LeagueManagement() {
       // Build update payload - only include scheduledAt if it changed
       const updatePayload: any = {
         homeTeamId: data.homeTeamId,
-        awayTeamId: data.awayTeamId,
+        awayTeamId: data.awayTeamId || null,
         venue: data.venue,
         homeTeamLockerRoom: data.homeTeamLockerRoom,
         awayTeamLockerRoom: data.awayTeamLockerRoom,
+        isScrimmage: data.isScrimmage,
       };
       
       if (shouldUpdateScheduledAt) {
@@ -4723,7 +4728,14 @@ export default function LeagueManagement() {
           <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] overflow-y-auto">
             <div className="p-4">
               <div className="flex items-center justify-between mb-2">
-                <h2 className="text-lg font-bold">Edit Game</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold">Edit Game</h2>
+                  {selectedGame.isScrimmage && (
+                    <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full font-medium">
+                      SCRIMMAGE
+                    </span>
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     setShowEditGame(false);
@@ -4746,6 +4758,36 @@ export default function LeagueManagement() {
                 })}
                 className="space-y-2"
               >
+                {/* Game/Scrimmage Toggle */}
+                <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => editGameForm.setValue('isScrimmage', false)}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                      !editGameForm.watch('isScrimmage')
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    data-testid="button-edit-game-type"
+                  >
+                    Game
+                    <span className="block text-xs font-normal opacity-70">Counts for standings</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => editGameForm.setValue('isScrimmage', true)}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                      editGameForm.watch('isScrimmage')
+                        ? 'bg-orange-500 text-white shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    data-testid="button-edit-scrimmage-type"
+                  >
+                    Scrimmage
+                    <span className="block text-xs font-normal opacity-70">No stats/standings</span>
+                  </button>
+                </div>
+
                 {/* Teams Row */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
