@@ -22,7 +22,8 @@ export default function PaymentRequests() {
       const response = await apiRequest('GET', '/api/payment-requests/unpaid-count');
       return response.json();
     },
-    refetchInterval: 30000, // Check every 30 seconds
+    refetchInterval: 90000, // Reduced from 30s to 90s to lower egress
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Fetch user's teams to get team-to-league mapping

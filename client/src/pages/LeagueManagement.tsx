@@ -105,8 +105,8 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
   // Fetch count of games that need score verification
   const { data: gamesNeedingVerification = [], isLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games-needing-verification-count'],
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
-    staleTime: 20000,
+    refetchInterval: 90000, // Reduced from 30s to 90s to lower egress
+    staleTime: 5 * 60 * 1000, // 5 minutes
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
       const allGames = await response.json();
@@ -809,6 +809,13 @@ export default function LeagueManagement() {
         if (data.type === 'pending_member_added' && data.leagueId === leagueId) {
           // Refetch pending members to show the new request immediately
           refetchPending();
+        }
+        
+        // Handle real-time notification updates
+        if (data.type === 'notification_update') {
+          queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
         }
       } catch (error) {
         console.error('WebSocket message parse error:', error);

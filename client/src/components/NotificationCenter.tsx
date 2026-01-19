@@ -28,14 +28,14 @@ export function NotificationCenter() {
 
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
     queryKey: ['/api/notifications'],
-    refetchInterval: 30000,
-    staleTime: 10000,
+    refetchInterval: 90000, // Reduced from 30s to 90s to lower egress
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const { data: unreadNotifications = [] } = useQuery<Notification[]>({
     queryKey: ['/api/notifications/unread'],
-    refetchInterval: 10000,
-    staleTime: 5000,
+    refetchInterval: 60000, // Reduced from 10s to 60s to lower egress
+    staleTime: 30000,
   });
 
   const markAsReadMutation = useMutation({

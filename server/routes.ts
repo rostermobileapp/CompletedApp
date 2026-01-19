@@ -95,6 +95,14 @@ export function broadcastToUser(userId: string, message: any) {
   return false;
 }
 
+// Helper function to broadcast notification count update to a user
+// This enables real-time notification badges without polling
+export function broadcastNotificationUpdate(userId: string) {
+  broadcastToUser(userId, {
+    type: 'notification_update',
+    timestamp: new Date().toISOString()
+  });
+}
 
 // Helper function to format date as local time string without timezone suffix
 // Returns format: "YYYY-MM-DDTHH:MM:SS" which prevents timezone adjustments on frontend
@@ -2105,6 +2113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 isRead: false,
                 isDismissed: false,
               });
+              broadcastNotificationUpdate(user.id);
               
               console.log('[Webhook] User downgraded and notification created');
             } else {
@@ -3420,6 +3429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         actionUrl: `/league-management/${leagueId}`,
         actionText: 'View League Management'
       });
+      broadcastNotificationUpdate(targetUser.id);
       
       // Send push notification
       try {
@@ -7680,6 +7690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             actionUrl: `/game/${gameId}`,
             actionText: 'View Game',
           });
+          broadcastNotificationUpdate(substitutePlayerId);
           
           // Send push notification to device (fire and forget)
           const gameInfo = `${homeTeam?.name || 'Home'} vs ${awayTeam?.name || 'Away'}`;
@@ -10605,6 +10616,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 actionUrl: `/scrimmage/${parentScrimmage.id}`,
                 scrimmageId: parentScrimmage.id,
               });
+              broadcastNotificationUpdate(coHostId);
             } catch (coHostError) {
               console.error(`Failed to add co-host ${coHostId}:`, coHostError);
             }
@@ -10763,6 +10775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 actionUrl: `/scrimmage/${scrimmage.id}`,
                 scrimmageId: scrimmage.id,
               });
+              broadcastNotificationUpdate(coHostId);
             } catch (coHostError) {
               console.error(`Failed to add co-host ${coHostId}:`, coHostError);
             }
@@ -11256,6 +11269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               actionText: 'View Details',
               scrimmageId: scrimmage.id,
             });
+            broadcastNotificationUpdate(player.id);
             
             // Send IMMEDIATE push notification - await to ensure delivery
             const scrimmageDateTime = formatScrimmageDateTime(scrimmage.dateTime, timezone);
@@ -11409,6 +11423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             actionText: 'View Details',
             scrimmageId: scrimmage.id,
           });
+          broadcastNotificationUpdate(playerId);
         }
         console.log(`✅ Sent confirmation notifications to ${approvedUserIds.length} approved players`);
       } catch (notificationError) {
@@ -11551,6 +11566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         actionUrl: `/scrimmage/${scrimmageId}`,
         scrimmageId: scrimmageId,
       });
+      broadcastNotificationUpdate(coHostUserId);
       
       // Send push notification
       try {

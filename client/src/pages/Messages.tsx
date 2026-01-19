@@ -624,8 +624,8 @@ export default function Messages() {
   // Fetch unread message counts per conversation
   const { data: unreadCountsData } = useQuery<{ unreadCounts: Array<{ conversationId: string; unreadCount: number }> }>({
     queryKey: ['/api/messages/unread-count-per-conversation'],
-    refetchInterval: 10000, // Poll every 10 seconds
-    staleTime: 5000, // Consider data stale after 5 seconds
+    refetchInterval: 30000, // Reduced from 10s to 30s to lower egress (messages stay more responsive)
+    staleTime: 15000, // Consider data stale after 15 seconds
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
@@ -1159,6 +1159,13 @@ export default function Messages() {
             queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', data.pollId, 'results'] });
             queryClient.invalidateQueries({ queryKey: ['/api/messages', data.messageId, 'polls'] });
           }
+          break;
+          
+        case 'notification_update':
+          // Real-time notification badge update - invalidate notification queries
+          queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
           break;
       }
     };

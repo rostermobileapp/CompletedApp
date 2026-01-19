@@ -25,16 +25,16 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
   
   const { data: unreadData } = useQuery({
     queryKey: ['/api/messages/unread-count'],
-    refetchInterval: 10000,
-    staleTime: 5000,
+    refetchInterval: 60000, // Reduced from 10s to 60s to lower egress
+    staleTime: 30000,
   });
   
   const unreadCount = (unreadData as { count: number } | undefined)?.count ?? 0;
 
   const { data: unpaidPaymentData } = useQuery({
     queryKey: ['/api/payment-requests/unpaid-count'],
-    refetchInterval: 10000,
-    staleTime: 5000,
+    refetchInterval: 60000, // Reduced from 10s to 60s to lower egress
+    staleTime: 30000,
   });
   
   const unpaidPaymentCount = (unpaidPaymentData as { count: number } | undefined)?.count ?? 0;

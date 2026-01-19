@@ -106,7 +106,8 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
   const { data: preferences, isLoading } = useQuery<NotificationPreferences>({
     queryKey: ['/api/notification-preferences'],
     enabled: open,
-    refetchInterval: 3000, // Poll for updates
+    staleTime: 30000, // 30 seconds - only poll when modal is open
+    refetchInterval: open ? 15000 : false, // Poll every 15s only when open (reduced from 3s)
   });
 
   useEffect(() => {

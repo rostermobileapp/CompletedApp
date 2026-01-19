@@ -113,7 +113,8 @@ function AnnouncementBadge({ leagueId, tournamentId }: { leagueId?: string | nul
       return { count: 0 };
     },
     enabled: !!(leagueId || tournamentId),
-    refetchInterval: 30000, // Check every 30 seconds
+    staleTime: 5 * 60 * 1000, // 5 minutes - use cached data
+    refetchInterval: 90000, // Check every 90 seconds (reduced from 30s to lower egress)
   });
 
   if (!unreadCount || unreadCount.count === 0) {
@@ -1555,7 +1556,8 @@ export default function Dashboard() {
   }>({
     queryKey: ['/api/user/notification-counts'],
     enabled: !!supabaseUser, // Only fetch when user is authenticated
-    refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 5 * 60 * 1000, // 5 minutes - use cached data
+    refetchInterval: 90000, // Refetch every 90 seconds (reduced from 30s to lower egress)
   });
   
   // Filter leagues to only show those where user has no team
@@ -1928,7 +1930,8 @@ export default function Dashboard() {
       }
     },
     enabled: !!effectiveLeagueId,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 5 * 60 * 1000, // 5 minutes - use cached data
+    refetchInterval: 90000, // Refresh every 90 seconds (reduced from 30s to lower egress)
   });
 
   return (
