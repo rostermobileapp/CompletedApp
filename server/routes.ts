@@ -4020,8 +4020,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      // Filter past games
+      // Filter past games (exclude scrimmages - they don't require score verification)
       const pastGames = games.filter((game: any) => {
+        if (game.isScrimmage) return false; // Scrimmages don't need score verification
         const gameDate = new Date(game.scheduledAt);
         gameDate.setHours(0, 0, 0, 0);
         return gameDate < today;
@@ -5390,6 +5391,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const gamesNeedingStars = [];
 
       for (const game of allGames) {
+        // Skip scrimmages - they don't require star awards
+        if (game.isScrimmage) {
+          continue;
+        }
+
         // Only check completed games with scores
         if (!game.isCompleted || game.homeScore === null || game.awayScore === null) {
           continue;
