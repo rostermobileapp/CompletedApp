@@ -161,7 +161,7 @@ function CreateTournamentAnnouncementModal({
     for (const mediaFile of mediaFiles) {
       try {
         const uploadResponse = await apiRequest('POST', '/api/announcement-media/upload');
-        const { uploadURL } = await uploadResponse.json();
+        const { uploadURL, path } = await uploadResponse.json();
         
         const fileToUpload = mediaFile.compressed || mediaFile.file;
         
@@ -177,12 +177,9 @@ function CreateTournamentAnnouncementModal({
           throw new Error('Failed to upload file');
         }
         
-        const urlObj = new URL(uploadURL);
-        const objectPath = urlObj.pathname.split('/').pop();
-        
         uploadedAttachments.push({
           type: mediaFile.type,
-          url: `/announcement-media/${objectPath}`,
+          url: path,
           fileName: mediaFile.file.name,
         });
       } catch (error) {

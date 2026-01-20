@@ -184,9 +184,9 @@ function CreateAnnouncementModal({
     
     for (const mediaFile of mediaFiles) {
       try {
-        // Get upload URL
+        // Get upload URL and path from the API
         const uploadResponse = await apiRequest('POST', '/api/announcement-media/upload');
-        const { uploadURL } = await uploadResponse.json();
+        const { uploadURL, path } = await uploadResponse.json();
         
         // Use compressed version if available, otherwise use original
         const fileToUpload = mediaFile.compressed || mediaFile.file;
@@ -204,13 +204,10 @@ function CreateAnnouncementModal({
           throw new Error('Failed to upload file');
         }
         
-        // Extract the object path from the upload URL for serving
-        const urlObj = new URL(uploadURL);
-        const objectPath = urlObj.pathname.split('/').pop();
-        
+        // Use the path returned from the API for serving
         uploadedAttachments.push({
           type: mediaFile.type,
-          url: `/announcement-media/${objectPath}`,
+          url: path,
           fileName: mediaFile.file.name,
         });
       } catch (error) {
