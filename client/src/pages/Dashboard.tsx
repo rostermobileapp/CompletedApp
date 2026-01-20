@@ -966,7 +966,7 @@ function StandingsModal({ isOpen, onClose, leagueId, tournamentId }: {
                         <Link 
                           href={`/team/${team.teamId}`}
                           onClick={onClose}
-                          className="inline-block px-2 py-1 text-primary font-medium underline hover:bg-primary/10 rounded transition-colors cursor-pointer"
+                          className="inline-block px-2 py-1 bg-primary text-white font-medium rounded hover:bg-primary/80 transition-colors cursor-pointer"
                           data-testid={`team-link-${team.teamId}`}
                         >
                           {team.teamName}
