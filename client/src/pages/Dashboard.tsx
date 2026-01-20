@@ -2998,10 +2998,10 @@ export default function Dashboard() {
                 setEventType('reminder');
                 setShowAddEventDialog(false);
               }}
-              className="h-20 flex items-center justify-center text-lg font-semibold text-white hover:bg-blue-600 bg-blue-500 rounded-xl"
+              className="h-20 flex items-center justify-center text-lg font-semibold text-white hover:bg-blue-600 bg-blue-500 rounded-xl text-center px-3"
               data-testid="button-select-reminder"
             >
-              Personal Reminder
+              Personal<br />Reminder
             </Button>
             {canScheduleGames && (
               <Button
