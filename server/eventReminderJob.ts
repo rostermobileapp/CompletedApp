@@ -376,17 +376,24 @@ export async function checkAndSendEventReminders(): Promise<void> {
       
       for (const reminder of pendingReminders) {
         try {
-          await sendPersonalReminderPushNotification(
+          const success = await sendPersonalReminderPushNotification(
             reminder.userId,
             reminder.id,
             reminder.title,
             reminder.description
           );
           
-          await storage.markPersonalReminderNotificationSent(reminder.id);
-          console.log(`✅ Sent personal reminder notification: ${reminder.title} to user ${reminder.userId}`);
+          // Only mark as sent if push notification was actually delivered
+          if (success) {
+            await storage.markPersonalReminderNotificationSent(reminder.id);
+            console.log(`✅ Sent personal reminder notification: ${reminder.title} to user ${reminder.userId}`);
+          } else {
+            // Push failed but don't mark as sent - will retry on next job run
+            console.log(`⚠️ Personal reminder push not delivered (user may not have push enabled): ${reminder.title}`);
+          }
         } catch (error) {
           console.error(`❌ Failed to send personal reminder ${reminder.id}:`, error);
+          // Don't mark as sent - will retry on next job run
         }
       }
     } catch (error) {

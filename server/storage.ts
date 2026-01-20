@@ -5126,16 +5126,19 @@ export class DatabaseStorage implements IStorage {
 
   async getPendingPersonalReminders(): Promise<PersonalReminder[]> {
     const now = new Date();
-    const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
-    const tenMinutesAhead = new Date(now.getTime() + 10 * 60 * 1000);
+    // Use a 15-minute window in the past to catch reminders that should have fired
+    // and 5 minutes ahead to handle scheduling drift
+    // Note: scheduledAt is stored as a string timestamp, so we compare lexicographically
+    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+    const fiveMinutesAhead = new Date(now.getTime() + 5 * 60 * 1000);
     
     return await db.select()
       .from(personalReminders)
       .where(and(
         eq(personalReminders.isCompleted, false),
         isNull(personalReminders.notificationSentAt),
-        sql`${personalReminders.scheduledAt} >= ${tenMinutesAgo.toISOString()}`,
-        sql`${personalReminders.scheduledAt} <= ${tenMinutesAhead.toISOString()}`
+        sql`${personalReminders.scheduledAt} <= ${fiveMinutesAhead.toISOString()}`,
+        sql`${personalReminders.scheduledAt} >= ${fifteenMinutesAgo.toISOString()}`
       ));
   }
 
