@@ -18,13 +18,13 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
     
     return (
       <div 
-        className="fixed bottom-16 left-0 right-0 z-40 cursor-pointer"
+        className="fixed bottom-16 left-0 right-0 z-40 cursor-pointer flex justify-center"
         onClick={handleClick}
       >
         <img 
           src={hpibBannerImage} 
           alt="Hockey Players In Business - Join for only $50/yr"
-          className="w-full h-auto object-cover"
+          className="w-full max-w-2xl h-auto max-h-32 object-cover"
         />
       </div>
     );
