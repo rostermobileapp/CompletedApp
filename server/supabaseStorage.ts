@@ -310,6 +310,26 @@ export class SupabaseStorageService {
     };
   }
 
+  async getAnnouncementMediaSignedUrl(announcementMediaPath: string, expiresIn: number = 3600): Promise<string | null> {
+    if (!announcementMediaPath.startsWith("/announcement-media/")) {
+      return announcementMediaPath;
+    }
+
+    const objectId = announcementMediaPath.slice("/announcement-media/".length);
+    const filePath = `announcement-media/${objectId}`;
+
+    const { data, error } = await this.supabase.storage
+      .from("private")
+      .createSignedUrl(filePath, expiresIn);
+
+    if (error || !data) {
+      console.error("Error creating signed URL for announcement media:", error);
+      return null;
+    }
+
+    return data.signedUrl;
+  }
+
   // Tournament Photos
   async getTournamentPhotoUploadURL(): Promise<{ uploadURL: string; path: string }> {
     const objectId = randomUUID();

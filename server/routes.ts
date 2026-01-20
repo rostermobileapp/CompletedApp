@@ -9622,13 +9622,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[ANNOUNCEMENTS] League ${leagueId}: Returning ${result.announcements.length} announcements (scrimmage invites filtered out)`);
 
+      // Convert attachment URLs to signed URLs (like messages do)
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      
+      const announcementsWithSignedUrls = await Promise.all(
+        result.announcements.map(async (announcement: any) => {
+          if (announcement.attachments && announcement.attachments.length > 0) {
+            const attachmentsWithSignedUrls = await Promise.all(
+              announcement.attachments.map(async (attachment: any) => {
+                if (attachment.url && attachment.url.startsWith('/announcement-media/')) {
+                  const signedUrl = await supabaseStorageService.getAnnouncementMediaSignedUrl(attachment.url);
+                  return {
+                    ...attachment,
+                    url: signedUrl || attachment.url
+                  };
+                }
+                return attachment;
+              })
+            );
+            return { ...announcement, attachments: attachmentsWithSignedUrls };
+          }
+          return announcement;
+        })
+      );
+
       // Pagination is now accurate since visibility filtering happens in SQL
       // Add no-cache headers to ensure fresh data
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
       res.json({
-        announcements: result.announcements,
+        announcements: announcementsWithSignedUrls,
         pagination: {
           page,
           limit,
@@ -10211,9 +10236,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderDirection,
       }, userId);
 
+      // Convert attachment URLs to signed URLs (like messages do)
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      
+      const announcementsWithSignedUrls = await Promise.all(
+        result.announcements.map(async (announcement: any) => {
+          if (announcement.attachments && announcement.attachments.length > 0) {
+            const attachmentsWithSignedUrls = await Promise.all(
+              announcement.attachments.map(async (attachment: any) => {
+                if (attachment.url && attachment.url.startsWith('/announcement-media/')) {
+                  const signedUrl = await supabaseStorageService.getAnnouncementMediaSignedUrl(attachment.url);
+                  return {
+                    ...attachment,
+                    url: signedUrl || attachment.url
+                  };
+                }
+                return attachment;
+              })
+            );
+            return { ...announcement, attachments: attachmentsWithSignedUrls };
+          }
+          return announcement;
+        })
+      );
+
       // Pagination is now accurate since visibility filtering happens in SQL
       res.json({
-        announcements: result.announcements,
+        announcements: announcementsWithSignedUrls,
         pagination: {
           page,
           limit,
