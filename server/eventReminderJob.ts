@@ -14,7 +14,7 @@ import { and, eq, gt, lt, gte, lte, inArray, sql, or, not, isNull } from "drizzl
 import { storage } from "./storage";
 import { format, subDays, setHours, setMinutes, subHours, addDays } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
-import { sendScheduleReminderPushNotification } from "./oneSignalNotifications";
+import { sendScheduleReminderPushNotification, sendPersonalReminderPushNotification } from "./oneSignalNotifications";
 import { parseLeagueLocalDateTime } from "./dateUtils";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
@@ -366,6 +366,33 @@ export async function checkAndSendEventReminders(): Promise<void> {
       }
     }
     
+    // Process personal reminders
+    try {
+      const pendingReminders = await storage.getPendingPersonalReminders();
+      
+      if (pendingReminders.length > 0) {
+        console.log(`📧 Found ${pendingReminders.length} personal reminders due for notification`);
+      }
+      
+      for (const reminder of pendingReminders) {
+        try {
+          await sendPersonalReminderPushNotification(
+            reminder.userId,
+            reminder.id,
+            reminder.title,
+            reminder.description
+          );
+          
+          await storage.markPersonalReminderNotificationSent(reminder.id);
+          console.log(`✅ Sent personal reminder notification: ${reminder.title} to user ${reminder.userId}`);
+        } catch (error) {
+          console.error(`❌ Failed to send personal reminder ${reminder.id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Error processing personal reminders:', error);
+    }
+    
   } catch (error) {
     console.error('Error in event reminder job:', error);
   }
@@ -381,7 +408,7 @@ export function startEventReminderJob(): void {
   
   console.log('🔔 Starting unified event reminder job (checking every 5 minutes)');
   console.log('   - Reminders: 2 days before at 3PM (league timezone), 2 hours before');
-  console.log('   - Covers: Games and Scrimmages');
+  console.log('   - Covers: Games, Scrimmages, and Personal Reminders');
   
   // Run immediately on startup
   checkAndSendEventReminders();

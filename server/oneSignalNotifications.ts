@@ -349,3 +349,29 @@ export async function sendPlayerRsvpPushNotification(
     },
   });
 }
+
+export async function sendPersonalReminderPushNotification(
+  userId: string,
+  reminderId: string,
+  title: string,
+  description?: string | null
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(userId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.personalReminders === false) {
+    console.log(`[OneSignal] Personal reminder notifications disabled for user ${userId}`);
+    return false;
+  }
+  
+  const message = description || 'Your scheduled reminder is now due';
+  
+  return sendPushNotificationToUser({
+    userId,
+    title: `🔔 ${title}`,
+    message,
+    data: {
+      type: 'personal_reminder',
+      reminderId,
+    },
+  });
+}

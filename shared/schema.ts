@@ -666,6 +666,7 @@ export const personalReminders = pgTable("personal_reminders", {
   description: text("description"),
   scheduledAt: timestamp("scheduled_at", { mode: 'string' }).notNull(),
   isCompleted: boolean("is_completed").default(false).notNull(),
+  notificationSentAt: timestamp("notification_sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -2394,6 +2395,7 @@ export const insertPersonalReminderSchema = createInsertSchema(personalReminders
   id: true,
   createdAt: true,
   updatedAt: true,
+  notificationSentAt: true,
 }).extend({
   // Keep datetime as string - stored as league-local time
   scheduledAt: z.string(),

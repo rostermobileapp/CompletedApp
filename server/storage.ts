@@ -374,6 +374,8 @@ export interface IStorage {
   getUserPersonalReminders(userId: string): Promise<PersonalReminder[]>;
   createPersonalReminder(reminder: InsertPersonalReminder): Promise<PersonalReminder>;
   deletePersonalReminder(reminderId: string, userId: string): Promise<void>;
+  getPendingPersonalReminders(): Promise<PersonalReminder[]>;
+  markPersonalReminderNotificationSent(reminderId: string): Promise<void>;
   
   // RSVP operations
   createOrUpdateRsvp(rsvp: InsertGameRsvp): Promise<GameRsvp>;
@@ -5120,6 +5122,27 @@ export class DatabaseStorage implements IStorage {
         eq(personalReminders.id, reminderId),
         eq(personalReminders.userId, userId)
       ));
+  }
+
+  async getPendingPersonalReminders(): Promise<PersonalReminder[]> {
+    const now = new Date();
+    const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+    const tenMinutesAhead = new Date(now.getTime() + 10 * 60 * 1000);
+    
+    return await db.select()
+      .from(personalReminders)
+      .where(and(
+        eq(personalReminders.isCompleted, false),
+        isNull(personalReminders.notificationSentAt),
+        sql`${personalReminders.scheduledAt} >= ${tenMinutesAgo.toISOString()}`,
+        sql`${personalReminders.scheduledAt} <= ${tenMinutesAhead.toISOString()}`
+      ));
+  }
+
+  async markPersonalReminderNotificationSent(reminderId: string): Promise<void> {
+    await db.update(personalReminders)
+      .set({ notificationSentAt: new Date() })
+      .where(eq(personalReminders.id, reminderId));
   }
 
   async deleteTeam(teamId: string): Promise<void> {
