@@ -374,7 +374,7 @@ export interface IStorage {
   getUserPersonalReminders(userId: string): Promise<PersonalReminder[]>;
   createPersonalReminder(reminder: InsertPersonalReminder): Promise<PersonalReminder>;
   deletePersonalReminder(reminderId: string, userId: string): Promise<void>;
-  getPendingPersonalReminders(): Promise<PersonalReminder[]>;
+  getPendingPersonalRemindersWithTimezone(): Promise<(PersonalReminder & { userTimezone: string | null })[]>;
   markPersonalReminderNotificationSent(reminderId: string): Promise<void>;
   
   // RSVP operations
@@ -5124,22 +5124,40 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
-  async getPendingPersonalReminders(): Promise<PersonalReminder[]> {
+  async getPendingPersonalRemindersWithTimezone(): Promise<(PersonalReminder & { userTimezone: string | null })[]> {
+    // Get all incomplete personal reminders that haven't been notified yet
+    // and are scheduled within the next 3 days (similar window to games/scrimmages)
+    // Also fetch the user's timezone from their primary league membership
     const now = new Date();
-    // Use a 15-minute window in the past to catch reminders that should have fired
-    // and 5 minutes ahead to handle scheduling drift
-    // Note: scheduledAt is stored as a string timestamp, so we compare lexicographically
-    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
-    const fiveMinutesAhead = new Date(now.getTime() + 5 * 60 * 1000);
+    const threeDaysAhead = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
     
-    return await db.select()
+    // Get pending reminders with user timezone from their league
+    const results = await db.select({
+      id: personalReminders.id,
+      userId: personalReminders.userId,
+      title: personalReminders.title,
+      description: personalReminders.description,
+      scheduledAt: personalReminders.scheduledAt,
+      isCompleted: personalReminders.isCompleted,
+      notificationSentAt: personalReminders.notificationSentAt,
+      createdAt: personalReminders.createdAt,
+      updatedAt: personalReminders.updatedAt,
+      userTimezone: sql<string | null>`(
+        SELECT l.timezone FROM leagues l
+        JOIN league_memberships lm ON l.id = lm.league_id
+        WHERE lm.user_id = ${personalReminders.userId}
+        AND lm.status = 'approved'
+        LIMIT 1
+      )`.as('user_timezone'),
+    })
       .from(personalReminders)
       .where(and(
         eq(personalReminders.isCompleted, false),
         isNull(personalReminders.notificationSentAt),
-        sql`${personalReminders.scheduledAt} <= ${fiveMinutesAhead.toISOString()}`,
-        sql`${personalReminders.scheduledAt} >= ${fifteenMinutesAgo.toISOString()}`
+        sql`${personalReminders.scheduledAt}::timestamp <= ${threeDaysAhead.toISOString()}::timestamp`
       ));
+    
+    return results;
   }
 
   async markPersonalReminderNotificationSent(reminderId: string): Promise<void> {

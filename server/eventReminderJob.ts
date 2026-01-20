@@ -366,34 +366,62 @@ export async function checkAndSendEventReminders(): Promise<void> {
       }
     }
     
-    // Process personal reminders
+    // Process personal reminders (2 hours before, like games/scrimmages)
     try {
-      const pendingReminders = await storage.getPendingPersonalReminders();
+      const pendingReminders = await storage.getPendingPersonalRemindersWithTimezone();
       
       if (pendingReminders.length > 0) {
-        console.log(`📧 Found ${pendingReminders.length} personal reminders due for notification`);
+        console.log(`🔔 Found ${pendingReminders.length} pending personal reminders to check`);
       }
       
       for (const reminder of pendingReminders) {
         try {
-          const success = await sendPersonalReminderPushNotification(
-            reminder.userId,
-            reminder.id,
-            reminder.title,
-            reminder.description
-          );
+          // Parse the scheduled time using the user's timezone
+          // The scheduledAt is stored as a LOCAL time string like "2026-01-20 15:00:00"
+          const userTimezone = reminder.userTimezone || 'America/New_York'; // Default to EST if no league
           
-          // Only mark as sent if push notification was actually delivered
-          if (success) {
-            await storage.markPersonalReminderNotificationSent(reminder.id);
-            console.log(`✅ Sent personal reminder notification: ${reminder.title} to user ${reminder.userId}`);
+          // Use parseLeagueLocalDateTime to properly convert local time to UTC
+          const scheduledTimeUTC = parseLeagueLocalDateTime(reminder.scheduledAt, userTimezone);
+          
+          if (isNaN(scheduledTimeUTC.getTime())) {
+            console.error(`❌ Invalid scheduledAt format for reminder ${reminder.id}: ${reminder.scheduledAt}`);
+            continue;
+          }
+          
+          // Calculate 2-hour-before trigger time
+          const twoHoursBefore = subHours(scheduledTimeUTC, 2);
+          
+          console.log(`📋 Personal reminder "${reminder.title}": scheduledAt=${reminder.scheduledAt}, timezone=${userTimezone}, scheduledUTC=${scheduledTimeUTC.toISOString()}, trigger=${twoHoursBefore.toISOString()}, now=${now.toISOString()}`);
+          
+          // Use a 30-minute window to be forgiving (job runs every 5 minutes)
+          const nowTime = now.getTime();
+          const triggerTimeMs = twoHoursBefore.getTime();
+          const withinWindow = nowTime >= triggerTimeMs && nowTime <= triggerTimeMs + (30 * 60 * 1000);
+          
+          if (withinWindow) {
+            console.log(`📧 Sending 2-hour reminder for personal reminder: ${reminder.title}`);
+            
+            const success = await sendPersonalReminderPushNotification(
+              reminder.userId,
+              reminder.id,
+              reminder.title,
+              reminder.description
+            );
+            
+            // Only mark as sent if push notification was actually delivered
+            if (success) {
+              await storage.markPersonalReminderNotificationSent(reminder.id);
+              console.log(`✅ Sent personal reminder notification: ${reminder.title} to user ${reminder.userId}`);
+            } else {
+              // Push failed but don't mark as sent - will retry on next job run
+              console.log(`⚠️ Personal reminder push not delivered (user may not have push enabled): ${reminder.title}`);
+            }
           } else {
-            // Push failed but don't mark as sent - will retry on next job run
-            console.log(`⚠️ Personal reminder push not delivered (user may not have push enabled): ${reminder.title}`);
+            const timeDiff = (nowTime - triggerTimeMs) / 60000; // in minutes
+            console.log(`⏰ Personal reminder "${reminder.title}": not in trigger window (diff: ${timeDiff.toFixed(1)} mins)`);
           }
         } catch (error) {
-          console.error(`❌ Failed to send personal reminder ${reminder.id}:`, error);
-          // Don't mark as sent - will retry on next job run
+          console.error(`❌ Failed to process personal reminder ${reminder.id}:`, error);
         }
       }
     } catch (error) {
