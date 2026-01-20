@@ -911,25 +911,25 @@ function StandingsModal({ isOpen, onClose, leagueId, tournamentId }: {
   if (!isOpen) return null;
 
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-card rounded-lg border border-border w-full max-w-md h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-1 sm:p-4 z-50">
+      <div className="bg-card rounded-lg border border-border w-[calc(100vw-0.5rem)] sm:w-[calc(100vw-2rem)] md:max-w-lg h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b border-border relative">
-          <h2 className="text-2xl font-semibold text-center">
+        <div className="p-3 sm:p-6 border-b border-border relative">
+          <h2 className="text-xl sm:text-2xl font-semibold text-center pr-10">
             {tournamentId ? 'Tournament Standings' : 'League Standings'}
           </h2>
           <button
             onClick={onClose}
-            className="absolute top-6 right-6 w-10 h-10 bg-red-600 hover:bg-red-700 rounded flex items-center justify-center transition-colors"
+            className="absolute top-3 right-3 sm:top-6 sm:right-6 w-8 h-8 sm:w-10 sm:h-10 bg-red-600 hover:bg-red-700 rounded flex items-center justify-center transition-colors"
             data-testid="button-close-standings"
           >
-            <X className="w-5 h-5 text-white" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </button>
         </div>
 
         {/* Content */}
         <FeatureLockOverlay isLocked={false} className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-2 sm:p-6">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
@@ -943,18 +943,16 @@ function StandingsModal({ isOpen, onClose, leagueId, tournamentId }: {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left p-3 font-semibold">Team Name</th>
-                    <th className="text-center p-3 font-semibold">GP</th>
-                    <th className="text-center p-3 font-semibold">W</th>
-                    <th className="text-center p-3 font-semibold">L</th>
-                    <th className="text-center p-3 font-semibold">T</th>
-                    <th className="text-center p-3 font-semibold">OTL</th>
-                    <th className="text-center p-3 font-semibold">PTS</th>
-                    <th className="text-center p-3 font-semibold">GF</th>
-                    <th className="text-center p-3 font-semibold">GA</th>
+                    <th className="text-left px-1 py-2 font-semibold">Team</th>
+                    <th className="text-center px-1 py-2 font-semibold">GP</th>
+                    <th className="text-center px-1 py-2 font-semibold">W</th>
+                    <th className="text-center px-1 py-2 font-semibold">L</th>
+                    <th className="text-center px-1 py-2 font-semibold">T</th>
+                    <th className="text-center px-1 py-2 font-semibold">OTL</th>
+                    <th className="text-center px-1 py-2 font-semibold">PTS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -964,34 +962,33 @@ function StandingsModal({ isOpen, onClose, leagueId, tournamentId }: {
                       className={`border-b border-border/50 hover:bg-muted/30 ${index === 0 ? 'bg-primary/5' : ''}`}
                       data-testid={`standings-row-${team.teamId}`}
                     >
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{team.teamName}</span>
-                        </div>
+                      <td className="px-1 py-2">
+                        <Link 
+                          href={`/team/${team.teamId}`}
+                          onClick={onClose}
+                          className="inline-block px-2 py-1 text-primary font-medium underline hover:bg-primary/10 rounded transition-colors cursor-pointer"
+                          data-testid={`team-link-${team.teamId}`}
+                        >
+                          {team.teamName}
+                        </Link>
                       </td>
-                      <td className="text-center p-3" data-testid={`games-played-${team.teamId}`}>
+                      <td className="text-center px-1 py-2" data-testid={`games-played-${team.teamId}`}>
                         {team.gamesPlayed}
                       </td>
-                      <td className="text-center p-3 text-green-600 font-medium" data-testid={`wins-${team.teamId}`}>
+                      <td className="text-center px-1 py-2 text-green-600 font-medium" data-testid={`wins-${team.teamId}`}>
                         {team.wins}
                       </td>
-                      <td className="text-center p-3 text-red-600 font-medium" data-testid={`losses-${team.teamId}`}>
+                      <td className="text-center px-1 py-2 text-red-600 font-medium" data-testid={`losses-${team.teamId}`}>
                         {team.losses}
                       </td>
-                      <td className="text-center p-3 text-yellow-600 font-medium" data-testid={`ties-${team.teamId}`}>
+                      <td className="text-center px-1 py-2 text-yellow-600 font-medium" data-testid={`ties-${team.teamId}`}>
                         {team.ties}
                       </td>
-                      <td className="text-center p-3 text-orange-600 font-medium" data-testid={`shootout-losses-${team.teamId}`}>
+                      <td className="text-center px-1 py-2 text-orange-600 font-medium" data-testid={`shootout-losses-${team.teamId}`}>
                         {team.shootoutLosses}
                       </td>
-                      <td className="text-center p-3 font-bold text-primary" data-testid={`points-${team.teamId}`}>
+                      <td className="text-center px-1 py-2 font-bold text-primary" data-testid={`points-${team.teamId}`}>
                         {team.points}
-                      </td>
-                      <td className="text-center p-3" data-testid={`goals-for-${team.teamId}`}>
-                        {team.goalsFor}
-                      </td>
-                      <td className="text-center p-3" data-testid={`goals-against-${team.teamId}`}>
-                        {team.goalsAgainst}
                       </td>
                     </tr>
                   ))}
