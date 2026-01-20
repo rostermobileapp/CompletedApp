@@ -22,8 +22,8 @@ interface EnhancedMediaUploaderProps {
   className?: string;
 }
 
-// Image compression utility
-const compressImage = async (file: File, quality: number = 0.8, maxWidth: number = 1920): Promise<File> => {
+// Image compression utility with WebP support for better storage savings
+const compressImage = async (file: File, quality: number = 0.7, maxWidth: number = 1200): Promise<File> => {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -33,9 +33,17 @@ const compressImage = async (file: File, quality: number = 0.8, maxWidth: number
       // Calculate new dimensions
       let { width, height } = img;
       
+      // Also limit height to prevent very tall images
+      const maxHeight = 1200;
+      
       if (width > maxWidth) {
         height = (height * maxWidth) / width;
         width = maxWidth;
+      }
+      
+      if (height > maxHeight) {
+        width = (width * maxHeight) / height;
+        height = maxHeight;
       }
       
       canvas.width = width;
@@ -44,21 +52,41 @@ const compressImage = async (file: File, quality: number = 0.8, maxWidth: number
       // Draw and compress
       ctx?.drawImage(img, 0, 0, width, height);
       
+      // Try WebP first for better compression (typically 25-35% smaller than JPEG)
+      // Fall back to original type if WebP not supported
+      const supportsWebP = canvas.toDataURL('image/webp').startsWith('data:image/webp');
+      const outputType = supportsWebP ? 'image/webp' : file.type;
+      const outputFileName = supportsWebP ? file.name.replace(/\.[^.]+$/, '.webp') : file.name;
+      
       canvas.toBlob(
         (blob) => {
           if (blob) {
-            const compressedFile = new File([blob], file.name, {
-              type: file.type,
+            const compressedFile = new File([blob], outputFileName, {
+              type: outputType,
               lastModified: Date.now(),
             });
-            resolve(compressedFile);
+            
+            // Only use compressed version if it's actually smaller
+            if (compressedFile.size < file.size) {
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
           } else {
             resolve(file);
           }
         },
-        file.type,
+        outputType,
         quality
       );
+      
+      // Clean up object URL
+      URL.revokeObjectURL(img.src);
+    };
+    
+    img.onerror = () => {
+      // If image loading fails, return original file
+      resolve(file);
     };
     
     img.src = URL.createObjectURL(file);
@@ -112,9 +140,9 @@ export function EnhancedMediaUploader({
       
       let compressed = file;
       
-      // Compress images for better performance
+      // Compress images for better storage savings (70% quality, 1200px max, WebP conversion)
       if (type === 'image') {
-        compressed = await compressImage(file, 0.8, 1920);
+        compressed = await compressImage(file);
       }
 
       mediaFiles.push({
@@ -272,11 +300,15 @@ export function EnhancedMediaUploader({
                               {mediaFile.file.name}
                             </p>
                             <p className="text-xs opacity-75">
-                              {(mediaFile.file.size / 1024).toFixed(1)} KB
-                              {mediaFile.compressed && mediaFile.compressed.size !== mediaFile.file.size && (
-                                <span className="ml-1 text-green-400">
-                                  (compressed from {(mediaFile.file.size / 1024).toFixed(1)} KB)
-                                </span>
+                              {mediaFile.compressed && mediaFile.compressed.size !== mediaFile.file.size ? (
+                                <>
+                                  {(mediaFile.compressed.size / 1024).toFixed(1)} KB
+                                  <span className="ml-1 text-green-400">
+                                    ({Math.round((1 - mediaFile.compressed.size / mediaFile.file.size) * 100)}% smaller)
+                                  </span>
+                                </>
+                              ) : (
+                                `${(mediaFile.file.size / 1024).toFixed(1)} KB`
                               )}
                             </p>
                           </div>
