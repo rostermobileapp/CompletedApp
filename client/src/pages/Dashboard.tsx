@@ -2992,19 +2992,16 @@ export default function Dashboard() {
           <DialogHeader>
             <DialogTitle className="text-white" data-testid="text-add-event-title">Add Event</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col items-start gap-3 py-4">
+          <div className="grid grid-cols-2 gap-3 py-4">
             <Button
               onClick={() => {
                 setEventType('reminder');
                 setShowAddEventDialog(false);
               }}
-              className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-blue-600 bg-blue-500"
+              className="h-20 flex items-center justify-center text-lg font-semibold text-white hover:bg-blue-600 bg-blue-500 rounded-xl"
               data-testid="button-select-reminder"
             >
-              <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
-                <div className="font-semibold">Personal Reminder</div>
-                <div className="text-sm text-gray-300">Add a personal note or reminder to your calendar</div>
-              </div>
+              Personal Reminder
             </Button>
             {canScheduleGames && (
               <Button
@@ -3012,13 +3009,10 @@ export default function Dashboard() {
                   setEventType('game');
                   setShowAddEventDialog(false);
                 }}
-                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-blue-600 bg-blue-500"
+                className="h-20 flex items-center justify-center text-lg font-semibold text-white hover:bg-blue-600 bg-blue-500 rounded-xl"
                 data-testid="button-select-game"
               >
-                <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
-                  <div className="font-semibold">Team Game</div>
-                  <div className="text-sm text-gray-300">Schedule a game for your team</div>
-                </div>
+                Team Game
               </Button>
             )}
             {canScheduleGames && (
@@ -3027,13 +3021,10 @@ export default function Dashboard() {
                   setEventType('generalEvent');
                   setShowAddEventDialog(false);
                 }}
-                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-blue-600 bg-blue-500"
+                className="h-20 flex items-center justify-center text-lg font-semibold text-white hover:bg-blue-600 bg-blue-500 rounded-xl"
                 data-testid="button-select-general-event"
               >
-                <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
-                  <div className="font-semibold">General Event</div>
-                  <div className="text-sm text-gray-300">Schedule a team party, meeting, or other event</div>
-                </div>
+                General Event
               </Button>
             )}
             {canScheduleGames && (
@@ -3042,13 +3033,10 @@ export default function Dashboard() {
                   setEventType('scrimmage');
                   setShowAddEventDialog(false);
                 }}
-                className="inline-flex max-w-full h-auto py-3 px-4 items-start text-left text-white hover:bg-blue-600 bg-blue-500"
+                className="h-20 flex items-center justify-center text-lg font-semibold text-white hover:bg-blue-600 bg-blue-500 rounded-xl"
                 data-testid="button-select-scrimmage"
               >
-                <div className="max-w-[min(100vw-4rem,320px)] whitespace-normal">
-                  <div className="font-semibold">Scrimmage</div>
-                  <div className="text-sm text-gray-300">Schedule a practice scrimmage (internal or vs another team)</div>
-                </div>
+                Scrimmage
               </Button>
             )}
           </div>
