@@ -1094,6 +1094,9 @@ export default function Dashboard() {
   // Edit team event state
   const [editingTeamEvent, setEditingTeamEvent] = useState<any>(null);
   
+  // Dismissing reminders animation state
+  const [dismissingReminders, setDismissingReminders] = useState<Set<string>>(new Set());
+  
   // Reminder form
   const reminderForm = useForm<z.infer<typeof personalReminderSchema>>({
     resolver: zodResolver(personalReminderSchema),
@@ -1183,7 +1186,12 @@ export default function Dashboard() {
         description: "Your reminder has been removed from your calendar.",
       });
     },
-    onError: () => {
+    onError: (_error, reminderId) => {
+      setDismissingReminders(prev => {
+        const next = new Set(prev);
+        next.delete(reminderId);
+        return next;
+      });
       toast({
         title: "Error",
         description: "Failed to dismiss reminder. Please try again.",
@@ -1191,6 +1199,14 @@ export default function Dashboard() {
       });
     },
   });
+
+  // Animated dismiss handler for personal reminders
+  const handleDismissReminder = (reminderId: string) => {
+    setDismissingReminders(prev => new Set(prev).add(reminderId));
+    setTimeout(() => {
+      deleteReminderMutation.mutate(reminderId);
+    }, 300);
+  };
 
   // Create team game mutation
   const createGameMutation = useMutation({
@@ -2505,46 +2521,52 @@ export default function Dashboard() {
               })
               .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
               .slice(0, 5)
-              .map((reminder: any) => (
-                <div 
-                  key={`reminder-${reminder.id}`}
-                  className="rounded-xl border border-green-200 dark:border-green-800 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
-                  data-testid={`card-reminder-${reminder.id}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-                      <Clock className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold" data-testid={`text-reminder-title-${reminder.id}`}>
-                          {reminder.title}
-                        </h3>
-                        <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">Reminder</span>
+              .map((reminder: any) => {
+                const isDismissing = dismissingReminders.has(reminder.id);
+                return (
+                  <div 
+                    key={`reminder-${reminder.id}`}
+                    className={`rounded-xl border border-green-200 dark:border-green-800 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] transition-all duration-300 ease-out ${
+                      isDismissing ? 'opacity-0 -translate-x-full scale-95' : 'opacity-100 translate-x-0 scale-100'
+                    }`}
+                    style={{ maxHeight: isDismissing ? '0px' : '200px', marginBottom: isDismissing ? '0px' : undefined, overflow: 'hidden' }}
+                    data-testid={`card-reminder-${reminder.id}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
+                        <Clock className="w-6 h-6 text-white" />
                       </div>
-                      <p className="text-sm text-muted-foreground" data-testid={`text-reminder-time-${reminder.id}`}>
-                        {format(new Date(reminder.scheduledAt), 'MMM d • h:mm a')}
-                      </p>
-                      {reminder.description && (
-                        <p className="text-xs text-muted-foreground" data-testid={`text-reminder-description-${reminder.id}`}>
-                          {reminder.description}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold" data-testid={`text-reminder-title-${reminder.id}`}>
+                            {reminder.title}
+                          </h3>
+                          <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">Reminder</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground" data-testid={`text-reminder-time-${reminder.id}`}>
+                          {format(new Date(reminder.scheduledAt), 'MMM d • h:mm a')}
                         </p>
-                      )}
+                        {reminder.description && (
+                          <p className="text-xs text-muted-foreground" data-testid={`text-reminder-description-${reminder.id}`}>
+                            {reminder.description}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDismissReminder(reminder.id);
+                        }}
+                        className="px-3 py-1 text-sm hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                        data-testid={`button-dismiss-reminder-${reminder.id}`}
+                        disabled={isDismissing || deleteReminderMutation.isPending}
+                      >
+                        Dismiss
+                      </button>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteReminderMutation.mutate(reminder.id);
-                      }}
-                      className="px-3 py-1 text-sm hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-                      data-testid={`button-dismiss-reminder-${reminder.id}`}
-                      disabled={deleteReminderMutation.isPending}
-                    >
-                      Dismiss
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             
             {/* Show team events (general events and scrimmages) */}
             {Array.isArray(teamEvents) && teamEvents
