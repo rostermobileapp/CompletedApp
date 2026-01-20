@@ -363,12 +363,10 @@ export async function sendPersonalReminderPushNotification(
     return false;
   }
   
-  const message = description || 'Your scheduled reminder is now due';
-  
   return sendPushNotificationToUser({
     userId,
-    title: `🔔 ${title}`,
-    message,
+    title: `🔔 Reminder`,
+    message: title,
     data: {
       type: 'personal_reminder',
       reminderId,
