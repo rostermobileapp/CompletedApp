@@ -1205,7 +1205,7 @@ export default function Dashboard() {
     setDismissingReminders(prev => new Set(prev).add(reminderId));
     setTimeout(() => {
       deleteReminderMutation.mutate(reminderId);
-    }, 300);
+    }, 350);
   };
 
   // Create team game mutation
@@ -2526,12 +2526,20 @@ export default function Dashboard() {
                 return (
                   <div 
                     key={`reminder-${reminder.id}`}
-                    className={`rounded-xl border border-green-200 dark:border-green-800 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] transition-all duration-300 ease-out ${
-                      isDismissing ? 'opacity-0 -translate-x-full scale-95' : 'opacity-100 translate-x-0 scale-100'
-                    }`}
-                    style={{ maxHeight: isDismissing ? '0px' : '200px', marginBottom: isDismissing ? '0px' : undefined, overflow: 'hidden' }}
-                    data-testid={`card-reminder-${reminder.id}`}
+                    className={`transition-all duration-300 ease-out ${isDismissing ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+                    style={{ 
+                      maxHeight: isDismissing ? '0px' : '200px', 
+                      marginTop: isDismissing ? '0px' : undefined,
+                      marginBottom: isDismissing ? '-12px' : undefined,
+                      padding: isDismissing ? '0px' : undefined,
+                      overflow: 'hidden',
+                      transform: isDismissing ? 'translateX(-100%)' : 'translateX(0)',
+                    }}
                   >
+                    <div 
+                      className="rounded-xl border border-green-200 dark:border-green-800 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
+                      data-testid={`card-reminder-${reminder.id}`}
+                    >
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
                         <Clock className="w-6 h-6 text-white" />
@@ -2563,6 +2571,7 @@ export default function Dashboard() {
                       >
                         Dismiss
                       </button>
+                    </div>
                     </div>
                   </div>
                 );
