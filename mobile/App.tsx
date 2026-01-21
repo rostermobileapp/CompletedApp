@@ -126,7 +126,7 @@ export default function App() {
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#0066cc" />
         <Text style={styles.loadingText}>Loading...</Text>
-        <StatusBar style="auto" />
+        <StatusBar style="light" backgroundColor="#000000" />
       </View>
     );
   }
@@ -178,7 +178,7 @@ export default function App() {
         </TouchableOpacity>
       )}
 
-      <StatusBar style="auto" />
+      <StatusBar style="light" backgroundColor="#000000" />
     </View>
   );
 }
