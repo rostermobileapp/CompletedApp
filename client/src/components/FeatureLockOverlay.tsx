@@ -34,9 +34,6 @@ export function FeatureLockOverlay({ isLocked, children, className = '' }: Featu
           </div>
           <div className="space-y-2">
             <h3 className="text-xl font-semibold">Premium Feature</h3>
-            <p className="text-muted-foreground max-w-sm mx-auto">
-              This feature is available with a Player Pro or Commissioner subscription
-            </p>
           </div>
           <Button 
             onClick={handleUpgrade}
