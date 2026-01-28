@@ -13542,8 +13542,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (userId) {
               activeConnections.set(userId, ws);
               
-              // Update user online status
-              await messagingService.updateUserOnlineStatus(userId, true);
+              // Update user online status (wrapped in try-catch to prevent server crash)
+              try {
+                await messagingService.updateUserOnlineStatus(userId, true);
+              } catch (err) {
+                console.error('Failed to update online status for user:', userId, err);
+              }
               
               // Broadcast to contacts that user is online
               broadcastOnlineStatus(userId, true);
@@ -13678,11 +13682,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Remove connection
         activeConnections.delete(userId);
         
-        // Update user offline status
-        await messagingService.updateUserOnlineStatus(userId, false);
+        // Update user offline status (wrapped in try-catch to prevent server crash)
+        try {
+          await messagingService.updateUserOnlineStatus(userId, false);
+        } catch (err) {
+          console.error('Failed to update offline status for user:', userId, err);
+        }
         
         // Clear any typing indicators
-        await messagingService.clearUserTypingIndicators(userId);
+        try {
+          await messagingService.clearUserTypingIndicators(userId);
+        } catch (err) {
+          console.error('Failed to clear typing indicators for user:', userId, err);
+        }
         
         // Broadcast to contacts that user is offline
         broadcastOnlineStatus(userId, false);
