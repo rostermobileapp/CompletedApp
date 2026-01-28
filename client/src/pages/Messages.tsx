@@ -1548,20 +1548,17 @@ export default function Messages() {
   const currentConversation = cachedConversation || fetchedConversation;
   
   // FREE TIER RESTRICTION: Check if current conversation is allowed for free tier users
-  // If free tier user is trying to access a non-team_group conversation or another team's chat, block it
+  // For free tier, we ONLY allow team_group conversations (the conversation list is already filtered to user's own teams)
   const isConversationAllowedForFreeTier = useMemo(() => {
     // Premium users can access everything
     if (!isFreeTier) return true;
     // If no conversation selected, allow (no restriction needed yet)
     if (!currentConversation) return true;
-    // Free tier can only access team_group conversations for their own teams
-    // First check: must be team_group type
-    if (currentConversation.type !== 'team_group') return false;
-    // If userTeamIds not loaded yet, allow temporarily (will re-check when loaded)
-    if (userTeamIds.length === 0) return true;
-    // Check if this is user's own team
-    return userTeamIds.includes(currentConversation.teamId);
-  }, [isFreeTier, currentConversation, userTeamIds]);
+    // Free tier can only access team_group conversations
+    // The conversation list is already filtered to only show user's own team chats
+    // So if they have a team_group selected, it must be their own team
+    return currentConversation.type === 'team_group';
+  }, [isFreeTier, currentConversation]);
 
   // Fetch team data for team group chats (to get logo)
   const { data: conversationTeam } = useQuery<Team>({
