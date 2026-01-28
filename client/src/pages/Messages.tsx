@@ -1550,9 +1550,17 @@ export default function Messages() {
   // FREE TIER RESTRICTION: Check if current conversation is allowed for free tier users
   // If free tier user is trying to access a non-team_group conversation or another team's chat, block it
   const isConversationAllowedForFreeTier = useMemo(() => {
-    if (!isFreeTier || !currentConversation) return true;
+    // Premium users can access everything
+    if (!isFreeTier) return true;
+    // If no conversation selected, allow (no restriction needed yet)
+    if (!currentConversation) return true;
     // Free tier can only access team_group conversations for their own teams
-    return currentConversation.type === 'team_group' && userTeamIds.includes(currentConversation.teamId);
+    // First check: must be team_group type
+    if (currentConversation.type !== 'team_group') return false;
+    // If userTeamIds not loaded yet, allow temporarily (will re-check when loaded)
+    if (userTeamIds.length === 0) return true;
+    // Check if this is user's own team
+    return userTeamIds.includes(currentConversation.teamId);
   }, [isFreeTier, currentConversation, userTeamIds]);
 
   // Fetch team data for team group chats (to get logo)
@@ -2165,29 +2173,6 @@ export default function Messages() {
             </div>
           </div>
           
-          {/* Free tier upgrade banner - show for attachments in allowed conversations */}
-          {!canAccessPremiumFeatures() && isConversationAllowedForFreeTier && (
-            <div className="bg-background border-b border-border p-3" data-testid="message-upgrade-banner">
-              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <MessageCircle className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Upgrade to send files & GIFs</p>
-                    <p className="text-xs text-muted-foreground">Attachments available with Player Pro</p>
-                  </div>
-                </div>
-                <Button 
-                  onClick={() => window.location.href = '/subscription'}
-                  size="sm"
-                  data-testid="button-upgrade-to-reply"
-                >
-                  Upgrade
-                </Button>
-              </div>
-            </div>
-          )}
           
           {/* Messages */}
           <div 
