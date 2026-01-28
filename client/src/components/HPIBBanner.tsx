@@ -18,7 +18,7 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
     
     return (
       <div 
-        className="fixed bottom-16 left-0 right-0 z-40 cursor-pointer flex justify-center"
+        className="fixed bottom-20 left-0 right-0 z-40 cursor-pointer flex justify-center"
         onClick={handleClick}
       >
         <img 
