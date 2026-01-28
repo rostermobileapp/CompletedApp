@@ -28,20 +28,17 @@ export function FeatureLockOverlay({ isLocked, children, className = '' }: Featu
       </div>
       
       <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-        <div className="text-center space-y-4 p-8">
-          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-            <Lock className="w-8 h-8 text-primary" />
+        <div className="text-center space-y-2 p-4">
+          <div className="w-10 h-10 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+            <Lock className="w-5 h-5 text-primary" />
           </div>
-          <div className="space-y-2">
-            <h3 className="text-xl font-semibold">Premium Feature</h3>
-          </div>
+          <h3 className="text-lg font-semibold">Premium Feature</h3>
           <Button 
             onClick={handleUpgrade}
-            size="lg"
-            className="mt-4"
+            size="sm"
             data-testid="button-upgrade-feature"
           >
-            Upgrade to enjoy this feature
+            Upgrade
           </Button>
         </div>
       </div>
