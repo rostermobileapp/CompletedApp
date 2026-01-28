@@ -2662,18 +2662,36 @@ export default function Messages() {
               <Smile className="w-4 h-4" />
             </button>
             <button 
-              onClick={() => setShowPollCreator(!showPollCreator)}
-              className="p-2 hover:bg-accent rounded transition-colors mb-1"
+              onClick={() => {
+                if (isFreeTier) {
+                  toast({
+                    title: "Premium Feature",
+                    description: "Upgrade to Player Pro to create polls",
+                  });
+                  return;
+                }
+                setShowPollCreator(!showPollCreator);
+              }}
+              className={`p-2 rounded transition-colors mb-1 ${isFreeTier ? 'opacity-40 cursor-not-allowed text-muted-foreground' : 'hover:bg-accent'}`}
               data-testid="button-create-poll"
-              title="Create Poll"
+              title={isFreeTier ? "Upgrade to create polls" : "Create Poll"}
             >
               <BarChart3 className="w-4 h-4" />
             </button>
             <button 
-              onClick={() => setShowPaymentRequestCreator(!showPaymentRequestCreator)}
-              className="p-2 hover:bg-accent rounded transition-colors mb-1"
+              onClick={() => {
+                if (isFreeTier) {
+                  toast({
+                    title: "Premium Feature",
+                    description: "Upgrade to Player Pro to request payments",
+                  });
+                  return;
+                }
+                setShowPaymentRequestCreator(!showPaymentRequestCreator);
+              }}
+              className={`p-2 rounded transition-colors mb-1 ${isFreeTier ? 'opacity-40 cursor-not-allowed text-muted-foreground' : 'hover:bg-accent'}`}
               data-testid="button-request-payment"
-              title="Request Payment"
+              title={isFreeTier ? "Upgrade to request payments" : "Request Payment"}
             >
               <DollarSign className="w-4 h-4" />
             </button>
