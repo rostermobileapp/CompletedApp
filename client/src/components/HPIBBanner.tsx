@@ -1,5 +1,6 @@
 import hpibBannerImage from "@assets/HPIB-Red2_(1)_1768339929994.png";
 import { usePermissions } from "@/context/SubscriptionContext";
+import { useLocation } from "wouter";
 
 interface HPIBBannerProps {
   placement: 'bottom-nav' | 'profile-header';
@@ -8,6 +9,7 @@ interface HPIBBannerProps {
 export function HPIBBanner({ placement }: HPIBBannerProps) {
   const { hasRole } = usePermissions();
   const isPaidUser = hasRole('player_pro');
+  const [location] = useLocation();
 
   const handleClick = () => {
     window.open('https://hockeyplayersinbusiness.org/', '_blank');
@@ -15,6 +17,8 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
 
   if (placement === 'bottom-nav') {
     if (isPaidUser) return null;
+    
+    if (location.startsWith('/messages')) return null;
     
     return (
       <div 
