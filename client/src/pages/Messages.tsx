@@ -2629,20 +2629,19 @@ export default function Messages() {
           )}
           
           <div className="flex items-end gap-2">
-            {/* FREE TIER RESTRICTION: Attachments disabled for free tier */}
+            {/* FREE TIER RESTRICTION: Attachments disabled for free tier - greyed out */}
             <button 
               onClick={() => {
                 if (isFreeTier) {
                   toast({
                     title: "Premium Feature",
-                    description: "Upgrade to Player Pro or Commissioner to send attachments",
-                    variant: "destructive"
+                    description: "Upgrade to Player Pro to send attachments",
                   });
                   return;
                 }
                 fileInputRef.current?.click();
               }}
-              className={`p-2 rounded transition-colors mb-1 ${isFreeTier ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent'}`}
+              className={`p-2 rounded transition-colors mb-1 relative ${isFreeTier ? 'opacity-40 cursor-not-allowed text-muted-foreground' : 'hover:bg-accent'}`}
               data-testid="button-attach-file-basic"
               title={isFreeTier ? "Upgrade to send attachments" : "Attach file"}
             >
@@ -2653,14 +2652,13 @@ export default function Messages() {
                 if (isFreeTier) {
                   toast({
                     title: "Premium Feature",
-                    description: "Upgrade to Player Pro or Commissioner to send GIFs",
-                    variant: "destructive"
+                    description: "Upgrade to Player Pro to send GIFs",
                   });
                   return;
                 }
                 setGifModalOpen(true);
               }}
-              className={`p-2 rounded transition-colors mb-1 ${isFreeTier ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent'}`}
+              className={`p-2 rounded transition-colors mb-1 relative ${isFreeTier ? 'opacity-40 cursor-not-allowed text-muted-foreground' : 'hover:bg-accent'}`}
               data-testid="button-gif-search"
               title={isFreeTier ? "Upgrade to send GIFs" : "Send GIF"}
             >
