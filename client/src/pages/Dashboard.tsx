@@ -963,14 +963,24 @@ function StandingsModal({ isOpen, onClose, leagueId, tournamentId }: {
                       data-testid={`standings-row-${team.teamId}`}
                     >
                       <td className="px-1 py-2">
-                        <Link 
-                          href={`/team/${team.teamId}`}
-                          onClick={onClose}
-                          className="block w-full px-2 py-1 bg-primary text-white font-medium rounded hover:bg-primary/80 transition-colors cursor-pointer text-center"
-                          data-testid={`team-link-${team.teamId}`}
-                        >
-                          {team.teamName}
-                        </Link>
+                        {/* FREE TIER RESTRICTION: Disable team navigation for free tier users */}
+                        {canAccessPremiumFeatures() ? (
+                          <Link 
+                            href={`/team/${team.teamId}`}
+                            onClick={onClose}
+                            className="block w-full px-2 py-1 bg-primary text-white font-medium rounded hover:bg-primary/80 transition-colors cursor-pointer text-center"
+                            data-testid={`team-link-${team.teamId}`}
+                          >
+                            {team.teamName}
+                          </Link>
+                        ) : (
+                          <span 
+                            className="block w-full px-2 py-1 bg-muted text-muted-foreground font-medium rounded text-center"
+                            data-testid={`team-name-${team.teamId}`}
+                          >
+                            {team.teamName}
+                          </span>
+                        )}
                       </td>
                       <td className="text-center px-1 py-2" data-testid={`games-played-${team.teamId}`}>
                         {team.gamesPlayed}

@@ -128,7 +128,46 @@ export default function MediaGalleryPage() {
   const [availableTeams, setAvailableTeams] = useState<any[]>([]);
   const [showOnlyMyPhotos, setShowOnlyMyPhotos] = useState(false);
   const [showUserFilter, setShowUserFilter] = useState(false);
-  const { role } = usePermissions();
+  const { role, canAccessPremiumFeatures } = usePermissions();
+  
+  // FREE TIER RESTRICTION: Block access to Photos page for free tier users
+  const isFreeTier = !canAccessPremiumFeatures();
+  
+  if (isFreeTier) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+          <div className="flex items-center gap-4 px-4 py-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/')}
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-xl font-semibold">Photo Gallery</h1>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center p-8 mt-12">
+          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <Camera className="w-8 h-8 text-primary" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Premium Feature</h3>
+          <p className="text-muted-foreground text-center max-w-sm mb-6">
+            Access to the photo gallery is available with a Player Pro or Commissioner subscription.
+          </p>
+          <Button 
+            onClick={() => navigate('/subscription')}
+            size="lg"
+            data-testid="button-upgrade-photos"
+          >
+            Upgrade to View Photos
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Determine entity type and ID
   const entityType = tournamentParams ? 'tournament' : leagueParams ? 'league' : teamParams ? 'team' : null;

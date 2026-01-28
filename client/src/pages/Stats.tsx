@@ -17,6 +17,52 @@ export default function Stats() {
   const { user } = useAuth();
   const { canAccessPremiumFeatures, canEditStats } = usePermissions();
   const [location, navigate] = useLocation();
+  
+  // FREE TIER RESTRICTION: Block access to Stats page for free tier users
+  const isFreeTier = !canAccessPremiumFeatures();
+  
+  if (isFreeTier) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="bg-card border-b border-border px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate('/');
+              }}
+              className="p-2"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-xl font-semibold">Statistics</h1>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center p-8 mt-12">
+          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <Trophy className="w-8 h-8 text-primary" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Premium Feature</h3>
+          <p className="text-muted-foreground text-center max-w-sm mb-6">
+            Access to player and team statistics is available with a Player Pro or Commissioner subscription.
+          </p>
+          <Button 
+            onClick={() => {
+              setPageTransitionDirection('up');
+              navigate('/subscription');
+            }}
+            size="lg"
+            data-testid="button-upgrade-stats"
+          >
+            Upgrade to View Stats
+          </Button>
+        </div>
+      </div>
+    );
+  }
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
   const [viewMode, setViewMode] = useState<'summary' | 'table'>('summary');

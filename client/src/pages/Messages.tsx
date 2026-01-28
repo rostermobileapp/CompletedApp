@@ -464,11 +464,14 @@ function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentReques
 
 export default function Messages() {
   const { user } = useAuth();
-  const { canAccessPremiumFeatures } = usePermissions();
+  const { canAccessPremiumFeatures, hasRole } = usePermissions();
   const currentUserId = (user as any)?.id;
   const params = useParams();
   const [, navigate] = useLocation();
   const { selectedTeamId, selectedLeagueId, selectedTournamentId } = useDashboardSelection();
+  
+  // Check if user is on free tier (no premium access)
+  const isFreeTier = !canAccessPremiumFeatures();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
 
   // Handle conversation ID from URL parameter
@@ -588,9 +591,22 @@ export default function Messages() {
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
+  // Get user's own team IDs for free tier restrictions
+  const userTeamIds = useMemo(() => {
+    return userTeams.map((t: any) => t.id);
+  }, [userTeams]);
+  
   // Filter conversations by selected league, team, or tournament (client-side for instant filtering)
   const conversations = useMemo(() => {
     let filtered = allConversations;
+    
+    // FREE TIER RESTRICTION: Only show team group chats for the user's OWN teams
+    // (no direct messages, no custom groups, no captain chats, no other teams' chats)
+    if (isFreeTier) {
+      filtered = filtered.filter(conv => 
+        conv.type === 'team_group' && userTeamIds.includes(conv.teamId)
+      );
+    }
     
     // Filter by tournament if one is selected
     if (selectedTournamentId) {
@@ -609,17 +625,25 @@ export default function Messages() {
       
       // Then filter to show team chat AND league-wide chats (direct, captain)
       // This includes conversations with matching teamId OR conversations with no teamId (direct/captain chats)
-      filtered = filtered.filter(conv => 
-        conv.teamId === selectedTeamId || conv.teamId === null
-      );
+      // But for free tier, we already filtered to own team chats only above
+      if (!isFreeTier) {
+        filtered = filtered.filter(conv => 
+          conv.teamId === selectedTeamId || conv.teamId === null
+        );
+      } else {
+        // Free tier: only show their own team's chat (already restricted above)
+        filtered = filtered.filter(conv => conv.teamId === selectedTeamId);
+      }
     }
     // Filter by league if one is selected
     else if (selectedLeagueId) {
       filtered = filtered.filter(conv => conv.leagueId === selectedLeagueId);
+      // For free tier with league context but no team selected, 
+      // they still only see their own team chats (already filtered above)
     }
     
     return filtered;
-  }, [allConversations, selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams]);
+  }, [allConversations, selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams, isFreeTier, userTeamIds]);
 
   // Fetch unread message counts per conversation
   const { data: unreadCountsData } = useQuery<{ unreadCounts: Array<{ conversationId: string; unreadCount: number }> }>({
@@ -1522,6 +1546,14 @@ export default function Messages() {
   
   // Use cached conversation if available, otherwise use fetched data
   const currentConversation = cachedConversation || fetchedConversation;
+  
+  // FREE TIER RESTRICTION: Check if current conversation is allowed for free tier users
+  // If free tier user is trying to access a non-team_group conversation or another team's chat, block it
+  const isConversationAllowedForFreeTier = useMemo(() => {
+    if (!isFreeTier || !currentConversation) return true;
+    // Free tier can only access team_group conversations for their own teams
+    return currentConversation.type === 'team_group' && userTeamIds.includes(currentConversation.teamId);
+  }, [isFreeTier, currentConversation, userTeamIds]);
 
   // Fetch team data for team group chats (to get logo)
   const { data: conversationTeam } = useQuery<Team>({
@@ -2062,6 +2094,47 @@ export default function Messages() {
             )}
           </div>
         </>
+      ) : !isConversationAllowedForFreeTier ? (
+        /* FREE TIER RESTRICTION: Block access to unauthorized conversations */
+        <>
+          <div className="sticky top-0 z-50 p-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[12px] pb-[12px] pl-[12px] pr-[12px]" data-testid="chat-header">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setSelectedConversation(null)}
+                className="p-2 hover:bg-accent rounded-lg transition-colors" 
+                data-testid="button-back"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="flex-1">
+                <h2 className="font-semibold" data-testid="text-chat-title">Premium Feature</h2>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-center justify-center p-8 flex-1">
+            <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <MessageCircle className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Premium Feature</h3>
+            <p className="text-muted-foreground text-center max-w-sm mb-6">
+              {currentConversation?.type === 'direct' 
+                ? 'Direct messaging is available with a Player Pro or Commissioner subscription.'
+                : currentConversation?.type === 'captain_only'
+                ? 'Captain chat is available with a Player Pro or Commissioner subscription.'
+                : 'This conversation is available with a Player Pro or Commissioner subscription.'}
+            </p>
+            <Button 
+              onClick={() => {
+                setPageTransitionDirection('up');
+                navigate('/subscription');
+              }}
+              size="lg"
+              data-testid="button-upgrade-conversation"
+            >
+              Upgrade to Access
+            </Button>
+          </div>
+        </>
       ) : (
         <>
           {/* Chat Header */}
@@ -2571,19 +2644,40 @@ export default function Messages() {
           )}
           
           <div className="flex items-end gap-2">
+            {/* FREE TIER RESTRICTION: Attachments disabled for free tier */}
             <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2 hover:bg-accent rounded transition-colors mb-1"
+              onClick={() => {
+                if (isFreeTier) {
+                  toast({
+                    title: "Premium Feature",
+                    description: "Upgrade to Player Pro or Commissioner to send attachments",
+                    variant: "destructive"
+                  });
+                  return;
+                }
+                fileInputRef.current?.click();
+              }}
+              className={`p-2 rounded transition-colors mb-1 ${isFreeTier ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent'}`}
               data-testid="button-attach-file-basic"
-              title="Attach file"
+              title={isFreeTier ? "Upgrade to send attachments" : "Attach file"}
             >
               <Paperclip className="w-4 h-4" />
             </button>
             <button 
-              onClick={() => setGifModalOpen(true)}
-              className="p-2 hover:bg-accent rounded transition-colors mb-1"
+              onClick={() => {
+                if (isFreeTier) {
+                  toast({
+                    title: "Premium Feature",
+                    description: "Upgrade to Player Pro or Commissioner to send GIFs",
+                    variant: "destructive"
+                  });
+                  return;
+                }
+                setGifModalOpen(true);
+              }}
+              className={`p-2 rounded transition-colors mb-1 ${isFreeTier ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent'}`}
               data-testid="button-gif-search"
-              title="Send GIF"
+              title={isFreeTier ? "Upgrade to send GIFs" : "Send GIF"}
             >
               <Smile className="w-4 h-4" />
             </button>

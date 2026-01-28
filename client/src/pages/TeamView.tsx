@@ -3,19 +3,38 @@ import { useLocation, useRoute } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trophy, Users, Target, TrendingUp, Apple, Flag, ArrowLeft } from 'lucide-react';
+import { Trophy, Users, Target, TrendingUp, Apple, Flag, ArrowLeft, Lock } from 'lucide-react';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
+import { usePermissions } from '@/context/SubscriptionContext';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function TeamView() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/team/:id");
   const teamId = params?.id;
+  const { canAccessPremiumFeatures } = usePermissions();
+  const { user } = useAuth();
+  
+  // Check if user is on free tier
+  const isFreeTier = !canAccessPremiumFeatures();
 
   const { data: team, isLoading: teamLoading } = useQuery({
     queryKey: ['/api/teams', teamId],
     enabled: !!teamId,
   });
+  
+  // Fetch user's teams to check if this is their own team
+  const { data: userTeams = [], isLoading: userTeamsLoading } = useQuery<any[]>({
+    queryKey: ['/api/user/teams'],
+    enabled: !!user,
+  });
+  
+  // Check if this is the user's own team (only after teams have loaded)
+  const isOwnTeam = userTeams.some((t: any) => t.id === teamId);
+  
+  // Determine if we're still loading ownership data for free tier check
+  const isLoadingOwnership = isFreeTier && userTeamsLoading;
 
   const { data: teamMembers = [] } = useQuery({
     queryKey: ['/api/teams', teamId, 'members'],
@@ -149,6 +168,88 @@ export default function TeamView() {
           <div className="bg-card rounded-xl border border-border p-6">
             <p className="text-center text-muted-foreground">Team not found</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // FREE TIER RESTRICTION: Block access to other teams' pages for free tier users
+  // Wait for ownership data to load before blocking
+  if (isLoadingOwnership) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="bg-card border-b border-border px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPageTransitionDirection('down');
+                if (window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  navigate('/');
+                }
+              }}
+              className="p-2"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-xl font-semibold">Team Details</h1>
+          </div>
+        </div>
+        <div className="px-6 py-6">
+          <div className="bg-card rounded-xl border border-border p-4 animate-pulse">
+            <div className="h-32 bg-muted rounded"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (isFreeTier && !isOwnTeam) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="bg-card border-b border-border px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPageTransitionDirection('down');
+                if (window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  navigate('/');
+                }
+              }}
+              className="p-2"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-xl font-semibold">Team Details</h1>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center p-8 mt-12">
+          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <Lock className="w-8 h-8 text-primary" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Premium Feature</h3>
+          <p className="text-muted-foreground text-center max-w-sm mb-6">
+            Viewing other teams' pages is available with a Player Pro or Commissioner subscription. You can still view your own team's page.
+          </p>
+          <Button 
+            onClick={() => {
+              setPageTransitionDirection('up');
+              navigate('/subscription');
+            }}
+            size="lg"
+            data-testid="button-upgrade-team-view"
+          >
+            Upgrade to View All Teams
+          </Button>
         </div>
       </div>
     );
