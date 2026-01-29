@@ -15,7 +15,7 @@ import {
   roleHierarchy
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, playerStats, teamMemberships, conversationParticipants } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
@@ -5547,44 +5547,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all games where user is a team captain
       const allGames = await storage.getAllUserGames(userId);
       
+      // Filter down to completed games with scores, not tied, and optionally by league
+      const completedGamesWithScores = allGames.filter((game: any) => {
+        if (game.isScrimmage) return false;
+        if (!game.isCompleted || game.homeScore === null || game.awayScore === null) return false;
+        if (game.homeScore === game.awayScore) return false;
+        if (leagueId && game.leagueId !== leagueId) return false;
+        return true;
+      });
+      
+      if (completedGamesWithScores.length === 0) {
+        return res.json([]);
+      }
+      
+      // Collect all unique winning team IDs and game IDs
+      const winningTeamIds = new Set<string>();
+      const gameIds: string[] = [];
+      for (const game of completedGamesWithScores) {
+        const winningTeamId = game.homeScore > game.awayScore ? game.homeTeamId : game.awayTeamId;
+        winningTeamIds.add(winningTeamId);
+        gameIds.push(game.id);
+      }
+      
+      // Batch fetch all teams (optimization)
+      const allTeams = winningTeamIds.size > 0 
+        ? await db.select().from(teams).where(inArray(teams.id, Array.from(winningTeamIds)))
+        : [];
+      const teamMap = new Map<string, typeof allTeams[0]>();
+      for (const team of allTeams) {
+        teamMap.set(team.id, team);
+      }
+      
+      // Batch fetch all game stars (optimization)
+      const allStars = gameIds.length > 0 
+        ? await db.select().from(gameStars).where(inArray(gameStars.gameId, gameIds))
+        : [];
+      const gamesWithStars = new Set<string>();
+      for (const star of allStars) {
+        gamesWithStars.add(star.gameId);
+      }
+      
       const gamesNeedingStars = [];
-
-      for (const game of allGames) {
-        // Skip scrimmages - they don't require star awards
-        if (game.isScrimmage) {
-          continue;
-        }
-
-        // Only check completed games with scores
-        if (!game.isCompleted || game.homeScore === null || game.awayScore === null) {
-          continue;
-        }
-
-        // Skip tied games
-        if (game.homeScore === game.awayScore) {
-          continue;
-        }
-
-        // Filter by league if specified
-        if (leagueId && game.leagueId !== leagueId) {
-          continue;
-        }
-
-        // Determine winning team
+      
+      for (const game of completedGamesWithScores) {
         const winningTeamId = game.homeScore > game.awayScore ? game.homeTeamId : game.awayTeamId;
         
-        // Check if user is captain of winning team
-        const winningTeam = await storage.getTeam(winningTeamId);
+        // Check if user is captain of winning team (using cached team data)
+        const winningTeam = teamMap.get(winningTeamId);
         if (!winningTeam || winningTeam.captainId !== userId) {
           continue;
         }
-
-        // Check if stars have already been awarded
-        const existingStars = await storage.getGameStars(game.id);
-        if (existingStars) {
+        
+        // Check if stars have already been awarded (using cached data)
+        if (gamesWithStars.has(game.id)) {
           continue;
         }
-
+        
         gamesNeedingStars.push(game);
       }
 
