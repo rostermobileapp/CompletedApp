@@ -4139,12 +4139,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const matchesNeedingVerification = [];
       
       for (const match of allMatches) {
-        // Must have both teams assigned
-        if (!match.team1Id || !match.team2Id) continue;
+        const tournament = leagueTournaments.find(t => t.id === match.tournamentId);
+        const settings = tournament?.settings as any;
+        
+        // Get team names - first try from team IDs, then from custom bracket settings
+        let team1Name: string | null = null;
+        let team2Name: string | null = null;
+        
+        // Try to get names from tournament_teams table
+        if (match.team1Id) {
+          const [team1] = await db
+            .select()
+            .from(tournamentTeams)
+            .where(eq(tournamentTeams.id, match.team1Id));
+          team1Name = team1?.teamName || null;
+        }
+        if (match.team2Id) {
+          const [team2] = await db
+            .select()
+            .from(tournamentTeams)
+            .where(eq(tournamentTeams.id, match.team2Id));
+          team2Name = team2?.teamName || null;
+        }
+        
+        // For custom brackets, get team names from settings if not already set
+        if (settings?.customBracket?.matchups) {
+          const matchup = settings.customBracket.matchups.find(
+            (m: any) => m.id === match.id
+          );
+          if (matchup) {
+            // Only use matchup team name if it's an actual team (not a placeholder)
+            const isRealTeam = (name: string) => 
+              name && !name.startsWith('winner:') && !name.startsWith('loser:') && name !== '';
+            
+            if (!team1Name && isRealTeam(matchup.team1)) {
+              team1Name = matchup.team1;
+            }
+            if (!team2Name && isRealTeam(matchup.team2)) {
+              team2Name = matchup.team2;
+            }
+          }
+        }
+        
+        // Must have both teams assigned (either via IDs or custom bracket names)
+        if (!team1Name || !team2Name) continue;
         
         // Must have a scheduled time in the past (or no scheduled time but tournament has started)
         const matchTime = match.scheduledTime ? new Date(match.scheduledTime) : null;
-        const tournament = leagueTournaments.find(t => t.id === match.tournamentId);
         const tournamentStartDate = tournament?.startDate ? new Date(tournament.startDate) : null;
         
         // Check if match should be played already
@@ -4164,21 +4205,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Must not be completed
         if (match.status === 'completed') continue;
         
-        // Get team names
-        const [team1] = await db
-          .select()
-          .from(tournamentTeams)
-          .where(eq(tournamentTeams.id, match.team1Id));
-        
-        const [team2] = await db
-          .select()
-          .from(tournamentTeams)
-          .where(eq(tournamentTeams.id, match.team2Id));
-        
         matchesNeedingVerification.push({
           ...match,
-          team1Name: team1?.teamName || 'Unknown Team',
-          team2Name: team2?.teamName || 'Unknown Team',
+          team1Name: team1Name,
+          team2Name: team2Name,
           tournamentName: tournament?.name || 'Unknown Tournament',
           tournamentId: tournament?.id,
           reason: 'Score not entered'
