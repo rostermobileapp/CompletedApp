@@ -4084,6 +4084,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get tournament matches needing score verification for a league
+  app.get("/api/leagues/:id/tournament-matches-needing-verification", isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      // Check if user is commissioner of this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      const isCommissioner = league.commissionerId === userId;
+      
+      // Also check if user has stat_manager permission
+      const user = await storage.getUser(userId);
+      const hasStatManager = user?.specialPermissions?.includes('stat_manager');
+      
+      // Check league-specific permissions
+      const leaguePermissions = await storage.getUserLeaguePermissions(userId, leagueId);
+      const hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager');
+      
+      if (!isCommissioner && !hasStatManager && !hasLeagueStatManager) {
+        // Return empty array for non-commissioners instead of 403
+        return res.json([]);
+      }
+      
+      // Get all tournaments for this league
+      const leagueTournaments = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.leagueId, leagueId));
+      
+      if (leagueTournaments.length === 0) {
+        return res.json([]);
+      }
+      
+      const tournamentIds = leagueTournaments.map(t => t.id);
+      
+      // Get all matches from these tournaments that need verification
+      // A match needs verification if:
+      // 1. It has both teams assigned (team1Id and team2Id are not null)
+      // 2. It has a scheduled time in the past
+      // 3. It doesn't have scores set yet (team1Score or team2Score is null)
+      // 4. Status is not 'completed'
+      const allMatches = await db
+        .select()
+        .from(tournamentMatches)
+        .where(inArray(tournamentMatches.tournamentId, tournamentIds));
+      
+      const today = new Date();
+      
+      const matchesNeedingVerification = [];
+      
+      for (const match of allMatches) {
+        // Must have both teams assigned
+        if (!match.team1Id || !match.team2Id) continue;
+        
+        // Must have a scheduled time in the past (or no scheduled time but tournament has started)
+        const matchTime = match.scheduledTime ? new Date(match.scheduledTime) : null;
+        const tournament = leagueTournaments.find(t => t.id === match.tournamentId);
+        const tournamentStartDate = tournament?.startDate ? new Date(tournament.startDate) : null;
+        
+        // Check if match should be played already
+        let isPastMatch = false;
+        if (matchTime && matchTime < today) {
+          isPastMatch = true;
+        } else if (!matchTime && tournamentStartDate && tournamentStartDate < today) {
+          // No scheduled time but tournament has started - include it
+          isPastMatch = true;
+        }
+        
+        if (!isPastMatch) continue;
+        
+        // Must not already have scores set
+        if (match.team1Score !== null && match.team2Score !== null) continue;
+        
+        // Must not be completed
+        if (match.status === 'completed') continue;
+        
+        // Get team names
+        const [team1] = await db
+          .select()
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.id, match.team1Id));
+        
+        const [team2] = await db
+          .select()
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.id, match.team2Id));
+        
+        matchesNeedingVerification.push({
+          ...match,
+          team1Name: team1?.teamName || 'Unknown Team',
+          team2Name: team2?.teamName || 'Unknown Team',
+          tournamentName: tournament?.name || 'Unknown Tournament',
+          tournamentId: tournament?.id,
+          reason: 'Score not entered'
+        });
+      }
+      
+      res.json(matchesNeedingVerification);
+    } catch (error) {
+      console.error("Error fetching tournament matches needing verification:", error);
+      res.status(500).json({ message: "Failed to fetch tournament matches needing verification" });
+    }
+  });
+
   app.get("/api/leagues/:id/standings", async (req, res) => {
     try {
       const leagueId = req.params.id;
@@ -16451,7 +16559,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Insert generated matches
         if (bracketResult.matches.length > 0) {
-          await db.insert(tournamentMatches).values(bracketResult.matches);
+          // First insert without advancesToMatchId to get actual IDs
+          const matchesWithoutAdvances = bracketResult.matches.map(m => ({
+            ...m,
+            advancesToMatchId: null // Clear temporarily
+          }));
+          
+          const insertedMatches = await db.insert(tournamentMatches).values(matchesWithoutAdvances).returning();
+          
+          // Build mapping from match_N to actual database ID
+          const matchNumberToId = new Map<string, string>();
+          insertedMatches.forEach(m => {
+            matchNumberToId.set(`match_${m.matchNumber}`, m.id);
+          });
+          
+          // Update advancesToMatchId with actual database IDs
+          for (const originalMatch of bracketResult.matches) {
+            if (originalMatch.advancesToMatchId && originalMatch.advancesToMatchId.startsWith('match_')) {
+              const actualNextMatchId = matchNumberToId.get(originalMatch.advancesToMatchId);
+              if (actualNextMatchId) {
+                const currentMatch = insertedMatches.find(m => m.matchNumber === originalMatch.matchNumber);
+                if (currentMatch) {
+                  await db.update(tournamentMatches)
+                    .set({ advancesToMatchId: actualNextMatchId })
+                    .where(eq(tournamentMatches.id, currentMatch.id));
+                }
+              }
+            }
+          }
           
           // Calculate access windows based on match dates
           const accessWindows = calculateAccessWindows(bracketResult.matches);
@@ -16769,11 +16904,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Invalid tournament format" });
       }
 
-      // Insert matches
+      // Insert matches - first without advancesToMatchId to get actual IDs
+      const matchesWithoutAdvances = bracketResult.matches.map(m => ({
+        ...m,
+        advancesToMatchId: null // Clear temporarily
+      }));
+      
       const insertedMatches = await db
         .insert(tournamentMatches)
-        .values(bracketResult.matches)
+        .values(matchesWithoutAdvances)
         .returning();
+      
+      // Build mapping from match_N to actual database ID
+      const matchNumberToId = new Map<string, string>();
+      insertedMatches.forEach(m => {
+        matchNumberToId.set(`match_${m.matchNumber}`, m.id);
+      });
+      
+      // Update advancesToMatchId with actual database IDs
+      for (const originalMatch of bracketResult.matches) {
+        if (originalMatch.advancesToMatchId && originalMatch.advancesToMatchId.startsWith('match_')) {
+          const actualNextMatchId = matchNumberToId.get(originalMatch.advancesToMatchId);
+          if (actualNextMatchId) {
+            const currentMatch = insertedMatches.find(m => m.matchNumber === originalMatch.matchNumber);
+            if (currentMatch) {
+              await db.update(tournamentMatches)
+                .set({ advancesToMatchId: actualNextMatchId })
+                .where(eq(tournamentMatches.id, currentMatch.id));
+              // Also update the in-memory version for the response
+              currentMatch.advancesToMatchId = actualNextMatchId;
+            }
+          }
+        }
+      }
 
       // DEBUG: Log bracket statistics
       const winnersMatches = insertedMatches.filter(m => m.bracketType === 'winners');

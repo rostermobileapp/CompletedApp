@@ -5,8 +5,10 @@ import { apiRequest } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Target, Check } from 'lucide-react';
+import { Target, Check, Trophy } from 'lucide-react';
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 
 export default function ScoreVerification() {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -23,40 +25,31 @@ export default function ScoreVerification() {
       
       if (!Array.isArray(allGames)) return [];
       
-      // Find games that need commissioner verification based on the correct business logic:
-      // 1. Today's date is AFTER the game's date (past games)
-      // 2. Game does NOT have final scores set yet
-      // 3. Game has problematic score submissions (0, 1, or 2 mismatched)
       const gamesNeedingVerification = [];
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // Start of today
+      today.setHours(0, 0, 0, 0);
       
       for (const game of allGames) {
         const gameDate = new Date(game.scheduledAt);
-        gameDate.setHours(0, 0, 0, 0); // Start of game date
+        gameDate.setHours(0, 0, 0, 0);
         
-        // Only check games from past dates
         if (gameDate >= today) {
-          continue; // Skip future games
+          continue;
         }
         
-        // Skip games that already have final scores set
-        // Check for both null and undefined, and ensure scores are actual numbers
         const hasValidHomeScore = game.homeScore !== null && game.homeScore !== undefined && typeof game.homeScore === 'number';
         const hasValidAwayScore = game.awayScore !== null && game.awayScore !== undefined && typeof game.awayScore === 'number';
         
         if (hasValidHomeScore && hasValidAwayScore) {
-          continue; // Game already has final scores
+          continue;
         }
         
         try {
           const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
           
-          // If we get a 403, it means user doesn't have access to this game's submissions
-          // This likely means they're not a captain of this game, so skip it (don't mark as needing verification)
           if (!submissionsResponse.ok) {
             if (submissionsResponse.status === 403) {
-              continue; // Skip games user doesn't have access to
+              continue;
             }
             throw new Error(`Failed to fetch submissions: ${submissionsResponse.status}`);
           }
@@ -70,24 +63,19 @@ export default function ScoreVerification() {
           let reason = '';
           let submissionDetails = submissions;
           
-          // Check if there's a commissioner submission - if so, no verification needed
           const hasCommissionerSubmission = submissions.some(sub => 
             sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
           );
           
           if (hasCommissionerSubmission) {
-            // Commissioner has already submitted final score - no verification needed
             needsVerification = false;
           } else if (submissionCount === 0) {
-            // No score submissions - needs verification
             needsVerification = true;
             reason = 'No score submissions';
           } else if (submissionCount === 1) {
-            // Only one team submitted - needs verification
             needsVerification = true;
             reason = 'Missing one team submission';
           } else if (submissionCount === 2) {
-            // Two submissions - check if they match
             const [sub1, sub2] = submissions;
             if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
               needsVerification = true;
@@ -104,12 +92,24 @@ export default function ScoreVerification() {
             });
           }
         } catch (error) {
-          // Skip on error
           continue;
         }
       }
       
       return gamesNeedingVerification;
+    },
+    enabled: !!leagueId,
+  });
+
+  // Fetch tournament matches needing verification
+  const { data: tournamentMatchesNeedingVerification = [], isLoading: isLoadingTournaments } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'tournament-matches-needing-verification'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/tournament-matches-needing-verification`);
+      if (!response.ok) {
+        return [];
+      }
+      return response.json();
     },
     enabled: !!leagueId,
   });
@@ -142,7 +142,35 @@ export default function ScoreVerification() {
     },
   });
 
-  // Component to handle individual score submission
+  // Mutation to submit score for a tournament match
+  const submitTournamentScoreMutation = useMutation({
+    mutationFn: async ({ tournamentId, matchId, team1Score, team2Score }: { tournamentId: string; matchId: string; team1Score: number; team2Score: number }) => {
+      const response = await apiRequest('POST', `/api/tournaments/${tournamentId}/matches/${matchId}/score`, {
+        team1Score,
+        team2Score,
+        playerStats: []
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tournament score submitted",
+        description: "Match score has been updated and winner will advance automatically.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'tournament-matches-needing-verification'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+    },
+    onError: (error) => {
+      console.error('Error submitting tournament score:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit tournament score. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Component to handle individual score submission for regular games
   const ScoreSubmissionCard = ({ game }: { game: any }) => {
     const [homeScore, setHomeScore] = useState('');
     const [awayScore, setAwayScore] = useState('');
@@ -161,7 +189,6 @@ export default function ScoreVerification() {
         return;
       }
       
-      // Double-check: only allow OT/SO if score difference is 0 or 1
       const scoreDiff = Math.abs(home - away);
       const canUseOvertimeShootout = scoreDiff <= 1;
       const resultType = (isOvertimeShootout && canUseOvertimeShootout) ? 'overtime' : 'regulation';
@@ -179,7 +206,6 @@ export default function ScoreVerification() {
             {format(new Date(game.scheduledAt), 'MMM d, yyyy • h:mm a')}
           </p>
         </div>
-        {/* Show existing submissions if any */}
         {game.submissions && game.submissions.length > 0 && (
           <div className="mb-3 p-3 bg-muted rounded-lg">
             <h4 className="text-sm font-medium mb-2">Current Submissions:</h4>
@@ -190,7 +216,6 @@ export default function ScoreVerification() {
             ))}
           </div>
         )}
-        {/* Score submission form */}
         <div className="grid grid-cols-3 gap-4 items-center mt-[4px] mb-[4px]">
           <div className="text-center">
             <label className="block text-sm font-medium mb-1">
@@ -243,7 +268,6 @@ export default function ScoreVerification() {
           </div>
         </div>
         
-        {/* Overtime/Shootout Checkbox */}
         {(() => {
           const homeVal = parseInt(homeScore);
           const awayVal = parseInt(awayScore);
@@ -291,6 +315,119 @@ export default function ScoreVerification() {
     );
   };
 
+  // Component to handle tournament match score submission
+  const TournamentMatchScoreCard = ({ match }: { match: any }) => {
+    const [team1Score, setTeam1Score] = useState('');
+    const [team2Score, setTeam2Score] = useState('');
+
+    const handleSubmitScore = () => {
+      const score1 = parseInt(team1Score);
+      const score2 = parseInt(team2Score);
+      
+      if (isNaN(score1) || isNaN(score2) || score1 < 0 || score2 < 0) {
+        toast({
+          title: "Invalid Score",
+          description: "Please enter valid scores (numbers only).",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (score1 === score2) {
+        toast({
+          title: "Invalid Score",
+          description: "Tournament matches cannot end in a tie. Please enter different scores.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      submitTournamentScoreMutation.mutate({ 
+        tournamentId: match.tournamentId, 
+        matchId: match.id, 
+        team1Score: score1, 
+        team2Score: score2 
+      });
+    };
+
+    return (
+      <div className="bg-card border border-border rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-amber-500" />
+            <Badge variant="outline" className="text-xs">{match.tournamentName}</Badge>
+          </div>
+          <Badge variant="secondary" className="text-xs">{match.round}</Badge>
+        </div>
+        
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-medium">
+            {match.team1Name} vs {match.team2Name}
+          </h3>
+          {match.scheduledTime && (
+            <p className="text-sm text-muted-foreground">
+              {format(new Date(match.scheduledTime), 'MMM d, yyyy • h:mm a')}
+            </p>
+          )}
+        </div>
+
+        <div className="mb-3 p-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            Winner will automatically advance to the next round in the bracket.
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-4 items-center mt-2 mb-2">
+          <div className="text-center">
+            <label className="block text-sm font-medium mb-1">
+              {match.team1Name}
+            </label>
+            <Input
+              type="number"
+              min="0"
+              value={team1Score}
+              onChange={(e) => setTeam1Score(e.target.value)}
+              className="text-center"
+              placeholder="0"
+              data-testid={`input-team1-score-${match.id}`}
+            />
+          </div>
+          
+          <div className="text-center text-xl font-bold text-muted-foreground">
+            -
+          </div>
+          
+          <div className="text-center">
+            <label className="block text-sm font-medium mb-1">
+              {match.team2Name}
+            </label>
+            <Input
+              type="number"
+              min="0"
+              value={team2Score}
+              onChange={(e) => setTeam2Score(e.target.value)}
+              className="text-center"
+              placeholder="0"
+              data-testid={`input-team2-score-${match.id}`}
+            />
+          </div>
+        </div>
+        
+        <Button
+          onClick={handleSubmitScore}
+          disabled={submitTournamentScoreMutation.isPending || !team1Score || !team2Score}
+          className="w-full mt-3"
+          data-testid={`button-submit-tournament-score-${match.id}`}
+        >
+          {submitTournamentScoreMutation.isPending ? "Submitting..." : "Submit Final Score & Advance Winner"}
+        </Button>
+      </div>
+    );
+  };
+
+  const totalNeedingVerification = (gamesNeedingVerification?.length || 0) + (tournamentMatchesNeedingVerification?.length || 0);
+  const isAllLoading = isLoading || isLoadingTournaments;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -309,14 +446,14 @@ export default function ScoreVerification() {
       {/* Content */}
       <div className="p-6">
         <div className="max-w-4xl mx-auto">
-          {isLoading ? (
+          {isAllLoading ? (
             <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
               <div className="flex items-center gap-3">
                 <Target className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-pulse" />
                 <span className="text-blue-600 dark:text-blue-300">Checking for games needing verification...</span>
               </div>
             </div>
-          ) : !Array.isArray(gamesNeedingVerification) || gamesNeedingVerification.length === 0 ? (
+          ) : totalNeedingVerification === 0 ? (
             <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-6">
               <div className="flex items-center gap-3 mb-2">
                 <Check className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -330,18 +467,65 @@ export default function ScoreVerification() {
             <>
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">{gamesNeedingVerification.length}</span>
+                  <span className="text-white text-sm font-bold">{totalNeedingVerification}</span>
                 </div>
                 <h2 className="text-xl font-bold text-red-600">
-                  {gamesNeedingVerification.length === 1 ? '1 Game' : `${gamesNeedingVerification.length} Games`} Needing Verification
+                  {totalNeedingVerification === 1 ? '1 Game' : `${totalNeedingVerification} Games`} Needing Verification
                 </h2>
               </div>
               
-              <div className="space-y-4">
-                {gamesNeedingVerification.map((game: any) => (
-                  <ScoreSubmissionCard key={game.id} game={game} />
-                ))}
-              </div>
+              <Tabs defaultValue={tournamentMatchesNeedingVerification.length > 0 ? "tournaments" : "regular"} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="regular" className="flex items-center gap-2">
+                    <Target className="w-4 h-4" />
+                    Regular Games
+                    {gamesNeedingVerification.length > 0 && (
+                      <Badge variant="destructive" className="ml-1">{gamesNeedingVerification.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="tournaments" className="flex items-center gap-2">
+                    <Trophy className="w-4 h-4" />
+                    Tournament Matches
+                    {tournamentMatchesNeedingVerification.length > 0 && (
+                      <Badge variant="destructive" className="ml-1">{tournamentMatchesNeedingVerification.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="regular">
+                  {gamesNeedingVerification.length === 0 ? (
+                    <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-6">
+                      <div className="flex items-center gap-3">
+                        <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        <span className="text-green-600 dark:text-green-300">All regular game scores are up to date.</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {gamesNeedingVerification.map((game: any) => (
+                        <ScoreSubmissionCard key={game.id} game={game} />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="tournaments">
+                  {tournamentMatchesNeedingVerification.length === 0 ? (
+                    <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-6">
+                      <div className="flex items-center gap-3">
+                        <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        <span className="text-green-600 dark:text-green-300">All tournament match scores are up to date.</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {tournamentMatchesNeedingVerification.map((match: any) => (
+                        <TournamentMatchScoreCard key={match.id} match={match} />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </>
           )}
         </div>
