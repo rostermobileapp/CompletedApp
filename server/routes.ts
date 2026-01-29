@@ -4038,11 +4038,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return gameDate < today;
       });
       
+      // Batch fetch all score submissions for past games (optimization)
+      const pastGameIds = pastGames.map((g: any) => g.id);
+      const allSubmissions = pastGameIds.length > 0 
+        ? await db.select().from(gameScoreSubmissions).where(inArray(gameScoreSubmissions.gameId, pastGameIds))
+        : [];
+      
+      // Group submissions by game ID for quick lookup
+      const submissionsByGameId = new Map<string, typeof allSubmissions>();
+      for (const sub of allSubmissions) {
+        const existing = submissionsByGameId.get(sub.gameId) || [];
+        existing.push(sub);
+        submissionsByGameId.set(sub.gameId, existing);
+      }
+      
       // Check each past game for verification needs
       const gamesNeedingVerification = [];
       
       for (const game of pastGames) {
-        const submissions = await storage.getGameScoreSubmissions(game.id);
+        const submissions = submissionsByGameId.get(game.id) || [];
         const submissionCount = submissions.length;
         let needsVerification = false;
         let reason = '';
@@ -4134,33 +4148,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(tournamentMatches)
         .where(inArray(tournamentMatches.tournamentId, tournamentIds));
       
+      // Batch fetch all tournament teams for these tournaments (optimization)
+      const allTournamentTeams = await db
+        .select()
+        .from(tournamentTeams)
+        .where(inArray(tournamentTeams.tournamentId, tournamentIds));
+      
+      // Create a map for quick team name lookups
+      const teamNameMap = new Map<string, string>();
+      for (const team of allTournamentTeams) {
+        teamNameMap.set(team.id, team.teamName);
+      }
+      
       const today = new Date();
       
       const matchesNeedingVerification = [];
+      
+      // Helper function to check if team name is a real team (not placeholder)
+      const isRealTeam = (name: string | null | undefined): name is string => 
+        !!name && !name.startsWith('winner:') && !name.startsWith('loser:') && name !== '';
       
       for (const match of allMatches) {
         const tournament = leagueTournaments.find(t => t.id === match.tournamentId);
         const settings = tournament?.settings as any;
         
-        // Get team names - first try from team IDs, then from custom bracket settings
-        let team1Name: string | null = null;
-        let team2Name: string | null = null;
-        
-        // Try to get names from tournament_teams table
-        if (match.team1Id) {
-          const [team1] = await db
-            .select()
-            .from(tournamentTeams)
-            .where(eq(tournamentTeams.id, match.team1Id));
-          team1Name = team1?.teamName || null;
-        }
-        if (match.team2Id) {
-          const [team2] = await db
-            .select()
-            .from(tournamentTeams)
-            .where(eq(tournamentTeams.id, match.team2Id));
-          team2Name = team2?.teamName || null;
-        }
+        // Get team names - first try from team IDs (using cached map), then from custom bracket settings
+        let team1Name: string | null = match.team1Id ? teamNameMap.get(match.team1Id) || null : null;
+        let team2Name: string | null = match.team2Id ? teamNameMap.get(match.team2Id) || null : null;
         
         // For custom brackets, get team names from settings if not already set
         if (settings?.customBracket?.matchups) {
@@ -4168,10 +4182,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             (m: any) => m.id === match.id
           );
           if (matchup) {
-            // Only use matchup team name if it's an actual team (not a placeholder)
-            const isRealTeam = (name: string) => 
-              name && !name.startsWith('winner:') && !name.startsWith('loser:') && name !== '';
-            
             if (!team1Name && isRealTeam(matchup.team1)) {
               team1Name = matchup.team1;
             }
