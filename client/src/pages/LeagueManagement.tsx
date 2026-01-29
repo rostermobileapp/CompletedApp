@@ -103,10 +103,10 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
   const [, navigate] = useLocation();
 
   // Fetch count of games that need score verification using optimized backend endpoint
-  const { data: gamesNeedingVerification = [], isLoading } = useQuery({
+  const { data: gamesNeedingVerification = [], isLoading: isLoadingGames } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
-    refetchInterval: 90000, // Reduced from 30s to 90s to lower egress
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 90000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/games-needing-verification`);
       if (!response.ok) return [];
@@ -115,11 +115,26 @@ function ScoreVerificationAlert({ leagueId }: { leagueId: string }) {
     enabled: !!leagueId,
   });
 
+  // Also fetch tournament matches needing verification
+  const { data: tournamentMatchesNeedingVerification = [], isLoading: isLoadingTournaments } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'tournament-matches-needing-verification'],
+    refetchInterval: 90000,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/tournament-matches-needing-verification`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!leagueId,
+  });
+
+  const isLoading = isLoadingGames || isLoadingTournaments;
+
   if (isLoading) {
     return null;
   }
 
-  const count = gamesNeedingVerification.length;
+  const count = gamesNeedingVerification.length + tournamentMatchesNeedingVerification.length;
 
   if (count === 0) {
     return null;
