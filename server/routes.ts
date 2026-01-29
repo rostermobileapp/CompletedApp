@@ -16207,16 +16207,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw new Error("Match not found");
         }
 
-        if (!match.team1Id || !match.team2Id) {
+        // Get tournament to check if it's a custom bracket
+        const [tournament] = await tx
+          .select()
+          .from(tournaments)
+          .where(eq(tournaments.id, tournamentId));
+        
+        const settings = tournament?.settings as any;
+        const isCustomBracket = !!settings?.customBracket;
+        
+        // For custom brackets, team names are in settings, not team1Id/team2Id
+        let hasTeamsAssigned = !!(match.team1Id && match.team2Id);
+        
+        if (!hasTeamsAssigned && isCustomBracket) {
+          // Check if teams are assigned in custom bracket settings
+          const matchup = settings.customBracket.matchups?.find((m: any) => m.id === matchId);
+          const isRealTeam = (name: string) => 
+            name && !name.startsWith('winner:') && !name.startsWith('loser:') && name !== '';
+          hasTeamsAssigned = matchup && isRealTeam(matchup.team1) && isRealTeam(matchup.team2);
+        }
+        
+        if (!hasTeamsAssigned) {
           throw new Error("Match does not have both teams assigned");
         }
 
-        // Determine winner
+        // Determine winner (for non-custom brackets)
         let winnerId = null;
-        if (team1Score > team2Score) {
-          winnerId = match.team1Id;
-        } else if (team2Score > team1Score) {
-          winnerId = match.team2Id;
+        if (match.team1Id && match.team2Id) {
+          if (team1Score > team2Score) {
+            winnerId = match.team1Id;
+          } else if (team2Score > team1Score) {
+            winnerId = match.team2Id;
+          }
         }
 
         const previousWinnerId = match.winnerId;
