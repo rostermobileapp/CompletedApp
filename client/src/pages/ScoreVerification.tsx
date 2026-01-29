@@ -16,87 +16,13 @@ export default function ScoreVerification() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch games that need score verification using correct business logic
+  // Fetch games that need score verification using optimized backend endpoint
   const { data: gamesNeedingVerification = [], isLoading } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'games-needing-verification'],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
-      const allGames = await response.json();
-      
-      if (!Array.isArray(allGames)) return [];
-      
-      const gamesNeedingVerification = [];
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      for (const game of allGames) {
-        const gameDate = new Date(game.scheduledAt);
-        gameDate.setHours(0, 0, 0, 0);
-        
-        if (gameDate >= today) {
-          continue;
-        }
-        
-        const hasValidHomeScore = game.homeScore !== null && game.homeScore !== undefined && typeof game.homeScore === 'number';
-        const hasValidAwayScore = game.awayScore !== null && game.awayScore !== undefined && typeof game.awayScore === 'number';
-        
-        if (hasValidHomeScore && hasValidAwayScore) {
-          continue;
-        }
-        
-        try {
-          const submissionsResponse = await apiRequest('GET', `/api/games/${game.id}/score-submissions`);
-          
-          if (!submissionsResponse.ok) {
-            if (submissionsResponse.status === 403) {
-              continue;
-            }
-            throw new Error(`Failed to fetch submissions: ${submissionsResponse.status}`);
-          }
-          
-          const submissions = await submissionsResponse.json();
-          
-          if (!Array.isArray(submissions)) continue;
-          
-          const submissionCount = submissions.length;
-          let needsVerification = false;
-          let reason = '';
-          let submissionDetails = submissions;
-          
-          const hasCommissionerSubmission = submissions.some(sub => 
-            sub.submitterRole === 'commissioner' || sub.isCommissionerOverride === true
-          );
-          
-          if (hasCommissionerSubmission) {
-            needsVerification = false;
-          } else if (submissionCount === 0) {
-            needsVerification = true;
-            reason = 'No score submissions';
-          } else if (submissionCount === 1) {
-            needsVerification = true;
-            reason = 'Missing one team submission';
-          } else if (submissionCount === 2) {
-            const [sub1, sub2] = submissions;
-            if (sub1.homeScore !== sub2.homeScore || sub1.awayScore !== sub2.awayScore) {
-              needsVerification = true;
-              reason = `Mismatched scores`;
-            }
-          }
-          
-          if (needsVerification) {
-            gamesNeedingVerification.push({
-              ...game,
-              submissionCount,
-              reason,
-              submissions: submissionDetails
-            });
-          }
-        } catch (error) {
-          continue;
-        }
-      }
-      
-      return gamesNeedingVerification;
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/games-needing-verification`);
+      if (!response.ok) return [];
+      return response.json();
     },
     enabled: !!leagueId,
   });
