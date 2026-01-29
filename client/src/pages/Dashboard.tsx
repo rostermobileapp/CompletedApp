@@ -206,6 +206,29 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
     refetchOnMount: true,
   });
 
+  // Fetch tournament matches that need score verification
+  const { data: tournamentMatchesNeedingVerification = [], isFetching: tournamentMatchesFetching } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'tournament-matches-needing-verification'],
+    queryFn: async () => {
+      if (!leagueId) return [];
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/tournament-matches-needing-verification`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!leagueId,
+    refetchOnMount: true,
+  });
+
+  // Combine games and tournament matches for verification
+  const allItemsNeedingVerification = [
+    ...gamesNeedingVerification,
+    ...tournamentMatchesNeedingVerification.map((match: any) => ({
+      ...match,
+      isTournamentMatch: true,
+    })),
+  ];
+
   // Fetch games needing star awards
   const { data: gamesNeedingStars = [], isFetching: starsFetching } = useQuery({
     queryKey: ['/api/user/games-needing-stars', leagueId],
@@ -291,7 +314,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
   const unreadNotificationCount = unreadNotifications.length;
 
   const totalTasks = (Array.isArray(pendingMembers) ? pendingMembers.length : 0) + 
-                     (Array.isArray(gamesNeedingVerification) ? gamesNeedingVerification.length : 0) +
+                     allItemsNeedingVerification.length +
                      (pendingSubstituteApprovals?.total || 0) +
                      (Array.isArray(gamesNeedingStars) ? gamesNeedingStars.length : 0) +
                      (Array.isArray(notifications) ? notifications.length : 0);
@@ -640,13 +663,13 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                 </div>
               )}
 
-              {/* Games Needing Score Verification Section */}
-              {Array.isArray(gamesNeedingVerification) && gamesNeedingVerification.length > 0 && (
+              {/* Games and Tournament Matches Needing Score Verification Section */}
+              {allItemsNeedingVerification.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-4">
                     <BarChart3 className="w-5 h-5 text-[#3c83f6]" />
                     <h3 className="text-lg font-semibold text-[#3c83f6]">
-                      Score Verifications ({gamesNeedingVerification.length})
+                      Score Verifications ({allItemsNeedingVerification.length})
                     </h3>
                   </div>
                   <div className="bg-[#e2e2e2] dark:bg-[#212121] rounded-lg p-4">
@@ -1918,9 +1941,10 @@ export default function Dashboard() {
       
       try {
         // Fetch all top-level data in parallel (including notifications and games needing verification)
-        const [pendingMembersResponse, gamesVerificationResponse, substituteApprovalsResponse, starsResponse, notificationsResponse] = await Promise.all([
+        const [pendingMembersResponse, gamesVerificationResponse, tournamentMatchesVerificationResponse, substituteApprovalsResponse, starsResponse, notificationsResponse] = await Promise.all([
           apiRequest('GET', `/api/leagues/${effectiveLeagueId}/pending-members`),
           apiRequest('GET', `/api/leagues/${effectiveLeagueId}/games-needing-verification`),
+          apiRequest('GET', `/api/leagues/${effectiveLeagueId}/tournament-matches-needing-verification`),
           apiRequest('GET', `/api/substitute-requests/pending-approvals?leagueId=${effectiveLeagueId}`).catch(() => null),
           apiRequest('GET', `/api/user/games-needing-stars?leagueId=${effectiveLeagueId}`).catch(() => null),
           apiRequest('GET', `/api/notifications`).catch(() => null)
@@ -1928,20 +1952,23 @@ export default function Dashboard() {
         
         const pendingMembers = await pendingMembersResponse.json();
         const gamesNeedingVerificationData = gamesVerificationResponse.ok ? await gamesVerificationResponse.json() : [];
+        const tournamentMatchesNeedingVerificationData = tournamentMatchesVerificationResponse.ok ? await tournamentMatchesVerificationResponse.json() : [];
         const substituteData = substituteApprovalsResponse ? await substituteApprovalsResponse.json().catch(() => ({ total: 0 })) : { total: 0 };
         const starsData = starsResponse ? await starsResponse.json().catch(() => []) : [];
         const notificationsData = notificationsResponse ? await notificationsResponse.json().catch(() => []) : [];
         
         const pendingMembersCount = Array.isArray(pendingMembers) ? pendingMembers.length : 0;
         const gamesNeedingVerification = Array.isArray(gamesNeedingVerificationData) ? gamesNeedingVerificationData.length : 0;
+        const tournamentMatchesNeedingVerification = Array.isArray(tournamentMatchesNeedingVerificationData) ? tournamentMatchesNeedingVerificationData.length : 0;
+        const allItemsNeedingVerification = gamesNeedingVerification + tournamentMatchesNeedingVerification;
         const pendingSubstituteApprovals = substituteData.total || 0;
         const gamesNeedingStars = Array.isArray(starsData) ? starsData.length : 0;
         const notificationsCount = Array.isArray(notificationsData) ? notificationsData.length : 0;
-        const total = pendingMembersCount + gamesNeedingVerification + pendingSubstituteApprovals + gamesNeedingStars + notificationsCount;
+        const total = pendingMembersCount + allItemsNeedingVerification + pendingSubstituteApprovals + gamesNeedingStars + notificationsCount;
         
         return {
           pendingMembers: pendingMembersCount,
-          gamesNeedingVerification,
+          gamesNeedingVerification: allItemsNeedingVerification,
           pendingSubstituteApprovals,
           gamesNeedingStars,
           notifications: notificationsCount,

@@ -4198,6 +4198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (!isPastMatch) continue;
+
         
         // Must not already have scores set
         if (match.team1Score !== null && match.team2Score !== null) continue;
