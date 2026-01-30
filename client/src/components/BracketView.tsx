@@ -568,8 +568,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       {getTeamDisplay(match.team1Id, match, 'team1')}
                     </span>
                   )}
-                  {match.team1Score !== null && (
-                    <span className={`font-bold ml-2 ${team1Wins ? '' : 'text-foreground'}`} data-testid={`text-score1-${match.matchNumber}`}>
+                  {match.team1Score != null && (
+                    <span className={`font-bold ml-2 flex-shrink-0 ${team1Wins ? '' : 'text-foreground'}`} data-testid={`text-score1-${match.matchNumber}`}>
                       {match.team1Score}
                     </span>
                   )}
@@ -616,8 +616,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       {getTeamDisplay(match.team2Id, match, 'team2')}
                     </span>
                   )}
-                  {match.team2Score !== null && (
-                    <span className={`font-bold ml-2 ${team2Wins ? '' : 'text-foreground'}`} data-testid={`text-score2-${match.matchNumber}`}>
+                  {match.team2Score != null && (
+                    <span className={`font-bold ml-2 flex-shrink-0 ${team2Wins ? '' : 'text-foreground'}`} data-testid={`text-score2-${match.matchNumber}`}>
                       {match.team2Score}
                     </span>
                   )}
