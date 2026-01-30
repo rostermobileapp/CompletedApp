@@ -1731,6 +1731,7 @@ export default function TournamentDetail() {
                         tournament={tournament}
                         embeddable={true}
                         locked={tournament.status !== 'draft' || (isBracketLocked && !isEditingBracket)}
+                        initialMatches={matches || []}
                         onSave={async (bracketData) => {
                           try {
                             // Set locked to true when saving

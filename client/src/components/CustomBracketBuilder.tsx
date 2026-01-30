@@ -482,24 +482,21 @@ export function CustomBracketBuilder({
   };
 
   useEffect(() => {
-    // Priority 1: Load from initialMatches prop (for editing existing auto-generated brackets)
-    if (initialMatches && initialMatches.length > 0) {
-      const { matchups: converted, connections: convertedConnections } = convertMatchesToMatchups(initialMatches, teams);
-      setMatchups(converted);
-      setConnections(convertedConnections);
-      return;
-    }
-    
-    // Priority 2: Load bracket from tournament settings (for custom bracket format)
+    // Priority 1: For custom brackets, use settings JSON but merge in scores from initialMatches
     if (tournament?.settings?.customBracket) {
       const data = tournament.settings.customBracket;
       if (data.matchups && data.matchups.length > 0) {
         // Merge scores from initialMatches (from DB) into settings matchups
         // Scores are stored in tournament_matches table, not in settings JSON
         // Match by ID since custom bracket match IDs equal the matchup IDs
+        console.log('🏀 CustomBracketBuilder: Merging scores from DB matches into settings matchups');
+        console.log('🏀 initialMatches:', initialMatches?.map(m => ({ id: m.id, team1Score: m.team1Score, team2Score: m.team2Score })));
+        console.log('🏀 settings matchups:', data.matchups.map((m: Matchup) => ({ id: m.id, gameNumber: m.gameNumber, score1: m.score1, score2: m.score2 })));
+        
         const matchupsWithScores = data.matchups.map((matchup: Matchup) => {
           const dbMatch = initialMatches?.find(m => m.id === matchup.id);
           if (dbMatch) {
+            console.log(`🏀 Found match for ${matchup.gameNumber}: score1=${dbMatch.team1Score}, score2=${dbMatch.team2Score}`);
             return {
               ...matchup,
               score1: dbMatch.team1Score,
@@ -511,6 +508,7 @@ export function CustomBracketBuilder({
           }
           return matchup;
         });
+        console.log('🏀 matchupsWithScores:', matchupsWithScores.map((m: Matchup) => ({ id: m.id, gameNumber: m.gameNumber, score1: m.score1, score2: m.score2 })));
         setMatchups(matchupsWithScores);
         setConnections(data.connections || []);
         setZoom(data.zoom || 1);
@@ -519,6 +517,14 @@ export function CustomBracketBuilder({
         localStorage.setItem('customBracket', JSON.stringify(data));
         return;
       }
+    }
+
+    // Priority 2: For non-custom brackets, convert initialMatches to matchups
+    if (initialMatches && initialMatches.length > 0 && !tournament?.settings?.customBracket) {
+      const { matchups: converted, connections: convertedConnections } = convertMatchesToMatchups(initialMatches, teams);
+      setMatchups(converted);
+      setConnections(convertedConnections);
+      return;
     }
 
     // Priority 3: Fall back to localStorage if no tournament settings
