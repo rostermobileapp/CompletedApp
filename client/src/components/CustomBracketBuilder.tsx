@@ -496,10 +496,9 @@ export function CustomBracketBuilder({
       if (data.matchups && data.matchups.length > 0) {
         // Merge scores from initialMatches (from DB) into settings matchups
         // Scores are stored in tournament_matches table, not in settings JSON
+        // Match by ID since custom bracket match IDs equal the matchup IDs
         const matchupsWithScores = data.matchups.map((matchup: Matchup) => {
-          // Find the corresponding match from the API
-          // Match by round field which contains the gameNumber string (e.g. "Play-In Game", "Game 1")
-          const dbMatch = initialMatches?.find(m => m.round === matchup.gameNumber);
+          const dbMatch = initialMatches?.find(m => m.id === matchup.id);
           if (dbMatch) {
             return {
               ...matchup,
