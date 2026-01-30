@@ -32,6 +32,7 @@ interface Matchup {
   winner: 'team1' | 'team2' | null;
   winnerDestination: string | 'final' | null;
   loserDestination: string | 'eliminated' | null;
+  scheduledTime?: string | null;
 }
 
 interface Connection {
@@ -43,6 +44,24 @@ interface Connection {
 
 function snapToGrid(value: number): number {
   return Math.round(value / GRID_SIZE) * GRID_SIZE;
+}
+
+function formatScheduledTime(scheduledTime: string | null | undefined): string | null {
+  if (!scheduledTime) return null;
+  try {
+    const date = new Date(scheduledTime);
+    if (isNaN(date.getTime())) return null;
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes.toString().padStart(2, '0');
+    return `${month}/${day} ${displayHours}:${displayMinutes}${ampm}`;
+  } catch {
+    return null;
+  }
 }
 
 function calculateConnectionPath(
@@ -74,6 +93,7 @@ interface TournamentMatch {
   team2Score: number | null;
   status: string | null;
   advancesToMatchId?: string | null;
+  scheduledTime?: string | null;
 }
 
 interface CustomBracketBuilderProps {
@@ -486,21 +506,17 @@ export function CustomBracketBuilder({
     if (tournament?.settings?.customBracket) {
       const data = tournament.settings.customBracket;
       if (data.matchups && data.matchups.length > 0) {
-        // Merge scores from initialMatches (from DB) into settings matchups
-        // Scores are stored in tournament_matches table, not in settings JSON
+        // Merge scores and scheduled times from initialMatches (from DB) into settings matchups
+        // Scores and times are stored in tournament_matches table, not in settings JSON
         // Match by ID since custom bracket match IDs equal the matchup IDs
-        console.log('🏀 CustomBracketBuilder: Merging scores from DB matches into settings matchups');
-        console.log('🏀 initialMatches:', initialMatches?.map(m => ({ id: m.id, team1Score: m.team1Score, team2Score: m.team2Score })));
-        console.log('🏀 settings matchups:', data.matchups.map((m: Matchup) => ({ id: m.id, gameNumber: m.gameNumber, score1: m.score1, score2: m.score2 })));
-        
         const matchupsWithScores = data.matchups.map((matchup: Matchup) => {
           const dbMatch = initialMatches?.find(m => m.id === matchup.id);
           if (dbMatch) {
-            console.log(`🏀 Found match for ${matchup.gameNumber}: score1=${dbMatch.team1Score}, score2=${dbMatch.team2Score}`);
             return {
               ...matchup,
               score1: dbMatch.team1Score,
               score2: dbMatch.team2Score,
+              scheduledTime: dbMatch.scheduledTime,
               winner: dbMatch.team1Score !== null && dbMatch.team2Score !== null
                 ? (dbMatch.team1Score > dbMatch.team2Score ? 'team1' : 'team2')
                 : matchup.winner
@@ -508,7 +524,6 @@ export function CustomBracketBuilder({
           }
           return matchup;
         });
-        console.log('🏀 matchupsWithScores:', matchupsWithScores.map((m: Matchup) => ({ id: m.id, gameNumber: m.gameNumber, score1: m.score1, score2: m.score2 })));
         setMatchups(matchupsWithScores);
         setConnections(data.connections || []);
         setZoom(data.zoom || 1);
@@ -781,6 +796,11 @@ export function CustomBracketBuilder({
                   disabled={locked}
                   data-testid={`input-game-number-${matchup.id}`}
                 />
+                {matchup.scheduledTime && formatScheduledTime(matchup.scheduledTime) && (
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                    {formatScheduledTime(matchup.scheduledTime)}
+                  </span>
+                )}
                 {!locked && (
                   <Button
                     variant="ghost"
