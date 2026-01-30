@@ -23,15 +23,6 @@ interface BracketViewProps {
 }
 
 export default function BracketView({ matches, teams, format, settings, tournamentName, tournamentId, isCommissioner = false, tournamentType }: BracketViewProps) {
-  // Debug: log incoming matches to see scores
-  console.log('🏀 BracketView matches:', matches.map(m => ({
-    id: m.id,
-    matchNumber: m.matchNumber,
-    team1Score: m.team1Score,
-    team2Score: m.team2Score,
-    status: m.status
-  })));
-  
   const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);

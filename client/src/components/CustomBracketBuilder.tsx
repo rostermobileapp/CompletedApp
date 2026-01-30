@@ -494,7 +494,25 @@ export function CustomBracketBuilder({
     if (tournament?.settings?.customBracket) {
       const data = tournament.settings.customBracket;
       if (data.matchups && data.matchups.length > 0) {
-        setMatchups(data.matchups);
+        // Merge scores from initialMatches (from DB) into settings matchups
+        // Scores are stored in tournament_matches table, not in settings JSON
+        const matchupsWithScores = data.matchups.map((matchup: Matchup) => {
+          // Find the corresponding match from the API
+          // Match by round field which contains the gameNumber string (e.g. "Play-In Game", "Game 1")
+          const dbMatch = initialMatches?.find(m => m.round === matchup.gameNumber);
+          if (dbMatch) {
+            return {
+              ...matchup,
+              score1: dbMatch.team1Score,
+              score2: dbMatch.team2Score,
+              winner: dbMatch.team1Score !== null && dbMatch.team2Score !== null
+                ? (dbMatch.team1Score > dbMatch.team2Score ? 'team1' : 'team2')
+                : matchup.winner
+            };
+          }
+          return matchup;
+        });
+        setMatchups(matchupsWithScores);
         setConnections(data.connections || []);
         setZoom(data.zoom || 1);
         setPan(data.pan || { x: 0, y: 0 });
@@ -776,61 +794,75 @@ export function CustomBracketBuilder({
 
               {/* Teams */}
               <div className="flex-1 flex flex-col gap-1">
-                <Select
-                  value={matchup.team1 || 'unassigned'}
-                  onValueChange={(value) => updateMatchup(matchup.id, { team1: value === 'unassigned' ? '' : value })}
-                  disabled={locked}
-                >
-                  <SelectTrigger className="h-7 text-xs" data-testid={`select-team1-${matchup.id}`}>
-                    <SelectValue placeholder="Select Team 1" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {teams.map(team => (
-                      <SelectItem key={team.id} value={team.teamName}>
-                        {team.teamName}
-                      </SelectItem>
-                    ))}
-                    {matchups.filter(m => m.id !== matchup.id).map(m => (
-                      <SelectItem key={`winner-${m.id}`} value={`winner:${m.gameNumber}`}>
-                        Winner of {m.gameNumber}
-                      </SelectItem>
-                    ))}
-                    {matchups.filter(m => m.id !== matchup.id).map(m => (
-                      <SelectItem key={`loser-${m.id}`} value={`loser:${m.gameNumber}`}>
-                        Loser of {m.gameNumber}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={matchup.team1 || 'unassigned'}
+                    onValueChange={(value) => updateMatchup(matchup.id, { team1: value === 'unassigned' ? '' : value })}
+                    disabled={locked}
+                  >
+                    <SelectTrigger className="h-7 text-xs flex-1" data-testid={`select-team1-${matchup.id}`}>
+                      <SelectValue placeholder="Select Team 1" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {teams.map(team => (
+                        <SelectItem key={team.id} value={team.teamName}>
+                          {team.teamName}
+                        </SelectItem>
+                      ))}
+                      {matchups.filter(m => m.id !== matchup.id).map(m => (
+                        <SelectItem key={`winner-${m.id}`} value={`winner:${m.gameNumber}`}>
+                          Winner of {m.gameNumber}
+                        </SelectItem>
+                      ))}
+                      {matchups.filter(m => m.id !== matchup.id).map(m => (
+                        <SelectItem key={`loser-${m.id}`} value={`loser:${m.gameNumber}`}>
+                          Loser of {m.gameNumber}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {matchup.score1 != null && (
+                    <span className={`font-bold text-sm flex-shrink-0 ${matchup.winner === 'team1' ? 'text-green-500' : ''}`}>
+                      {matchup.score1}
+                    </span>
+                  )}
+                </div>
                 <div className="text-center text-xs text-muted-foreground">vs</div>
-                <Select
-                  value={matchup.team2 || 'unassigned'}
-                  onValueChange={(value) => updateMatchup(matchup.id, { team2: value === 'unassigned' ? '' : value })}
-                  disabled={locked}
-                >
-                  <SelectTrigger className="h-7 text-xs" data-testid={`select-team2-${matchup.id}`}>
-                    <SelectValue placeholder="Select Team 2" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {teams.map(team => (
-                      <SelectItem key={team.id} value={team.teamName}>
-                        {team.teamName}
-                      </SelectItem>
-                    ))}
-                    {matchups.filter(m => m.id !== matchup.id).map(m => (
-                      <SelectItem key={`winner-${m.id}`} value={`winner:${m.gameNumber}`}>
-                        Winner of {m.gameNumber}
-                      </SelectItem>
-                    ))}
-                    {matchups.filter(m => m.id !== matchup.id).map(m => (
-                      <SelectItem key={`loser-${m.id}`} value={`loser:${m.gameNumber}`}>
-                        Loser of {m.gameNumber}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={matchup.team2 || 'unassigned'}
+                    onValueChange={(value) => updateMatchup(matchup.id, { team2: value === 'unassigned' ? '' : value })}
+                    disabled={locked}
+                  >
+                    <SelectTrigger className="h-7 text-xs flex-1" data-testid={`select-team2-${matchup.id}`}>
+                      <SelectValue placeholder="Select Team 2" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {teams.map(team => (
+                        <SelectItem key={team.id} value={team.teamName}>
+                          {team.teamName}
+                        </SelectItem>
+                      ))}
+                      {matchups.filter(m => m.id !== matchup.id).map(m => (
+                        <SelectItem key={`winner-${m.id}`} value={`winner:${m.gameNumber}`}>
+                          Winner of {m.gameNumber}
+                        </SelectItem>
+                      ))}
+                      {matchups.filter(m => m.id !== matchup.id).map(m => (
+                        <SelectItem key={`loser-${m.id}`} value={`loser:${m.gameNumber}`}>
+                          Loser of {m.gameNumber}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {matchup.score2 != null && (
+                    <span className={`font-bold text-sm flex-shrink-0 ${matchup.winner === 'team2' ? 'text-green-500' : ''}`}>
+                      {matchup.score2}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Routing Controls */}
