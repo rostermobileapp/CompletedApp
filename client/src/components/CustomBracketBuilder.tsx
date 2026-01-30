@@ -58,7 +58,7 @@ function formatScheduledTime(scheduledTime: string | null | undefined): string |
     const ampm = hours >= 12 ? 'PM' : 'AM';
     const displayHours = hours % 12 || 12;
     const displayMinutes = minutes.toString().padStart(2, '0');
-    return `${month}/${day} ${displayHours}:${displayMinutes}${ampm}`;
+    return `${month}/${day}    ${displayHours}:${displayMinutes}${ampm}`;
   } catch {
     return null;
   }
