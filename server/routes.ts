@@ -16328,6 +16328,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Handle custom bracket winner advancement (update settings JSON)
+        if (isCustomBracket && settings?.customBracket?.matchups) {
+          const matchup = settings.customBracket.matchups.find((m: any) => m.id === matchId);
+          if (matchup) {
+            // Determine winning team name from custom bracket settings
+            const winningTeamName = team1Score > team2Score ? matchup.team1 : matchup.team2;
+            const losingTeamName = team1Score > team2Score ? matchup.team2 : matchup.team1;
+            const gameNumber = matchup.gameNumber; // e.g., "Play-in-game", "Game 1", etc.
+            
+            // Create placeholders to search for
+            const winnerPlaceholder = `winner:${gameNumber}`;
+            const loserPlaceholder = `loser:${gameNumber}`;
+            
+            // Update all downstream matchups that reference this match
+            let updatedMatchups = settings.customBracket.matchups.map((m: any) => {
+              let updated = { ...m };
+              
+              // Replace winner placeholder with winning team name
+              if (m.team1 === winnerPlaceholder) {
+                updated.team1 = winningTeamName;
+              }
+              if (m.team2 === winnerPlaceholder) {
+                updated.team2 = winningTeamName;
+              }
+              
+              // Replace loser placeholder with losing team name (for consolation/losers brackets)
+              if (m.team1 === loserPlaceholder) {
+                updated.team1 = losingTeamName;
+              }
+              if (m.team2 === loserPlaceholder) {
+                updated.team2 = losingTeamName;
+              }
+              
+              return updated;
+            });
+            
+            // Update tournament settings with modified matchups
+            const updatedSettings = {
+              ...settings,
+              customBracket: {
+                ...settings.customBracket,
+                matchups: updatedMatchups
+              }
+            };
+            
+            await tx
+              .update(tournaments)
+              .set({ settings: updatedSettings })
+              .where(eq(tournaments.id, tournamentId));
+          }
+        }
+
         // Handle player stats - simple accumulation
         if (playerStats && Array.isArray(playerStats) && playerStats.length > 0) {
           for (const stat of playerStats) {

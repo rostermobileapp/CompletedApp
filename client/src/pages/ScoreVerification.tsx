@@ -78,13 +78,15 @@ export default function ScoreVerification() {
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast({
         title: "Tournament score submitted",
         description: "Match score has been updated and winner will advance automatically.",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'tournament-matches-needing-verification'] });
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', variables.tournamentId, 'matches'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', variables.tournamentId] });
     },
     onError: (error) => {
       console.error('Error submitting tournament score:', error);
