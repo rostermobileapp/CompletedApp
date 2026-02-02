@@ -343,12 +343,27 @@ export function CustomBracketBuilder({
     const matchup = matchups.find(m => m.id === matchupId);
     if (!matchup) return;
 
+    const winnerReference = `winner:${matchup.gameNumber}`;
+    const oldDestination = matchup.winnerDestination;
+
+    // Clear the winner reference from old destination matchup (if it exists and is different)
+    if (oldDestination && oldDestination !== 'final' && oldDestination !== destination) {
+      const oldDestMatchup = matchups.find(m => m.id === oldDestination);
+      if (oldDestMatchup) {
+        if (oldDestMatchup.team1 === winnerReference) {
+          updateMatchup(oldDestination, { team1: '' });
+        } else if (oldDestMatchup.team2 === winnerReference) {
+          updateMatchup(oldDestination, { team2: '' });
+        }
+      }
+    }
+
     // Remove old connection
     setConnections(connections.filter(c => c.source !== matchupId || c.type !== 'winner'));
 
     updateMatchup(matchupId, { winnerDestination: destination });
 
-    // Add new connection if destination is another matchup
+    // Add new connection and update destination team slot if destination is another matchup
     if (destination && destination !== 'final') {
       setConnections([...connections, {
         id: nanoid(),
@@ -356,6 +371,20 @@ export function CustomBracketBuilder({
         destination,
         type: 'winner'
       }]);
+
+      // Update the destination matchup's team slot to show the winner reference
+      const destMatchup = matchups.find(m => m.id === destination);
+      if (destMatchup) {
+        // Check if the winner reference is already assigned
+        if (destMatchup.team1 !== winnerReference && destMatchup.team2 !== winnerReference) {
+          // Assign to first empty slot, or team2 if team1 is taken
+          if (!destMatchup.team1 || destMatchup.team1 === 'unassigned') {
+            updateMatchup(destination, { team1: winnerReference });
+          } else if (!destMatchup.team2 || destMatchup.team2 === 'unassigned') {
+            updateMatchup(destination, { team2: winnerReference });
+          }
+        }
+      }
     }
   };
 
@@ -363,12 +392,27 @@ export function CustomBracketBuilder({
     const matchup = matchups.find(m => m.id === matchupId);
     if (!matchup) return;
 
+    const loserReference = `loser:${matchup.gameNumber}`;
+    const oldDestination = matchup.loserDestination;
+
+    // Clear the loser reference from old destination matchup (if it exists and is different)
+    if (oldDestination && oldDestination !== 'eliminated' && oldDestination !== destination) {
+      const oldDestMatchup = matchups.find(m => m.id === oldDestination);
+      if (oldDestMatchup) {
+        if (oldDestMatchup.team1 === loserReference) {
+          updateMatchup(oldDestination, { team1: '' });
+        } else if (oldDestMatchup.team2 === loserReference) {
+          updateMatchup(oldDestination, { team2: '' });
+        }
+      }
+    }
+
     // Remove old connection
     setConnections(connections.filter(c => c.source !== matchupId || c.type !== 'loser'));
 
     updateMatchup(matchupId, { loserDestination: destination });
 
-    // Add new connection if destination is another matchup
+    // Add new connection and update destination team slot if destination is another matchup
     if (destination && destination !== 'eliminated') {
       setConnections([...connections, {
         id: nanoid(),
@@ -376,6 +420,20 @@ export function CustomBracketBuilder({
         destination,
         type: 'loser'
       }]);
+
+      // Update the destination matchup's team slot to show the loser reference
+      const destMatchup = matchups.find(m => m.id === destination);
+      if (destMatchup) {
+        // Check if the loser reference is already assigned
+        if (destMatchup.team1 !== loserReference && destMatchup.team2 !== loserReference) {
+          // Assign to first empty slot, or team2 if team1 is taken
+          if (!destMatchup.team1 || destMatchup.team1 === 'unassigned') {
+            updateMatchup(destination, { team1: loserReference });
+          } else if (!destMatchup.team2 || destMatchup.team2 === 'unassigned') {
+            updateMatchup(destination, { team2: loserReference });
+          }
+        }
+      }
     }
   };
 
