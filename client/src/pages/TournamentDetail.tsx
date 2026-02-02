@@ -2356,9 +2356,9 @@ export default function TournamentDetail() {
                                       <span data-testid={`text-scheduled-time-${match.matchNumber}`}>
                                         {format(new Date(match.scheduledTime), "MMM d, yyyy 'at' h:mm a")}
                                       </span>
-                                    ) : match.status === 'completed' && match.updatedAt ? (
-                                      <span data-testid={`text-scheduled-time-${match.matchNumber}`} className="italic">
-                                        Played {format(new Date(match.updatedAt), "MMM d, yyyy")}
+                                    ) : match.status === 'completed' ? (
+                                      <span data-testid={`text-scheduled-time-${match.matchNumber}`} className="text-green-600 dark:text-green-400">
+                                        Completed
                                       </span>
                                     ) : (
                                       <span className="italic">Not scheduled</span>
