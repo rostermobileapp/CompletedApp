@@ -346,46 +346,68 @@ export function CustomBracketBuilder({
     const winnerReference = `winner:${matchup.gameNumber}`;
     const oldDestination = matchup.winnerDestination;
 
-    // Clear the winner reference from old destination matchup (if it exists and is different)
-    if (oldDestination && oldDestination !== 'final' && oldDestination !== destination) {
-      const oldDestMatchup = matchups.find(m => m.id === oldDestination);
-      if (oldDestMatchup) {
-        if (oldDestMatchup.team1 === winnerReference) {
-          updateMatchup(oldDestination, { team1: '' });
-        } else if (oldDestMatchup.team2 === winnerReference) {
-          updateMatchup(oldDestination, { team2: '' });
-        }
-      }
-    }
-
     // Remove old connection
     setConnections(connections.filter(c => c.source !== matchupId || c.type !== 'winner'));
 
-    updateMatchup(matchupId, { winnerDestination: destination });
-
-    // Add new connection and update destination team slot if destination is another matchup
+    // Add new connection if destination is another matchup
     if (destination && destination !== 'final') {
-      setConnections([...connections, {
+      setConnections(prev => [...prev.filter(c => c.source !== matchupId || c.type !== 'winner'), {
         id: nanoid(),
         source: matchupId,
         destination,
         type: 'winner'
       }]);
+    }
 
-      // Update the destination matchup's team slot to show the winner reference
-      const destMatchup = matchups.find(m => m.id === destination);
-      if (destMatchup) {
-        // Check if the winner reference is already assigned
-        if (destMatchup.team1 !== winnerReference && destMatchup.team2 !== winnerReference) {
-          // Assign to first empty slot, or team2 if team1 is taken
-          if (!destMatchup.team1 || destMatchup.team1 === 'unassigned') {
-            updateMatchup(destination, { team1: winnerReference });
-          } else if (!destMatchup.team2 || destMatchup.team2 === 'unassigned') {
-            updateMatchup(destination, { team2: winnerReference });
+    // Apply all matchup updates in a single state change to avoid React batching issues
+    setMatchups(prevMatchups => {
+      return prevMatchups.map(m => {
+        // Update the source matchup's winner destination
+        if (m.id === matchupId) {
+          return { ...m, winnerDestination: destination };
+        }
+        
+        // Clear the winner reference from old destination matchup (if it exists and is different)
+        if (oldDestination && oldDestination !== 'final' && oldDestination !== destination && m.id === oldDestination) {
+          if (m.team1 === winnerReference) {
+            return { ...m, team1: '' };
+          } else if (m.team2 === winnerReference) {
+            return { ...m, team2: '' };
           }
         }
-      }
-    }
+        
+        // Update the new destination matchup's team slot
+        if (destination && destination !== 'final' && m.id === destination) {
+          // Check if the winner reference is already assigned
+          if (m.team1 !== winnerReference && m.team2 !== winnerReference) {
+            // Priority 1: Assign to first empty slot
+            if (!m.team1 || m.team1 === 'unassigned') {
+              return { ...m, team1: winnerReference };
+            } else if (!m.team2 || m.team2 === 'unassigned') {
+              return { ...m, team2: winnerReference };
+            }
+            // Priority 2: Replace a slot with a different winner reference
+            else if (m.team1.startsWith('winner:') && m.team1 !== winnerReference) {
+              return { ...m, team1: winnerReference };
+            } else if (m.team2.startsWith('winner:') && m.team2 !== winnerReference) {
+              return { ...m, team2: winnerReference };
+            }
+            // Priority 3: Replace a slot with a loser reference (for winner bracket games)
+            else if (m.team1.startsWith('loser:')) {
+              return { ...m, team1: winnerReference };
+            } else if (m.team2.startsWith('loser:')) {
+              return { ...m, team2: winnerReference };
+            }
+            // Priority 4: Replace team2 slot as a last resort
+            else {
+              return { ...m, team2: winnerReference };
+            }
+          }
+        }
+        
+        return m;
+      });
+    });
   };
 
   const setLoserDestination = (matchupId: string, destination: string | null) => {
@@ -395,46 +417,68 @@ export function CustomBracketBuilder({
     const loserReference = `loser:${matchup.gameNumber}`;
     const oldDestination = matchup.loserDestination;
 
-    // Clear the loser reference from old destination matchup (if it exists and is different)
-    if (oldDestination && oldDestination !== 'eliminated' && oldDestination !== destination) {
-      const oldDestMatchup = matchups.find(m => m.id === oldDestination);
-      if (oldDestMatchup) {
-        if (oldDestMatchup.team1 === loserReference) {
-          updateMatchup(oldDestination, { team1: '' });
-        } else if (oldDestMatchup.team2 === loserReference) {
-          updateMatchup(oldDestination, { team2: '' });
-        }
-      }
-    }
-
     // Remove old connection
     setConnections(connections.filter(c => c.source !== matchupId || c.type !== 'loser'));
 
-    updateMatchup(matchupId, { loserDestination: destination });
-
-    // Add new connection and update destination team slot if destination is another matchup
+    // Add new connection if destination is another matchup
     if (destination && destination !== 'eliminated') {
-      setConnections([...connections, {
+      setConnections(prev => [...prev.filter(c => c.source !== matchupId || c.type !== 'loser'), {
         id: nanoid(),
         source: matchupId,
         destination,
         type: 'loser'
       }]);
+    }
 
-      // Update the destination matchup's team slot to show the loser reference
-      const destMatchup = matchups.find(m => m.id === destination);
-      if (destMatchup) {
-        // Check if the loser reference is already assigned
-        if (destMatchup.team1 !== loserReference && destMatchup.team2 !== loserReference) {
-          // Assign to first empty slot, or team2 if team1 is taken
-          if (!destMatchup.team1 || destMatchup.team1 === 'unassigned') {
-            updateMatchup(destination, { team1: loserReference });
-          } else if (!destMatchup.team2 || destMatchup.team2 === 'unassigned') {
-            updateMatchup(destination, { team2: loserReference });
+    // Apply all matchup updates in a single state change to avoid React batching issues
+    setMatchups(prevMatchups => {
+      return prevMatchups.map(m => {
+        // Update the source matchup's loser destination
+        if (m.id === matchupId) {
+          return { ...m, loserDestination: destination };
+        }
+        
+        // Clear the loser reference from old destination matchup (if it exists and is different)
+        if (oldDestination && oldDestination !== 'eliminated' && oldDestination !== destination && m.id === oldDestination) {
+          if (m.team1 === loserReference) {
+            return { ...m, team1: '' };
+          } else if (m.team2 === loserReference) {
+            return { ...m, team2: '' };
           }
         }
-      }
-    }
+        
+        // Update the new destination matchup's team slot
+        if (destination && destination !== 'eliminated' && m.id === destination) {
+          // Check if the loser reference is already assigned
+          if (m.team1 !== loserReference && m.team2 !== loserReference) {
+            // Priority 1: Assign to first empty slot
+            if (!m.team1 || m.team1 === 'unassigned') {
+              return { ...m, team1: loserReference };
+            } else if (!m.team2 || m.team2 === 'unassigned') {
+              return { ...m, team2: loserReference };
+            }
+            // Priority 2: Replace a slot with a different loser reference
+            else if (m.team1.startsWith('loser:') && m.team1 !== loserReference) {
+              return { ...m, team1: loserReference };
+            } else if (m.team2.startsWith('loser:') && m.team2 !== loserReference) {
+              return { ...m, team2: loserReference };
+            }
+            // Priority 3: Replace a slot with a winner reference (for loser bracket games)
+            else if (m.team1.startsWith('winner:')) {
+              return { ...m, team1: loserReference };
+            } else if (m.team2.startsWith('winner:')) {
+              return { ...m, team2: loserReference };
+            }
+            // Priority 4: Replace team2 slot as a last resort
+            else {
+              return { ...m, team2: loserReference };
+            }
+          }
+        }
+        
+        return m;
+      });
+    });
   };
 
   const saveBracket = async () => {
