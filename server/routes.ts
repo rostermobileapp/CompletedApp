@@ -16626,7 +16626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .from(tournamentTeams)
           .where(eq(tournamentTeams.tournamentId, id));
         
-        const teamNameToId = new Map(existingTeams.map(t => [t.name, t.id]));
+        const teamNameToId = new Map(existingTeams.map(t => [t.teamName, t.id]));
         
         // Create tournament_matches from matchups
         const matchesToInsert = matchups.map((matchup: any, index: number) => {

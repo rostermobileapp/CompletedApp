@@ -1760,10 +1760,11 @@ export default function TournamentDetail() {
                               title: "Bracket saved",
                               description: "Your custom bracket has been saved and locked"
                             });
-                          } catch (error) {
+                          } catch (error: any) {
+                            const message = error?.message || error?.response?.message || "Failed to save bracket";
                             toast({
                               title: "Error",
-                              description: "Failed to save bracket",
+                              description: message,
                               variant: "destructive"
                             });
                             throw error; // Rethrow so CustomBracketBuilder knows save failed
@@ -1841,10 +1842,11 @@ export default function TournamentDetail() {
                                     title: "Bracket saved",
                                     description: "Your bracket changes have been saved"
                                   });
-                                } catch (error) {
+                                } catch (error: any) {
+                                  const message = error?.message || error?.response?.message || "Failed to save bracket";
                                   toast({
                                     title: "Error",
-                                    description: "Failed to save bracket",
+                                    description: message,
                                     variant: "destructive"
                                   });
                                   throw error;
