@@ -15974,6 +15974,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.status = status;
       }
 
+      // Auto-set scheduledTime to now when completing a match without a scheduled time
+      const isCompletingMatch = status === 'completed' || 
+        (team1Score !== undefined && team2Score !== undefined && team1Score !== null && team2Score !== null);
+      
+      if (isCompletingMatch && !match.scheduledTime && scheduledTime === undefined) {
+        updateData.scheduledTime = new Date().toISOString();
+        console.log('⏰ Auto-setting scheduledTime for completed match:', updateData.scheduledTime);
+      }
+
       // Determine winner if scores are provided
       if (team1Score !== undefined && team2Score !== undefined) {
         if (team1Score === null || team2Score === null) {
@@ -16243,16 +16252,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const previousWinnerId = match.winnerId;
 
-        // Update match scores and winner
+        // Update match scores and winner, auto-set scheduledTime if not already set
+        const updateFields: any = {
+          team1Score,
+          team2Score,
+          winnerId,
+          status: 'completed',
+          updatedAt: new Date()
+        };
+        
+        // Auto-set scheduledTime to now when completing a match without a scheduled time
+        if (!match.scheduledTime) {
+          updateFields.scheduledTime = new Date().toISOString();
+          console.log('⏰ Auto-setting scheduledTime for completed match:', updateFields.scheduledTime);
+        }
+        
         const [updatedMatch] = await tx
           .update(tournamentMatches)
-          .set({
-            team1Score,
-            team2Score,
-            winnerId,
-            status: 'completed',
-            updatedAt: new Date()
-          })
+          .set(updateFields)
           .where(eq(tournamentMatches.id, matchId))
           .returning();
 
