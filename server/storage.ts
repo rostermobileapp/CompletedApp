@@ -3692,17 +3692,28 @@ export class DatabaseStorage implements IStorage {
             tournamentName: tournament.name,
             matchRound: gameName,
             matchNumber: match.matchNumber,
-            resultType: null
+            resultType: null,
+            linkedGameId: match.gameId // Track linked game to avoid duplicate display
           });
         }
       }
     }
 
-    console.log(`📅 getUpcomingGames for user ${userId}: returned ${gamesWithTeams.length} roster games, ${substituteGameIds.length} substitute game IDs, ${filteredScrimmages.length} approved scrimmages, ${tournamentMatchesAsGames.length} tournament matches`);
+    // Get game IDs that are linked to tournament matches to avoid duplicates
+    const tournamentGameIds = new Set(
+      tournamentMatchesAsGames
+        .map((tm: any) => tm.linkedGameId)
+        .filter((id: string | null) => id !== null)
+    );
+    
+    // Filter out games that are linked to tournament matches (they'll be shown as tournament matches instead)
+    const filteredGamesWithTeams = gamesWithTeams.filter(g => !tournamentGameIds.has(g.id));
+    
+    console.log(`📅 getUpcomingGames for user ${userId}: returned ${gamesWithTeams.length} roster games (${filteredGamesWithTeams.length} after filtering tournament-linked), ${substituteGameIds.length} substitute game IDs, ${filteredScrimmages.length} approved scrimmages, ${tournamentMatchesAsGames.length} tournament matches`);
     
     // Combine regular games, scrimmages, and tournament matches, then sort by scheduled time
-    const allEvents = [...gamesWithTeams, ...scrimmagesAsGames, ...tournamentMatchesAsGames];
-    console.log(`📅 Final response: ${gamesWithTeams.length} games + ${scrimmagesAsGames.length} scrimmages + ${tournamentMatchesAsGames.length} tournament matches = ${allEvents.length} total items`);
+    const allEvents = [...filteredGamesWithTeams, ...scrimmagesAsGames, ...tournamentMatchesAsGames];
+    console.log(`📅 Final response: ${filteredGamesWithTeams.length} games + ${scrimmagesAsGames.length} scrimmages + ${tournamentMatchesAsGames.length} tournament matches = ${allEvents.length} total items`);
     return allEvents.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
   }
 
