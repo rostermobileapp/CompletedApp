@@ -15,7 +15,7 @@ import {
   roleHierarchy
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
@@ -16616,6 +16616,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If custom bracket with matchups is being saved, create/update tournament_matches
       if (settings?.customBracket?.matchups && Array.isArray(settings.customBracket.matchups)) {
         const matchups = settings.customBracket.matchups;
+        
+        // Get existing match IDs for this tournament to delete related RSVPs first
+        const existingMatches = await db
+          .select({ id: tournamentMatches.id })
+          .from(tournamentMatches)
+          .where(eq(tournamentMatches.tournamentId, id));
+        
+        if (existingMatches.length > 0) {
+          const matchIds = existingMatches.map(m => m.id);
+          // Delete RSVPs first (foreign key constraint)
+          await db.delete(tournamentMatchRsvps).where(inArray(tournamentMatchRsvps.matchId, matchIds));
+        }
         
         // Clear existing matches for this tournament
         await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
