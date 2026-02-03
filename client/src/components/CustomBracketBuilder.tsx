@@ -701,7 +701,7 @@ export function CustomBracketBuilder({
   return (
     <div className={containerClass}>
       {/* Zoom controls - always visible (even when locked) */}
-      <div className="border-b bg-card p-3 flex items-center gap-3">
+      <div className="border-b bg-card p-3 flex items-center gap-3 pt-[2px] pb-[2px]">
         <Button
           onClick={handleZoomIn}
           variant="default"
@@ -798,7 +798,6 @@ export function CustomBracketBuilder({
           </>
         )}
       </div>
-
       {/* Canvas - use scrollbars when locked, drag-to-pan when editing */}
       <div
         ref={canvasRef}
