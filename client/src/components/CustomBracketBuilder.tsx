@@ -630,15 +630,26 @@ export function CustomBracketBuilder({
         });
         setMatchups(matchupsWithScores);
         // Deduplicate connections - keep only one connection per source+type pair
+        // Prefer connections with valid matchup ID destinations over legacy "match_X" format
         const loadedConnections = data.connections || [];
+        const matchupIds = new Set(matchupsWithScores.map((m: Matchup) => m.id));
         const deduplicatedConnections = loadedConnections.reduce((acc: Connection[], conn: Connection) => {
-          const existing = acc.find(c => c.source === conn.source && c.type === conn.type);
-          if (!existing) {
+          const existingIndex = acc.findIndex(c => c.source === conn.source && c.type === conn.type);
+          if (existingIndex === -1) {
             acc.push(conn);
+          } else {
+            // If current connection has a valid matchup ID destination and existing doesn't, replace it
+            const existingHasValidDest = matchupIds.has(acc[existingIndex].destination);
+            const newHasValidDest = matchupIds.has(conn.destination);
+            if (newHasValidDest && !existingHasValidDest) {
+              acc[existingIndex] = conn;
+            }
           }
           return acc;
         }, []);
-        setConnections(deduplicatedConnections);
+        // Filter out connections with invalid destinations
+        const validConnections = deduplicatedConnections.filter((c: Connection) => matchupIds.has(c.destination));
+        setConnections(validConnections);
         setZoom(data.zoom || 1);
         setPan(data.pan || { x: 0, y: 0 });
         // Also sync to localStorage for offline editing
@@ -661,16 +672,24 @@ export function CustomBracketBuilder({
       const data = JSON.parse(saved);
       if (data.matchups && data.matchups.length > 0) {
         setMatchups(data.matchups);
-        // Deduplicate connections from localStorage too
+        // Deduplicate connections from localStorage - same logic as above
         const loadedConnections = data.connections || [];
+        const matchupIds = new Set(data.matchups.map((m: Matchup) => m.id));
         const deduplicatedConnections = loadedConnections.reduce((acc: Connection[], conn: Connection) => {
-          const existing = acc.find((c: Connection) => c.source === conn.source && c.type === conn.type);
-          if (!existing) {
+          const existingIndex = acc.findIndex((c: Connection) => c.source === conn.source && c.type === conn.type);
+          if (existingIndex === -1) {
             acc.push(conn);
+          } else {
+            const existingHasValidDest = matchupIds.has(acc[existingIndex].destination);
+            const newHasValidDest = matchupIds.has(conn.destination);
+            if (newHasValidDest && !existingHasValidDest) {
+              acc[existingIndex] = conn;
+            }
           }
           return acc;
         }, []);
-        setConnections(deduplicatedConnections);
+        const validConnections = deduplicatedConnections.filter((c: Connection) => matchupIds.has(c.destination));
+        setConnections(validConnections);
         setZoom(data.zoom || 1);
         setPan(data.pan || { x: 0, y: 0 });
       }
