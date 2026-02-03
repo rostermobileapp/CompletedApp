@@ -339,6 +339,33 @@ export function CustomBracketBuilder({
   const handleZoomIn = () => setZoom(Math.min(zoom * 1.2, 3));
   const handleZoomOut = () => setZoom(Math.max(zoom * 0.8, 0.3));
 
+  // Touch event handlers for mobile panning
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const target = e.target as HTMLElement;
+      if (target === canvasRef.current || target.classList.contains('canvas-bg')) {
+        setIsPanning(true);
+        setPanStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y });
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 1 && isPanning) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      setPan({
+        x: touch.clientX - panStart.x,
+        y: touch.clientY - panStart.y
+      });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsPanning(false);
+  };
+
   const setWinnerDestination = (matchupId: string, destination: string | null) => {
     const matchup = matchups.find(m => m.id === matchupId);
     if (!matchup) return;
@@ -801,11 +828,14 @@ export function CustomBracketBuilder({
       {/* Canvas - always allow panning for navigation */}
       <div
         ref={canvasRef}
-        className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing"
+        className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing touch-none"
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         data-testid="canvas"
         style={embeddable ? { minHeight: '70vh' } : undefined}
       >
