@@ -840,7 +840,7 @@ export function CustomBracketBuilder({
               <g key={conn.id}>
                 <path
                   d={path}
-                  stroke={conn.type === 'winner' ? 'hsl(var(--primary))' : 'hsl(var(--destructive))'}
+                  stroke={conn.type === 'winner' ? '#22c55e' : 'hsl(var(--destructive))'}
                   strokeWidth={3 / zoom}
                   fill="none"
                   strokeDasharray={conn.type === 'loser' ? '5,5' : 'none'}
@@ -861,7 +861,7 @@ export function CustomBracketBuilder({
               orient="auto"
               markerUnits="strokeWidth"
             >
-              <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--primary))" />
+              <path d="M0,0 L0,6 L9,3 z" fill="#22c55e" />
             </marker>
             <marker
               id="arrow-loser"
