@@ -346,18 +346,19 @@ export function CustomBracketBuilder({
     const winnerReference = `winner:${matchup.gameNumber}`;
     const oldDestination = matchup.winnerDestination;
 
-    // Remove old connection
-    setConnections(connections.filter(c => c.source !== matchupId || c.type !== 'winner'));
-
-    // Add new connection if destination is another matchup
-    if (destination && destination !== 'final') {
-      setConnections(prev => [...prev.filter(c => c.source !== matchupId || c.type !== 'winner'), {
-        id: nanoid(),
-        source: matchupId,
-        destination,
-        type: 'winner'
-      }]);
-    }
+    // Update connections atomically - remove old and add new in single update
+    setConnections(prev => {
+      const filtered = prev.filter(c => !(c.source === matchupId && c.type === 'winner'));
+      if (destination && destination !== 'final') {
+        return [...filtered, {
+          id: nanoid(),
+          source: matchupId,
+          destination,
+          type: 'winner' as const
+        }];
+      }
+      return filtered;
+    });
 
     // Apply all matchup updates in a single state change to avoid React batching issues
     setMatchups(prevMatchups => {
@@ -417,18 +418,19 @@ export function CustomBracketBuilder({
     const loserReference = `loser:${matchup.gameNumber}`;
     const oldDestination = matchup.loserDestination;
 
-    // Remove old connection
-    setConnections(connections.filter(c => c.source !== matchupId || c.type !== 'loser'));
-
-    // Add new connection if destination is another matchup
-    if (destination && destination !== 'eliminated') {
-      setConnections(prev => [...prev.filter(c => c.source !== matchupId || c.type !== 'loser'), {
-        id: nanoid(),
-        source: matchupId,
-        destination,
-        type: 'loser'
-      }]);
-    }
+    // Update connections atomically - remove old and add new in single update
+    setConnections(prev => {
+      const filtered = prev.filter(c => !(c.source === matchupId && c.type === 'loser'));
+      if (destination && destination !== 'eliminated') {
+        return [...filtered, {
+          id: nanoid(),
+          source: matchupId,
+          destination,
+          type: 'loser' as const
+        }];
+      }
+      return filtered;
+    });
 
     // Apply all matchup updates in a single state change to avoid React batching issues
     setMatchups(prevMatchups => {
@@ -627,7 +629,16 @@ export function CustomBracketBuilder({
           return matchup;
         });
         setMatchups(matchupsWithScores);
-        setConnections(data.connections || []);
+        // Deduplicate connections - keep only one connection per source+type pair
+        const loadedConnections = data.connections || [];
+        const deduplicatedConnections = loadedConnections.reduce((acc: Connection[], conn: Connection) => {
+          const existing = acc.find(c => c.source === conn.source && c.type === conn.type);
+          if (!existing) {
+            acc.push(conn);
+          }
+          return acc;
+        }, []);
+        setConnections(deduplicatedConnections);
         setZoom(data.zoom || 1);
         setPan(data.pan || { x: 0, y: 0 });
         // Also sync to localStorage for offline editing
@@ -650,7 +661,16 @@ export function CustomBracketBuilder({
       const data = JSON.parse(saved);
       if (data.matchups && data.matchups.length > 0) {
         setMatchups(data.matchups);
-        setConnections(data.connections || []);
+        // Deduplicate connections from localStorage too
+        const loadedConnections = data.connections || [];
+        const deduplicatedConnections = loadedConnections.reduce((acc: Connection[], conn: Connection) => {
+          const existing = acc.find((c: Connection) => c.source === conn.source && c.type === conn.type);
+          if (!existing) {
+            acc.push(conn);
+          }
+          return acc;
+        }, []);
+        setConnections(deduplicatedConnections);
         setZoom(data.zoom || 1);
         setPan(data.pan || { x: 0, y: 0 });
       }
