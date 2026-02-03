@@ -798,29 +798,23 @@ export function CustomBracketBuilder({
           </>
         )}
       </div>
-      {/* Canvas - use scrollbars when locked, drag-to-pan when editing */}
+      {/* Canvas - always allow panning for navigation */}
       <div
         ref={canvasRef}
-        className={`flex-1 relative ${locked ? 'overflow-auto cursor-default' : 'overflow-hidden cursor-move'}`}
-        onMouseDown={locked ? undefined : handleCanvasMouseDown}
-        onMouseMove={locked ? undefined : handleMouseMove}
-        onMouseUp={locked ? undefined : handleMouseUp}
-        onMouseLeave={locked ? undefined : handleMouseUp}
+        className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing"
+        onMouseDown={handleCanvasMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
         data-testid="canvas"
         style={embeddable ? { minHeight: '70vh' } : undefined}
       >
-        {/* Inner content wrapper - needs explicit dimensions for scrolling when locked */}
+        {/* Inner content wrapper */}
         <div
           className="relative"
           style={{
-            width: locked 
-              ? Math.max(1200, ...matchups.map(m => (m.position.x + CARD_WIDTH) * zoom + 100))
-              : '100%',
-            height: locked
-              ? Math.max(800, ...matchups.map(m => (m.position.y + CARD_HEIGHT) * zoom + 100))
-              : '100%',
-            minWidth: locked ? '100%' : undefined,
-            minHeight: locked ? '100%' : undefined
+            width: '100%',
+            height: '100%'
           }}
         >
         {/* Grid Background */}
