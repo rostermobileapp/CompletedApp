@@ -1679,7 +1679,7 @@ export default function TournamentDetail() {
                 {tournament.format === 'custom_bracket' ? (
                   // Custom bracket builder embedded - full width
                   (<Card className="border-0 shadow-none bg-transparent">
-                    <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2 px-0">
+                    <CardHeader className="space-y-1.5 p-6 flex flex-row items-center justify-between flex-wrap gap-2 px-0 pt-[2px] pb-[2px]">
                       <div>
                         <CardTitle>Custom Bracket</CardTitle>
                         <CardDescription>
