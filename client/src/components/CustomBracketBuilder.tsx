@@ -928,7 +928,7 @@ export function CustomBracketBuilder({
                 <Input
                   value={matchup.gameNumber}
                   onChange={(e) => updateMatchup(matchup.id, { gameNumber: e.target.value })}
-                  className="h-6 text-xs font-bold flex-1"
+                  className={`h-6 text-xs font-bold flex-1 ${locked ? 'disabled:text-white disabled:opacity-100 disabled:font-bold' : ''}`}
                   placeholder="Game #"
                   disabled={locked}
                   data-testid={`input-game-number-${matchup.id}`}
@@ -962,7 +962,7 @@ export function CustomBracketBuilder({
                     onValueChange={(value) => updateMatchup(matchup.id, { team1: value === 'unassigned' ? '' : value })}
                     disabled={locked}
                   >
-                    <SelectTrigger className="h-7 text-xs flex-1" data-testid={`select-team1-${matchup.id}`}>
+                    <SelectTrigger className={`h-7 text-xs flex-1 ${locked ? 'disabled:text-white disabled:opacity-100 disabled:font-bold' : ''}`} data-testid={`select-team1-${matchup.id}`}>
                       <SelectValue placeholder="Select Team 1" />
                     </SelectTrigger>
                     <SelectContent>
@@ -997,7 +997,7 @@ export function CustomBracketBuilder({
                     onValueChange={(value) => updateMatchup(matchup.id, { team2: value === 'unassigned' ? '' : value })}
                     disabled={locked}
                   >
-                    <SelectTrigger className="h-7 text-xs flex-1" data-testid={`select-team2-${matchup.id}`}>
+                    <SelectTrigger className={`h-7 text-xs flex-1 ${locked ? 'disabled:text-white disabled:opacity-100 disabled:font-bold' : ''}`} data-testid={`select-team2-${matchup.id}`}>
                       <SelectValue placeholder="Select Team 2" />
                     </SelectTrigger>
                     <SelectContent>
