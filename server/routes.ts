@@ -245,7 +245,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw error;
       }
       
-      console.log("Successfully added to waitlist:", email);
       res.json({ success: true, message: "Successfully joined waitlist" });
     } catch (error: any) {
       console.error("Error adding to waitlist:", error?.message || error);
@@ -881,7 +880,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const invites = await storage.getScrimmageInvitesForUser(userId);
-      console.log(`📩 Scrimmage invites for user ${userId}:`, invites.length > 0 ? invites.map(i => ({ id: i.id, title: i.title, announcementId: i.announcementId })) : 'none');
       res.json(invites);
     } catch (error) {
       console.error('Error fetching user scrimmage invites:', error);
@@ -1127,7 +1125,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create Stripe customer if they don't have one
       if (!customerId) {
-        console.log('[Stripe] Creating new customer for checkout:', userId);
         const customer = await stripe.customers.create({
           email: user.email || undefined,
           name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
@@ -1138,10 +1135,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         customerId = customer.id;
         await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
-        console.log('[Stripe] Created customer:', customerId);
       } else {
         // Verify customer exists in Stripe and update their info
-        console.log('[Stripe] Verifying and updating customer for checkout:', customerId);
         try {
           await stripe.customers.update(customerId, {
             email: user.email || undefined,
@@ -1150,7 +1145,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (customerError: any) {
           // If customer doesn't exist in Stripe, create a new one
           if (customerError.code === 'resource_missing' || customerError.statusCode === 404) {
-            console.log('[Stripe] Customer not found in Stripe, creating new one:', userId);
             const customer = await stripe.customers.create({
               email: user.email || undefined,
               name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
@@ -1160,7 +1154,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             customerId = customer.id;
             await storage.updateUserStripeInfo(userId, customerId, '');
-            console.log('[Stripe] Created new customer:', customerId);
           } else {
             throw customerError;
           }
@@ -1176,7 +1169,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           if (subscriptions.data.length > 0) {
-            console.log('[Stripe] Customer has active subscription, redirecting to billing portal for upgrade');
             // Create a billing portal session for upgrade/management
             const protocol = req.protocol || 'https';
             const host = req.get('host') || (process.env.REPLIT_DOMAINS 
@@ -1191,7 +1183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.json({ url: portalSession.url });
           }
         } catch (subError: any) {
-          console.log('[Stripe] Error checking subscriptions, proceeding with checkout:', subError.message);
+          // Error checking subscriptions, proceeding with checkout
         }
       }
 
@@ -1260,7 +1252,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create Stripe customer if they don't have one
       if (!customerId) {
-        console.log('[Stripe] Creating new customer for tournament payment:', userId);
         const customer = await stripe.customers.create({
           email: user.email || undefined,
           name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
@@ -1271,10 +1262,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         customerId = customer.id;
         await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
-        console.log('[Stripe] Created customer:', customerId);
+
       } else {
         // Update existing customer's email to match current profile
-        console.log('[Stripe] Updating customer email for tournament checkout:', customerId);
         await stripe.customers.update(customerId, {
           email: user.email || undefined,
           name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
@@ -1328,12 +1318,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updatedAt: new Date()
         })
         .where(eq(tournaments.id, tournamentId));
-
-      console.log('[Stripe] Tournament checkout session created:', {
-        sessionId: session.id,
-        sessionUrl: session.url,
-        hasUrl: !!session.url
-      });
 
       if (!session.url) {
         console.error('[Stripe] Session created but URL is missing!', session);
@@ -1392,7 +1376,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create Stripe customer if they don't have one
       if (!customerId) {
-        console.log('[Stripe] Creating new customer for additional team payment:', userId);
         const customer = await stripe.customers.create({
           email: user.email || undefined,
           name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
@@ -1403,7 +1386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         customerId = customer.id;
         await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
-        console.log('[Stripe] Created customer:', customerId);
+
       } else {
         await stripe.customers.update(customerId, {
           email: user.email || undefined,
@@ -1451,12 +1434,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
 
-      console.log('[Stripe] Additional team checkout session created:', {
-        sessionId: session.id,
-        additionalTeamCount,
-        amountInCents
-      });
-
       if (!session.url) {
         console.error('[Stripe] Session created but URL is missing!', session);
         return res.status(500).json({ message: 'Stripe session URL missing' });
@@ -1483,7 +1460,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create Stripe customer if they don't have one or if the saved one doesn't exist
       if (!customerId) {
-        console.log('[Stripe] Creating new customer for user:', userId);
         const customer = await stripe.customers.create({
           email: user.email || undefined,
           name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
@@ -1496,10 +1472,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Save customer ID to database
         await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
-        console.log('[Stripe] Created customer:', customerId);
+
       } else {
         // Update existing customer's email to match current profile
-        console.log('[Stripe] Updating customer email for portal:', customerId);
         await stripe.customers.update(customerId, {
           email: user.email || undefined,
           name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
@@ -1521,7 +1496,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error: any) {
         // If customer doesn't exist in Stripe, create a new one
         if (error.code === 'resource_missing') {
-          console.log('[Stripe] Saved customer ID not found in Stripe, creating new customer for user:', userId);
           const customer = await stripe.customers.create({
             email: user.email || undefined,
             name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
@@ -1534,7 +1508,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Update database with new customer ID
           await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
-          console.log('[Stripe] Created new customer:', customerId);
           
           // Retry creating portal session with new customer
           const appUrl = process.env.REPLIT_DOMAINS 
@@ -1746,7 +1719,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limit: 10,
       });
 
-      console.log(`[Force Sync] Found ${subscriptions.data.length} subscriptions for user ${userId}`);
 
       // Find active subscription
       const activeSubscription = subscriptions.data.find(sub => 
@@ -1755,7 +1727,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!activeSubscription) {
         // No active subscription - downgrade to free tier
-        console.log('[Force Sync] No active subscription - downgrading to free_tier');
         await storage.updateUserRole(userId, 'free_tier');
         await storage.updateUserStripeInfo(userId, user.stripeCustomerId, '');
         
@@ -1769,7 +1740,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if subscription should be active
       if (activeSubscription.cancel_at_period_end || activeSubscription.status === 'canceled' || activeSubscription.status === 'unpaid') {
-        console.log('[Force Sync] Subscription cancelled - downgrading to free_tier');
         await storage.updateUserRole(userId, 'free_tier');
         await storage.updateUserStripeInfo(userId, user.stripeCustomerId, '');
         
@@ -1799,7 +1769,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateUserStripeInfo(userId, user.stripeCustomerId, activeSubscription.id);
       await storage.updateUserRole(userId, tier);
 
-      console.log('[Force Sync] Successfully synced subscription:', activeSubscription.id, 'to tier:', tier);
       
       res.json({ 
         message: 'Subscription synced successfully', 
@@ -1831,9 +1800,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch subscription from Stripe
       const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
       
-      console.log('[Stripe Sync] Checking subscription for user:', userId);
-      console.log('[Stripe Sync] Subscription status:', subscription.status);
-      console.log('[Stripe Sync] Cancel at period end:', subscription.cancel_at_period_end);
 
       // Map Stripe price IDs to user roles
       const PRICE_TO_ROLE: Record<string, 'player_pro' | 'commissioner'> = {
@@ -1845,7 +1811,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if subscription should be downgraded
       if (subscription.cancel_at_period_end || subscription.status === 'canceled' || subscription.status === 'unpaid') {
-        console.log('[Stripe Sync] Downgrading user to free_tier');
         await storage.updateUserRole(userId, 'free_tier');
         await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
         
@@ -1861,7 +1826,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
         
         if (tier && tier !== user.role) {
-          console.log('[Stripe Sync] Updating user to tier:', tier);
           await storage.updateUserRole(userId, tier);
           
           return res.json({ 
@@ -1905,7 +1869,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : 
                         typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
         event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
-        console.log('[Webhook] Signature verified successfully');
       } else {
         // Development mode without signature verification (not recommended for production)
         console.warn('[Webhook] WARNING: No STRIPE_WEBHOOK_SECRET configured - skipping signature verification');
@@ -1934,12 +1897,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       switch (event.type) {
         case 'checkout.session.completed': {
           const session = event.data.object as Stripe.Checkout.Session;
-          console.log('[Webhook] Checkout session completed:', session.id);
           
           // Check if this is a tournament payment
           if (session.metadata?.type === 'tournament_payment') {
             const tournamentId = session.metadata.tournamentId;
-            console.log('[Webhook] Tournament payment completed for tournament:', tournamentId);
             
             if (tournamentId && session.payment_status === 'paid') {
               // Get current team count to record as paid team count
@@ -1960,14 +1921,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 })
                 .where(eq(tournaments.id, tournamentId));
               
-              console.log('[Webhook] Tournament', tournamentId, 'marked as paid with', paidTeamCount, 'teams');
             }
           }
           // Handle additional team payment
           else if (session.metadata?.type === 'additional_team_payment') {
             const tournamentId = session.metadata.tournamentId;
             const additionalTeamCount = parseInt(session.metadata.additionalTeamCount || '0');
-            console.log('[Webhook] Additional team payment completed for tournament:', tournamentId, 'teams:', additionalTeamCount);
             
             if (tournamentId && session.payment_status === 'paid' && additionalTeamCount > 0) {
               // Increment the paidTeamCount by the number of additional teams paid for
@@ -1979,7 +1938,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 })
                 .where(eq(tournaments.id, tournamentId));
               
-              console.log('[Webhook] Tournament', tournamentId, 'paidTeamCount incremented by', additionalTeamCount);
             }
           }
           // Handle subscription checkout
@@ -1997,13 +1955,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
               if (tier) {
-                console.log('[Webhook] Checkout completed - updating user', user.id, 'to tier:', tier);
                 await storage.updateUserRole(user.id, tier);
               } else {
                 console.warn('[Webhook] Unknown price ID:', priceId);
               }
-            } else {
-              console.log('[Webhook] User not found for customer:', session.customer);
             }
           }
           break;
@@ -2027,8 +1982,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // IMMEDIATE ACCESS RESTRICTION: Check if subscription is cancelled or will be cancelled
             // This ensures users lose access immediately upon cancellation, not at period end
             if (subscription.cancel_at_period_end || subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
-              console.log('[Webhook] Downgrading user', user.id, 'to free_tier due to:', 
-                subscription.cancel_at_period_end ? 'cancel_at_period_end=true' : `status=${subscription.status || 'deleted'}`);
               await storage.updateUserRole(user.id, 'free_tier');
               
               // Clear subscription ID when downgrading to free tier
@@ -2039,7 +1992,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
               if (tier) {
-                console.log('[Webhook] Subscription active - updating user', user.id, 'to tier:', tier);
                 await storage.updateUserRole(user.id, tier);
                 
                 // Update subscription ID if it changed
@@ -2050,15 +2002,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.warn('[Webhook] Unknown price ID in subscription:', priceId);
               }
             }
-          } else {
-            console.log('[Webhook] User not found for subscription:', subscription.id);
           }
           break;
         }
 
         case 'invoice.payment_succeeded': {
           const invoice = event.data.object as Stripe.Invoice;
-          console.log('[Webhook] Payment succeeded for invoice:', invoice.id);
           
           // If this invoice has a subscription, update the user's role
           const subscriptionId = (invoice as any).subscription;
@@ -2073,7 +2022,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
               if (tier) {
-                console.log('[Webhook] Payment success - updating user', user.id, 'to tier:', tier);
                 await storage.updateUserRole(user.id, tier);
               } else {
                 console.warn('[Webhook] Unknown price ID in invoice:', priceId);
@@ -2085,7 +2033,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         case 'invoice.payment_failed': {
           const invoice = event.data.object as Stripe.Invoice;
-          console.log('[Webhook] Payment failed for invoice:', invoice.id);
           
           // Find user by subscription ID
           const subscriptionId = invoice.subscription as string;
@@ -2094,7 +2041,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const user = users.find(u => u.stripeSubscriptionId === subscriptionId);
             
             if (user) {
-              console.log('[Webhook] Payment failed - downgrading user', user.id, 'to free_tier');
               
               // Downgrade user to free tier
               await storage.updateUserRole(user.id, 'free_tier');
@@ -2115,16 +2061,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
               broadcastNotificationUpdate(user.id);
               
-              console.log('[Webhook] User downgraded and notification created');
-            } else {
-              console.log('[Webhook] User not found for subscription:', subscriptionId);
             }
           }
           break;
         }
 
         default:
-          console.log(`Unhandled event type ${event.type}`);
       }
 
       res.json({ received: true });
@@ -2139,9 +2081,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      
-      console.log('[Sync] Debug - User object:', JSON.stringify(user, null, 2));
-      console.log('[Sync] Debug - stripeCustomerId:', user?.stripeCustomerId);
       
       if (!user || !user.stripeCustomerId) {
         return res.status(400).json({ message: 'User does not have a Stripe customer ID', userId, userKeys: user ? Object.keys(user) : [] });
@@ -2170,13 +2109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const priceId = subscription.items.data[0]?.price?.id;
       const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
 
-      console.log('[Sync] Debug - Price ID from Stripe:', priceId);
-      console.log('[Sync] Debug - PRICE_TO_ROLE mapping:', PRICE_TO_ROLE);
-      console.log('[Sync] Debug - Determined tier:', tier);
-      console.log('[Sync] Debug - Current user role:', user.role);
-
       if (!tier) {
-        console.warn('[Sync] Unknown price ID:', priceId);
         return res.status(400).json({ 
           message: 'Unknown subscription price ID', 
           priceId,
@@ -2206,18 +2139,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         if (supabaseError) {
           console.warn('[Sync] Failed to update Supabase metadata:', supabaseError.message);
-        } else {
-          console.log('[Sync] Supabase metadata updated with tier:', tier);
         }
       } catch (supabaseErr) {
         console.warn('[Sync] Error updating Supabase metadata:', supabaseErr);
       }
       
-      console.log('[Sync] Successfully synced subscription for user:', userId, 'to tier:', tier);
-      
       // Verify the update by fetching the user again
       const verifyUser = await storage.getUser(userId);
-      console.log('[Sync] Verification - User role after update:', verifyUser?.role);
       
       res.json({ 
         message: 'Subscription synced successfully', 
@@ -4580,7 +4508,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const scrimmageRequests = await storage.getScrimmageRequestsByPlayer(userId);
       const approvedScrimmageRequests = scrimmageRequests.filter(req => req.status === 'approved');
       
-      console.log(`📅 getUpcomingGames for user ${userId}: returned ${games.length} roster games, ${substituteGameIds.length} substitute game IDs, ${approvedScrimmageRequests.length} approved scrimmages`);
       
       // Create a set of existing game IDs for deduplication
       const existingGameIds = new Set(games.map(g => g.id));
@@ -4665,13 +4592,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Sort by date
       allItems.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
-      
-      // Log any tournament matches for debugging
-      const tournamentMatches = formattedGames.filter((g: any) => g.isTournamentMatch);
-      if (tournamentMatches.length > 0) {
-        console.log(`🏆 Tournament matches in response:`, tournamentMatches.map((g: any) => ({ id: g.id, isTournamentMatch: g.isTournamentMatch, tournamentId: g.tournamentId, homeTeam: g.homeTeam?.name, awayTeam: g.awayTeam?.name })));
-      }
-      console.log(`📅 Final response: ${formattedGames.length} games + ${formattedScrimmages.length} scrimmages = ${allItems.length} total items`);
       
       // Disable caching to force fresh response
       res.setHeader('Cache-Control', 'no-store');
@@ -6555,7 +6475,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { gameId, dutyTemplateId } = req.params;
       const { teamId } = req.body;
       
-      console.log(`[DUTY CLAIM] gameId=${gameId}, dutyTemplateId=${dutyTemplateId}, teamId=${teamId}, userId=${userId}`);
       
       if (!teamId) {
         return res.status(400).json({ message: 'Team ID is required' });
@@ -6568,17 +6487,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // First check regular team membership
       const teamMembers = await storage.getTeamMembers(teamId);
       isMember = teamMembers.some(member => member.userId === userId);
-      console.log(`[DUTY CLAIM] Regular team members found: ${teamMembers.length}, isMember: ${isMember}`);
       
       // If not found in regular teams, check if this is a tournament team
       if (!isMember) {
-        console.log(`[DUTY CLAIM] Not a regular team member, checking if tournament team...`);
         const [tournamentTeam] = await db
           .select()
           .from(tournamentTeams)
           .where(eq(tournamentTeams.id, teamId));
         
-        console.log(`[DUTY CLAIM] Tournament team found: ${!!tournamentTeam}, linked teamId: ${tournamentTeam?.teamId}`);
         if (tournamentTeam) {
           // Check if user is a participant of this tournament team
           const [participant] = await db
@@ -6609,7 +6525,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Attempt to claim the duty using the effective team ID (linked regular team for tournament teams)
       try {
-        console.log(`[DUTY CLAIM] Attempting to claim with effectiveTeamId=${effectiveTeamId}`);
         const assignment = await storage.claimDuty({
           dutyTemplateId,
           gameId,
@@ -6617,10 +6532,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           teamId: effectiveTeamId,
         });
         
-        console.log(`[DUTY CLAIM] Success! Assignment created:`, assignment.id);
         res.json(assignment);
       } catch (error: any) {
-        console.log(`[DUTY CLAIM] Error during claim:`, error.message);
         // Handle unique constraint violations (duty already claimed)
         if (error.code === '23505' || error.message?.includes('unique')) {
           return res.status(409).json({ message: 'This duty has already been claimed' });
@@ -8261,9 +8174,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Bulk Player Import Routes with error handler wrapper
   app.post('/api/leagues/:leagueId/players/import', isAuthenticated, (req: any, res, next) => {
-    console.log('🔵 Player import endpoint hit, leagueId:', req.params.leagueId);
-    console.log('🔵 User authenticated:', !!req.user);
-    console.log('🔵 Request method:', req.method);
     
     upload.single('playerFile')(req, res, (err) => {
       if (err) {
@@ -8276,7 +8186,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         return res.status(400).json({ message: err.message || 'File upload error' });
       }
-      console.log('🔵 File uploaded successfully:', req.file?.originalname);
       next();
     });
   }, async (req: any, res) => {
@@ -8372,14 +8281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Log what headers we received to help with debugging
       const receivedHeaders = parseResults.meta?.fields || Object.keys(parseResults.data[0] || {});
-      console.log(`CSV Import: Received headers: ${receivedHeaders.join(', ')}`);
-      console.log(`CSV Import: Total rows to process: ${parseResults.data.length}`);
       
-      // Log first row for debugging
-      if (parseResults.data.length > 0) {
-        console.log(`CSV Import: First row data:`, JSON.stringify(parseResults.data[0]));
-      }
-
       // Helper function for email validation
       const isValidEmail = (email: string): boolean => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -9174,7 +9076,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               );
 
               if (existingGame) {
-                console.log(`Skipping duplicate game: ${schedule.homeTeamName} vs ${schedule.awayTeamName} on ${scheduledAt}`);
                 gamesSkipped++;
                 continue;
               }
@@ -9414,13 +9315,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { placeholderUserId, newUserId, preserveDisplayName = true, pendingMembershipIdToDelete } = req.body;
       const userId = req.user.claims.sub;
 
-      console.log('=== REPLACE PLAYER REQUEST ===');
-      console.log('leagueId:', leagueId);
-      console.log('placeholderUserId:', placeholderUserId);
-      console.log('newUserId:', newUserId);
-      console.log('pendingMembershipIdToDelete:', pendingMembershipIdToDelete);
-      console.log('preserveDisplayName:', preserveDisplayName);
-
       // Validate request body
       const replaceRequestSchema = z.object({
         placeholderUserId: z.string().min(1, 'Placeholder user ID is required'),
@@ -9449,7 +9343,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get the placeholder's membership
       const placeholderMembership = await storage.getUserLeagueMembership(validatedData.placeholderUserId, leagueId);
-      console.log('placeholderMembership found:', placeholderMembership?.id);
       if (!placeholderMembership) {
         return res.status(404).json({ message: 'Placeholder user is not a member of this league' });
       }
@@ -9476,22 +9369,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedData.pendingMembershipIdToDelete) {
         // Verify the membership to delete belongs to the new user (not the placeholder)
         const membershipToDelete = await storage.getLeagueMembership(validatedData.pendingMembershipIdToDelete);
-        console.log('membershipToDelete lookup:', {
-          id: validatedData.pendingMembershipIdToDelete,
-          found: !!membershipToDelete,
-          membershipUserId: membershipToDelete?.userId,
-          expectedNewUserId: validatedData.newUserId,
-          placeholderMembershipId: placeholderMembership.id
-        });
         if (membershipToDelete && 
             membershipToDelete.userId === validatedData.newUserId &&
             membershipToDelete.id !== placeholderMembership.id) {
-          console.log('Deleting new user pending membership:', validatedData.pendingMembershipIdToDelete);
           await db
             .delete(leagueMemberships)
             .where(eq(leagueMemberships.id, validatedData.pendingMembershipIdToDelete));
-        } else {
-          console.log('NOT deleting membership - safety check prevented deletion');
         }
       }
 
@@ -9540,8 +9423,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { membershipId, importedPlayerId } = req.body;
       const userId = req.user.claims.sub;
 
-      console.log('Player merge request:', { leagueId, membershipId, importedPlayerId, userId });
-
       // Validate required fields
       if (!membershipId || !importedPlayerId) {
         return res.status(400).json({ message: 'Missing required fields: membershipId and importedPlayerId are required' });
@@ -9560,22 +9441,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(1);
 
       if (!importedPlayer.length) {
-        console.log('Imported player not found:', importedPlayerId);
         return res.status(404).json({ message: 'Imported player not found' });
       }
 
       const player = importedPlayer[0];
-      console.log('Found imported player:', { firstName: player.firstName, lastName: player.lastName, teamName: player.teamName });
 
       // Get the membership first to verify it exists
       const membershipCheck = await db.select().from(leagueMemberships).where(eq(leagueMemberships.id, membershipId)).limit(1);
       if (!membershipCheck.length) {
-        console.log('Membership not found:', membershipId);
         return res.status(404).json({ message: 'Membership not found' });
       }
 
       const realUserId = membershipCheck[0].userId;
-      console.log('Real user ID from membership:', realUserId);
 
       // Approve the membership and assign to team if available
       await storage.approveLeagueMembership(membershipId, userId);
@@ -9626,8 +9503,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             )
           );
         
-        console.log('Found placeholder memberships:', placeholderMemberships.length);
-        
         // Delete placeholder memberships
         for (const pm of placeholderMemberships) {
           const placeholderUserId = pm.league_memberships.userId;
@@ -9657,7 +9532,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(importedPlayers.id, importedPlayerId));
 
-      console.log('Player merge completed successfully');
       res.json({ success: true });
     } catch (error: any) {
       console.error('Error merging player:', error);
@@ -9759,8 +9633,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ON CONFLICT (announcement_id, user_id) DO NOTHING
       `);
 
-      console.log(`📖 Bulk marked announcements as read for user ${userId} in league ${leagueId}`);
-      
       res.json({ success: true });
     } catch (error) {
       console.error('Error marking announcements as read:', error);
@@ -9794,8 +9666,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderBy,
         orderDirection,
       }, userId);
-
-      console.log(`[ANNOUNCEMENTS] League ${leagueId}: Returning ${result.announcements.length} announcements (scrimmage invites filtered out)`);
 
       // Convert attachment URLs to signed URLs (like messages do)
       const { SupabaseStorageService } = await import('./supabaseStorage');
@@ -9868,8 +9738,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const requestBody = req.body;
-      console.log('📝 Creating announcement with data:', JSON.stringify(requestBody, null, 2));
-      
       const { targetUserIds, ...announcementData } = createAnnouncementRequestSchema.parse(requestBody);
       
       // Set teamId based on user role:
@@ -9881,14 +9749,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate targetUserIds if provided - ensure they are league members
       if (targetUserIds && targetUserIds.length > 0) {
-        console.log('🎯 Validating targeted announcement user IDs:', targetUserIds);
         const validUserIds = [];
         for (const targetUserId of targetUserIds) {
           const membership = await storage.getUserLeagueMembership(targetUserId, leagueId);
           if (membership && membership.status === 'approved') {
             validUserIds.push(targetUserId);
-          } else {
-            console.warn(`⚠️ User ${targetUserId} is not an approved member of league ${leagueId}, excluding from targets`);
           }
         }
         
@@ -9906,10 +9771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Create visibility records for targeted users + author
         const visibilityUserIds = Array.from(new Set([...validUserIds, userId])); // Include author and remove duplicates
-        console.log(`🔒 Creating visibility records for ${visibilityUserIds.length} users (including author)`);
         await storage.createAnnouncementVisibility(announcement.id, visibilityUserIds);
-        
-        console.log(`✅ Created targeted announcement ${announcement.id} for users: ${validUserIds.join(', ')}`);
       } else {
         // Create regular announcement
         // Commissioner: visible to all league members (teamId = null)
@@ -9920,17 +9782,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           authorId: userId,
           teamId,
         });
-        
-        if (isCommissioner) {
-          console.log(`📢 Created commissioner announcement ${announcement.id} (visible to all)`);
-        } else {
-          console.log(`👥 Created team captain announcement ${announcement.id} for team ${teamId} (visible to team only)`);
-        }
       }
 
       // Handle attachments if provided
       if (requestBody.attachments && Array.isArray(requestBody.attachments)) {
-        console.log('📎 Processing attachments:', requestBody.attachments);
         for (const attachment of requestBody.attachments) {
           await storage.createAnnouncementAttachment({
             announcementId: announcement.id,
@@ -9943,7 +9798,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Handle poll if provided
       if (requestBody.poll && requestBody.poll.question) {
-        console.log('📊 Processing poll:', requestBody.poll);
         await storage.createAnnouncementPoll({
           announcementId: announcement.id,
           question: requestBody.poll.question,
@@ -9998,7 +9852,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error(`[Push] Failed to send announcement push to ${recipientId}:`, pushError);
             }
           }
-          console.log(`📲 Sent ${pushSuccessCount}/${recipientUserIds.length} push notifications for announcement`);
         }
       } catch (notificationError) {
         console.error('Failed to send announcement push notifications:', notificationError);
@@ -10486,7 +10339,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const requestBody = req.body;
-      console.log('📝 Creating tournament announcement with data:', JSON.stringify(requestBody, null, 2));
       
       const { targetUserIds, ...announcementData } = createAnnouncementRequestSchema.parse(requestBody);
       
@@ -10494,7 +10346,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate targetUserIds if provided - ensure they are tournament participants
       if (targetUserIds && targetUserIds.length > 0) {
-        console.log('🎯 Validating targeted tournament announcement user IDs:', targetUserIds);
         const validUserIds = [];
         for (const targetUserId of targetUserIds) {
           const [participant] = await db
@@ -10529,10 +10380,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Create visibility records for targeted users + author
         const visibilityUserIds = Array.from(new Set([...validUserIds, userId])); // Include author and remove duplicates
-        console.log(`🔒 Creating visibility records for ${visibilityUserIds.length} users (including author)`);
         await storage.createAnnouncementVisibility(announcement.id, visibilityUserIds);
         
-        console.log(`✅ Created targeted tournament announcement ${announcement.id} for users: ${validUserIds.join(', ')}`);
       } else {
         // Create regular announcement visible to all tournament participants
         announcement = await storage.createAnnouncement({
@@ -10542,12 +10391,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           teamId: null,
         });
         
-        console.log(`📢 Created tournament commissioner announcement ${announcement.id} (visible to all)`);
       }
 
       // Handle attachments if provided
       if (requestBody.attachments && Array.isArray(requestBody.attachments)) {
-        console.log('📎 Processing attachments:', requestBody.attachments);
         for (const attachment of requestBody.attachments) {
           await storage.createAnnouncementAttachment({
             announcementId: announcement.id,
@@ -10560,7 +10407,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Handle poll if provided
       if (requestBody.poll && requestBody.poll.question) {
-        console.log('📊 Processing poll:', requestBody.poll);
         await storage.createAnnouncementPoll({
           announcementId: announcement.id,
           question: requestBody.poll.question,
@@ -10617,7 +10463,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error(`[Push] Failed to send tournament announcement push to ${recipientId}:`, pushError);
             }
           }
-          console.log(`📲 Sent ${pushSuccessCount}/${recipientUserIds.length} push notifications for tournament announcement`);
         }
       } catch (notificationError) {
         console.error('Failed to send tournament announcement push notifications:', notificationError);
@@ -10693,7 +10538,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let announcementId = null;
       if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
         try {
-          console.log(`📬 Creating scrimmage invitations for members:`, req.body.selectedMemberIds);
           
           const invitationContent = `🏒 You're Invited! "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)} at ${scrimmageData.location}. Click to RSVP!`;
           
@@ -10710,7 +10554,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Create visibility records for invited players
           await storage.createAnnouncementVisibility(announcement.id, req.body.selectedMemberIds);
           
-          console.log(`✅ Created announcement ${announcement.id} and sent invitations to ${req.body.selectedMemberIds.length} players:`, req.body.selectedMemberIds);
         } catch (announcementError) {
           console.error('Error sending scrimmage invitations:', announcementError);
           // Continue with scrimmage creation even if announcement fails
@@ -10808,7 +10651,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        console.log(`📅 Generating ${dates.length} recurring scrimmages`);
         
         // Create parent scrimmage (first occurrence)
         const parentScrimmage = await storage.createScrimmage({
@@ -10817,11 +10659,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dateTime: dates[0],
         });
         
-        console.log(`✅ Created parent scrimmage ${parentScrimmage.id}`);
         
         // Add co-hosts if provided
         if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
-          console.log(`👥 Adding ${req.body.coHostIds.length} co-hosts to parent scrimmage ${parentScrimmage.id}`);
           for (const coHostId of req.body.coHostIds) {
             try {
               await storage.addScrimmageCoHost({
@@ -10846,7 +10686,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error(`Failed to add co-host ${coHostId}:`, coHostError);
             }
           }
-          console.log(`✅ Added co-hosts to parent scrimmage`);
         }
         
         // Create child scrimmages for remaining dates
@@ -10877,11 +10716,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        console.log(`✅ Created ${dates.length - 1} recurring scrimmages linked to parent ${parentScrimmage.id}`);
         
         // ALWAYS send in-app notifications when members are invited
         if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
-          console.log(`📲 Creating in-app notifications for ${req.body.selectedMemberIds.length} members for recurring scrimmage`);
           const creator = await storage.getUser(userId);
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
@@ -10900,7 +10737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 actionUrl: `/scrimmage/${parentScrimmage.id}`,
                 scrimmageId: parentScrimmage.id,
               });
-              console.log(`[Notification] Created in-app notification for ${memberId}`);
+
               
               // Only send push notification if sendInviteNow is enabled
               if (req.body.sendInviteNow) {
@@ -10919,7 +10756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error(`Failed to create notification for user ${memberId}:`, notifError);
             }
           }
-          console.log(`✅ Created in-app notifications${req.body.sendInviteNow ? ' and push notifications' : ''}`);
+
         }
         
         // Save email invites if provided
@@ -10936,7 +10773,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (uniqueEmails.length > 0) {
               await storage.createScrimmageInvites(parentScrimmage.id, uniqueEmails);
-              console.log(`📧 Created ${uniqueEmails.length} email invites for scrimmage ${parentScrimmage.id}`);
               
               // Send email notifications
               try {
@@ -10956,7 +10792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 };
                 
                 const emailResults = await sendBulkScrimmageInvites(uniqueEmails, emailData);
-                console.log(`✅ Sent ${emailResults.sent.length} email notifications, ${emailResults.failed.length} failed`);
+
               } catch (emailSendError) {
                 console.error('Error sending email notifications:', emailSendError);
                 // Continue even if email notifications fail
@@ -10976,11 +10812,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           announcementId,
         });
         
-        console.log(`✅ Created scrimmage ${scrimmage.id}${announcementId ? ` linked to announcement ${announcementId}` : ''}`);
         
         // Add co-hosts if provided
         if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
-          console.log(`👥 Adding ${req.body.coHostIds.length} co-hosts to scrimmage ${scrimmage.id}`);
           for (const coHostId of req.body.coHostIds) {
             try {
               await storage.addScrimmageCoHost({
@@ -11005,12 +10839,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error(`Failed to add co-host ${coHostId}:`, coHostError);
             }
           }
-          console.log(`✅ Added co-hosts to scrimmage`);
         }
         
         // ALWAYS send in-app notifications when members are invited
         if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
-          console.log(`📲 Creating in-app notifications for ${req.body.selectedMemberIds.length} members`);
           const creator = await storage.getUser(userId);
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
@@ -11029,7 +10861,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 actionUrl: `/scrimmage/${scrimmage.id}`,
                 scrimmageId: scrimmage.id,
               });
-              console.log(`[Notification] Created in-app notification for ${memberId}`);
+
               
               // Only send push notification if sendInviteNow is enabled
               if (req.body.sendInviteNow) {
@@ -11048,7 +10880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error(`Failed to create notification for user ${memberId}:`, notifError);
             }
           }
-          console.log(`✅ Created in-app notifications${req.body.sendInviteNow ? ' and push notifications' : ''}`);
+
         }
         
         // Save email invites if provided
@@ -11065,7 +10897,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (uniqueEmails.length > 0) {
               await storage.createScrimmageInvites(scrimmage.id, uniqueEmails);
-              console.log(`📧 Created ${uniqueEmails.length} email invites for scrimmage ${scrimmage.id}`);
               
               // Send email notifications
               try {
@@ -11085,7 +10916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 };
                 
                 const emailResults = await sendBulkScrimmageInvites(uniqueEmails, emailData);
-                console.log(`✅ Sent ${emailResults.sent.length} email notifications, ${emailResults.failed.length} failed`);
+
               } catch (emailSendError) {
                 console.error('Error sending email notifications:', emailSendError);
                 // Continue even if email notifications fail
@@ -11261,7 +11092,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
-      console.log(`[Scrimmage Request] Creating request for scrimmage ${scrimmageId} by user ${userId}`);
       
       const user = await storage.getUser(userId);
       if (!user) {
@@ -11271,10 +11101,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if scrimmage exists and get details
       const scrimmage = await storage.getScrimmage(scrimmageId);
       if (!scrimmage) {
-        console.log(`[Scrimmage Request] Scrimmage ${scrimmageId} not found`);
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
-      console.log(`[Scrimmage Request] Found scrimmage: ${scrimmage.title}, leagueId: ${scrimmage.leagueId}`);
       
       // Business invariant: Cannot join scrimmage that has passed or is imminent
       const now = new Date();
@@ -11288,9 +11116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Verify user is a member of the league
-      console.log(`[Scrimmage Request] Checking league membership for user ${userId} in league ${scrimmage.leagueId}`);
       const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
-      console.log(`[Scrimmage Request] Membership result:`, membership ? `status=${membership.status}` : 'none');
       if (!membership || membership.status !== 'approved') {
         return res.status(403).json({ message: "Must be an approved league member to join scrimmages" });
       }
@@ -11314,7 +11140,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isCreator = scrimmage.creatorId === userId;
       const isCoHost = await storage.isUserScrimmageCoHost(scrimmageId, userId);
       const shouldAutoApprove = isCreator || isCoHost;
-      console.log(`[Scrimmage Request] isCreator=${isCreator}, isCoHost=${isCoHost}, shouldAutoApprove=${shouldAutoApprove}`);
       
       let requestData;
       try {
@@ -11328,9 +11153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid request data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
       }
 
-      console.log(`[Scrimmage Request] Creating request with data:`, requestData);
       const request = await storage.createScrimmageRequest(requestData);
-      console.log(`[Scrimmage Request] Successfully created request ${request.id}`);
       res.status(201).json(request);
     } catch (error) {
       console.error('[Scrimmage Request] Error creating scrimmage request:', error);
@@ -11507,7 +11330,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
             console.log(`[Push] Scrimmage approval push to ${player.id}: ${pushResult ? 'sent' : 'skipped/failed'}`);
             
-            console.log(`✅ Sent scrimmage approval notification to ${player.firstName || player.id}`);
             
             // Also send email if available
             if (player.email && creator) {
@@ -11521,7 +11343,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 maxPlayers: scrimmage.maxPlayers,
                 currentPlayers: approvedCount,
               });
-              console.log(`✅ Sent scrimmage approval email to ${player.email}`);
             }
           }
         } catch (emailError) {
@@ -11650,17 +11471,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           broadcastNotificationUpdate(playerId);
         }
-        console.log(`✅ Sent confirmation notifications to ${approvedUserIds.length} approved players`);
       } catch (notificationError) {
         console.error('Error sending confirmation notifications:', notificationError);
         // Don't fail the finalization if notification fails
-      }
-
-      // Non-approved players don't receive notifications - they weren't approved so no notification needed
-      // They can check the scrimmage status if interested
-      const nonApprovedCount = requests.filter(req => req.status !== 'approved').length;
-      if (nonApprovedCount > 0) {
-        console.log(`ℹ️ ${nonApprovedCount} non-approved players - no notification sent`);
       }
 
       // Automatically create payment request if there's a cost
@@ -11680,7 +11493,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             approvedUserIds
           );
           
-          console.log(`💰 Created payment request ${paymentRequest.id} for ${approvedUserIds.length} approved players`);
         } catch (paymentError) {
           console.error('Error creating payment request:', paymentError);
           // Don't fail the finalization if payment request creation fails
@@ -11920,7 +11732,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Create visibility records for approved players
           await storage.createAnnouncementVisibility(announcement.id, targetUserIds);
           
-          console.log(`✅ Cancelled scrimmage ${scrimmageId} and sent notifications to ${targetUserIds.length} players`);
         } catch (announcementError) {
           console.error('Error sending cancellation notifications:', announcementError);
           // Don't fail the deletion if announcement fails
@@ -13021,7 +12832,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({ id: leagues.id })
         .from(leagues);
       
-      console.log(`Starting captain chat sync for ${allLeagues.length} leagues...`);
       
       let synced = 0;
       let failed = 0;
@@ -13031,7 +12841,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           await messagingService.ensureCaptainChatMembership(league.id);
           synced++;
-          console.log(`✓ Synced captain chat for league ${league.id}`);
         } catch (error) {
           failed++;
           const errorMsg = `Failed to sync captain chat for league ${league.id}: ${error instanceof Error ? error.message : String(error)}`;
@@ -13040,7 +12849,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      console.log(`Captain chat sync complete: ${synced} succeeded, ${failed} failed`);
       
       res.json({
         success: true,
@@ -13070,7 +12878,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(teams)
         .where(sql`${teams.leagueId} IS NOT NULL`);
       
-      console.log(`Starting sync for ${teamsWithLeagues.length} teams...`);
       
       let synced = 0;
       let failed = 0;
@@ -13080,7 +12887,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           await messagingService.syncTeamChatParticipants(team.id, team.leagueId);
           synced++;
-          console.log(`✓ Synced team chat for team ${team.id}`);
         } catch (error) {
           failed++;
           const errorMsg = `Failed to sync team ${team.id}: ${error instanceof Error ? error.message : String(error)}`;
@@ -13089,7 +12895,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      console.log(`Sync complete: ${synced} succeeded, ${failed} failed`);
       
       res.json({
         success: true,
@@ -13974,14 +13779,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send email using Resend
       try {
-        console.log('[Feedback] Attempting to send feedback email...');
-        console.log('[Feedback] RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
-        console.log('[Feedback] RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL);
-        console.log('[Feedback] FEEDBACK_EMAIL:', process.env.FEEDBACK_EMAIL);
         
         const { getUncachableResendClient } = await import('./resend');
         const { client, fromEmail } = await getUncachableResendClient();
-        console.log('[Feedback] Got Resend client, fromEmail:', fromEmail);
         
         const categoryLabel = validatedData.category === 'product_improvement' 
           ? 'Product Improvement' 
@@ -13989,7 +13789,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Send to FEEDBACK_EMAIL, or fallback to contact@roster-app.com
         const recipientEmail = process.env.FEEDBACK_EMAIL || 'contact@roster-app.com';
-        console.log('[Feedback] Sending to:', recipientEmail, 'from:', fromEmail);
 
         const emailResult = await client.emails.send({
           from: fromEmail,
@@ -14006,7 +13805,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             <p>${validatedData.message.replace(/\n/g, '<br />')}</p>
           `,
         });
-        console.log('[Feedback] Email sent successfully:', emailResult);
       } catch (emailError: any) {
         console.error("[Feedback] Error sending feedback email:", emailError?.message || emailError);
         console.error("[Feedback] Full error:", JSON.stringify(emailError, null, 2));
@@ -15100,19 +14898,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/team-events', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      console.log("[Team Events POST] User:", userId, "Body:", JSON.stringify(req.body));
       
       const validatedData = createTeamEventRequestSchema.parse(req.body);
-      console.log("[Team Events POST] Validated data:", JSON.stringify(validatedData));
       
       // Check if user is a member of this team (and preferably captain)
       const membership = await storage.getTeamMembership(userId, validatedData.teamId);
-      console.log("[Team Events POST] Membership:", membership);
       if (!membership) {
         return res.status(403).json({ message: "You must be a team member to create events" });
       }
       
-      console.log("[Team Events POST] Inserting event...");
       const [newEvent] = await db
         .insert(teamEvents)
         .values({
@@ -15120,7 +14914,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           creatorId: userId,
         })
         .returning();
-      console.log("[Team Events POST] Created event:", newEvent?.id);
       
       res.status(201).json({
         ...newEvent,
@@ -15129,13 +14922,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       if (error instanceof ZodError) {
-        console.error("[Team Events POST] Zod validation error:", error.errors);
         return res.status(400).json({ 
           message: "Invalid event data", 
           errors: error.errors 
         });
       }
-      console.error("[Team Events POST] Error creating team event:", error);
+      console.error("Error creating team event:", error);
       res.status(500).json({ message: "Failed to create team event" });
     }
   });
@@ -15988,7 +15780,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (isCompletingMatch && !match.scheduledTime && scheduledTime === undefined) {
         updateData.scheduledTime = new Date().toISOString();
-        console.log('⏰ Auto-setting scheduledTime for completed match:', updateData.scheduledTime);
       }
 
       // Determine winner if scores are provided
@@ -16025,27 +15816,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(tournamentTeams.id, match.team2Id))
         .limit(1) : null;
 
-      console.log('🎯 Tournament match update:', {
-        matchId,
-        scheduledTime,
-        team1TournamentId: match.team1Id,
-        team2TournamentId: match.team2Id,
-        team1ActualId: team1Data?.[0]?.teamId,
-        team2ActualId: team2Data?.[0]?.teamId,
-        hasGameId: !!match.gameId,
-        tournamentExists: !!tournament,
-        hasTeam1: !!team1Data?.[0]?.teamId,
-        hasTeam2: !!team2Data?.[0]?.teamId
-      });
-
       // Create or update game record if both teams exist and match has schedule info
       if (team1Data?.[0]?.teamId && team2Data?.[0]?.teamId && tournament) {
-        console.log('✅ All conditions met for game creation/update');
         if (scheduledTime) {
-          console.log('📅 Creating/updating game with scheduledTime:', scheduledTime);
           // Schedule is set - create or update game
           if (match.gameId) {
-            console.log('🔄 Updating existing game:', match.gameId);
             // Update existing game
             await db
               .update(games)
@@ -16057,15 +15832,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 isCompleted: status === 'completed'
               })
               .where(eq(games.id, match.gameId));
-            console.log('✅ Game updated successfully');
           } else {
-            console.log('➕ Creating new game for match:', {
-              leagueId: tournament.leagueId,
-              seasonId: tournament.seasonId,
-              homeTeamId: team1Data[0].teamId,
-              awayTeamId: team2Data[0].teamId,
-              scheduledAt: scheduledTime
-            });
             // Create new game
             const [newGame] = await db
               .insert(games)
@@ -16082,12 +15849,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .returning();
             
-            console.log('✅ Game created with ID:', newGame.id);
             // Link game to tournament match
             updateData.gameId = newGame.id;
           }
         } else if (scheduledTime === null && match.gameId) {
-          console.log('🗑️ Clearing schedule - attempting to delete game');
           // Schedule cleared - delete related records then the game
           try {
             // Delete related duty exclusions first
@@ -16104,19 +15869,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await db
               .delete(games)
               .where(eq(games.id, match.gameId));
-            console.log('✅ Game and related records deleted successfully');
           } catch (deleteError) {
-            console.log('⚠️ Could not delete game (may have other references):', deleteError);
+            // Could not delete game (may have other references)
           }
           // Always unlink the game from the tournament match
           updateData.gameId = null;
         }
-      } else {
-        console.log('❌ Skipping game creation - missing requirements:', {
-          hasTeam1: !!team1Data?.[0]?.teamId,
-          hasTeam2: !!team2Data?.[0]?.teamId,
-          hasTournament: !!tournament
-        });
       }
 
       const [updatedMatch] = await db
@@ -16272,7 +16030,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Auto-set scheduledTime to now when completing a match without a scheduled time
         if (!match.scheduledTime) {
           updateFields.scheduledTime = new Date().toISOString();
-          console.log('⏰ Auto-setting scheduledTime for completed match:', updateFields.scheduledTime);
         }
         
         const [updatedMatch] = await tx
@@ -16987,7 +16744,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let seededTeamData = [...teamData];
       if (tournament.type === 'season_playoff' && tournament.leagueId) {
         try {
-          console.log('🏆 [SERVER] Season playoff detected, fetching standings for seeding...');
           
           // First try season-specific standings
           let standingsData = await storage.getLeagueStandings(tournament.leagueId, tournament.seasonId || undefined);
@@ -16996,11 +16752,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const hasRealData = standingsData.some((s: any) => s.wins > 0 || s.losses > 0 || s.points > 0);
           
           if (!hasRealData && tournament.seasonId) {
-            console.log('🏆 [SERVER] Season standings empty, falling back to overall league standings');
             standingsData = await storage.getLeagueStandings(tournament.leagueId, undefined);
           }
           
-          console.log('🏆 [SERVER] Standings data:', standingsData.map((s: any) => `${s.teamName}: ${s.points} pts`));
           
           if (standingsData.length > 0) {
             // Create a map of teamId -> standings rank (0-indexed)
@@ -17022,7 +16776,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               seed: index + 1
             }));
             
-            console.log('🏆 [SERVER] Final seeding:', seededTeamData.map((t: any) => `#${t.seed} ${t.teamName}`));
           }
         } catch (standingsError) {
           console.warn('🏆 [SERVER] Failed to fetch standings for seeding, using client order:', standingsError);
@@ -17112,8 +16865,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const winnersMatches = insertedMatches.filter(m => m.bracketType === 'winners');
       const losersMatches = insertedMatches.filter(m => m.bracketType === 'losers');
       const grandFinalMatches = insertedMatches.filter(m => m.bracketType === 'grand_final');
-      console.log(`🏆 BRACKET GENERATED - Total: ${insertedMatches.length}, Winners: ${winnersMatches.length}, Losers: ${losersMatches.length}, Grand Finals: ${grandFinalMatches.length}`);
-      console.log(`🏆 Losers rounds:`, losersMatches.map(m => m.round));
 
       res.json({ 
         teams: insertedTeams, 
@@ -17869,7 +17620,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
         
         teamLookup.set(teamKey, newTeam.id);
-        console.log(`Created tournament team: ${teamName} with seed ${newTeam.seed}`);
       }
 
       // Import players
@@ -17940,7 +17690,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             if (existingParticipantsWithName.length > 0) {
               // Participant with this name already exists on this team - skip
-              console.log(`Skipping duplicate: ${player.firstName} ${player.lastName} already on team ${player.teamName}`);
               continue;
             }
             
@@ -18052,7 +17801,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .set({ paymentAmount })
           .where(eq(tournaments.id, tournamentId));
         
-        console.log(`Updated tournament payment amount: ${teamCount} teams × 1000 cents = ${paymentAmount} cents ($${paymentAmount / 100})`);
       }
 
       // Clean up file
@@ -18666,7 +18414,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // IMPORTANT: Catch-all for unmatched API routes - must return JSON 404 instead of HTML
   // This prevents the static file handler from serving index.html for API routes
   app.all('/api/*', (req, res) => {
-    console.log(`⚠️ Unmatched API route: ${req.method} ${req.originalUrl}`);
     res.status(404).json({ message: 'API endpoint not found', path: req.originalUrl });
   });
 
