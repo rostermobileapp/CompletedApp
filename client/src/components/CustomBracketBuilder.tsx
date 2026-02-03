@@ -834,10 +834,13 @@ export function CustomBracketBuilder({
 
         {/* SVG for connections */}
         <svg
-          className="absolute inset-0 pointer-events-none"
+          className="absolute pointer-events-none"
           style={{
-            width: '100%',
-            height: '100%'
+            width: Math.max(2000, ...matchups.map(m => (m.position.x + CARD_WIDTH) * zoom + pan.x + 200)),
+            height: Math.max(1500, ...matchups.map(m => (m.position.y + CARD_HEIGHT) * zoom + pan.y + 200)),
+            left: 0,
+            top: 0,
+            overflow: 'visible'
           }}
         >
           {connections.map(conn => {
