@@ -18,7 +18,7 @@ import { db } from "./db";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
-import { eq, and, or, ilike, sql, inArray } from "drizzle-orm";
+import { eq, and, or, ilike, sql, inArray, isNotNull } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
 import { formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, parseLeagueLocalDateTime } from "./dateUtils";
 import {
@@ -4027,12 +4027,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const games = await storage.getGamesByLeague(leagueId);
       
+      // Get all game IDs that are linked to tournament matches (these should not appear as regular games)
+      const tournamentLinkedGames = await db
+        .select({ gameId: tournamentMatches.gameId })
+        .from(tournamentMatches)
+        .where(isNotNull(tournamentMatches.gameId));
+      const tournamentGameIds = new Set(tournamentLinkedGames.map(t => t.gameId).filter(Boolean));
+      
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      // Filter past games (exclude scrimmages - they don't require score verification)
+      // Filter past games (exclude scrimmages and tournament-linked games - they don't require score verification here)
       const pastGames = games.filter((game: any) => {
         if (game.isScrimmage) return false; // Scrimmages don't need score verification
+        if (tournamentGameIds.has(game.id)) return false; // Tournament games are handled separately
         const gameDate = new Date(game.scheduledAt);
         gameDate.setHours(0, 0, 0, 0);
         return gameDate < today;
