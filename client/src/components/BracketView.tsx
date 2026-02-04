@@ -514,7 +514,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
               {/* Header - clean but with round context */}
               <div className="flex items-center justify-between gap-1">
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold text-black dark:text-white truncate" data-testid={`label-match-${match.matchNumber}`}>
+                  <span className="text-xs font-bold text-card-foreground truncate" data-testid={`label-match-${match.matchNumber}`}>
                     Game {match.matchNumber}
                   </span>
                   <span className="text-[10px] text-muted-foreground truncate">
@@ -522,7 +522,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                   </span>
                 </div>
                 {match.scheduledTime && (
-                  <span className="text-[9px] font-bold text-black dark:text-white whitespace-nowrap">
+                  <span className="text-[9px] font-bold text-card-foreground whitespace-nowrap">
                     {formatDate(new Date(match.scheduledTime), "MMM d")}
                   </span>
                 )}
@@ -545,8 +545,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       onValueChange={(value) => handleTeamSelect(match.id, 'team1', value, match)}
                       disabled={updateMatchTeamMutation.isPending}
                     >
-                      <SelectTrigger className="h-6 text-xs bg-background border-0 font-bold text-black dark:text-white [&>span]:text-black dark:[&>span]:text-white" data-testid={`select-team1-${match.matchNumber}`}>
-                        <SelectValue placeholder="Select Team" className="font-bold text-black dark:text-white">
+                      <SelectTrigger className="h-6 text-xs bg-background border-0 font-bold text-card-foreground" data-testid={`select-team1-${match.matchNumber}`}>
+                        <SelectValue placeholder="Select Team">
                           {match.team1Id ? getTeamName(match.team1Id) : "Select Team"}
                         </SelectValue>
                       </SelectTrigger>
@@ -564,19 +564,19 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       </SelectContent>
                     </Select>
                   ) : (
-                    <span className="text-xs font-bold text-black dark:text-white" data-testid={`text-team1-${match.matchNumber}`}>
+                    <span className="text-xs font-bold text-card-foreground" data-testid={`text-team1-${match.matchNumber}`}>
                       {getTeamDisplay(match.team1Id, match, 'team1')}
                     </span>
                   )}
                   {match.team1Score != null && (
-                    <span className={`font-bold ml-2 flex-shrink-0 text-black dark:text-white`} data-testid={`text-score1-${match.matchNumber}`}>
+                    <span className="font-bold ml-2 flex-shrink-0 text-card-foreground" data-testid={`text-score1-${match.matchNumber}`}>
                       {match.team1Score}
                     </span>
                   )}
                 </div>
 
                 {/* VS divider like CustomBracketBuilder */}
-                <div className="text-center text-xs font-bold text-black dark:text-white">vs</div>
+                <div className="text-center text-xs font-bold text-card-foreground">vs</div>
 
                 {/* Team 2 */}
                 <div
@@ -593,8 +593,8 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       onValueChange={(value) => handleTeamSelect(match.id, 'team2', value, match)}
                       disabled={updateMatchTeamMutation.isPending}
                     >
-                      <SelectTrigger className="h-6 text-xs bg-background border-0 font-bold text-black dark:text-white [&>span]:text-black dark:[&>span]:text-white" data-testid={`select-team2-${match.matchNumber}`}>
-                        <SelectValue placeholder="Select Team" className="font-bold text-black dark:text-white">
+                      <SelectTrigger className="h-6 text-xs bg-background border-0 font-bold text-card-foreground" data-testid={`select-team2-${match.matchNumber}`}>
+                        <SelectValue placeholder="Select Team">
                           {match.team2Id ? getTeamName(match.team2Id) : "Select Team"}
                         </SelectValue>
                       </SelectTrigger>
@@ -612,12 +612,12 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       </SelectContent>
                     </Select>
                   ) : (
-                    <span className="text-xs font-bold text-black dark:text-white" data-testid={`text-team2-${match.matchNumber}`}>
+                    <span className="text-xs font-bold text-card-foreground" data-testid={`text-team2-${match.matchNumber}`}>
                       {getTeamDisplay(match.team2Id, match, 'team2')}
                     </span>
                   )}
                   {match.team2Score != null && (
-                    <span className={`font-bold ml-2 flex-shrink-0 text-black dark:text-white`} data-testid={`text-score2-${match.matchNumber}`}>
+                    <span className="font-bold ml-2 flex-shrink-0 text-card-foreground" data-testid={`text-score2-${match.matchNumber}`}>
                       {match.team2Score}
                     </span>
                   )}
