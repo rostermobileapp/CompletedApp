@@ -159,6 +159,9 @@
     overflow-x: hidden;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    height: 100%;
+    min-height: 100%;
+    position: relative;
   }
 
   html::-webkit-scrollbar,
@@ -212,6 +215,18 @@
     .tier-badge {
       font-size: 0.75rem;
       padding: 0.125rem 0.375rem;
+    }
+  }
+
+  /* Safe area insets for notched devices and small screens */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Ensure fixed elements respect viewport on all devices */
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .fixed.bottom-0 {
+      padding-bottom: env(safe-area-inset-bottom, 0px);
     }
   }
 

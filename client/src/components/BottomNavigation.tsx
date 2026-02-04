@@ -85,7 +85,14 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50" data-testid="bottom-navigation">
+    <nav 
+      className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-[100]" 
+      data-testid="bottom-navigation" 
+      style={{ 
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        minHeight: '60px'
+      }}
+    >
       <div className="grid py-2 grid-cols-5 bg-[#e2e2e2] dark:bg-[#212121]">
         {FIXED_SHORTCUTS.map((shortcut) => {
           const Icon = shortcut.icon;
@@ -123,6 +130,6 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }
