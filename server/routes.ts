@@ -80,6 +80,7 @@ import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageRemi
 import { startEventReminderJob } from "./eventReminderJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
 import { getUncachableResendClient } from "./resend";
+import { sendTeamEventPushNotification } from "./oneSignalNotifications";
 
 // Module-level map to store active WebSocket connections by user ID
 // This allows broadcasting from anywhere in routes.ts
@@ -14914,6 +14915,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           creatorId: userId,
         })
         .returning();
+      
+      // Send push notifications to all team members (except the creator)
+      try {
+        const team = await storage.getTeam(validatedData.teamId);
+        const teamMembers = await storage.getTeamMembers(validatedData.teamId);
+        const creator = await storage.getUser(userId);
+        
+        if (team && creator && teamMembers.length > 0) {
+          const creatorName = `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Team member';
+          const formattedDate = formatDayAndTime(newEvent.scheduledAt);
+          
+          // Send notifications to all team members except the creator
+          for (const member of teamMembers) {
+            if (member.userId !== userId) {
+              sendTeamEventPushNotification(
+                member.userId,
+                creatorName,
+                newEvent.title,
+                newEvent.eventType,
+                formattedDate,
+                newEvent.location,
+                newEvent.id,
+                team.name
+              ).catch(err => console.error(`Failed to send team event notification to ${member.userId}:`, err));
+            }
+          }
+          console.log(`[TeamEvents] Sent push notifications to ${teamMembers.length - 1} team members for event "${newEvent.title}"`);
+        }
+      } catch (notificationError) {
+        console.error("Error sending team event notifications:", notificationError);
+      }
       
       res.status(201).json({
         ...newEvent,

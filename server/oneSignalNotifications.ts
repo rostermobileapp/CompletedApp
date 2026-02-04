@@ -373,3 +373,44 @@ export async function sendPersonalReminderPushNotification(
     },
   });
 }
+
+export async function sendTeamEventPushNotification(
+  recipientId: string,
+  creatorName: string,
+  eventTitle: string,
+  eventType: string,
+  dateTime: string,
+  location: string | null,
+  teamEventId: string,
+  teamName: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.upcomingEvents === false) {
+    console.log(`[OneSignal] Team event notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  const typeEmojis: Record<string, string> = {
+    general: '📅',
+    practice: '🏃',
+    scrimmage: '🏒',
+    social: '🎉',
+  };
+  const emoji = typeEmojis[eventType] || '📅';
+  
+  let message = `${creatorName} scheduled "${eventTitle}" for ${dateTime}`;
+  if (location) {
+    message += ` at ${location}`;
+  }
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `${emoji} New ${teamName} Event`,
+    message,
+    data: {
+      type: 'team_event',
+      teamEventId,
+    },
+  });
+}
