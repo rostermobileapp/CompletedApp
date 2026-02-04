@@ -522,7 +522,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                   </span>
                 </div>
                 {match.scheduledTime && (
-                  <span className="text-[9px] text-muted-foreground whitespace-nowrap">
+                  <span className="text-[9px] font-bold text-foreground whitespace-nowrap">
                     {formatDate(new Date(match.scheduledTime), "MMM d")}
                   </span>
                 )}
