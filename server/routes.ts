@@ -16399,11 +16399,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (settings?.customBracket?.matchups && Array.isArray(settings.customBracket.matchups)) {
         const matchups = settings.customBracket.matchups;
         
-        // Get existing match IDs for this tournament to delete related RSVPs first
+        // Get existing matches to preserve scheduledTime, location, notes, gameId
         const existingMatches = await db
-          .select({ id: tournamentMatches.id })
+          .select()
           .from(tournamentMatches)
           .where(eq(tournamentMatches.tournamentId, id));
+        
+        // Build a map of existing match data by ID to preserve important fields
+        const existingMatchMap = new Map(existingMatches.map(m => [m.id, m]));
         
         if (existingMatches.length > 0) {
           const matchIds = existingMatches.map(m => m.id);
@@ -16427,6 +16430,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Extract game number from string like "Game 1" -> 1
           const matchNumber = parseInt(matchup.gameNumber?.replace(/\D/g, '') || String(index + 1));
           
+          // Get existing match data to preserve scheduledTime, location, notes, gameId
+          const existingMatch = existingMatchMap.get(matchup.id);
+          
           return {
             id: matchup.id,
             tournamentId: id,
@@ -16438,9 +16444,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             team2Score: matchup.score2,
             winnerId: matchup.winner ? teamNameToId.get(matchup.winner) : null,
             status: matchup.winner ? 'completed' : 'pending',
-            scheduledTime: null,
-            location: null,
-            notes: null
+            scheduledTime: existingMatch?.scheduledTime || matchup.scheduledTime || null,
+            location: existingMatch?.location || null,
+            notes: existingMatch?.notes || null,
+            gameId: existingMatch?.gameId || null
           };
         });
         
