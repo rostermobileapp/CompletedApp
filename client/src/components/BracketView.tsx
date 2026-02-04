@@ -545,7 +545,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       onValueChange={(value) => handleTeamSelect(match.id, 'team1', value, match)}
                       disabled={updateMatchTeamMutation.isPending}
                     >
-                      <SelectTrigger className="h-6 text-xs bg-background border-0" data-testid={`select-team1-${match.matchNumber}`}>
+                      <SelectTrigger className="h-6 text-xs bg-background border-0 font-bold text-black dark:text-white" data-testid={`select-team1-${match.matchNumber}`}>
                         <SelectValue placeholder="Select Team">
                           {match.team1Id ? getTeamName(match.team1Id) : "Select Team"}
                         </SelectValue>
@@ -593,7 +593,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       onValueChange={(value) => handleTeamSelect(match.id, 'team2', value, match)}
                       disabled={updateMatchTeamMutation.isPending}
                     >
-                      <SelectTrigger className="h-6 text-xs bg-background border-0" data-testid={`select-team2-${match.matchNumber}`}>
+                      <SelectTrigger className="h-6 text-xs bg-background border-0 font-bold text-black dark:text-white" data-testid={`select-team2-${match.matchNumber}`}>
                         <SelectValue placeholder="Select Team">
                           {match.team2Id ? getTeamName(match.team2Id) : "Select Team"}
                         </SelectValue>
