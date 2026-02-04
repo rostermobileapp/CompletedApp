@@ -14989,9 +14989,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is commissioner of the team's league
       const team = await storage.getTeam(existingEvent.teamId);
-      const isCommissioner = team?.leagueId 
-        ? await storage.isLeagueCommissioner(userId, team.leagueId)
-        : false;
+      let isCommissioner = false;
+      if (team?.leagueId) {
+        const league = await storage.getLeague(team.leagueId);
+        isCommissioner = league?.commissionerId === userId;
+      }
       
       if (existingEvent.creatorId !== userId && !membership.isCaptain && !isCommissioner) {
         return res.status(403).json({ message: "Only the event creator, team captain, or commissioner can edit events" });
@@ -15050,9 +15052,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is commissioner of the team's league
       const team = await storage.getTeam(existingEvent.teamId);
-      const isCommissioner = team?.leagueId 
-        ? await storage.isLeagueCommissioner(userId, team.leagueId)
-        : false;
+      let isCommissioner = false;
+      if (team?.leagueId) {
+        const league = await storage.getLeague(team.leagueId);
+        isCommissioner = league?.commissionerId === userId;
+      }
       
       if (existingEvent.creatorId !== userId && !membership.isCaptain && !isCommissioner) {
         return res.status(403).json({ message: "Only the event creator, team captain, or commissioner can delete events" });
