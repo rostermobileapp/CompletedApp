@@ -514,7 +514,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
               {/* Header - clean but with round context */}
               <div className="flex items-center justify-between gap-1">
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold text-foreground truncate" data-testid={`label-match-${match.matchNumber}`}>
+                  <span className="text-xs font-bold text-black dark:text-white truncate" data-testid={`label-match-${match.matchNumber}`}>
                     Game {match.matchNumber}
                   </span>
                   <span className="text-[10px] text-muted-foreground truncate">
@@ -522,7 +522,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                   </span>
                 </div>
                 {match.scheduledTime && (
-                  <span className="text-[9px] font-bold text-foreground whitespace-nowrap">
+                  <span className="text-[9px] font-bold text-black dark:text-white whitespace-nowrap">
                     {formatDate(new Date(match.scheduledTime), "MMM d")}
                   </span>
                 )}
