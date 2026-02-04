@@ -142,7 +142,7 @@
     pointer-events: none;
   }
 
-  /* Hide scrollbars while keeping scroll functionality */
+  /* Hide scrollbars while keeping scroll functionality - comprehensive approach */
   * {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
@@ -150,6 +150,43 @@
   
   *::-webkit-scrollbar {
     display: none;  /* Chrome, Safari, Opera */
+    width: 0;
+    height: 0;
+    background: transparent;
+  }
+
+  html, body, #root {
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  #root::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /* Ensure all scrollable areas hide scrollbars */
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-auto,
+  .overflow-scroll,
+  [style*="overflow"] {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .overflow-y-auto::-webkit-scrollbar,
+  .overflow-x-auto::-webkit-scrollbar,
+  .overflow-auto::-webkit-scrollbar,
+  .overflow-scroll::-webkit-scrollbar,
+  [style*="overflow"]::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   /* Input and form styling */
