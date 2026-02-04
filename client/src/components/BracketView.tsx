@@ -565,7 +565,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                     </Select>
                   ) : (
                     <span className="text-xs font-bold text-card-foreground" data-testid={`text-team1-${match.matchNumber}`}>
-                      {getTeamDisplay(match.team1Id, match, 'team1')}
+                      {getTeamDisplay(match.team1Id, match, 'team1') || 'TBD'}
                     </span>
                   )}
                   {match.team1Score != null && (
@@ -613,7 +613,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                     </Select>
                   ) : (
                     <span className="text-xs font-bold text-card-foreground" data-testid={`text-team2-${match.matchNumber}`}>
-                      {getTeamDisplay(match.team2Id, match, 'team2')}
+                      {getTeamDisplay(match.team2Id, match, 'team2') || 'TBD'}
                     </span>
                   )}
                   {match.team2Score != null && (
