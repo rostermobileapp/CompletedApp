@@ -564,19 +564,19 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       </SelectContent>
                     </Select>
                   ) : (
-                    <span className={`truncate text-xs ${team1Wins ? '' : 'text-foreground'}`} data-testid={`text-team1-${match.matchNumber}`}>
+                    <span className={`truncate text-xs font-bold text-black dark:text-white`} data-testid={`text-team1-${match.matchNumber}`}>
                       {getTeamDisplay(match.team1Id, match, 'team1')}
                     </span>
                   )}
                   {match.team1Score != null && (
-                    <span className={`font-bold ml-2 flex-shrink-0 ${team1Wins ? '' : 'text-foreground'}`} data-testid={`text-score1-${match.matchNumber}`}>
+                    <span className={`font-bold ml-2 flex-shrink-0 text-black dark:text-white`} data-testid={`text-score1-${match.matchNumber}`}>
                       {match.team1Score}
                     </span>
                   )}
                 </div>
 
                 {/* VS divider like CustomBracketBuilder */}
-                <div className="text-center text-xs text-muted-foreground">vs</div>
+                <div className="text-center text-xs font-bold text-black dark:text-white">vs</div>
 
                 {/* Team 2 */}
                 <div
@@ -612,12 +612,12 @@ export default function BracketView({ matches, teams, format, settings, tourname
                       </SelectContent>
                     </Select>
                   ) : (
-                    <span className={`truncate text-xs ${team2Wins ? '' : 'text-foreground'}`} data-testid={`text-team2-${match.matchNumber}`}>
+                    <span className={`truncate text-xs font-bold text-black dark:text-white`} data-testid={`text-team2-${match.matchNumber}`}>
                       {getTeamDisplay(match.team2Id, match, 'team2')}
                     </span>
                   )}
                   {match.team2Score != null && (
-                    <span className={`font-bold ml-2 flex-shrink-0 ${team2Wins ? '' : 'text-foreground'}`} data-testid={`text-score2-${match.matchNumber}`}>
+                    <span className={`font-bold ml-2 flex-shrink-0 text-black dark:text-white`} data-testid={`text-score2-${match.matchNumber}`}>
                       {match.team2Score}
                     </span>
                   )}
