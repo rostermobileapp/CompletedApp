@@ -958,13 +958,13 @@ export function CustomBracketBuilder({
                 <Input
                   value={matchup.gameNumber}
                   onChange={(e) => updateMatchup(matchup.id, { gameNumber: e.target.value })}
-                  className={`h-6 text-xs font-bold flex-1 ${locked ? 'disabled:text-white disabled:opacity-100 disabled:font-bold' : ''}`}
+                  className={`h-6 text-xs font-bold flex-1 ${locked ? 'disabled:text-black dark:disabled:text-white disabled:opacity-100 disabled:font-bold' : ''}`}
                   placeholder="Game #"
                   disabled={locked}
                   data-testid={`input-game-number-${matchup.id}`}
                 />
                 {matchup.scheduledTime && formatScheduledTime(matchup.scheduledTime) && (
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                  <span className="text-xs font-bold text-black dark:text-white flex-shrink-0">
                     {formatScheduledTime(matchup.scheduledTime)}
                   </span>
                 )}
@@ -992,7 +992,7 @@ export function CustomBracketBuilder({
                     onValueChange={(value) => updateMatchup(matchup.id, { team1: value === 'unassigned' ? '' : value })}
                     disabled={locked}
                   >
-                    <SelectTrigger className={`h-7 text-xs flex-1 ${locked ? 'disabled:text-white disabled:opacity-100 disabled:font-bold' : ''}`} data-testid={`select-team1-${matchup.id}`}>
+                    <SelectTrigger className={`h-7 text-xs flex-1 ${locked ? 'disabled:text-black dark:disabled:text-white disabled:opacity-100 disabled:font-bold' : ''}`} data-testid={`select-team1-${matchup.id}`}>
                       <SelectValue placeholder="Select Team 1" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1020,14 +1020,14 @@ export function CustomBracketBuilder({
                     </span>
                   )}
                 </div>
-                <div className="text-center text-xs text-muted-foreground">vs</div>
+                <div className="text-center text-xs font-bold text-black dark:text-white">vs</div>
                 <div className="flex items-center gap-2">
                   <Select
                     value={matchup.team2 || 'unassigned'}
                     onValueChange={(value) => updateMatchup(matchup.id, { team2: value === 'unassigned' ? '' : value })}
                     disabled={locked}
                   >
-                    <SelectTrigger className={`h-7 text-xs flex-1 ${locked ? 'disabled:text-white disabled:opacity-100 disabled:font-bold' : ''}`} data-testid={`select-team2-${matchup.id}`}>
+                    <SelectTrigger className={`h-7 text-xs flex-1 ${locked ? 'disabled:text-black dark:disabled:text-white disabled:opacity-100 disabled:font-bold' : ''}`} data-testid={`select-team2-${matchup.id}`}>
                       <SelectValue placeholder="Select Team 2" />
                     </SelectTrigger>
                     <SelectContent>
