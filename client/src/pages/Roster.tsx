@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -8,12 +9,19 @@ import { useToast } from '@/hooks/use-toast';
 import { queryClient, getImageUrl } from '@/lib/queryClient';
 import type { UploadResult } from '@uppy/core';
 import { apiRequest } from '@/lib/queryClient';
-import { ClickableAvatar } from '@/components/ClickableAvatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfilePhotoPreview } from '@/components/ProfilePhotoPreview';
 
 export default function Roster() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [previewUser, setPreviewUser] = useState<{
+    id: string;
+    profileImageUrl?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null>(null);
 
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
@@ -195,13 +203,28 @@ export default function Roster() {
               .map((member: any) => (
               <div key={member.id} className="bg-card rounded-lg border border-border p-3" data-testid={`card-player-${member.id}`}>
                 <div className="flex items-center gap-2">
-                  <ClickableAvatar
-                    userId={member.user?.id || ''}
-                    profileImageUrl={member.user?.profilePictureUrl}
-                    firstName={member.user?.firstName}
-                    lastName={member.user?.lastName}
-                    size="sm"
-                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPreviewUser({
+                        id: member.user?.id || '',
+                        profileImageUrl: member.user?.profilePictureUrl,
+                        firstName: member.user?.firstName,
+                        lastName: member.user?.lastName
+                      });
+                    }}
+                    className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary rounded-full"
+                    data-testid={`button-avatar-${member.user?.id}`}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={getImageUrl(member.user?.profilePictureUrl) || undefined} alt={member.user?.firstName || 'User'} />
+                      <AvatarFallback>
+                        {member.user?.firstName?.[0]?.toUpperCase() || ''}{member.user?.lastName?.[0]?.toUpperCase() || ''}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1">
                       <h3 className="font-semibold text-sm truncate" data-testid={`text-player-name-${member.id}`}>
@@ -239,6 +262,15 @@ export default function Roster() {
           </div>
         )}
       </div>
+
+      <ProfilePhotoPreview
+        isOpen={!!previewUser}
+        onClose={() => setPreviewUser(null)}
+        userId={previewUser?.id || ''}
+        profileImageUrl={previewUser?.profileImageUrl}
+        firstName={previewUser?.firstName}
+        lastName={previewUser?.lastName}
+      />
     </div>
   );
 }
