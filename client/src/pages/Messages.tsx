@@ -2782,27 +2782,19 @@ export default function Messages() {
           </DialogHeader>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {currentConversation?.participants?.map((participant) => {
-              const handleMemberClick = () => {
-                setShowMembersModal(false);
-                setPageTransitionDirection('up');
-                navigate(`/user/${participant.userId}`);
-              };
-              
               return (
-                <button
+                <div
                   key={participant.id}
-                  onClick={handleMemberClick}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer text-left"
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors"
                   data-testid={`member-${participant.userId}`}
                 >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={participant.user?.profileImageUrl || undefined} alt={participant.user?.firstName || 'User'} />
-                    <AvatarFallback>
-                      {participant.user?.firstName && participant.user?.lastName 
-                        ? `${participant.user.firstName[0]}${participant.user.lastName[0]}`.toUpperCase()
-                        : participant.user?.firstName?.[0]?.toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
+                  <ClickableAvatar
+                    userId={participant.userId}
+                    profileImageUrl={participant.user?.profileImageUrl}
+                    firstName={participant.user?.firstName}
+                    lastName={participant.user?.lastName}
+                    size="sm"
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate" data-testid={`member-name-${participant.userId}`}>
                       {participant.user?.displayName || 'Unknown User'}
@@ -2813,7 +2805,7 @@ export default function Messages() {
                       You
                     </span>
                   )}
-                </button>
+                </div>
               );
             })}
             {(!currentConversation?.participants || currentConversation.participants.length === 0) && (

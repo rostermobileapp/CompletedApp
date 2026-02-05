@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { queryClient, getImageUrl } from '@/lib/queryClient';
 import type { UploadResult } from '@uppy/core';
 import { apiRequest } from '@/lib/queryClient';
+import { ClickableAvatar } from '@/components/ClickableAvatar';
 
 export default function Roster() {
   const { user } = useAuth();
@@ -194,20 +195,13 @@ export default function Roster() {
               .map((member: any) => (
               <div key={member.id} className="bg-card rounded-lg border border-border p-3" data-testid={`card-player-${member.id}`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shrink-0">
-                    {member.user.profileImageUrl ? (
-                      <img 
-                        src={getImageUrl(member.user.profileImageUrl) || ''} 
-                        alt={`${member.user.firstName} ${member.user.lastName}`}
-                        className="w-full h-full rounded-full object-cover"
-                        data-testid={`img-player-avatar-${member.id}`}
-                      />
-                    ) : (
-                      <span className="text-primary-foreground font-semibold text-sm" data-testid={`text-player-initials-${member.id}`}>
-                        {member.user.firstName?.[0]}{member.user.lastName?.[0]}
-                      </span>
-                    )}
-                  </div>
+                  <ClickableAvatar
+                    userId={member.user.id || member.userId}
+                    profileImageUrl={member.user.profileImageUrl}
+                    firstName={member.user.firstName}
+                    lastName={member.user.lastName}
+                    size="sm"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1">
                       <h3 className="font-semibold text-sm truncate" data-testid={`text-player-name-${member.id}`}>
