@@ -1,7 +1,7 @@
-import { useLocation } from 'wouter';
+import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { setPageTransitionDirection } from '@/components/PageTransition';
 import { getImageUrl } from '@/lib/queryClient';
+import { ProfilePhotoPreview } from '@/components/ProfilePhotoPreview';
 
 interface ClickableAvatarProps {
   userId: string;
@@ -20,11 +20,10 @@ export function ClickableAvatar({
   className = '',
   size = 'md'
 }: ClickableAvatarProps) {
-  const [, navigate] = useLocation();
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const handleClick = () => {
-    setPageTransitionDirection('up');
-    navigate(`/user/${userId}`);
+    setIsPreviewOpen(true);
   };
 
   const getInitials = () => {
@@ -44,15 +43,26 @@ export function ClickableAvatar({
   };
 
   return (
-    <button
-      onClick={handleClick}
-      className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary rounded-full"
-      data-testid={`button-avatar-${userId}`}
-    >
-      <Avatar className={`${sizeClasses[size]} ${className}`}>
-        <AvatarImage src={getImageUrl(profileImageUrl) || undefined} alt={firstName || 'User'} />
-        <AvatarFallback>{getInitials()}</AvatarFallback>
-      </Avatar>
-    </button>
+    <>
+      <button
+        onClick={handleClick}
+        className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary rounded-full"
+        data-testid={`button-avatar-${userId}`}
+      >
+        <Avatar className={`${sizeClasses[size]} ${className}`}>
+          <AvatarImage src={getImageUrl(profileImageUrl) || undefined} alt={firstName || 'User'} />
+          <AvatarFallback>{getInitials()}</AvatarFallback>
+        </Avatar>
+      </button>
+
+      <ProfilePhotoPreview
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        userId={userId}
+        profileImageUrl={profileImageUrl}
+        firstName={firstName}
+        lastName={lastName}
+      />
+    </>
   );
 }

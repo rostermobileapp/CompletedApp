@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation, useRoute } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Trophy, Users, Target, TrendingUp, Apple, Flag, ArrowLeft, Lock } from 'lucide-react';
+import { ClickableAvatar } from '@/components/ClickableAvatar';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { usePermissions } from '@/context/SubscriptionContext';
@@ -413,20 +413,17 @@ export default function TeamView() {
                   return (
                     <div 
                       key={member.id} 
-                      className="flex items-center justify-between p-3 rounded-lg bg-card border cursor-pointer hover:bg-accent transition-colors"
+                      className="flex items-center justify-between p-3 rounded-lg bg-card border hover:bg-accent transition-colors"
                       data-testid={`roster-member-${member.id}`}
-                      onClick={() => member.user?.id && navigate(`/user/${member.user.id}`)}
                     >
                       <div className="flex items-center gap-3">
-                        <Avatar className="w-10 h-10">
-                          <AvatarImage 
-                            src={member.user?.profilePictureUrl ? getImageUrl(member.user.profilePictureUrl) || undefined : undefined} 
-                            alt={`${member.user?.firstName || 'Unknown'} ${member.user?.lastName || ''}`} 
-                          />
-                          <AvatarFallback>
-                            {(member.user?.firstName?.[0] || '?')}{(member.user?.lastName?.[0] || '')}
-                          </AvatarFallback>
-                        </Avatar>
+                        <ClickableAvatar
+                          userId={member.user?.id || ''}
+                          profileImageUrl={member.user?.profilePictureUrl}
+                          firstName={member.user?.firstName}
+                          lastName={member.user?.lastName}
+                          size="sm"
+                        />
                         <div>
                           <p className="font-medium" data-testid={`text-member-name-${member.id}`}>
                             {member.user?.firstName || 'Unknown'} {member.user?.lastName || 'Player'}
