@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useKeyboard } from '@/hooks/use-keyboard';
 import { useSwipeableNav, SCREEN_ORDER, ScreenId } from '@/context/SwipeableNavContext';
+import { useAuth } from '@/hooks/useAuth';
 
 interface BottomNavigationProps {
   useSwipeNav?: boolean;
@@ -15,6 +16,7 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
   const [location, navigate] = useLocation();
   const { selectedType, selectedId } = useDashboardSelection();
   const { isOpen: isKeyboardOpen } = useKeyboard();
+  const { isAuthenticated } = useAuth();
   
   let swipeNav: ReturnType<typeof useSwipeableNav> | null = null;
   try {
@@ -39,9 +41,16 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
   
   const unpaidPaymentCount = (unpaidPaymentData as { count: number } | undefined)?.count ?? 0;
   
+  const { data: userTeams } = useQuery({
+    queryKey: ['/api/user/teams'],
+    enabled: !!isAuthenticated,
+  });
+  
+  const primaryTeamId = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0].id : null;
+  
   const getActiveId = (pathname: string): ScreenId | '' => {
     if (pathname === '/') return 'home';
-    if (pathname.startsWith('/teams') || pathname.startsWith('/tournament-teams')) return 'teams';
+    if (pathname.startsWith('/teams') || pathname.startsWith('/tournament-teams') || (pathname.startsWith('/team/') && primaryTeamId && pathname.includes(primaryTeamId))) return 'teams';
     if (pathname.startsWith('/messages')) return 'messages';
     if (pathname.startsWith('/profile') || pathname.startsWith('/subscription')) return 'profile';
     if (pathname.startsWith('/payment-requests') || pathname.startsWith('/create-payment-request')) return 'payments';
@@ -57,6 +66,8 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
       if (shortcutId === 'teams') {
         if (selectedType === 'tournament' && selectedId) {
           navigate(`/tournament-teams/${selectedId}`);
+        } else if (primaryTeamId) {
+          navigate(`/team/${primaryTeamId}`);
         } else {
           navigate('/teams');
         }
