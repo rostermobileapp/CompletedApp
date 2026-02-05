@@ -196,10 +196,10 @@ export default function Roster() {
               <div key={member.id} className="bg-card rounded-lg border border-border p-3" data-testid={`card-player-${member.id}`}>
                 <div className="flex items-center gap-2">
                   <ClickableAvatar
-                    userId={member.user.id || member.userId}
-                    profileImageUrl={member.user.profilePictureUrl || member.user.profileImageUrl}
-                    firstName={member.user.firstName}
-                    lastName={member.user.lastName}
+                    userId={member.user?.id || ''}
+                    profileImageUrl={member.user?.profilePictureUrl}
+                    firstName={member.user?.firstName}
+                    lastName={member.user?.lastName}
                     size="sm"
                   />
                   <div className="flex-1 min-w-0">
