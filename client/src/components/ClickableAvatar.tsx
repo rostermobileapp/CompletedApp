@@ -52,11 +52,22 @@ export function ClickableAvatar({
       <button
         type="button"
         onClick={handleInteraction}
-        onPointerDown={handleInteraction}
-        className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary rounded-full"
+        onTouchStart={(e) => {
+          e.stopPropagation();
+        }}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!isPreviewOpen) {
+            console.log('[ClickableAvatar] Touch end, opening preview for userId:', userId);
+            setIsPreviewOpen(true);
+          }
+        }}
+        className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary rounded-full relative z-10"
+        style={{ touchAction: 'manipulation' }}
         data-testid={`button-avatar-${userId}`}
       >
-        <Avatar className={`${sizeClasses[size]} ${className}`}>
+        <Avatar className={`${sizeClasses[size]} ${className} pointer-events-none`}>
           <AvatarImage src={getImageUrl(profileImageUrl) || undefined} alt={firstName || 'User'} />
           <AvatarFallback>{getInitials()}</AvatarFallback>
         </Avatar>
