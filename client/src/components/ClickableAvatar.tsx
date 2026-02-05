@@ -25,6 +25,7 @@ export function ClickableAvatar({
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log('[ClickableAvatar] Avatar clicked, opening preview for userId:', userId);
     setIsPreviewOpen(true);
   };
 
