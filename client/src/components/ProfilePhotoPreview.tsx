@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -66,17 +67,18 @@ export function ProfilePhotoPreview({
 
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 transition-opacity duration-500 ${
         isAnimating ? 'opacity-100' : 'opacity-0'
       }`}
       onClick={handleBackdropClick}
       data-testid="profile-photo-preview-overlay"
     >
       <button
+        type="button"
         onClick={handleClose}
-        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-[10000]"
         data-testid="button-close-preview"
       >
         <X className="w-6 h-6 text-white" />
@@ -119,4 +121,6 @@ export function ProfilePhotoPreview({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
