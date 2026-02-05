@@ -22,7 +22,9 @@ export function ClickableAvatar({
 }: ClickableAvatarProps) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsPreviewOpen(true);
   };
 
@@ -45,6 +47,7 @@ export function ClickableAvatar({
   return (
     <>
       <button
+        type="button"
         onClick={handleClick}
         className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary rounded-full"
         data-testid={`button-avatar-${userId}`}
