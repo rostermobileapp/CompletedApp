@@ -3307,3 +3307,27 @@ export const insertEventReminderSentSchema = createInsertSchema(eventRemindersSe
 
 export type EventReminderSent = typeof eventRemindersSent.$inferSelect;
 export type InsertEventReminderSent = z.infer<typeof insertEventReminderSentSchema>;
+
+// RSVP event type enum for RSVP reminders
+export const rsvpEventTypeEnum = pgEnum("rsvp_event_type", ["game", "tournament_match", "team_event"]);
+
+// RSVP reminders sent table - tracks RSVP reminders sent to users who haven't responded
+export const rsvpRemindersSent = pgTable("rsvp_reminders_sent", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventType: rsvpEventTypeEnum("event_type").notNull(),
+  eventId: varchar("event_id").notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_rsvp_reminder").on(table.eventType, table.eventId, table.userId),
+  index("idx_rsvp_reminders_event").on(table.eventType, table.eventId),
+  index("idx_rsvp_reminders_user").on(table.userId),
+]);
+
+export const insertRsvpReminderSentSchema = createInsertSchema(rsvpRemindersSent).omit({
+  id: true,
+  sentAt: true,
+});
+
+export type RsvpReminderSent = typeof rsvpRemindersSent.$inferSelect;
+export type InsertRsvpReminderSent = z.infer<typeof insertRsvpReminderSentSchema>;

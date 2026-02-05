@@ -414,3 +414,28 @@ export async function sendTeamEventPushNotification(
     },
   });
 }
+
+export async function sendRsvpReminderPushNotification(
+  recipientId: string,
+  eventName: string,
+  eventId: string,
+  eventType: 'game' | 'tournament_match' | 'team_event'
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.upcomingEvents === false) {
+    console.log(`[OneSignal] RSVP reminder notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `📅 RSVP Reminder`,
+    message: `You haven't RSVP'd for ${eventName} yet. Open Roster to RSVP`,
+    data: {
+      type: 'rsvp_reminder',
+      eventType,
+      eventId,
+    },
+  });
+}

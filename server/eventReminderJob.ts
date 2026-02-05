@@ -8,13 +8,21 @@ import {
   eventRemindersSent,
   leagues,
   gameRsvps,
-  leagueMemberships
+  leagueMemberships,
+  teamEvents,
+  teamEventRsvps,
+  tournamentMatches,
+  tournamentMatchRsvps,
+  tournamentTeams,
+  tournaments,
+  rsvpRemindersSent,
+  teams
 } from "@shared/schema";
-import { and, eq, gt, lt, gte, lte, inArray, sql, or, not, isNull } from "drizzle-orm";
+import { and, eq, gt, lt, gte, lte, inArray, sql, or, not, isNull, notInArray } from "drizzle-orm";
 import { storage } from "./storage";
 import { format, subDays, setHours, setMinutes, subHours, addDays } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
-import { sendScheduleReminderPushNotification, sendPersonalReminderPushNotification } from "./oneSignalNotifications";
+import { sendScheduleReminderPushNotification, sendPersonalReminderPushNotification, sendRsvpReminderPushNotification } from "./oneSignalNotifications";
 import { parseLeagueLocalDateTime } from "./dateUtils";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
@@ -213,6 +221,317 @@ async function sendEventReminder(
   } catch (error) {
     console.error(`❌ Failed to send ${trigger} reminder for ${event.eventType} ${event.id} to ${player.id}:`, error);
   }
+}
+
+// RSVP Reminder Helper Functions
+async function hasRsvpReminderBeenSent(
+  eventType: "game" | "tournament_match" | "team_event",
+  eventId: string,
+  userId: string
+): Promise<boolean> {
+  const existing = await db
+    .select({ id: rsvpRemindersSent.id })
+    .from(rsvpRemindersSent)
+    .where(
+      and(
+        eq(rsvpRemindersSent.eventType, eventType),
+        eq(rsvpRemindersSent.eventId, eventId),
+        eq(rsvpRemindersSent.userId, userId)
+      )
+    )
+    .limit(1);
+  
+  return existing.length > 0;
+}
+
+async function markRsvpReminderSent(
+  eventType: "game" | "tournament_match" | "team_event",
+  eventId: string,
+  userId: string
+): Promise<void> {
+  await db.insert(rsvpRemindersSent).values({
+    eventType,
+    eventId,
+    userId,
+  }).onConflictDoNothing();
+}
+
+async function checkAndSendRsvpReminders(now: Date): Promise<void> {
+  // 5 days from now window (check events happening in ~5 days)
+  const fiveDaysFromNow = addDays(now, 5);
+  const fiveDaysWindowStart = addDays(now, 4); // Events between 4-6 days from now
+  const fiveDaysWindowEnd = addDays(now, 6);
+  
+  const windowStartStr = fiveDaysWindowStart.toISOString();
+  const windowEndStr = fiveDaysWindowEnd.toISOString();
+  
+  console.log(`🔔 Checking RSVP reminders for events between ${windowStartStr} and ${windowEndStr}`);
+  
+  // 1. Check Games - find games where team members haven't RSVPd
+  try {
+    const upcomingGames = await db
+      .select({
+        id: games.id,
+        scheduledAt: games.scheduledAt,
+        homeTeamId: games.homeTeamId,
+        awayTeamId: games.awayTeamId,
+        venue: games.venue,
+        leagueId: games.leagueId,
+      })
+      .from(games)
+      .where(
+        and(
+          sql`${games.scheduledAt} >= ${windowStartStr}`,
+          sql`${games.scheduledAt} < ${windowEndStr}`,
+          eq(games.isCompleted, false)
+        )
+      );
+    
+    for (const game of upcomingGames) {
+      // Build event name
+      let eventName = "Game";
+      try {
+        const homeTeam = await storage.getTeam(game.homeTeamId);
+        const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId) : null;
+        if (homeTeam && awayTeam) {
+          eventName = `${awayTeam.name} @ ${homeTeam.name}`;
+        } else if (homeTeam) {
+          eventName = `${homeTeam.name} Game`;
+        }
+      } catch (e) {
+        // Keep default name
+      }
+      
+      // Get all team members who should RSVP
+      const teamIds = [game.homeTeamId, game.awayTeamId].filter(Boolean) as string[];
+      
+      // Get team members from direct memberships
+      const directMembers = await db
+        .select({ userId: teamMemberships.userId, teamId: teamMemberships.teamId })
+        .from(teamMemberships)
+        .where(
+          and(
+            inArray(teamMemberships.teamId, teamIds),
+            eq(teamMemberships.status, 'approved')
+          )
+        );
+      
+      // Get team members from league memberships
+      const leagueMembers = await db
+        .select({ userId: leagueMemberships.userId, teamId: leagueMemberships.assignedTeamId })
+        .from(leagueMemberships)
+        .where(
+          and(
+            inArray(leagueMemberships.assignedTeamId, teamIds),
+            eq(leagueMemberships.status, 'approved'),
+            not(isNull(leagueMemberships.assignedTeamId))
+          )
+        );
+      
+      // Combine and deduplicate
+      const allMembers = new Map<string, { userId: string; teamId: string }>();
+      for (const m of directMembers) {
+        allMembers.set(m.userId, { userId: m.userId, teamId: m.teamId });
+      }
+      for (const m of leagueMembers) {
+        if (m.teamId) {
+          allMembers.set(m.userId, { userId: m.userId, teamId: m.teamId });
+        }
+      }
+      
+      // Get existing RSVPs for this game
+      const existingRsvps = await db
+        .select({ userId: gameRsvps.userId })
+        .from(gameRsvps)
+        .where(
+          and(
+            eq(gameRsvps.gameId, game.id),
+            or(
+              eq(gameRsvps.status, 'attending'),
+              eq(gameRsvps.status, 'not_attending')
+            )
+          )
+        );
+      
+      const rsvpdUserIds = new Set(existingRsvps.map(r => r.userId));
+      
+      // Find members who haven't RSVPd
+      for (const [userId, member] of Array.from(allMembers.entries())) {
+        if (!rsvpdUserIds.has(userId)) {
+          // Check if we already sent this reminder
+          const alreadySent = await hasRsvpReminderBeenSent('game', game.id, userId);
+          if (!alreadySent) {
+            const success = await sendRsvpReminderPushNotification(userId, eventName, game.id, 'game');
+            if (success) {
+              await markRsvpReminderSent('game', game.id, userId);
+              console.log(`✅ Sent RSVP reminder for game ${game.id} to user ${userId}`);
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error processing game RSVP reminders:', error);
+  }
+  
+  // 2. Check Team Events - find team events where members haven't RSVPd
+  try {
+    const upcomingTeamEvents = await db
+      .select({
+        id: teamEvents.id,
+        title: teamEvents.title,
+        scheduledAt: teamEvents.scheduledAt,
+        teamId: teamEvents.teamId,
+      })
+      .from(teamEvents)
+      .where(
+        and(
+          sql`${teamEvents.scheduledAt} >= ${windowStartStr}`,
+          sql`${teamEvents.scheduledAt} < ${windowEndStr}`
+        )
+      );
+    
+    for (const event of upcomingTeamEvents) {
+      // Get team members
+      const teamMembers = await db
+        .select({ userId: teamMemberships.userId })
+        .from(teamMemberships)
+        .where(
+          and(
+            eq(teamMemberships.teamId, event.teamId),
+            eq(teamMemberships.status, 'approved')
+          )
+        );
+      
+      // Get existing RSVPs
+      const existingRsvps = await db
+        .select({ userId: teamEventRsvps.userId })
+        .from(teamEventRsvps)
+        .where(
+          and(
+            eq(teamEventRsvps.teamEventId, event.id),
+            or(
+              eq(teamEventRsvps.status, 'attending'),
+              eq(teamEventRsvps.status, 'not_attending')
+            )
+          )
+        );
+      
+      const rsvpdUserIds = new Set(existingRsvps.map(r => r.userId));
+      
+      // Find members who haven't RSVPd
+      for (const member of teamMembers) {
+        if (!rsvpdUserIds.has(member.userId)) {
+          const alreadySent = await hasRsvpReminderBeenSent('team_event', event.id, member.userId);
+          if (!alreadySent) {
+            const success = await sendRsvpReminderPushNotification(member.userId, event.title, event.id, 'team_event');
+            if (success) {
+              await markRsvpReminderSent('team_event', event.id, member.userId);
+              console.log(`✅ Sent RSVP reminder for team event "${event.title}" to user ${member.userId}`);
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error processing team event RSVP reminders:', error);
+  }
+  
+  // 3. Check Tournament Matches - find matches where participants haven't RSVPd
+  try {
+    const upcomingMatches = await db
+      .select({
+        id: tournamentMatches.id,
+        scheduledTime: tournamentMatches.scheduledTime,
+        tournamentId: tournamentMatches.tournamentId,
+        team1Id: tournamentMatches.team1Id,
+        team2Id: tournamentMatches.team2Id,
+        round: tournamentMatches.round,
+      })
+      .from(tournamentMatches)
+      .where(
+        and(
+          sql`${tournamentMatches.scheduledTime} >= ${windowStartStr}`,
+          sql`${tournamentMatches.scheduledTime} < ${windowEndStr}`,
+          not(isNull(tournamentMatches.scheduledTime))
+        )
+      );
+    
+    for (const match of upcomingMatches) {
+      // Get tournament name for event title
+      let eventName = `Tournament Match - ${match.round}`;
+      try {
+        const tournament = await db
+          .select({ name: tournaments.name })
+          .from(tournaments)
+          .where(eq(tournaments.id, match.tournamentId))
+          .limit(1);
+        if (tournament.length > 0) {
+          eventName = `${tournament[0].name} - ${match.round}`;
+        }
+      } catch (e) {
+        // Keep default name
+      }
+      
+      // Get team IDs
+      const tournamentTeamIds = [match.team1Id, match.team2Id].filter(Boolean) as string[];
+      if (tournamentTeamIds.length === 0) continue;
+      
+      // Get tournament team info to find actual team IDs
+      const tTeams = await db
+        .select({ id: tournamentTeams.id, teamId: tournamentTeams.teamId })
+        .from(tournamentTeams)
+        .where(inArray(tournamentTeams.id, tournamentTeamIds));
+      
+      // Get members from linked teams
+      const actualTeamIds = tTeams.map(t => t.teamId).filter(Boolean) as string[];
+      if (actualTeamIds.length === 0) continue;
+      
+      const teamMembers = await db
+        .select({ userId: teamMemberships.userId, teamId: teamMemberships.teamId })
+        .from(teamMemberships)
+        .where(
+          and(
+            inArray(teamMemberships.teamId, actualTeamIds),
+            eq(teamMemberships.status, 'approved')
+          )
+        );
+      
+      // Get existing RSVPs
+      const existingRsvps = await db
+        .select({ userId: tournamentMatchRsvps.userId })
+        .from(tournamentMatchRsvps)
+        .where(
+          and(
+            eq(tournamentMatchRsvps.matchId, match.id),
+            or(
+              eq(tournamentMatchRsvps.status, 'attending'),
+              eq(tournamentMatchRsvps.status, 'not_attending')
+            )
+          )
+        );
+      
+      const rsvpdUserIds = new Set(existingRsvps.map(r => r.userId));
+      
+      // Find members who haven't RSVPd
+      for (const member of teamMembers) {
+        if (!rsvpdUserIds.has(member.userId)) {
+          const alreadySent = await hasRsvpReminderBeenSent('tournament_match', match.id, member.userId);
+          if (!alreadySent) {
+            const success = await sendRsvpReminderPushNotification(member.userId, eventName, match.id, 'tournament_match');
+            if (success) {
+              await markRsvpReminderSent('tournament_match', match.id, member.userId);
+              console.log(`✅ Sent RSVP reminder for tournament match ${match.id} to user ${member.userId}`);
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error processing tournament match RSVP reminders:', error);
+  }
+  
+  console.log('📋 RSVP reminder check completed');
 }
 
 export async function checkAndSendEventReminders(): Promise<void> {
@@ -428,6 +747,13 @@ export async function checkAndSendEventReminders(): Promise<void> {
       console.error('Error processing personal reminders:', error);
     }
     
+    // Process RSVP reminders - 5 days before events for users who haven't responded
+    try {
+      await checkAndSendRsvpReminders(now);
+    } catch (error) {
+      console.error('Error processing RSVP reminders:', error);
+    }
+    
   } catch (error) {
     console.error('Error in event reminder job:', error);
   }
@@ -443,7 +769,8 @@ export function startEventReminderJob(): void {
   
   console.log('🔔 Starting unified event reminder job (checking every 5 minutes)');
   console.log('   - Reminders: 2 days before at 3PM (league timezone), 2 hours before');
-  console.log('   - Covers: Games, Scrimmages, and Personal Reminders');
+  console.log('   - RSVP Reminders: 5 days before for users who haven\'t responded');
+  console.log('   - Covers: Games, Scrimmages, Team Events, Tournament Matches, and Personal Reminders');
   
   // Run immediately on startup
   checkAndSendEventReminders();
