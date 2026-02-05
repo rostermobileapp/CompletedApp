@@ -47,6 +47,7 @@
         {
           "mode": "development",
           "smallIcons": ["./assets/notification/ic_stat_onesignal_default.png"],
+          "largeIcons": ["./assets/notification/ic_onesignal_large_icon_default.png"],
           "smallIconAccentColor": "#FF0000"
         }
       ]
