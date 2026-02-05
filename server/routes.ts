@@ -643,7 +643,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (oneSignalAppId && oneSignalRestApiKey) {
         try {
-          // Use OneSignal's REST API to set the external user ID
+          // Build tags object with user email for cross-referencing with Supabase
+          const tags: Record<string, string> = {};
+          if (user.email) {
+            tags.email = user.email;
+          }
+          if (user.displayId) {
+            tags.display_id = user.displayId;
+          }
+          
+          // Use OneSignal's REST API to set the external user ID and email tag
           const response = await fetch(`https://onesignal.com/api/v1/players/${oneSignalId}`, {
             method: 'PUT',
             headers: {
@@ -653,11 +662,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             body: JSON.stringify({
               app_id: oneSignalAppId,
               external_user_id: externalIdToUse,
+              tags,
             }),
           });
           
           if (response.ok) {
-            console.log(`[OneSignal] External ID linked via REST API for user ${userId}: ${externalIdToUse}`);
+            console.log(`[OneSignal] External ID and email linked for user ${userId}: ${externalIdToUse}, email: ${user.email || 'N/A'}`);
           } else {
             const errorData = await response.text();
             console.warn(`[OneSignal] REST API link failed:`, errorData);
@@ -677,6 +687,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error linking external ID:", error);
       res.status(500).json({ message: "Failed to link external ID" });
+    }
+  });
+
+  // Sync email to OneSignal for the current user (refresh email tag)
+  app.post('/api/notification-preferences/sync-email', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const preferences = await storage.getNotificationPreferences(userId);
+      if (!preferences?.oneSignalPlayerId) {
+        return res.status(400).json({ message: "No OneSignal subscription found for this user" });
+      }
+      
+      const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
+      const oneSignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
+      
+      if (!oneSignalAppId || !oneSignalRestApiKey) {
+        return res.status(500).json({ message: "OneSignal is not configured" });
+      }
+      
+      const tags: Record<string, string> = {};
+      if (user.email) {
+        tags.email = user.email;
+      }
+      if (user.displayId) {
+        tags.display_id = user.displayId;
+      }
+      
+      const response = await fetch(`https://onesignal.com/api/v1/players/${preferences.oneSignalPlayerId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${oneSignalRestApiKey}`,
+        },
+        body: JSON.stringify({
+          app_id: oneSignalAppId,
+          tags,
+        }),
+      });
+      
+      if (response.ok) {
+        console.log(`[OneSignal] Email synced for user ${userId}: ${user.email}`);
+        res.json({ success: true, email: user.email, displayId: user.displayId });
+      } else {
+        const errorData = await response.text();
+        console.error(`[OneSignal] Email sync failed for user ${userId}:`, errorData);
+        res.status(500).json({ message: "Failed to sync email to OneSignal" });
+      }
+    } catch (error) {
+      console.error("Error syncing email to OneSignal:", error);
+      res.status(500).json({ message: "Failed to sync email" });
+    }
+  });
+
+  // Admin endpoint: Bulk sync all users' emails to OneSignal
+  app.post('/api/admin/sync-onesignal-emails', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Check if user has admin permissions
+      if (!user?.specialPermissions?.includes('admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
+      const oneSignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
+      
+      if (!oneSignalAppId || !oneSignalRestApiKey) {
+        return res.status(500).json({ message: "OneSignal is not configured" });
+      }
+      
+      // Get all users with OneSignal subscriptions
+      const allPreferences = await storage.getAllNotificationPreferencesWithUsers();
+      
+      let synced = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      
+      for (const pref of allPreferences) {
+        if (!pref.oneSignalPlayerId || !pref.user) continue;
+        
+        const tags: Record<string, string> = {};
+        if (pref.user.email) {
+          tags.email = pref.user.email;
+        }
+        if (pref.user.displayId) {
+          tags.display_id = pref.user.displayId;
+        }
+        
+        if (Object.keys(tags).length === 0) continue;
+        
+        try {
+          const response = await fetch(`https://onesignal.com/api/v1/players/${pref.oneSignalPlayerId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Basic ${oneSignalRestApiKey}`,
+            },
+            body: JSON.stringify({
+              app_id: oneSignalAppId,
+              tags,
+            }),
+          });
+          
+          if (response.ok) {
+            synced++;
+            console.log(`[OneSignal Bulk Sync] Email synced for user ${pref.userId}: ${pref.user.email}`);
+          } else {
+            failed++;
+            const errorData = await response.text();
+            errors.push(`User ${pref.userId}: ${errorData}`);
+          }
+        } catch (error) {
+          failed++;
+          errors.push(`User ${pref.userId}: ${String(error)}`);
+        }
+        
+        // Rate limit: wait 100ms between requests
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      console.log(`[OneSignal Bulk Sync] Complete. Synced: ${synced}, Failed: ${failed}`);
+      res.json({ success: true, synced, failed, errors: errors.slice(0, 10) });
+    } catch (error) {
+      console.error("Error in bulk email sync:", error);
+      res.status(500).json({ message: "Bulk sync failed" });
     }
   });
 

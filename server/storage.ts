@@ -270,6 +270,7 @@ export interface IStorage {
   upsertNotificationPreferences(userId: string, data: Partial<UpdateNotificationPreferences>): Promise<NotificationPreferences>;
   updateOneSignalPlayerId(userId: string, playerId: string): Promise<NotificationPreferences>;
   getUsersWithPushEnabled(userIds: string[]): Promise<{ userId: string; displayId: string | null; oneSignalPlayerId: string; notificationSettings: any }[]>;
+  getAllNotificationPreferencesWithUsers(): Promise<{ userId: string; oneSignalPlayerId: string | null; user: { email: string | null; displayId: string | null } }[]>;
   
   // Permission management operations (global - deprecated, use league-specific instead)
   getAllUsers(): Promise<User[]>;
@@ -1116,6 +1117,28 @@ export class DatabaseStorage implements IStorage {
       ));
     
     return prefs.filter(p => p.oneSignalPlayerId !== null) as { userId: string; displayId: string | null; oneSignalPlayerId: string; notificationSettings: any }[];
+  }
+
+  async getAllNotificationPreferencesWithUsers(): Promise<{ userId: string; oneSignalPlayerId: string | null; user: { email: string | null; displayId: string | null } }[]> {
+    const prefs = await db
+      .select({
+        userId: notificationPreferences.userId,
+        oneSignalPlayerId: notificationPreferences.oneSignalPlayerId,
+        email: users.email,
+        displayId: users.displayId,
+      })
+      .from(notificationPreferences)
+      .innerJoin(users, eq(notificationPreferences.userId, users.id))
+      .where(isNotNull(notificationPreferences.oneSignalPlayerId));
+    
+    return prefs.map(p => ({
+      userId: p.userId,
+      oneSignalPlayerId: p.oneSignalPlayerId,
+      user: {
+        email: p.email,
+        displayId: p.displayId,
+      },
+    }));
   }
 
   async deleteUser(id: string): Promise<void> {
