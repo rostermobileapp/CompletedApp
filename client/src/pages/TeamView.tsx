@@ -419,7 +419,7 @@ export default function TeamView() {
                       <div className="flex items-center gap-3">
                         <ClickableAvatar
                           userId={member.user?.id || ''}
-                          profileImageUrl={member.user?.profilePictureUrl}
+                          profileImageUrl={member.user?.profileImageUrl}
                           firstName={member.user?.firstName}
                           lastName={member.user?.lastName}
                           size="sm"
