@@ -197,7 +197,7 @@ export default function Roster() {
                 <div className="flex items-center gap-2">
                   <ClickableAvatar
                     userId={member.user.id || member.userId}
-                    profileImageUrl={member.user.profileImageUrl}
+                    profileImageUrl={member.user.profilePictureUrl || member.user.profileImageUrl}
                     firstName={member.user.firstName}
                     lastName={member.user.lastName}
                     size="sm"
