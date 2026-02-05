@@ -22,11 +22,13 @@ export function ClickableAvatar({
 }: ClickableAvatarProps) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  const handleClick = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleInteraction = (e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('[ClickableAvatar] Avatar clicked, opening preview for userId:', userId);
-    setIsPreviewOpen(true);
+    if (!isPreviewOpen) {
+      console.log('[ClickableAvatar] Avatar clicked, opening preview for userId:', userId);
+      setIsPreviewOpen(true);
+    }
   };
 
   const getInitials = () => {
@@ -49,7 +51,8 @@ export function ClickableAvatar({
     <>
       <button
         type="button"
-        onClick={handleClick}
+        onClick={handleInteraction}
+        onPointerDown={handleInteraction}
         className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary rounded-full"
         data-testid={`button-avatar-${userId}`}
       >
