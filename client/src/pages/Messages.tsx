@@ -1734,7 +1734,7 @@ export default function Messages() {
             {(selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
               <div>
                 <label className="text-sm font-medium mb-2 block">Conversation Type</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   <button
                     type="button"
                     onClick={() => setConversationType('direct')}
