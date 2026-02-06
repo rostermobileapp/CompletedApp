@@ -9,12 +9,12 @@ interface ModalTransitionProps {
 export function ModalTransition({ isOpen, children, onClose }: ModalTransitionProps) {
   return isOpen ? (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-modal-backdrop"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative"
+        className="relative animate-modal-pop"
       >
         {children}
       </div>
