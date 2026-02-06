@@ -12,6 +12,7 @@ import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
 import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
 import { useDashboardSelection } from "@/hooks/useDashboardSelection";
+import LocationLink from "@/components/LocationLink";
 
 export default function Calendar() {
   const { user } = useAuth();
@@ -256,7 +257,7 @@ export default function Calendar() {
                         </p>
                         {event.location && (
                           <p className="text-xs text-muted-foreground" data-testid={`text-scrimmage-location-${event.id}`}>
-                            {event.location}
+                            <LocationLink location={event.location} />
                           </p>
                         )}
                       </div>

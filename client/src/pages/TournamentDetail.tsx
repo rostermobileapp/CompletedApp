@@ -32,6 +32,7 @@ import TournamentMatchScoreModal from "@/components/TournamentMatchScoreModal";
 import { CustomBracketBuilder } from "@/components/CustomBracketBuilder";
 import { EnhancedMediaUploader } from "@/components/EnhancedMediaUploader";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
+import LocationLink from "@/components/LocationLink";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
@@ -2367,7 +2368,7 @@ export default function TournamentDetail() {
                                   {match.location && (
                                     <div className="flex items-center gap-1.5">
                                       <MapPin className="h-4 w-4" />
-                                      <span data-testid={`text-location-${match.matchNumber}`}>{match.location}</span>
+                                      <LocationLink location={match.location} data-testid={`text-location-${match.matchNumber}`} />
                                     </div>
                                   )}
                                 </div>

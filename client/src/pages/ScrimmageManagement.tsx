@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import LocationLink from "@/components/LocationLink";
 
 // Extended types with relationships for UI
 type ScrimmageWithCreatorAndCount = Scrimmage & {
@@ -352,7 +353,7 @@ export default function ScrimmageManagement() {
                           </div>
                           <div className="flex items-center gap-2 text-sm">
                             <MapPin className="w-4 h-4" />
-                            <span>{scrimmage.location}</span>
+                            <LocationLink location={scrimmage.location} />
                           </div>
                           <div className="flex items-center gap-2 text-sm">
                             <Users className="w-4 h-4" />

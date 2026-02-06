@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
 import type { User } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
+import LocationLink from "@/components/LocationLink";
 
 interface TeamEventData {
   id: string;
@@ -207,7 +208,9 @@ export default function TeamEventDetails() {
             {eventData.location && (
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">{eventData.location}</p>
+                <p className="text-sm text-muted-foreground">
+                  <LocationLink location={eventData.location} />
+                </p>
               </div>
             )}
 

@@ -21,6 +21,7 @@ import * as React from "react";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
+import LocationLink from "@/components/LocationLink";
 
 export default function GameDetails() {
   const { user } = useAuth();
@@ -375,7 +376,7 @@ export default function GameDetails() {
               <div className="flex items-center gap-2 mb-3">
                 <MapPin className="w-4 h-4 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground" data-testid="text-scrimmage-location">
-                  {scrimmage.location}
+                  <LocationLink location={scrimmage.location} />
                 </p>
               </div>
             )}
