@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
+import { SlideUpTransition } from '@/components/SlideUpTransition';
 import { 
   Megaphone, 
   Plus, 
@@ -1178,98 +1179,100 @@ export default function Announcements() {
   const contextName = isTournamentContext ? currentTournament?.name : currentLeague?.name;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-2xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Megaphone className="w-6 h-6 text-primary" />
-              <div>
-                <h1 className="text-xl font-semibold">News</h1>
-                <p className="text-sm text-muted-foreground">{contextName}</p>
+    <SlideUpTransition>
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
+          <div className="max-w-2xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Megaphone className="w-6 h-6 text-primary" />
+                <div>
+                  <h1 className="text-xl font-semibold">News</h1>
+                  <p className="text-sm text-muted-foreground">{contextName}</p>
+                </div>
               </div>
+              
+              {canPost && (
+                <Button 
+                  onClick={() => setShowCreateModal(true)}
+                  size="sm"
+                  data-testid="button-create-announcement"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Post
+                </Button>
+              )}
             </div>
-            
-            {canPost && (
-              <Button 
-                onClick={() => setShowCreateModal(true)}
-                size="sm"
-                data-testid="button-create-announcement"
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Post
-              </Button>
-            )}
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="animate-pulse">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-muted rounded-full" />
-                    <div className="space-y-2">
-                      <div className="h-4 bg-muted rounded w-32" />
-                      <div className="h-3 bg-muted rounded w-24" />
+        {/* Content */}
+        <div className="max-w-2xl mx-auto px-4 py-6">
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-muted rounded-full" />
+                      <div className="space-y-2">
+                        <div className="h-4 bg-muted rounded w-32" />
+                        <div className="h-3 bg-muted rounded w-24" />
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="h-4 bg-muted rounded w-full" />
-                    <div className="h-4 bg-muted rounded w-3/4" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (announcements as Announcement[]).length === 0 ? (
-          <div className="text-center py-12">
-            <Megaphone className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No Announcements Yet</h2>
-            <p className="text-muted-foreground mb-4">
-              {canPost 
-                ? 'Be the first to share an announcement!'
-                : 'Check back later for updates.'
-              }
-            </p>
-            {canPost && (
-              <Button onClick={() => setShowCreateModal(true)}>
-                <Plus className="w-4 h-4 mr-1" />
-                Create First Announcement
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-6" data-testid="announcements-list">
-            {(announcements as Announcement[]).map((announcement: Announcement) => (
-              <AnnouncementCard
-                key={announcement.id}
-                announcement={announcement}
-                leagueId={isTournamentContext ? null : leagueId}
-                tournamentId={isTournamentContext ? tournamentId : null}
-                currentUserId={user.id}
-                isCommissioner={isTournamentContext ? isTournamentCommissioner : isLeagueCommissioner}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted rounded w-full" />
+                      <div className="h-4 bg-muted rounded w-3/4" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (announcements as Announcement[]).length === 0 ? (
+            <div className="text-center py-12">
+              <Megaphone className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold mb-2">No Announcements Yet</h2>
+              <p className="text-muted-foreground mb-4">
+                {canPost 
+                  ? 'Be the first to share an announcement!'
+                  : 'Check back later for updates.'
+                }
+              </p>
+              {canPost && (
+                <Button onClick={() => setShowCreateModal(true)}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Create First Announcement
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-6" data-testid="announcements-list">
+              {(announcements as Announcement[]).map((announcement: Announcement) => (
+                <AnnouncementCard
+                  key={announcement.id}
+                  announcement={announcement}
+                  leagueId={isTournamentContext ? null : leagueId}
+                  tournamentId={isTournamentContext ? tournamentId : null}
+                  currentUserId={user.id}
+                  isCommissioner={isTournamentContext ? isTournamentCommissioner : isLeagueCommissioner}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* Create Announcement Modal */}
-      <CreateAnnouncementModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        leagueId={isTournamentContext ? null : leagueId}
-        tournamentId={isTournamentContext ? tournamentId : null}
-        canPost={canPost}
-      />
-    </div>
+        {/* Create Announcement Modal */}
+        <CreateAnnouncementModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          leagueId={isTournamentContext ? null : leagueId}
+          tournamentId={isTournamentContext ? tournamentId : null}
+          canPost={canPost}
+        />
+      </div>
+    </SlideUpTransition>
   );
 }
