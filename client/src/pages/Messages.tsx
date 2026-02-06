@@ -3,7 +3,7 @@
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign, CheckCircle } from 'lucide-react';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
@@ -495,6 +495,7 @@ export default function Messages() {
   const [groupTitle, setGroupTitle] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const pendingScrollConversation = useRef<string | null>(null);
   const firstUnreadMessageRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -1226,45 +1227,36 @@ export default function Messages() {
     );
   }, [messages, currentUserId]);
 
-  const prevConversationRef = useRef<string | null>(null);
-  const hasScrolledForConversation = useRef<string | null>(null);
   const prevMessagesLengthRef = useRef<number>(0);
 
+  const scrollMessagesToEnd = useCallback((behavior: ScrollBehavior = 'instant') => {
+    messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+  }, []);
+
   useEffect(() => {
-    if (!selectedConversation || messagesLoading) return;
+    if (selectedConversation) {
+      pendingScrollConversation.current = selectedConversation;
+    }
+  }, [selectedConversation]);
 
-    const container = messagesScrollRef.current;
-    if (!container || !messages.length) return;
+  useEffect(() => {
+    if (!selectedConversation || messagesLoading || !messages.length) return;
 
-    const isNewConversation = hasScrolledForConversation.current !== selectedConversation;
-
-    if (isNewConversation) {
-      hasScrolledForConversation.current = selectedConversation;
-      const doScroll = () => {
-        const c = messagesScrollRef.current;
-        if (!c) return;
-        if (firstUnreadMessage && firstUnreadMessageRef.current) {
-          firstUnreadMessageRef.current.scrollIntoView({ behavior: 'instant', block: 'start' });
-        } else {
-          c.scrollTop = c.scrollHeight;
-        }
-      };
-      doScroll();
-      setTimeout(doScroll, 50);
-      setTimeout(doScroll, 150);
+    if (pendingScrollConversation.current === selectedConversation) {
+      pendingScrollConversation.current = null;
+      scrollMessagesToEnd('instant');
+      setTimeout(() => scrollMessagesToEnd('instant'), 100);
+      setTimeout(() => scrollMessagesToEnd('instant'), 300);
+      setTimeout(() => scrollMessagesToEnd('instant'), 600);
     } else {
       const isNewMessage = messages.length > prevMessagesLengthRef.current;
       if (isNewMessage) {
-        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-        if (isNearBottom) {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
+        scrollMessagesToEnd('smooth');
       }
     }
 
     prevMessagesLengthRef.current = messages.length;
-    prevConversationRef.current = selectedConversation;
-  }, [messages, selectedConversation, messagesLoading, firstUnreadMessage]);
+  }, [messages, selectedConversation, messagesLoading, scrollMessagesToEnd]);
 
   // Typing indicator functions
   const handleTypingStart = () => {
