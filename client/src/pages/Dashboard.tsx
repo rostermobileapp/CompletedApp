@@ -1794,7 +1794,86 @@ export default function Dashboard() {
     enabled: !!(selectedType === 'tournament' ? selectedId : effectiveLeagueId),
     staleTime: 30000,
   });
-  
+
+  // Prefetch Stats page data so it loads instantly on Toaster Up
+  const { data: prefetchedSeasons } = useQuery({
+    queryKey: [`/api/leagues/${effectiveLeagueId}/seasons`],
+    enabled: !!effectiveLeagueId && selectedType !== 'tournament',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const prefetchSeasonId = React.useMemo(() => {
+    if (!Array.isArray(prefetchedSeasons) || prefetchedSeasons.length === 0) return null;
+    const active = prefetchedSeasons.find((s: any) => s.isActive);
+    return active?.id || prefetchedSeasons[0].id;
+  }, [prefetchedSeasons]);
+
+  useQuery({
+    queryKey: ['/api/leagues', effectiveLeagueId, 'stats', { seasonId: prefetchSeasonId, playerType: 'non-goalies' }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (prefetchSeasonId) params.append('seasonId', prefetchSeasonId);
+      params.append('playerType', 'non-goalies');
+      const res = await apiRequest('GET', `/api/leagues/${effectiveLeagueId}/stats?${params.toString()}`);
+      return res.json();
+    },
+    enabled: !!effectiveLeagueId && !!prefetchSeasonId && selectedType !== 'tournament',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useQuery({
+    queryKey: ['/api/leagues', effectiveLeagueId, 'stats', { seasonId: prefetchSeasonId, playerType: 'goalies' }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (prefetchSeasonId) params.append('seasonId', prefetchSeasonId);
+      params.append('playerType', 'goalies');
+      const res = await apiRequest('GET', `/api/leagues/${effectiveLeagueId}/stats?${params.toString()}`);
+      return res.json();
+    },
+    enabled: !!effectiveLeagueId && !!prefetchSeasonId && selectedType !== 'tournament',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useQuery({
+    queryKey: [`/api/leagues/${effectiveLeagueId}/star-leaderboard`],
+    enabled: !!effectiveLeagueId && selectedType !== 'tournament',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useQuery({
+    queryKey: [`/api/leagues/${effectiveLeagueId}/members`],
+    enabled: !!effectiveLeagueId && selectedType !== 'tournament',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useQuery({
+    queryKey: [`/api/leagues/${effectiveLeagueId}/teams`],
+    enabled: !!effectiveLeagueId && selectedType !== 'tournament',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Prefetch tournament stats data
+  useQuery({
+    queryKey: ['/api/tournaments', selectedId, 'stats'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/tournaments/${selectedId}/stats`);
+      return res.json();
+    },
+    enabled: selectedType === 'tournament' && !!selectedId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useQuery({
+    queryKey: ['/api/tournaments', selectedId, 'teams'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/tournaments/${selectedId}/teams`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: selectedType === 'tournament' && !!selectedId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Compute captain status for the selected league using team.captainId
   const isTeamCaptainInSelectedLeague = React.useMemo(() => {
     if (!selectedLeagueId || !Array.isArray(userTeams) || !(userProfile as any)?.id) return false;

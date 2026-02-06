@@ -132,6 +132,7 @@ export default function Stats() {
   const { data: seasons } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/seasons`],
     enabled: !!leagueId && !isTournamentContext,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Auto-select current season when seasons are loaded (only for leagues)
@@ -161,6 +162,7 @@ export default function Stats() {
       return res.json();
     },
     enabled: !!leagueId && !isTournamentContext,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch tournament stats when in tournament context
@@ -171,6 +173,7 @@ export default function Stats() {
       return res.json();
     },
     enabled: !!tournamentId && isTournamentContext,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Use the appropriate stats based on context
@@ -181,6 +184,7 @@ export default function Stats() {
   const { data: starLeaderboard } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/star-leaderboard`],
     enabled: !!leagueId && !isTournamentContext,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Ensure playerStats is an array
@@ -190,12 +194,14 @@ export default function Stats() {
   const { data: leagueMemberships } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/members`],
     enabled: !!leagueId && !isTournamentContext,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch league teams to get team names (only for leagues)
   const { data: leagueTeams } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/teams`],
     enabled: !!leagueId && !isTournamentContext,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch tournament teams (only for tournaments)
@@ -207,6 +213,7 @@ export default function Stats() {
       return response.json();
     },
     enabled: !!tournamentId && isTournamentContext,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Create a map of userId to membership data (only used for leagues)
