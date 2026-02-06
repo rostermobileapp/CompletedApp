@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users } from 'lucide-react';
 import { Link } from 'wouter';
-import { getImageUrl } from '@/lib/queryClient';
+import { ClickableAvatar } from '@/components/ClickableAvatar';
 
 interface LineManagerProps {
   teamId: string;
@@ -46,39 +46,37 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
               const playerId = member.user?.id || member.userId;
               
               return (
-                <Link
+                <div
                   key={member.id || playerId}
-                  href={`/user/${playerId}`}
-                  className="flex items-center py-1.5 px-2 rounded hover:bg-muted/50 transition-colors cursor-pointer bg-card border border-border"
+                  className="flex items-center py-1.5 px-2 rounded hover:bg-muted/50 transition-colors bg-card border border-border"
                   data-testid={`roster-player-${playerId}`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                      {profileImageUrl ? (
-                        <img 
-                          src={getImageUrl(profileImageUrl) || ''} 
-                          alt={`${firstName} ${lastName}`}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-primary-foreground font-semibold text-xs">
-                          {firstName?.[0]}{lastName?.[0]}
+                    <ClickableAvatar
+                      userId={playerId}
+                      profileImageUrl={profileImageUrl}
+                      firstName={firstName}
+                      lastName={lastName}
+                      size="xs"
+                    />
+                    <Link
+                      href={`/user/${playerId}`}
+                      className="flex items-center gap-2 min-w-0 cursor-pointer"
+                    >
+                      {jerseyNumber && (
+                        <span className="text-xs font-bold text-muted-foreground shrink-0">
+                          #{jerseyNumber}
                         </span>
                       )}
-                    </div>
-                    {jerseyNumber && (
-                      <span className="text-xs font-bold text-muted-foreground shrink-0">
-                        #{jerseyNumber}
+                      <span className="text-sm font-medium truncate">
+                        {lastName}{firstName ? `, ${firstName.charAt(0)}.` : ''}
                       </span>
-                    )}
-                    <span className="text-sm font-medium truncate">
-                      {lastName}{firstName ? `, ${firstName.charAt(0)}.` : ''}
-                    </span>
-                    {isCaptain && (
-                      <span className="text-warning font-bold text-xs shrink-0">C</span>
-                    )}
+                      {isCaptain && (
+                        <span className="text-warning font-bold text-xs shrink-0">C</span>
+                      )}
+                    </Link>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
