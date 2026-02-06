@@ -27,8 +27,9 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
   const [slideIn, setSlideIn] = useState(false);
   const animatingRef = useRef(false);
 
-  const [dismissContent, setDismissContent] = useState<ReactNode | null>(null);
+  const [slideDownTarget, setSlideDownTarget] = useState<string | null>(null);
   const [slideOut, setSlideOut] = useState(false);
+  const [capturedHtml, setCapturedHtml] = useState<string | null>(null);
 
   const overlayRouteRef = useRef<string | null>(null);
 
@@ -67,17 +68,15 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
     if (animatingRef.current) return;
     animatingRef.current = true;
 
-    const mainEl = document.querySelector('[data-page-content]');
-    let capturedContent: ReactNode = null;
-    if (mainEl) {
-      const html = mainEl.innerHTML;
-      capturedContent = <div dangerouslySetInnerHTML={{ __html: html }} style={{ pointerEvents: 'none' }} />;
+    const pageContent = document.querySelector('[data-page-content]');
+    if (pageContent) {
+      setCapturedHtml(pageContent.outerHTML);
     }
 
     navigate(targetRoute);
     overlayRouteRef.current = null;
 
-    setDismissContent(capturedContent);
+    setSlideDownTarget(targetRoute);
     setSlideOut(false);
 
     requestAnimationFrame(() => {
@@ -85,8 +84,9 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
         setSlideOut(true);
 
         setTimeout(() => {
-          setDismissContent(null);
+          setSlideDownTarget(null);
           setSlideOut(false);
+          setCapturedHtml(null);
           animatingRef.current = false;
         }, SLIDE_DOWN_DURATION);
       });
@@ -113,7 +113,7 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
             willChange: 'transform',
             overflowY: slideIn ? 'auto' : 'hidden',
             WebkitOverflowScrolling: 'touch' as any,
-            backgroundColor: 'var(--background, #fff)',
+            backgroundColor: 'hsl(var(--background))',
             borderTopLeftRadius: '12px',
             borderTopRightRadius: '12px',
           }}
@@ -122,7 +122,7 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {dismissContent !== null && (
+      {slideDownTarget !== null && capturedHtml && (
         <div
           style={{
             position: 'fixed',
@@ -132,16 +132,15 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
             bottom: `${bottomNavHeight}px`,
             zIndex: 99,
             transform: slideOut ? `translateY(calc(100% + ${bottomNavHeight}px))` : 'translateY(0)',
-            transition: `transform ${SLIDE_DOWN_DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+            transition: slideOut ? `transform ${SLIDE_DOWN_DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)` : 'none',
             willChange: 'transform',
             overflow: 'hidden',
-            backgroundColor: 'var(--background, #fff)',
+            pointerEvents: 'none',
             borderTopLeftRadius: '12px',
             borderTopRightRadius: '12px',
           }}
-        >
-          {dismissContent}
-        </div>
+          dangerouslySetInnerHTML={{ __html: capturedHtml }}
+        />
       )}
     </SlideUpOverlayContext.Provider>
   );
