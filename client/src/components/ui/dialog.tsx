@@ -38,7 +38,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[15%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg animate-dialog-pop sm:rounded-lg",
+        "fixed left-[50%] top-4 z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg animate-dialog-pop sm:rounded-lg",
         className
       )}
       {...props}
