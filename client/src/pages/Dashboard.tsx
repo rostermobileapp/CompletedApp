@@ -1784,6 +1784,14 @@ export default function Dashboard() {
     }
     return null;
   }, [selectedType, selectedTeam, selectedLeagueId]);
+
+  useQuery({
+    queryKey: selectedType === 'tournament' && selectedId
+      ? ['/api/tournaments', selectedId, 'announcements']
+      : ['/api/leagues', effectiveLeagueId, 'announcements'],
+    enabled: !!(selectedType === 'tournament' ? selectedId : effectiveLeagueId),
+    staleTime: 30000,
+  });
   
   // Compute captain status for the selected league using team.captainId
   const isTeamCaptainInSelectedLeague = React.useMemo(() => {
