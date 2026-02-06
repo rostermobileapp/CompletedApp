@@ -494,6 +494,7 @@ export default function Messages() {
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [groupTitle, setGroupTitle] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const firstUnreadMessageRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -1226,22 +1227,34 @@ export default function Messages() {
   }, [messages, currentUserId]);
 
   const prevConversationRef = useRef<string | null>(null);
+  const hasScrolledForConversation = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!messages.length) return;
+    if (!messages.length || !selectedConversation) return;
+
+    const container = messagesScrollRef.current;
+    if (!container) return;
 
     const isNewConversation = prevConversationRef.current !== selectedConversation;
     prevConversationRef.current = selectedConversation;
 
-    const scrollBehavior = isNewConversation ? 'instant' as ScrollBehavior : 'smooth' as ScrollBehavior;
-
-    requestAnimationFrame(() => {
-      if (isNewConversation && firstUnreadMessage && firstUnreadMessageRef.current) {
-        firstUnreadMessageRef.current.scrollIntoView({ behavior: scrollBehavior, block: 'start' });
-      } else {
-        messagesEndRef.current?.scrollIntoView({ behavior: scrollBehavior });
+    if (isNewConversation && hasScrolledForConversation.current !== selectedConversation) {
+      hasScrolledForConversation.current = selectedConversation;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (firstUnreadMessage && firstUnreadMessageRef.current) {
+            firstUnreadMessageRef.current.scrollIntoView({ behavior: 'instant', block: 'start' });
+          } else {
+            container.scrollTop = container.scrollHeight;
+          }
+        });
+      });
+    } else if (!isNewConversation) {
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+      if (isNearBottom) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
-    });
+    }
   }, [messages, selectedConversation, firstUnreadMessage]);
 
   // Typing indicator functions
@@ -2197,7 +2210,7 @@ export default function Messages() {
                 />
               </div>
             )}
-            <div className="absolute inset-0 overflow-y-auto z-10">
+            <div ref={messagesScrollRef} className="absolute inset-0 overflow-y-auto z-10">
             <div className="relative p-4 space-y-4 pb-4">
             {messagesLoading ? (
               <div className="space-y-4" data-testid="messages-loading">
