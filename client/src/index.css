@@ -39,7 +39,7 @@
 }
 
 .animate-modal-pop {
-  animation: modal-pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: modal-pop-in 0.5s ease-out both;
 }
 
 [data-state="open"].animate-radix-backdrop {
@@ -50,7 +50,7 @@
 }
 
 [data-state="open"].animate-radix-pop {
-  animation: modal-pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: modal-pop-in 0.5s ease-out both;
 }
 [data-state="closed"].animate-radix-pop {
   animation: modal-pop-out 0.3s ease-in both;
