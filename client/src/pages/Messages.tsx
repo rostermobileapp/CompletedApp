@@ -1225,15 +1225,23 @@ export default function Messages() {
     );
   }, [messages, currentUserId]);
 
-  // Scroll to first unread message or bottom when messages change or conversation changes
+  const prevConversationRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (firstUnreadMessage && firstUnreadMessageRef.current) {
-      // Scroll to first unread message
-      firstUnreadMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else {
-      // If no unread messages, scroll to bottom
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (!messages.length) return;
+
+    const isNewConversation = prevConversationRef.current !== selectedConversation;
+    prevConversationRef.current = selectedConversation;
+
+    const scrollBehavior = isNewConversation ? 'instant' as ScrollBehavior : 'smooth' as ScrollBehavior;
+
+    requestAnimationFrame(() => {
+      if (isNewConversation && firstUnreadMessage && firstUnreadMessageRef.current) {
+        firstUnreadMessageRef.current.scrollIntoView({ behavior: scrollBehavior, block: 'start' });
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: scrollBehavior });
+      }
+    });
   }, [messages, selectedConversation, firstUnreadMessage]);
 
   // Typing indicator functions
