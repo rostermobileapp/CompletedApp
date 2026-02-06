@@ -34,6 +34,7 @@ import { SlideOutMenu } from '@/components/SlideOutMenu';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import Announcements from '@/pages/Announcements';
 import MediaGalleryPage from '@/pages/MediaGallery';
+import StatsPage from '@/pages/Stats';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -2295,9 +2296,7 @@ export default function Dashboard() {
           <div 
             className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-stats"
-            onClick={() => {
-              navigate('/stats');
-            }}
+            onClick={() => openOverlay('/stats', <StatsPage />)}
           >
             <div className="h-full flex flex-col items-center justify-center">
               <BarChart3 className="w-8 h-8 text-blue-500 mb-3" />

@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { setPageTransitionDirection } from '@/components/PageTransition';
+import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import { ArrowLeft, ChevronRight, Settings, Trophy, Star } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
@@ -17,22 +18,20 @@ export default function Stats() {
   const { user } = useAuth();
   const { canAccessPremiumFeatures, canEditStats } = usePermissions();
   const [location, navigate] = useLocation();
+  const { closeWithSlideDown } = useSlideUpOverlay();
   
   // FREE TIER RESTRICTION: Block access to Stats page for free tier users
   const isFreeTier = !canAccessPremiumFeatures();
   
   if (isFreeTier) {
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="min-h-screen bg-background pb-20" data-page-content>
         <div className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                setPageTransitionDirection('down');
-                navigate('/');
-              }}
+              onClick={() => closeWithSlideDown('/')}
               className="p-2"
               data-testid="button-back"
             >
@@ -382,7 +381,7 @@ export default function Stats() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black text-[#212121] dark:text-white pb-24" data-testid="stats-page">
+    <div className="min-h-screen bg-white dark:bg-black text-[#212121] dark:text-white pb-24" data-testid="stats-page" data-page-content>
       <FeatureLockOverlay isLocked={!canAccessPremiumFeatures() && !canEditStats()} className="min-h-screen flex flex-col">
         {/* Header */}
         <div className="sticky top-0 z-50 bg-white/95 dark:bg-black/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
@@ -390,10 +389,7 @@ export default function Stats() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <button 
-                  onClick={() => {
-                    setPageTransitionDirection('down');
-                    navigate('/');
-                  }}
+                  onClick={() => closeWithSlideDown('/')}
                   className="text-gray-600 dark:text-gray-400 hover:text-[#212121] dark:hover:text-white transition-colors"
                   data-testid="button-back"
                 >
