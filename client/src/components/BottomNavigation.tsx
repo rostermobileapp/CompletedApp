@@ -64,13 +64,7 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
       swipeNav.navigateToScreen(shortcutId, true);
     } else {
       if (shortcutId === 'teams') {
-        if (selectedType === 'tournament' && selectedId) {
-          navigate(`/tournament-teams/${selectedId}`);
-        } else if (primaryTeamId) {
-          navigate(`/team/${primaryTeamId}`);
-        } else {
-          navigate('/teams');
-        }
+        navigate('/teams');
       } else if (shortcutId === 'messages') {
         navigate('/messages');
       } else if (shortcutId === 'home') {

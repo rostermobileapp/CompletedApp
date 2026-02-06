@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, memo, useMemo, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
-import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
 import Dashboard from '@/pages/Dashboard';
 import Teams from '@/pages/Teams';
@@ -38,7 +37,6 @@ interface SwipeableMainScreensProps {
 function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
   const [location, navigate] = useLocation();
   const { user } = useAuth();
-  const { selectedType, selectedId } = useDashboardSelection();
   const containerRef = useRef<HTMLDivElement>(null);
   const isFirstRender = useRef(true);
   
@@ -75,16 +73,8 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
     if (index < 0 || index >= SCREEN_ORDER.length) return;
     
     const screenId = SCREEN_ORDER[index];
-    
-    if (screenId === 'teams') {
-      if (selectedType === 'tournament' && selectedId) {
-        navigate(`/tournament-teams/${selectedId}`);
-        return;
-      }
-    }
-    
     navigate(SCREEN_ROUTES[screenId]);
-  }, [navigate, selectedType, selectedId]);
+  }, [navigate]);
 
 
   const screens = useMemo(() => [
