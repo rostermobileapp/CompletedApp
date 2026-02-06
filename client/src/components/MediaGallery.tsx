@@ -202,7 +202,7 @@ export function MediaGallery({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-white hover:bg-white/20 h-8 w-8 p-0"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 h-8 w-8 p-0"
                   data-testid="button-close-gallery"
                 >
                   <X className="w-4 h-4" />
