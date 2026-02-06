@@ -24,24 +24,26 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
   const openOverlay = useCallback((targetRoute: string, content: ReactNode) => {
     if (animatingRef.current) return;
     animatingRef.current = true;
+
+    navigate(targetRoute);
+
     setOverlay({ content, targetRoute });
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setSlideIn(true);
       });
     });
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (!slideIn || !overlay) return;
     const timer = setTimeout(() => {
-      navigate(overlay.targetRoute);
       setOverlay(null);
       setSlideIn(false);
       animatingRef.current = false;
-    }, DURATION + 50);
+    }, DURATION + 100);
     return () => clearTimeout(timer);
-  }, [slideIn, overlay, navigate]);
+  }, [slideIn, overlay]);
 
   return (
     <SlideUpOverlayContext.Provider value={{ openOverlay }}>
