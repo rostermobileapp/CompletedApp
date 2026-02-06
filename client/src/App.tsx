@@ -12,6 +12,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { SwipeableMainScreens } from "@/components/SwipeableMainScreens";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { SlideUpOverlayProvider } from "@/components/SlideUpOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppDataPrefetch } from "@/hooks/useAppDataPrefetch";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
@@ -174,6 +175,7 @@ function Router() {
 
   return (
     <PermissionProvider>
+      <SlideUpOverlayProvider>
       <ScrollToTop />
       <NativelyNotificationsInitializer />
       <div className="relative min-h-screen w-full">
@@ -238,6 +240,7 @@ function Router() {
           <HPIBBanner placement="bottom-nav" />
           <BottomNavigation />
         </div>
+      </SlideUpOverlayProvider>
     </PermissionProvider>
   );
 }

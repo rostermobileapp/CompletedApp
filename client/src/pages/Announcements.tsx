@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useLocation } from 'wouter';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
-import { SlideUpTransition } from '@/components/SlideUpTransition';
 import { 
   Megaphone, 
   Plus, 
@@ -1146,11 +1145,9 @@ export default function Announcements() {
   // Show loading state while auth is loading
   if (authLoading) {
     return (
-      <SlideUpTransition>
-        <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
-          <div className="text-center">Loading...</div>
-        </div>
-      </SlideUpTransition>
+      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
+        <div className="text-center">Loading...</div>
+      </div>
     );
   }
 
@@ -1161,30 +1158,27 @@ export default function Announcements() {
 
   if (!currentLeague && !currentTournament) {
     return (
-      <SlideUpTransition>
-        <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center px-6 pb-20" data-testid="no-league-state">
-          <Megaphone className="w-16 h-16 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-bold text-[#212121] dark:text-white mb-2">No Context Found</h2>
-          <p className="text-muted-foreground text-center mb-6">
-            You need to join a league or tournament to view announcements
-          </p>
-          <Button 
-            onClick={() => navigate('/leagues')}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            data-testid="button-find-league"
-          >
-            Find a League
-          </Button>
-        </div>
-      </SlideUpTransition>
+      <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center px-6 pb-20" data-testid="no-league-state">
+        <Megaphone className="w-16 h-16 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-bold text-[#212121] dark:text-white mb-2">No Context Found</h2>
+        <p className="text-muted-foreground text-center mb-6">
+          You need to join a league or tournament to view announcements
+        </p>
+        <Button 
+          onClick={() => navigate('/leagues')}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+          data-testid="button-find-league"
+        >
+          Find a League
+        </Button>
+      </div>
     );
   }
 
   const contextName = isTournamentContext ? currentTournament?.name : currentLeague?.name;
 
   return (
-    <SlideUpTransition>
-      <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
           <div className="max-w-2xl mx-auto px-4 py-4">
@@ -1276,7 +1270,6 @@ export default function Announcements() {
           tournamentId={isTournamentContext ? tournamentId : null}
           canPost={canPost}
         />
-      </div>
-    </SlideUpTransition>
+    </div>
   );
 }
