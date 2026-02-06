@@ -16,7 +16,8 @@ export function useSlideUpOverlay() {
   return ctx;
 }
 
-const DURATION = 500;
+const SLIDE_UP_DURATION = 500;
+const SLIDE_DOWN_DURATION = 600;
 
 export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
@@ -58,7 +59,7 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
           animatingRef.current = false;
         });
       });
-    }, DURATION);
+    }, SLIDE_UP_DURATION);
     return () => clearTimeout(timer);
   }, [slideIn, overlay, navigate]);
 
@@ -87,7 +88,7 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
           setDismissContent(null);
           setSlideOut(false);
           animatingRef.current = false;
-        }, DURATION);
+        }, SLIDE_DOWN_DURATION);
       });
     });
   }, [navigate]);
@@ -108,7 +109,7 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
             bottom: `${bottomNavHeight}px`,
             zIndex: 99,
             transform: slideIn ? 'translateY(0)' : `translateY(calc(100% + ${bottomNavHeight}px))`,
-            transition: `transform ${DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+            transition: `transform ${SLIDE_UP_DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)`,
             willChange: 'transform',
             overflowY: slideIn ? 'auto' : 'hidden',
             WebkitOverflowScrolling: 'touch' as any,
@@ -131,7 +132,7 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
             bottom: `${bottomNavHeight}px`,
             zIndex: 99,
             transform: slideOut ? `translateY(calc(100% + ${bottomNavHeight}px))` : 'translateY(0)',
-            transition: `transform ${DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+            transition: `transform ${SLIDE_DOWN_DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)`,
             willChange: 'transform',
             overflow: 'hidden',
             backgroundColor: 'var(--background, #fff)',
