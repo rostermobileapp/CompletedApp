@@ -56,6 +56,35 @@
   animation: modal-pop-out 0.3s ease-in both;
 }
 
+@keyframes dialog-pop-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes dialog-pop-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+}
+
+[data-state="open"].animate-dialog-pop {
+  animation: dialog-pop-in 0.5s ease-out both;
+}
+[data-state="closed"].animate-dialog-pop {
+  animation: dialog-pop-out 0.3s ease-in both;
+}
+
 :root {
   --background: 0 0% 100%;
   --foreground: 0 0% 13%;
