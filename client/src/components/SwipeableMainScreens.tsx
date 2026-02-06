@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, memo, useMemo, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { motion, useSpring } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
@@ -41,6 +40,7 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
   const { user } = useAuth();
   const { selectedType, selectedId } = useDashboardSelection();
   const containerRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
   
   const currentScreen = getScreenFromPath(location);
   const isMainScreen = currentScreen !== null;
@@ -49,38 +49,27 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
     currentScreen ? SCREEN_ORDER.indexOf(currentScreen) : 2
   );
   
-  const springX = useSpring(0, { 
-    stiffness: 400, 
-    damping: 40,
-    mass: 0.8,
-  });
+  const [shouldAnimate, setShouldAnimate] = useState(false);
   
-  const [containerWidth, setContainerWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 375);
   const bottomPadding = currentScreen === 'messages' ? 0 : (user?.role === 'free_tier' ? 132 : 82);
 
   useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
-      }
-    };
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
-
-  useEffect(() => {
-    springX.set(-activeIndex * containerWidth);
-  }, [activeIndex, containerWidth, springX]);
-
-  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    
     if (currentScreen) {
       const newIndex = SCREEN_ORDER.indexOf(currentScreen);
-      if (newIndex !== activeIndex) {
-        setActiveIndex(newIndex);
-      }
+      setActiveIndex((prev) => {
+        if (prev !== newIndex) {
+          setShouldAnimate(true);
+          return newIndex;
+        }
+        return prev;
+      });
     }
-  }, [currentScreen, activeIndex]);
+  }, [currentScreen]);
 
   const navigateToIndex = useCallback((index: number) => {
     if (index < 0 || index >= SCREEN_ORDER.length) return;
@@ -110,6 +99,8 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
     return <>{children}</>;
   }
 
+  const translateX = -(activeIndex * 100 / screens.length);
+
   return (
     <div 
       ref={containerRef}
@@ -117,15 +108,17 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
       style={{ paddingBottom: `${bottomPadding}px` }}
       data-testid="swipeable-container"
     >
-      <motion.div
+      <div
         className="flex h-full"
         style={{ 
-          x: springX,
+          transform: `translate3d(${translateX}%, 0, 0)`,
+          transition: shouldAnimate ? 'transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)' : 'none',
           width: `${screens.length * 100}%`,
           willChange: 'transform',
         }}
+        onTransitionEnd={() => setShouldAnimate(false)}
       >
-        {screens.map((screen, index) => (
+        {screens.map((screen) => (
           <div
             key={screen.id}
             className="relative h-full flex flex-col bg-background overflow-y-auto overflow-x-hidden"
@@ -138,7 +131,7 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
             {screen.component}
           </div>
         ))}
-      </motion.div>
+      </div>
     </div>
   );
 }
