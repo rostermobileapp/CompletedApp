@@ -1142,21 +1142,12 @@ export default function Announcements() {
   const announcements: Announcement[] = Array.isArray(data) ? data : (data?.announcements ?? []);
   const pagination = Array.isArray(data) ? undefined : data?.pagination;
 
-  // Show loading state while auth is loading
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
-        <div className="text-center">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
+  if (!authLoading && !user) {
     navigate('/');
     return null;
   }
 
-  if (!currentLeague && !currentTournament) {
+  if (!authLoading && user && !currentLeague && !currentTournament) {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center px-6 pb-20" data-testid="no-league-state">
         <Megaphone className="w-16 h-16 text-muted-foreground mb-4" />
@@ -1254,7 +1245,7 @@ export default function Announcements() {
                   announcement={announcement}
                   leagueId={isTournamentContext ? null : leagueId}
                   tournamentId={isTournamentContext ? tournamentId : null}
-                  currentUserId={user.id}
+                  currentUserId={user?.id || ''}
                   isCommissioner={isTournamentContext ? isTournamentCommissioner : isLeagueCommissioner}
                 />
               ))}
