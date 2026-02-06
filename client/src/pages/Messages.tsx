@@ -1228,34 +1228,43 @@ export default function Messages() {
 
   const prevConversationRef = useRef<string | null>(null);
   const hasScrolledForConversation = useRef<string | null>(null);
+  const prevMessagesLengthRef = useRef<number>(0);
 
   useEffect(() => {
-    if (!messages.length || !selectedConversation) return;
+    if (!selectedConversation || messagesLoading) return;
 
     const container = messagesScrollRef.current;
-    if (!container) return;
+    if (!container || !messages.length) return;
 
-    const isNewConversation = prevConversationRef.current !== selectedConversation;
-    prevConversationRef.current = selectedConversation;
+    const isNewConversation = hasScrolledForConversation.current !== selectedConversation;
 
-    if (isNewConversation && hasScrolledForConversation.current !== selectedConversation) {
+    if (isNewConversation) {
       hasScrolledForConversation.current = selectedConversation;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (firstUnreadMessage && firstUnreadMessageRef.current) {
-            firstUnreadMessageRef.current.scrollIntoView({ behavior: 'instant', block: 'start' });
-          } else {
-            container.scrollTop = container.scrollHeight;
-          }
-        });
-      });
-    } else if (!isNewConversation) {
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-      if (isNearBottom) {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const doScroll = () => {
+        const c = messagesScrollRef.current;
+        if (!c) return;
+        if (firstUnreadMessage && firstUnreadMessageRef.current) {
+          firstUnreadMessageRef.current.scrollIntoView({ behavior: 'instant', block: 'start' });
+        } else {
+          c.scrollTop = c.scrollHeight;
+        }
+      };
+      doScroll();
+      setTimeout(doScroll, 50);
+      setTimeout(doScroll, 150);
+    } else {
+      const isNewMessage = messages.length > prevMessagesLengthRef.current;
+      if (isNewMessage) {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+        if (isNearBottom) {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
       }
     }
-  }, [messages, selectedConversation, firstUnreadMessage]);
+
+    prevMessagesLengthRef.current = messages.length;
+    prevConversationRef.current = selectedConversation;
+  }, [messages, selectedConversation, messagesLoading, firstUnreadMessage]);
 
   // Typing indicator functions
   const handleTypingStart = () => {
