@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
 import { useLocation } from 'wouter';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SlideUpOverlayContextType {
   openOverlay: (targetRoute: string, content: ReactNode) => void;
@@ -17,9 +18,12 @@ const DURATION = 500;
 
 export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const [overlay, setOverlay] = useState<{ content: ReactNode; targetRoute: string } | null>(null);
   const [slideIn, setSlideIn] = useState(false);
   const animatingRef = useRef(false);
+
+  const bottomNavHeight = (user as any)?.role === 'free_tier' ? 132 : 82;
 
   const openOverlay = useCallback((targetRoute: string, content: ReactNode) => {
     if (animatingRef.current) return;
@@ -59,14 +63,16 @@ export function SlideUpOverlayProvider({ children }: { children: ReactNode }) {
             top: 0,
             left: 0,
             right: 0,
-            bottom: 0,
-            zIndex: 9999,
-            transform: slideIn ? 'translateY(0)' : 'translateY(100%)',
+            bottom: `${bottomNavHeight}px`,
+            zIndex: 99,
+            transform: slideIn ? 'translateY(0)' : `translateY(calc(100% + ${bottomNavHeight}px))`,
             transition: `transform ${DURATION}ms cubic-bezier(0.32, 0.72, 0, 1)`,
             willChange: 'transform',
             overflowY: slideIn ? 'auto' : 'hidden',
             WebkitOverflowScrolling: 'touch' as any,
             backgroundColor: 'var(--background, #fff)',
+            borderTopLeftRadius: '12px',
+            borderTopRightRadius: '12px',
           }}
         >
           {overlay.content}
