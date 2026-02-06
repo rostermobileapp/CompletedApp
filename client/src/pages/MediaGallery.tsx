@@ -10,6 +10,7 @@ import { TeamPhotos } from "@/components/TeamPhotos";
 import { usePermissions } from "@/context/SubscriptionContext";
 import { useState, useRef, useEffect } from "react";
 import { getImageUrl, apiRequest } from "@/lib/queryClient";
+import { useSlideUpOverlay } from "@/components/SlideUpOverlay";
 
 interface FilterUser {
   id: string;
@@ -116,11 +117,31 @@ function UserFilterSearch({
   );
 }
 
-export default function MediaGalleryPage() {
+interface MediaGalleryPageProps {
+  overlayEntityType?: 'tournament' | 'league' | 'team';
+  overlayEntityId?: string;
+}
+
+export default function MediaGalleryPage({ overlayEntityType, overlayEntityId }: MediaGalleryPageProps = {}) {
   const [, tournamentParams] = useRoute("/media/tournament/:id");
   const [, leagueParams] = useRoute("/media/league/:id");
   const [, teamParams] = useRoute("/media/team/:id");
   const [, navigate] = useLocation();
+  
+  let slideOverlay: ReturnType<typeof useSlideUpOverlay> | null = null;
+  try {
+    slideOverlay = useSlideUpOverlay();
+  } catch {
+    slideOverlay = null;
+  }
+  
+  const handleBack = () => {
+    if (slideOverlay?.isOverlayRoute) {
+      slideOverlay.closeWithSlideDown('/');
+    } else {
+      navigate('/');
+    }
+  };
   const [showUploader, setShowUploader] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedTeamFilter, setSelectedTeamFilter] = useState("all");
@@ -135,13 +156,13 @@ export default function MediaGalleryPage() {
   
   if (isFreeTier) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background" data-page-content>
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
           <div className="flex items-center gap-4 px-4 py-3">
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/')}
+              onClick={handleBack}
               data-testid="button-back"
             >
               <ArrowLeft className="h-5 w-5" />
@@ -169,9 +190,8 @@ export default function MediaGalleryPage() {
     );
   }
 
-  // Determine entity type and ID
-  const entityType = tournamentParams ? 'tournament' : leagueParams ? 'league' : teamParams ? 'team' : null;
-  const entityId = tournamentParams?.id || leagueParams?.id || teamParams?.id;
+  const entityType = overlayEntityType || (tournamentParams ? 'tournament' : leagueParams ? 'league' : teamParams ? 'team' : null);
+  const entityId = overlayEntityId || tournamentParams?.id || leagueParams?.id || teamParams?.id;
   
   // Check if user has paid access (not free tier) for league photos
   const hasPaidAccess = role !== 'free_tier';
@@ -257,14 +277,14 @@ export default function MediaGalleryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" data-page-content>
       {/* Header */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
         <div className="flex items-center gap-4 px-4 py-3">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/')}
+            onClick={handleBack}
             data-testid="button-back"
           >
             <ArrowLeft className="h-5 w-5" />

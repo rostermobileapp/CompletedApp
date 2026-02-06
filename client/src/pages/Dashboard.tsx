@@ -33,6 +33,7 @@ import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { SlideOutMenu } from '@/components/SlideOutMenu';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import Announcements from '@/pages/Announcements';
+import MediaGalleryPage from '@/pages/MediaGallery';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -2261,14 +2262,26 @@ export default function Dashboard() {
             className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
             data-testid="card-photos"
             onClick={() => {
+              let entityType: 'tournament' | 'league' | 'team' | null = null;
+              let entityId: string | null = null;
+              let route: string | null = null;
+              
               if (selectedType === 'tournament' && selectedId) {
-                navigate(`/media/tournament/${selectedId}`);
+                entityType = 'tournament';
+                entityId = selectedId;
+                route = `/media/tournament/${selectedId}`;
               } else if (effectiveLeagueId) {
-                // Prioritize league photos when in a league context (even if a team is selected)
-                navigate(`/media/league/${effectiveLeagueId}`);
+                entityType = 'league';
+                entityId = effectiveLeagueId;
+                route = `/media/league/${effectiveLeagueId}`;
               } else if (selectedType === 'team' && selectedId) {
-                // Only go to team photos if there's no league context
-                navigate(`/media/team/${selectedId}`);
+                entityType = 'team';
+                entityId = selectedId;
+                route = `/media/team/${selectedId}`;
+              }
+              
+              if (route && entityType && entityId) {
+                openOverlay(route, <MediaGalleryPage overlayEntityType={entityType} overlayEntityId={entityId} />);
               }
             }}
           >
