@@ -27,7 +27,7 @@ export default function LocationLink({ location, className, "data-testid": testI
       href={getMapUrl(location)}
       target="_blank"
       rel="noopener noreferrer"
-      className={`underline decoration-dotted underline-offset-2 hover:text-primary transition-colors ${className || ""}`}
+      className={`font-bold text-blue-500 underline underline-offset-2 hover:text-blue-400 transition-colors ${className || ""}`}
       data-testid={testId}
       onClick={(e) => e.stopPropagation()}
     >
