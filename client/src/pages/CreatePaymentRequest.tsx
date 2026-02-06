@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
+import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import { ArrowLeft, DollarSign, Users } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { createPaymentRequestSchema } from '@shared/schema';
@@ -26,6 +27,7 @@ export default function CreatePaymentRequest() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { closeWithSlideDown } = useSlideUpOverlay();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
@@ -34,9 +36,7 @@ export default function CreatePaymentRequest() {
   const handlePremiumAlertClose = (open: boolean) => {
     setShowPremiumAlert(open);
     if (!open && !canAccessPremiumFeatures()) {
-      // If dialog is being closed and user still doesn't have premium access, redirect back
-      setPageTransitionDirection('down');
-      navigate('/payment-requests');
+      closeWithSlideDown('/payment-requests');
     }
   };
 
@@ -117,8 +117,7 @@ export default function CreatePaymentRequest() {
       });
       queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] });
-      setPageTransitionDirection('down');
-      navigate('/payment-requests');
+      closeWithSlideDown('/payment-requests');
     },
     onError: (error: any) => {
       toast({
@@ -169,15 +168,12 @@ export default function CreatePaymentRequest() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-48" data-testid="create-payment-request-page">
+    <div className="min-h-screen flex flex-col pb-48 bg-background" data-testid="create-payment-request-page" data-page-content>
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
           <button 
-            onClick={() => {
-              setPageTransitionDirection('down');
-              navigate('/payment-requests');
-            }}
+            onClick={() => closeWithSlideDown('/payment-requests')}
             className="text-muted-foreground"
             data-testid="button-back"
           >

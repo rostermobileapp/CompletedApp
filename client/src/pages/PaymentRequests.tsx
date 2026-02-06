@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
+import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
+import CreatePaymentRequestPage from '@/pages/CreatePaymentRequest';
 import { ArrowLeft, DollarSign, Plus, Users, Calendar, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +15,7 @@ import { usePermissions } from '@/context/SubscriptionContext';
 
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
+  const { openOverlay } = useSlideUpOverlay();
   const [activeTab, setActiveTab] = useState<'created' | 'received'>('created');
   const { selectedType, selectedTeamId, selectedLeagueId } = useDashboardSelection();
   const { canAccessPremiumFeatures } = usePermissions();
@@ -280,10 +283,7 @@ export default function PaymentRequests() {
           </div>
 
           <Button
-            onClick={() => {
-              setPageTransitionDirection('up');
-              navigate('/create-payment-request');
-            }}
+            onClick={() => openOverlay('/create-payment-request', <CreatePaymentRequestPage />)}
             size="sm"
             data-testid="button-create-payment-request"
           >
@@ -320,10 +320,7 @@ export default function PaymentRequests() {
                 <DollarSign className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground mb-4">You haven't created any payment requests yet.</p>
                 <Button
-                  onClick={() => {
-                    setPageTransitionDirection('up');
-                    navigate('/create-payment-request');
-                  }}
+                  onClick={() => openOverlay('/create-payment-request', <CreatePaymentRequestPage />)}
                   data-testid="button-create-first-request"
                 >
                   <Plus className="w-4 h-4 mr-2" />
