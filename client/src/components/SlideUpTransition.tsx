@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState, useRef } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 
 interface SlideUpTransitionProps {
   children: ReactNode;
@@ -7,40 +7,23 @@ interface SlideUpTransitionProps {
 
 export function SlideUpTransition({ children, duration = 500 }: SlideUpTransitionProps) {
   const [isVisible, setIsVisible] = useState(false);
-  const [animationDone, setAnimationDone] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       setIsVisible(true);
     });
-    const timer = setTimeout(() => {
-      setAnimationDone(true);
-    }, duration + 50);
-    return () => {
-      cancelAnimationFrame(frame);
-      clearTimeout(timer);
-    };
-  }, [duration]);
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return (
     <div
-      ref={wrapperRef}
       style={{
-        overflow: animationDone ? undefined : 'hidden',
-        minHeight: animationDone ? undefined : '100vh',
+        transform: isVisible ? 'translateY(0)' : 'translateY(60px)',
+        opacity: isVisible ? 1 : 0,
+        transition: `transform ${duration}ms cubic-bezier(0.32, 0.72, 0, 1), opacity ${Math.round(duration * 0.4)}ms ease-out`,
       }}
     >
-      <div
-        style={{
-          transform: isVisible ? 'translateY(0)' : 'translateY(100vh)',
-          opacity: isVisible ? 1 : 0,
-          transition: `transform ${duration}ms cubic-bezier(0.32, 0.72, 0, 1), opacity ${Math.round(duration * 0.6)}ms ease-out`,
-          willChange: 'transform, opacity',
-        }}
-      >
-        {children}
-      </div>
+      {children}
     </div>
   );
 }

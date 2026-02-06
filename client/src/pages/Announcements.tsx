@@ -1146,9 +1146,11 @@ export default function Announcements() {
   // Show loading state while auth is loading
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
-        <div className="text-center">Loading...</div>
-      </div>
+      <SlideUpTransition>
+        <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
+          <div className="text-center">Loading...</div>
+        </div>
+      </SlideUpTransition>
     );
   }
 
@@ -1159,20 +1161,22 @@ export default function Announcements() {
 
   if (!currentLeague && !currentTournament) {
     return (
-      <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center px-6 pb-20" data-testid="no-league-state">
-        <Megaphone className="w-16 h-16 text-muted-foreground mb-4" />
-        <h2 className="text-xl font-bold text-[#212121] dark:text-white mb-2">No Context Found</h2>
-        <p className="text-muted-foreground text-center mb-6">
-          You need to join a league or tournament to view announcements
-        </p>
-        <Button 
-          onClick={() => navigate('/leagues')}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-          data-testid="button-find-league"
-        >
-          Find a League
-        </Button>
-      </div>
+      <SlideUpTransition>
+        <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center px-6 pb-20" data-testid="no-league-state">
+          <Megaphone className="w-16 h-16 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-bold text-[#212121] dark:text-white mb-2">No Context Found</h2>
+          <p className="text-muted-foreground text-center mb-6">
+            You need to join a league or tournament to view announcements
+          </p>
+          <Button 
+            onClick={() => navigate('/leagues')}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            data-testid="button-find-league"
+          >
+            Find a League
+          </Button>
+        </div>
+      </SlideUpTransition>
     );
   }
 
