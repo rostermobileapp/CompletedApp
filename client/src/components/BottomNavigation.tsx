@@ -7,6 +7,7 @@ import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useKeyboard } from '@/hooks/use-keyboard';
 import { useSwipeableNav, SCREEN_ORDER, ScreenId } from '@/context/SwipeableNavContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 
 interface BottomNavigationProps {
   useSwipeNav?: boolean;
@@ -23,6 +24,13 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
     swipeNav = useSwipeableNav();
   } catch {
     swipeNav = null;
+  }
+  
+  let slideOverlay: ReturnType<typeof useSlideUpOverlay> | null = null;
+  try {
+    slideOverlay = useSlideUpOverlay();
+  } catch {
+    slideOverlay = null;
   }
   
   const { data: unreadData } = useQuery({
@@ -59,20 +67,26 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
   
   const activeId = useSwipeNav && swipeNav ? SCREEN_ORDER[swipeNav.activeIndex] : getActiveId(location);
   
+  const getRouteForScreen = (shortcutId: ScreenId): string => {
+    switch (shortcutId) {
+      case 'teams': return '/teams';
+      case 'messages': return '/messages';
+      case 'home': return '/';
+      case 'payments': return '/payment-requests';
+      case 'profile': return '/profile';
+      default: return '/';
+    }
+  };
+
   const handleNavClick = (shortcutId: ScreenId) => {
     if (useSwipeNav && swipeNav) {
       swipeNav.navigateToScreen(shortcutId, true);
     } else {
-      if (shortcutId === 'teams') {
-        navigate('/teams');
-      } else if (shortcutId === 'messages') {
-        navigate('/messages');
-      } else if (shortcutId === 'home') {
-        navigate('/');
-      } else if (shortcutId === 'payments') {
-        navigate('/payment-requests');
-      } else if (shortcutId === 'profile') {
-        navigate('/profile');
+      const targetRoute = getRouteForScreen(shortcutId);
+      if (slideOverlay?.isOverlayRoute) {
+        slideOverlay.closeWithSlideDown(targetRoute);
+      } else {
+        navigate(targetRoute);
       }
     }
   };

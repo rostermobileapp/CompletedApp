@@ -1169,7 +1169,7 @@ export default function Announcements() {
   const contextName = isTournamentContext ? currentTournament?.name : currentLeague?.name;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" data-page-content>
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
           <div className="max-w-2xl mx-auto px-4 py-4">
